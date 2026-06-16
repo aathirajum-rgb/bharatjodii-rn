@@ -1,0 +1,95 @@
+{
+  "cli": {
+    "version": ">= 16.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      }
+    },
+    "jodii-preview": {
+      "distribution": "internal",
+      "env": {
+        "APP_FLAVOR": "jodii",
+        "EXPO_PUBLIC_APP_FLAVOR": "jodii",
+        "EXPO_PUBLIC_APP_TYPE": "115"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleJodiiRelease"
+      }
+    },
+    "jodii-production": {
+      "env": {
+        "APP_FLAVOR": "jodii",
+        "EXPO_PUBLIC_APP_FLAVOR": "jodii",
+        "EXPO_PUBLIC_APP_TYPE": "115"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleJodiiRelease"
+      }
+    },
+    "tamil-preview": {
+      "distribution": "internal",
+      "env": {
+        "APP_FLAVOR": "tamil",
+        "EXPO_PUBLIC_APP_FLAVOR": "tamil",
+        "EXPO_PUBLIC_APP_TYPE": "116"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleTamilRelease"
+      }
+    },
+    "tamil-production": {
+      "env": {
+        "APP_FLAVOR": "tamil",
+        "EXPO_PUBLIC_APP_FLAVOR": "tamil",
+        "EXPO_PUBLIC_APP_TYPE": "116"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleTamilRelease"
+      }
+    },
+    "malayalam-preview": {
+      "distribution": "internal",
+      "env": {
+        "APP_FLAVOR": "malayalam",
+        "EXPO_PUBLIC_APP_FLAVOR": "malayalam",
+        "EXPO_PUBLIC_APP_TYPE": "118"
+      },
+      "android": {
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleMalayalamRelease"
+      }
+    },
+    "malayalam-production": {
+      "env": {
+        "APP_FLAVOR": "malayalam",
+        "EXPO_PUBLIC_APP_FLAVOR": "malayalam",
+        "EXPO_PUBLIC_APP_TYPE": "118"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "gradleCommand": ":app:bundleMalayalamRelease"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}

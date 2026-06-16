@@ -1,0 +1,18 @@
+node_modules/
+.expo/
+dist/
+web-build/
+
+# Generated .env (never commit this — it's copied by setup-env.js)
+.env
+
+# Firebase — real keys go here, never commit
+firebase/google-services.*.json
+firebase/GoogleService-Info.*.plist
+
+# Env files with real keys
+envs/.env.*
+
+# Android/iOS generated firebase files
+android/app/google-services.json
+ios/GoogleService-Info.plist
