@@ -4,6 +4,7 @@ const flavor = process.env.APP_FLAVOR || 'jodii';
 const f = FLAVORS[flavor] || FLAVORS.jodii;
 
 const appEnv = process.env.EXPO_PUBLIC_APP_ENV || 'dev';
+const channelSuffix = process.env.CHANNEL_SUFFIX || 'production';
 
 module.exports = ({ config }) => ({
   ...config,
@@ -11,6 +12,18 @@ module.exports = ({ config }) => ({
   slug: 'jodii',
   scheme: f.scheme,
   icon: f.icon,
+  runtimeVersion: {
+    policy: 'appVersion',
+  },
+  updates: {
+    url: 'https://stgimg.jodii.app/jodii-ota-server/jodii-ota-server/manifest.php',
+    fallbackToCacheTimeout: 0,
+    checkAutomatically: 'ON_LOAD',
+    requestHeaders: {
+      'expo-flavor': flavor,
+      'expo-channel-name': `${flavor}-${channelSuffix}`,
+    },
+  },
   android: {
     ...config.android,
     adaptiveIcon: {

@@ -21,10 +21,12 @@
     },
     "jodii-preview": {
       "distribution": "internal",
+      "channel": "jodii-preview",
       "env": {
         "APP_FLAVOR": "jodii",
         "EXPO_PUBLIC_APP_FLAVOR": "jodii",
-        "EXPO_PUBLIC_APP_TYPE": "115"
+        "EXPO_PUBLIC_APP_TYPE": "115",
+        "CHANNEL_SUFFIX": "preview"
       },
       "android": {
         "buildType": "apk",
@@ -32,10 +34,12 @@
       }
     },
     "jodii-production": {
+      "channel": "jodii-production",
       "env": {
         "APP_FLAVOR": "jodii",
         "EXPO_PUBLIC_APP_FLAVOR": "jodii",
-        "EXPO_PUBLIC_APP_TYPE": "115"
+        "EXPO_PUBLIC_APP_TYPE": "115",
+        "CHANNEL_SUFFIX": "production"
       },
       "android": {
         "buildType": "app-bundle",
@@ -44,10 +48,12 @@
     },
     "tamil-preview": {
       "distribution": "internal",
+      "channel": "tamil-preview",
       "env": {
         "APP_FLAVOR": "tamil",
         "EXPO_PUBLIC_APP_FLAVOR": "tamil",
-        "EXPO_PUBLIC_APP_TYPE": "116"
+        "EXPO_PUBLIC_APP_TYPE": "116",
+        "CHANNEL_SUFFIX": "preview"
       },
       "android": {
         "buildType": "apk",
@@ -55,10 +61,12 @@
       }
     },
     "tamil-production": {
+      "channel": "tamil-production",
       "env": {
         "APP_FLAVOR": "tamil",
         "EXPO_PUBLIC_APP_FLAVOR": "tamil",
-        "EXPO_PUBLIC_APP_TYPE": "116"
+        "EXPO_PUBLIC_APP_TYPE": "116",
+        "CHANNEL_SUFFIX": "production"
       },
       "android": {
         "buildType": "app-bundle",
@@ -67,10 +75,12 @@
     },
     "malayalam-preview": {
       "distribution": "internal",
+      "channel": "malayalam-preview",
       "env": {
         "APP_FLAVOR": "malayalam",
         "EXPO_PUBLIC_APP_FLAVOR": "malayalam",
-        "EXPO_PUBLIC_APP_TYPE": "118"
+        "EXPO_PUBLIC_APP_TYPE": "118",
+        "CHANNEL_SUFFIX": "preview"
       },
       "android": {
         "buildType": "apk",
@@ -78,10 +88,12 @@
       }
     },
     "malayalam-production": {
+      "channel": "malayalam-production",
       "env": {
         "APP_FLAVOR": "malayalam",
         "EXPO_PUBLIC_APP_FLAVOR": "malayalam",
-        "EXPO_PUBLIC_APP_TYPE": "118"
+        "EXPO_PUBLIC_APP_TYPE": "118",
+        "CHANNEL_SUFFIX": "production"
       },
       "android": {
         "buildType": "app-bundle",

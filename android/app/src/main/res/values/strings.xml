@@ -1,3 +1,4 @@
 <resources>
-  <string name="app_name">Jodii</string>
+  <string name="app_name">Tamil Jodii</string>
+  <string name="expo_runtime_version">1.0.0</string>
 </resources>

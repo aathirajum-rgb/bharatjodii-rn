@@ -87,9 +87,9 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
-    namespace 'jodii.app'
+    namespace 'jodiiapp.android.tamil'
     defaultConfig {
-        applicationId 'jodii.app'
+        applicationId 'jodiiapp.android.tamil'
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

@@ -1,4 +1,4 @@
-package jodii.app
+package jodiiapp.android.tamil
 
 import android.app.Application
 import android.content.res.Configuration

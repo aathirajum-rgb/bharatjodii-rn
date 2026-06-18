@@ -14,8 +14,10 @@
     "expo-linking": "~56.0.14",
     "expo-location": "~56.0.17",
     "expo-media-library": "~56.0.7",
+    "expo-network": "~56.0.5",
     "expo-notifications": "~56.0.17",
     "expo-status-bar": "~56.0.4",
+    "expo-updates": "~56.0.19",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.85.3",
@@ -29,8 +31,9 @@
     "eslint": "^9.39.4",
     "eslint-config-expo": "^56.0.4",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-tplugin-prettier": "^5.5.6",
+    "eslint-plugin-prettier": "^5.5.6",
     "prettier": "^3.8.4",
+    "ssh2-sftp-client": "^12.1.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
@@ -63,7 +66,10 @@
     "eas:tamil:aab": "eas build --platform android --profile tamil-production",
     "eas:malayalam:apk": "eas build --platform android --profile malayalam-preview",
     "eas:malayalam:aab": "eas build --platform android --profile malayalam-production",
-    "build:ios": "eas build --platform ios --profile production"
+    "build:ios": "eas build --platform ios --profile production",
+    "ota:production": "CHANNEL_SUFFIX=production node scripts/deploy-ota.js",
+    "ota:preview": "CHANNEL_SUFFIX=preview node scripts/deploy-ota.js",
+    "ota:server": "node ../jodii-ota-server/server.js"
   },
   "private": true
 }

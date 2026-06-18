@@ -1,8 +1,12 @@
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
+import * as Network from 'expo-network';
 import { StatusBar } from 'expo-status-bar';
-import { Image, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Image, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useOTAInfo, useOTAStatus, useOTAUpdate } from './hooks/useOTAUpdate';
 import GalleryScreen from './screens/GalleryScreen';
 import PermissionDemoScreen from './screens/PermissionDemoScreen';
 
@@ -34,17 +38,18 @@ const FLAVOR_INFO: Record<FlavorKey, { welcome: string; logo: ReturnType<typeof 
   },
 };
 
-const appFlavor = (process.env.EXPO_PUBLIC_APP_FLAVOR || 'jodii') as FlavorKey;
-const appType = process.env.EXPO_PUBLIC_APP_TYPE || '115';
+const appFlavor = (Constants.expoConfig?.extra?.appFlavor ?? process.env.EXPO_PUBLIC_APP_FLAVOR ?? 'jodii') as FlavorKey;
+const appType = Constants.expoConfig?.extra?.appType ?? process.env.EXPO_PUBLIC_APP_TYPE ?? '115';
 const info = FLAVOR_INFO[appFlavor] ?? FLAVOR_INFO.jodii;
 
+function getLinkingPrefixes() {
+  const base = ['https://jodii.app', 'https://tamil.jodii.app', 'https://malayalam.jodii.app'];
+  try { base.unshift(Linking.createURL('/')); } catch {}
+  return base;
+}
+
 const linking = {
-  prefixes: [
-    Linking.createURL('/'),
-    'https://jodii.app',
-    'https://tamil.jodii.app',
-    'https://malayalam.jodii.app',
-  ],
+  prefixes: getLinkingPrefixes(),
   config: {
     screens: {
       Home: 'home',
@@ -55,6 +60,10 @@ const linking = {
 };
 
 function HomeScreen({ navigation }: { navigation: any }) {
+  const [ipAddress, setIpAddress] = useState<string | null>(null);
+  const otaInfo = useOTAInfo();
+  const otaStatus = useOTAStatus();
+
   const handleShare = async () => {
     const url = `${info.domain}/home`;
     await Share.share({
@@ -63,39 +72,66 @@ function HomeScreen({ navigation }: { navigation: any }) {
     });
   };
 
+  const handleGetIp = async () => {
+    try {
+      const ip = await Network.getIpAddressAsync();
+      setIpAddress(ip);
+      Alert.alert('Device IP Address', ip);
+    } catch {
+      Alert.alert('Error', 'Could not retrieve IP address');
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Image source={info.logo} style={styles.logo} resizeMode="contain" />
-      <Text style={styles.welcome}>{info.welcome}</Text>
-      <Text style={styles.appType}>App Type: {appType}</Text>
+
+      <View style={[styles.badge, otaStatus === 'EMBEDDED' ? { backgroundColor: '#FF3B30' } : { backgroundColor: '#30D158' }]}>
+        <Text style={styles.badgeText}>{otaStatus === 'EMBEDDED' ? '⚠️ EMBEDDED' : `✅ OTA LIVE — ${otaStatus}`}</Text>
+      </View>
+
+      <Text style={[styles.welcome, { color: '#ffffff' }]}>{info.welcome}</Text>
+      <Text style={[styles.appType, { color: '#cce5ff' }]}>App Type: {appType}</Text>
+      <Text style={[styles.appType, { color: '#a8d8ff', fontSize: 11 }]}>{otaInfo}</Text>
 
       <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.navigate('Permissions')}
+        style={[styles.button, { backgroundColor: '#6200EA' }]}
+        onPress={() => Alert.alert('OTA Works!', 'Red theme live via OTA!\nNo app store needed!')}
       >
-        <Text style={styles.buttonText}>Manage Permissions</Text>
+        <Text style={styles.buttonText}>OTA Red Update</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.button, { backgroundColor: '#34C759' }]}
+        style={[styles.button, { backgroundColor: '#30D158' }]}
         onPress={() => navigation.navigate('Gallery')}
       >
         <Text style={styles.buttonText}>Open Gallery</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.button, { backgroundColor: '#FF9500' }]}
+        style={[styles.button, { backgroundColor: '#FF9F0A' }]}
         onPress={handleShare}
       >
         <Text style={styles.buttonText}>Share App</Text>
       </TouchableOpacity>
 
-      <StatusBar style="auto" />
+      <TouchableOpacity
+        style={[styles.button, { backgroundColor: '#BF5AF2' }]}
+        onPress={handleGetIp}
+      >
+        <Text style={styles.buttonText}>Get Device IP</Text>
+      </TouchableOpacity>
+
+      {ipAddress ? <Text style={[styles.appType, { color: '#a8d8ff' }]}>IP: {ipAddress}</Text> : null}
+
+      <StatusBar style="light" />
     </View>
   );
 }
 
 export default function App() {
+  useOTAUpdate();
+
   return (
     <NavigationContainer linking={linking}>
       <Stack.Navigator>
@@ -110,6 +146,7 @@ export default function App() {
           component={GalleryScreen}
           options={{ title: 'Gallery', headerStyle: { backgroundColor: '#111' }, headerTintColor: '#fff' }}
         />
+        
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -118,7 +155,7 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#D32F2F',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 16,
@@ -148,5 +185,16 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  badge: {
+    backgroundColor: '#FFD700',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  badgeText: {
+    color: '#000',
+    fontSize: 14,
+    fontWeight: '700',
   },
 });
