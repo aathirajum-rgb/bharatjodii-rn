@@ -25,16 +25,10 @@ copyIfExists(
   path.join(ROOT, 'android', 'app', 'google-services.json')
 );
 
-// Copy firebase config for iOS (GoogleService-Info.plist)
+// Copy firebase config for iOS
 copyIfExists(
   path.join(ROOT, 'firebase', `GoogleService-Info.${env}.plist`),
   path.join(ROOT, 'ios', 'GoogleService-Info.plist')
-);
-
-// Copy env file to .env (Expo picks this up automatically)
-copyIfExists(
-  path.join(ROOT, 'envs', `.env.${env}`),
-  path.join(ROOT, '.env')
 );
 
 console.log(`\nEnvironment set to: ${env}`);

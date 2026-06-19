@@ -1,0 +1,236 @@
+import axios, { AxiosRequestConfig } from 'axios'
+import { getItem, setItem, getMultiple, setMultiple, removeMultiple } from './storageService'
+import { StorageKeys } from '../constants/storage.keys'
+import { AUTH_ONLY_ENDPOINTS, MEDIA_ENDPOINTS } from './api.endpoints'
+
+// ─────────────────────────────────────────────────────────────
+//  AXIOS INSTANCE
+// ─────────────────────────────────────────────────────────────
+
+const client = axios.create({
+  headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+  timeout: 30000,
+})
+
+// ─────────────────────────────────────────────────────────────
+//  BUILD COMMON PARAMS
+//  Angular appended APPTYPE, LANG, ATN, RTN to every request.
+//  Extracted into one place instead of 3 duplicate blocks.
+// ─────────────────────────────────────────────────────────────
+
+async function buildCommonParams(url: string): Promise<string> {
+  const [appType, lang, atn, rtn] = await Promise.all([
+    getItem(StorageKeys.Auth.APP_TYPE),
+    getItem(StorageKeys.Auth.LANG),
+    getItem(StorageKeys.Auth.TOKEN),
+    getItem(StorageKeys.Auth.REFRESH_TOKEN),
+  ])
+
+  const type  = appType ?? '115'
+  const l     = lang    ?? 'en'
+  const token = atn     ?? ''
+  const rToken= rtn     ?? ''
+
+  const isAuthOnly = AUTH_ONLY_ENDPOINTS.includes(url)
+  const isRegInsert = url.includes('registration/insert')
+
+  if (isRegInsert) return `&APPTYPE=${type}`
+  if (isAuthOnly)  return `&APPTYPE=${type}&LANG=${l}`
+  return `&APPTYPE=${type}&LANG=${l}&ATN=${token}&RTN=${rToken}`
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ERRCODE HANDLER
+//  Angular had this same block copy-pasted in POST, GET, upload.
+//  Now lives in exactly one place.
+// ─────────────────────────────────────────────────────────────
+
+type ApiResult = Record<string, any>
+
+async function handleErrCode(
+  errCode: number | string,
+  newRtn: string | undefined,
+  moduleName: string,
+  retry: () => Promise<ApiResult>,
+): Promise<ApiResult | null> {
+
+  const code = Number(errCode)
+
+  if (code === 22 || code === 61) {
+    // Token soft-expired — server sends new RTN, retry once
+    if (newRtn) await setItem(StorageKeys.Auth.REFRESH_TOKEN, newRtn)
+    return retry()
+  }
+
+  if (code === 23) {
+    // Both tokens invalid — force logout
+    const userId = await getItem(StorageKeys.Auth.USER_ID)
+    console.warn(`[apiClient] Token expired (ERRCODE 23) — user ${userId} — ${moduleName}`)
+    await clearSession()
+    return null
+  }
+
+  return null
+}
+
+// ─────────────────────────────────────────────────────────────
+//  ERROR RESPONSE SHAPE
+// ─────────────────────────────────────────────────────────────
+
+function errorResponse(moduleName: string): ApiResult {
+  return {
+    ERRCODE: '2',
+    RESPONSECODE: '500',
+    modulename: moduleName,
+    message: 'No internet or server error. Please try again.',
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  API CALL  (POST / GET)
+// ─────────────────────────────────────────────────────────────
+
+export async function apiCall(
+  url: string,
+  method: 'POST' | 'GET',
+  params: string,
+  _retrying = false,
+): Promise<ApiResult> {
+  try {
+    const common    = await buildCommonParams(url)
+    const fullParams = params + common
+
+    const userId = await getItem(StorageKeys.Auth.USER_ID)
+    const isMedia = MEDIA_ENDPOINTS.includes(url)
+
+    let reqUrl = url
+    if (method === 'POST' && userId && !isMedia) {
+      reqUrl = `${url}?ID=${userId}`
+    }
+
+    const config: AxiosRequestConfig = {
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+    }
+
+    const res: ApiResult = method === 'POST'
+      ? (await client.post(reqUrl, fullParams, config)).data
+      : (await client.get(`${reqUrl}?${fullParams}`, config)).data
+
+    if (!res) return errorResponse(url)
+
+    const errCode = res['ERRCODE']
+    if (errCode === 22 || errCode === 61 || errCode === 23) {
+      if (_retrying) return errorResponse(url) // prevent infinite retry
+      const result = await handleErrCode(errCode, res['RTN'], url, () =>
+        apiCall(url, method, params, true),
+      )
+      return result ?? res
+    }
+
+    return res
+  } catch {
+    return errorResponse(url)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  UPLOAD FILE  (multipart/form-data)
+// ─────────────────────────────────────────────────────────────
+
+export async function uploadFile(
+  url: string,
+  formData: FormData,
+  _retrying = false,
+): Promise<ApiResult> {
+  try {
+    const [atn, rtn, appType, lang] = await Promise.all([
+      getItem(StorageKeys.Auth.TOKEN),
+      getItem(StorageKeys.Auth.REFRESH_TOKEN),
+      getItem(StorageKeys.Auth.APP_TYPE),
+      getItem(StorageKeys.Auth.LANG),
+    ])
+
+    formData.append('ATN',      atn      ?? '')
+    formData.append('RTN',      rtn      ?? '')
+    formData.append('APPTYPE',  appType  ?? '115')
+    formData.append('LANG',     lang     ?? 'en')
+    formData.append('OUTPUTTYPE', '1')
+
+    const res: ApiResult = (await client.post(url, formData)).data
+
+    if (!res) return errorResponse(url)
+
+    const errCode = res['ERRCODE']
+    if (errCode === 22 || errCode === 61 || errCode === 23) {
+      if (_retrying) return errorResponse(url)
+      const result = await handleErrCode(errCode, res['RTN'], url, () =>
+        uploadFile(url, formData, true),
+      )
+      return result ?? res
+    }
+
+    return res
+  } catch {
+    return errorResponse(url)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  SESSION CLEAR  (logout)
+//  Preserves non-user keys so app settings survive logout.
+//  Angular's deleteAllLocalStorage() — cleaned up here.
+// ─────────────────────────────────────────────────────────────
+
+const PRESERVE_KEYS = [
+  'SEARCHLOGINCOUNT',
+  'SHOWAPPRATINGDATE',
+  'SHOWAPPRATINGCOUNT',
+  StorageKeys.App.UPI_APPS,
+  StorageKeys.App.APP_VERSION,
+  StorageKeys.Auth.APP_TYPE,
+  'LANG_SELECTED',
+  StorageKeys.Auth.LANG,
+  'MOBILENO',
+  StorageKeys.User.MEMBER_CODE,
+  StorageKeys.Auth.WEB_LOGIN,
+] as const
+
+export async function clearSession(): Promise<void> {
+  const preserved = await getMultiple([...PRESERVE_KEYS])
+  const entries: Record<string, string> = {}
+
+  for (const key of PRESERVE_KEYS) {
+    if (preserved[key] != null) entries[key] = preserved[key] as string
+  }
+
+  // Remove known user session keys instead of wiping everything
+  await removeMultiple([
+    StorageKeys.Auth.TOKEN,
+    StorageKeys.Auth.REFRESH_TOKEN,
+    StorageKeys.Auth.USER_ID,
+    StorageKeys.User.NAME,
+    StorageKeys.User.GENDER,
+    StorageKeys.User.PHOTO_URL,
+    StorageKeys.User.MEMBERSHIP_TYPE,
+    StorageKeys.Auth.LOGIN_GENDER,
+  ])
+
+  if (Object.keys(entries).length > 0) {
+    await setMultiple(entries)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
+//  FETCH USER IP  (used for token generation)
+// ─────────────────────────────────────────────────────────────
+
+export async function fetchUserIp(): Promise<string | null> {
+  try {
+    const res = await client.get('https://api.ipify.org/?format=json')
+    const ip: string = res.data?.ip ?? null
+    if (ip) await setItem('USERIP', ip)
+    return ip
+  } catch {
+    return null
+  }
+}

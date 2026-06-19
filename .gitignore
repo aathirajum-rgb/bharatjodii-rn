@@ -10,8 +10,9 @@ web-build/
 firebase/google-services.*.json
 firebase/GoogleService-Info.*.plist
 
-# Env files with real keys
+# Env files with real keys — ignore all except the template
 envs/.env.*
+!envs/.env.template
 
 # Android/iOS generated firebase files
 android/app/google-services.json

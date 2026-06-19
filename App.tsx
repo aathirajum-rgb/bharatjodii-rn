@@ -4,16 +4,22 @@ import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
 import * as Network from 'expo-network';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
-import { Alert, Image, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Image, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useOTAInfo, useOTAStatus, useOTAUpdate } from './hooks/useOTAUpdate';
 import GalleryScreen from './screens/GalleryScreen';
 import PermissionDemoScreen from './screens/PermissionDemoScreen';
+import PaymentSuccessScreen from './screens/payment/PaymentSuccessScreen';
+import RechargeScreen from './screens/payment/RechargeScreen';
+import { setupNotificationHandlers } from './service/notificationService';
+import { navigationRef } from './utils/navigationRef';
 
 type RootStackParamList = {
-  Home: undefined;
-  Permissions: undefined;
-  Gallery: undefined;
+  Home:              undefined;
+  Permissions:       undefined;
+  Gallery:           undefined;
+  recharge:          { from?: string; paymentId?: string; type?: string } | undefined;
+  'payment-success': undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -83,7 +89,7 @@ function HomeScreen({ navigation }: { navigation: any }) {
   };
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
       <Image source={info.logo} style={styles.logo} resizeMode="contain" />
 
       <View style={[styles.badge, otaStatus === 'EMBEDDED' ? { backgroundColor: '#FF3B30' } : { backgroundColor: '#30D158' }]}>
@@ -122,18 +128,30 @@ function HomeScreen({ navigation }: { navigation: any }) {
         <Text style={styles.buttonText}>Get Device IP</Text>
       </TouchableOpacity>
 
+      <TouchableOpacity
+        style={[styles.button, { backgroundColor: '#C62828' }]}
+        onPress={() => navigation.navigate('recharge')}
+      >
+        <Text style={styles.buttonText}>💳 Payment</Text>
+      </TouchableOpacity>
+
       {ipAddress ? <Text style={[styles.appType, { color: '#a8d8ff' }]}>IP: {ipAddress}</Text> : null}
 
       <StatusBar style="light" />
-    </View>
+    </ScrollView>
   );
 }
 
 export default function App() {
   useOTAUpdate();
 
+  useEffect(() => {
+    const cleanup = setupNotificationHandlers()
+    return cleanup
+  }, [])
+
   return (
-    <NavigationContainer linking={linking}>
+    <NavigationContainer ref={navigationRef} linking={linking}>
       <Stack.Navigator>
         <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
         <Stack.Screen
@@ -146,7 +164,16 @@ export default function App() {
           component={GalleryScreen}
           options={{ title: 'Gallery', headerStyle: { backgroundColor: '#111' }, headerTintColor: '#fff' }}
         />
-        
+        <Stack.Screen
+          name="recharge"
+          component={RechargeScreen}
+          options={{ title: 'Membership Plans', headerStyle: { backgroundColor: '#C62828' }, headerTintColor: '#fff' }}
+        />
+        <Stack.Screen
+          name="payment-success"
+          component={PaymentSuccessScreen}
+          options={{ headerShown: false }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );

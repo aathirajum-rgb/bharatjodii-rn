@@ -3,14 +3,14 @@
 export const StorageKeys = {
 
   Auth: {
-    TOKEN: 'ATN',            // access token
-    REFRESH_TOKEN: 'RTN',    // refresh token
-    USER_ID: 'NBID',         // logged-in user ID
-    LOGIN_COUNT: 'LOGINCOUNT',
-    WEB_LOGIN: 'WEBLOGIN',
-    APP_TYPE: 'APPTYPE',
-    ENTRY_TYPE: 'ENTRYTYPE',
-    LANG: 'LANG',
+    TOKEN:         'ATN',          // access token
+    REFRESH_TOKEN: 'RTN',          // refresh token
+    USER_ID:       'NBID',         // logged-in user ID
+    LOGIN_COUNT:   'LOGINCOUNT',
+    WEB_LOGIN:     'WEBLOGIN',
+    APP_TYPE:      'APPTYPE',
+    ENTRY_TYPE:    'ENTRYTYPE',
+    LANG:          'LANG',
   },
 
   User: {

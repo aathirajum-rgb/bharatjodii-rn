@@ -46,4 +46,20 @@ export enum ENavigation {
   PRELAUNCH_WELCOME = 'prelaunch-welcome',
   MEMBERSHIP_DETAILS = 'membership-details',
   PAYMENT_OPTIONS = 'payment-options',
+
+  // ─── Jodii-specific screens ──────────────────────────────────────────────
+  DAILY_RECOMMENDATIONS  = 'daily-recommendations',
+  ONBOARDING             = 'onboarding',
+  EDIT_FORM              = 'editform',
+  CHAT_WINDOW            = 'chat-window',
+  VERIFY_ID              = 'verify-id',
+  HOROSCOPE              = 'horoscope',
+  RECHARGE               = 'recharge',
+  RENEWAL                = 'renewal',
+  MY_MEMBERSHIP          = 'my-membership',
+  PAYMENT                = 'payment',
+  PAYMENT_SUCCESS        = 'payment-success',
+  ADD_PHOTO_INTERMEDIATE = 'addphoto-intermediate',
+  ADD_PHOTO_PUBLISH      = 'addphoto-publish',
+  PHOTO_REJECTION        = 'photo-rejection',
 }

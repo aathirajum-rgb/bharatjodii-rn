@@ -7,7 +7,7 @@
     <key>CFBundleDevelopmentRegion</key>
     <string>$(DEVELOPMENT_LANGUAGE)</string>
     <key>CFBundleDisplayName</key>
-    <string>Tamil Jodii</string>
+    <string>Jodii</string>
     <key>CFBundleExecutable</key>
     <string>$(EXECUTABLE_NAME)</string>
     <key>CFBundleIdentifier</key>
@@ -27,8 +27,8 @@
       <dict>
         <key>CFBundleURLSchemes</key>
         <array>
-          <string>tamilmatrimony</string>
-          <string>jodiiapp.android.tamil</string>
+          <string>jodii</string>
+          <string>jodii.app</string>
         </array>
       </dict>
     </array>

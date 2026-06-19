@@ -1,0 +1,223 @@
+// Communication service — central profile-action dispatcher.
+// Migrated from Angular communication.service.ts (827 lines).
+// Angular showed Ionic modals directly; in RN this service returns ActionResult
+// descriptors and components render the appropriate UI.
+
+import { apiCall } from './apiClient'
+import { Endpoints } from './api.endpoints'
+import { getItem, getJson } from './storageService'
+import { StorageKeys as SK } from '../constants/storage.keys'
+import { navigate } from '../utils/navigationRef'
+import { ENavigation } from '../types/enums/navigation.enum'
+import { resolveFemaleFreeAction } from './femaleFreeService'
+import { redirectToIntermediatePage } from './paymentService'
+
+// ─── Result types ─────────────────────────────────────────────────────────────
+// Components switch on `type` to show the correct modal / sheet / alert.
+
+export type CommActionResult =
+  | { type: 'api_success';       data: any; action: string }
+  | { type: 'show_contact';      contact: string; whatsapp: boolean }
+  | { type: 'payment_promo';     action: string; profile: any }
+  | { type: 'verify_id';         fromPage: string; action: string }
+  | { type: 'female_free';       action: string; profile: any }
+  | { type: 'chat_limit';        limitType: string }
+  | { type: 'report_popup';      partnerId: string; profile: any }
+  | { type: 'view_later_done' }
+  | { type: 'skip_done' }
+  | { type: 'error';             message: string }
+
+export type CommunicationAction =
+  | 'like' | 'dislike' | 'skip' | 'dontshow'
+  | 'call' | 'whatsapp' | 'whatsappNudge'
+  | 'jodimessages' | 'paynow' | 'viewlater'
+  | 'reportprofile'
+
+// ─── Main entry ───────────────────────────────────────────────────────────────
+
+export async function communicationBtnOnClick(
+  fromPage: string,
+  action: CommunicationAction,
+  oppProfile: any,
+): Promise<CommActionResult> {
+  const partnerId = String(oppProfile?.MATRIID ?? oppProfile?.PARTNERID ?? '')
+
+  switch (action) {
+    case 'like':
+    case 'dislike':
+      return callHttpAction(action, 'POST', `ID=${await userId()}&PARTNERID=${partnerId}&TYPE=${action}`, action)
+
+    case 'skip':
+    case 'dontshow':
+      return dontShowSection(partnerId, oppProfile, fromPage)
+
+    case 'call':
+    case 'whatsapp':
+    case 'whatsappNudge':
+      return showCallOrWhatsApp(fromPage, action, oppProfile)
+
+    case 'jodimessages':
+      return handleChat(fromPage, oppProfile)
+
+    case 'viewlater':
+      return callViewLater(partnerId, oppProfile, fromPage)
+
+    case 'paynow':
+      await redirectToIntermediatePage(fromPage)
+      return { type: 'api_success', data: null, action: 'paynow' }
+
+    case 'reportprofile':
+      return { type: 'report_popup', partnerId, profile: oppProfile }
+
+    default:
+      return { type: 'error', message: `Unknown action: ${action}` }
+  }
+}
+
+// ─── Call / WhatsApp / WhatsApp nudge ─────────────────────────────────────────
+
+async function showCallOrWhatsApp(
+  fromPage: string,
+  action: string,
+  oppProfile: any,
+): Promise<CommActionResult> {
+  const [entryType, ekycStatus, femaleFreeRaw, ppSetRaw] = await Promise.all([
+    getItem(SK.Auth.ENTRY_TYPE),
+    getItem('PI_EKYCSTATUS'),
+    getItem(SK.Promotions.FEMALE_FREE_CONTACT),
+    getJson<Record<string, any>>(SK.App.PP_SET_DATA),
+  ])
+
+  const photoStatus: string = (ppSetRaw as any)?.PI_PHOTOSTATUS ?? 'N'
+
+  // Female free 3-contact promo
+  if (entryType !== 'P' && femaleFreeRaw) {
+    const femaleFreeData = JSON.parse(femaleFreeRaw)
+    if (femaleFreeData.FEMALEFREECONACT === '1') {
+      const femaleFreeAction = await resolveFemaleFreeAction(photoStatus, ekycStatus ?? '0')
+      if (femaleFreeAction) {
+        return { type: 'female_free', action: femaleFreeAction, profile: oppProfile }
+      }
+      // Eligible — show contact for free
+      return showContactDetails(oppProfile, action === 'whatsapp' || action === 'whatsappNudge')
+    }
+  }
+
+  // Non-ID verified user
+  if (ekycStatus !== '1') {
+    return { type: 'verify_id', fromPage, action }
+  }
+
+  // Free user → payment promo
+  if (entryType !== 'P') {
+    return { type: 'payment_promo', action, profile: oppProfile }
+  }
+
+  // Paid + verified → show contact
+  return showContactDetails(oppProfile, action === 'whatsapp' || action === 'whatsappNudge')
+}
+
+async function showContactDetails(
+  oppProfile: any,
+  isWhatsapp: boolean,
+): Promise<CommActionResult> {
+  const loginId   = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const partnerId = String(oppProfile?.MATRIID ?? '')
+  const params    = `ID=${loginId}&PARTNERID=${partnerId}&TYPE=viewcontact`
+  const result    = await apiCall(Endpoints.communication.viewContact, 'POST', params)
+
+  if (result?.RESPONSECODE === '1' && result?.ERRCODE === '0') {
+    const contact = result.RESPONSE?.CONTACTNUMBER ?? ''
+    return { type: 'show_contact', contact, whatsapp: isWhatsapp }
+  }
+  return { type: 'error', message: 'Could not fetch contact' }
+}
+
+// ─── Chat ─────────────────────────────────────────────────────────────────────
+
+async function handleChat(fromPage: string, oppProfile: any): Promise<CommActionResult> {
+  const [entryType, ekycStatus, ppSetRaw] = await Promise.all([
+    getItem(SK.Auth.ENTRY_TYPE),
+    getItem('PI_EKYCSTATUS'),
+    getJson<Record<string, any>>(SK.App.PP_SET_DATA),
+  ])
+
+  const photoStatus: string = (ppSetRaw as any)?.PI_PHOTOSTATUS ?? 'N'
+
+  // Photo check for female users
+  if (photoStatus === 'N') {
+    return { type: 'female_free', action: 'femaleFree-PhotoAdd', profile: oppProfile }
+  }
+
+  if (ekycStatus !== '1') {
+    return { type: 'verify_id', fromPage, action: 'jodimessages' }
+  }
+
+  if (entryType !== 'P') {
+    return { type: 'payment_promo', action: 'jodimessages', profile: oppProfile }
+  }
+
+  navigate(ENavigation.CHAT_WINDOW, {
+    partnerId: String(oppProfile?.MATRIID ?? ''),
+    partnerName: oppProfile?.FIRSTNAME ?? '',
+    partnerPhoto: oppProfile?.PHOTOTHUMB ?? '',
+  })
+
+  return { type: 'api_success', data: null, action: 'jodimessages' }
+}
+
+// ─── Skip / Don't show ───────────────────────────────────────────────────────
+
+async function dontShowSection(
+  partnerId: string,
+  _oppProfile: any,
+  _fromPage: string,
+): Promise<CommActionResult> {
+  const loginId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const params  = `ID=${loginId}&PARTNERID=${partnerId}&TYPE=skip`
+  const result  = await apiCall(Endpoints.communication.skipProfile, 'POST', params)
+
+  if (result?.RESPONSECODE === '1' && result?.ERRCODE === '0') {
+    return { type: 'skip_done' }
+  }
+  return { type: 'error', message: 'Skip failed' }
+}
+
+// ─── View later ───────────────────────────────────────────────────────────────
+
+async function callViewLater(
+  partnerId: string,
+  _oppProfile: any,
+  _fromPage: string,
+): Promise<CommActionResult> {
+  const loginId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const params  = `ID=${loginId}&PARTNERID=${partnerId}&TYPE=viewlater`
+  const result  = await apiCall(Endpoints.communication.viewLater, 'POST', params)
+
+  if (result?.RESPONSECODE === '1') {
+    return { type: 'view_later_done' }
+  }
+  return { type: 'error', message: 'View later failed' }
+}
+
+// ─── Generic HTTP action ──────────────────────────────────────────────────────
+
+async function callHttpAction(
+  endpoint: string,
+  method: 'POST' | 'GET',
+  params: string,
+  action: string,
+): Promise<CommActionResult> {
+  const url = (Endpoints.communication as Record<string, string>)[endpoint] ?? endpoint
+  const result = await apiCall(url, method, params)
+  if (result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1) {
+    return { type: 'api_success', data: result.RESPONSE, action }
+  }
+  return { type: 'error', message: result?.ERRORMESSAGE ?? 'Action failed' }
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function userId(): Promise<string> {
+  return (await getItem(SK.Auth.USER_ID)) ?? ''
+}
