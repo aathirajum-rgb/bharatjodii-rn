@@ -1,7 +1,3 @@
-import {
-  getRecordingPermissionsAsync,
-  requestRecordingPermissionsAsync,
-} from 'expo-audio';
 import { Camera } from 'expo-camera';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Location from 'expo-location';
@@ -129,17 +125,14 @@ export async function requestStoragePermission(): Promise<PermissionResult> {
 
 /** Microphone / audio recording permission. iOS & Android. */
 export async function requestMicrophonePermission(): Promise<PermissionResult> {
-  const { granted: existing } = await getRecordingPermissionsAsync();
+  const { granted: existing } = await Camera.getMicrophonePermissionsAsync();
 
   if (existing) return 'granted';
 
-  const { granted, canAskAgain, status } = await requestRecordingPermissionsAsync();
+  const { granted, canAskAgain, status } = await Camera.requestMicrophonePermissionsAsync();
 
   if (granted) return 'granted';
 
-  // Only show "Open Settings" if the user explicitly denied before (status=denied).
-  // canAskAgain=false with status=undetermined means RECORD_AUDIO is missing
-  // from the native manifest — needs npx expo run:android to take effect.
   if (!canAskAgain && status === 'denied') {
     showBlockedAlert('Microphone');
     return 'blocked';
