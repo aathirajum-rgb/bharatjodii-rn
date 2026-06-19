@@ -1,0 +1,42 @@
+// Registration form state — mirrors the API payload for user registration
+export interface IRegistrationValues {
+  CREATEDBY: string
+  GENDER: string
+  NAME: string
+  MARITALSTATUS: string
+  YEAR: string
+  MONTH: string
+  DATE: string
+  AGE: string
+  HEIGHT: string
+  STATE: string
+  CITY: string
+  QUALIFICATION: string
+  OCCUPATION: string
+  MOBILENO?: string
+  RELIGION: string
+  CASTE: string
+  SUBCASTE: string
+  HOROSTATE: string
+  HOROCITY: string
+  MOTHERTONGUE: string
+  INCOME: string
+  NRISTATE: string
+  NRICOUNTRY: string
+  NATIVECOUNTRY: string
+  NATIVECITY: string
+  NATIVESTATE: string
+  COUNTRY?: string
+  COUNTRYCODE?: string
+  INCOMETYPE: string
+  HOMESTATE: string
+  HOMECITY: string
+  HEIGHTCATEGORY: string
+  PHONEVEIRFY?: string
+  EATINGHABITS?: string
+  PHYSICALSTATUS?: string
+  NOOFCHILD?: string
+  INCOMECURRENCY: string
+  GOTHRA: string
+  HOMETOWN: boolean
+}
