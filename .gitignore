@@ -6,6 +6,9 @@ web-build/
 # Generated .env (never commit this — it's copied by setup-env.js)
 .env
 
+# OTA deployment config — contains real SFTP credentials, never commit
+.env.ota
+
 # Firebase — real keys go here, never commit
 firebase/google-services.*.json
 firebase/GoogleService-Info.*.plist
