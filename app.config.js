@@ -79,5 +79,5 @@ module.exports = ({ config }) => ({
     appEnv,
     welcomeText: f.welcomeText,
   },
-  plugins: ['./plugins/withAndroidFlavors', 'expo-image'],
+  plugins: ['./plugins/withAndroidFlavors', 'expo-image', 'expo-splash-screen'],
 });

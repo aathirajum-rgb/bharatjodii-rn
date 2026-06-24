@@ -3,18 +3,26 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import Constants from 'expo-constants';
 import * as Linking from 'expo-linking';
 import * as Network from 'expo-network';
+import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { Alert, Image, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useOTAInfo, useOTAStatus, useOTAUpdate } from './hooks/useOTAUpdate';
 import GalleryScreen from './screens/GalleryScreen';
+import LanguageSelectionScreen from './screens/LanguageSelectionScreen';
 import PermissionDemoScreen from './screens/PermissionDemoScreen';
+import SplashAnimationScreen from './screens/SplashAnimationScreen';
 import PaymentSuccessScreen from './screens/payment/PaymentSuccessScreen';
 import RechargeScreen from './screens/payment/RechargeScreen';
 import { setupNotificationHandlers } from './service/notificationService';
 import { navigationRef } from './utils/navigationRef';
 
+// Keep native splash visible until SplashAnimationScreen mounts and calls hideAsync()
+SplashScreen.preventAutoHideAsync();
+
 type RootStackParamList = {
+  Splash:            undefined;
+  LanguageSelection: undefined;
   Home:              undefined;
   Permissions:       undefined;
   Gallery:           undefined;
@@ -146,28 +154,41 @@ export default function App() {
   useOTAUpdate();
 
   useEffect(() => {
-    const cleanup = setupNotificationHandlers()
-    return cleanup
-  }, [])
+    const cleanup = setupNotificationHandlers();
+    return cleanup;
+  }, []);
 
   return (
     <NavigationContainer ref={navigationRef} linking={linking}>
-      <Stack.Navigator>
-        <Stack.Screen name="Home" component={HomeScreen} options={{ headerShown: false }} />
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="Splash" options={{ animation: 'none' }}>
+          {({ navigation }) => (
+            <SplashAnimationScreen onFinish={() => navigation.replace('LanguageSelection')} />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen name="LanguageSelection" options={{ animation: 'none' }}>
+          {({ navigation }) => (
+            <LanguageSelectionScreen onSelect={() => navigation.replace('Home')} />
+          )}
+        </Stack.Screen>
+
+        <Stack.Screen name="Home" component={HomeScreen} />
+
         <Stack.Screen
           name="Permissions"
           component={PermissionDemoScreen}
-          options={{ title: 'Permissions' }}
+          options={{ headerShown: true, title: 'Permissions' }}
         />
         <Stack.Screen
           name="Gallery"
           component={GalleryScreen}
-          options={{ title: 'Gallery', headerStyle: { backgroundColor: '#111' }, headerTintColor: '#fff' }}
+          options={{ headerShown: true, title: 'Gallery', headerStyle: { backgroundColor: '#111' }, headerTintColor: '#fff' }}
         />
         <Stack.Screen
           name="recharge"
           component={RechargeScreen}
-          options={{ title: 'Membership Plans', headerStyle: { backgroundColor: '#C62828' }, headerTintColor: '#fff' }}
+          options={{ headerShown: true, title: 'Membership Plans', headerStyle: { backgroundColor: '#C62828' }, headerTintColor: '#fff' }}
         />
         <Stack.Screen
           name="payment-success"
