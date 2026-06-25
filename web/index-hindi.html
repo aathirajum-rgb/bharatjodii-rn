@@ -1,0 +1,960 @@
+<!DOCTYPE html>
+<html lang="hi">
+
+<head>
+    <style>html { visibility: hidden; }</style>
+    <script>
+      // Skip redirect when opened as a local file
+      if (location.protocol !== 'file:') {
+        var _ua = navigator.userAgent || '';
+        var _mobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(_ua)
+                      || window.innerWidth < 768;
+        if (_mobile) {
+          document.documentElement.style.visibility = 'visible';
+          location.replace('/app/');
+        } else {
+          document.documentElement.style.visibility = 'visible';
+        }
+      } else {
+        document.documentElement.style.visibility = 'visible';
+      }
+      // Polyfill for window.crypto.randomUUID (unavailable on HTTP non-secure contexts)
+      if (typeof window.crypto === 'undefined') window.crypto = {};
+      if (typeof window.crypto.randomUUID !== 'function') {
+        window.crypto.randomUUID = function() {
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0;
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+          });
+        };
+      }
+    </script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1, minimum-scale=1.0, maximum-scale=1.0, user-scalable=0" />
+    <meta name="format-detection" content="telephone=no">
+    <meta name="description"
+        content="Looking for your Jodi? Download Jodii App - Best Thirumana & Jathagam porutham app in Tamil. Register on Jodii marriage porutham app and start searching for your Jodi." />
+    <meta name="keywords"
+        content="jodii app, jodi app, download jodii app, best thirumana porutham app in tamil, jathaka porutham in tamil app, marriage porutham app, kalyana porutham app, tamil jathagam porutham app, marriage matching app in tamil, porutham app, thirumana porutham app, thirumana porutham tamil app, jathagam porutham app, download jodii app, best thirumana porutham app in tamil, Jathagam Porutham, rasi porutham app, kalyana, marriage" />
+    <meta name="author" content="" />
+    <title>Download Jodii App - A Vernacular Marriage App for Common People</title>
+    <link rel="canonical" href="https://www.jodii.com/">
+    <link rel="icon" type="image/x-icon" href="assets/img/jodii-logo-hindi.png" />
+    <!-- Google fonts-->
+     <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-8PNH1ZM725');
+    </script>
+    <!-- Google Tag Manager -->
+    <script>
+        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+        })(window,document,'script','dataLayer','GTM-KB9JPFMH');
+    </script>
+    <!-- End Google Tag Manager -->
+
+    <!-- Bootstrap -->
+    <link href="css/bootstrap.min.css?id=12334634" rel="stylesheet" />
+    <link href="css/swiper-bundle.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/jodii-styles.css?v=1778889600000">
+
+    <link rel="manifest" href="https://stgimg.jodii.app/pwa/manifest.json">
+    <link rel="apple-touch-icon" href="./assets/images/jodii-logo.svg">
+    <script src="js/config.js"></script>
+    <script src="https://unpkg.com/@lottiefiles/lottie-player@latest/dist/lottie-player.js"></script>
+</head>
+
+<body class="hi hindi">
+    <!-- Google Tag Manager (noscript) -->
+<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-KB9JPFMH"
+height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+<!-- End Google Tag Manager (noscript) -->
+
+    <!-- DESKTOP HEADER -->
+    <header class="lang-header d-none d-md-flex">
+        <div class="container-fluid">
+            <div class="row align-items-center justify-content-between">
+                <!-- Logo -->
+                <div class="col-auto">
+                    <a href="#" class="lang-logo">
+                        <img src="./assets/images/jodii-logo.svg" alt="Jodii Logo" class="logo-img">
+                    </a>
+                </div>
+
+                <!-- Header Controls -->
+                <div class="col-auto">
+                    <div class="lang-header-controls">
+                        <button class="lang-contact-btn" type="button" data-bs-toggle="tooltip"
+                            data-bs-placement="bottom" data-bs-custom-class="custom-tooltip" data-bs-html="true"
+                            title="हमें <b> +91 7550087450 </b>पर <br> कॉल करें" data-trigger="click">
+                            <span>हमसे संपर्क करें</span>
+                            <svg width="12" height="8" viewBox="0 0 12 8" fill="none"
+                                xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1 1L6 6L11 1" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                            </svg>
+                        </button>
+                        <a href="https://play.google.com/store/apps/details?id=jodii.app&hl=en_US&gl=US" target="_blank"
+                            rel="noreferrer" class="lang-download-btn">
+                            <span>ऐप डाउनलोड करें</span>
+                            <img src="./assets/images/arrow-animation.gif" alt="Animation" width="24" height="auto">
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- HERO SECTION Desktop-->
+    <section class="hero-section d-none d-md-block"
+        style="background-image: url('./assets/images/hindi-hero.jpg'); background-size: cover; background-position: left; background-repeat: no-repeat;">
+        <div class="hero-overlay"></div>
+        <div class="hero-container">
+            <div class="jodii-card-shadow"></div>
+            <div class="jodii-card">
+                <div class="card-header">
+                    <div class="card-logo-container">
+                        <!-- Add your Jodii logo image here -->
+                        <img src="./assets/images/jodii-logo.svg" alt="Jodii Logo" class="card-logo-image">
+                    </div>
+                </div>
+                <div class="card-body">
+                    <p class="card-subtitle"> <span style="color: #f48220;">भारत </span> <span
+                            style="color: #00a650;">मैट्रिमोनी </span>से</p>
+
+                    <div class="card-stats">
+                        <div>
+                            <img src="./assets/images/left-flower.svg" alt="Jodii Logo">
+                        </div>
+
+                        <div class="stat-item">
+                            <span class="stat-number">25+ वर्ष</span>
+                            <span class="stat-label">मैचमेकिंग के</span>
+                        </div>
+                        <div class="stat-divider"></div>
+                        <div class="stat-item">
+                            <span class="stat-number">लाखों</span>
+                            <span class="stat-label">खुशहाल विवाह</span>
+                        </div>
+                        <div>
+                            <img src="./assets/images/right-flower.svg" alt="Jodii Logo">
+                        </div>
+                    </div>
+
+                    <p class="card-description">
+                        आम लोगों के लिए एक मैचमेकिंग ऐप - Matrimony.com ग्रुप से
+                    </p>
+
+                    <a href="https://play.google.com/store/apps/details?id=jodii.app&hl=en_US&gl=US" target="_blank"
+                        rel="noreferrer" class="btn-explore">ऐप डाउनलोड करें
+                        <img src="./assets/images/arrow-animation.gif" alt="Animation" width="24" height="auto">
+                    </a>
+                </div>
+            </div>
+        </div>
+
+    </section>
+
+    <!-- HERO SECTION for Mobile-->
+    <section class="d-block d-md-none "
+        style="background: linear-gradient(180deg, #FFF 0%, #FFECF1 77.66%, #FFF 100%);">
+
+        <!-- Top Section -->
+        <div class="mobile-container text-center">
+
+            <div class="top-bar">
+                <span>पहले से मेम्बर हैं?</span>
+                <button onclick="openPopup('EnterMobile', 'login')" class="login-btn">
+                    लॉगिन
+                </button>
+            </div>
+            <div class="card-logo-container" style="margin-top: 1rem;">
+                <!-- Add your Jodii logo image here -->
+                <img src="./assets/images/jodii-logo.svg" alt="Jodii Logo" class="card-logo-image">
+            </div>
+
+            <div class="card-body">
+                <p class="card-subtitle"> <span style="color: #f48220;">भारत </span> <span
+                        style="color: #00a650;">मैट्रिमोनी </span>से</p>
+
+                <div class="card-stats">
+                    <div>
+                        <img src="./assets/images/left-flower.svg" alt="Jodii Logo">
+                    </div>
+
+                    <div class="stat-item">
+                        <span class="stat-number">25+ वर्ष</span>
+                        <span class="stat-label">मैट्रिमोनी सेवा</span>
+                    </div>
+                    <div class="stat-divider"></div>
+                    <div class="stat-item">
+                        <span class="stat-number">लाखों</span>
+                        <span class="stat-label">खुशहाल शादियां</span>
+                    </div>
+                    <div>
+                        <img src="./assets/images/right-flower.svg" alt="Jodii Logo">
+                    </div>
+                </div>
+
+                <p class="card-description">
+                    आम लोगों के लिए एक मैचमेकिंग ऐप - Matrimony.com ग्रुप से
+                </p>
+            </div>
+            <!-- Form Card -->
+            <div class="form-card">
+
+                <div class="create-profile">अपनी प्रोफ़ाइल बनाएँ</div>
+
+                <!-- Profile Dropdown -->
+                <div class="dropdown" id="dropdown">
+                    <div class="dropdown-header">
+                        <span id="selectedOption">किसके लिए प्रोफ़ाइल बनाई जा रही है</span>
+                        <span class="arrow"></span>
+                    </div>
+<label id="lbl-created" class="display-none" for="selectedOption">किसके लिए प्रोफ़ाइल बनाई जा रही है</label>
+                    <div id="dd-createdby" class="dropdown-list">
+                       
+                    </div>
+                    <input type="hidden" id="createdby" name="createdby" value="" />
+                    <input type="hidden" id="gender" name="gender" value="" />
+                </div>
+
+                <p class="error" id="dropdownError" data-hi="कृपया एक विकल्प चुनें"></p>
+
+                <!-- Name -->
+                <div class="input-group">
+                    <input type="text" autocomplete="off" autocorrect="off" spellcheck="false" id="name" name="name" class="input-field" required placeholder="वर/वधू का नाम लिखें" />
+                    <label for="name">नाम</label>
+                </div>
+                <p class="error" id="nameError" data-hi="कृपया वर/वधू का नाम लिखें"></p>
+
+                <!-- Mobile -->
+                <div class="input-group mobile-field" id="mobileField">
+
+                    <div class="country-dropdown">
+                        <div class="country-header">
+                            <span id="selectedCode">+91</span>
+                            <span class="arrow small"></span>
+                        </div>
+
+                        <div id="dd-ccode" class="dropdown-list">
+                            <div>🇮🇳 India (+91)</div>
+                            <div>🇺🇸 USA (+1)</div>
+                            <div>🇬🇧 UK (+44)</div>
+                        </div>
+                    </div>
+
+                    <input type="tel" autocomplete="off" autocorrect="off" spellcheck="false" id="mobileno" name="mobileno" placeholder="मोबाइल नंबर लिखें" inputmode="numeric" maxlength="10" required />
+                    <label for="mobileno" class="input-mobile">मोबाइल नंबर</label>
+
+                    <!-- Hidden fields -->
+                    <input type="hidden" id="countryname" name="countryname" value="India" />
+                    <input type="hidden" id="ccode" name="ccode" value="91" />
+                    <input type="hidden" id="countrykey" name="countrykey" value="98" />
+                    <input type="hidden" id="language" name="language" value="hi" />
+                    <input type="hidden" id="type" name="type" value="register" />
+                    <input type="hidden" id="apptype" name="apptype" value="609" />
+                </div>
+
+                <p class="error" id="mobileError" data-hi="कृपया एक सही मोबाइल नंबर लिखे"></p>
+
+                <p class="terms">
+                    'मुफ़्त रजिस्टर करें' पर क्लिक करके, मैं
+                    <a class="color-29339B" href="terms.html">T&C <br></a> और <a class="color-29339B"
+                        href="privacy-policy.html">Privacy Policy</a>
+                    से सहमत हूँ।
+                </p>
+
+                <button id="registerBtn" disabled onclick="getotpFunc('register')" class="btn">
+                    मुफ़्त रजिस्टर करें
+                    <img src="./assets/images/arrow-animation.gif" alt="" width="24px">
+                </button>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- STATS SECTION -->
+    <section class="stats-section-pwa">
+        <div class="stats-container">
+            <div class="stat-card order-1 order-md-1">
+                <div class="stat-icon">
+                    <img src="./assets/images/icon-users.svg" alt="users">
+                </div>
+                <p class="stat-large-text">10 लाख<span>+</span></p>
+                <p class="stat-small-text">यूज़र</p>
+            </div>
+            <div class="stat-card order-3 order-md-2">
+                <div class="stat-icon">
+                    <img src="./assets/images/icon-marriages.svg" alt="marriages">
+                </div>
+                <p class="stat-large-text">3,00,000<span>+</span></p>
+                <p class="stat-small-text">सफल विवाह</p>
+            </div>
+            <div class="stat-card order-2 order-md-3">
+                <div class="stat-icon">
+                    <img src="./assets/images/icon-verified.svg" alt="verified">
+                </div>
+                <p class="stat-large-text">2 लाख<span>+</span></p>
+                <p class="stat-small-text">सत्यापित प्रोफ़ाइल</p>
+            </div>
+            <div class="stat-card order-4 order-md-4">
+                <div class="stat-icon">
+                    <img src="./assets/images/icon-rating.svg" alt="rating">
+                </div>
+                <p class="stat-large-text">4.2
+                    <img src="./assets/images/star.svg" alt="rating">
+                </p>
+                <p class="stat-small-text">43K समीक्षाएं</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- WHY JODII SECTION -->
+    <section class="why-jodii-section">
+        <div class="container">
+            <div class="why-jodii-container">
+                <div class="why-jodii-left-content">
+                    <h2 class="why-jodii-title">Jodii ही क्यों?</h2>
+                    <p class="why-jodii-description">Jodii एक आसान मैचमेकिंग प्लेटफॉर्म है जिसे खास आम लोगों के लिए
+                        बनाया गया है। यह हज़ारों सत्यापित प्रोफाइल दिखता है और भारत के सभी मुख्य भारतीय भाषाओं में तमिल,
+                        तेलुगु, हिंदी, मलयालम, आदि सभी में उपलब्ध है।</p>
+
+                    <div class="features-list">
+                        <div class="feature-item">
+                            <div class="feature-icon">
+                                <img src="./assets/images/icon-affordable.svg" alt="Affordable Plans">
+                            </div>
+                            <div class="feature-content">
+                                <p class="feature-name">किफायती प्लान</p>
+                                <p class="feature-subtitle">सभी के लिए किफायती पेमेंट पैकेज</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="feature-icon">
+                                <img src="./assets/images/icon-secure.svg" alt="Safe and Secure">
+                            </div>
+                            <div class="feature-content">
+                                <p class="feature-name">सुरक्षित</p>
+                                <p class="feature-subtitle">गोपनीयता सुरक्षा के साथ विश्वसनीय प्लेटफ़ॉर्म</p>
+                            </div>
+                        </div>
+                        <div class="feature-item">
+                            <div class="feature-icon">
+                                <img src="./assets/images/icon-languages.svg" alt="Available in Local Languages">
+                            </div>
+                            <div class="feature-content">
+                                <p class="feature-name">स्थानीय भाषाओं में उपलब्ध</p>
+                                <p class="feature-subtitle">सभी प्रमुख भारतीय भाषाओं को सपोर्ट करता है</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="why-jodii-right-content">
+                    <div class="profile-image-container">
+                        <img src="https://jodii.matrimonycdn.com/web/verified-hindi.png" alt="Profile Girl" class="profile-image">
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- VIDEO SECTION -->
+    <!-- <section class="video-section">
+        <div class="container">
+             <div class="video-bg d-none d-md-block">
+                <img src="./assets/images/video-bg.svg" alt="Video">
+            </div>
+            <div class="video-bg-right d-none d-md-block">
+                <img src="./assets/images/video-bg.svg" alt="Video">
+            </div>
+            <div class="video-bg-right-mobile d-block d-md-none">
+                <img src="./assets/images/video-bg.svg" alt="Video">
+            </div>
+            <h2 class="section-title text-center">हमारा लेटेस्ट TVC देखें</h2>
+            <div class="row justify-content-center">
+                <div class="col-lg-8">
+                    <div class="video-container">
+                        <img src="./assets/images/video-thumbnail.svg" alt="Video" class="video-image">
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section> -->
+
+    <!-- HAPPILY MARRIED SECTION -->
+    <section class="married-section">
+        <div class="container">
+            <div class="d-none d-md-block">
+
+                <img class=" happy-marriage-heart-desktop" src="./assets/images/happy-marriage-heart-dektop.svg"
+                    alt="Couple 1">
+            </div>
+            <div class="d-block d-md-none">
+                <img class="happy-marriage-heart-mobile" src="./assets/images/happy-marriage-heart-animation.gif"
+                    width="100px" height="100px" alt="Couple 1">
+            </div>
+            <div class="d-none d-md-block">
+                <img class="happy-marriage-right-bg" src="./assets/images/married-bg-right.svg" alt="">
+            </div>
+            <div class="d-block d-md-none">
+                <img class="happy-marriage-right-bg-mobile" src="./assets/images/married-bg-right.svg" alt="">
+            </div>
+            <div class="text-center married-header">
+                <h2 class="section-title">खुशहाल विवाहित जोड़े</h2>
+                <p class="section-description">हजारों सदस्यों को Jodii के माध्यम से अपना योग्य जीवनसाथी मिल गया है और अब
+                    वह खुशहाल शादीशुदा जीवन बिता रहे हैं</p>
+            </div>
+
+            <!-- Desktop Grid View -->
+            <div class="row g-4 d-none d-lg-flex" id="marriedDesktopList">
+                <div class="col-lg-4 col-md-6">
+                    <div class="couple-card">
+                        <div alt=" " class="couple-image skeleton"> </div>
+                        <div class="couple-info">
+                            <div class="skeleton skeleton-text"></div>
+                            <div class="skeleton skeleton-text"></div>
+                            <div class="skeleton skeleton-text"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="couple-card">
+                        <div alt=" " class="couple-image skeleton"> </div>
+                        <div class="couple-info">
+                            <div class="skeleton skeleton-text"></div>
+                            <div class="skeleton skeleton-text"></div>
+                            <div class="skeleton skeleton-text"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4 col-md-6">
+                    <div class="couple-card">
+                        <div alt=" " class="couple-image skeleton"> </div>
+                        <div class="couple-info">
+                            <div class="skeleton skeleton-text"></div>
+                            <div class="skeleton skeleton-text"></div>
+                            <div class="skeleton skeleton-text"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mobile Swiper View (Hidden on Desktop) -->
+            <div class="couples-swiper-mobile">
+                <div class="swiper couples-carousel-swiper">
+                    <div id="marriedMobileList" class="swiper-wrapper">
+                        <div class="swiper-slide">
+                            <div class="couple-card">
+                                <div alt=" " class="couple-image skeleton"> </div>
+                                <div class="couple-info">
+                                    <div class="skeleton skeleton-text"></div>
+                                    <div class="skeleton skeleton-text"></div>
+                                    <div class="skeleton skeleton-text"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="swiper-slide">
+                            <div class="couple-card">
+                                <div alt=" " class="couple-image skeleton"> </div>
+                                <div class="couple-info">
+                                    <div class="skeleton skeleton-text"></div>
+                                    <div class="skeleton skeleton-text"></div>
+                                    <div class="skeleton skeleton-text"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="swiper-slide">
+                            <div class="couple-card">
+                                <div alt=" " class="couple-image skeleton"> </div>
+                                <div class="couple-info">
+                                    <div class="skeleton skeleton-text"></div>
+                                    <div class="skeleton skeleton-text"></div>
+                                    <div class="skeleton skeleton-text"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- Pagination dots -->
+                    <div class="swiper-pagination couples-pagination"></div>
+                </div>
+            </div>
+        </div>
+        <div class="married-section-bottom d-flex align-item-center d-none d-md-block">
+            <img class="width-12per" src="./assets/images/wave.svg" alt="wave">
+            <img class="width-12per" src="./assets/images/wave.svg" alt="wave">
+            <img class="width-12per" src="./assets/images/wave.svg" alt="wave">
+            <img class="width-12per" src="./assets/images/wave.svg" alt="wave">
+            <img class="width-12per" src="./assets/images/wave.svg" alt="wave">
+            <img class="width-12per" src="./assets/images/wave.svg" alt="wave">
+            <img class="width-12per" src="./assets/images/wave.svg" alt="wave">
+            <img class="width-12per" src="./assets/images/wave.svg" alt="wave">
+        </div>
+        <div class="married-section-bottom d-flex align-item-center d-block d-md-none">
+            <img class="width-25per" src="./assets/images/wave.svg" alt="wave">
+            <img class="width-25per" src="./assets/images/wave.svg" alt="wave">
+            <img class="width-25per" src="./assets/images/wave.svg" alt="wave">
+            <img class="width-25per" src="./assets/images/wave.svg" alt="wave">
+        </div>
+        </div>
+    </section>
+
+    <!-- EXPLORE MODULES SECTION -->
+    <section class="explore-modules-section">
+        <div class="container">
+            <div class="explore-grid">
+                <!-- LEFT SIDE - PHONE MOCKUP -->
+                <div class="explore-left order-2 order-md-1">
+                    <div class="explore-phone-container">
+                        <div class="d-none d-md-block">
+                            <img class="explore-swiper-bg" src="./assets/images/explore-swiper-bg.svg" alt="">
+                        </div>
+                        <div class="d-block d-md-none">
+                            <img class="explore-swiper-bg-mobile" src="./assets/images/explore-swiper-bg.svg" alt="">
+                        </div>
+                        <div class="phone-mockup">
+
+                            <!-- Phone Header with Logo -->
+                            <div class="phone-header d-flex justify-content-center">
+                                <img src="./assets/images/jodii-logo.svg" alt="Jodii Logo" class="phone-logo">
+                            </div>
+
+                            <!-- Image Swiper for Card -->
+                            <div class="swiper card-images-swiper">
+                                <div class="swiper-wrapper">
+                                    <div class="swiper-slide">
+                                        <img src="https://jodii.matrimonycdn.com/web/hi-swiper-1.png" alt="" class="profile-image">
+                                    </div>
+                                    <div class="swiper-slide">
+                                        <img src="https://jodii.matrimonycdn.com/web/hi-swiper-2.png" alt="" class="profile-image">
+                                    </div>
+                                    <div class="swiper-slide">
+                                        <img src="https://jodii.matrimonycdn.com/web/hi-swiper-3.png" alt="" class="profile-image">
+                                    </div>
+                                    <div class="swiper-slide">
+                                        <img src="https://jodii.matrimonycdn.com/web/hi-swiper-4.png" alt="" class="profile-image">
+                                    </div>
+                                    <div class="swiper-slide">
+                                        <img src="https://jodii.matrimonycdn.com/web/hi-swiper-5.png" alt="" class="profile-image">
+                                    </div>
+                                    <div class="swiper-slide">
+                                        <img src="https://jodii.matrimonycdn.com/web/hi-swiper-6.png" alt="" class="profile-image">
+                                    </div>
+                                    <div class="swiper-slide">
+                                        <img src="https://jodii.matrimonycdn.com/web/hi-swiper-7.png" alt="" class="profile-image">
+                                    </div>
+                                    <div class="swiper-slide">
+                                        <img src="https://jodii.matrimonycdn.com/web/hi-swiper-8.png" alt="" class="profile-image">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RIGHT SIDE - CONTENT -->
+                <div class="explore-right order-1 order-md-2">
+                    <div class="explore-content">
+                        <h2 class="explore-title">रिश्ते खोजें</h2>
+                        <p class="explore-description">शीर्ष शहरों में अपनी कुंडली और सामुदाय से मिलान करते हुए
+                            प्रोफ़ाइल खोजें। अपना परफेक्ट रिश्ता खोजने के लिए 20 लाख से ज़्यादा मेंबर्स से जुड़ें हैं
+                        </p>
+
+                        <!-- Stats Grid -->
+                        <div class="explore-stats-grid">
+                            <div class="explore-stat">
+                                <p class="stat-value">2 लाख<span>+</span></p>
+                                <p class="stat-text">सत्यापित प्रोफ़ाइल</p>
+                            </div>
+                            <div class="explore-stat">
+                                <p class="stat-value">10,000<span>+</span></p>
+                                <p class="stat-text">अपने घर, सरकारी नौकरी वालों के रिश्ते</p>
+                            </div>
+                            <div class="explore-stat">
+                                <p class="stat-value">2000<span>+</span></p>
+                                <p class="stat-text">शीर्ष शहरों में रिश्ते</p>
+                            </div>
+                        </div>
+
+                        <!-- CTA Button -->
+                        <div class="width100 d-flex justify-content-center justify-content-md-start">
+                            <a href="https://play.google.com/store/apps/details?id=jodii.app&hl=en_US&gl=US"
+                                target="_blank" rel="noreferrer" class="btn-explore">
+                                ऐप डाउनलोड करें
+                                <img src="./assets/images/arrow-animation.gif" alt="Animation" width="24" height="auto">
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 3 STEPS SECTION -->
+    <section class="steps-section">
+        <div class="container">
+
+            <h2 class="section-title text-center">
+                अपना योग्य साथी ढूंढने के 3 आसान कदम
+            </h2>
+
+            <div class="row g-4 steps-row">
+
+                <!-- STEP 1 -->
+                <div class="col-lg-4 col-md-6 step-col">
+
+                    <div class="step-item">
+                        <div class="step-icon">
+                            <img src="./assets/images/step-1.svg" alt="Step 1">
+                        </div>
+
+                        <h5>ऐप डाउनलोड करें</h5>
+                        <p>अपनी पसंद की भाषा चुनकर शुरुआत करें।</p>
+                    </div>
+
+                    <div class="step-arrow">
+                        <img src="./assets/images/forward-icon.svg" class="img-fluid d-none d-md-block" alt="desktop">
+
+                        <img src="./assets/images/downward-arrow.svg" class="img-fluid d-block d-md-none" alt="mobile">
+                    </div>
+
+                </div>
+
+                <!-- STEP 2 -->
+                <div class="col-lg-4 col-md-6 step-col">
+
+                    <div class="step-item">
+                        <div class="step-icon">
+                            <img src="./assets/images/step-2.svg" alt="Step 2">
+                        </div>
+
+                        <h5>अपनी प्रोफ़ाइल बनाएँ</h5>
+                        <p>नाम, उम्र, स्थान और शिक्षा जैसी बुनियादी जानकारी जोड़ें।</p>
+                    </div>
+
+                    <div class="step-arrow">
+                        <img src="./assets/images/forward-icon.svg" class="img-fluid d-none d-md-block" alt="desktop">
+
+                        <img src="./assets/images/downward-arrow.svg" class="img-fluid d-block d-md-none" alt="mobile">
+                    </div>
+
+                </div>
+
+                <!-- STEP 3 -->
+                <div class="col-lg-4 col-md-6 step-col">
+
+                    <div class="step-item">
+                        <div class="step-icon">
+                            <img src="./assets/images/step-3.svg" alt="Step 3">
+                        </div>
+
+                        <h5>रिश्तों से संपर्क करें</h5>
+                        <p>
+                            प्रोफ़ाइल देखें और अपने पसंद के रिश्तों को
+                            कॉल या मैसेज करने के लिए पेड मेंबरशिप लें।
+                        </p>
+                    </div>
+
+                </div>
+
+            </div>
+
+            <!-- DOWNLOAD BUTTON -->
+            <div class="d-none d-md-block">
+                <div class="width100 d-flex justify-content-center">
+
+                    <a href="https://play.google.com/store/apps/details?id=jodii.app&hl=en_US&gl=US" target="_blank"
+                        rel="noreferrer" class="btn-explore">
+
+                        ऐप डाउनलोड करें
+
+                        <img src="./assets/images/arrow-animation.gif" alt="Animation" width="24" height="auto">
+
+                    </a>
+
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- DOWNLOAD APP SECTION -->
+    <section class="download-section">
+        <div class="container">
+            <div class="row align-items-center download-section-block d-flex justify-content-center">
+
+                <!-- Image Column -->
+                <div class="col-lg-5">
+                    <div class="app-phone-frame position-relative">
+                        <img src="https://jodii.matrimonycdn.com/web/download-hindi.png" alt="App Download" class="phone-image img-fluid">
+                        <div class="phone-image-rating-shadow d-block d-md-none"></div>
+                    </div>
+                </div>
+
+                <!-- Text Column -->
+                <div class="col-lg-6">
+                    <div class="download-content">
+                        <h2 class="section-title">Jodii ऐप डाउनलोड करें!</h2>
+
+                        <p class="download-count">10M+ डाउनलोड</p>
+
+                        <div class="rating-container">
+                            <div class="rating-value-main">4.2</div>
+                            <div class="rating-stars-container">
+                                <img alt="" src="./assets/images/star-filled.svg" class="rating-star-img">
+                                <img alt="" src="./assets/images/star-filled.svg" class="rating-star-img">
+                                <img alt="" src="./assets/images/star-filled.svg" class="rating-star-img">
+                                <img alt="" src="./assets/images/star-filled.svg" class="rating-star-img">
+                                <img alt="" src="./assets/images/star-half.svg" class="rating-star-img">
+                            </div>
+                        </div>
+
+                        <p class="rating-text">43K कस्टमर रिव्यू के आधार पर</p>
+
+                        <div class="width100 d-flex">
+                            <a href="https://play.google.com/store/apps/details?id=jodii.app&hl=en_US&gl=US"
+                                target="_blank" rel="noreferrer" class="btn-explore">
+                                ऐप डाउनलोड करें
+                                <img src="./assets/images/arrow-animation.gif" alt="Animation" width="24" height="auto">
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- NEED HELP SECTION -->
+    <section class="need-help-section d-flex justify-content-center text-align-center">
+        <div class="d-flex align-item-center">
+            <div class="need-help-icon">
+                <img src="./assets/images/need-help.svg" alt="Need Help">
+            </div>
+
+            <div class="need-help-title d-flex align-item-center">
+                मदद चाहिए? अभी हमसे संपर्क करें
+                <span class="need-help-description">+91 7550087450</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="footer-section">
+        <div class="footer-container">
+            <!-- Footer Top -->
+            <div class="footer-top">
+                <!-- Footer Left: Logo & Description -->
+                <div class="footer-left">
+                    <div class="footer-logo">
+                        <img src="./assets/images/jodii-logo-yellow.svg" alt="Jodii Logo" class="footer-logo-img">
+                    </div>
+                    <p class="footer-description">Jodii को Matrimony.com ने बनाया है, जो 25 साल के अनुभव के साथ ऑनलाइन
+                        मैचमेकिंग में लीडर है। हमने BharatMatrimony ब्रांड और हमारी रीजनल मैट्रिमोनी सर्विस के ज़रिए
+                        लाखों भारतीयों को अपना जीवनसाथी ढूंढने में मदद की है।</p>
+                </div>
+
+                <!-- Footer Right: Get the App -->
+                <div class="footer-right">
+                    <div class="footer-app-section">
+                        <p class="footer-app-label">ऐप डाउनलोड करें</p>
+                        <a href="https://play.google.com/store/apps/details?id=jodii.app&hl=en_US&gl=US" target="_blank"
+                            rel="noreferrer" class="footer-playstore-badge">
+                            <img src="./assets/images/google-play.svg" alt="Get it on Google Play"
+                                class="playstore-img">
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer Bottom: Copyright & Links - Desktop View -->
+            <div class="footer-bottom d-none d-md-flex">
+                <p class="footer-copyright">© 2026 Jodii All rights reserved</p>
+                <div class="footer-legal-links">
+                    <a href="terms.html">नियम एवं शर्तें</a>
+                    <a href="privacy-policy.html">गोपनीयता नीति</a>
+                </div>
+            </div>
+
+            <!-- Footer Bottom: Copyright & Links - Mobile View -->
+            <div class="footer-bottom-mobile d-block d-md-none">
+                <p class="footer-copyright-mobile">© 2026 All rights reserved. <a href="terms.html">नियम
+                        एवं शर्तें</a> | <a href="privacy-policy.html">गोपनीयता नीति</a></p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- QR CODE POPUP MODAL -->
+    <div class="modal fade" id="qrCodeModal" tabindex="-1" aria-labelledby="qrCodeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content qr-modal-content">
+                <div class="qr-modal-header">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="qr-modal-body">
+                    <p class="qr-modal-title">ऐप डाउनलोड करने के लिए अपने मोबाइल से QR कोड स्कैन करें।</p>
+                    <div class="qr-code-container">
+                        <div class="qr-brackets-frame">
+                            <img src="./assets/images/qr-brackets.svg" alt="brackets">
+                        </div>
+                        <img class="qr-code-img" src="./assets/qr-code/jodii-eng-qr.svg" alt="QR Code">
+                    </div>
+                    <div class="qr-modal-footer">
+                        <img src="./assets/images/jodii-logo.svg" alt="Jodii Logo" class="qr-modal-logo">
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- bottom popup -->
+
+    <!-- OVERLAY -->
+    <div class="popup-overlay" id="popupOverlay"></div>
+
+    <!-- OTP POPUP -->
+    <div class="popup-container" id="otpPopup">
+        <div class="close-popup" onclick="closePopup()">
+            <img src="./assets/images/close-popup.svg" alt="edit">
+        </div>
+        <div class="otp-container">
+
+        <div id="otp-section">
+            <!-- Header -->
+            <div class="otp-header">
+                <span class="otp-title">OTP लिखें</span>
+            </div>
+
+            <!-- Subtext -->
+            <div class="otp-subtext">
+
+                हमने <span class="align-item-center">
+                    <span id="spanMobile"> +91 9884381394 </span>
+                </span> पर 4 अंकों का कोड भेजा है <br>
+                <img src="./assets/images/edit.svg" alt="edit">
+                <span class="edit" onclick="openPopup('EnterMobile')">बदलें</span>
+
+            </div>
+
+            <!-- OTP Inputs -->
+            <div class="otp-inputs">
+                <input id="otp1" autocomplete="off" autocorrect="off" spellcheck="false" type="number" maxlength="1" />
+                <input id="otp2" autocomplete="off" autocorrect="off" spellcheck="false" type="number" maxlength="1" />
+                <input id="otp3" autocomplete="off" autocorrect="off" spellcheck="false" type="number" maxlength="1" />
+                <input id="otp4" autocomplete="off" autocorrect="off" spellcheck="false" type="number" maxlength="1" />
+            </div>
+            <input type="hidden" id="matriId" name="matriId" value="" />
+
+            <p class="error" id="otpError" data-hi="कृपया एक मान्य OTP दर्ज करें"></p>
+            <!-- Resend -->
+            <div class="otp-resend" id="otpResendDiv">
+                OTP नहीं मिला? <span id="resendBtn" onclick="return resend();" style="display:none">दोबारा भेजें</span>
+                <span id="timerText">01:00</span>
+            </div>
+
+
+
+            <!-- Button -->
+            <button class="otp-btn" id="otpsubmit" onclick="return handleOtpSubmit()">OTP सत्यापित करें</button>
+            <div id="extraSpaceOTP" class="mt-3rem display-none"></div>
+    </div>
+            <div id="otp-loader" style="display:none" class="screen-loader" aria-hidden="true">
+                <lottie-player src="https://imgs.jodii.app/assets/jodii-lottie-files/loader.json" background="transparent"
+                    speed="1" style="width: 120px; height: 120px;" loop autoplay>
+                </lottie-player>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- OTP success -->
+    <div class="popup-container pl-24 pr-24" id="otpSuccess">
+        <div>
+            <lottie-player src="https://imgs.jodii.app/assets/jodii-lottie-files/success-new.json" background="transparent"
+                speed="1" style="width: 100px; height: 100px; margin-left: -1.5rem;" loop autoplay>
+            </lottie-player>
+            <div class="otp-header">
+                <span class="otp-title">OTP सफलतापूर्वक सत्यापित हो गया है!</span>
+            </div>
+            <div class="otp-subtext">
+                आपका नंबर सत्यापित हो गया है। चलिए, आपकी प्रोफ़ाइल बनाना शुरू करते हैं
+            </div>
+        </div>
+    </div>
+
+    <!-- enter mobile number Popup -->
+    <div class="popup-container" id="EnterMobile">
+
+        <!-- Close -->
+        <div class="close-popup" onclick="closePopup()">
+            <img src="./assets/images/close-popup.svg" alt="edit">
+        </div>
+
+        <div class="mobile-container-popup">
+
+            <!-- Title -->
+            <div class="otp-title mb-2rem">अपना मोबाइल नंबर दर्ज करें</div>
+            <div class="input-group mobile-field" id="mobileField">
+
+                <div class="country-dropdown">
+                    <div class="country-header">
+                        <span id="selectedPopUpCode">+91</span>
+                        <span class="arrow small"></span>
+                    </div>
+
+                    <div id="countryDropdown" class="dropdown-list">
+                        <div>🇮🇳 India (+91)</div>
+                        <div>🇺🇸 USA (+1)</div>
+                        <div>🇬🇧 UK (+44)</div>
+                    </div>
+                </div>
+
+                <input type="tel" autocomplete="off" autocorrect="off" spellcheck="false" id="mobilepopup" name="mobilepopup" placeholder="मोबाइल नंबर लिखें" inputmode="numeric" maxlength="10" required />
+                <label for="mobilepopup" class="input-mobile">मोबाइल नंबर</label>
+
+                <!-- Hidden fields -->
+                <input type="hidden" id="countryname" name="countryname" value="India" />
+                <input type="hidden" id="ccodepopup" name="ccodepopup" value="91" />
+                <!-- <input type="hidden" id="countrykey" name="countrykey" value="98" /> -->
+
+            </div>
+            <p class="error" id="mobilePopupError" data-hi="कृपया एक सही मोबाइल नंबर लिखे"></p>
+
+            <!-- Button -->
+            <button class="otp-btn mt-2rem" onclick="return handlePopupOtp()">OTP प्राप्त करें</button>
+            <div id="extraSpacePopup" class="mt-3rem display-none"></div>
+
+        </div>
+    </div>
+</body>
+
+<script src="js/jquery.min.js?v=1234"></script>
+<script src="js/landing-page.js?v=1778889600000"></script>
+<script src="js/bootstrap.bundle.min.js?v=1234"></script>
+<script src="js/swiper-bundle.min.js"></script>
+<script src="js/popper.min.js"></script>
+<script>
+    /**
+     * Register Service Worker
+     */
+    // if ('serviceWorker' in navigator) {
+    //     window.addEventListener('load', () => {
+    //         navigator.serviceWorker.register('https://stgimg.jodii.app/pwa/sw.js')
+    //             .then(registration => {
+    //                 console.log('SW Registered with scope:', registration.scope);
+    //             })
+    //             .catch(error => {
+    //                 console.error('SW Registration Failed:', error);
+    //             });
+    //     });
+    // }
+</script>
+
+</html>

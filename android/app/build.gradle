@@ -104,6 +104,12 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            storeFile file(System.getenv('JODII_KEYSTORE_FILE') ?: 'jodii-release.keystore')
+            storePassword System.getenv('JODII_STORE_PASSWORD') ?: ''
+            keyAlias System.getenv('JODII_KEY_ALIAS') ?: 'jodii-release'
+            keyPassword System.getenv('JODII_KEY_PASSWORD') ?: ''
+        }
     }
 
     flavorDimensions "appType"
@@ -133,9 +139,7 @@ android {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            signingConfig signingConfigs.release
             def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
             shrinkResources enableShrinkResources.toBoolean()
             minifyEnabled enableMinifyInReleaseBuilds

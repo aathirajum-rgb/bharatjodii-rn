@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <style>html { visibility: hidden; }</style>
+    <script>
+      // Skip redirect when opened as a local file
+      if (location.protocol !== 'file:') {
+        var _ua = navigator.userAgent || '';
+        var _mobile = /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(_ua)
+                      || window.innerWidth < 768;
+        if (_mobile) {
+          document.documentElement.style.visibility = 'visible';
+          location.replace('/app/');
+        } else {
+          document.documentElement.style.visibility = 'visible';
+        }
+      } else {
+        document.documentElement.style.visibility = 'visible';
+      }
+      // Polyfill for window.crypto.randomUUID (unavailable on HTTP non-secure contexts)
+      if (typeof window.crypto === 'undefined') window.crypto = {};
+      if (typeof window.crypto.randomUUID !== 'function') {
+        window.crypto.randomUUID = function() {
+          return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+            var r = Math.random() * 16 | 0;
+            return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+          });
+        };
+      }
+    </script>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="viewport-fit=cover, width=device-width, initial-scale=1, minimum-scale=1.0, maximum-scale=1.0, user-scalable=0" />
+    <meta name="description"
+        content="Looking for your Jodi? Download Jodii App - Best Thirumana & Jathagam porutham app in Tamil. Register on Jodii marriage porutham app and start searching for your Jodi." />
+    <meta name="keywords"
+        content="jodii app, jodi app, download jodii app, best thirumana porutham app in tamil, jathaka porutham in tamil app, marriage porutham app, kalyana porutham app, tamil jathagam porutham app, marriage matching app in tamil, porutham app, thirumana porutham app, thirumana porutham tamil app, jathagam porutham app, download jodii app, best thirumana porutham app in tamil, Jathagam Porutham, rasi porutham app, kalyana, marriage" />
+    <meta name="author" content="" />
+    <title>Download Jodii App - A Vernacular Marriage App for Common People</title>
+    <link rel="canonical" href="https://www.jodii.com/">
+    <link rel="icon" type="image/x-icon" href="assets/img/jodii-logo.svg" />
+    <!-- Google fonts-->
+    <link
+        href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap"
+        rel="stylesheet">
+    <!-- Bootstrap CSS -->
+    <link href="css/bootstrap.min.css?v=1456" rel="stylesheet">
+
+    <!-- Custom CSS -->
+
+    <link rel="stylesheet" href="css/jodii-styles.css?v=13223g16as">
+</head>
+<body>
+    <!-- Header -->
+    <header class="lang-header">
+        <div class="container-fluid">
+            <div class="row align-items-center justify-content-between">
+                <!-- Logo -->
+                <div class="col-auto">
+                    <a href="#" class="lang-logo">
+                        <img src="./assets/images/jodii-logo.svg" alt="Jodii Logo" class="logo-img">
+                    </a>
+                </div>
+                
+                <!-- Header Controls -->
+                <div class="col-auto">
+                    <div class="lang-header-controls">
+                        <button class="lang-contact-btn" type="button" data-bs-toggle="tooltip" data-bs-placement="bottom" data-bs-custom-class="custom-tooltip" data-bs-html="true" title=" Call us on <br> <b> +91 7550087450 </b>" data-trigger="click" >
+                           
+                            <span>Contact us</span>
+                            <svg width="12" height="8" viewBox="0 0 12 8" fill="none"
+                                xmlns="http://www.w3.org/2000/svg">
+                                <path d="M1 1L6 6L11 1" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round" />
+                            </svg>
+                        </button>
+                       <a href="https://play.google.com/store/apps/details?id=jodii.app&hl=en_US&gl=US" data-bs-toggle="modal" data-bs-target="#qrCodeModal"
+                            rel="noreferrer" class="lang-download-btn">
+                            <span>Download App</span>
+                              <img src="./assets/images/arrow-animation.gif" alt="Animation" width="24px" height="auto">
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+    
+    <!-- Mobile Header (Jodii Logo Only) -->
+    <div class="mobile-header">
+        <img src="./assets/images/jodii-logo.svg" alt="Jodii Logo" class="mobile-logo-img">
+    </div>
+    
+
+    <!-- Background Pattern (Decorative) -->
+    <div class="lang-bg-pattern"></div>
+
+    <!-- Main Content -->
+    <main class="lang-main desktop-bottom-padding">
+        <div class="language-selection-left d-none d-lg-block">
+             <img src="./assets/images/langugage-selection-left-bg.svg" alt="Step 3">
+        </div>
+        <div class="language-selection-right d-none d-lg-block">
+             <img src="./assets/images/language-selection-right-bg.svg" alt="Step 3">
+        </div>
+        <div class="container-fluid">
+            <div class="row justify-content-center">
+                <div class="col-12 col-lg-10 mobile-view-padd">
+                    
+                    <!-- Hero Section -->
+                    <div class="lang-hero">
+                        <h1 class="lang-title">Welcome to Jodii</h1>
+                        <p class="lang-subtitle">A matrimony app for common people<br>– from Matrimony.com</p>
+                        <!-- Mobile Download Button -->
+                        <a class="mobile-download-btn" href="https://play.google.com/store/apps/details?id=jodii.app&hl=en_US&gl=US"
+                            target="_blank" rel="noreferrer">
+                            <span>Download App</span>
+                             <img src="./assets/images/arrow-animation.gif" alt="Animation" width="24px" height="auto">
+                        </a>
+                    </div>
+
+                    <!-- Language Selection Card -->
+                    <div class="lang-card-wrapper">
+                        <!-- Mobile Top Shadow -->
+                        <div class="lang-card-shadow"></div>
+                        <div class="lang-card" >
+                            <h2 class="lang-card-title">Choose display language</h2>
+                            
+                            <!-- Language Grid -->
+                            <div class="lang-grid">
+                                <!-- Row 1 -->
+                                 <a href="index-hindi.html"> <button class="lang-btn" data-language="hindi">
+                                 <div class="lang-btn-content">
+                                        <span class="lang-name">हिंदी</span>
+                                        <span class="lang-label">Hindi</span>
+                                    </div>
+                                    <img src="./assets/images/forward-arrow-grey.svg" alt="arrow">
+                                </button></a> 
+
+                                <a href="index-tamil.html"> <button class="lang-btn" data-language="tamil">
+                                  <div class="lang-btn-content">
+                                        <span class="lang-name">தமிழ்</span>
+                                        <span class="lang-label">Tamil</span>
+                                    </div>
+                                   <img src="./assets/images/forward-arrow-grey.svg" alt="arrow">
+                                </button></a> 
+
+                                <a href="index-telugu.html">    <button class="lang-btn" data-language="telugu">
+                                 <div class="lang-btn-content">
+                                        <span class="lang-name">తెలుగు</span>
+                                        <span class="lang-label">Telugu</span>
+                                    </div>
+                                    <img src="./assets/images/forward-arrow-grey.svg" alt="arrow">
+                                </button> </a>
+
+                                <!-- Row 2 -->
+                                <a href="index-malayalam.html"> <button class="lang-btn" data-language="malayalam">
+                                    <div class="lang-btn-content">
+                                        <span class="lang-name">മലയാളം</span>
+                                        <span class="lang-label">Malayalam</span>
+                                    </div>
+                                    <img src="./assets/images/forward-arrow-grey.svg" alt="arrow">
+                                </button></a>
+
+                                 <a href="index-gujarati.html">   <button class="lang-btn" data-language="gujarati">
+                                  <div class="lang-btn-content">
+                                        <span class="lang-name">ગુજરાતી</span>
+                                        <span class="lang-label">Gujarati</span>
+                                    </div>
+                                   <img src="./assets/images/forward-arrow-grey.svg" alt="arrow">
+                                </button> </a>
+
+                                  <a href="index-oriya.html">   <button class="lang-btn" data-language="odia">
+                                 <div class="lang-btn-content">
+                                        <span class="lang-name">ଓଡ଼ିଆ</span>
+                                        <span class="lang-label">Odia</span>
+                                    </div>
+                                    <img src="./assets/images/forward-arrow-grey.svg" alt="arrow">
+                                </button></a>
+
+                                <!-- Row 3 -->
+                                  <a href="index-bengali.html">  <button class="lang-btn" data-language="bengali">
+                                  <div class="lang-btn-content">
+                                        <span class="lang-name">বাঙ্গালী</span>
+                                        <span class="lang-label">Bengali</span>
+                                    </div>
+                                    <img src="./assets/images/forward-arrow-grey.svg" alt="arrow">
+                                </button></a>
+
+                                <a href="index-kannada.html">   <button class="lang-btn" data-language="kannada">
+                                   <div class="lang-btn-content">
+                                        <span class="lang-name">ಕನ್ನಡ</span>
+                                        <span class="lang-label">Kannada</span>
+                                    </div>
+                                    <img src="./assets/images/forward-arrow-grey.svg" alt="arrow">
+                                </button> </a>
+
+                                <a href="index-marathi.html">   <button class="lang-btn" data-language="marathi">
+                                   <div class="lang-btn-content">
+                                        <span class="lang-name">मराठी</span>
+                                        <span class="lang-label">Marathi</span>
+                                    </div>
+                                    <img src="./assets/images/forward-arrow-grey.svg" alt="arrow">
+                                </button>  </a>
+                                <a href="index-punjabi.html">  <button class="lang-btn" data-language="panjabi">
+                                     <div class="lang-btn-content">
+                                        <span class="lang-name">ਪੰਜਾਬੀ</span>
+                                        <span class="lang-label">Punjabi</span>
+                                    </div>
+                                    <img src="./assets/images/forward-arrow-grey.svg" alt="arrow">
+                                </button>  </a>
+                                <a href="index-eng.html">    <button class="lang-btn" data-language="panjabi">
+                                   <div class="lang-btn-content">
+                                        <span class="lang-name">English</span>
+                                        <span class="lang-label">English</span>
+                                    </div>
+                                   <img src="./assets/images/forward-arrow-grey.svg" alt="arrow">
+                                </button></a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+    <div class="modal fade" id="qrCodeModal" tabindex="-1" aria-labelledby="qrCodeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content qr-modal-content">
+                <div class="qr-modal-header">
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="qr-modal-body">
+                    <p class="qr-modal-title">Scan the QR with your Mobile <br> to download the application.</p>
+                    <div class="qr-code-container">
+                        <div class="qr-brackets-frame">
+                            <img src="./assets/images/qr-brackets.svg" alt="brackets">
+                        </div>
+                        <img class="qr-code-img" src="./assets/qr-code/jodii-eng-qr.svg" alt="QR Code">
+                    </div>
+                    <div class="qr-modal-footer">
+                        <img src="./assets/images/jodii-logo.svg" alt="Jodii Logo" class="qr-modal-logo">
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Bootstrap JS -->
+    <script src="js/jquery.min.js?v=1234"></script>
+    <script src="js/bootstrap.bundle.min.js?v=1234"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"></script>
+    <!-- Language Selection Script -->
+    <script src="js/language-selection.js?v=12345"></script>
+</body>
+</html>
