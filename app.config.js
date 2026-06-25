@@ -12,9 +12,7 @@ module.exports = ({ config }) => ({
   slug: 'jodii',
   scheme: f.scheme,
   icon: f.icon,
-  runtimeVersion: {
-    policy: 'appVersion',
-  },
+  runtimeVersion: '1.0.0',
   updates: {
     url: 'https://stgimg.jodii.app/jodii-ota-server/jodii-ota-server/manifest.php',
     fallbackToCacheTimeout: 0,

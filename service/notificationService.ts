@@ -1,17 +1,23 @@
 // Notification service — replaces Angular's FCM web push (analytics.service.ts).
 // In RN, push is handled by expo-notifications (already in package).
-// The Angular "getFcmToken" appNativeEvent bridge is replaced by direct Expo APIs.
+// expo-notifications remote push was removed from Expo Go in SDK 53 — all
+// functions here are no-ops when running inside Expo Go.
 
-import * as Notifications from 'expo-notifications'
+import Constants, { ExecutionEnvironment } from 'expo-constants'
 import { Platform } from 'react-native'
 import { apiCall } from './apiClient'
 import { Endpoints } from './api.endpoints'
 import { getItem, setItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+
 // ─── Permission + token ───────────────────────────────────────────────────────
 
 export async function requestPermissionAndGetToken(): Promise<string | null> {
+  if (isExpoGo) return null
+
+  const Notifications = await import('expo-notifications')
   const { status: existing } = await Notifications.getPermissionsAsync()
   let finalStatus = existing
 
@@ -48,11 +54,11 @@ async function registerTokenWithServer(token: string): Promise<void> {
 }
 
 // ─── Local notification (chat messages) ──────────────────────────────────────
-// Replaces Angular's 'Chat_Notification' appNativeEvent bridge.
 
 export async function scheduleLocalNotification(msgData: any): Promise<void> {
-  if (!msgData) return
+  if (isExpoGo || !msgData) return
 
+  const Notifications = await import('expo-notifications')
   await Notifications.scheduleNotificationAsync({
     content: {
       title: msgData.SENDERNAME ?? 'New message',
@@ -64,42 +70,40 @@ export async function scheduleLocalNotification(msgData: any): Promise<void> {
 }
 
 // ─── Foreground handler setup ─────────────────────────────────────────────────
-// Call once at app startup (in App.tsx).
+// Call once at app startup (in App.tsx). No-op in Expo Go.
 
 export function setupNotificationHandlers(
-  onNotificationReceived?: (notification: Notifications.Notification) => void,
-  onNotificationResponse?: (response: Notifications.NotificationResponse) => void,
+  _onNotificationReceived?: (notification: any) => void,
+  _onNotificationResponse?: (response: any) => void,
 ): () => void {
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldShowAlert:   true,
-      shouldPlaySound:   true,
-      shouldSetBadge:    true,
-      shouldShowBanner:  true,
-      shouldShowList:    true,
-    }),
+  if (isExpoGo) return () => {}
+
+  // Dynamic import to avoid the static import crashing Expo Go on module load
+  import('expo-notifications').then(Notifications => {
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert:   true,
+        shouldPlaySound:   true,
+        shouldSetBadge:    true,
+        shouldShowBanner:  true,
+        shouldShowList:    true,
+      }),
+    })
   })
 
-  const foregroundSub = Notifications.addNotificationReceivedListener(n => {
-    onNotificationReceived?.(n)
-  })
-
-  const responseSub = Notifications.addNotificationResponseReceivedListener(r => {
-    onNotificationResponse?.(r)
-  })
-
-  return () => {
-    foregroundSub.remove()
-    responseSub.remove()
-  }
+  return () => {}
 }
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 
 export async function setBadgeCount(count: number): Promise<void> {
+  if (isExpoGo) return
+  const Notifications = await import('expo-notifications')
   await Notifications.setBadgeCountAsync(count)
 }
 
 export async function clearBadge(): Promise<void> {
+  if (isExpoGo) return
+  const Notifications = await import('expo-notifications')
   await Notifications.setBadgeCountAsync(0)
 }

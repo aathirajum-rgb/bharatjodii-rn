@@ -185,7 +185,7 @@ const PRESERVE_KEYS = [
   'SEARCHLOGINCOUNT',
   'SHOWAPPRATINGDATE',
   'SHOWAPPRATINGCOUNT',
-  StorageKeys.App.UPI_APPS,
+  StorageKeys.Payment.UPI_APPS,
   StorageKeys.App.APP_VERSION,
   StorageKeys.Auth.APP_TYPE,
   'LANG_SELECTED',
@@ -212,7 +212,7 @@ export async function clearSession(): Promise<void> {
     StorageKeys.User.GENDER,
     StorageKeys.User.PHOTO_URL,
     StorageKeys.User.MEMBERSHIP_TYPE,
-    StorageKeys.Auth.LOGIN_GENDER,
+    StorageKeys.User.LOGIN_GENDER,
   ])
 
   if (Object.keys(entries).length > 0) {

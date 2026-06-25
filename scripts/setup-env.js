@@ -4,7 +4,7 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const env = process.argv[2];
 
-const VALID_ENVS = ['dev', 'uat', 'preprod', 'prod'];
+const VALID_ENVS = ['dev', 'stg', 'uat', 'preprod', 'prod'];
 if (!env || !VALID_ENVS.includes(env)) {
   console.error(`Usage: node scripts/setup-env.js <${VALID_ENVS.join('|')}>`);
   process.exit(1);

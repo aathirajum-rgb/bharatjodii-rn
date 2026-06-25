@@ -55,21 +55,20 @@ export async function getJson<T>(key: string): Promise<T | null> {
 //  MULTIPLE VALUES  (more efficient than calling one-by-one)
 // ─────────────────────────────────────────────────────────────
 
-/** Save multiple key-value pairs in one call */
+/** Save multiple key-value pairs in parallel */
 export async function setMultiple(pairs: Record<string, string>): Promise<void> {
-  const entries = Object.entries(pairs) as [string, string][]
-  await AsyncStorage.multiSet(entries)
+  await Promise.all(Object.entries(pairs).map(([key, value]) => AsyncStorage.setItem(key, value)))
 }
 
-/** Get multiple keys in one call — returns a key→value map */
+/** Get multiple keys in parallel — returns a key→value map */
 export async function getMultiple(keys: string[]): Promise<Record<string, string | null>> {
-  const pairs = await AsyncStorage.multiGet(keys)
-  return Object.fromEntries(pairs)
+  const values = await Promise.all(keys.map(key => AsyncStorage.getItem(key)))
+  return Object.fromEntries(keys.map((key, i) => [key, values[i]]))
 }
 
-/** Remove multiple keys in one call */
+/** Remove multiple keys in parallel */
 export async function removeMultiple(keys: string[]): Promise<void> {
-  await AsyncStorage.multiRemove(keys)
+  await Promise.all(keys.map(key => AsyncStorage.removeItem(key)))
 }
 
 // ─────────────────────────────────────────────────────────────

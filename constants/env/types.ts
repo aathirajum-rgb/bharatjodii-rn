@@ -1,4 +1,4 @@
-export type AppEnv = 'dev' | 'uat' | 'preprod' | 'prod'
+export type AppEnv = 'dev' | 'stg' | 'uat' | 'preprod' | 'prod'
 
 export interface IEnvConfig {
   env:        AppEnv

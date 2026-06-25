@@ -56,12 +56,13 @@ export async function requestLocationWithCoordinates(): Promise<LocationData> {
     accuracy: Location.Accuracy.High,
   });
 
-  return {
+  const result: LocationData = {
     status: 'granted',
     latitude: location.coords.latitude,
     longitude: location.coords.longitude,
-    accuracy: location.coords.accuracy ?? undefined,
-  };
+  }
+  if (location.coords.accuracy != null) result.accuracy = location.coords.accuracy
+  return result
 }
 
 // ─── Push Notification ───────────────────────────────────────────────────────

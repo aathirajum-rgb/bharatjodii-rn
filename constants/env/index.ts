@@ -1,10 +1,11 @@
 import type { AppEnv, IEnvConfig } from './types'
 import dev     from './env.dev'
+import stg     from './env.stg'
 import uat     from './env.uat'
 import preprod from './env.preprod'
 import prod    from './env.prod'
 
-const envMap: Record<AppEnv, IEnvConfig> = { dev, uat, preprod, prod }
+const envMap: Record<AppEnv, IEnvConfig> = { dev, stg, uat, preprod, prod }
 
 const APP_ENV = (process.env.EXPO_PUBLIC_APP_ENV as AppEnv) ?? 'dev'
 

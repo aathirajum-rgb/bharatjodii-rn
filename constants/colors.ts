@@ -1,0 +1,67 @@
+// Jodii design token — single source of truth for all colors.
+// Import from here instead of hardcoding hex values in components.
+
+export const Colors = {
+  // ── Brand ─────────────────────────────────────────────────────────────────
+  primary:          '#C62828',   // main brand red
+  primaryDark:      '#B50033',   // darker red (borders, pressed states)
+  primaryDeep:      '#8D0028',   // deep maroon (secondary text on light surfaces)
+  primaryLight:     '#e57373',   // light red (disabled button bg)
+  primarySurface:   '#fff0f0',   // very light red (badge background)
+  primarySurfaceAlt:'#fff5f5',   // light red tint (OTP box filled bg)
+
+  // ── Input border states ───────────────────────────────────────────────────
+  inputBorder:      '#B0B0B0',   // default / unfocused
+  inputFocus:       '#4797D9',   // focused (blue)
+  inputError:       '#DE2A68',   // error (red-pink)
+
+  // ── Text ──────────────────────────────────────────────────────────────────
+  textPrimary:      '#111111',   // headings, body
+  textDark:         '#333333',   // slightly lighter primary text
+  textMedium:       '#555555',   // subtitle, softer body
+  textSecondary:    '#666666',   // captions, descriptions
+  textTertiary:     '#888888',   // dimmed labels, timers
+  textPlaceholder:  '#999999',   // placeholder, terms
+  textMuted:        '#aaaaaa',   // dev-only labels, very light
+
+  // ── Background / Surface ──────────────────────────────────────────────────
+  background:       '#f4f4f6',   // page/screen background
+  surface:          '#ffffff',   // card, modal surface
+  surfaceAlt:       '#fafafa',   // picker rows, OTP box bg
+  surfaceInput:     '#f5f5f5',   // country-code picker button bg
+
+  // ── Borders ───────────────────────────────────────────────────────────────
+  border:           '#dddddd',   // default border (inputs, cards)
+  borderLight:      '#cccccc',   // slightly lighter border
+  divider:          '#f0f0f0',   // list dividers, card top borders
+  borderBadge:      '#ffcccc',   // badge / chip border (light red)
+
+  // ── Utility ───────────────────────────────────────────────────────────────
+  white:            '#ffffff',
+  black:            '#000000',
+  shadow:           '#000000',
+
+  // ── System accents (non-brand) ─────────────────────────────────────────────
+  success:          '#30D158',   // OTA live badge
+  devAccent:        '#1A237E',   // Component Library header / button
+
+  // ── Link / CTA ──────────────────────────────────────────────────────────────
+  link:             '#29339B',   // contact CTA blue (LinkCTA component)
+
+  // ── Selection / form states ──────────────────────────────────────────────────
+  selectionBg:     '#FFF1F5',              // checked row bg (checkbox / radio list)
+  radioCheckedBg:  'rgba(181, 0, 51, 0.02)', // checked pill bg (nearly transparent)
+
+  // ── Chip states ─────────────────────────────────────────────────────────────
+  chipBorderActive:    'rgba(181, 0, 51, 0.40)',    // selected / checked border
+  chipSurfaceSelected: '#FAE7ED',                   // selected fill
+  chipSurfaceChecked:  'rgba(249, 230, 235, 0.20)', // checked fill (subtle)
+
+  // ── Badge surfaces ───────────────────────────────────────────────────────────
+  badgePaidBg:       '#FFF8E1',   // paid-member badge background
+  badgePaidText:     '#E65100',   // paid-member text
+  badgeVerifiedBg:   '#E8F0FE',   // id-verified badge background
+  badgeVerifiedText: '#1565C0',   // id-verified text
+  badgeNewBg:        '#E8F5E9',   // newly-joined badge background
+  badgeNewText:      '#2E7D32',   // newly-joined text
+}

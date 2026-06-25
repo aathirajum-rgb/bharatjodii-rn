@@ -3,6 +3,10 @@ node_modules/
 dist/
 web-build/
 
+# macOS Finder metadata — never commit
+.DS_Store
+**/.DS_Store
+
 # Generated .env (never commit this — it's copied by setup-env.js)
 .env
 

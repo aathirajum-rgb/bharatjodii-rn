@@ -2,6 +2,7 @@
 // Maps 1:1 to React Navigation screen names.
 export enum ENavigation {
   LOGIN = 'login',
+  OTP = 'otp',
   WELCOME = 'welcome',
   REGISTRATION = 'registration',
   FILTER = 'filter',
