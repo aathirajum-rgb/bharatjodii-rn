@@ -4,6 +4,18 @@ import { StorageKeys } from '../constants/storage.keys'
 import { AUTH_ONLY_ENDPOINTS, MEDIA_ENDPOINTS } from './api.endpoints'
 
 // ─────────────────────────────────────────────────────────────
+//  LOGOUT CALLBACK
+//  AuthProvider registers this so ERRCODE 23 can flip the
+//  navigation stack to AuthStack without importing React here.
+// ─────────────────────────────────────────────────────────────
+
+let _onLogout: (() => void) | null = null
+
+export function registerLogoutCallback(fn: () => void): void {
+  _onLogout = fn
+}
+
+// ─────────────────────────────────────────────────────────────
 //  AXIOS INSTANCE
 // ─────────────────────────────────────────────────────────────
 
@@ -218,6 +230,9 @@ export async function clearSession(): Promise<void> {
   if (Object.keys(entries).length > 0) {
     await setMultiple(entries)
   }
+
+  // Notify AuthContext → switches navigator to AuthStack
+  _onLogout?.()
 }
 
 // ─────────────────────────────────────────────────────────────

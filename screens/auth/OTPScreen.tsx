@@ -19,7 +19,9 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import i18n from '../../i18n'
 import { parseAndStoreWebViewURL, resendOTP, verifyOTP } from '../../service/registrationService'
-import { getItem } from '../../service/storageService'
+import { getItem, setItem } from '../../service/storageService'
+import { StorageKeys } from '../../constants/storage.keys'
+import { useAuth } from '../../contexts/AuthContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -45,6 +47,7 @@ export default function OTPScreen({ navigation, route }: Props) {
   const { mobile, countryCode, matriId } = route.params
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
+  const { loginUpdate } = useAuth()
 
   const [otpValues,    setOtpValues]    = useState<string[]>(Array(OTP_LENGTH).fill(''))
   const [error,        setError]        = useState('')
@@ -53,7 +56,10 @@ export default function OTPScreen({ navigation, route }: Props) {
   const [resending,    setResending]    = useState(false)
   const [showSuccess,  setShowSuccess]  = useState(false)
 
-  const inputRefs = useRef<Array<TextInput | null>>(Array(OTP_LENGTH).fill(null))
+  // Hold userId until OTPSuccessSheet dismisses so loginUpdate fires after animation
+  const pendingUserId = useRef<string>('')
+
+  const inputRefs     = useRef<Array<TextInput | null>>(Array(OTP_LENGTH).fill(null))
 
   // Auto-focus first box on mount — matches Angular ionViewDidEnter setFocusOnOtpPage
   useEffect(() => {
@@ -139,8 +145,17 @@ export default function OTPScreen({ navigation, route }: Props) {
       const nallow = await getItem('NALLOW') ?? '0'
       const res    = await verifyOTP('otp', { ...buildParams(otpValues.join('')), NALLOW: nallow })
       if (res?.RESPONSECODE == 1) {
-        if (res?.RESPONSE?.WEBVIEWURL) {
-          await parseAndStoreWebViewURL(res.RESPONSE.WEBVIEWURL)
+        // Store tokens — wrapped so a storage failure doesn't block the success UI.
+        // ATN/RTN are at root of response; WEBVIEWURL carries profile data only.
+        try {
+          if (res.ATN) await setItem(StorageKeys.Auth.TOKEN, res.ATN)
+          if (res.RTN) await setItem(StorageKeys.Auth.REFRESH_TOKEN, res.RTN)
+          if (res?.RESPONSE?.WEBVIEWURL) {
+            await parseAndStoreWebViewURL(res.RESPONSE.WEBVIEWURL)
+          }
+          pendingUserId.current = (await getItem(StorageKeys.Auth.USER_ID)) ?? ''
+        } catch (storageErr) {
+          if (__DEV__) console.error('[OTP] storage error (non-fatal):', storageErr)
         }
         setShowSuccess(true)
       } else {
@@ -150,7 +165,8 @@ export default function OTPScreen({ navigation, route }: Props) {
         setOtpValues(Array(OTP_LENGTH).fill(''))
         setTimeout(() => inputRefs.current[0]?.focus(), 50)
       }
-    } catch {
+    } catch (e) {
+      if (__DEV__) console.error('[OTP] handleVerify network error:', e)
       setError(t('GENERAL.NOINTERNET', 'No internet connection'))
     } finally {
       setLoading(false)
@@ -307,11 +323,12 @@ export default function OTPScreen({ navigation, route }: Props) {
         </View>
       </KeyboardAvoidingView>
       {/* OTP success bottom sheet — auto-closes after 3s then navigates to onboarding */}
+      {/* Success sheet plays for 3s, then loginUpdate fires.
+          AuthContext sets isAuthenticated=true → RootNavigation switches
+          to AppStack which starts at 'onboarding' for new users. */}
       <OTPSuccessSheet
         visible={showSuccess}
-        onDismiss={() =>
-          navigation.reset({ index: 0, routes: [{ name: 'onboarding', params: { pageNo: '1' } }] })
-        }
+        onDismiss={() => loginUpdate(pendingUserId.current)}
       />
     </View>
   )

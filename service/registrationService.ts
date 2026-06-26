@@ -121,13 +121,21 @@ export async function storeWebURLData(data: Record<string, any>): Promise<void> 
   if (data.FEMALEFREECONACT) ops.push(setItem(SK.Promotions.FEMALE_FREE_CONTACT, JSON.stringify(data.FEMALEFREECONACT)))
   if (data.PAYMENTWALL)      ops.push(setItem(SK.Payment.PAYMENT_WALL,    JSON.stringify(data.PAYMENTWALL)))
   if (data['S&FPROMOTION'])  ops.push(setItem(SK.Promotions.SF_PROMOTION, JSON.stringify(data['S&FPROMOTION'])))
-  if (data.FEMALEFREEPROMO)  ops.push(setItem('FEMALEFREEPROMO',          JSON.stringify(data.FEMALEFREEPROMO)))
-  if (data.NONIDVUTYPE)      ops.push(setItem('NONIDVUTYPE',              data.NONIDVUTYPE))
+  if (data.NONIDVUTYPE)      ops.push(setItem('NONIDVUTYPE',              JSON.stringify(data.NONIDVUTYPE)))
   if (data.PHOTOSTATUSARRAY) ops.push(setItem('PHOTOSTATUSARRAY',         JSON.stringify(data.PHOTOSTATUSARRAY)))
-  if (data.PROFILEPUBLISHEDFLAG) ops.push(setItem('PROFILEPUBLISHEDFLAG', data.PROFILEPUBLISHEDFLAG))
 
-  // Remaining known scalar keys stored as-is
-  const SCALAR_KEYS = ['RENEWALENABLEKEY', 'PAYRENEWALFLAG', 'PAYMENTPACKAGE', 'NEWPPCALL', 'APPVERSION']
+  // Use !== undefined so falsy values (0, "") are still written — matches Angular behaviour
+  const SCALAR_KEYS = [
+    'RENEWALENABLEKEY', 'PAYRENEWALFLAG', 'PAYMENTPACKAGE', 'NEWPPCALL', 'APPVERSION',
+    // Profile data
+    'NAME', 'PHOTOURL', 'LOGINCOUNT', 'DATEOFBIRTH', 'CREATEDBY', 'RELIGIONKEY',
+    'PHONEVERIFIED', 'LASTLOGIN', 'FREETRAILVALIDDAY', 'RENEWALDAY',
+    // Flags (stored as "0"/"1" strings — same as Angular localStorage)
+    'NALLOW', 'FEMALEFREEPROMO', 'PROFILEPUBLISHEDFLAG', 'PROFILEPUBLISHEDTYPE',
+    'PAYPROMO', 'PROFILEVERIFIED', 'DEFERREDIDUSER', 'LOGINTYPE', 'NRIWHATSAPP',
+    'IPCOUNTRYCODE', 'AIVFLAG', 'SHORTLISTENABLE', 'SURVEYPOPUP',
+    'GLASSBOXFLAG', 'UPIFLAG', 'RPAYFLAG', 'DRNEXT',
+  ]
   SCALAR_KEYS.forEach(k => { if (data[k] !== undefined) ops.push(setItem(k, String(data[k]))) })
 
   await Promise.all(ops)
