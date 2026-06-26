@@ -1,186 +1,215 @@
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
-import { FlatList, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
+import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AppHeader from '../components/app-header/AppHeader';
+import ButtonRevamp from '../components/button-revamp/ButtonRevamp';
+import { Colors } from '../constants/colors';
+import i18n from '../i18n';
+import { getCurrentLanguage, submitLanguage } from '../service/languageService';
 
-// Angular Ionic PWA uses a centered column max ~480px on wide screens
-const MAX_WIDTH = 480;
-
+// Language order matches Figma design (en.json node-id 11851:6689)
 const LANGUAGES = [
-  { id: 'tm', native: 'தமிழ்', english: 'Tamil' },
-  { id: 'en', native: 'English', english: 'English' },
-  { id: 'tl', native: 'తెలుగు', english: 'Telugu' },
-  { id: 'ml', native: 'മലയാളം', english: 'Malayalam' },
-  { id: 'kn', native: 'ಕನ್ನಡ', english: 'Kannada' },
-  { id: 'mt', native: 'मराठी', english: 'Marathi' },
-  { id: 'or', native: 'ଓଡ଼ିଆ', english: 'Odia' },
-  { id: 'gj', native: 'ગુજરાતી', english: 'Gujarati' },
-  { id: 'bn', native: 'বাংলা', english: 'Bengali' },
-  { id: 'hi', native: 'हिंदी', english: 'Hindi' },
-  { id: 'pa', native: 'ਪੰਜਾਬੀ', english: 'Punjabi' },
-];
+  { id: 'en', native: 'English',   english: 'English'   },
+  { id: 'tm', native: 'தமிழ்',     english: 'Tamil'     },
+  { id: 'tl', native: 'తెలుగు',    english: 'Telugu'    },
+  { id: 'hi', native: 'हिंदी',      english: 'Hindi'     },
+  { id: 'ml', native: 'മലയാളം',    english: 'Malayalam' },
+  { id: 'kn', native: 'ಕನ್ನಡ',     english: 'Kannada'   },
+  { id: 'bn', native: 'বাংলা',      english: 'Bengali'   },
+  { id: 'mt', native: 'मराठी',      english: 'Marathi'   },
+  { id: 'or', native: 'ଓଡ଼ିଆ',     english: 'Odia'      },
+  { id: 'gj', native: 'ગુજરાતી',   english: 'Gujarati'  },
+  { id: 'pa', native: 'ਪੰਜਾਬੀ',    english: 'Punjabi'   },
+] as const;
 
-type Language = (typeof LANGUAGES)[number];
+type LangId = (typeof LANGUAGES)[number]['id'];
 
-type Props = {
-  onSelect: (langId: string) => void;
-};
+type Props = { onSelect: (langId: string) => void; navigation?: any };
 
-export default function LanguageSelectionScreen({ onSelect }: Props) {
-  const [selected, setSelected] = useState<string | null>(null);
+export default function LanguageSelectionScreen({ onSelect, navigation }: Props) {
+  const [selected, setSelected]   = useState<LangId | null>(null);
+  const [submitting, setSubmitting] = useState(false);
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
 
-  const renderItem = ({ item }: { item: Language }) => {
-    const isSelected = selected === item.id;
-    return (
-      <TouchableOpacity
-        style={[styles.card, isSelected && styles.cardSelected]}
-        onPress={() => setSelected(item.id)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.cardContent}>
-          <Text style={styles.nativeName}>{item.native}</Text>
-          <Text style={styles.englishName}>{item.english}</Text>
-        </View>
-        <View style={[styles.radio, isSelected && styles.radioSelected]}>
-          {isSelected && <View style={styles.radioDot} />}
-        </View>
-      </TouchableOpacity>
-    );
+  const handleNext = async () => {
+    if (!selected || submitting) return;
+    setSubmitting(true);
+    const current = await getCurrentLanguage();
+    await Promise.all([
+      i18n.changeLanguage(selected),
+      submitLanguage(current, selected),
+    ]);
+    if (navigation?.canGoBack()) {
+      navigation.goBack();
+    } else {
+      onSelect(selected);
+    }
   };
 
-  const footerHeight = 80 + (Platform.OS === 'ios' ? insets.bottom : 16);
-
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <View style={styles.screen}>
       <StatusBar style="dark" />
-      <View style={styles.inner}>
-        <Text style={styles.heading}>Choose your display language</Text>
-        <FlatList
-          data={LANGUAGES}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          numColumns={2}
-          columnWrapperStyle={styles.row}
-          contentContainerStyle={[styles.list, { paddingBottom: footerHeight + 12 }]}
-          showsVerticalScrollIndicator={false}
-        />
-        <View style={[styles.footer, { paddingBottom: Platform.OS === 'ios' ? insets.bottom : 16 }]}>
-          <TouchableOpacity
-            style={[styles.selectBtn, !selected && styles.selectBtnDisabled]}
-            onPress={() => selected && onSelect(selected)}
-            disabled={!selected}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.selectBtnText}>SELECT</Text>
-          </TouchableOpacity>
+
+      <AppHeader
+        type="registration"
+        showBackBtn={navigation?.canGoBack() ?? false}
+        onBackPress={() => navigation?.goBack()}
+      />
+
+      {/* Scrollable area: title + 2-col language grid */}
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: FOOTER_H + (Platform.OS === 'ios' ? insets.bottom : 20) + 12 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.title}>{t('LOGIN_PAGE.SELECT_LANG')}</Text>
+
+        <View style={styles.grid}>
+          {LANGUAGES.map(lang => {
+            const isSelected = selected === lang.id;
+            return (
+              <Pressable
+                key={lang.id}
+                style={[styles.card, isSelected && styles.cardSelected]}
+                onPress={() => setSelected(lang.id)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: isSelected }}
+                accessibilityLabel={`${lang.native} ${lang.english}`}
+              >
+                <View style={styles.cardText}>
+                  <Text style={styles.nativeName} numberOfLines={1}>{lang.native}</Text>
+                  <Text style={styles.englishName} numberOfLines={1}>{lang.english}</Text>
+                </View>
+                <View style={[styles.radio, isSelected && styles.radioSelected]}>
+                  {isSelected && <View style={styles.radioDot} />}
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
+      </ScrollView>
+
+      {/* Sticky footer CTA — Primary CTA (Figma node 561:518 → ButtonRevamp) */}
+      <View
+        style={[
+          styles.footer,
+          { paddingBottom: Platform.OS === 'ios' ? insets.bottom : 20 },
+        ]}
+      >
+        <ButtonRevamp
+          label={t('LOGIN_PAGE.NEXT', 'Next')}
+          variant="primary"
+          size="standard"
+          fullWidth
+          disabled={!selected}
+          loading={submitting}
+          onPress={handleNext}
+        />
       </View>
     </View>
   );
 }
 
-const BRAND = '#B30033';
+// ─── Design tokens (from Figma node 11851:6689) ───────────────────────────────
+
+const GRID_H_PAD = 24;   // horizontal padding matching Figma left:24px
+const GRID_GAP   = 16;   // gap between cards
+const CARD_W     = 148;  // fixed card width (2 cards + gap = 312px content area)
+const CARD_H     = 64;   // fixed card height
+const FOOTER_H   = 84;   // footer container height
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
+  screen: {
+    flex:            1,
+    backgroundColor: Colors.surface,
   },
-  inner: {
-    flex: 1,
-    width: '100%',
-    maxWidth: MAX_WIDTH,
+
+  // Scrollable content
+  scrollContent: {
+    paddingHorizontal: GRID_H_PAD,
+    paddingTop:        12,
   },
-  heading: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#1f1e1b',
-    textAlign: 'center',
-    marginTop: 20,
-    marginBottom: 16,
-    paddingHorizontal: 20,
+  title: {
+    fontSize:     22,
+    fontWeight:   '600',
+    color:        Colors.textPrimary,
+    marginBottom: 24,
   },
-  list: {
-    paddingHorizontal: 12,
-  },
-  row: {
-    justifyContent: 'space-between',
-    marginBottom: 12,
-  },
-  card: {
-    width: '48%',
-    borderWidth: 1,
-    borderColor: '#e1e1e1',
-    borderRadius: 8,
-    padding: 14,
-    backgroundColor: '#fff',
+
+  // 2-column grid using flexWrap (avoids FlatList numColumns quirks)
+  grid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexWrap:      'wrap',
+    gap:           GRID_GAP,
+  },
+
+  // Language card
+  card: {
+    width:           CARD_W,
+    height:          CARD_H,
+    borderWidth:     1,
+    borderColor:     Colors.inputBorder,
+    borderRadius:    8,
+    backgroundColor: Colors.surface,
+    flexDirection:   'row',
+    alignItems:      'center',
+    paddingLeft:     16,
+    paddingRight:    10,
   },
   cardSelected: {
-    borderColor: BRAND,
-    backgroundColor: '#FEFAFB',
+    borderColor:     Colors.primaryDark,
+    backgroundColor: Colors.selectionBg,
   },
-  cardContent: {
+  cardText: {
     flex: 1,
+    gap:  8,
   },
   nativeName: {
-    fontSize: 16,
+    fontSize:   16,
     fontWeight: '600',
-    color: '#1f1e1b',
+    color:      Colors.textPrimary,
   },
   englishName: {
     fontSize: 12,
-    color: '#666666',
-    marginTop: 2,
+    color:    Colors.textSecondary,
   },
+
+  // Radio indicator (Figma: 24×24, Radio Button node 824:2040)
   radio: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 2,
-    borderColor: '#cccccc',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-    flexShrink: 0,
+    width:           24,
+    height:          24,
+    borderRadius:    12,
+    borderWidth:     2,
+    borderColor:     Colors.inputBorder,
+    alignItems:      'center',
+    justifyContent:  'center',
+    flexShrink:      0,
   },
   radioSelected: {
-    borderColor: BRAND,
+    borderColor: Colors.primaryDark,
   },
   radioDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 5,
-    backgroundColor: BRAND,
+    width:           12,
+    height:          12,
+    borderRadius:    6,
+    backgroundColor: Colors.primaryDark,
   },
+
+  // Sticky footer
   footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: '#fff',
-    paddingTop: 12,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-  },
-  selectBtn: {
-    backgroundColor: BRAND,
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  selectBtnDisabled: {
-    backgroundColor: '#cccccc',
-  },
-  selectBtnText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    position:          'absolute',
+    bottom:            0,
+    left:              0,
+    right:             0,
+    paddingHorizontal: GRID_H_PAD,
+    paddingTop:        20,
+    backgroundColor:   Colors.surface,
   },
 });

@@ -28,7 +28,7 @@ export interface AppHeaderProps {
 
   // ── registration / signIn ───────────────────────────────────────────────
   showBackBtn?:     boolean | undefined
-  languageLabel?:   string  | undefined   // e.g. "English"
+  languageLabel?:   string  | undefined   // e.g. "Eng"
 
   // ── Callbacks ────────────────────────────────────────────────────────────
   onMenuPress?:      (() => void) | undefined
@@ -170,7 +170,9 @@ export default function AppHeader({
             <Text style={styles.backChevron}>{'‹'}</Text>
           </Pressable>
         )}
+
         <View style={styles.flex1} />
+
         {languageLabel && (
           <Pressable style={styles.langBtn} onPress={onLanguagePress}>
             <Image source={{ uri: ICONS.lang }} style={styles.langIcon} resizeMode="contain" />
@@ -334,9 +336,16 @@ const styles = StyleSheet.create({
     paddingTop:        24,
   },
   langBtn: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           4,
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               4,
+    borderWidth:       1,
+    borderColor:       'rgba(138,138,138,1)',
+    borderRadius:      8,
+    paddingVertical:   4,
+    paddingHorizontal: 8,
+    height:            36,
+    marginTop:         4,
   },
   langIcon: {
     width:  24,

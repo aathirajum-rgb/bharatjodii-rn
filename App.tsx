@@ -7,12 +7,15 @@ import * as Network from 'expo-network';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
+import './i18n'; // initialise i18next — must be imported before any screen renders
+import i18n from './i18n';
 
 import { Alert, Image, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Colors } from './constants/colors';
 import { useOTAInfo, useOTAStatus, useOTAUpdate } from './hooks/useOTAUpdate';
 import LoginScreen from './screens/auth/LoginScreen';
 import OTPScreen from './screens/auth/OTPScreen';
+import CreatedByScreen from './screens/onboarding/CreatedByScreen';
 import ComponentShowcaseScreen from './screens/dev/ComponentShowcaseScreen';
 import GalleryScreen from './screens/GalleryScreen';
 import LanguageSelectionScreen from './screens/LanguageSelectionScreen';
@@ -181,20 +184,34 @@ function HomeScreen({ navigation }: { navigation: any }) {
 async function initializeAppConfig(): Promise<void> {
   const version = Constants.expoConfig?.version ?? '1.0.0'
   await Promise.all([
-    setItem(StorageKeys.Auth.APP_TYPE, appType),   // 115 / 116 / 118 per flavor
-    setItem(StorageKeys.Auth.WEB_LOGIN, '0'),       // 0 = native app (not web PWA)
+    setItem(StorageKeys.Auth.APP_TYPE, appType),
+    setItem(StorageKeys.Auth.WEB_LOGIN, '0'),
     setItem('APPVERSION', version),
     setItem('GLASSBOXFLAG', '0'),
-    // Only set LANG if it hasn't been set by a previous language selection
-    getItem(StorageKeys.Auth.LANG).then(lang => {
-      if (!lang) return setItem(StorageKeys.Auth.LANG, 'en')
-    }),
   ])
+
+  // Read saved language (or default to 'en') and apply to i18next
+  let lang = await getItem(StorageKeys.Auth.LANG)
+  if (!lang) {
+    lang = 'en'
+    await setItem(StorageKeys.Auth.LANG, lang)
+  }
+  await i18n.changeLanguage(lang)
+}
+
+// Routes onboarding pageNo to the correct screen.
+// Add new cases here as each onboarding page is implemented.
+function OnboardingRouter({ navigation, route }: { navigation: any; route: any }) {
+  const pageNo = route.params?.pageNo ?? '1'
+  switch (pageNo) {
+    case '1': return <CreatedByScreen navigation={navigation} route={route} />
+    default:  return <HomeScreen navigation={navigation} />
+  }
 }
 
 export default function App() {
   useOTAUpdate();
-  const [initialRoute, setInitialRoute] = useState<'login' | 'Home'>('login');
+  const [initialRoute, setInitialRoute] = useState<'Splash' | 'Home'>('Splash');
   const [authChecked, setAuthChecked]   = useState(false);
 
   useEffect(() => {
@@ -206,7 +223,7 @@ export default function App() {
     // Init config first, then check auth — order matters
     initializeAppConfig().then(() =>
       getItem(StorageKeys.Auth.TOKEN).then(token => {
-        setInitialRoute(token ? 'Home' : 'login')
+        setInitialRoute(token ? 'Home' : 'Splash')
         setAuthChecked(true)
       })
     )
@@ -217,7 +234,9 @@ export default function App() {
   return (
     <SafeAreaProvider>
     <NavigationContainer ref={navigationRef} linking={linking}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName={initialRoute}>
+
+        {/* ── Onboarding flow (new users) ──────────────────────────────────── */}
         <Stack.Screen name="Splash" options={{ animation: 'none' }}>
           {({ navigation }) => (
             <SplashAnimationScreen onFinish={() => navigation.replace('LanguageSelection')} />
@@ -226,17 +245,23 @@ export default function App() {
 
         <Stack.Screen name="LanguageSelection" options={{ animation: 'none' }}>
           {({ navigation }) => (
-            <LanguageSelectionScreen onSelect={() => navigation.replace('Home')} />
+            <LanguageSelectionScreen
+              navigation={navigation}
+              onSelect={() => navigation.replace('login')}
+            />
           )}
         </Stack.Screen>
-         <Stack.Screen name="login" component={LoginScreen} options={{ headerShown: false }} />
-        <Stack.Screen
-          name="otp"
-          component={OTPScreen}
-          options={{ title: 'Verify OTP', headerStyle: { backgroundColor: Colors.primary }, headerTintColor: Colors.white }}
-        />
-        <Stack.Screen name="Home" component={HomeScreen} />
 
+        {/* ── Auth screens ─────────────────────────────────────────────────── */}
+        <Stack.Screen name="login" component={LoginScreen} />
+        <Stack.Screen name="otp"   component={OTPScreen} />
+
+        {/* ── Main app ─────────────────────────────────────────────────────── */}
+        <Stack.Screen name="Home"       component={HomeScreen} />
+        <Stack.Screen name="dashboard"  component={HomeScreen} />
+        <Stack.Screen name="onboarding" component={OnboardingRouter} />
+
+        {/* ── Utility / secondary screens ──────────────────────────────────── */}
         <Stack.Screen
           name="Permissions"
           component={PermissionDemoScreen}
@@ -245,17 +270,16 @@ export default function App() {
         <Stack.Screen
           name="Gallery"
           component={GalleryScreen}
-          options={{  headerShown: true, title: 'Gallery', headerStyle: { backgroundColor: '#111' }, headerTintColor: Colors.white }}
+          options={{ headerShown: true, title: 'Gallery', headerStyle: { backgroundColor: '#111' }, headerTintColor: Colors.white }}
         />
         <Stack.Screen
           name="recharge"
           component={RechargeScreen}
-          options={{  headerShown: true, title: 'Membership Plans', headerStyle: { backgroundColor: Colors.primary }, headerTintColor: Colors.white }}
+          options={{ headerShown: true, title: 'Membership Plans', headerStyle: { backgroundColor: Colors.primary }, headerTintColor: Colors.white }}
         />
         <Stack.Screen
           name="payment-success"
           component={PaymentSuccessScreen}
-          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="ComponentShowcase"

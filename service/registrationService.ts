@@ -69,12 +69,37 @@ export async function parseAndStoreWebViewURL(webViewUrl: string): Promise<void>
   try {
     const loginSegment = webViewUrl.split('login/')[1]
     if (!loginSegment) return
-    const jsonStr = loginSegment.split('/2')[0]
+    // Locate the outermost JSON object by first { and last }
+    // Splitting on '/2' was fragile — the JSON itself can contain '/2'
+    const jsonStart = loginSegment.indexOf('{')
+    const jsonEnd   = loginSegment.lastIndexOf('}')
+    if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) return
+    const jsonStr = loginSegment.slice(jsonStart, jsonEnd + 1)
     const data    = JSON.parse(jsonStr)
     await storeWebURLData(data)
   } catch (e) {
     if (__DEV__) console.error('[parseWebViewURL]', e)
   }
+}
+
+// ─── Registration onboarding ──────────────────────────────────────────────────
+
+// Fetches PROFILECREATEDBY options from the initialfetch API.
+// Maps the server object {"1":"Myself","4":"Son's",...} to a typed array.
+// Excludes key "2" (Parents) which is not shown in the revamped UI.
+export async function fetchProfileCreatedByOptions(): Promise<Array<{ key: string; label: string }>> {
+  const ccode   = await getItem(SK.User.COUNTRY_CODE) ?? '91'
+  const lang    = await getItem(SK.Auth.LANG) ?? 'en'
+  const apptype = await getItem(SK.Auth.APP_TYPE) ?? '115'
+  const paramStr = `type=all&ccode=${ccode}&LANG=${lang}&APPTYPE=${apptype}`
+  const res = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
+  const raw = res?.RESPONSE?.PROFILECREATEDBY
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return (Object.entries(raw) as [string, string][])
+      .filter(([key]) => key !== '2')   // exclude 'Parents' — not in revamp UI
+      .map(([key, label]) => ({ key, label }))
+  }
+  return []
 }
 
 export async function storeWebURLData(data: Record<string, any>): Promise<void> {

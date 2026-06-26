@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
-  Alert,
+  Animated,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -12,254 +13,402 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
-import { login } from '../../service/registrationService'
-import { getItem } from '../../service/storageService'
+import { Colors } from '../../constants/colors'
 import { StorageKeys } from '../../constants/storage.keys'
+import i18n from '../../i18n'
+import { login } from '../../service/registrationService'
+import { getItem, setItem } from '../../service/storageService'
 import { ENavigation } from '../../types/enums/navigation.enum'
 
-// ─── Brand tokens (from Angular variables.scss) ───────────────────────────────
-const BG        = '#FAFAFA'
-const TEXT_DARK = '#1F1E1B'
-const TEXT_GREY = '#545454'
-const BORDER    = '#BD8800'       // item-border-edit — always amber
-const PINK      = '#DE2A68'
+// ─── Country codes (Angular signin.config.ts: COUNTRYCODELIST) ────────────────
 
-// Indian mobile: starts 6-9, exactly 10 digits
-const MOBILE_RE = /^[6-9][0-9]{9}$/
+const COUNTRIES = [
+  { code: '91',  name: 'India',                minLen: 10, maxLen: 10 },
+  { code: '971', name: 'United Arab Emirates', minLen: 8,  maxLen: 10 },
+  { code: '974', name: 'Qatar',                minLen: 8,  maxLen: 10 },
+  { code: '965', name: 'Kuwait',               minLen: 8,  maxLen: 10 },
+  { code: '968', name: 'Oman',                 minLen: 8,  maxLen: 10 },
+  { code: '973', name: 'Bahrain',              minLen: 8,  maxLen: 10 },
+  { code: '966', name: 'Saudi Arabia',         minLen: 8,  maxLen: 10 },
+] as const
+
+type Country = (typeof COUNTRIES)[number]
+
+// Angular signin.page.ts validateMobileNumber() — exact regex match
+function isValidMobile(mobile: string, country: Country): boolean {
+  if (mobile.length < country.minLen || mobile.length > country.maxLen) return false
+  const re = country.code === '91' ? /^[6-9][0-9]{7,11}$/ : /^[5-9][0-9]{7,11}$/
+  return re.test(mobile)
+}
+
+// Short labels for the header language pill (matches Angular language IDs)
+const LANG_LABEL: Record<string, string> = {
+  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
+  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function LoginScreen({ navigation }: { navigation: any }) {
+  const { t } = useTranslation()
   const insets = useSafeAreaInsets()
 
-  const [mobile,  setMobile]  = useState('')
-  const [name,    setName]    = useState('')
-  const [loading, setLoading] = useState(false)
-  const inputRef = useRef<TextInput>(null)
+  const [country,  setCountry]  = useState<Country>(COUNTRIES[0])
+  const [mobile,   setMobile]   = useState('')
+  const [dropOpen, setDropOpen] = useState(false)
+  const [focused,  setFocused]  = useState(false)
+  const [touched,  setTouched]  = useState(false)
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState('')
 
-  // Load returning user's name (shown in subtitle)
+  const inputRef  = useRef<TextInput>(null)
+  const labelAnim = useRef(new Animated.Value(0)).current
+
+  // Restore previously used country code
   useEffect(() => {
-    getItem(StorageKeys.User.NAME).then(n => { if (n) setName(n.trim()) })
+    getItem(StorageKeys.User.MEMBER_CODE).then(saved => {
+      const found = COUNTRIES.find(c => c.code === saved)
+      if (found) setCountry(found)
+    })
   }, [])
 
-  const isValid  = MOBILE_RE.test(mobile)
-  const canSubmit = isValid && !loading
+  // Auto-focus input on mount — matches Angular ionViewDidEnter setTimeout setFocus(100ms)
+  useEffect(() => {
+    const t = setTimeout(() => inputRef.current?.focus(), 300)
+    return () => clearTimeout(t)
+  }, [])
 
-  async function handleConfirm() {
-    if (!canSubmit) return
+  // Float the "Mobile number" label when focused or value present
+  useEffect(() => {
+    Animated.timing(labelAnim, {
+      toValue:         focused || mobile.length > 0 ? 1 : 0,
+      duration:        150,
+      useNativeDriver: false,
+    }).start()
+  }, [focused, mobile])
+
+  const valid = isValidMobile(mobile, country)
+  // Show validation error only after user has left the field (touched), not while typing
+  const showValidationError = touched && mobile.length > 0 && !valid && !error
+
+  function handleMobileChange(text: string) {
+    const cleaned = text.replace(/\D/g, '').slice(0, country.maxLen)
+    setMobile(cleaned)
+    if (error) setError('')
+  }
+
+  function selectCountry(c: Country) {
+    setCountry(c)
+    setDropOpen(false)
+    setMobile('')
+    setError('')
+    setTouched(false)
+    setItem(StorageKeys.User.MEMBER_CODE, c.code)
+    inputRef.current?.focus()
+  }
+
+  async function handleGetOtp() {
+    if (!valid || loading) return
     setLoading(true)
+    setError('')
     try {
-      const res = await login('login', { MOBILENO: mobile, MCODE: '91', NEWREG: '1' })
+      const res = await login('login', { MOBILENO: mobile, MCODE: country.code, NEWREG: '1' })
       if (res?.RESPONSECODE == 1) {
-        const matriId = String(res?.RESPONSE?.MATRIID ?? '')
-        navigation.navigate(ENavigation.OTP, { mobile, countryCode: '91', matriId })
+        navigation.navigate(ENavigation.OTP, {
+          mobile,
+          countryCode: country.code,
+          matriId: String(res?.RESPONSE?.MATRIID ?? ''),
+        })
       } else {
-        Alert.alert('Error', res?.ERRMSG ?? res?.ERRORMESSAGE ?? 'Failed to send OTP. Please try again.')
+        setError(res?.ERRMSG ?? res?.ERRORMESSAGE ?? t('LOGIN_PAGE.VALID_MOBILENO'))
       }
     } catch {
-      Alert.alert('Error', 'Network error. Please check your connection.')
+      setError(t('GENERAL.NOINTERNET'))
     } finally {
       setLoading(false)
     }
   }
 
-  const subtitle = name
-    ? `Hi ${name}, please enter your mobile number to verify your profile`
-    : 'Please enter your mobile number to verify your profile'
+  // ── Floating label interpolations ──────────────────────────────────────────
+  const labelTop  = labelAnim.interpolate({ inputRange: [0, 1], outputRange: [17, -9] })
+  const labelSize = labelAnim.interpolate({ inputRange: [0, 1], outputRange: [14, 11] })
+  const hasError = !!error || showValidationError
+
+  const labelColor = labelAnim.interpolate({
+    inputRange:  [0, 1],
+    outputRange: [
+      Colors.inputBorder,
+      hasError ? Colors.inputError : focused ? Colors.inputFocus : Colors.inputBorder,
+    ],
+  })
+
+  const borderColor = hasError ? Colors.inputError : focused ? Colors.inputFocus : Colors.inputBorder
+
+  // Title from i18n — Angular stores it with <br /> tag, strip to \n
+  const title = t('LOGIN_PAGE.ENT_UR_MOBILE', 'Enter your\nmobile number')
+    .replace(/<br\s*\/?>/gi, '\n')
+
+  const langLabel = LANG_LABEL[i18n.language] ?? 'Eng'
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        contentContainerStyle={[styles.scroll, { paddingTop: insets.top + 32 }]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
+      {/* Header: back | audio | language pill */}
+      <AppHeader
+        type="registration"
+        showBackBtn
+        languageLabel={langLabel}
+        onBackPress={() => navigation.canGoBack() && navigation.goBack()}
+        onLanguagePress={() => navigation.navigate('LanguageSelection')}
+      />
+
+      <KeyboardAvoidingView
+        style={styles.flex1}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={insets.top + 56}
       >
-        {/* Logo */}
-        <Image
-          source={require('../../assets/icon.png')}
-          style={styles.logo}
-          resizeMode="contain"
-        />
+        <ScrollView
+          style={styles.flex1}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Phone illustration — CDN SVG (same source as Angular signin.config.ts ICONTYPE) */}
+          <Image
+            source={{ uri: 'https://imgs.jodii.app/assets/images/svg/registration-new/mobile.svg' }}
+            style={styles.phoneImg}
+            resizeMode="contain"
+          />
 
-        {/* "Verify your profile using your mobile number" — matches Angular heading */}
-        <Text style={styles.verifyLabel}>Verify your profile using your mobile number</Text>
+          {/* Title */}
+          <Text style={styles.title}>{title}</Text>
 
-        {/* Dynamic subtitle with user name */}
-        <Text style={styles.subtitle}>{subtitle}</Text>
+          {/* Mobile number input — floating label + country code prefix */}
+          <View style={[styles.inputBox, { borderColor }]}>
+            <Animated.Text
+              style={[styles.floatLabel, { top: labelTop, fontSize: labelSize, color: labelColor }]}
+              pointerEvents="none"
+            >
+              {t('LOGIN_PAGE.MOBILE_NO')}
+            </Animated.Text>
 
-        {/* Mobile input — amber border always (matches .item-border-edit) */}
-        <View style={styles.inputCard}>
-          <View style={styles.inputRow}>
-            {/* +91- prefix inside the input — matches Angular <ion-text>+91-</ion-text> */}
-            <Text style={styles.prefix}>+91-</Text>
-            <TextInput
-              ref={inputRef}
-              style={styles.textInput}
-              placeholder="Enter mobile number"
-              placeholderTextColor="#AAAAAA"
-              keyboardType="phone-pad"
-              value={mobile}
-              onChangeText={t => setMobile(t.replace(/\D/g, '').slice(0, 10))}
-              maxLength={10}
-              returnKeyType="done"
-              onSubmitEditing={handleConfirm}
-              autoComplete="tel"
-              underlineColorAndroid="transparent"
-            />
-            {/* Edit icon — clears the field (matches Angular editValue()) */}
-            {mobile.length > 0 && (
+            <View style={styles.inputRow}>
+              {/* Country code picker — tapping opens inline dropdown */}
               <Pressable
-                onPress={() => { setMobile(''); inputRef.current?.focus() }}
-                style={styles.editBtn}
-                hitSlop={8}
+                style={styles.codeBtn}
+                onPress={() => {
+                  setDropOpen(v => !v)
+                  inputRef.current?.blur()
+                }}
+                hitSlop={6}
+                accessibilityRole="button"
+                accessibilityLabel={`Country code +${country.code}`}
               >
-                <Text style={styles.editIcon}>✎</Text>
+                <Text style={styles.codeText}>+{country.code}</Text>
+                <Image
+                  source={{ uri: 'https://imgs.jodii.app/assets/images/svg/chevron_down.svg' }}
+                  style={[styles.chevron, dropOpen && styles.chevronUp]}
+                />
               </Pressable>
-            )}
+
+              <View style={styles.separator} />
+
+              {/* Phone number text input */}
+              <TextInput
+                ref={inputRef}
+                style={[styles.textInput, webReset]}
+                value={mobile}
+                onChangeText={handleMobileChange}
+                onFocus={() => { setFocused(true); setDropOpen(false) }}
+                onBlur={() => { setFocused(false); setTouched(true) }}
+                keyboardType="number-pad"
+                placeholder={focused ? t('LOGIN_PAGE.ENT_MOBILE') : ''}
+                placeholderTextColor={Colors.textPlaceholder}
+                maxLength={country.maxLen}
+                returnKeyType="done"
+                onSubmitEditing={handleGetOtp}
+                autoComplete="tel"
+                // suppress web focus ring
+                // @ts-ignore
+                outlineStyle="none"
+              />
+            </View>
           </View>
+
+          {/* Country code dropdown — inline below input (Figma node 12536:13613) */}
+          {dropOpen && (
+            <View style={styles.dropdown}>
+              {COUNTRIES.map(c => {
+                const isActive = c.code === country.code
+                return (
+                  <Pressable
+                    key={c.code}
+                    style={({ pressed }) => [styles.dropRow, pressed && styles.dropRowPressed]}
+                    onPress={() => selectCountry(c)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isActive }}
+                  >
+                    <Text style={[styles.dropText, isActive && styles.dropTextActive]}>
+                      +{c.code} ({c.name})
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+          )}
+
+          {/* Validation / API error */}
+          {hasError && (
+            <Text style={styles.errorText}>
+              {error || t('LOGIN_PAGE.VALID_MOBILENO')}
+            </Text>
+          )}
+        </ScrollView>
+
+        {/* Sticky "Get OTP" CTA — rises above keyboard via KeyboardAvoidingView */}
+        <View style={[styles.footer, { paddingBottom: Platform.OS === 'ios' ? insets.bottom : 20 }]}>
+          <ButtonRevamp
+            label={t('LOGIN_PAGE.GET_OTP', 'Get OTP')}
+            variant="primary"
+            size="standard"
+            fullWidth
+            disabled={!valid}
+            loading={loading}
+            onPress={handleGetOtp}
+          />
         </View>
-
-        {/* Inline validation hint */}
-        {mobile.length > 0 && !isValid && (
-          <Text style={styles.validHint}>
-            {mobile.length < 10
-              ? 'Enter a valid 10-digit mobile number'
-              : 'Mobile number must start with 6, 7, 8 or 9'}
-          </Text>
-        )}
-      </ScrollView>
-
-      {/* Fixed bottom confirm button — matches .confirm-button-block-login (bottom: 24px) */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom + 24 }]}>
-        <ButtonRevamp
-          label="Confirm"
-          variant="primary"
-          size="large"
-          fullWidth
-          loading={loading}
-          disabled={!canSubmit}
-          onPress={handleConfirm}
-        />
-      </View>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </View>
   )
 }
 
+// Suppress browser focus ring on web — same pattern as FloatingLabelInput
+const webReset = { outlineStyle: 'none' } as any
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: BG,
+  screen: {
+    flex:            1,
+    backgroundColor: Colors.surface,
   },
-  scroll: {
-    flexGrow: 1,
-    paddingHorizontal: 24,    // matches --ion-cust-padding: 24px
-    paddingBottom: 120,
-  },
-  logo: {
-    width: 72,
-    height: 72,
-    alignSelf: 'center',
-    marginBottom: 28,
+  flex1: { flex: 1 },
+
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop:        24,
+    paddingBottom:     32,
   },
 
-  // heading3-semibold-16, matches pageContent['VERIFY_PROFILE'] label
-  verifyLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: TEXT_DARK,
-    marginBottom: 8,
+  // Phone illustration — CDN SVG (Angular: signin.config.ts ICONTYPE → registration-new/mobile.svg)
+  phoneImg: {
+    width:        48,
+    height:       48,
+    marginBottom: 24,
   },
 
-  // header02 class — 16px medium, matches ENTER_MOBILE_TITLE row
-  subtitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: TEXT_GREY,
-    marginBottom: 28,
-    lineHeight: 24,
+  // Title — "Enter your\nmobile number" (Figma: Poppins Bold 28px)
+  title: {
+    fontSize:     28,
+    fontWeight:   '700',
+    color:        Colors.textPrimary,
+    lineHeight:   36,
+    marginBottom: 32,
   },
 
-  // input-fields-style → ion-item.item-border-edit
-  // border: 1px solid #BD8800, border-radius: 16px — ALWAYS amber, not just focused
-  inputCard: {
-    borderWidth: 1,
-    borderColor: BORDER,
-    borderRadius: 16,
-    backgroundColor: '#FFFFFF',
-    overflow: 'hidden',
+  // ── Mobile input ────────────────────────────────────────────────────────────
+  inputBox: {
+    borderWidth:     1,
+    borderRadius:    8,
+    height:          56,
+    overflow:        'visible',
+    position:        'relative',
+    backgroundColor: Colors.surface,
+  },
+  floatLabel: {
+    position:          'absolute',
+    left:              12,
+    backgroundColor:   Colors.surface,
+    paddingHorizontal: 4,
+    zIndex:            10,
   },
   inputRow: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    height:            '100%',
+    paddingHorizontal: 12,
+  },
+  codeBtn: {
     flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,    // matches --inner-padding-start: 16px
-    height: 56,
-  },
-
-  // +91- prefix text — matches <ion-text class="pl-16">+91-</ion-text>
-  // body2-regular-14 on ion-input means prefix inherits 14px regular
-  prefix: {
-    fontSize: 14,
-    fontWeight: '400',
-    color: TEXT_DARK,
-    marginRight: 2,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 14,
-    color: TEXT_DARK,
-    height: '100%',
-    // suppress native focus ring on web and underline on Android
-    outlineWidth: 0,
-    borderWidth: 0,
-  },
-
-  // Edit icon — matches .edit-icon-id-verification
-  editBtn: {
-    paddingLeft: 12,
-  },
-  editIcon: {
-    fontSize: 18,
-    color: TEXT_GREY,
-  },
-
-  validHint: {
-    fontSize: 12,
-    color: PINK,
-    marginTop: 6,
-    marginLeft: 4,
-  },
-
-  // confirm-button-block-login → position: fixed, bottom: 24px
-  bottomBar: {
-    paddingHorizontal: 24,
-    paddingTop: 12,
-    backgroundColor: BG,
-  },
-  btnWrap: {
-    borderRadius: 100,
-    overflow: 'hidden',
-  },
-  btn: {
-    height: 52,
-    borderRadius: 100,
-    alignItems: 'center',
+    alignItems:    'center',
+    gap:           4,
+    paddingRight:  8,
+    height:        '100%',
     justifyContent: 'center',
   },
-  btnContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  codeText: {
+    fontSize:   14,
+    fontWeight: '500',
+    color:      Colors.textPrimary,
   },
-  btnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
+  separator: {
+    width:           1,
+    height:          20,
+    backgroundColor: Colors.border,
+    marginRight:     12,
+  },
+  textInput: {
+    flex:            1,
+    fontSize:        14,
+    color:           Colors.textPrimary,
+    paddingVertical: 0,
+  },
+  chevron: {
+    width:  12,
+    height: 12,
+  },
+  chevronUp: {
+    transform: [{ rotate: '180deg' }],
+  },
+
+  // ── Inline country dropdown ─────────────────────────────────────────────────
+  dropdown: {
+    marginTop:       4,
+    borderWidth:     1,
+    borderColor:     Colors.inputBorder,
+    borderRadius:    8,
+    backgroundColor: Colors.surface,
+    overflow:        'hidden',
+  },
+  dropRow: {
+    paddingVertical:   14,
+    paddingHorizontal: 16,
+  },
+  dropRowPressed: {
+    backgroundColor: Colors.selectionBg,
+  },
+  dropText: {
+    fontSize: 14,
+    color:    Colors.textPrimary,
+  },
+  dropTextActive: {
+    color:      Colors.primaryDark,
     fontWeight: '600',
   },
-  btnArrow: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    lineHeight: 24,
+
+  // ── Error ───────────────────────────────────────────────────────────────────
+  errorText: {
+    marginTop:  6,
+    marginLeft: 4,
+    fontSize:   12,
+    color:      Colors.inputError,
+  },
+
+  // ── Footer CTA ──────────────────────────────────────────────────────────────
+  footer: {
+    paddingHorizontal: 24,
+    paddingTop:        12,
+    backgroundColor:   Colors.surface,
   },
 })

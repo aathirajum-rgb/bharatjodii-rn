@@ -1,13 +1,17 @@
 // Screen route names — use these everywhere instead of raw strings.
 // Maps 1:1 to React Navigation screen names.
 export enum ENavigation {
-  LOGIN = 'login',
-  OTP = 'otp',
+  SPLASH             = 'Splash',
+  LANGUAGE_SELECTION = 'LanguageSelection',
+  LOGIN              = 'login',
+  OTP                = 'otp',
+  HOME               = 'Home',
+  DASHBOARD          = 'dashboard',
+  ONBOARDING         = 'onboarding',
   WELCOME = 'welcome',
   REGISTRATION = 'registration',
   FILTER = 'filter',
   LOGOUT = 'logout',
-  DASHBOARD = 'dashboard',
   VIEW_PROFILE = 'viewProfile',
   SETUP = 'setup',
   SELFIE_VERIFICATION = 'selfie-verification',
@@ -50,7 +54,6 @@ export enum ENavigation {
 
   // ─── Jodii-specific screens ──────────────────────────────────────────────
   DAILY_RECOMMENDATIONS  = 'daily-recommendations',
-  ONBOARDING             = 'onboarding',
   EDIT_FORM              = 'editform',
   CHAT_WINDOW            = 'chat-window',
   VERIFY_ID              = 'verify-id',

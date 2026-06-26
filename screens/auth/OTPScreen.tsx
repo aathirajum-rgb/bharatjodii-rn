@@ -1,7 +1,8 @@
+import Constants from 'expo-constants'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator,
-  Alert,
+  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,393 +13,437 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import Constants from 'expo-constants'
+import AppHeader from '../../components/app-header/AppHeader'
+import OTPSuccessSheet from '../../components/bottom-sheet/OTPSuccessSheet'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import { Colors } from '../../constants/colors'
+import i18n from '../../i18n'
 import { parseAndStoreWebViewURL, resendOTP, verifyOTP } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
-import { StorageKeys } from '../../constants/storage.keys'
 
-// ─── Brand tokens ─────────────────────────────────────────────────────────────
-const BG         = '#FAFAFA'
-const TEXT_DARK  = '#1F1E1B'
-const TEXT_GREY  = '#545454'
-const PINK       = '#DE2A68'        // logo-pink class
-const ERROR_RED  = '#E12B10'        // otp-error-msg color from global.scss
-const RESEND_S   = 59               // matches Angular resendotpTimer = 59
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const OTP_LENGTH  = 4
+const TIMER_START = 59  // matches Angular resendotpTimer = 59
+const CDN         = 'https://imgs.jodii.app/assets/images/svg/registration-new/'
+
+const LANG_LABEL: Record<string, string> = {
+  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
+  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type Props = {
   navigation: any
   route: { params: { mobile: string; countryCode: string; matriId: string } }
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
+
 export default function OTPScreen({ navigation, route }: Props) {
   const { mobile, countryCode, matriId } = route.params
+  const { t } = useTranslation()
   const insets = useSafeAreaInsets()
 
-  const [otp,       setOtp]       = useState('')
-  const [errorMsg,  setErrorMsg]  = useState('')
-  const [name,      setName]      = useState('')
-  const [seconds,   setSeconds]   = useState(RESEND_S)
-  const [verifying, setVerifying] = useState(false)
-  const [resending, setResending] = useState(false)
-  const inputRef = useRef<TextInput>(null)
+  const [otpValues,    setOtpValues]    = useState<string[]>(Array(OTP_LENGTH).fill(''))
+  const [error,        setError]        = useState('')
+  const [seconds,      setSeconds]      = useState(TIMER_START)
+  const [loading,      setLoading]      = useState(false)
+  const [resending,    setResending]    = useState(false)
+  const [showSuccess,  setShowSuccess]  = useState(false)
 
+  const inputRefs = useRef<Array<TextInput | null>>(Array(OTP_LENGTH).fill(null))
+
+  // Auto-focus first box on mount — matches Angular ionViewDidEnter setFocusOnOtpPage
   useEffect(() => {
-    getItem(StorageKeys.User.NAME).then(n => { if (n) setName(n.trim()) })
-    setTimeout(() => inputRef.current?.focus(), 400)
+    const timer = setTimeout(() => inputRefs.current[0]?.focus(), 300)
+    return () => clearTimeout(timer)
   }, [])
 
-  // Countdown — matches Angular startResendOTPTimer()
+  // Countdown timer — matches Angular startCountdown()
   useEffect(() => {
     if (seconds <= 0) return
     const id = setInterval(() => setSeconds(s => s - 1), 1000)
     return () => clearInterval(id)
   }, [seconds])
 
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
   function formatTimer(s: number) {
-    const m = Math.floor(s / 60)
+    const m   = Math.floor(s / 60)
     const sec = s % 60
     return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
   }
 
-  function buildParams(withOtp?: string) {
-    const appVersion = Constants.expoConfig?.version ?? '1.0.0'
+  function buildParams(otp?: string) {
     return {
       ID:           matriId,
       MOBILENO:     mobile,
       MCODE:        countryCode,
       NEWREG:       '1',
-      APPVERSION:   appVersion,
+      APPVERSION:   Constants.expoConfig?.version ?? '1.0.0',
       DEVICEDETAIL: '{}',
       DEVICEID:     '',
       REGISTERID:   '',
-      ...(withOtp ? { OTP: withOtp } : {}),
+      ...(otp ? { OTP: otp } : {}),
     }
   }
 
-  // Matches Angular: disabled when otp.length < 4
-  const canSubmit = otp.length >= 4 && !verifying
+  // isOtpCompleteAndValid — matches Angular: every value is a single digit
+  const isValid = otpValues.every(v => /^[0-9]$/.test(v))
 
-  async function handleConfirm() {
-    if (!canSubmit) return
-    setErrorMsg('')
-    setVerifying(true)
+  // ── OTP box handlers ───────────────────────────────────────────────────────
+
+  function handleChange(text: string, index: number) {
+    // Paste support: distribute digits across boxes — matches Angular onPaste()
+    if (text.length > 1) {
+      const digits = text.replace(/\D/g, '').slice(0, OTP_LENGTH)
+      const next   = Array(OTP_LENGTH).fill('')
+      for (let i = 0; i < digits.length; i++) next[i] = digits[i]
+      setOtpValues(next)
+      setError('')
+      inputRefs.current[Math.min(digits.length, OTP_LENGTH - 1)]?.focus()
+      return
+    }
+
+    const digit   = text.replace(/\D/g, '')
+    const updated = [...otpValues]
+    updated[index] = digit
+    setOtpValues(updated)
+    if (error) setError('')
+
+    // Auto-advance — matches Angular otpController next logic
+    if (digit && index < OTP_LENGTH - 1) {
+      inputRefs.current[index + 1]?.focus()
+    }
+  }
+
+  function handleKeyPress(key: string, index: number) {
+    // Backspace on empty box → clear prev + focus prev — matches Angular otpController prev logic
+    if (key === 'Backspace' && !otpValues[index] && index > 0) {
+      const updated = [...otpValues]
+      updated[index - 1] = ''
+      setOtpValues(updated)
+      inputRefs.current[index - 1]?.focus()
+    }
+  }
+
+  // ── Actions ────────────────────────────────────────────────────────────────
+
+  async function handleVerify() {
+    if (!isValid || loading) return
+    setLoading(true)
+    setError('')
     try {
       const nallow = await getItem('NALLOW') ?? '0'
-      const res = await verifyOTP('otp', { ...buildParams(otp), NALLOW: nallow })
+      const res    = await verifyOTP('otp', { ...buildParams(otpValues.join('')), NALLOW: nallow })
       if (res?.RESPONSECODE == 1) {
         if (res?.RESPONSE?.WEBVIEWURL) {
           await parseAndStoreWebViewURL(res.RESPONSE.WEBVIEWURL)
         }
-        navigation.reset({ index: 0, routes: [{ name: 'Home' }] })
+        setShowSuccess(true)
       } else {
-        // errorMsg inline — matches Angular otp-error-msg div
-        const msg = res?.ERRMSG ?? res?.RESPONSE?.MSG ?? res?.ERRORMESSAGE ?? 'Invalid OTP. Please try again.'
-        setErrorMsg(msg)
-        setOtp('')
+        const msg = res?.ERRMSG ?? res?.RESPONSE?.MSG ?? res?.ERRORMESSAGE
+          ?? t('LOGIN_PAGE.ENTERVALIDOTP', 'Please enter a valid OTP')
+        setError(msg)
+        setOtpValues(Array(OTP_LENGTH).fill(''))
+        setTimeout(() => inputRefs.current[0]?.focus(), 50)
       }
     } catch {
-      Alert.alert('Error', 'Network error. Please check your connection.')
+      setError(t('GENERAL.NOINTERNET', 'No internet connection'))
     } finally {
-      setVerifying(false)
+      setLoading(false)
     }
   }
 
-  // Matches Angular callSignZGenerateOTP() on resend click — resets timer to 59
   async function handleResend() {
+    if (resending || seconds > 0) return
     setResending(true)
-    setErrorMsg('')
+    setError('')
     try {
-      const res = await resendOTP('otp', buildParams())
+      const res = await resendOTP('resendotp', buildParams())
       if (res?.RESPONSECODE == 1) {
-        setOtp('')
-        setSeconds(RESEND_S)
-        inputRef.current?.focus()
-      } else if (res?.ERRCODE === 'OTP_LIMIT') {
-        Alert.alert('Limit Reached', 'You have reached the daily OTP limit. Please try again tomorrow.')
+        setOtpValues(Array(OTP_LENGTH).fill(''))
+        setSeconds(TIMER_START)   // matches Angular clearIntervalTime + startCountdown
+        setTimeout(() => inputRefs.current[0]?.focus(), 50)
       } else {
-        Alert.alert('Error', res?.ERRMSG ?? 'Failed to resend OTP. Please try again.')
+        setError(res?.ERRMSG ?? t('GENERAL.NOINTERNET', 'Failed to resend OTP'))
       }
     } catch {
-      Alert.alert('Error', 'Network error. Please check your connection.')
+      setError(t('GENERAL.NOINTERNET', 'No internet connection'))
     } finally {
       setResending(false)
     }
   }
 
-  // Matches Angular changeNumber() — go back to mobile form
-  function handleChangeNumber() {
+  // Edit number → go back to LoginScreen — matches Angular redirectSignin()
+  function handleEdit() {
     navigation.goBack()
   }
 
+  const langLabel = LANG_LABEL[i18n.language] ?? 'Eng'
+
+  // Angular subtitle: 'LOGIN_PAGE.DIGITCODE' with ##NO## replaced by mobile
+  const subtitle = t('LOGIN_PAGE.DIGITCODE', "We've sent 4 digit code to")
+    .replace('##NO##', mobile)
+
+  // ─── Render ───────────────────────────────────────────────────────────────
+
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      {/* Header with back button — matches Angular otp-form header */}
-      <View style={[styles.header, { paddingTop: insets.top + 4 }]}>
-        <Pressable
-          onPress={() => navigation.goBack()}
-          style={styles.backBtn}
-          hitSlop={12}
-        >
-          <Text style={styles.backIcon}>‹</Text>
-        </Pressable>
-      </View>
+    <View style={styles.screen}>
+      <AppHeader
+        type="registration"
+        showBackBtn
+        languageLabel={langLabel}
+        onBackPress={handleEdit}
+        onLanguagePress={() => navigation.navigate('LanguageSelection')}
+      />
 
-      <ScrollView
-        contentContainerStyle={styles.scroll}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        style={styles.flex1}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={insets.top + 56}
       >
-        {/* ENTER_OTP_TITLE — matches Angular header02 col for otp-form */}
-        <Text style={styles.otpTitle}>Verify OTP</Text>
-
-        {/* OTP_RECIEVED message — matches Angular .otp-msg */}
-        <Text style={styles.otpMsg}>
-          Please enter the OTP received from your mobile operator (Airtel / Jio / Vi)
-        </Text>
-
-        {/* OTP input — matches Angular enter-otp class, single field, tel, maxlength 6 */}
-        <View style={styles.otpInputWrap}>
-          <TextInput
-            ref={inputRef}
-            style={styles.otpInput}
-            value={otp}
-            onChangeText={t => {
-              setErrorMsg('')
-              setOtp(t.replace(/\D/g, '').slice(0, 6))
-            }}
-            keyboardType="number-pad"
-            maxLength={6}
-            placeholder="Enter OTP"
-            placeholderTextColor="#AAAAAA"
-            returnKeyType="done"
-            onSubmitEditing={handleConfirm}
-            textAlign="center"
+        <ScrollView
+          style={styles.flex1}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* OTP illustration — CDN SVG (Angular: otpPage.ICONTYPE) */}
+          <Image
+            source={{ uri: CDN + 'otp.svg' }}
+            style={styles.icon}
+            resizeMode="contain"
           />
-        </View>
 
-        {/* Error message — matches Angular .otp-error-msg with alert-circle icon */}
-        {errorMsg ? (
-          <View style={styles.errorRow}>
-            <Text style={styles.errorIcon}>⚠</Text>
-            <Text style={styles.errorText}>{errorMsg}</Text>
-          </View>
-        ) : null}
-
-        {/* Resend section — matches Angular resend divs */}
-        <View style={styles.resendRow}>
-          {seconds > 0 ? (
-            // resendotpTimer > 0: "Didn't get OTP? [Resend OTP in MM:SS]"
-            <Text style={styles.resendTimerTxt}>
-              Didn't get OTP?{'  '}
-              <Text style={styles.resendHighlight}>
-                Resend OTP in {formatTimer(seconds)}
-              </Text>
-            </Text>
-          ) : (
-            // resendotpTimer <= 0: "Didn't get OTP? [Resend OTP] ›"
-            <Pressable onPress={handleResend} disabled={resending} style={styles.resendAction}>
-              <Text style={styles.resendNotGet}>Didn't get OTP?{'  '}</Text>
-              {resending ? (
-                <ActivityIndicator size="small" color={PINK} />
-              ) : (
-                <>
-                  <Text style={styles.resendLink}>Resend OTP</Text>
-                  <Text style={styles.resendChevron}> ›</Text>
-                </>
-              )}
-            </Pressable>
-          )}
-        </View>
-
-        {/* Confirm button — matches Angular round button, disabled when otp.length < 4 */}
-        <View style={styles.confirmRow}>
-          <ButtonRevamp
-            label="Confirm"
-            variant="primary"
-            size="large"
-            fullWidth
-            loading={verifying}
-            disabled={!canSubmit}
-            onPress={handleConfirm}
-          />
-        </View>
-
-        {/* Not registered / Change number — matches Angular not-registered-change */}
-        <View style={styles.changeRow}>
-          <Text style={styles.changeLabel}>
-            {name ? `Not ${name}?  ` : 'Not your number?  '}
+          {/* Title — i18n key: LOGIN_PAGE.ENT_OTP */}
+          <Text style={styles.title}>
+            {t('LOGIN_PAGE.ENT_OTP', 'Enter OTP')}
           </Text>
-          <Pressable onPress={handleChangeNumber}>
-            <Text style={styles.changeLink}>Change Number</Text>
-          </Pressable>
-          <Text style={styles.changeChevron}> ›</Text>
+
+          {/* Subtitle: "We've sent 4 digit code to" + phone + edit link */}
+          <View style={styles.subtitleBlock}>
+            <Text style={styles.subtitleText}>{subtitle}</Text>
+
+            <View style={styles.phoneRow}>
+              <Text style={styles.phoneNumber}>{mobile}</Text>
+              <Pressable style={styles.editBtn} onPress={handleEdit} hitSlop={8}>
+                <Image
+                  source={{ uri: CDN + 'edit-pencil.svg' }}
+                  style={styles.editIcon}
+                  resizeMode="contain"
+                />
+                <Text style={styles.editText}>{t('LOGIN_PAGE.EDIT', 'Edit')}</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* 4 OTP boxes — matches Angular otp-inputs list (Figma: 48×48, gap 24) */}
+          <View style={styles.otpRow}>
+            {Array.from({ length: OTP_LENGTH }, (_, i) => (
+              <TextInput
+                key={i}
+                ref={r => { inputRefs.current[i] = r }}
+                style={[
+                  styles.otpBox,
+                  otpValues[i] ? styles.otpBoxFilled : styles.otpBoxEmpty,
+                  !!error      ? styles.otpBoxError  : null,
+                ]}
+                value={otpValues[i]}
+                onChangeText={text => handleChange(text, i)}
+                onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, i)}
+                keyboardType="number-pad"
+                maxLength={2}         // 2 to allow paste detection; trimmed in handleChange
+                returnKeyType={i === OTP_LENGTH - 1 ? 'done' : 'next'}
+                onSubmitEditing={i === OTP_LENGTH - 1 ? handleVerify : undefined}
+                selectTextOnFocus
+                // @ts-ignore — suppress web focus ring
+                outlineStyle="none"
+              />
+            ))}
+          </View>
+
+          {/* Inline error — matches Angular otp-error-msg div */}
+          {!!error && (
+            <Text style={styles.errorText}>
+              {error}
+            </Text>
+          )}
+
+          {/* Timer / Resend — matches Angular timer + resend divs */}
+          <View style={styles.resendRow}>
+            {seconds > 0 ? (
+              <Text style={styles.resendText}>
+                {t('LOGIN_PAGE.RESENDOTP', `Didn't receive OTP? Resend in ##TIMER##`)
+                  .replace('##TIMER##', formatTimer(seconds))}
+              </Text>
+            ) : (
+              <Text style={styles.resendText}>
+                {t('LOGIN_PAGE.SENDOTP', "Didn't receive OTP? ")}
+                <Text
+                  style={[styles.resendLink, resending && styles.resendDisabled]}
+                  onPress={handleResend}
+                >
+                  {t('LOGIN_PAGE.RESEND', 'Resend')}
+                </Text>
+              </Text>
+            )}
+          </View>
+        </ScrollView>
+
+        {/* Sticky "Verify OTP" CTA — matches Angular otp-cta div */}
+        <View style={[styles.footer, { paddingBottom: Platform.OS === 'ios' ? insets.bottom : 20 }]}>
+          <ButtonRevamp
+            label={t('LOGIN_PAGE.VERIFYOTP', 'Verify OTP')}
+            variant="primary"
+            size="standard"
+            fullWidth
+            disabled={!isValid}
+            loading={loading}
+            onPress={handleVerify}
+          />
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+      {/* OTP success bottom sheet — auto-closes after 3s then navigates to onboarding */}
+      <OTPSuccessSheet
+        visible={showSuccess}
+        onDismiss={() =>
+          navigation.reset({ index: 0, routes: [{ name: 'onboarding', params: { pageNo: '1' } }] })
+        }
+      />
+    </View>
   )
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: BG,
+  screen: {
+    flex:            1,
+    backgroundColor: Colors.surface,
+  },
+  flex1: { flex: 1 },
+
+  scrollContent: {
+    paddingHorizontal: 24,
+    paddingTop:        24,
+    paddingBottom:     32,
   },
 
-  // Header — hide-header-bar style, minimal
-  header: {
-    paddingHorizontal: 16,
-    paddingBottom: 4,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#EDEDED',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: {
-    fontSize: 28,
-    color: TEXT_DARK,
-    lineHeight: 32,
-    marginTop: -2,
-  },
-
-  scroll: {
-    flexGrow: 1,
-    paddingHorizontal: 24,    // ion-cust-padding: 24px
-    paddingBottom: 40,
-  },
-
-  // header02 col for otp-form — 16px medium
-  otpTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: TEXT_DARK,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-
-  // .otp-msg — color #000000, font-size ~3.9vmin≈14px, letter-spacing 0.36
-  otpMsg: {
-    fontSize: 14,
-    color: '#000000',
-    lineHeight: 22,
-    letterSpacing: 0.36,
+  // OTP illustration (Figma: 48×48)
+  icon: {
+    width:        48,
+    height:       48,
     marginBottom: 24,
   },
 
-  // enter-otp + otp-not-entered + font-bold
-  // border-radius: 4px, border always #DE2A68 (enter-otp declared last → wins)
-  otpInputWrap: {
-    marginBottom: 12,
-  },
-  otpInput: {
-    borderWidth: 1,
-    borderColor: PINK,            // always pink — enter-otp overrides otp-not-entered
-    borderRadius: 4,              // --border-radius: 4px from Angular
-    backgroundColor: '#FFFFFF',
-    height: 60,
-    fontSize: 22,                 // font-size-mlg=16px in Angular; 22 keeps digits readable
-    fontWeight: '700',            // font-bold class
-    color: TEXT_DARK,
-    letterSpacing: 6,
-    textAlign: 'center',
-    paddingHorizontal: 19,        // --padding-start: 19px (ps-19 class)
-    outlineWidth: 0,
-  },
-
-  // .otp-error-msg — color #E12B10, font-size ~3.3vmin≈13px
-  errorRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 6,
+  // Title — "Enter OTP" (Figma: Poppins SemiBold 22px)
+  title: {
+    fontSize:     22,
+    fontWeight:   '600',
+    color:        Colors.textPrimary,
+    lineHeight:   28,
     marginBottom: 8,
   },
-  errorIcon: {
-    fontSize: 16,                 // f-mlg class
-    color: ERROR_RED,
-    marginTop: 1,
+
+  // Subtitle block
+  subtitleBlock: {
+    gap:          4,
+    marginBottom: 32,
   },
-  errorText: {
-    flex: 1,
-    fontSize: 13,                 // ~3.3vmin
-    color: ERROR_RED,
+  subtitleText: {
+    fontSize:   14,
+    color:      Colors.textPrimary,
     lineHeight: 20,
-    letterSpacing: 0.36,
+  },
+  phoneRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           6,
+  },
+  phoneNumber: {
+    fontSize:   14,
+    fontWeight: '600',
+    color:      Colors.textPrimary,
+    lineHeight: 20,
+  },
+  editBtn: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           4,
+  },
+  editIcon: {
+    width:  14,
+    height: 14,
+  },
+  editText: {
+    fontSize:   14,
+    color:      Colors.link,    // #29339B — matches Figma "Edit" blue
+    lineHeight: 20,
   },
 
-  // Resend row — ion-text-start d-flex ion-margin-top
+  // ── 4 OTP boxes (Figma: 48×48px, gap 24px, centred) ──────────────────────
+  otpRow: {
+    flexDirection: 'row',
+    gap:           16,
+    marginBottom:  8,
+  },
+  otpBox: {
+    width:              56,
+    height:             56,
+    borderWidth:        1,
+    borderRadius:       8,
+    fontSize:           22,
+    fontWeight:         '600',
+    color:              Colors.textPrimary,
+    backgroundColor:    Colors.surface,
+    textAlign:          'center',
+    textAlignVertical:  'center',   // Android vertical centering
+    paddingVertical:    0,          // remove default padding that pushes text to top
+    includeFontPadding: false,      // Android: strip extra font metric padding
+  },
+  otpBoxEmpty: {
+    borderColor: Colors.inputBorder,   // #B0B0B0 — Figma empty state
+  },
+  otpBoxFilled: {
+    borderColor: Colors.inputError,    // #DE2A68 — Figma filled state
+  },
+  otpBoxError: {
+    borderColor: Colors.inputError,    // #DE2A68 — Figma error state
+  },
+
+  // Error — "Please enter a valid OTP" in #DE2A68
+  errorText: {
+    marginTop:  4,
+    marginLeft: 4,
+    fontSize:   12,
+    color:      Colors.inputError,
+    lineHeight: 16,
+  },
+
+  // Timer / Resend
   resendRow: {
     marginTop: 16,
-    marginBottom: 24,
   },
-  resendTimerTxt: {
-    fontSize: 14,
-    color: TEXT_GREY,
-  },
-  resendHighlight: {
-    color: PINK,               // logo-pink class
-    fontWeight: '600',
-  },
-  resendAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  resendNotGet: {
-    fontSize: 14,
-    color: TEXT_GREY,          // otp-not-get class
+  resendText: {
+    fontSize:   14,
+    color:      Colors.textPrimary,
+    lineHeight: 20,
   },
   resendLink: {
-    fontSize: 14,
-    color: PINK,               // logo-pink send-again-otp
-    fontWeight: '600',
+    fontWeight: '500',
+    color:      Colors.link,     // #29339B — Figma "Resend" blue
   },
-  resendChevron: {
-    fontSize: 16,
-    color: PINK,               // skip-icon logo-pink
+  resendDisabled: {
+    opacity: 0.5,
   },
 
-  // Confirm button — round, gradient (otpcontinuebtn color)
-  confirmRow: {
-    marginBottom: 20,
-  },
-  btnWrap: {
-    borderRadius: 100,
-    overflow: 'hidden',
-  },
-  btn: {
-    height: 52,
-    borderRadius: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-
-  // not-registered-change row
-  changeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  changeLabel: {
-    fontSize: 14,
-    color: TEXT_GREY,
-  },
-  changeLink: {
-    fontSize: 14,
-    color: PINK,               // logo-pink
-    fontWeight: '600',
-  },
-  changeChevron: {
-    fontSize: 16,
-    color: PINK,
+  // Sticky CTA footer
+  footer: {
+    paddingHorizontal: 24,
+    paddingTop:        12,
+    backgroundColor:   Colors.surface,
   },
 })
