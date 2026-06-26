@@ -4,12 +4,12 @@ import { useEffect, useState } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import './i18n'
 import i18n from './i18n'
+import { StorageKeys } from './constants/storage.keys'
 import { AuthProvider } from './contexts/AuthContext'
+import { useOTAUpdate } from './hooks/useOTAUpdate'
 import RootNavigation from './navigation/RootNavigation'
 import { setupNotificationHandlers } from './service/notificationService'
 import { getItem, setItem } from './service/storageService'
-import { StorageKeys } from './constants/storage.keys'
-import { useOTAUpdate } from './hooks/useOTAUpdate'
 
 // Keep native splash visible until SplashAnimationScreen mounts and calls hideAsync()
 SplashScreen.preventAutoHideAsync()

@@ -10,6 +10,13 @@ import { useOTAInfo, useOTAStatus } from '../hooks/useOTAUpdate'
 import ComponentShowcaseScreen from '../screens/dev/ComponentShowcaseScreen'
 import GalleryScreen from '../screens/GalleryScreen'
 import CreatedByScreen from '../screens/onboarding/CreatedByScreen'
+import DOBScreen from '../screens/onboarding/DOBScreen'
+import EatingHabitScreen from '../screens/onboarding/EatingHabitScreen'
+import GenderScreen from '../screens/onboarding/GenderScreen'
+import HeightScreen from '../screens/onboarding/HeightScreen'
+import MaritalStatusScreen from '../screens/onboarding/MaritalStatusScreen'
+import MotherTongueScreen from '../screens/onboarding/MotherTongueScreen'
+import NameScreen from '../screens/onboarding/NameScreen'
 import PaymentSuccessScreen from '../screens/payment/PaymentSuccessScreen'
 import RechargeScreen from '../screens/payment/RechargeScreen'
 import PermissionDemoScreen from '../screens/PermissionDemoScreen'
@@ -115,8 +122,15 @@ function HomeScreen({ navigation }: { navigation: any }) {
 function OnboardingRouter({ navigation, route }: { navigation: any; route: any }) {
   const pageNo = route.params?.pageNo ?? '1'
   switch (pageNo) {
-    case '1': return <CreatedByScreen navigation={navigation} route={route} />
-    default:  return <HomeScreen navigation={navigation} />
+    case '1':  return <CreatedByScreen    navigation={navigation} route={route} />
+    case '2':  return <NameScreen         navigation={navigation} route={route} />
+    case '3':  return <GenderScreen       navigation={navigation} route={route} />
+    case '4':  return <MaritalStatusScreen navigation={navigation} route={route} />
+    case '5':  return <DOBScreen          navigation={navigation} route={route} />
+    case '43': return <HeightScreen       navigation={navigation} route={route} />
+    case '38': return <EatingHabitScreen  navigation={navigation} route={route} />
+    case '39': return <MotherTongueScreen navigation={navigation} route={route} />
+    default:   return <HomeScreen navigation={navigation} />
   }
 }
 

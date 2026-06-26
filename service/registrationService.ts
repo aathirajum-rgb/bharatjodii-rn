@@ -102,6 +102,189 @@ export async function fetchProfileCreatedByOptions(): Promise<Array<{ key: strin
   return []
 }
 
+export type GenderOption = {
+  key: string        // '1' = Male, '0' = Female
+  label: string      // display label in current language
+  img: string        // unselected avatar URL  (API: IMG)
+  imgActive: string  // selected avatar URL    (API: IMG-ACTIVE)
+}
+
+// Fetches gender options for the given createdBy from the initialfetch API.
+// GENDERARRAY[createdBy] contains [{ key, value, IMG, IMG-ACTIVE }] per Angular.
+export async function fetchGenderOptions(createdBy: string): Promise<GenderOption[]> {
+  const ccode   = await getItem(SK.User.COUNTRY_CODE) ?? '91'
+  const lang    = await getItem(SK.Auth.LANG) ?? 'en'
+  const apptype = await getItem(SK.Auth.APP_TYPE) ?? '115'
+  const paramStr = `type=all&ccode=${ccode}&LANG=${lang}&APPTYPE=${apptype}`
+  const res = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
+  const genderArray = res?.RESPONSE?.GENDERARRAY
+  const list: any[] = genderArray?.[createdBy] ?? genderArray?.['1'] ?? []
+  if (!Array.isArray(list)) return []
+  // Raw API field names: KEY, VALUE, IMG, IMG-ACTIVE
+  // (Angular mappingArray renames KEY→key, VALUE→value before using; IMG/IMG-ACTIVE stay unchanged)
+  return list
+    .map((item: any) => ({
+      key:       String(item['KEY'] ?? item['key'] ?? ''),
+      label:     String(item['VALUE'] ?? item['value'] ?? ''),
+      img:       item['IMG'] ?? '',
+      imgActive: item['IMG-ACTIVE'] ?? '',
+    }))
+    .filter(o => o.key !== '')
+}
+
+// Fetches marital status options from initialfetch API.
+// GENDER='0' → MARITALSTATUSFEMALE, GENDER='1' → MARITALSTATUSMALE (Angular logic).
+// Raw response is an object {"1":"Never Married","2":"Divorced",...} → converted to array.
+export async function fetchMaritalStatusOptions(
+  gender: string,
+): Promise<Array<{ key: string; label: string }>> {
+  const ccode   = await getItem(SK.User.COUNTRY_CODE) ?? '91'
+  const lang    = await getItem(SK.Auth.LANG) ?? 'en'
+  const apptype = await getItem(SK.Auth.APP_TYPE) ?? '115'
+  const paramStr = `type=all&ccode=${ccode}&LANG=${lang}&APPTYPE=${apptype}`
+  const res = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
+  const raw = gender === '0'
+    ? res?.RESPONSE?.MARITALSTATUSFEMALE
+    : res?.RESPONSE?.MARITALSTATUSMALE
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+  }
+  return []
+}
+
+// Reads REGISTRATIONARRAYS from cache (AsyncStorage) or fetches fresh from API and saves.
+// Angular stores the full initialfetch response under this key — mirrors that pattern.
+async function getRegistrationArrays(): Promise<Record<string, any>> {
+  const cached = await getItem('REGISTRATIONARRAYS')
+  if (cached) {
+    try { return JSON.parse(cached) } catch {}
+  }
+  const ccode   = await getItem(SK.User.COUNTRY_CODE) ?? '91'
+  const lang    = await getItem(SK.Auth.LANG) ?? 'en'
+  const apptype = await getItem(SK.Auth.APP_TYPE) ?? '115'
+  const paramStr = `type=all&ccode=${ccode}&LANG=${lang}&APPTYPE=${apptype}`
+  const res = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
+  const data = res?.RESPONSE ?? {}
+  if (res?.RESPONSE) await setItem('REGISTRATIONARRAYS', JSON.stringify(res.RESPONSE))
+  return data
+}
+
+// Fetches mother tongue options from MOTHERTONGUES key in registrationArrays.
+// Angular: profileMotherTongues = apiResponse["MOTHERTONGUES"] — array of {MKEY, VALUE}.
+// VALUE may contain HTML (stripped on display).
+export async function fetchMotherTongueOptions(): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const raw  = data?.MOTHERTONGUES
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item: any) => ({
+        key:   String(item.MKEY  ?? item.KEY   ?? item.key   ?? ''),
+        label: String(item.VALUE ?? item.value ?? ''),
+      }))
+      .filter(o => o.key !== '')
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+  }
+  return []
+}
+
+// Fetches eating habit options from EATINGHABITS key in registrationArrays.
+// Angular: profileEatingHabits = apiResponse["EATINGHABITS"] — plain object {key: label}.
+export async function fetchEatingHabitOptions(): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const raw  = data?.EATINGHABITS
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => ({
+      key:   String(item.KEY   ?? item.key   ?? ''),
+      label: String(item.VALUE ?? item.value ?? ''),
+    })).filter(o => o.key !== '')
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+  }
+  return []
+}
+
+// Fetches height CATEGORY options (Below average / Average / Above average / Tall)
+// Angular: apiResponse["HEIGHTMALE"] / ["HEIGHTFEMALE"] — labels contain HTML (strips on return).
+export async function fetchHeightCategoryOptions(
+  gender: string,
+): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const raw  = gender === '0' ? data?.HEIGHTFEMALE : data?.HEIGHTMALE
+  const toEntry = (key: string, rawLabel: string) => ({
+    key,
+    label: String(rawLabel),   // raw HTML — HeightScreen strips it for display
+  })
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item: any) => toEntry(
+        String(item.KEY ?? item.key ?? ''),
+        String(item.VALUE ?? item.value ?? ''),
+      ))
+      .filter(o => o.key !== '')
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([key, value]) => toEntry(key, String(value)))
+  }
+  return []
+}
+
+// Group display names for the exact height side panel — mirrors Angular's REG.SHORT / REG.MEDIUM / REG.TALL
+const HEIGHT_GROUP_LABELS: Record<string, string> = {
+  'Short':         'Short',
+  'Average Heigth': 'Average Height', // API typo preserved as key
+  'Tall':          'Tall',
+}
+
+export type HeightGroup = {
+  title: string
+  data:  Array<{ key: string; label: string }>
+}
+
+// Fetches exact heights grouped by Short / Average Heigth / Tall for the side panel SectionList.
+// Angular: apiResponse["HEIGHT"]["Male"] / ["Female"] — each group is a plain object {key: label}.
+// Angular uses `| keyvalue` pipe + isShowFt: true (label already includes ft/inch from API).
+export async function fetchExactHeightGrouped(gender: string): Promise<HeightGroup[]> {
+  const data    = await getRegistrationArrays()
+  const grouped = gender === '0' ? data?.HEIGHT?.Female : data?.HEIGHT?.Male
+  if (!grouped || typeof grouped !== 'object') return []
+
+  const ORDER = ['Short', 'Average Heigth', 'Tall']
+  const keys  = [...ORDER, ...Object.keys(grouped).filter(k => !ORDER.includes(k))]
+  const result: HeightGroup[] = []
+
+  keys.forEach(k => {
+    const group = grouped[k]
+    if (!group || typeof group !== 'object') return
+    const items: Array<{ key: string; label: string }> = []
+    if (Array.isArray(group)) {
+      group.forEach((item: any) => {
+        const key   = String(item.KEY   ?? item.key   ?? '')
+        const label = String(item.VALUE ?? item.value ?? '')
+        if (key) items.push({ key, label })
+      })
+    } else {
+      Object.entries(group).forEach(([key, value]) => {
+        if (key) items.push({ key, label: String(value) })
+      })
+    }
+    if (items.length) {
+      result.push({ title: HEIGHT_GROUP_LABELS[k] ?? k, data: items })
+    }
+  })
+  return result
+}
+
+// Flat list (kept for backward compatibility / other uses)
+export async function fetchExactHeightOptions(
+  gender: string,
+): Promise<Array<{ key: string; label: string }>> {
+  const groups = await fetchExactHeightGrouped(gender)
+  return groups.flatMap(g => g.data)
+}
+
 export async function storeWebURLData(data: Record<string, any>): Promise<void> {
   const ops: Promise<void>[] = []
 

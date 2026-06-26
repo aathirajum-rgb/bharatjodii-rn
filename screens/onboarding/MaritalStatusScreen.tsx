@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
   Image,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -16,33 +17,45 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import i18n from '../../i18n'
-import { fetchProfileCreatedByOptions } from '../../service/registrationService'
+import {
+  callRegistrationAPI,
+  fetchMaritalStatusOptions,
+} from '../../service/registrationService'
 import { getItem, setItem } from '../../service/storageService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/creating-profile.svg'
-const FOOTER_H = 84
+const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/marital-status.svg'
+const FOOTER_H = 140   // Next button + "Need help?" section height
 
-// Gender groups — used to pre-set LOGINGENDER for family-member profiles
-const MALE_GENDER   = ['4', '8']   // son / brother → M
-const FEMALE_GENDER = ['5', '9']   // daughter / sister → F
+// Possessive labels per createdBy — matches Angular PROFILETYPE replacements
+const PROFILE_POSSESSIVE: Record<string, string> = {
+  '4':  "son's",
+  '5':  "daughter's",
+  '8':  "brother's",
+  '9':  "sister's",
+  '10': "friend's",
+  '11': "relative's",
+}
+
+// Fallback options when API is unavailable
+const FALLBACK_MALE_OPTIONS   = [
+  { key: '1', label: 'Never Married' },
+  { key: '2', label: 'Divorced'      },
+  { key: '3', label: 'Widower'       },
+  { key: '4', label: 'Awaiting Divorce' },
+]
+const FALLBACK_FEMALE_OPTIONS = [
+  { key: '1', label: 'Never Married' },
+  { key: '2', label: 'Divorced'      },
+  { key: '3', label: 'Widow'         },
+  { key: '4', label: 'Awaiting Divorce' },
+]
 
 const LANG_LABEL: Record<string, string> = {
   en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
   hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
 }
-
-// Hardcoded fallback — used if API is unavailable
-const FALLBACK_OPTIONS: Option[] = [
-  { key: '1',  label: 'Myself'      },
-  { key: '4',  label: "Son's"       },
-  { key: '5',  label: "Daughter's"  },
-  { key: '8',  label: "Brother's"   },
-  { key: '9',  label: "Sister's"    },
-  { key: '10', label: "Friend's"    },
-  { key: '11', label: "Relative's"  },
-]
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -55,49 +68,63 @@ type Props = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function CreatedByScreen({ navigation }: Props) {
+export default function MaritalStatusScreen({ navigation }: Props) {
   const { t }  = useTranslation()
   const insets = useSafeAreaInsets()
 
-  const [options,    setOptions]    = useState<Option[]>([])
-  const [selected,   setSelected]   = useState<string | null>(null)
-  const [fetching,   setFetching]   = useState(true)
-  const [submitting, setSubmitting] = useState(false)
+  const [options,      setOptions]      = useState<Option[]>([])
+  const [fetching,     setFetching]     = useState(true)
+  const [selected,     setSelected]     = useState<string | null>(null)
+  const [createdBy,    setCreatedBy]    = useState('1')
+  const [submitting,   setSubmitting]   = useState(false)
+  const [customerCare, setCustomerCare] = useState('')
 
-  // Restore previously saved selection (user pressed back from page 2)
   useEffect(() => {
-    getItem(SK.User.CREATED_BY).then(v => { if (v) setSelected(v) })
+    Promise.all([
+      getItem(SK.User.CREATED_BY),
+      getItem(SK.User.GENDER),
+      getItem('MARITALSTATUS'),         // restore prior selection (back navigation)
+      getItem(SK.App.CUSTOMER_CARE),
+    ]).then(([cb, gender, savedMS, cc]) => {
+      const cb2 = cb ?? '1'
+      const g2  = gender ?? '1'
+      if (cb2)   setCreatedBy(cb2)
+      if (savedMS) setSelected(savedMS)
+      if (cc)    setCustomerCare(cc)
+
+      const fallback = g2 === '0' ? FALLBACK_FEMALE_OPTIONS : FALLBACK_MALE_OPTIONS
+      fetchMaritalStatusOptions(g2)
+        .then(list => setOptions(list.length ? list : fallback))
+        .catch(() => setOptions(fallback))
+        .finally(() => setFetching(false))
+    })
   }, [])
 
-  // Fetch PROFILECREATEDBY from API; use fallback on failure
-  useEffect(() => {
-    fetchProfileCreatedByOptions()
-      .then(list => setOptions(list.length ? list : FALLBACK_OPTIONS))
-      .catch(() => setOptions(FALLBACK_OPTIONS))
-      .finally(() => setFetching(false))
-  }, [])
+  // Title: "Select your [possessive] marital status" — Angular: REGISTRATION.MARITALSTATUS
+  const possessive = PROFILE_POSSESSIVE[createdBy]
+  const title = possessive
+    ? `Select your ${possessive} marital status`
+    : t('REGISTRATION.MARITALSTATUS', 'Select your marital status').replace(' #PROFILETYPE#', '')
+
+  const langLabel = LANG_LABEL[i18n.language] ?? 'Eng'
 
   async function handleNext() {
     if (!selected || submitting) return
     setSubmitting(true)
-
-    // Persist CREATEDBY — matches Angular updateRegistrationValues('CREATEDBY', key)
-    await setItem(SK.User.CREATED_BY, selected)
-
-    // Set LOGINGENDER for family-member profiles — matches Angular getNextUrlForPage1()
-    if (MALE_GENDER.includes(selected)) {
-      await setItem(SK.User.LOGIN_GENDER, 'M')
-    } else if (FEMALE_GENDER.includes(selected)) {
-      await setItem(SK.User.LOGIN_GENDER, 'F')
+    try {
+      await setItem('MARITALSTATUS', selected)
+      await callRegistrationAPI({ MARITALSTATUS: selected })
+      navigation.push('onboarding', { pageNo: '5' })
+    } catch {
+      // Allow retry
+    } finally {
+      setSubmitting(false)
     }
-
-    // Everyone goes to page 2 (NAME) — Angular getNextUrlForPage1() returns /onboarding/2 for ALL createdBy values.
-    // Branching to page 3 vs 4 happens at page 2 (NAME screen), not here.
-    navigation.push('onboarding', { pageNo: '2' })
-    setSubmitting(false)
   }
 
-  const langLabel = LANG_LABEL[i18n.language] ?? 'Eng'
+  function handleCallPress() {
+    if (customerCare) Linking.openURL(`tel:${customerCare}`)
+  }
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -119,25 +146,19 @@ export default function CreatedByScreen({ navigation }: Props) {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Page illustration — Angular: ICONTYPE = domain + creating-profile.svg */}
+        {/* Page illustration — Figma: 48×48 ring-heart icon */}
         <Image
-          source={{ uri: CDN_ICON }}
-          style={styles.icon}
+          source={{ uri: CDN_PAGE_ICON }}
+          style={styles.pageIcon}
           resizeMode="contain"
         />
 
-        {/* Title — i18n: REGISTRATION.CREATEDBY */}
-        <Text style={styles.title}>
-          {t('REGISTRATION.CREATEDBY', 'Creating profile for')}
-        </Text>
+        {/* Title — Figma: 22px Poppins SemiBold */}
+        <Text style={styles.title}>{title}</Text>
 
-        {/* Pill chip grid — TYPE=type-1, horizontal wrapping (Figma: node 11851-2413) */}
+        {/* Pill chip grid — TYPE=type-1, horizontal wrapping (same as CreatedByScreen) */}
         {fetching ? (
-          <ActivityIndicator
-            color={Colors.primary}
-            size="large"
-            style={styles.loader}
-          />
+          <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
         ) : (
           <View style={styles.chipGrid}>
             {options.map(opt => {
@@ -151,11 +172,10 @@ export default function CreatedByScreen({ navigation }: Props) {
                   accessibilityState={{ selected: isSelected }}
                   accessibilityLabel={opt.label}
                 >
-                  {/* Left check indicator — empty circle unselected, filled + tick selected */}
+                  {/* Left indicator — empty circle or filled red with tick */}
                   <View style={[styles.chipIcon, isSelected && styles.chipIconSelected]}>
                     {isSelected && <Text style={styles.checkmark}>✓</Text>}
                   </View>
-
                   <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}>
                     {opt.label}
                   </Text>
@@ -166,11 +186,11 @@ export default function CreatedByScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      {/* Sticky footer — matches Angular .otp-cta sticky bottom */}
+      {/* Sticky footer — Next button + "Need help? Call" section */}
       <View
         style={[
           styles.footer,
-          { paddingBottom: Platform.OS === 'ios' ? insets.bottom : 20 },
+          { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
         ]}
       >
         <ButtonRevamp
@@ -182,6 +202,16 @@ export default function CreatedByScreen({ navigation }: Props) {
           loading={submitting}
           onPress={handleNext}
         />
+
+        {!!customerCare && (
+          <>
+            <View style={styles.divider} />
+            <Pressable style={styles.helpRow} onPress={handleCallPress}>
+              <Text style={styles.helpText}>Need help?  Call</Text>
+              <Text style={styles.helpPhone}>{customerCare}</Text>
+            </Pressable>
+          </>
+        )}
       </View>
     </View>
   )
@@ -204,41 +234,39 @@ const styles = StyleSheet.create({
     paddingTop:        24,
   },
 
-  // Page icon — CDN SVG (Angular: ICONTYPE → creating-profile.svg)
-  icon: {
+  pageIcon: {
     width:        48,
     height:       48,
     marginBottom: 24,
   },
 
-  // Title — "Creating profile for" (Figma: Poppins SemiBold 22px / lineHeight 24)
   title: {
     fontSize:     22,
     fontWeight:   '600',
     color:        Colors.textPrimary,
     lineHeight:   28,
-    marginBottom: 24,
+    marginBottom: 32,
   },
 
   loader: {
     marginTop: 48,
   },
 
-  // Horizontal wrapping chip grid — TYPE=type-1 (Figma: gap 16, flexWrap)
+  // Horizontal wrapping chip grid — TYPE=type-1 (Figma: gap:16, flexWrap)
   chipGrid: {
     flexDirection: 'row',
     flexWrap:      'wrap',
     gap:           16,
   },
 
-  // Pill chip — 40px height, fully-rounded (Figma: borderRadius 50px)
+  // Pill chip — 40px height, fully-rounded (Figma: borderRadius:50px)
   chip: {
     flexDirection:   'row',
     alignItems:      'center',
     height:          40,
     borderRadius:    50,
     borderWidth:     1,
-    borderColor:     Colors.inputBorder,
+    borderColor:     '#8a8a8a',
     backgroundColor: Colors.surface,
     paddingLeft:     8,
     paddingRight:    16,
@@ -249,13 +277,13 @@ const styles = StyleSheet.create({
     backgroundColor: CHIP_CHECKED_BG,
   },
 
-  // Left indicator icon — 20×20 circle, fills brand-red when selected
+  // Left indicator icon — 20×20 circle
   chipIcon: {
     width:           20,
     height:          20,
     borderRadius:    10,
     borderWidth:     1.5,
-    borderColor:     Colors.inputBorder,
+    borderColor:     '#8a8a8a',
     alignItems:      'center',
     justifyContent:  'center',
   },
@@ -264,7 +292,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryDark,
   },
 
-  // White checkmark rendered inside the filled circle
   checkmark: {
     color:      Colors.surface,
     fontSize:   11,
@@ -291,5 +318,31 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop:        20,
     backgroundColor:   Colors.surface,
+  },
+
+  // "Need help?" section — Figma: line + "Need help? Call [number]"
+  divider: {
+    height:          1,
+    backgroundColor: Colors.inputBorder,
+    marginTop:       16,
+    marginBottom:    16,
+  },
+  helpRow: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    justifyContent: 'center',
+    gap:            6,
+  },
+  helpText: {
+    fontSize:      14,
+    fontWeight:    '400',
+    color:         Colors.textPrimary,
+    letterSpacing: 0.42,
+  },
+  helpPhone: {
+    fontSize:      14,
+    fontWeight:    '500',
+    color:         '#29339b',
+    letterSpacing: 0.42,
   },
 })
