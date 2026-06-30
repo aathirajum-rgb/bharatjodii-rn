@@ -1,13 +1,8 @@
-import Constants from 'expo-constants'
-import * as Network from 'expo-network'
-import { StatusBar } from 'expo-status-bar'
-import { useState } from 'react'
-import { Alert, Image, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { Colors } from '../constants/colors'
 import { useAuth } from '../contexts/AuthContext'
-import { useOTAInfo, useOTAStatus } from '../hooks/useOTAUpdate'
 import ComponentShowcaseScreen from '../screens/dev/ComponentShowcaseScreen'
+import HomeScreen from '../screens/home/HomeScreen'
 import GalleryScreen from '../screens/GalleryScreen'
 import CreatedByScreen from '../screens/onboarding/CreatedByScreen'
 import DOBScreen from '../screens/onboarding/DOBScreen'
@@ -31,20 +26,6 @@ import PaymentSuccessScreen from '../screens/payment/PaymentSuccessScreen'
 import RechargeScreen from '../screens/payment/RechargeScreen'
 import PermissionDemoScreen from '../screens/PermissionDemoScreen'
 
-// ─── Flavor config (same as before) ──────────────────────────────────────────
-
-type FlavorKey = 'jodii' | 'tamil' | 'malayalam'
-
-const FLAVOR_INFO: Record<FlavorKey, { welcome: string; logo: ReturnType<typeof require>; domain: string }> = {
-  jodii:     { welcome: 'Welcome to Jodii',           logo: require('../assets/icon.png'),                          domain: 'https://jodii.app' },
-  tamil:     { welcome: 'Welcome to Tamil Jodii',     logo: require('../assets/icons/logos/tamil_jodii.png'),       domain: 'https://tamil.jodii.app' },
-  malayalam: { welcome: 'Welcome to Malayalam Jodii', logo: require('../assets/icons/logos/malayalam_jodii.png'),   domain: 'https://malayalam.jodii.app' },
-}
-
-const appFlavor = (Constants.expoConfig?.extra?.appFlavor ?? process.env.EXPO_PUBLIC_APP_FLAVOR ?? 'jodii') as FlavorKey
-const appType   = Constants.expoConfig?.extra?.appType ?? process.env.EXPO_PUBLIC_APP_TYPE ?? '115'
-const info      = FLAVOR_INFO[appFlavor] ?? FLAVOR_INFO.jodii
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type AppStackParamList = {
@@ -58,74 +39,6 @@ export type AppStackParamList = {
   ComponentShowcase: undefined
 }
 
-// ─── Dev home screen ──────────────────────────────────────────────────────────
-
-function HomeScreen({ navigation }: { navigation: any }) {
-  const [ipAddress, setIpAddress] = useState<string | null>(null)
-  const { logoutUpdate } = useAuth()
-  const otaInfo   = useOTAInfo()
-  const otaStatus = useOTAStatus()
-
-  const handleShare = async () => {
-    const url = `${info.domain}/home`
-    await Share.share({ message: `Check out Jodii! ${url}`, url })
-  }
-
-  const handleGetIp = async () => {
-    try {
-      const ip = await Network.getIpAddressAsync()
-      setIpAddress(ip)
-      Alert.alert('Device IP Address', ip)
-    } catch {
-      Alert.alert('Error', 'Could not retrieve IP address')
-    }
-  }
-
-  return (
-    <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
-      <Image source={info.logo} style={styles.logo} resizeMode="contain" />
-
-      <View style={[styles.badge, otaStatus === 'EMBEDDED' ? { backgroundColor: '#FF3B30' } : { backgroundColor: Colors.success }]}>
-        <Text style={styles.badgeText}>{otaStatus === 'EMBEDDED' ? '⚠️ EMBEDDED' : `✅ OTA LIVE — ${otaStatus}`}</Text>
-      </View>
-
-      <Text style={[styles.welcome, { color: '#ffffff' }]}>{info.welcome}</Text>
-      <Text style={[styles.appType,  { color: '#cce5ff' }]}>App Type: {appType}</Text>
-      <Text style={[styles.appType,  { color: '#a8d8ff', fontSize: 11 }]}>{otaInfo}</Text>
-
-      <TouchableOpacity style={[styles.button, { backgroundColor: '#6200EA' }]} onPress={() => Alert.alert('OTA Works!', 'Red theme live via OTA!\nNo app store needed!')}>
-        <Text style={styles.buttonText}>OTA Red Update</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={[styles.button, { backgroundColor: Colors.success }]} onPress={() => navigation.navigate('Gallery')}>
-        <Text style={styles.buttonText}>Open Gallery</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={[styles.button, { backgroundColor: '#FF9F0A' }]} onPress={handleShare}>
-        <Text style={styles.buttonText}>Share App</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={[styles.button, { backgroundColor: '#BF5AF2' }]} onPress={handleGetIp}>
-        <Text style={styles.buttonText}>Get Device IP</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={[styles.button, { backgroundColor: Colors.primary }]} onPress={() => navigation.navigate('recharge')}>
-        <Text style={styles.buttonText}>💳 Payment</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={[styles.button, { backgroundColor: Colors.devAccent }]} onPress={() => navigation.navigate('ComponentShowcase')}>
-        <Text style={styles.buttonText}>🧩 Component Library</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity style={[styles.button, { backgroundColor: '#FF3B30' }]} onPress={logoutUpdate}>
-        <Text style={styles.buttonText}>🚪 Logout</Text>
-      </TouchableOpacity>
-
-      {ipAddress ? <Text style={[styles.appType, { color: '#a8d8ff' }]}>IP: {ipAddress}</Text> : null}
-      <StatusBar style="light" />
-    </ScrollView>
-  )
-}
 
 // ─── Onboarding router ────────────────────────────────────────────────────────
 
@@ -168,6 +81,7 @@ export default function AppStack() {
     >
       <Stack.Screen name="Home"      component={HomeScreen} />
       <Stack.Screen name="dashboard" component={HomeScreen} />
+      {/* HomeScreen is in screens/home/HomeScreen.tsx — AppHeader + FlatList + AppFooter */}
       <Stack.Screen name="onboarding" component={OnboardingRouter} />
       <Stack.Screen
         name="Permissions"
@@ -194,22 +108,3 @@ export default function AppStack() {
   )
 }
 
-// ─── Styles (HomeScreen) ──────────────────────────────────────────────────────
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    paddingHorizontal: 24,
-  },
-  logo:        { width: 120, height: 120 },
-  welcome:     { fontSize: 22, fontWeight: '600', color: '#1a1a1a' },
-  appType:     { fontSize: 16, color: '#666' },
-  button:      { backgroundColor: '#007AFF', paddingHorizontal: 28, paddingVertical: 14, borderRadius: 10, marginTop: 8 },
-  buttonText:  { color: '#fff', fontSize: 16, fontWeight: '600' },
-  badge:       { backgroundColor: '#FFD700', paddingHorizontal: 16, paddingVertical: 6, borderRadius: 20 },
-  badgeText:   { color: '#000', fontSize: 14, fontWeight: '700' },
-})

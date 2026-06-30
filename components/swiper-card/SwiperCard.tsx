@@ -37,6 +37,7 @@ export interface SwiperItem {
   isNewLabel?:          boolean | undefined
   labelContent?:        string | undefined
   likedViewedDateText?: string | undefined
+  date?:                string | undefined   // success story posted date (variant 4)
 
   // See-all card (variant 5)
   viewMoreList?:    { THUMBIMG: string }[] | undefined
@@ -152,6 +153,7 @@ export default function SwiperCard({
               isNewLabel={item.isNewLabel}
               labelContent={item.labelContent}
               likedViewedDateText={item.likedViewedDateText}
+              date={item.date}
               viewMoreList={item.viewMoreList}
               viewMoreContent={item.viewMoreContent}
               onPress={() => onCardPress?.(item, index)}
