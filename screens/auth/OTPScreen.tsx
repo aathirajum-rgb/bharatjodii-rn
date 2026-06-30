@@ -422,13 +422,13 @@ const styles = StyleSheet.create({
     includeFontPadding: false,      // Android: strip extra font metric padding
   },
   otpBoxEmpty: {
-    borderColor: Colors.inputBorder,   // #B0B0B0 — Figma empty state
+    borderColor: Colors.inputBorder,
   },
   otpBoxFilled: {
-    borderColor: Colors.inputError,    // #DE2A68 — Figma filled state
+    borderColor: Colors.inputBorder,
   },
   otpBoxError: {
-    borderColor: Colors.inputError,    // #DE2A68 — Figma error state
+    borderColor: Colors.inputError,
   },
 
   // Error — "Please enter a valid OTP" in #DE2A68

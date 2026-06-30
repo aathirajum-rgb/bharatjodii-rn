@@ -19,7 +19,7 @@ import { StorageKeys as SK } from '../../constants/storage.keys'
 import i18n from '../../i18n'
 import {
   callRegistrationAPI,
-  fetchEatingHabitOptions,
+  fetchQualificationOptions,
   getRegValue,
   setRegValue,
 } from '../../service/registrationService'
@@ -27,8 +27,8 @@ import { getItem } from '../../service/storageService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/eating-updated.svg'
-const FOOTER_H = 140
+const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/qualification.svg'
+const FOOTER_H      = 140
 
 const PROFILE_POSSESSIVE: Record<string, string> = {
   '4':  "son's",
@@ -38,12 +38,6 @@ const PROFILE_POSSESSIVE: Record<string, string> = {
   '10': "friend's",
   '11': "relative's",
 }
-
-const FALLBACK_OPTIONS = [
-  { key: '1', label: 'Vegetarian'     },
-  { key: '2', label: 'Non-vegetarian' },
-  { key: '3', label: 'Eggetarian'     },
-]
 
 const LANG_LABEL: Record<string, string> = {
   en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
@@ -61,7 +55,7 @@ type Props = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function EatingHabitScreen({ navigation }: Props) {
+export default function QualificationScreen({ navigation }: Props) {
   const { t }  = useTranslation()
   const insets = useSafeAreaInsets()
 
@@ -75,34 +69,31 @@ export default function EatingHabitScreen({ navigation }: Props) {
   useEffect(() => {
     Promise.all([
       getRegValue('CREATEDBY'),
-      getRegValue('EATING'),
+      getRegValue('QUALIFICATION'),
       getItem(SK.App.CUSTOMER_CARE),
-    ]).then(([cb, savedEating, cc]) => {
-      if (cb)          setCreatedBy(cb)
-      if (savedEating) setSelected(savedEating)
-      if (cc)          setCustomerCare(cc)
+    ]).then(([cb, savedQual, cc]) => {
+      if (cb)        setCreatedBy(cb)
+      if (savedQual) setSelected(savedQual)
+      if (cc)        setCustomerCare(cc)
 
-      fetchEatingHabitOptions()
-        .then(list => setOptions(list.length ? list : FALLBACK_OPTIONS))
-        .catch(() => setOptions(FALLBACK_OPTIONS))
+      fetchQualificationOptions()
+        .then(list => setOptions(list))
+        .catch(() => {})
         .finally(() => setFetching(false))
     })
   }, [])
 
-  const possessive = PROFILE_POSSESSIVE[createdBy]
-  const title = possessive
-    ? `Select ${possessive} eating habits`
-    : 'Select eating habits'
-
-  const langLabel = LANG_LABEL[i18n.language] ?? 'Eng'
+  const possessive = PROFILE_POSSESSIVE[createdBy] ?? 'their'
+  const title      = `What is ${possessive} highest qualification?`
+  const langLabel  = LANG_LABEL[i18n.language] ?? 'Eng'
 
   async function handleNext() {
     if (!selected || submitting) return
     setSubmitting(true)
     try {
-      await setRegValue('EATING', selected)
-      await callRegistrationAPI({ EATING: selected })
-      navigation.push('onboarding', { pageNo: '39' })
+      await setRegValue('QUALIFICATION', selected)
+      await callRegistrationAPI({ Education: selected })
+      navigation.push('onboarding', { pageNo: '11' })
     } catch {
       // Allow retry
     } finally {
@@ -233,7 +224,7 @@ const styles = StyleSheet.create({
 
   loader: { marginTop: 48 },
 
-  // Pill chip grid — TYPE=type-1, same as MaritalStatus and CreatedBy screens
+  // Pill chip grid — same pattern as EatingHabitScreen
   chipGrid: {
     flexDirection: 'row',
     flexWrap:      'wrap',

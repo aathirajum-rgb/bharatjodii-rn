@@ -7,6 +7,7 @@ import { apiCall } from './apiClient'
 import { Endpoints } from './api.endpoints'
 import { getItem, getJson } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
+import { getSessionValue } from './registrationService'
 import { navigate } from '../utils/navigationRef'
 import { ENavigation } from '../types/enums/navigation.enum'
 import { resolveFemaleFreeAction } from './femaleFreeService'
@@ -81,18 +82,17 @@ async function showCallOrWhatsApp(
   action: string,
   oppProfile: any,
 ): Promise<CommActionResult> {
-  const [entryType, ekycStatus, femaleFreeRaw, ppSetRaw] = await Promise.all([
-    getItem(SK.Auth.ENTRY_TYPE),
+  const [entryType, ekycStatus, femaleFreeData, ppSetRaw] = await Promise.all([
+    getSessionValue('ENTRYTYPE'),
     getItem('PI_EKYCSTATUS'),
-    getItem(SK.Promotions.FEMALE_FREE_CONTACT),
+    getSessionValue('FEMALEFREECONACT'),
     getJson<Record<string, any>>(SK.App.PP_SET_DATA),
   ])
 
   const photoStatus: string = (ppSetRaw as any)?.PI_PHOTOSTATUS ?? 'N'
 
   // Female free 3-contact promo
-  if (entryType !== 'P' && femaleFreeRaw) {
-    const femaleFreeData = JSON.parse(femaleFreeRaw)
+  if (entryType !== 'P' && femaleFreeData) {
     if (femaleFreeData.FEMALEFREECONACT === '1') {
       const femaleFreeAction = await resolveFemaleFreeAction(photoStatus, ekycStatus ?? '0')
       if (femaleFreeAction) {
@@ -137,7 +137,7 @@ async function showContactDetails(
 
 async function handleChat(fromPage: string, oppProfile: any): Promise<CommActionResult> {
   const [entryType, ekycStatus, ppSetRaw] = await Promise.all([
-    getItem(SK.Auth.ENTRY_TYPE),
+    getSessionValue('ENTRYTYPE'),
     getItem('PI_EKYCSTATUS'),
     getJson<Record<string, any>>(SK.App.PP_SET_DATA),
   ])

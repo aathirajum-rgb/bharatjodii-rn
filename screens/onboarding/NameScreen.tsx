@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Image,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -10,14 +9,13 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
-import { StorageKeys as SK } from '../../constants/storage.keys'
 import i18n from '../../i18n'
-import { callRegistrationAPI } from '../../service/registrationService'
-import { getItem, setItem } from '../../service/storageService'
+import { callRegistrationAPI, getRegValues, setRegValue } from '../../service/registrationService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -69,12 +67,9 @@ export default function NameScreen({ navigation }: Props) {
 
   // Load CREATEDBY + restore any previously typed name (back navigation)
   useEffect(() => {
-    Promise.all([
-      getItem(SK.User.CREATED_BY),
-      getItem(SK.User.NAME),
-    ]).then(([cb, savedName]) => {
-      if (cb) setCreatedBy(cb)
-      if (savedName) setName(savedName)
+    getRegValues().then(({ CREATEDBY, NAME }) => {
+      if (CREATEDBY) setCreatedBy(CREATEDBY)
+      if (NAME) setName(NAME)
     })
   }, [])
 
@@ -120,7 +115,7 @@ export default function NameScreen({ navigation }: Props) {
 
     setSubmitting(true)
     try {
-      await setItem(SK.User.NAME, trimmed)
+      await setRegValue('NAME', trimmed)
       await callRegistrationAPI({ NAME: trimmed })
 
       // SELFGENDER [1,10,11] → page 3 (GENDER); OTHERGENDER [4,5,8,9] → page 4 (MARITALSTATUS)
@@ -165,7 +160,7 @@ export default function NameScreen({ navigation }: Props) {
           <Image
             source={{ uri: CDN_ICON }}
             style={styles.icon}
-            resizeMode="contain"
+            contentFit="contain"
           />
 
           {/* Dynamic title — "Enter your name" / "Enter your son's name" etc. */}

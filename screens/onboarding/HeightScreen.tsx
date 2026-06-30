@@ -4,7 +4,6 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
-  Image,
   Linking,
   Modal,
   Platform,
@@ -16,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
@@ -27,8 +27,10 @@ import {
   callRegistrationAPI,
   fetchHeightCategoryOptions,
   fetchExactHeightGrouped,
+  getRegValue,
+  setRegValues,
 } from '../../service/registrationService'
-import { getItem, setItem } from '../../service/storageService'
+import { getItem } from '../../service/storageService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -104,10 +106,10 @@ export default function HeightScreen({ navigation }: Props) {
 
   useEffect(() => {
     Promise.all([
-      getItem(SK.User.CREATED_BY),
-      getItem(SK.User.GENDER),
-      getItem('HEIGHTCATEGORY'),
-      getItem('HEIGHT'),
+      getRegValue('CREATEDBY'),
+      getRegValue('GENDER'),
+      getRegValue('HEIGHTCATEGORY'),
+      getRegValue('HEIGHT'),
       getItem(SK.App.CUSTOMER_CARE),
     ]).then(([cb, gender, savedCat, savedHeight, cc]) => {
       const g2 = gender ?? '1'
@@ -189,13 +191,11 @@ export default function HeightScreen({ navigation }: Props) {
     try {
       if (selectedHeight) {
         // Exact height selected — Angular: saves HEIGHT key, clears HEIGHTCATEGORY
-        await setItem('HEIGHT', selectedHeight.key)
-        await setItem('HEIGHTCATEGORY', '')
+        await setRegValues({ HEIGHT: selectedHeight.key, HEIGHTCATEGORY: '' })
         await callRegistrationAPI({ HEIGHT: selectedHeight.key, HEIGHTCATEGORY: '' })
       } else {
         // Category selected (101-104) — Angular: saves HEIGHTCATEGORY, clears HEIGHT
-        await setItem('HEIGHTCATEGORY', selectedCategory!)
-        await setItem('HEIGHT', '')
+        await setRegValues({ HEIGHTCATEGORY: selectedCategory!, HEIGHT: '' })
         await callRegistrationAPI({ HEIGHTCATEGORY: selectedCategory, HEIGHT: '' })
       }
       navigation.push('onboarding', { pageNo: '38' })
@@ -229,7 +229,7 @@ export default function HeightScreen({ navigation }: Props) {
         <Image
           source={{ uri: CDN_PAGE_ICON }}
           style={styles.pageIcon}
-          resizeMode="contain"
+          contentFit="contain"
         />
 
         <Text style={styles.title}>{title}</Text>
@@ -529,9 +529,7 @@ const styles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
-  exactFieldActive: {
-    borderColor: Colors.primaryDark,
-  },
+  exactFieldActive: {},
   exactFieldText: {
     flex:       1,
     fontSize:   14,

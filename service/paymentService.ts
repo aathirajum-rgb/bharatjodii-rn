@@ -7,6 +7,7 @@ import { apiCall } from './apiClient'
 import { Endpoints } from './api.endpoints'
 import { getItem, setItem, getJson, setJson, removeItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
+import { getSessionValue } from './registrationService'
 import { navigate, resetTo } from '../utils/navigationRef'
 import { ENavigation } from '../types/enums/navigation.enum'
 import { decrypt } from './encryptionService'
@@ -41,8 +42,8 @@ export async function redirectToIntermediatePage(
   paymentId?: string,
   type?: string,
 ): Promise<void> {
-  const renewalFlag = await getItem('PAYRENEWALFLAG')
-  const renewalKey  = await getItem('RENEWALENABLEKEY')
+  const renewalFlag = String((await getSessionValue('PAYRENEWALFLAG')) ?? '')
+  const renewalKey  = String((await getSessionValue('RENEWALENABLEKEY')) ?? '')
 
   const goToRenewal =
     renewalFlag === '1' &&
@@ -54,7 +55,7 @@ export async function redirectToIntermediatePage(
 }
 
 export async function redirectToMembershipPage(fromPage = '', replaceStack = false): Promise<void> {
-  const entryType = await getItem(SK.Auth.ENTRY_TYPE)
+  const entryType = String((await getSessionValue('ENTRYTYPE')) ?? '')
   const target    = entryType === 'P' ? ENavigation.MY_MEMBERSHIP : ENavigation.RECHARGE
 
   if (replaceStack) resetTo(target, { from: fromPage })

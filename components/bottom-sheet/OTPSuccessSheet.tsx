@@ -1,7 +1,7 @@
 import LottieView from 'lottie-react-native'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Animated, Dimensions, Modal, StyleSheet, Text } from 'react-native'
+import { Animated, Dimensions, Modal, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 
@@ -109,13 +109,15 @@ export default function OTPSuccessSheet({ visible, onDismiss }: Props) {
           { transform: [{ translateY: slideAnim }] },
         ]}
       >
-        {/* Success Lottie — matches Angular lottie-player success-new.json, 124×125px */}
-        <LottieView
-          source={{ uri: LOTTIE_URL }}
-          autoPlay
-          loop={false}
-          style={styles.lottie}
-        />
+        {/* Success Lottie — 124×125px, left-aligned (matches Angular .anim-slot + pl-0) */}
+        <View style={styles.lottieWrapper}>
+          <LottieView
+            source={{ uri: LOTTIE_URL }}
+            autoPlay
+            loop={false}
+            style={styles.lottie}
+          />
+        </View>
 
         {/* "Your OTP is verified successfully!" — i18n: LOGIN_PAGE.YOUROTP */}
         <Text style={styles.title}>
@@ -151,11 +153,17 @@ const styles = StyleSheet.create({
     elevation:            16,
   },
 
-  // 124×124px — matches Angular .anim-slot { width: 124px; height: 125px }
-  lottie: {
+  // Outer wrapper constrains size + pins to left — LottieView ignores alignSelf on some platforms
+  lottieWrapper: {
     width:        124,
-    height:       124,
+    height:       125,
+    alignSelf:    'flex-start',
     marginBottom: 16,
+    overflow:     'hidden',
+  },
+  lottie: {
+    width:  124,
+    height: 125,
   },
 
   // heading2-semibold-18 color-1f1e1b

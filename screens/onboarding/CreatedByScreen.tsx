@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -10,14 +9,13 @@ import {
   Text,
   View,
 } from 'react-native'
+import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
-import { StorageKeys as SK } from '../../constants/storage.keys'
 import i18n from '../../i18n'
-import { fetchProfileCreatedByOptions } from '../../service/registrationService'
-import { getItem, setItem } from '../../service/storageService'
+import { fetchProfileCreatedByOptions, getRegValue, setRegValues } from '../../service/registrationService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -66,7 +64,7 @@ export default function CreatedByScreen({ navigation }: Props) {
 
   // Restore previously saved selection (user pressed back from page 2)
   useEffect(() => {
-    getItem(SK.User.CREATED_BY).then(v => { if (v) setSelected(v) })
+    getRegValue('CREATEDBY').then(v => { if (v) setSelected(v) })
   }, [])
 
   // Fetch PROFILECREATEDBY from API; use fallback on failure
@@ -82,14 +80,14 @@ export default function CreatedByScreen({ navigation }: Props) {
     setSubmitting(true)
 
     // Persist CREATEDBY — matches Angular updateRegistrationValues('CREATEDBY', key)
-    await setItem(SK.User.CREATED_BY, selected)
-
     // Set LOGINGENDER for family-member profiles — matches Angular getNextUrlForPage1()
+    const updates: Record<string, string> = { CREATEDBY: selected }
     if (MALE_GENDER.includes(selected)) {
-      await setItem(SK.User.LOGIN_GENDER, 'M')
+      updates.LOGINGENDER = 'M'
     } else if (FEMALE_GENDER.includes(selected)) {
-      await setItem(SK.User.LOGIN_GENDER, 'F')
+      updates.LOGINGENDER = 'F'
     }
+    await setRegValues(updates)
 
     // Everyone goes to page 2 (NAME) — Angular getNextUrlForPage1() returns /onboarding/2 for ALL createdBy values.
     // Branching to page 3 vs 4 happens at page 2 (NAME screen), not here.
@@ -123,7 +121,7 @@ export default function CreatedByScreen({ navigation }: Props) {
         <Image
           source={{ uri: CDN_ICON }}
           style={styles.icon}
-          resizeMode="contain"
+          contentFit="contain"
         />
 
         {/* Title — i18n: REGISTRATION.CREATEDBY */}

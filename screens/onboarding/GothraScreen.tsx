@@ -23,18 +23,18 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import i18n from '../../i18n'
+import RegistrationSuccessSheet from '../../components/registration-success-sheet/RegistrationSuccessSheet'
 import {
   callRegistrationAPI,
-  fetchMotherTongueOptions,
+  fetchGothraOptions,
   getRegValue,
-  loadAndStoreStatesForMotherTongue,
   setRegValue,
 } from '../../service/registrationService'
-import { getItem } from '../../service/storageService'
+import { getItem, setItem } from '../../service/storageService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/mother-tongue.svg'
+const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/gothra.svg'
 const FOOTER_H      = 140
 const PANEL_WIDTH   = Dimensions.get('window').width * 0.85
 const ITEM_HEIGHT   = 52
@@ -53,13 +53,6 @@ const LANG_LABEL: Record<string, string> = {
   hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Strip Angular HTML from VALUE labels (e.g. <span>...</span>)
-function stripHtml(raw: string): string {
-  return raw.replace(/<[^>]+>/g, '').trim()
-}
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Option = { key: string; label: string }
@@ -71,17 +64,18 @@ type Props = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function MotherTongueScreen({ navigation }: Props) {
+export default function GothraScreen({ navigation }: Props) {
   const { t }  = useTranslation()
   const insets = useSafeAreaInsets()
 
-  const [allOptions,   setAllOptions]   = useState<Option[]>([])
-  const [fetching,     setFetching]     = useState(true)
-  const [selected,     setSelected]     = useState<Option | null>(null)
-  const [createdBy,    setCreatedBy]    = useState('4')
-  const [submitting,   setSubmitting]   = useState(false)
-  const [customerCare, setCustomerCare] = useState('')
+  const [allOptions,    setAllOptions]    = useState<Option[]>([])
+  const [fetching,      setFetching]      = useState(true)
+  const [selected,      setSelected]      = useState<Option | null>(null)
+  const [createdBy,     setCreatedBy]     = useState('4')
+  const [submitting,    setSubmitting]    = useState(false)
+  const [customerCare,  setCustomerCare]  = useState('')
   const [panelVisible,   setPanelVisible]   = useState(false)
+  const [successVisible, setSuccessVisible] = useState(false)
   const [search,         setSearch]         = useState('')
   const [searchFocused,  setSearchFocused]  = useState(false)
 
@@ -90,19 +84,17 @@ export default function MotherTongueScreen({ navigation }: Props) {
   useEffect(() => {
     Promise.all([
       getRegValue('CREATEDBY'),
-      getRegValue('MOTHERTONGUE'),
+      getRegValue('GOTHRA'),
       getItem(SK.App.CUSTOMER_CARE),
-    ]).then(([cb, savedMT, cc]) => {
+    ]).then(([cb, savedGothra, cc]) => {
       if (cb) setCreatedBy(cb)
       if (cc) setCustomerCare(cc)
 
-      fetchMotherTongueOptions()
+      fetchGothraOptions()
         .then(list => {
-          const cleaned = list.map(o => ({ key: o.key, label: stripHtml(o.label) }))
-          setAllOptions(cleaned)
-          // Restore prior selection (back navigation)
-          if (savedMT) {
-            const found = cleaned.find(o => o.key === savedMT)
+          setAllOptions(list)
+          if (savedGothra) {
+            const found = list.find(o => o.key === savedGothra)
             if (found) setSelected(found)
           }
         })
@@ -111,7 +103,7 @@ export default function MotherTongueScreen({ navigation }: Props) {
     })
   }, [])
 
-  // Filtered list for search
+  // Filtered list for panel search
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return allOptions
@@ -141,10 +133,10 @@ export default function MotherTongueScreen({ navigation }: Props) {
 
   // ─── Derived ──────────────────────────────────────────────────────────────
 
-  const possessive       = PROFILE_POSSESSIVE[createdBy] ?? 'their'
-  const title            = `What is ${possessive} mother tongue?`
-  const langLabel        = LANG_LABEL[i18n.language] ?? 'Eng'
-  const panelTranslateX  = slideAnim.interpolate({
+  const possessive      = PROFILE_POSSESSIVE[createdBy] ?? 'their'
+  const title           = `Select ${possessive} gothram`
+  const langLabel       = LANG_LABEL[i18n.language] ?? 'Eng'
+  const panelTranslateX = slideAnim.interpolate({
     inputRange: [0, 1], outputRange: [PANEL_WIDTH, 0],
   })
 
@@ -154,14 +146,15 @@ export default function MotherTongueScreen({ navigation }: Props) {
     if (!selected || submitting) return
     setSubmitting(true)
     try {
-      await setRegValue('MOTHERTONGUE', selected.key)
-      // Angular loadStateList(): type=MOTHERTONGUE&MOTHERTONGUE=<key> → stores STATEOBJ
-      // in REGISTRATIONARRAYS so page 9 can read the state list immediately.
-      await Promise.all([
-        callRegistrationAPI({ MOTHERTONGUE: selected.key }),
-        loadAndStoreStatesForMotherTongue(selected.key),
-      ])
-      navigation.push('onboarding', { pageNo: '9' })
+      await setRegValue('GOTHRA', selected.key)
+      const res = await callRegistrationAPI({ GOTHRA: selected.key })
+      const matriId = res?.RESPONSE?.MATRIID
+      if (matriId) {
+        await setItem(SK.Auth.USER_ID, String(matriId))
+        setSuccessVisible(true)
+      } else {
+        navigation.push('onboarding', { pageNo: '20' })
+      }
     } catch {
       // Allow retry
     } finally {
@@ -201,18 +194,17 @@ export default function MotherTongueScreen({ navigation }: Props) {
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
         ) : (
-          /* "Select mother tongue" field — opens right-side panel */
           <Pressable
-            style={[styles.selectField, !!selected && styles.selectFieldActive]}
+            style={styles.selectField}
             onPress={openPanel}
             accessibilityRole="button"
-            accessibilityLabel="Select mother tongue"
+            accessibilityLabel="Select gothram"
           >
             <Text
               style={[styles.selectFieldText, !!selected && styles.selectFieldTextActive]}
               numberOfLines={1}
             >
-              {selected ? selected.label : 'Select mother tongue'}
+              {selected ? selected.label : 'Select Gothram'}
             </Text>
             <Text style={styles.selectFieldArrow}>›</Text>
           </Pressable>
@@ -250,7 +242,15 @@ export default function MotherTongueScreen({ navigation }: Props) {
         )}
       </View>
 
-      {/* Mother tongue picker — right-side sliding panel */}
+      <RegistrationSuccessSheet
+        visible={successVisible}
+        onContinue={() => {
+          setSuccessVisible(false)
+          navigation.push('onboarding', { pageNo: '20' })
+        }}
+      />
+
+      {/* Gothram picker — right-side sliding panel */}
       <Modal
         transparent
         visible={panelVisible}
@@ -259,10 +259,8 @@ export default function MotherTongueScreen({ navigation }: Props) {
         statusBarTranslucent
       >
         <View style={styles.panelContainer}>
-          {/* Backdrop */}
           <Pressable style={styles.backdrop} onPress={closePanel} />
 
-          {/* Sliding panel */}
           <Animated.View
             style={[
               styles.panel,
@@ -274,18 +272,18 @@ export default function MotherTongueScreen({ navigation }: Props) {
           >
             {/* Header */}
             <View style={styles.panelHeader}>
-              <Text style={styles.panelTitle}>Select mother tongue</Text>
+              <Text style={styles.panelTitle}>Select gothram</Text>
               <TouchableOpacity onPress={closePanel} hitSlop={8}>
                 <Text style={styles.panelCloseTxt}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Search box */}
+            {/* Search */}
             <View style={[styles.searchBox, searchFocused && styles.searchBoxFocused]}>
               <Text style={styles.searchIcon}>⌕</Text>
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search language..."
+                placeholder="Search gothram..."
                 placeholderTextColor="rgba(0,0,0,0.35)"
                 value={search}
                 onChangeText={setSearch}
@@ -302,7 +300,7 @@ export default function MotherTongueScreen({ navigation }: Props) {
               )}
             </View>
 
-            {/* Language list */}
+            {/* Gothram list */}
             {filtered.length === 0 ? (
               <View style={styles.panelEmpty}>
                 <Text style={styles.panelEmptyText}>No results found</Text>
@@ -347,8 +345,8 @@ export default function MotherTongueScreen({ navigation }: Props) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const SELECTED_BG    = 'rgba(181,0,51,0.02)'
-const BORDER_COLOR   = '#e6e6e6'
+const SELECTED_BG  = 'rgba(181,0,51,0.02)'
+const BORDER_COLOR = '#e6e6e6'
 
 const styles = StyleSheet.create({
   screen: {
@@ -378,7 +376,6 @@ const styles = StyleSheet.create({
 
   loader: { marginTop: 48 },
 
-  // "Select mother tongue" outlined field — same style as exact height field
   selectField: {
     flexDirection:   'row',
     alignItems:      'center',
@@ -390,7 +387,6 @@ const styles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
-  selectFieldActive: {},
   selectFieldText: {
     flex:       1,
     fontSize:   14,
@@ -406,7 +402,7 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
 
-  // Sticky footer
+  // Footer
   footer: {
     position:          'absolute',
     bottom:            0,
@@ -441,7 +437,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.42,
   },
 
-  // Right-side sliding panel
+  // Panel
   panelContainer: {
     flex:           1,
     flexDirection:  'row',
@@ -480,7 +476,6 @@ const styles = StyleSheet.create({
     padding:  4,
   },
 
-  // Search box
   searchBox: {
     flexDirection:     'row',
     alignItems:        'center',
@@ -494,34 +489,14 @@ const styles = StyleSheet.create({
     gap:               8,
     backgroundColor:   Colors.surface,
   },
-  searchBoxFocused: {
-    borderColor: Colors.primary,
-  },
-  searchIcon: {
-    fontSize: 14,
-  },
-  searchInput: {
-    flex:       1,
-    fontSize:   14,
-    color:      Colors.textPrimary,
-    padding:    0,
-  },
-  searchClear: {
-    fontSize: 13,
-    color:    'rgba(0,0,0,0.4)',
-    padding:  2,
-  },
+  searchBoxFocused: { borderColor: Colors.primary },
+  searchIcon:  { fontSize: 14 },
+  searchInput: { flex: 1, fontSize: 14, color: Colors.textPrimary, padding: 0 },
+  searchClear: { fontSize: 13, color: 'rgba(0,0,0,0.4)', padding: 2 },
 
-  panelEmpty: {
-    padding:    32,
-    alignItems: 'center',
-  },
-  panelEmptyText: {
-    fontSize: 14,
-    color:    'rgba(0,0,0,0.4)',
-  },
+  panelEmpty:     { padding: 32, alignItems: 'center' },
+  panelEmptyText: { fontSize: 14, color: 'rgba(0,0,0,0.4)' },
 
-  // Language list items
   item: {
     flexDirection:     'row',
     alignItems:        'center',
@@ -530,19 +505,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f2f2f2',
   },
-  itemSelected: {
-    backgroundColor: SELECTED_BG,
-  },
-  itemText: {
-    flex:       1,
-    fontSize:   14,
-    fontWeight: '400',
-    color:      Colors.textPrimary,
-  },
-  itemTextSelected: {
-    fontWeight: '500',
-    color:      Colors.primaryDark,
-  },
+  itemSelected:     { backgroundColor: SELECTED_BG },
+  itemText:         { flex: 1, fontSize: 14, fontWeight: '400', color: Colors.textPrimary },
+  itemTextSelected: { fontWeight: '500', color: Colors.primaryDark },
   itemRadio: {
     width:           20,
     height:          20,

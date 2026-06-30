@@ -23,18 +23,21 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import i18n from '../../i18n'
+import RegistrationSuccessSheet from '../../components/registration-success-sheet/RegistrationSuccessSheet'
 import {
   callRegistrationAPI,
-  fetchMotherTongueOptions,
-  getRegValue,
-  loadAndStoreStatesForMotherTongue,
+  fetchCasteOptions,
+  fetchSubcasteOptions,
+  getNextPageAfterCaste,
+  getRegValues,
   setRegValue,
+  getRegValue,
 } from '../../service/registrationService'
-import { getItem } from '../../service/storageService'
+import { getItem, setItem } from '../../service/storageService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/mother-tongue.svg'
+const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/caste.svg'
 const FOOTER_H      = 140
 const PANEL_WIDTH   = Dimensions.get('window').width * 0.85
 const ITEM_HEIGHT   = 52
@@ -53,16 +56,10 @@ const LANG_LABEL: Record<string, string> = {
   hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Strip Angular HTML from VALUE labels (e.g. <span>...</span>)
-function stripHtml(raw: string): string {
-  return raw.replace(/<[^>]+>/g, '').trim()
-}
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type Option = { key: string; label: string }
+type Option      = { key: string; label: string }
+type ActivePanel = 'caste' | 'subcaste' | null
 
 type Props = {
   navigation: any
@@ -71,58 +68,110 @@ type Props = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function MotherTongueScreen({ navigation }: Props) {
+export default function CasteScreen({ navigation }: Props) {
   const { t }  = useTranslation()
   const insets = useSafeAreaInsets()
 
-  const [allOptions,   setAllOptions]   = useState<Option[]>([])
-  const [fetching,     setFetching]     = useState(true)
-  const [selected,     setSelected]     = useState<Option | null>(null)
+  // Options
+  const [casteOptions,    setCasteOptions]    = useState<Option[]>([])
+  const [subcasteOptions, setSubcasteOptions] = useState<Option[]>([])
+
+  // Selections
+  const [selectedCaste,    setSelectedCaste]    = useState<Option | null>(null)
+  const [selectedSubcaste, setSelectedSubcaste] = useState<Option | null>(null)
+
+  // UI state
+  const [fetchingCaste,    setFetchingCaste]    = useState(true)
+  const [fetchingSubcaste, setFetchingSubcaste] = useState(false)
+  const [hasSubcaste,      setHasSubcaste]      = useState(false)
+  const [submitting,       setSubmitting]       = useState(false)
+  const [successVisible,   setSuccessVisible]   = useState(false)
+  const [customerCare,     setCustomerCare]     = useState('')
+
+  // Panel state — single modal, one at a time
+  const [activePanel,  setActivePanel]  = useState<ActivePanel>(null)
+  const [search,       setSearch]       = useState('')
+  const [searchFocused, setSearchFocused] = useState(false)
+
+  // Context
   const [createdBy,    setCreatedBy]    = useState('4')
-  const [submitting,   setSubmitting]   = useState(false)
-  const [customerCare, setCustomerCare] = useState('')
-  const [panelVisible,   setPanelVisible]   = useState(false)
-  const [search,         setSearch]         = useState('')
-  const [searchFocused,  setSearchFocused]  = useState(false)
+  const [religion,     setReligion]     = useState('')
+  const [mothertongue, setMothertongue] = useState('')
 
   const slideAnim = useRef(new Animated.Value(0)).current
+
+  // ─── Init ────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     Promise.all([
       getRegValue('CREATEDBY'),
-      getRegValue('MOTHERTONGUE'),
       getItem(SK.App.CUSTOMER_CARE),
-    ]).then(([cb, savedMT, cc]) => {
-      if (cb) setCreatedBy(cb)
-      if (cc) setCustomerCare(cc)
+      getRegValues(),
+    ]).then(async ([cb, cc, regVals]) => {
+      const { RELIGION: rel, MOTHERTONGUE: mt, CASTE: savedCaste, SUBCASTE: savedSubcaste } = regVals
+      if (cb)  setCreatedBy(cb)
+      if (rel) setReligion(rel)
+      if (mt)  setMothertongue(mt)
+      if (cc)  setCustomerCare(cc)
 
-      fetchMotherTongueOptions()
-        .then(list => {
-          const cleaned = list.map(o => ({ key: o.key, label: stripHtml(o.label) }))
-          setAllOptions(cleaned)
-          // Restore prior selection (back navigation)
-          if (savedMT) {
-            const found = cleaned.find(o => o.key === savedMT)
-            if (found) setSelected(found)
+      try {
+        const list = await fetchCasteOptions(rel ?? '', mt ?? '')
+        setCasteOptions(list)
+
+        if (savedCaste) {
+          const found = list.find(o => o.key === savedCaste)
+          if (found) {
+            setSelectedCaste(found)
+            // Also restore subcaste if available
+            if (savedSubcaste && rel !== '2') {
+              await loadSubcaste(rel ?? '', savedCaste, mt ?? '', savedSubcaste)
+            }
           }
-        })
-        .catch(() => {})
-        .finally(() => setFetching(false))
+        }
+      } catch {
+        // continue — user can still try
+      } finally {
+        setFetchingCaste(false)
+      }
     })
   }, [])
 
-  // Filtered list for search
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return allOptions
-    return allOptions.filter(o => o.label.toLowerCase().includes(q))
-  }, [allOptions, search])
+  // ─── Subcaste loader ──────────────────────────────────────────────────────
+
+  async function loadSubcaste(
+    rel: string,
+    caste: string,
+    mt: string,
+    restoreKey?: string,
+  ) {
+    if (rel === '2') {
+      // Christianity — no subcaste
+      setHasSubcaste(false)
+      setSubcasteOptions([])
+      return
+    }
+    setFetchingSubcaste(true)
+    try {
+      const list = await fetchSubcasteOptions(rel, caste, mt)
+      setSubcasteOptions(list)
+      setHasSubcaste(list.length > 0)
+      if (restoreKey && list.length > 0) {
+        const found = list.find(o => o.key === restoreKey)
+        if (found) setSelectedSubcaste(found)
+      }
+    } catch {
+      setHasSubcaste(false)
+    } finally {
+      setFetchingSubcaste(false)
+    }
+  }
 
   // ─── Panel ────────────────────────────────────────────────────────────────
 
-  function openPanel() {
+  function openPanel(panel: ActivePanel) {
     setSearch('')
-    setPanelVisible(true)
+    setSearchFocused(false)
+    setActivePanel(panel)
     Animated.timing(slideAnim, {
       toValue: 1, duration: 280, useNativeDriver: true,
     }).start()
@@ -131,37 +180,63 @@ export default function MotherTongueScreen({ navigation }: Props) {
   function closePanel() {
     Animated.timing(slideAnim, {
       toValue: 0, duration: 230, useNativeDriver: true,
-    }).start(() => setPanelVisible(false))
+    }).start(() => setActivePanel(null))
   }
 
-  function selectOption(opt: Option) {
-    setSelected(opt)
+  async function selectCaste(opt: Option) {
+    setSelectedCaste(opt)
+    setSelectedSubcaste(null)   // clear subcaste when caste changes
+    setHasSubcaste(false)
+    closePanel()
+    await loadSubcaste(religion, opt.key, mothertongue)
+  }
+
+  function selectSubcaste(opt: Option) {
+    setSelectedSubcaste(opt)
     closePanel()
   }
 
   // ─── Derived ──────────────────────────────────────────────────────────────
 
-  const possessive       = PROFILE_POSSESSIVE[createdBy] ?? 'their'
-  const title            = `What is ${possessive} mother tongue?`
-  const langLabel        = LANG_LABEL[i18n.language] ?? 'Eng'
-  const panelTranslateX  = slideAnim.interpolate({
+  const possessive      = PROFILE_POSSESSIVE[createdBy] ?? 'their'
+  const title           = `Select ${possessive} caste`
+  const langLabel       = LANG_LABEL[i18n.language] ?? 'Eng'
+  const panelTranslateX = slideAnim.interpolate({
     inputRange: [0, 1], outputRange: [PANEL_WIDTH, 0],
   })
+
+  const activeOptions = activePanel === 'caste' ? casteOptions : subcasteOptions
+  const panelTitle    = activePanel === 'caste' ? 'Select caste' : 'Select sub caste'
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    if (!q) return activeOptions
+    return activeOptions.filter(o => o.label.toLowerCase().includes(q))
+  }, [activeOptions, search])
 
   // ─── Submit ───────────────────────────────────────────────────────────────
 
   async function handleNext() {
-    if (!selected || submitting) return
+    if (!selectedCaste || submitting) return
     setSubmitting(true)
     try {
-      await setRegValue('MOTHERTONGUE', selected.key)
-      // Angular loadStateList(): type=MOTHERTONGUE&MOTHERTONGUE=<key> → stores STATEOBJ
-      // in REGISTRATIONARRAYS so page 9 can read the state list immediately.
-      await Promise.all([
-        callRegistrationAPI({ MOTHERTONGUE: selected.key }),
-        loadAndStoreStatesForMotherTongue(selected.key),
-      ])
-      navigation.push('onboarding', { pageNo: '9' })
+      await setRegValue('CASTE', selectedCaste.key)
+      let res = await callRegistrationAPI({ CASTE: selectedCaste.key })
+
+      if (selectedSubcaste) {
+        await setRegValue('SUBCASTE', selectedSubcaste.key)
+        res = await callRegistrationAPI({ SUBCASTE: selectedSubcaste.key })
+      }
+
+      const matriId = res?.RESPONSE?.MATRIID
+      const nextPage = await getNextPageAfterCaste(selectedCaste.key)
+
+      if (matriId && nextPage === '20') {
+        await setItem(SK.Auth.USER_ID, String(matriId))
+        setSuccessVisible(true)
+      } else {
+        navigation.push('onboarding', { pageNo: nextPage })
+      }
     } catch {
       // Allow retry
     } finally {
@@ -198,24 +273,71 @@ export default function MotherTongueScreen({ navigation }: Props) {
 
         <Text style={styles.title}>{title}</Text>
 
-        {fetching ? (
+        {fetchingCaste ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
         ) : (
-          /* "Select mother tongue" field — opens right-side panel */
-          <Pressable
-            style={[styles.selectField, !!selected && styles.selectFieldActive]}
-            onPress={openPanel}
-            accessibilityRole="button"
-            accessibilityLabel="Select mother tongue"
-          >
-            <Text
-              style={[styles.selectFieldText, !!selected && styles.selectFieldTextActive]}
-              numberOfLines={1}
-            >
-              {selected ? selected.label : 'Select mother tongue'}
-            </Text>
-            <Text style={styles.selectFieldArrow}>›</Text>
-          </Pressable>
+          <View style={styles.fields}>
+            {/* ── Caste select field ─────────────────────────────────── */}
+            <View style={styles.fieldWrapper}>
+              <View style={styles.fieldLabelBadge}>
+                <Text style={styles.fieldLabelText}>Caste</Text>
+              </View>
+              <Pressable
+                style={styles.selectField}
+                onPress={() => openPanel('caste')}
+                accessibilityRole="button"
+                accessibilityLabel="Select caste"
+              >
+                <Text
+                  style={[
+                    styles.selectFieldText,
+                    !!selectedCaste && styles.selectFieldTextActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {selectedCaste ? selectedCaste.label : 'Select caste'}
+                </Text>
+                <Text style={styles.selectFieldArrow}>›</Text>
+              </Pressable>
+            </View>
+
+            {/* ── Sub caste field — only when available ─────────────── */}
+            {selectedCaste && (
+              fetchingSubcaste ? (
+                <ActivityIndicator
+                  color={Colors.primary}
+                  size="small"
+                  style={styles.subcasteLoader}
+                />
+              ) : hasSubcaste ? (
+                <View style={[styles.fieldWrapper, styles.fieldWrapperGap]}>
+                  <View style={styles.fieldLabelBadge}>
+                    <Text style={styles.fieldLabelText}>
+                      Sub caste{' '}
+                      <Text style={styles.fieldLabelOptional}>(Optional)</Text>
+                    </Text>
+                  </View>
+                  <Pressable
+                    style={styles.selectField}
+                    onPress={() => openPanel('subcaste')}
+                    accessibilityRole="button"
+                    accessibilityLabel="Select sub caste"
+                  >
+                    <Text
+                      style={[
+                        styles.selectFieldText,
+                        !!selectedSubcaste && styles.selectFieldTextActive,
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {selectedSubcaste ? selectedSubcaste.label : 'Select sub caste'}
+                    </Text>
+                    <Text style={styles.selectFieldArrow}>›</Text>
+                  </Pressable>
+                </View>
+              ) : null
+            )}
+          </View>
         )}
       </ScrollView>
 
@@ -231,7 +353,7 @@ export default function MotherTongueScreen({ navigation }: Props) {
           variant="primary"
           size="standard"
           fullWidth
-          disabled={!selected}
+          disabled={!selectedCaste || submitting}
           loading={submitting}
           onPress={handleNext}
         />
@@ -250,19 +372,17 @@ export default function MotherTongueScreen({ navigation }: Props) {
         )}
       </View>
 
-      {/* Mother tongue picker — right-side sliding panel */}
+      {/* Single sliding panel — renders caste or subcaste list based on activePanel */}
       <Modal
         transparent
-        visible={panelVisible}
+        visible={activePanel !== null}
         animationType="none"
         onRequestClose={closePanel}
         statusBarTranslucent
       >
         <View style={styles.panelContainer}>
-          {/* Backdrop */}
           <Pressable style={styles.backdrop} onPress={closePanel} />
 
-          {/* Sliding panel */}
           <Animated.View
             style={[
               styles.panel,
@@ -274,18 +394,18 @@ export default function MotherTongueScreen({ navigation }: Props) {
           >
             {/* Header */}
             <View style={styles.panelHeader}>
-              <Text style={styles.panelTitle}>Select mother tongue</Text>
+              <Text style={styles.panelTitle}>{panelTitle}</Text>
               <TouchableOpacity onPress={closePanel} hitSlop={8}>
                 <Text style={styles.panelCloseTxt}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            {/* Search box */}
+            {/* Search */}
             <View style={[styles.searchBox, searchFocused && styles.searchBoxFocused]}>
               <Text style={styles.searchIcon}>⌕</Text>
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search language..."
+                placeholder={activePanel === 'caste' ? 'Search caste...' : 'Search sub caste...'}
                 placeholderTextColor="rgba(0,0,0,0.35)"
                 value={search}
                 onChangeText={setSearch}
@@ -302,7 +422,7 @@ export default function MotherTongueScreen({ navigation }: Props) {
               )}
             </View>
 
-            {/* Language list */}
+            {/* List */}
             {filtered.length === 0 ? (
               <View style={styles.panelEmpty}>
                 <Text style={styles.panelEmptyText}>No results found</Text>
@@ -317,11 +437,16 @@ export default function MotherTongueScreen({ navigation }: Props) {
                 showsVerticalScrollIndicator={false}
                 keyboardShouldPersistTaps="handled"
                 renderItem={({ item }: { item: Option }) => {
-                  const isSelected = selected?.key === item.key
+                  const isSelected =
+                    activePanel === 'caste'
+                      ? selectedCaste?.key === item.key
+                      : selectedSubcaste?.key === item.key
                   return (
                     <Pressable
                       style={[styles.item, isSelected && styles.itemSelected]}
-                      onPress={() => selectOption(item)}
+                      onPress={() =>
+                        activePanel === 'caste' ? selectCaste(item) : selectSubcaste(item)
+                      }
                       accessibilityRole="menuitem"
                       accessibilityState={{ selected: isSelected }}
                     >
@@ -341,14 +466,22 @@ export default function MotherTongueScreen({ navigation }: Props) {
           </Animated.View>
         </View>
       </Modal>
+
+      <RegistrationSuccessSheet
+        visible={successVisible}
+        onContinue={() => {
+          setSuccessVisible(false)
+          navigation.push('onboarding', { pageNo: '20' })
+        }}
+      />
     </View>
   )
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const SELECTED_BG    = 'rgba(181,0,51,0.02)'
-const BORDER_COLOR   = '#e6e6e6'
+const SELECTED_BG  = 'rgba(181,0,51,0.02)'
+const BORDER_COLOR = '#e6e6e6'
 
 const styles = StyleSheet.create({
   screen: {
@@ -376,9 +509,41 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
-  loader: { marginTop: 48 },
+  loader:       { marginTop: 48 },
+  subcasteLoader: { marginTop: 20, alignSelf: 'flex-start' },
 
-  // "Select mother tongue" outlined field — same style as exact height field
+  fields: { gap: 0 },
+
+  // Floating-label field
+  fieldWrapper: {
+    position: 'relative',
+    marginTop: 8,
+  },
+  fieldWrapperGap: {
+    marginTop: 32,
+  },
+  fieldLabelBadge: {
+    position:          'absolute',
+    top:               -8,
+    left:              12,
+    zIndex:            1,
+    backgroundColor:   Colors.surface,
+    paddingHorizontal: 4,
+    flexDirection:     'row',
+    alignItems:        'center',
+  },
+  fieldLabelText: {
+    fontSize:   12,
+    fontWeight: '400',
+    color:      Colors.textSecondary ?? '#666',
+    lineHeight: 16,
+  },
+  fieldLabelOptional: {
+    fontSize:   12,
+    fontWeight: '400',
+    color:      Colors.textSecondary ?? '#8a8a8a',
+  },
+
   selectField: {
     flexDirection:   'row',
     alignItems:      'center',
@@ -390,15 +555,15 @@ const styles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
-  selectFieldActive: {},
   selectFieldText: {
     flex:       1,
     fontSize:   14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      'rgba(0,0,0,0.35)',
   },
   selectFieldTextActive: {
     fontWeight: '500',
+    color:      Colors.textPrimary,
   },
   selectFieldArrow: {
     fontSize:   22,
@@ -406,7 +571,7 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
 
-  // Sticky footer
+  // Footer
   footer: {
     position:          'absolute',
     bottom:            0,
@@ -441,7 +606,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.42,
   },
 
-  // Right-side sliding panel
+  // Panel
   panelContainer: {
     flex:           1,
     flexDirection:  'row',
@@ -480,7 +645,6 @@ const styles = StyleSheet.create({
     padding:  4,
   },
 
-  // Search box
   searchBox: {
     flexDirection:     'row',
     alignItems:        'center',
@@ -494,34 +658,14 @@ const styles = StyleSheet.create({
     gap:               8,
     backgroundColor:   Colors.surface,
   },
-  searchBoxFocused: {
-    borderColor: Colors.primary,
-  },
-  searchIcon: {
-    fontSize: 14,
-  },
-  searchInput: {
-    flex:       1,
-    fontSize:   14,
-    color:      Colors.textPrimary,
-    padding:    0,
-  },
-  searchClear: {
-    fontSize: 13,
-    color:    'rgba(0,0,0,0.4)',
-    padding:  2,
-  },
+  searchBoxFocused: { borderColor: Colors.primary },
+  searchIcon:  { fontSize: 14 },
+  searchInput: { flex: 1, fontSize: 14, color: Colors.textPrimary, padding: 0 },
+  searchClear: { fontSize: 13, color: 'rgba(0,0,0,0.4)', padding: 2 },
 
-  panelEmpty: {
-    padding:    32,
-    alignItems: 'center',
-  },
-  panelEmptyText: {
-    fontSize: 14,
-    color:    'rgba(0,0,0,0.4)',
-  },
+  panelEmpty: { padding: 32, alignItems: 'center' },
+  panelEmptyText: { fontSize: 14, color: 'rgba(0,0,0,0.4)' },
 
-  // Language list items
   item: {
     flexDirection:     'row',
     alignItems:        'center',
@@ -530,31 +674,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f2f2f2',
   },
-  itemSelected: {
-    backgroundColor: SELECTED_BG,
-  },
-  itemText: {
-    flex:       1,
-    fontSize:   14,
-    fontWeight: '400',
-    color:      Colors.textPrimary,
-  },
-  itemTextSelected: {
-    fontWeight: '500',
-    color:      Colors.primaryDark,
-  },
+  itemSelected:     { backgroundColor: SELECTED_BG },
+  itemText:         { flex: 1, fontSize: 14, fontWeight: '400', color: Colors.textPrimary },
+  itemTextSelected: { fontWeight: '500', color: Colors.primaryDark },
   itemRadio: {
-    width:           20,
-    height:          20,
-    borderRadius:    10,
-    backgroundColor: Colors.primaryDark,
-    alignItems:      'center',
-    justifyContent:  'center',
+    width: 20, height: 20, borderRadius: 10,
+    backgroundColor: Colors.primaryDark, alignItems: 'center', justifyContent: 'center',
   },
   itemRadioTick: {
-    color:      Colors.surface,
-    fontSize:   10,
-    fontWeight: '700',
-    lineHeight: 12,
+    color: Colors.surface, fontSize: 10, fontWeight: '700', lineHeight: 12,
   },
 })

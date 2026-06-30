@@ -25,16 +25,16 @@ import { StorageKeys as SK } from '../../constants/storage.keys'
 import i18n from '../../i18n'
 import {
   callRegistrationAPI,
-  fetchMotherTongueOptions,
-  getRegValue,
-  loadAndStoreStatesForMotherTongue,
+  fetchOccupationOptions,
+  getRegValues,
   setRegValue,
+  getRegValue,
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/mother-tongue.svg'
+const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/occupation.svg'
 const FOOTER_H      = 140
 const PANEL_WIDTH   = Dimensions.get('window').width * 0.85
 const ITEM_HEIGHT   = 52
@@ -53,13 +53,6 @@ const LANG_LABEL: Record<string, string> = {
   hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-// Strip Angular HTML from VALUE labels (e.g. <span>...</span>)
-function stripHtml(raw: string): string {
-  return raw.replace(/<[^>]+>/g, '').trim()
-}
-
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Option = { key: string; label: string }
@@ -71,7 +64,7 @@ type Props = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function MotherTongueScreen({ navigation }: Props) {
+export default function OccupationScreen({ navigation }: Props) {
   const { t }  = useTranslation()
   const insets = useSafeAreaInsets()
 
@@ -79,30 +72,31 @@ export default function MotherTongueScreen({ navigation }: Props) {
   const [fetching,     setFetching]     = useState(true)
   const [selected,     setSelected]     = useState<Option | null>(null)
   const [createdBy,    setCreatedBy]    = useState('4')
+  const [gender,       setGender]       = useState('1')
   const [submitting,   setSubmitting]   = useState(false)
   const [customerCare, setCustomerCare] = useState('')
-  const [panelVisible,   setPanelVisible]   = useState(false)
-  const [search,         setSearch]         = useState('')
-  const [searchFocused,  setSearchFocused]  = useState(false)
+  const [panelVisible, setPanelVisible] = useState(false)
+  const [search,       setSearch]       = useState('')
+  const [searchFocused, setSearchFocused] = useState(false)
 
   const slideAnim = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
     Promise.all([
       getRegValue('CREATEDBY'),
-      getRegValue('MOTHERTONGUE'),
+      getRegValues(),
       getItem(SK.App.CUSTOMER_CARE),
-    ]).then(([cb, savedMT, cc]) => {
-      if (cb) setCreatedBy(cb)
-      if (cc) setCustomerCare(cc)
+    ]).then(([cb, rv, cc]) => {
+      const { GENDER: gnd, OCCUPATION: savedOcc } = rv as Record<string, string>
+      if (cb)  setCreatedBy(cb)
+      if (gnd) setGender(gnd)
+      if (cc)  setCustomerCare(cc)
 
-      fetchMotherTongueOptions()
+      fetchOccupationOptions()
         .then(list => {
-          const cleaned = list.map(o => ({ key: o.key, label: stripHtml(o.label) }))
-          setAllOptions(cleaned)
-          // Restore prior selection (back navigation)
-          if (savedMT) {
-            const found = cleaned.find(o => o.key === savedMT)
+          setAllOptions(list)
+          if (savedOcc) {
+            const found = list.find(o => o.key === savedOcc)
             if (found) setSelected(found)
           }
         })
@@ -111,7 +105,7 @@ export default function MotherTongueScreen({ navigation }: Props) {
     })
   }, [])
 
-  // Filtered list for search
+  // Filtered list for panel search
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     if (!q) return allOptions
@@ -141,12 +135,14 @@ export default function MotherTongueScreen({ navigation }: Props) {
 
   // ─── Derived ──────────────────────────────────────────────────────────────
 
-  const possessive       = PROFILE_POSSESSIVE[createdBy] ?? 'their'
-  const title            = `What is ${possessive} mother tongue?`
-  const langLabel        = LANG_LABEL[i18n.language] ?? 'Eng'
-  const panelTranslateX  = slideAnim.interpolate({
+  const possessive      = PROFILE_POSSESSIVE[createdBy] ?? 'their'
+  const title           = `What is ${possessive} occupation?`
+  const langLabel       = LANG_LABEL[i18n.language] ?? 'Eng'
+  const panelTranslateX = slideAnim.interpolate({
     inputRange: [0, 1], outputRange: [PANEL_WIDTH, 0],
   })
+  // Angular: GENDER=='1' → page 12 (MonthlyIncome), else page 13 (Religion)
+  const nextPage = gender === '1' ? '12' : '13'
 
   // ─── Submit ───────────────────────────────────────────────────────────────
 
@@ -154,14 +150,9 @@ export default function MotherTongueScreen({ navigation }: Props) {
     if (!selected || submitting) return
     setSubmitting(true)
     try {
-      await setRegValue('MOTHERTONGUE', selected.key)
-      // Angular loadStateList(): type=MOTHERTONGUE&MOTHERTONGUE=<key> → stores STATEOBJ
-      // in REGISTRATIONARRAYS so page 9 can read the state list immediately.
-      await Promise.all([
-        callRegistrationAPI({ MOTHERTONGUE: selected.key }),
-        loadAndStoreStatesForMotherTongue(selected.key),
-      ])
-      navigation.push('onboarding', { pageNo: '9' })
+      await setRegValue('OCCUPATION', selected.key)
+      await callRegistrationAPI({ OCCUPATION: selected.key })
+      navigation.push('onboarding', { pageNo: nextPage })
     } catch {
       // Allow retry
     } finally {
@@ -201,18 +192,17 @@ export default function MotherTongueScreen({ navigation }: Props) {
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
         ) : (
-          /* "Select mother tongue" field — opens right-side panel */
           <Pressable
             style={[styles.selectField, !!selected && styles.selectFieldActive]}
             onPress={openPanel}
             accessibilityRole="button"
-            accessibilityLabel="Select mother tongue"
+            accessibilityLabel="Select occupation"
           >
             <Text
               style={[styles.selectFieldText, !!selected && styles.selectFieldTextActive]}
               numberOfLines={1}
             >
-              {selected ? selected.label : 'Select mother tongue'}
+              {selected ? selected.label : 'Select occupation'}
             </Text>
             <Text style={styles.selectFieldArrow}>›</Text>
           </Pressable>
@@ -250,7 +240,7 @@ export default function MotherTongueScreen({ navigation }: Props) {
         )}
       </View>
 
-      {/* Mother tongue picker — right-side sliding panel */}
+      {/* Occupation picker — right-side sliding panel */}
       <Modal
         transparent
         visible={panelVisible}
@@ -274,7 +264,7 @@ export default function MotherTongueScreen({ navigation }: Props) {
           >
             {/* Header */}
             <View style={styles.panelHeader}>
-              <Text style={styles.panelTitle}>Select mother tongue</Text>
+              <Text style={styles.panelTitle}>Select occupation</Text>
               <TouchableOpacity onPress={closePanel} hitSlop={8}>
                 <Text style={styles.panelCloseTxt}>✕</Text>
               </TouchableOpacity>
@@ -285,7 +275,7 @@ export default function MotherTongueScreen({ navigation }: Props) {
               <Text style={styles.searchIcon}>⌕</Text>
               <TextInput
                 style={styles.searchInput}
-                placeholder="Search language..."
+                placeholder="Search occupation..."
                 placeholderTextColor="rgba(0,0,0,0.35)"
                 value={search}
                 onChangeText={setSearch}
@@ -302,7 +292,7 @@ export default function MotherTongueScreen({ navigation }: Props) {
               )}
             </View>
 
-            {/* Language list */}
+            {/* Occupation list */}
             {filtered.length === 0 ? (
               <View style={styles.panelEmpty}>
                 <Text style={styles.panelEmptyText}>No results found</Text>
@@ -347,8 +337,8 @@ export default function MotherTongueScreen({ navigation }: Props) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const SELECTED_BG    = 'rgba(181,0,51,0.02)'
-const BORDER_COLOR   = '#e6e6e6'
+const SELECTED_BG  = 'rgba(181,0,51,0.02)'
+const BORDER_COLOR = '#e6e6e6'
 
 const styles = StyleSheet.create({
   screen: {
@@ -378,7 +368,6 @@ const styles = StyleSheet.create({
 
   loader: { marginTop: 48 },
 
-  // "Select mother tongue" outlined field — same style as exact height field
   selectField: {
     flexDirection:   'row',
     alignItems:      'center',
@@ -501,10 +490,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   searchInput: {
-    flex:       1,
-    fontSize:   14,
-    color:      Colors.textPrimary,
-    padding:    0,
+    flex:    1,
+    fontSize: 14,
+    color:    Colors.textPrimary,
+    padding:  0,
   },
   searchClear: {
     fontSize: 13,
@@ -521,7 +510,7 @@ const styles = StyleSheet.create({
     color:    'rgba(0,0,0,0.4)',
   },
 
-  // Language list items
+  // Occupation list items
   item: {
     flexDirection:     'row',
     alignItems:        'center',

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Linking,
   Modal,
@@ -15,14 +14,15 @@ import {
   TouchableWithoutFeedback,
   View,
 } from 'react-native'
+import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import i18n from '../../i18n'
-import { callRegistrationAPI } from '../../service/registrationService'
-import { getItem, setItem } from '../../service/storageService'
+import { callRegistrationAPI, getRegValue, setRegValue } from '../../service/registrationService'
+import { getItem } from '../../service/storageService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -122,8 +122,8 @@ export default function DOBScreen({ navigation }: Props) {
 
   useEffect(() => {
     Promise.all([
-      getItem(SK.User.CREATED_BY),
-      getItem('DATEOFBIRTH'),
+      getRegValue('CREATEDBY'),
+      getRegValue('DATEOFBIRTH'),
       getItem(SK.App.CUSTOMER_CARE),
     ]).then(([cb, dob, cc]) => {
       if (cb) setCreatedBy(cb)
@@ -209,7 +209,7 @@ export default function DOBScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       const dob = `${selYear}-${selMonth.padStart(2, '0')}-${selDate.padStart(2, '0')}`
-      await setItem('DATEOFBIRTH', dob)
+      await setRegValue('DATEOFBIRTH', dob)
       await callRegistrationAPI({ DATE: selDate, MONTH: selMonth, YEAR: selYear })
       navigation.push('onboarding', { pageNo: '43' })
     } catch {
@@ -231,7 +231,7 @@ export default function DOBScreen({ navigation }: Props) {
     setShowAgeSheet(false)
     setSubmitting(true)
     try {
-      await setItem('AGE', age)
+      await setRegValue('AGE', age)
       await callRegistrationAPI({ AGE: age })
       navigation.push('onboarding', { pageNo: '43' })
     } catch {
@@ -278,7 +278,7 @@ export default function DOBScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         {/* Birthday cake icon */}
-        <Image source={{ uri: CDN_PAGE_ICON }} style={styles.pageIcon} resizeMode="contain" />
+        <Image source={{ uri: CDN_PAGE_ICON }} style={styles.pageIcon} contentFit="contain" />
 
         {/* Title */}
         <Text style={styles.title}>{`Select ${titleLine2}\ndate of birth`}</Text>
@@ -337,22 +337,25 @@ export default function DOBScreen({ navigation }: Props) {
           </View>
         )}
 
-        {/* OR divider */}
-        <View style={styles.orRow}>
-          <View style={styles.orLine} />
-          <Text style={styles.orText}>OR</Text>
-          <View style={styles.orLine} />
-        </View>
+        {/* OR divider + "Please enter age" — hidden once all 3 date fields are filled */}
+        {!isAllSelected && (
+          <>
+            <View style={styles.orRow}>
+              <View style={styles.orLine} />
+              <Text style={styles.orText}>OR</Text>
+              <View style={styles.orLine} />
+            </View>
 
-        {/* "If you don't remember" + "Please enter age" link */}
-        <Text style={styles.noRemText}>{noRemText}</Text>
-        <Pressable
-          style={styles.enterAgeRow}
-          onPress={() => { setAgeInput(''); setAgeError(''); setShowAgeSheet(true) }}
-        >
-          <Text style={styles.enterAgeLink}>Please enter age</Text>
-          <Text style={styles.enterAgeCaret}> ›</Text>
-        </Pressable>
+            <Text style={styles.noRemText}>{noRemText}</Text>
+            <Pressable
+              style={styles.enterAgeRow}
+              onPress={() => { setAgeInput(''); setAgeError(''); setShowAgeSheet(true) }}
+            >
+              <Text style={styles.enterAgeLink}>Please enter age</Text>
+              <Text style={styles.enterAgeCaret}> ›</Text>
+            </Pressable>
+          </>
+        )}
       </ScrollView>
 
       {/* Sticky footer */}

@@ -12,6 +12,64 @@ import { navigate } from '../utils/navigationRef'
 import { ENavigation } from '../types/enums/navigation.enum'
 import { setAppsFlyerUserId } from './analyticsService'
 
+// ─── Registration value store ─────────────────────────────────────────────────
+// Single AsyncStorage object for all onboarding field values.
+// Replaces N individual setItem/getItem calls per screen with one read + one write.
+
+const REG_STORE_KEY = 'REGISTRATION_VALUES'
+
+export async function getRegValues(): Promise<Record<string, string>> {
+  const raw = await getItem(REG_STORE_KEY)
+  if (!raw) return {}
+  try { return JSON.parse(raw) } catch { return {} }
+}
+
+export async function getRegValue(key: string): Promise<string | null> {
+  const rv = await getRegValues()
+  return rv[key] != null ? String(rv[key]) : null
+}
+
+export async function setRegValue(key: string, value: string): Promise<void> {
+  const rv = await getRegValues()
+  rv[key] = value
+  await setItem(REG_STORE_KEY, JSON.stringify(rv))
+}
+
+export async function setRegValues(updates: Record<string, string>): Promise<void> {
+  const rv = await getRegValues()
+  Object.assign(rv, updates)
+  await setItem(REG_STORE_KEY, JSON.stringify(rv))
+}
+
+// ─── User session store ───────────────────────────────────────────────────────
+// Single AsyncStorage object for all post-login session values.
+// Replaces 30+ individual keys from storeWebURLData with one JSON blob.
+
+const SESSION_STORE_KEY = 'USER_SESSION'
+
+export async function getSession(): Promise<Record<string, any>> {
+  const raw = await getItem(SESSION_STORE_KEY)
+  if (!raw) return {}
+  try { return JSON.parse(raw) } catch { return {} }
+}
+
+export async function getSessionValue(key: string): Promise<any> {
+  const sd = await getSession()
+  return sd[key] ?? null
+}
+
+export async function setSessionValue(key: string, value: any): Promise<void> {
+  const sd = await getSession()
+  sd[key] = value
+  await setItem(SESSION_STORE_KEY, JSON.stringify(sd))
+}
+
+export async function setSessionValues(updates: Record<string, any>): Promise<void> {
+  const sd = await getSession()
+  Object.assign(sd, updates)
+  await setItem(SESSION_STORE_KEY, JSON.stringify(sd))
+}
+
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 
 export async function login(_moduleName: string, params: Record<string, any>): Promise<any> {
@@ -206,6 +264,253 @@ export async function fetchEatingHabitOptions(): Promise<Array<{ key: string; la
   return []
 }
 
+// Fetches gothram options for the selected caste.
+// Angular: type=gothra&caste=${CASTE}&LANG=${lang} → RESPONSE.GOTHRAM (plain object)
+// Key '998' = "All except your gothra" — excluded from registration list.
+// Returns [] when response is "no gothram" string.
+export async function fetchGothraOptions(): Promise<Array<{ key: string; label: string }>> {
+  const toList = (raw: any): Array<{ key: string; label: string }> => {
+    if (raw === 'no gothram' || !raw) return []
+    if (Array.isArray(raw)) {
+      return raw.map((item: any) => ({
+        key:   String(item.KEY ?? item.key ?? ''),
+        label: String(item.VALUE ?? item.value ?? ''),
+      })).filter((o: { key: string }) => o.key !== '' && o.key !== '998')
+    }
+    if (typeof raw === 'object') {
+      return Object.entries(raw)
+        .filter(([key]) => key !== '998')
+        .map(([key, value]) => ({ key, label: String(value) }))
+    }
+    return []
+  }
+
+  // Check cache (Angular stores under GOTHRAM inside REGISTRATIONARRAYS)
+  const arrays = await getRegistrationArrays()
+  if (arrays?.GOTHRAM && arrays.GOTHRAM !== 'no gothram') {
+    const cached = toList(arrays.GOTHRAM)
+    if (cached.length > 0) return cached
+  }
+
+  // Fetch fresh — must send caste + lang (same as Angular: type=gothra&caste=X&LANG=en)
+  const caste = (await getRegValue('CASTE')) ?? ''
+  const lang  = (await getItem(SK.Auth.LANG)) ?? 'en'
+  const res   = await apiCall(
+    Endpoints.registration.initialFetch,
+    'POST',
+    `type=gothra&caste=${caste}&LANG=${lang}`,
+  )
+  const gothram = res?.RESPONSE?.GOTHRAM
+
+  if (gothram !== undefined) {
+    // Cache it so re-entry is instant
+    const updated = { ...arrays, GOTHRAM: gothram }
+    await setItem('REGISTRATIONARRAYS', JSON.stringify(updated))
+    return toList(gothram)
+  }
+  return []
+}
+
+// Fetches caste list for a given religion.
+// Angular: type=caste&religion=X&mothertongue=X → RESPONSE.CASTE (plain object or array)
+// Checks REGISTRATIONARRAYS.CASTE cache first; fetches fresh if missing.
+export async function fetchCasteOptions(
+  religion: string,
+  mothertongue: string,
+): Promise<Array<{ key: string; label: string }>> {
+  const arrays = await getRegistrationArrays()
+  const toList = (raw: any) => {
+    if (Array.isArray(raw)) {
+      return raw.map((item: any) => ({
+        key:   String(item.KEY ?? item.key ?? ''),
+        label: String(item.VALUE ?? item.value ?? ''),
+      })).filter((o: { key: string }) => o.key !== '')
+    }
+    if (raw && typeof raw === 'object') {
+      return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+    }
+    return []
+  }
+
+  if (arrays?.CASTE) return toList(arrays.CASTE)
+
+  const lang     = (await getItem(SK.Auth.LANG)) ?? 'en'
+  const paramStr = `type=caste&religion=${religion}&mothertongue=${mothertongue}&LANG=${lang}`
+  const res      = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
+  const list     = toList(res?.RESPONSE?.CASTE)
+
+  if (res?.RESPONSE?.CASTE) {
+    const updated = { ...arrays, CASTE: res.RESPONSE.CASTE }
+    await setItem('REGISTRATIONARRAYS', JSON.stringify(updated))
+  }
+  return list
+}
+
+// Fetches subcaste list for a given religion + caste.
+// Angular: type=subcaste&religion=X&caste=X&mothertongue=X → RESPONSE.SUBCASTE (plain object)
+// Always fetches fresh (subcaste is caste-specific; cache invalidates when caste changes).
+export async function fetchSubcasteOptions(
+  religion: string,
+  caste: string,
+  mothertongue: string,
+): Promise<Array<{ key: string; label: string }>> {
+  const lang     = (await getItem(SK.Auth.LANG)) ?? 'en'
+  const paramStr = `type=subcaste&religion=${religion}&caste=${caste}&mothertongue=${mothertongue}&LANG=${lang}`
+  const res      = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
+  const raw      = res?.RESPONSE?.SUBCASTE
+
+  const toList = (r: any) => {
+    if (Array.isArray(r)) {
+      return r.map((item: any) => ({
+        key:   String(item.KEY ?? item.key ?? ''),
+        label: String(item.VALUE ?? item.value ?? ''),
+      })).filter((o: { key: string }) => o.key !== '')
+    }
+    if (r && typeof r === 'object') {
+      return Object.entries(r).map(([key, value]) => ({ key, label: String(value) }))
+    }
+    return []
+  }
+
+  const list = toList(raw)
+
+  // Cache subcaste (used on back-navigation)
+  const arrays = await getRegistrationArrays()
+  await setItem('REGISTRATIONARRAYS', JSON.stringify({ ...arrays, SUBCASTE: raw ?? '' }))
+
+  return list
+}
+
+// After caste is selected, determine whether the Gothra page (16) is needed.
+// Angular reads REGISTRATIONARRAYS.GOTHRAAVAILCASTE — if the array includes selectedCaste,
+// go to page 16; if the array is missing, default to page 16 (gothra available).
+export async function getNextPageAfterCaste(selectedCaste: string): Promise<string> {
+  const arrays          = await getRegistrationArrays()
+  const gothraAvailList = arrays?.GOTHRAAVAILCASTE
+  if (!gothraAvailList) return '16'                  // no list → assume gothra available
+  if (!Array.isArray(gothraAvailList)) return '16'
+  return gothraAvailList.map(String).includes(String(selectedCaste)) ? '16' : '20'
+}
+
+// Fetches religion options from REGISTRATIONARRAYS.RELIGION.
+// Angular uses | keyvalue pipe on the plain object → { key: "1", value: "Hindu" }.
+// API returns either a plain object {"1":"Hindu",...} or an array [{KEY,VALUE}].
+export async function fetchReligionOptions(): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const raw  = data?.RELIGION
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => ({
+      key:   String(item.KEY   ?? item.key   ?? ''),
+      label: String(item.VALUE ?? item.value ?? ''),
+    })).filter(o => o.key !== '')
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+  }
+  return []
+}
+
+// Fetches monthly income options from REGISTRATIONARRAYS.MONTHLYINCOME
+// Angular: apiResponse["MONTHLYINCOME"] → array of { CKEY, VALUE }
+export async function fetchMonthlyIncomeOptions(): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const raw  = data?.MONTHLYINCOME
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => ({
+      key:   String(item.CKEY  ?? item.key   ?? ''),
+      label: String(item.VALUE ?? item.value ?? ''),
+    })).filter(o => o.key !== '')
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+  }
+  return []
+}
+
+// Fetches NRI income options for non-Indian users.
+// Angular: type=NRIINCOME&country=<COUNTRY_key> → { MONTHLYINCOME, NRIINCOME, CURRENCYTYPE }
+// Checks REGISTRATIONARRAYS cache first; only calls API if NRIINCOME missing.
+export async function fetchNriIncomeData(country: string): Promise<{
+  indianList:   Array<{ key: string; label: string }>
+  nriList:      Array<{ key: string; label: string }>
+  currencyType: string
+}> {
+  const arrays = await getRegistrationArrays()
+  const toList = (raw: any) => {
+    if (Array.isArray(raw)) {
+      return raw.map((item: any) => ({
+        key:   String(item.CKEY  ?? item.key   ?? ''),
+        label: String(item.VALUE ?? item.value ?? ''),
+      })).filter((o: { key: string }) => o.key !== '')
+    }
+    if (raw && typeof raw === 'object') {
+      return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+    }
+    return []
+  }
+
+  // Use cache if available
+  if (arrays?.NRIINCOME) {
+    return {
+      indianList:   toList(arrays.MONTHLYINCOME),
+      nriList:      toList(arrays.NRIINCOME),
+      currencyType: String(arrays.CURRENCYTYPE ?? ''),
+    }
+  }
+
+  // API fetch
+  const lang     = (await getItem(SK.Auth.LANG)) ?? 'en'
+  const res      = await apiCall(Endpoints.registration.initialFetch, 'POST', `type=NRIINCOME&country=${country}&LANG=${lang}`)
+  const indianList   = toList(res?.RESPONSE?.MONTHLYINCOME)
+  const nriList      = toList(res?.RESPONSE?.NRIINCOME)
+  const currencyType = String(res?.RESPONSE?.CURRENCYTYPE ?? '')
+
+  // Cache result
+  if (res?.RESPONSE) {
+    const updated = { ...arrays }
+    if (res.RESPONSE.NRIINCOME)    updated.NRIINCOME    = res.RESPONSE.NRIINCOME
+    if (res.RESPONSE.CURRENCYTYPE) updated.CURRENCYTYPE  = currencyType
+    if (res.RESPONSE.MONTHLYINCOME) updated.MONTHLYINCOME = res.RESPONSE.MONTHLYINCOME
+    await setItem('REGISTRATIONARRAYS', JSON.stringify(updated))
+  }
+
+  return { indianList, nriList, currencyType }
+}
+
+// Fetches occupation options from REGISTRATIONARRAYS.OCCUPATION
+// Angular: apiResponse["OCCUPATION"] → array of { OCCKEY, VALUE }
+export async function fetchOccupationOptions(): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const raw  = data?.OCCUPATION
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => ({
+      key:   String(item.OCCKEY ?? item.key   ?? ''),
+      label: String(item.VALUE  ?? item.value ?? ''),
+    })).filter(o => o.key !== '')
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+  }
+  return []
+}
+
+// Fetches qualification options from REGISTRATIONARRAYS.EDUCATION
+// Angular: apiResponse["EDUCATION"] → array of { EDUKEY, VALUE }
+export async function fetchQualificationOptions(): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const raw  = data?.EDUCATION
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => ({
+      key:   String(item.EDUKEY ?? item.key   ?? ''),
+      label: String(item.VALUE  ?? item.value ?? ''),
+    })).filter(o => o.key !== '')
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+  }
+  return []
+}
+
 // Fetches height CATEGORY options (Below average / Average / Above average / Tall)
 // Angular: apiResponse["HEIGHTMALE"] / ["HEIGHTFEMALE"] — labels contain HTML (strips on return).
 export async function fetchHeightCategoryOptions(
@@ -285,45 +590,152 @@ export async function fetchExactHeightOptions(
   return groups.flatMap(g => g.data)
 }
 
+// ─── Location (page 9) ────────────────────────────────────────────────────────
+
+// Angular `loadStateList(motherTongue)` — called after mother tongue is selected.
+// Fetches type=MOTHERTONGUE&MOTHERTONGUE=<key> and stores result as STATEOBJ in
+// REGISTRATIONARRAYS. Must be called from MotherTongueScreen before navigating to page 9.
+export async function loadAndStoreStatesForMotherTongue(motherTongueKey: string): Promise<void> {
+  const lang     = (await getItem(SK.Auth.LANG)) ?? 'en'
+  const paramStr = `type=MOTHERTONGUE&MOTHERTONGUE=${motherTongueKey}&LANG=${lang}`
+  const res      = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
+  if (!res?.RESPONSE) return
+
+  // Store as STATEOBJ in REGISTRATIONARRAYS (mirrors Angular localStorage write)
+  const cached = await getItem('REGISTRATIONARRAYS')
+  const arrays: Record<string, any> = cached ? JSON.parse(cached) : {}
+  arrays.STATEOBJ = res.RESPONSE
+  await setItem('REGISTRATIONARRAYS', JSON.stringify(arrays))
+}
+
+// State list for Indian flow.
+// Angular reads STATEOBJ from REGISTRATIONARRAYS (populated by type=MOTHERTONGUE call above).
+// Falls back to type=state&country=98 if STATEOBJ is missing.
+export async function fetchStates(): Promise<Array<{ key: string; label: string }>> {
+  const arrays = await getRegistrationArrays()
+
+  // Primary: STATEOBJ is an array of {STATEID, STATE} set by loadAndStoreStatesForMotherTongue
+  const stateObj = arrays?.STATEOBJ
+  let items: Array<{ key: string; label: string }> = []
+
+  if (Array.isArray(stateObj) && stateObj.length > 0) {
+    items = stateObj
+      .map((s: any) => ({ key: String(s.STATEID ?? s.key ?? ''), label: String(s.STATE ?? s.value ?? '') }))
+      .filter(o => o.key !== '')
+  }
+
+  // Secondary: STATE key in REGISTRATIONARRAYS (from type=all)
+  if (items.length === 0) {
+    const stateRaw = arrays?.STATE
+    if (Array.isArray(stateRaw) && stateRaw.length > 0) {
+      items = stateRaw
+        .map((s: any) => ({ key: String(s.STATEID ?? ''), label: String(s.STATE ?? '') }))
+        .filter(o => o.key !== '')
+    } else if (stateRaw && typeof stateRaw === 'object') {
+      items = Object.entries(stateRaw).map(([key, value]) => ({ key, label: String(value) }))
+    }
+  }
+
+  // Fallback: direct API call type=state&country=98 (covers edge cases)
+  if (items.length === 0) {
+    const lang  = (await getItem(SK.Auth.LANG)) ?? 'en'
+    const res   = await apiCall(Endpoints.registration.initialFetch, 'POST', `type=state&country=98&state=&LANG=${lang}`)
+    const rawArr = res?.RESPONSE?.STATEOBJ
+    const rawObj = res?.RESPONSE?.STATE?.[0]
+    if (Array.isArray(rawArr) && rawArr.length > 0) {
+      items = rawArr.map((s: any) => ({ key: String(s.STATEID ?? ''), label: String(s.STATE ?? '') })).filter(o => o.key !== '')
+    } else if (rawObj && typeof rawObj === 'object') {
+      items = Object.entries(rawObj).map(([key, value]) => ({ key, label: String(value) }))
+    }
+  }
+
+  return items.sort((a, b) => a.label.localeCompare(b.label))
+}
+
+// City list for a state: type=city&country=&state=<STATEID>
+// API returns CITYOBJ array [{key, value}] OR CITY[0] plain object {cityId: cityName}
+export async function fetchCities(stateId: string): Promise<Array<{ key: string; label: string }>> {
+  const lang     = (await getItem(SK.Auth.LANG)) ?? 'en'
+  const paramStr = `type=city&country=&state=${stateId}&LANG=${lang}`
+  const res      = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
+
+  const rawArr   = res?.RESPONSE?.CITYOBJ   // preferred: array of {key, value}
+  const rawObj   = res?.RESPONSE?.CITY?.[0] // fallback: plain object {cityId: cityName}
+
+  let items: Array<{ key: string; label: string }> = []
+
+  if (Array.isArray(rawArr) && rawArr.length > 0) {
+    items = rawArr
+      .map((c: any) => ({
+        key:   String(c.key   ?? c.CITYID ?? c.cityid ?? ''),
+        label: String(c.value ?? c.CITY   ?? c.city   ?? ''),
+      }))
+      .filter(o => o.key !== '')
+  } else if (rawObj && typeof rawObj === 'object') {
+    items = Object.entries(rawObj).map(([key, value]) => ({ key, label: String(value) }))
+  }
+
+  return items
+}
+
+// Determines which page follows page 9.
+// Angular getRedirectURL(): if countryCode==91 AND MOTHERTONGUE in NATIVEPLACEDOMAIN → page 44
+// else page 10 (Education). Default homePlaceDomain = ['2','14','17','41','4','51']
+export async function getNextPageAfterLocation(): Promise<string> {
+  const arrays      = await getRegistrationArrays()
+  const mothertongue = String((await getSessionValue('MOTHERTONGUE')) ?? '')
+  const domain: string[] = Array.isArray(arrays?.NATIVEPLACEDOMAIN)
+    ? arrays.NATIVEPLACEDOMAIN.map(String)
+    : ['2', '14', '17', '41', '4', '51']
+  const ccode = (await getItem(SK.User.COUNTRY_CODE)) ?? '91'
+  if (ccode === '91' && mothertongue && domain.includes(mothertongue)) {
+    return '44'
+  }
+  return '10'
+}
+
 export async function storeWebURLData(data: Record<string, any>): Promise<void> {
+  // Auth tokens + IDs stay as individual keys — required by apiClient & AuthContext
   const ops: Promise<void>[] = []
-
-  if (data.ATN)              ops.push(setItem(SK.Auth.TOKEN,              data.ATN))
-  if (data.RTN)              ops.push(setItem(SK.Auth.REFRESH_TOKEN,      data.RTN))
-  if (data.MATRIID)          ops.push(setItem(SK.Auth.USER_ID,            String(data.MATRIID)))
-  if (data.GENDER)           ops.push(setItem(SK.User.LOGIN_GENDER,       data.GENDER))
+  if (data.ATN)     ops.push(setItem(SK.Auth.TOKEN,         data.ATN))
+  if (data.RTN)     ops.push(setItem(SK.Auth.REFRESH_TOKEN, data.RTN))
+  if (data.MATRIID) ops.push(setItem(SK.Auth.USER_ID,       String(data.MATRIID)))
+  if (data.GENDER)  ops.push(setItem(SK.User.LOGIN_GENDER,  data.GENDER))
   if (data.CCODE) {
-    ops.push(setItem('CCODE',                 data.CCODE))
-    ops.push(setItem(SK.User.MEMBER_CODE,     data.CCODE))
+    ops.push(setItem('CCODE',             data.CCODE))
+    ops.push(setItem(SK.User.MEMBER_CODE, data.CCODE))
   }
-  if (data.MEMBERSHIPTYPE)   ops.push(setItem(SK.Auth.ENTRY_TYPE,         data.MEMBERSHIPTYPE))
-  if (data.MOTHERTOUNGE) {
-    ops.push(setItem('MOTHERTOUNGE',     data.MOTHERTOUNGE))
-    ops.push(setItem('MOTHERTONGUE',     data.MOTHERTOUNGE))
-  }
-  if (data.FEMALEFREECONACT) ops.push(setItem(SK.Promotions.FEMALE_FREE_CONTACT, JSON.stringify(data.FEMALEFREECONACT)))
-  if (data.PAYMENTWALL)      ops.push(setItem(SK.Payment.PAYMENT_WALL,    JSON.stringify(data.PAYMENTWALL)))
-  if (data['S&FPROMOTION'])  ops.push(setItem(SK.Promotions.SF_PROMOTION, JSON.stringify(data['S&FPROMOTION'])))
-  if (data.NONIDVUTYPE)      ops.push(setItem('NONIDVUTYPE',              JSON.stringify(data.NONIDVUTYPE)))
-  if (data.PHOTOSTATUSARRAY) ops.push(setItem('PHOTOSTATUSARRAY',         JSON.stringify(data.PHOTOSTATUSARRAY)))
 
-  // Use !== undefined so falsy values (0, "") are still written — matches Angular behaviour
+  // All session/profile data → single USER_SESSION object
+  const session: Record<string, any> = await getSession()
+
+  if (data.MEMBERSHIPTYPE) session.ENTRYTYPE    = data.MEMBERSHIPTYPE
+  if (data.MOTHERTOUNGE) {
+    session.MOTHERTOUNGE = data.MOTHERTOUNGE
+    session.MOTHERTONGUE = data.MOTHERTOUNGE
+  }
+  // JSON objects stored as parsed values (no double-stringify)
+  if (data.FEMALEFREECONACT) session.FEMALEFREECONACT = data.FEMALEFREECONACT
+  if (data.PAYMENTWALL)      session.PAYMENTWALL      = data.PAYMENTWALL
+  if (data['S&FPROMOTION'])  session['S&FPROMOTION']  = data['S&FPROMOTION']
+  if (data.NONIDVUTYPE)      session.NONIDVUTYPE      = data.NONIDVUTYPE
+  if (data.PHOTOSTATUSARRAY) session.PHOTOSTATUSARRAY = data.PHOTOSTATUSARRAY
+
+  // Scalar fields — falsy values (0, "") still written to match Angular behaviour
   const SCALAR_KEYS = [
     'RENEWALENABLEKEY', 'PAYRENEWALFLAG', 'PAYMENTPACKAGE', 'NEWPPCALL', 'APPVERSION',
-    // Profile data
     'NAME', 'PHOTOURL', 'LOGINCOUNT', 'DATEOFBIRTH', 'CREATEDBY', 'RELIGIONKEY',
     'PHONEVERIFIED', 'LASTLOGIN', 'FREETRAILVALIDDAY', 'RENEWALDAY',
-    // Flags (stored as "0"/"1" strings — same as Angular localStorage)
     'NALLOW', 'FEMALEFREEPROMO', 'PROFILEPUBLISHEDFLAG', 'PROFILEPUBLISHEDTYPE',
     'PAYPROMO', 'PROFILEVERIFIED', 'DEFERREDIDUSER', 'LOGINTYPE', 'NRIWHATSAPP',
     'IPCOUNTRYCODE', 'AIVFLAG', 'SHORTLISTENABLE', 'SURVEYPOPUP',
     'GLASSBOXFLAG', 'UPIFLAG', 'RPAYFLAG', 'DRNEXT',
   ]
-  SCALAR_KEYS.forEach(k => { if (data[k] !== undefined) ops.push(setItem(k, String(data[k]))) })
+  SCALAR_KEYS.forEach(k => { if (data[k] !== undefined) session[k] = String(data[k]) })
 
+  ops.push(setItem(SESSION_STORE_KEY, JSON.stringify(session)))
   await Promise.all(ops)
 
-  // AppsFlyer user ID binding (once ATN is stored)
   if (data.MATRIID) setAppsFlyerUserId(String(data.MATRIID))
 }
 
@@ -359,6 +771,43 @@ export async function updateRegistrationArray(moduleName: string, data: any): Pr
   const key = REG_ARRAY_MAP[moduleName]
   if (!key) return
   await setItem(key, JSON.stringify(data))
+}
+
+// ─── Family details ───────────────────────────────────────────────────────────
+// Angular: registration/familyinfo/v1 POST with ID&PROPERTY&BROTHERS&SISTERS
+// Empty BROTHERS+SISTERS returns the option arrays; filled values save the data.
+
+function objToOptions(raw: any): Array<{ key: string; label: string }> {
+  if (!raw || typeof raw !== 'object') return []
+  return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+}
+
+export async function fetchFamilyOptions(): Promise<{
+  brothers: Array<{ key: string; label: string }>
+  sisters:  Array<{ key: string; label: string }>
+}> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const res = await apiCall(
+    Endpoints.registration.updateFamily,
+    'POST',
+    `ID=${userId}&PROPERTY=&BROTHERS=&SISTERS=`,
+  )
+  if (res?.RESPONSECODE === '1' && res?.ERRCODE === '0' && res?.RESPONSE) {
+    return {
+      brothers: objToOptions(res.RESPONSE.BOTHER),
+      sisters:  objToOptions(res.RESPONSE.SISTER),
+    }
+  }
+  return { brothers: [], sisters: [] }
+}
+
+export async function submitFamilyDetails(brothers: string, sisters: string): Promise<void> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  await apiCall(
+    Endpoints.registration.updateFamily,
+    'POST',
+    `ID=${userId}&PROPERTY=&BROTHERS=${brothers}&SISTERS=${sisters}`,
+  )
 }
 
 // ─── Registration update ──────────────────────────────────────────────────────

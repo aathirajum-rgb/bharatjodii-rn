@@ -18,17 +18,17 @@ import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import i18n from '../../i18n'
 import {
-  callRegistrationAPI,
-  fetchEatingHabitOptions,
+  fetchFamilyOptions,
   getRegValue,
-  setRegValue,
+  setRegValues,
+  submitFamilyDetails,
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/eating-updated.svg'
-const FOOTER_H = 140
+const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/family-details.svg'
+const FOOTER_H = 160
 
 const PROFILE_POSSESSIVE: Record<string, string> = {
   '4':  "son's",
@@ -39,10 +39,22 @@ const PROFILE_POSSESSIVE: Record<string, string> = {
   '11': "relative's",
 }
 
-const FALLBACK_OPTIONS = [
-  { key: '1', label: 'Vegetarian'     },
-  { key: '2', label: 'Non-vegetarian' },
-  { key: '3', label: 'Eggetarian'     },
+const FALLBACK_BROTHERS = [
+  { key: '1', label: '1' },
+  { key: '2', label: '2' },
+  { key: '3', label: '3' },
+  { key: '4', label: '4' },
+  { key: '5', label: 'More than 5' },
+  { key: '6', label: 'No brothers' },
+]
+
+const FALLBACK_SISTERS = [
+  { key: '1', label: '1' },
+  { key: '2', label: '2' },
+  { key: '3', label: '3' },
+  { key: '4', label: '4' },
+  { key: '5', label: 'More than 5' },
+  { key: '6', label: 'No sisters' },
 ]
 
 const LANG_LABEL: Record<string, string> = {
@@ -61,53 +73,69 @@ type Props = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function EatingHabitScreen({ navigation }: Props) {
+export default function FamilyDetailsScreen({ navigation }: Props) {
   const { t }  = useTranslation()
   const insets = useSafeAreaInsets()
 
-  const [options,      setOptions]      = useState<Option[]>([])
-  const [fetching,     setFetching]     = useState(true)
-  const [selected,     setSelected]     = useState<string | null>(null)
-  const [createdBy,    setCreatedBy]    = useState('4')
-  const [submitting,   setSubmitting]   = useState(false)
+  const [brotherOptions, setBrotherOptions] = useState<Option[]>([])
+  const [sisterOptions,  setSisterOptions]  = useState<Option[]>([])
+  const [fetching,       setFetching]       = useState(true)
+
+  const [selBrothers,  setSelBrothers]  = useState<string | null>(null)
+  const [selSisters,   setSelSisters]   = useState<string | null>(null)
+  const [createdBy,    setCreatedBy]    = useState('1')
   const [customerCare, setCustomerCare] = useState('')
+  const [submitting,   setSubmitting]   = useState(false)
 
   useEffect(() => {
     Promise.all([
       getRegValue('CREATEDBY'),
-      getRegValue('EATING'),
+      getRegValue('BROTHERS'),
+      getRegValue('SISTERS'),
       getItem(SK.App.CUSTOMER_CARE),
-    ]).then(([cb, savedEating, cc]) => {
-      if (cb)          setCreatedBy(cb)
-      if (savedEating) setSelected(savedEating)
-      if (cc)          setCustomerCare(cc)
+    ]).then(([cb, br, si, cc]) => {
+      if (cb) setCreatedBy(cb)
+      if (br) setSelBrothers(br)
+      if (si) setSelSisters(si)
+      if (cc) setCustomerCare(cc)
 
-      fetchEatingHabitOptions()
-        .then(list => setOptions(list.length ? list : FALLBACK_OPTIONS))
-        .catch(() => setOptions(FALLBACK_OPTIONS))
+      fetchFamilyOptions()
+        .then(({ brothers, sisters }) => {
+          setBrotherOptions(brothers.length ? brothers : FALLBACK_BROTHERS)
+          setSisterOptions(sisters.length  ? sisters  : FALLBACK_SISTERS)
+        })
+        .catch(() => {
+          setBrotherOptions(FALLBACK_BROTHERS)
+          setSisterOptions(FALLBACK_SISTERS)
+        })
         .finally(() => setFetching(false))
     })
   }, [])
 
   const possessive = PROFILE_POSSESSIVE[createdBy]
   const title = possessive
-    ? `Select ${possessive} eating habits`
-    : 'Select eating habits'
+    ? `Add your ${possessive} family details`
+    : 'Add family details'
 
   const langLabel = LANG_LABEL[i18n.language] ?? 'Eng'
+  const isReady = !!(selBrothers && selSisters)
 
   async function handleNext() {
-    if (!selected || submitting) return
+    if (!isReady || submitting) return
     setSubmitting(true)
     try {
-      await setRegValue('EATING', selected)
-      await callRegistrationAPI({ EATING: selected })
-      navigation.push('onboarding', { pageNo: '39' })
+      await setRegValues({ BROTHERS: selBrothers!, SISTERS: selSisters! })
+      await submitFamilyDetails(selBrothers!, selSisters!)
+      navigation.push('onboarding', { pageNo: '28' })
     } catch {
       // Allow retry
     } finally {
       setSubmitting(false)
     }
+  }
+
+  function handleSkip() {
+    navigation.push('onboarding', { pageNo: '28' })
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -141,28 +169,57 @@ export default function EatingHabitScreen({ navigation }: Props) {
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
         ) : (
-          <View style={styles.chipGrid}>
-            {options.map(opt => {
-              const isSelected = selected === opt.key
-              return (
-                <Pressable
-                  key={opt.key}
-                  style={[styles.chip, isSelected && styles.chipSelected]}
-                  onPress={() => setSelected(opt.key)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: isSelected }}
-                  accessibilityLabel={opt.label}
-                >
-                  <View style={[styles.chipIcon, isSelected && styles.chipIconSelected]}>
-                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                  </View>
-                  <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              )
-            })}
-          </View>
+          <>
+            {/* Brothers section */}
+            <Text style={styles.sectionLabel}>No of brothers</Text>
+            <View style={styles.chipGrid}>
+              {brotherOptions.map(opt => {
+                const isSelected = selBrothers === opt.key
+                return (
+                  <Pressable
+                    key={opt.key}
+                    style={[styles.chip, isSelected && styles.chipSelected]}
+                    onPress={() => setSelBrothers(opt.key)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isSelected }}
+                    accessibilityLabel={opt.label}
+                  >
+                    <View style={[styles.chipIcon, isSelected && styles.chipIconSelected]}>
+                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                    <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+
+            {/* Sisters section */}
+            <Text style={[styles.sectionLabel, styles.sectionLabelSpacing]}>No of sisters</Text>
+            <View style={styles.chipGrid}>
+              {sisterOptions.map(opt => {
+                const isSelected = selSisters === opt.key
+                return (
+                  <Pressable
+                    key={opt.key}
+                    style={[styles.chip, isSelected && styles.chipSelected]}
+                    onPress={() => setSelSisters(opt.key)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isSelected }}
+                    accessibilityLabel={opt.label}
+                  >
+                    <View style={[styles.chipIcon, isSelected && styles.chipIconSelected]}>
+                      {isSelected && <Text style={styles.checkmark}>✓</Text>}
+                    </View>
+                    <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+          </>
         )}
       </ScrollView>
 
@@ -178,10 +235,15 @@ export default function EatingHabitScreen({ navigation }: Props) {
           variant="primary"
           size="standard"
           fullWidth
-          disabled={!selected}
+          disabled={!isReady}
           loading={submitting}
           onPress={handleNext}
         />
+
+        <Pressable style={styles.skipRow} onPress={handleSkip}>
+          <Text style={styles.skipText}>{"I'll do this later"}</Text>
+          <Text style={styles.skipArrow}>›</Text>
+        </Pressable>
 
         {!!customerCare && (
           <>
@@ -228,12 +290,21 @@ const styles = StyleSheet.create({
     fontWeight:   '600',
     color:        Colors.textPrimary,
     lineHeight:   28,
-    marginBottom: 32,
+    marginBottom: 24,
   },
 
   loader: { marginTop: 48 },
 
-  // Pill chip grid — TYPE=type-1, same as MaritalStatus and CreatedBy screens
+  sectionLabel: {
+    fontSize:     16,
+    fontWeight:   '500',
+    color:        Colors.textPrimary,
+    marginBottom: 16,
+  },
+  sectionLabelSpacing: {
+    marginTop: 28,
+  },
+
   chipGrid: {
     flexDirection: 'row',
     flexWrap:      'wrap',
@@ -298,6 +369,25 @@ const styles = StyleSheet.create({
     paddingTop:        20,
     backgroundColor:   Colors.surface,
   },
+
+  skipRow: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    justifyContent: 'center',
+    marginTop:      12,
+    gap:            2,
+  },
+  skipText: {
+    fontSize:   14,
+    fontWeight: '400',
+    color:      'rgba(0,0,0,0.55)',
+  },
+  skipArrow: {
+    fontSize:   18,
+    color:      'rgba(0,0,0,0.55)',
+    lineHeight: 22,
+  },
+
   divider: {
     height:          1,
     backgroundColor: Colors.inputBorder,

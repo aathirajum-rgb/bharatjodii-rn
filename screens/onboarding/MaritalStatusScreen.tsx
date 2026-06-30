@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Image,
   Linking,
   Platform,
   Pressable,
@@ -11,6 +10,7 @@ import {
   Text,
   View,
 } from 'react-native'
+import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
@@ -20,12 +20,14 @@ import i18n from '../../i18n'
 import {
   callRegistrationAPI,
   fetchMaritalStatusOptions,
+  getRegValues,
+  setRegValue,
 } from '../../service/registrationService'
-import { getItem, setItem } from '../../service/storageService'
+import { getItem } from '../../service/storageService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/marital-status.svg'
+const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/son-marital.svg'
 const FOOTER_H = 140   // Next button + "Need help?" section height
 
 // Possessive labels per createdBy — matches Angular PROFILETYPE replacements
@@ -81,16 +83,14 @@ export default function MaritalStatusScreen({ navigation }: Props) {
 
   useEffect(() => {
     Promise.all([
-      getItem(SK.User.CREATED_BY),
-      getItem(SK.User.GENDER),
-      getItem('MARITALSTATUS'),         // restore prior selection (back navigation)
-      getItem(SK.App.CUSTOMER_CARE),
-    ]).then(([cb, gender, savedMS, cc]) => {
-      const cb2 = cb ?? '1'
-      const g2  = gender ?? '1'
-      if (cb2)   setCreatedBy(cb2)
-      if (savedMS) setSelected(savedMS)
-      if (cc)    setCustomerCare(cc)
+      getRegValues(),                   // CREATEDBY, GENDER, MARITALSTATUS from reg store
+      getItem(SK.App.CUSTOMER_CARE),    // app-level key — stays in storageService
+    ]).then(([{ CREATEDBY, GENDER, MARITALSTATUS }, cc]) => {
+      const cb2 = CREATEDBY ?? '1'
+      const g2  = GENDER    ?? '1'
+      if (cb2)          setCreatedBy(cb2)
+      if (MARITALSTATUS) setSelected(MARITALSTATUS)
+      if (cc)           setCustomerCare(cc)
 
       const fallback = g2 === '0' ? FALLBACK_FEMALE_OPTIONS : FALLBACK_MALE_OPTIONS
       fetchMaritalStatusOptions(g2)
@@ -112,7 +112,7 @@ export default function MaritalStatusScreen({ navigation }: Props) {
     if (!selected || submitting) return
     setSubmitting(true)
     try {
-      await setItem('MARITALSTATUS', selected)
+      await setRegValue('MARITALSTATUS', selected)
       await callRegistrationAPI({ MARITALSTATUS: selected })
       navigation.push('onboarding', { pageNo: '5' })
     } catch {
@@ -150,7 +150,7 @@ export default function MaritalStatusScreen({ navigation }: Props) {
         <Image
           source={{ uri: CDN_PAGE_ICON }}
           style={styles.pageIcon}
-          resizeMode="contain"
+          contentFit="contain"
         />
 
         {/* Title — Figma: 22px Poppins SemiBold */}

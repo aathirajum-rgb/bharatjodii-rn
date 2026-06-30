@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Image,
   Platform,
   Pressable,
   ScrollView,
@@ -10,22 +9,23 @@ import {
   Text,
   View,
 } from 'react-native'
+import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
-import { StorageKeys as SK } from '../../constants/storage.keys'
 import i18n from '../../i18n'
 import {
   GenderOption,
   callRegistrationAPI,
   fetchGenderOptions,
+  getRegValues,
+  setRegValues,
 } from '../../service/registrationService'
-import { getItem, setItem } from '../../service/storageService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/gender.svg'
+const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/gender-registration.svg'
 const FOOTER_H = 84
 
 // Fallback used when the API is unavailable — CDN URLs matched from Angular codebase
@@ -72,15 +72,11 @@ export default function GenderScreen({ navigation }: Props) {
 
   // Load stored name + prior selection (back navigation), fetch gender options from API
   useEffect(() => {
-    Promise.all([
-      getItem(SK.User.NAME),
-      getItem(SK.User.GENDER),
-      getItem(SK.User.CREATED_BY),
-    ]).then(([savedName, savedGender, createdBy]) => {
-      if (savedName)   setName(savedName)
-      if (savedGender) setSelected(savedGender)
+    getRegValues().then(({ NAME, GENDER, CREATEDBY }) => {
+      if (NAME)   setName(NAME)
+      if (GENDER) setSelected(GENDER)
       // Fetch API options — IMG/IMG-ACTIVE come from GENDERARRAY[createdBy] in the API
-      fetchGenderOptions(createdBy ?? '1')
+      fetchGenderOptions(CREATEDBY ?? '1')
         .then(list => setOptions(list.length ? list : FALLBACK_OPTIONS))
         .catch(() => setOptions(FALLBACK_OPTIONS))
         .finally(() => setFetching(false))
@@ -101,10 +97,7 @@ export default function GenderScreen({ navigation }: Props) {
     setError('')
     try {
       const lg = LOGIN_GENDER[selected] ?? 'M'
-      await Promise.all([
-        setItem(SK.User.GENDER, selected),
-        setItem(SK.User.LOGIN_GENDER, lg),
-      ])
+      await setRegValues({ GENDER: selected, LOGINGENDER: lg })
       await callRegistrationAPI({ GENDER: selected })
       navigation.push('onboarding', { pageNo: '4' })
     } catch {
@@ -138,7 +131,7 @@ export default function GenderScreen({ navigation }: Props) {
         <Image
           source={{ uri: CDN_PAGE_ICON }}
           style={styles.pageIcon}
-          resizeMode="contain"
+          contentFit="contain"
         />
 
         {/* Title — "Select the gender of Ranganathan" (Figma: 22px SemiBold) */}
@@ -164,7 +157,7 @@ export default function GenderScreen({ navigation }: Props) {
                   <Image
                     source={{ uri: isSelected ? opt.imgActive : opt.img }}
                     style={styles.avatar}
-                    resizeMode="contain"
+                    contentFit="contain"
                   />
 
                   {/* Label — Figma: 14px Poppins Medium, flex:1 */}
