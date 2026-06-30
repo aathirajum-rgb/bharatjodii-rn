@@ -14,10 +14,10 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppHeader from '../../components/app-header/AppHeader'
+import { CDN_REG, CDN_SVG } from '../../constants/cdn'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys } from '../../constants/storage.keys'
-import i18n from '../../i18n'
 import { login } from '../../service/registrationService'
 import { getItem, setItem } from '../../service/storageService'
 import { ENavigation } from '../../types/enums/navigation.enum'
@@ -41,12 +41,6 @@ function isValidMobile(mobile: string, country: Country): boolean {
   if (mobile.length < country.minLen || mobile.length > country.maxLen) return false
   const re = country.code === '91' ? /^[6-9][0-9]{7,11}$/ : /^[5-9][0-9]{7,11}$/
   return re.test(mobile)
-}
-
-// Short labels for the header language pill (matches Angular language IDs)
-const LANG_LABEL: Record<string, string> = {
-  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
-  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -150,15 +144,12 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
   const title = t('LOGIN_PAGE.ENT_UR_MOBILE', 'Enter your\nmobile number')
     .replace(/<br\s*\/?>/gi, '\n')
 
-  const langLabel = LANG_LABEL[i18n.language] ?? 'Eng'
-
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       {/* Header: back | audio | language pill */}
       <AppHeader
         type="registration"
         showBackBtn
-        languageLabel={langLabel}
         onBackPress={() => navigation.canGoBack() && navigation.goBack()}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />
@@ -176,7 +167,7 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
         >
           {/* Phone illustration — CDN SVG (same source as Angular signin.config.ts ICONTYPE) */}
           <Image
-            source={{ uri: 'https://imgs.jodii.app/assets/images/svg/registration-new/mobile.svg' }}
+            source={{ uri: CDN_REG + 'mobile.svg' }}
             style={styles.phoneImg}
             resizeMode="contain"
           />
@@ -207,7 +198,7 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
               >
                 <Text style={styles.codeText}>+{country.code}</Text>
                 <Image
-                  source={{ uri: 'https://imgs.jodii.app/assets/images/svg/chevron_down.svg' }}
+                  source={{ uri: CDN_SVG + 'chevron_down.svg' }}
                   style={[styles.chevron, dropOpen && styles.chevronUp]}
                 />
               </Pressable>

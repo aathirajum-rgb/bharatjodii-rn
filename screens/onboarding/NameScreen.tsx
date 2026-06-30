@@ -14,12 +14,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
-import i18n from '../../i18n'
 import { callRegistrationAPI, getRegValues, setRegValue } from '../../service/registrationService'
+import { CDN_REG } from '../../constants/cdn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/son-name.svg'
+const CDN_ICON = CDN_REG + 'son-name.svg'
 const FOOTER_H = 84
 
 // SELFGENDER → next page is GENDER (3); OTHERGENDER → skip to MARITALSTATUS (4)
@@ -39,11 +39,6 @@ const PROFILE_POSSESSIVE: Record<string, string> = {
 
 // Emoji regex — matches Angular alphabetOnly() which strips emojis from name input
 const EMOJI_REGEX = /(?:[✀-➿]|(?:\ud83c[\udde6-\uddff]){2}|[\ud800-\udbff][\udc00-\udfff]|[#-9]️?⃣|㊙|㊗|〽|〰|Ⓜ|\ud83c[\udd70-\udd71]|\ud83c[\udd7e-\udd7f]|🆎|\ud83c[\udd91-\udd9a]|\ud83c[\udde6-\uddff]|\ud83c[\ude01-\ude02]|🈚|🈯|\ud83c[\ude32-\ude3a]|\ud83c[\ude50-\ude51]|‼|⁉|[▪-▫]|▶|◀|[◻-◾]|©|®|™|ℹ|🀄|[☀-⛿]|⬅|⬆|⬇|⬛|⬜|⭐|⭕|⌚|⌛|⌨|⏏|[⏩-⏳]|[⏸-⏺]|🃏|⤴|⤵|[←-⇿])/g
-
-const LANG_LABEL: Record<string, string> = {
-  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
-  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -128,8 +123,6 @@ export default function NameScreen({ navigation }: Props) {
     }
   }
 
-  const langLabel = LANG_LABEL[i18n.language] ?? 'Eng'
-
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -137,7 +130,6 @@ export default function NameScreen({ navigation }: Props) {
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
-        languageLabel={langLabel}
         onBackPress={() => navigation.goBack()}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />

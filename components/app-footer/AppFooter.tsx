@@ -1,6 +1,7 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -24,7 +25,7 @@ export interface AppFooterProps {
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
-const CDN = 'https://imgs.jodii.app/assets/images/svg/bottom-nav/'
+const CDN = CDN_SVG + 'bottom-nav/'
 
 // [inactive, active] icon pairs — matches Angular footer.component.html
 const TAB_ICONS: Record<FooterTab, [string, string]> = {

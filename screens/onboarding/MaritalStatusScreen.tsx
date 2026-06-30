@@ -16,7 +16,6 @@ import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import i18n from '../../i18n'
 import {
   callRegistrationAPI,
   fetchMaritalStatusOptions,
@@ -24,10 +23,11 @@ import {
   setRegValue,
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
+import { CDN_REG } from '../../constants/cdn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/son-marital.svg'
+const CDN_PAGE_ICON = CDN_REG + 'son-marital.svg'
 const FOOTER_H = 140   // Next button + "Need help?" section height
 
 // Possessive labels per createdBy — matches Angular PROFILETYPE replacements
@@ -53,11 +53,6 @@ const FALLBACK_FEMALE_OPTIONS = [
   { key: '3', label: 'Widow'         },
   { key: '4', label: 'Awaiting Divorce' },
 ]
-
-const LANG_LABEL: Record<string, string> = {
-  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
-  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -106,8 +101,6 @@ export default function MaritalStatusScreen({ navigation }: Props) {
     ? `Select your ${possessive} marital status`
     : t('REGISTRATION.MARITALSTATUS', 'Select your marital status').replace(' #PROFILETYPE#', '')
 
-  const langLabel = LANG_LABEL[i18n.language] ?? 'Eng'
-
   async function handleNext() {
     if (!selected || submitting) return
     setSubmitting(true)
@@ -133,7 +126,6 @@ export default function MaritalStatusScreen({ navigation }: Props) {
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
-        languageLabel={langLabel}
         onBackPress={() => navigation.goBack()}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />
@@ -218,9 +210,6 @@ export default function MaritalStatusScreen({ navigation }: Props) {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
-
-const CHIP_CHECKED_BG     = 'rgba(181, 0, 51, 0.02)'
-const CHIP_CHECKED_BORDER = 'rgba(181, 0, 51, 0.4)'
 
 const styles = StyleSheet.create({
   screen: {

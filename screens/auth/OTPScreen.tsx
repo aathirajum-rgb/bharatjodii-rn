@@ -17,22 +17,17 @@ import AppHeader from '../../components/app-header/AppHeader'
 import OTPSuccessSheet from '../../components/bottom-sheet/OTPSuccessSheet'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
-import i18n from '../../i18n'
 import { parseAndStoreWebViewURL, resendOTP, verifyOTP } from '../../service/registrationService'
 import { getItem, setItem } from '../../service/storageService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { useAuth } from '../../contexts/AuthContext'
+import { CDN_REG } from '../../constants/cdn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const OTP_LENGTH  = 4
 const TIMER_START = 59  // matches Angular resendotpTimer = 59
-const CDN         = 'https://imgs.jodii.app/assets/images/svg/registration-new/'
-
-const LANG_LABEL: Record<string, string> = {
-  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
-  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
-}
+const CDN         = CDN_REG
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -198,8 +193,6 @@ export default function OTPScreen({ navigation, route }: Props) {
     navigation.goBack()
   }
 
-  const langLabel = LANG_LABEL[i18n.language] ?? 'Eng'
-
   // Angular subtitle: 'LOGIN_PAGE.DIGITCODE' with ##NO## replaced by mobile
   const subtitle = t('LOGIN_PAGE.DIGITCODE', "We've sent 4 digit code to")
     .replace('##NO##', mobile)
@@ -211,7 +204,6 @@ export default function OTPScreen({ navigation, route }: Props) {
       <AppHeader
         type="registration"
         showBackBtn
-        languageLabel={langLabel}
         onBackPress={handleEdit}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />

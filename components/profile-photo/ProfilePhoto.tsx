@@ -13,6 +13,7 @@ import {
 import { BlurView } from 'expo-blur'
 import * as ImagePicker from 'expo-image-picker'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG, CDN_IMG } from '../../constants/cdn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -68,14 +69,14 @@ export interface ProfilePhotoProps {
 
 // ─── CDN constants ────────────────────────────────────────────────────────────
 
-const CDN = 'https://imgs.jodii.app/assets/images/svg/revamp/'
-const DEFAULT_AVATAR = 'https://imgs.jodii.app/assets/images/default-profile.jpg'
+const CDN = CDN_SVG + 'revamp/'
+const DEFAULT_AVATAR = CDN_IMG + 'default-profile.jpg'
 
 const ICONS = {
   newlyJoinedBg:  CDN + 'newly-joined.svg',
   newlyJoinedStar: CDN + 'newly-joined-star.svg',
-  shortlistOff:   'https://imgs.jodii.app/assets/images/svg/shortlist/shortlist-white.svg',
-  shortlistOn:    'https://imgs.jodii.app/assets/images/svg/shortlist/shortlisted-white-updated.svg',
+  shortlistOff:   CDN_SVG + 'shortlist/shortlist-white.svg',
+  shortlistOn:    CDN_SVG + 'shortlist/shortlisted-white-updated.svg',
   closeWhite:     CDN + 'close-white.svg',
   camera:         CDN + 'camera-upload.svg',    // upload CTA icon
   addPhoto:       CDN + 'add-photo-icon.svg',

@@ -1,6 +1,14 @@
 import { Image, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
+import i18n from '../../i18n'
+
+// Maps i18n language codes to their short display labels shown in the header button
+const LANG_LABEL: Record<string, string> = {
+  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
+  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,7 +36,7 @@ export interface AppHeaderProps {
 
   // ── registration / signIn ───────────────────────────────────────────────
   showBackBtn?:     boolean | undefined
-  languageLabel?:   string  | undefined   // e.g. "Eng"
+  languageLabel?:   string  | undefined   // auto-computed from i18n.language if omitted
 
   // ── Callbacks ────────────────────────────────────────────────────────────
   onMenuPress?:      (() => void) | undefined
@@ -43,7 +51,7 @@ export interface AppHeaderProps {
 
 // ─── CDN ─────────────────────────────────────────────────────────────────────
 
-const CDN = 'https://imgs.jodii.app/assets/images/svg/'
+const CDN = CDN_SVG
 
 const ICONS = {
   menu:       CDN + 'revamp/menu-home.svg',
@@ -162,6 +170,8 @@ export default function AppHeader({
   }
 
   // registration / signIn
+  const resolvedLangLabel = languageLabel ?? LANG_LABEL[i18n.language] ?? 'Eng'
+
   return (
     <View style={[styles.wrapperAuth, { paddingTop: insets.top }, style]}>
       <View style={styles.authRow}>
@@ -173,13 +183,11 @@ export default function AppHeader({
 
         <View style={styles.flex1} />
 
-        {languageLabel && (
-          <Pressable style={styles.langBtn} onPress={onLanguagePress}>
-            <Image source={{ uri: ICONS.lang }} style={styles.langIcon} resizeMode="contain" />
-            <Text style={styles.langText}>{languageLabel}</Text>
-            <Image source={{ uri: ICONS.chevDown }} style={styles.chevIcon} resizeMode="contain" />
-          </Pressable>
-        )}
+        <Pressable style={styles.langBtn} onPress={onLanguagePress}>
+          <Image source={{ uri: ICONS.lang }} style={styles.langIcon} resizeMode="contain" />
+          <Text style={styles.langText}>{resolvedLangLabel}</Text>
+          <Image source={{ uri: ICONS.chevDown }} style={styles.chevIcon} resizeMode="contain" />
+        </Pressable>
       </View>
     </View>
   )
@@ -340,7 +348,7 @@ const styles = StyleSheet.create({
     alignItems:        'center',
     gap:               4,
     borderWidth:       1,
-    borderColor:       'rgba(138,138,138,1)',
+    borderColor:       Colors.borderNeutral,
     borderRadius:      8,
     paddingVertical:   4,
     paddingHorizontal: 8,

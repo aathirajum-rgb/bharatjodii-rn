@@ -3,6 +3,9 @@ node_modules/
 dist/
 web-build/
 
+# Claude Code internal data — agent worktrees, memory, task logs
+.claude/
+
 # macOS Finder metadata — never commit
 .DS_Store
 **/.DS_Store

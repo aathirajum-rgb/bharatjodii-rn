@@ -10,6 +10,7 @@ import {
   type ViewToken,
 } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
 import ProfilePhoto from '../profile-photo/ProfilePhoto'
 import Badge from '../badge/Badge'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
@@ -94,7 +95,7 @@ export interface MatchesCardProps {
 const SCREEN_W = Dimensions.get('window').width
 const DEFAULT_PHOTO_H = Math.round(SCREEN_W * 0.85)
 
-const CDN = 'https://imgs.jodii.app/assets/images/svg/'
+const CDN = CDN_SVG
 const ICONS = {
   call:      CDN + 'revamp/call-revamp.svg',
   whatsapp:  CDN + 'whatsapp-revamp.svg',

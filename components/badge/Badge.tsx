@@ -1,5 +1,6 @@
 import { Image, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -16,7 +17,7 @@ export interface BadgeProps {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN = 'https://imgs.jodii.app/assets/images/svg/'
+const CDN = CDN_SVG
 const INFO_ICON = CDN + 'verified-info.svg'
 
 // Per-variant visual tokens — mirrors Angular SCSS badge block styles

@@ -21,7 +21,6 @@ import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import i18n from '../../i18n'
 import {
   HeightGroup,
   callRegistrationAPI,
@@ -31,10 +30,11 @@ import {
   setRegValues,
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
+import { CDN_REG } from '../../constants/cdn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON  = 'https://imgs.jodii.app/assets/images/svg/registration-new/son-height.svg'
+const CDN_PAGE_ICON  = CDN_REG + 'son-height.svg'
 const FOOTER_H       = 140
 const PANEL_WIDTH    = Dimensions.get('window').width * 0.85
 
@@ -54,11 +54,6 @@ const FALLBACK_CATEGORIES: Category[] = [
   { key: '103', label: 'Above average', subtitle: "5'7 - 5'11 ft"       },
   { key: '104', label: 'Tall',          subtitle: "Greater than 6 ft"    },
 ]
-
-const LANG_LABEL: Record<string, string> = {
-  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
-  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -174,7 +169,6 @@ export default function HeightScreen({ navigation }: Props) {
 
   const possessive   = PROFILE_POSSESSIVE[createdBy] ?? 'their'
   const title        = `What is ${possessive} height?`
-  const langLabel    = LANG_LABEL[i18n.language] ?? 'Eng'
   const hasSelection = selectedCategory !== null || selectedHeight !== null
 
   // Panel slides in from the right
@@ -213,7 +207,6 @@ export default function HeightScreen({ navigation }: Props) {
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
-        languageLabel={langLabel}
         onBackPress={() => navigation.goBack()}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />

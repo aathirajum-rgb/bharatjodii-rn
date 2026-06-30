@@ -1,5 +1,6 @@
 import { Image, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,7 +22,7 @@ export interface ChipProps {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN = 'https://imgs.jodii.app/assets/images/svg/revamp/'
+const CDN = CDN_SVG + 'revamp/'
 
 // Angular SCSS: $IconURLs map — each icon class → background-image URL
 const ICON_URL: Record<ChipIcon, string> = {

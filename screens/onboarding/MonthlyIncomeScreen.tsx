@@ -16,7 +16,6 @@ import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import i18n from '../../i18n'
 import {
   callRegistrationAPI,
   fetchMonthlyIncomeOptions,
@@ -26,10 +25,11 @@ import {
   getRegValue,
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
+import { CDN_REG } from '../../constants/cdn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/income.svg'
+const CDN_PAGE_ICON = CDN_REG + 'income.svg'
 const FOOTER_H      = 140
 const ITEM_H        = 44
 const SELECTED_ROW  = '#fff1f5'
@@ -41,11 +41,6 @@ const PROFILE_POSSESSIVE: Record<string, string> = {
   '9':  "sister's",
   '10': "friend's",
   '11': "relative's",
-}
-
-const LANG_LABEL: Record<string, string> = {
-  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
-  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -126,8 +121,6 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
 
   const possessive = PROFILE_POSSESSIVE[createdBy] ?? 'their'
   const title      = `What is ${possessive} monthly Income?`
-  const langLabel  = LANG_LABEL[i18n.language] ?? 'Eng'
-
   // Active income list depends on selected currency
   const activeOptions = (isNRI && selectedCurrency !== 'INR' && nriOptions.length)
     ? nriOptions
@@ -173,7 +166,6 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
-        languageLabel={langLabel}
         onBackPress={() => navigation.goBack()}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />

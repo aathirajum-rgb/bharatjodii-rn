@@ -1,5 +1,6 @@
 import { Image, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -12,7 +13,7 @@ export interface LinkCTAProps {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CALL_ICON = 'https://imgs.jodii.app/assets/images/svg/revamp/call-blue.svg'
+const CALL_ICON = CDN_SVG + 'revamp/call-blue.svg'
 
 // ─── LinkCTA ──────────────────────────────────────────────────────────────────
 // Mirrors Angular link-cta.component — shows a context label above a tappable

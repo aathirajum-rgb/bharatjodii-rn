@@ -1,5 +1,6 @@
 import { ActivityIndicator, Image, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ export interface ButtonRevampProps {
 // ─── Icon CDN map ─────────────────────────────────────────────────────────────
 // Mirrors Angular button-revamp.component.scss $IconURLs map exactly.
 
-const CDN = 'https://imgs.jodii.app/assets/images/svg/'
+const CDN = CDN_SVG
 
 export const ICON_URLS: Record<string, string> = {
   'like-img':             CDN + 'revamp/like-white-revamp.svg',

@@ -22,7 +22,6 @@ import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import i18n from '../../i18n'
 import {
   callRegistrationAPI,
   fetchCities,
@@ -32,10 +31,11 @@ import {
   getRegValue,
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
+import { CDN_REG } from '../../constants/cdn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/location.svg'
+const CDN_PAGE_ICON = CDN_REG + 'location.svg'
 const PANEL_WIDTH   = Dimensions.get('window').width * 0.85
 const ITEM_HEIGHT   = 52
 
@@ -46,11 +46,6 @@ const PROFILE_POSSESSIVE: Record<string, string> = {
   '9':  "sister's",
   '10': "friend's",
   '11': "relative's",
-}
-
-const LANG_LABEL: Record<string, string> = {
-  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
-  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -231,7 +226,6 @@ export default function HomeTownScreen({ navigation }: Props) {
 
   const possessive       = PROFILE_POSSESSIVE[createdBy] ?? 'their'
   const title            = `Is ${possessive} home town same as current location?`
-  const langLabel        = LANG_LABEL[i18n.language] ?? 'Eng'
   const panelTranslateX  = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [PANEL_WIDTH, 0] })
   const panelTitle       = panelKind === 'state' ? 'Select state' : 'Select district'
   const currentList      = panelKind === 'state' ? states : cities
@@ -269,7 +263,6 @@ export default function HomeTownScreen({ navigation }: Props) {
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
-        languageLabel={langLabel}
         onBackPress={() => navigation.goBack()}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />

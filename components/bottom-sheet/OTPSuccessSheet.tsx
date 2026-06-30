@@ -4,11 +4,12 @@ import { useTranslation } from 'react-i18next'
 import { Animated, Dimensions, Modal, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import { CDN_LOTTIE } from '../../constants/cdn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SCREEN_H      = Dimensions.get('window').height
-const LOTTIE_URL    = 'https://imgs.jodii.app/assets/jodii-lottie-files/success-new.json'
+const LOTTIE_URL    = CDN_LOTTIE + 'success-new.json'
 const AUTO_CLOSE_MS = 3000   // matches Angular: setTimeout dismissModal 3000ms
 
 // ─── Types ────────────────────────────────────────────────────────────────────

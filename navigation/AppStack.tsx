@@ -20,6 +20,7 @@ import LocationScreen from '../screens/onboarding/LocationScreen'
 import MotherTongueScreen from '../screens/onboarding/MotherTongueScreen'
 import AddPhotoScreen from '../screens/onboarding/AddPhotoScreen'
 import FamilyDetailsScreen from '../screens/onboarding/FamilyDetailsScreen'
+import PropertyDetailsScreen from '../screens/onboarding/PropertyDetailsScreen'
 import CasteScreen from '../screens/onboarding/CasteScreen'
 import GothraScreen from '../screens/onboarding/GothraScreen'
 import MonthlyIncomeScreen from '../screens/onboarding/MonthlyIncomeScreen'
@@ -150,6 +151,7 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
     case '16': return <GothraScreen        navigation={navigation} route={route} />
     case '20': return <AddPhotoScreen      navigation={navigation} route={route} />
     case '27': return <FamilyDetailsScreen navigation={navigation} route={route} />
+    case '28': return <PropertyDetailsScreen navigation={navigation} route={route} />
     default:   return <HomeScreen navigation={navigation} />
   }
 }
