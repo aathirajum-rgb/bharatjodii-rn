@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Colors } from '../constants/colors';
 
 const NUM_COLUMNS = 3;
 const GAP = 2;

@@ -17,18 +17,19 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
-  callRegistrationAPI,
-  fetchEatingHabitOptions,
+  fetchPropertyOptions,
   getRegValue,
+  getRegValues,
   setRegValue,
+  submitPropertyDetails,
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = CDN_REG + 'eating-updated.svg'
-const FOOTER_H = 140
+const CDN_PAGE_ICON = CDN_REG + 'property.svg'
+const FOOTER_H = 160
 
 const PROFILE_POSSESSIVE: Record<string, string> = {
   '4':  "son's",
@@ -40,9 +41,11 @@ const PROFILE_POSSESSIVE: Record<string, string> = {
 }
 
 const FALLBACK_OPTIONS = [
-  { key: '1', label: 'Vegetarian'     },
-  { key: '2', label: 'Non-vegetarian' },
-  { key: '3', label: 'Eggetarian'     },
+  { key: '1', label: 'Flat/Apartment' },
+  { key: '2', label: 'Independent House/Villa' },
+  { key: '3', label: 'Independent/Builder Floor' },
+  { key: '4', label: 'Farm House' },
+  { key: '5', label: 'Agricultural Land' },
 ]
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -56,28 +59,35 @@ type Props = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function EatingHabitScreen({ navigation }: Props) {
+export default function PropertyDetailsScreen({ navigation }: Props) {
   const { t }  = useTranslation()
   const insets = useSafeAreaInsets()
 
   const [options,      setOptions]      = useState<Option[]>([])
   const [fetching,     setFetching]     = useState(true)
-  const [selected,     setSelected]     = useState<string | null>(null)
-  const [createdBy,    setCreatedBy]    = useState('4')
-  const [submitting,   setSubmitting]   = useState(false)
+  const [selected,     setSelected]     = useState<Set<string>>(new Set())
+  const [createdBy,    setCreatedBy]    = useState('1')
   const [customerCare, setCustomerCare] = useState('')
+  const [submitting,   setSubmitting]   = useState(false)
 
   useEffect(() => {
     Promise.all([
-      getRegValue('CREATEDBY'),
-      getRegValue('EATING'),
+      getRegValues(),
       getItem(SK.App.CUSTOMER_CARE),
-    ]).then(([cb, savedEating, cc]) => {
-      if (cb)          setCreatedBy(cb)
-      if (savedEating) setSelected(savedEating)
-      if (cc)          setCustomerCare(cc)
+    ]).then(([regVals, cc]) => {
+      if (regVals.CREATEDBY) setCreatedBy(regVals.CREATEDBY)
+      if (cc) setCustomerCare(cc)
 
-      fetchEatingHabitOptions()
+      // Restore previously selected properties (stored as array or ~-separated string)
+      const existing = regVals.PROPERTIES
+      if (existing) {
+        const keys = Array.isArray(existing)
+          ? existing
+          : String(existing).split('~').filter(Boolean)
+        setSelected(new Set(keys))
+      }
+
+      fetchPropertyOptions()
         .then(list => setOptions(list.length ? list : FALLBACK_OPTIONS))
         .catch(() => setOptions(FALLBACK_OPTIONS))
         .finally(() => setFetching(false))
@@ -86,21 +96,35 @@ export default function EatingHabitScreen({ navigation }: Props) {
 
   const possessive = PROFILE_POSSESSIVE[createdBy]
   const title = possessive
-    ? `Select ${possessive} eating habits`
-    : 'Select eating habits'
+    ? `Select your ${possessive} property details`
+    : 'Select property details'
+
+  function toggleOption(key: string) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
 
   async function handleNext() {
-    if (!selected || submitting) return
+    if (submitting) return
     setSubmitting(true)
     try {
-      await setRegValue('EATING', selected)
-      await callRegistrationAPI({ EATING: selected })
-      navigation.push('onboarding', { pageNo: '39' })
+      const keys = Array.from(selected)
+      await setRegValue('PROPERTIES', keys as any)
+      if (keys.length > 0) await submitPropertyDetails(keys)
+      navigation.push('onboarding', { pageNo: '29' })
     } catch {
       // Allow retry
     } finally {
       setSubmitting(false)
     }
+  }
+
+  function handleSkip() {
+    navigation.push('onboarding', { pageNo: '29' })
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -129,28 +153,29 @@ export default function EatingHabitScreen({ navigation }: Props) {
         />
 
         <Text style={styles.title}>{title}</Text>
+        <Text style={styles.subtitle}>{t('REG.CHOOSEMORE', 'You can choose more than one')}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
         ) : (
-          <View style={styles.chipGrid}>
+          <View style={styles.checkList}>
             {options.map(opt => {
-              const isSelected = selected === opt.key
+              const isChecked = selected.has(opt.key)
               return (
                 <Pressable
                   key={opt.key}
-                  style={[styles.chip, isSelected && styles.chipSelected]}
-                  onPress={() => setSelected(opt.key)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: isSelected }}
+                  style={[styles.checkItem, isChecked && styles.checkItemSelected]}
+                  onPress={() => toggleOption(opt.key)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: isChecked }}
                   accessibilityLabel={opt.label}
                 >
-                  <View style={[styles.chipIcon, isSelected && styles.chipIconSelected]}>
-                    {isSelected && <Text style={styles.checkmark}>✓</Text>}
-                  </View>
-                  <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}>
+                  <Text style={[styles.checkLabel, isChecked && styles.checkLabelSelected]}>
                     {opt.label}
                   </Text>
+                  <View style={[styles.checkbox, isChecked && styles.checkboxSelected]}>
+                    {isChecked && <Text style={styles.checkmark}>✓</Text>}
+                  </View>
                 </Pressable>
               )
             })}
@@ -165,15 +190,21 @@ export default function EatingHabitScreen({ navigation }: Props) {
           { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
         ]}
       >
-        <ButtonRevamp
-          label={t('REGISTRATION.NEXTCTA', 'Next')}
-          variant="primary"
-          size="standard"
-          fullWidth
-          disabled={!selected}
-          loading={submitting}
-          onPress={handleNext}
-        />
+        {selected.size > 0 ? (
+          <ButtonRevamp
+            label={t('REGISTRATION.NEXTCTA', 'Next')}
+            variant="primary"
+            size="standard"
+            fullWidth
+            loading={submitting}
+            onPress={handleNext}
+          />
+        ) : (
+          <Pressable style={styles.skipRow} onPress={handleSkip}>
+            <Text style={styles.skipText}>{t('REG.DO_LATER', "I'll do this later")}</Text>
+            <Text style={styles.skipArrow}>›</Text>
+          </Pressable>
+        )}
 
         {!!customerCare && (
           <>
@@ -193,6 +224,9 @@ export default function EatingHabitScreen({ navigation }: Props) {
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
+
+const CHECKED_BG     = 'rgba(181, 0, 51, 0.02)'
+const CHECKED_BORDER = 'rgba(181, 0, 51, 0.4)'
 
 const styles = StyleSheet.create({
   screen: {
@@ -217,64 +251,72 @@ const styles = StyleSheet.create({
     fontWeight:   '600',
     color:        Colors.textPrimary,
     lineHeight:   28,
-    marginBottom: 32,
+    marginBottom: 8,
+  },
+
+  subtitle: {
+    fontSize:     14,
+    fontWeight:   '400',
+    color:        Colors.textSecondary ?? '#888',
+    lineHeight:   20,
+    marginBottom: 24,
   },
 
   loader: { marginTop: 48 },
 
-  // Pill chip grid — TYPE=type-1, same as MaritalStatus and CreatedBy screens
-  chipGrid: {
-    flexDirection: 'row',
-    flexWrap:      'wrap',
-    gap:           16,
+  checkList: {
+    gap: 12,
   },
 
-  chip: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    height:          40,
-    borderRadius:    50,
-    borderWidth:     1,
-    borderColor:     Colors.borderNeutral,
-    backgroundColor: Colors.surface,
-    paddingLeft:     8,
-    paddingRight:    16,
-    gap:             8,
+  // Row: label left, checkbox right
+  checkItem: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
+    paddingHorizontal: 16,
+    paddingVertical:   14,
+    borderRadius:      12,
+    borderWidth:       1,
+    borderColor:       '#d0d0d0',
+    backgroundColor:   Colors.surface,
   },
-  chipSelected: {
-    borderColor:     Colors.chipBorderActive,
-    backgroundColor: Colors.radioCheckedBg,
+  checkItemSelected: {
+    borderColor:     CHECKED_BORDER,
+    backgroundColor: CHECKED_BG,
   },
 
-  chipIcon: {
-    width:           20,
-    height:          20,
-    borderRadius:    10,
+  checkLabel: {
+    flex:       1,
+    fontSize:   15,
+    fontWeight: '400',
+    color:      Colors.textPrimary,
+    lineHeight: 20,
+    marginRight: 12,
+  },
+  checkLabelSelected: {
+    fontWeight: '500',
+  },
+
+  checkbox: {
+    width:           24,
+    height:          24,
+    borderRadius:    6,
     borderWidth:     1.5,
-    borderColor:     Colors.borderNeutral,
+    borderColor:     '#8a8a8a',
     alignItems:      'center',
     justifyContent:  'center',
+    flexShrink:      0,
   },
-  chipIconSelected: {
+  checkboxSelected: {
     borderColor:     Colors.primaryDark,
     backgroundColor: Colors.primaryDark,
   },
 
   checkmark: {
     color:      Colors.surface,
-    fontSize:   11,
+    fontSize:   13,
     fontWeight: '700',
-    lineHeight: 13,
-  },
-
-  chipLabel: {
-    fontSize:   14,
-    fontWeight: '400',
-    color:      Colors.textPrimary,
     lineHeight: 16,
-  },
-  chipLabelSelected: {
-    fontWeight: '500',
   },
 
   // Sticky footer
@@ -287,6 +329,25 @@ const styles = StyleSheet.create({
     paddingTop:        20,
     backgroundColor:   Colors.surface,
   },
+
+  skipRow: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    justifyContent: 'center',
+    paddingVertical: 14,
+    gap:            4,
+  },
+  skipText: {
+    fontSize:   15,
+    fontWeight: '500',
+    color:      'rgba(0,0,0,0.55)',
+  },
+  skipArrow: {
+    fontSize:   18,
+    color:      'rgba(0,0,0,0.55)',
+    lineHeight: 22,
+  },
+
   divider: {
     height:          1,
     backgroundColor: Colors.inputBorder,
@@ -308,7 +369,7 @@ const styles = StyleSheet.create({
   helpPhone: {
     fontSize:      14,
     fontWeight:    '500',
-    color:         Colors.link,
+    color:         '#29339b',
     letterSpacing: 0.42,
   },
 })

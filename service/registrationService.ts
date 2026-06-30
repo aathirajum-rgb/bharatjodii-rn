@@ -810,6 +810,28 @@ export async function submitFamilyDetails(brothers: string, sisters: string): Pr
   )
 }
 
+export async function fetchPropertyOptions(): Promise<Array<{ key: string; label: string }>> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const res = await apiCall(
+    Endpoints.registration.updateFamily,
+    'POST',
+    `ID=${userId}&PROPERTY=&BROTHERS=&SISTERS=`,
+  )
+  if (res?.RESPONSECODE === '1' && res?.ERRCODE === '0' && res?.RESPONSE) {
+    return objToOptions(res.RESPONSE.ASSETS)
+  }
+  return []
+}
+
+export async function submitPropertyDetails(properties: string[]): Promise<void> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  await apiCall(
+    Endpoints.registration.updateFamily,
+    'POST',
+    `ID=${userId}&PROPERTY=${properties.join('~')}&BROTHERS=&SISTERS=`,
+  )
+}
+
 // ─── Registration update ──────────────────────────────────────────────────────
 
 export async function callRegistrationAPI(params: Record<string, any>): Promise<any> {

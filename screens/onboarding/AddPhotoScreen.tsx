@@ -18,21 +18,16 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppHeader from '../../components/app-header/AppHeader'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import i18n from '../../i18n'
 import { Endpoints } from '../../service/api.endpoints'
 import { uploadFile } from '../../service/apiClient'
 import { getRegValue } from '../../service/registrationService'
 import { getItem, setItem } from '../../service/storageService'
+import { CDN_IMG } from '../../constants/cdn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_MALE_PLACEHOLDER   = 'https://imgs.jodii.app/assets/images/male_silhouette.png'
-const CDN_FEMALE_PLACEHOLDER = 'https://imgs.jodii.app/assets/images/female_silhouette.png'
-
-const LANG_LABEL: Record<string, string> = {
-  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
-  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
-}
+const CDN_MALE_PLACEHOLDER   = CDN_IMG + 'male_silhouette.png'
+const CDN_FEMALE_PLACEHOLDER = CDN_IMG + 'female_silhouette.png'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -83,7 +78,6 @@ export default function AddPhotoScreen({ navigation }: Props) {
   // ─── Derived ──────────────────────────────────────────────────────────────
 
   const isFemale  = gender === '2' || ['5', '9'].includes(createdBy)
-  const langLabel = LANG_LABEL[i18n.language] ?? 'Eng'
 
   // ─── Photo picker ─────────────────────────────────────────────────────────
 
@@ -188,7 +182,6 @@ export default function AddPhotoScreen({ navigation }: Props) {
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
-        languageLabel={langLabel}
         onBackPress={() => navigation.goBack()}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />
@@ -381,11 +374,11 @@ const styles = StyleSheet.create({
     backgroundColor:   Colors.surface,
     borderRadius:      16,
     borderWidth:       1,
-    borderColor:       '#f0f0f0',
+    borderColor:       Colors.divider,
     paddingHorizontal: 20,
     paddingVertical:   20,
     gap:               14,
-    shadowColor:       '#000',
+    shadowColor:       Colors.black,
     shadowOpacity:     0.06,
     shadowOffset:      { width: 0, height: 2 },
     shadowRadius:      8,
@@ -431,13 +424,13 @@ const styles = StyleSheet.create({
   addBtnLabel: {
     fontSize:   16,
     fontWeight: '600',
-    color:      '#fff',
+    color:      Colors.white,
   },
 
   // Skip-confirm sheet
   sheetOverlay: {
     flex:            1,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: Colors.scrim,
     justifyContent:  'flex-end',
   },
   sheet: {
@@ -459,7 +452,7 @@ const styles = StyleSheet.create({
     marginBottom:    4,
   },
   warnIconText: {
-    color:      '#fff',
+    color:      Colors.white,
     fontSize:   20,
     fontWeight: '700',
     lineHeight: 24,
@@ -499,7 +492,7 @@ const styles = StyleSheet.create({
   sheetBtnSolidLabel: {
     fontSize:   16,
     fontWeight: '600',
-    color:      '#fff',
+    color:      Colors.white,
   },
 
   // Skip

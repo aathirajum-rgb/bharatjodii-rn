@@ -4,6 +4,14 @@ import MenuIcon from '../../assets/icons/MenuIcon'
 import NotificationIcon from '../../assets/icons/NotificationIcon'
 import SearchIcon from '../../assets/icons/SearchIcon'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
+import i18n from '../../i18n'
+
+// Maps i18n language codes to their short display labels shown in the header button
+const LANG_LABEL: Record<string, string> = {
+  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
+  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -32,7 +40,7 @@ export interface AppHeaderProps {
 
   // ── registration / signIn ───────────────────────────────────────────────
   showBackBtn?:       boolean | undefined
-  languageLabel?:     string  | undefined   // e.g. "Eng"
+  languageLabel?:     string  | undefined   // auto-computed from i18n.language if omitted
 
   // ── Callbacks ────────────────────────────────────────────────────────────
   onMenuPress?:        (() => void) | undefined
@@ -47,7 +55,7 @@ export interface AppHeaderProps {
 
 // ─── CDN ─────────────────────────────────────────────────────────────────────
 
-const CDN = 'https://imgs.jodii.app/assets/images/svg/'
+const CDN = CDN_SVG
 
 const ICONS = {
   lang:     CDN + 'revamp/lang-change-img.svg',
@@ -87,6 +95,9 @@ export default function AppHeader({
 }: AppHeaderProps) {
   const insets = useSafeAreaInsets()
 
+  // Resolve language label — use explicit prop, else auto-detect from i18n
+  const resolvedLangLabel = languageLabel ?? LANG_LABEL[i18n.language] ?? 'Eng'
+
   // ── header1: home screen header (Figma node 15859:14389 top area) ───────────
   // Row 1 (app bar): hamburger | [flex] | language selector | toolbar icons
   // Row 2 (user bar): avatar + completion % | name | edit profile link
@@ -107,14 +118,12 @@ export default function AppHeader({
 
           <View style={styles.flex1} />
 
-          {/* Language selector pill */}
-          {languageLabel && (
-            <Pressable style={styles.h1LangBtn} onPress={onLanguagePress}>
-              <Image source={{ uri: ICONS.lang }} style={styles.h1LangIcon} resizeMode="contain" />
-              <Text style={styles.h1LangText}>{languageLabel}</Text>
-              <Image source={{ uri: ICONS.chevDown }} style={styles.h1ChevIcon} resizeMode="contain" />
-            </Pressable>
-          )}
+          {/* Language selector pill — always visible, auto-detects language */}
+          <Pressable style={styles.h1LangBtn} onPress={onLanguagePress}>
+            <Image source={{ uri: ICONS.lang }} style={styles.h1LangIcon} resizeMode="contain" />
+            <Text style={styles.h1LangText}>{resolvedLangLabel}</Text>
+            <Image source={{ uri: ICONS.chevDown }} style={styles.h1ChevIcon} resizeMode="contain" />
+          </Pressable>
 
           {/* Notification + chat icon buttons */}
           {homeToolBar?.filter(t => t.toolType !== 'menu').map(item => (
@@ -192,13 +201,11 @@ export default function AppHeader({
 
         <View style={styles.flex1} />
 
-        {languageLabel && (
-          <Pressable style={styles.langBtn} onPress={onLanguagePress}>
-            <Image source={{ uri: ICONS.lang }} style={styles.langIcon} resizeMode="contain" />
-            <Text style={styles.langText}>{languageLabel}</Text>
-            <Image source={{ uri: ICONS.chevDown }} style={styles.chevIcon} resizeMode="contain" />
-          </Pressable>
-        )}
+        <Pressable style={styles.langBtn} onPress={onLanguagePress}>
+          <Image source={{ uri: ICONS.lang }} style={styles.langIcon} resizeMode="contain" />
+          <Text style={styles.langText}>{resolvedLangLabel}</Text>
+          <Image source={{ uri: ICONS.chevDown }} style={styles.chevIcon} resizeMode="contain" />
+        </Pressable>
       </View>
     </View>
   )
@@ -291,8 +298,8 @@ const styles = StyleSheet.create({
     color:      Colors.primary,
   },
   h1EditIcon: {
-    width:  12,
-    height: 12,
+    width:     12,
+    height:    12,
     tintColor: Colors.primary,
   },
 
@@ -341,18 +348,18 @@ const styles = StyleSheet.create({
 
   // Badge on toolbar icon
   badgeWrap: {
-    position:        'absolute',
-    top:             -4,
-    right:           -4,
-    backgroundColor: Colors.primary,
-    borderRadius:    10,
-    minWidth:        16,
-    height:          16,
-    alignItems:      'center',
-    justifyContent:  'center',
+    position:          'absolute',
+    top:               -4,
+    right:             -4,
+    backgroundColor:   Colors.primary,
+    borderRadius:      10,
+    minWidth:          16,
+    height:            16,
+    alignItems:        'center',
+    justifyContent:    'center',
     paddingHorizontal: 3,
-    borderWidth:     1,
-    borderColor:     Colors.white,
+    borderWidth:       1,
+    borderColor:       Colors.white,
   },
   badgeText: {
     fontFamily: 'Poppins-SemiBold',
@@ -409,7 +416,7 @@ const styles = StyleSheet.create({
     alignItems:        'center',
     gap:               4,
     borderWidth:       1,
-    borderColor:       'rgba(138,138,138,1)',
+    borderColor:       Colors.borderNeutral,
     borderRadius:      8,
     paddingVertical:   4,
     paddingHorizontal: 8,

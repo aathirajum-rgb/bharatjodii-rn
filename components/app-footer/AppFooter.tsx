@@ -1,6 +1,7 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // Tab IDs match Figma bottom nav order exactly:
@@ -26,7 +27,7 @@ export interface AppFooterProps {
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
-const CDN = 'https://imgs.jodii.app/assets/images/svg/bottom-nav/'
+const CDN = CDN_SVG + 'bottom-nav/'
 
 // [inactive, active] icon pairs — Figma bottom nav node 8379:10131
 // Tab order: Home · Matches · Likes · Search · Membership

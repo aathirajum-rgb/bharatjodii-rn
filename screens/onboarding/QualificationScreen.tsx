@@ -16,7 +16,6 @@ import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import i18n from '../../i18n'
 import {
   callRegistrationAPI,
   fetchQualificationOptions,
@@ -24,10 +23,11 @@ import {
   setRegValue,
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
+import { CDN_REG } from '../../constants/cdn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/qualification.svg'
+const CDN_PAGE_ICON = CDN_REG + 'qualification.svg'
 const FOOTER_H      = 140
 
 const PROFILE_POSSESSIVE: Record<string, string> = {
@@ -37,11 +37,6 @@ const PROFILE_POSSESSIVE: Record<string, string> = {
   '9':  "sister's",
   '10': "friend's",
   '11': "relative's",
-}
-
-const LANG_LABEL: Record<string, string> = {
-  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
-  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -85,8 +80,6 @@ export default function QualificationScreen({ navigation }: Props) {
 
   const possessive = PROFILE_POSSESSIVE[createdBy] ?? 'their'
   const title      = `What is ${possessive} highest qualification?`
-  const langLabel  = LANG_LABEL[i18n.language] ?? 'Eng'
-
   async function handleNext() {
     if (!selected || submitting) return
     setSubmitting(true)
@@ -108,7 +101,6 @@ export default function QualificationScreen({ navigation }: Props) {
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
-        languageLabel={langLabel}
         onBackPress={() => navigation.goBack()}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />

@@ -16,7 +16,6 @@ import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import i18n from '../../i18n'
 import {
   fetchFamilyOptions,
   getRegValue,
@@ -24,10 +23,11 @@ import {
   submitFamilyDetails,
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
+import { CDN_REG } from '../../constants/cdn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/family-details.svg'
+const CDN_PAGE_ICON = CDN_REG + 'family-details.svg'
 const FOOTER_H = 160
 
 const PROFILE_POSSESSIVE: Record<string, string> = {
@@ -56,11 +56,6 @@ const FALLBACK_SISTERS = [
   { key: '5', label: 'More than 5' },
   { key: '6', label: 'No sisters' },
 ]
-
-const LANG_LABEL: Record<string, string> = {
-  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
-  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -117,7 +112,6 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
     ? `Add your ${possessive} family details`
     : 'Add family details'
 
-  const langLabel = LANG_LABEL[i18n.language] ?? 'Eng'
   const isReady = !!(selBrothers && selSisters)
 
   async function handleNext() {
@@ -145,7 +139,6 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
-        languageLabel={langLabel}
         onBackPress={() => navigation.goBack()}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />
@@ -264,9 +257,6 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const CHIP_CHECKED_BG     = 'rgba(181, 0, 51, 0.02)'
-const CHIP_CHECKED_BORDER = 'rgba(181, 0, 51, 0.4)'
-
 const styles = StyleSheet.create({
   screen: {
     flex:            1,
@@ -317,15 +307,15 @@ const styles = StyleSheet.create({
     height:          40,
     borderRadius:    50,
     borderWidth:     1,
-    borderColor:     '#8a8a8a',
+    borderColor:     Colors.borderNeutral,
     backgroundColor: Colors.surface,
     paddingLeft:     8,
     paddingRight:    16,
     gap:             8,
   },
   chipSelected: {
-    borderColor:     CHIP_CHECKED_BORDER,
-    backgroundColor: CHIP_CHECKED_BG,
+    borderColor:     Colors.chipBorderActive,
+    backgroundColor: Colors.radioCheckedBg,
   },
 
   chipIcon: {
@@ -333,7 +323,7 @@ const styles = StyleSheet.create({
     height:          20,
     borderRadius:    10,
     borderWidth:     1.5,
-    borderColor:     '#8a8a8a',
+    borderColor:     Colors.borderNeutral,
     alignItems:      'center',
     justifyContent:  'center',
   },
@@ -380,11 +370,11 @@ const styles = StyleSheet.create({
   skipText: {
     fontSize:   14,
     fontWeight: '400',
-    color:      'rgba(0,0,0,0.55)',
+    color:      Colors.scrim,
   },
   skipArrow: {
     fontSize:   18,
-    color:      'rgba(0,0,0,0.55)',
+    color:      Colors.scrim,
     lineHeight: 22,
   },
 
@@ -409,7 +399,7 @@ const styles = StyleSheet.create({
   helpPhone: {
     fontSize:      14,
     fontWeight:    '500',
-    color:         '#29339b',
+    color:         Colors.link,
     letterSpacing: 0.42,
   },
 })

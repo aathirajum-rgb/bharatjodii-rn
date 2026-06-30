@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
 import ProfilePhoto, { type PhotoVariant } from '../profile-photo/ProfilePhoto'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -78,7 +79,7 @@ export interface ProfileCardProps {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SCREEN_W  = Dimensions.get('window').width
-const IMG_CDN   = 'https://imgs.jodii.app/assets/images/svg/'
+const IMG_CDN   = CDN_SVG
 const AVATAR_FB = IMG_CDN + 'default-profile.svg'
 
 // Derived from Angular SCSS vmin values.

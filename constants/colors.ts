@@ -64,4 +64,25 @@ export const Colors = {
   badgeVerifiedText: '#1565C0',   // id-verified text
   badgeNewBg:        '#E8F5E9',   // newly-joined badge background
   badgeNewText:      '#2E7D32',   // newly-joined text
+
+  // ── Neutral borders ───────────────────────────────────────────────────────────
+  borderNeutral:  '#8a8a8a',   // unselected chip / radio / text-input outline
+  borderSoft:     '#d0d0d0',   // softer outline (checkbox list rows)
+  borderSubtle:   '#e6e6e6',   // very light border (card dividers, row separators)
+
+  // ── Extra surfaces ────────────────────────────────────────────────────────────
+  surfaceDim:     '#f2f2f2',   // light-grey bg (tag chips, alternate input bg)
+
+  // ── Text emphasis ─────────────────────────────────────────────────────────────
+  textStrong:     '#1a1a1a',   // near-black (slightly softer than pure black)
+
+  // ── Overlays / scrims ─────────────────────────────────────────────────────────
+  scrim:          'rgba(0,0,0,0.55)',   // bottom-sheet / modal dark backdrop
+  scrimMedium:    'rgba(0,0,0,0.45)',   // medium overlay (drawers, pickers)
+  scrimLight:     'rgba(0,0,0,0.40)',   // light overlay (action sheets)
+  scrimSubtle:    'rgba(0,0,0,0.35)',   // subtle overlay (tooltips, hints)
+
+  // ── System (platform) ─────────────────────────────────────────────────────────
+  iOSBlue:        '#007AFF',   // iOS system blue (native controls, links)
+  iOSGreen:       '#34C759',   // iOS system green (success states)
 }

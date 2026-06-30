@@ -17,6 +17,7 @@ import { Colors } from '../../constants/colors'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
 import { clickingOnBtn } from '../../service/buttonService'
 import { getItem } from '../../service/storageService'
+import { CDN_SVG } from '../../constants/cdn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -64,7 +65,7 @@ interface Props {
 }
 
 // ─── CDN base ─────────────────────────────────────────────────────────────────
-const IMG = 'https://imgs.jodii.app/assets/images/svg/'
+const IMG = CDN_SVG
 
 // ─── Like state helpers ───────────────────────────────────────────────────────
 function isLiked(liked: any): boolean {

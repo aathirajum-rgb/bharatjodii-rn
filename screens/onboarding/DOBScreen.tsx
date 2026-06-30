@@ -20,14 +20,13 @@ import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import i18n from '../../i18n'
 import { callRegistrationAPI, getRegValue, setRegValue } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
+import { CDN_REG } from '../../constants/cdn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON =
-  'https://imgs.jodii.app/assets/images/svg/registration-new/son-birth-date.svg'
+const CDN_PAGE_ICON = CDN_REG + 'son-birth-date.svg'
 const FOOTER_H      = 140
 const ITEM_H        = 40   // Figma: each dropdown row is 40px tall
 const MAX_LIST_ITEMS = 7   // how many rows visible before scroll
@@ -49,11 +48,6 @@ const MONTHS = [
   { key: '9',  label: 'September' }, { key: '10', label: 'October'   },
   { key: '11', label: 'November'  }, { key: '12', label: 'December'  },
 ]
-
-const LANG_LABEL: Record<string, string> = {
-  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
-  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
-}
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -151,8 +145,6 @@ export default function DOBScreen({ navigation }: Props) {
   const selMonthLabel    = MONTHS.find(m => m.key === selMonth)?.label ?? ''
   const isAllSelected    = !!(selDate && selMonth && selYear)
   const calculatedAge    = isAllSelected ? calculateAge(selYear, selMonth, selDate) : null
-  const langLabel        = LANG_LABEL[i18n.language] ?? 'Eng'
-
   // ── Picker helpers ────────────────────────────────────────────────────────
 
   function getOptions(field: FieldKey) {
@@ -263,7 +255,6 @@ export default function DOBScreen({ navigation }: Props) {
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
-        languageLabel={langLabel}
         onBackPress={() => navigation.goBack()}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />

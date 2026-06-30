@@ -1,5 +1,13 @@
 import * as SplashScreen from 'expo-splash-screen'
 import Constants from 'expo-constants'
+import {
+  Poppins_400Regular,
+  Poppins_500Medium,
+  Poppins_600SemiBold,
+  Poppins_700Bold,
+  Poppins_900Black,
+  useFonts,
+} from '@expo-google-fonts/poppins'
 import { useEffect, useState } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import './i18n'
@@ -39,6 +47,17 @@ export default function App() {
   useOTAUpdate()
   const [appReady, setAppReady] = useState(false)
 
+  // Load Poppins — all weights used across the Figma design.
+  // Keys match themes/typography.ts FontFamilies.english so every component
+  // that sets fontFamily: 'Poppins-Regular' etc. gets the real typeface.
+  const [fontsLoaded] = useFonts({
+    'Poppins-Regular':  Poppins_400Regular,
+    'Poppins-Medium':   Poppins_500Medium,
+    'Poppins-SemiBold': Poppins_600SemiBold,
+    'Poppins-Bold':     Poppins_700Bold,
+    'Poppins-Black':    Poppins_900Black,
+  })
+
   useEffect(() => {
     const cleanup = setupNotificationHandlers()
     return cleanup
@@ -49,7 +68,8 @@ export default function App() {
     initializeAppConfig().then(() => setAppReady(true))
   }, [])
 
-  if (!appReady) return null
+  // Wait for both app config AND fonts before rendering anything
+  if (!appReady || !fontsLoaded) return null
 
   return (
     <SafeAreaProvider>

@@ -14,7 +14,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
-import i18n from '../../i18n'
 import {
   GenderOption,
   callRegistrationAPI,
@@ -22,33 +21,29 @@ import {
   getRegValues,
   setRegValues,
 } from '../../service/registrationService'
+import { CDN_SVG, CDN_REVAMP } from '../../constants/cdn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = 'https://imgs.jodii.app/assets/images/svg/gender-registration.svg'
+const CDN_PAGE_ICON = CDN_SVG + 'gender-registration.svg'
 const FOOTER_H = 84
 
 // Fallback used when the API is unavailable — CDN URLs matched from Angular codebase
 const FALLBACK_OPTIONS: GenderOption[] = [
   {
     key: '1', label: 'Male',
-    img:       'https://imgs.jodii.app/assets/images/revamp-img/avatar_male_120.svg',
-    imgActive: 'https://imgs.jodii.app/assets/images/svg/male_avatar_new.svg',
+    img:       CDN_REVAMP + 'avatar_male_120.svg',
+    imgActive: CDN_SVG + 'male_avatar_new.svg',
   },
   {
     key: '0', label: 'Female',
-    img:       'https://imgs.jodii.app/assets/images/revamp-img/avatar_female_120.svg',
-    imgActive: 'https://imgs.jodii.app/assets/images/svg/female_avatar_new.svg',
+    img:       CDN_REVAMP + 'avatar_female_120.svg',
+    imgActive: CDN_SVG + 'female_avatar_new.svg',
   },
 ]
 
 // Male='1' → loginGender='M', Female='0' → loginGender='F'
 const LOGIN_GENDER: Record<string, string> = { '1': 'M', '0': 'F' }
-
-const LANG_LABEL: Record<string, string> = {
-  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
-  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -89,8 +84,6 @@ export default function GenderScreen({ navigation }: Props) {
     ? genderKey.replace('#NAME#', name)
     : genderKey.replace(' of #NAME#', '')
 
-  const langLabel = LANG_LABEL[i18n.language] ?? 'Eng'
-
   async function handleNext() {
     if (!selected || submitting) return
     setSubmitting(true)
@@ -114,7 +107,6 @@ export default function GenderScreen({ navigation }: Props) {
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
-        languageLabel={langLabel}
         onBackPress={() => navigation.goBack()}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />
@@ -201,9 +193,6 @@ export default function GenderScreen({ navigation }: Props) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const CARD_CHECKED_BG     = 'rgba(181, 0, 51, 0.02)'
-const CARD_CHECKED_BORDER = 'rgba(181, 0, 51, 0.4)'
-
 const styles = StyleSheet.create({
   screen: {
     flex:            1,
@@ -252,8 +241,8 @@ const styles = StyleSheet.create({
     overflow:          'hidden',
   },
   cardSelected: {
-    borderColor:     CARD_CHECKED_BORDER,
-    backgroundColor: CARD_CHECKED_BG,
+    borderColor:     Colors.chipBorderActive,
+    backgroundColor: Colors.radioCheckedBg,
   },
 
   // Avatar — Figma: 80×80, fills full card height (no vertical card padding)
@@ -279,7 +268,7 @@ const styles = StyleSheet.create({
     height:          24,
     borderRadius:    12,
     borderWidth:     2,
-    borderColor:     '#8a8a8a',
+    borderColor:     Colors.borderNeutral,
     alignItems:      'center',
     justifyContent:  'center',
   },

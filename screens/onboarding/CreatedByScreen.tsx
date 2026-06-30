@@ -14,22 +14,17 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
-import i18n from '../../i18n'
 import { fetchProfileCreatedByOptions, getRegValue, setRegValues } from '../../service/registrationService'
+import { CDN_REG } from '../../constants/cdn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_ICON = 'https://imgs.jodii.app/assets/images/svg/registration-new/creating-profile.svg'
+const CDN_ICON = CDN_REG + 'creating-profile.svg'
 const FOOTER_H = 84
 
 // Gender groups — used to pre-set LOGINGENDER for family-member profiles
 const MALE_GENDER   = ['4', '8']   // son / brother → M
 const FEMALE_GENDER = ['5', '9']   // daughter / sister → F
-
-const LANG_LABEL: Record<string, string> = {
-  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
-  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
-}
 
 // Hardcoded fallback — used if API is unavailable
 const FALLBACK_OPTIONS: Option[] = [
@@ -95,8 +90,6 @@ export default function CreatedByScreen({ navigation }: Props) {
     setSubmitting(false)
   }
 
-  const langLabel = LANG_LABEL[i18n.language] ?? 'Eng'
-
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
@@ -104,7 +97,6 @@ export default function CreatedByScreen({ navigation }: Props) {
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
-        languageLabel={langLabel}
         onBackPress={() => navigation.goBack()}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />
@@ -187,9 +179,6 @@ export default function CreatedByScreen({ navigation }: Props) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const CHIP_CHECKED_BG     = 'rgba(181, 0, 51, 0.02)'
-const CHIP_CHECKED_BORDER = 'rgba(181, 0, 51, 0.4)'
-
 const styles = StyleSheet.create({
   screen: {
     flex:            1,
@@ -243,8 +232,8 @@ const styles = StyleSheet.create({
     gap:             8,
   },
   chipSelected: {
-    borderColor:     CHIP_CHECKED_BORDER,
-    backgroundColor: CHIP_CHECKED_BG,
+    borderColor:     Colors.chipBorderActive,
+    backgroundColor: Colors.radioCheckedBg,
   },
 
   // Left indicator icon — 20×20 circle, fills brand-red when selected
