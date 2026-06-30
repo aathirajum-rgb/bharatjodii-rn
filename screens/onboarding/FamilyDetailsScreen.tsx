@@ -24,20 +24,13 @@ import {
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
+import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
+import { os, scrollPaddingBottom } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'family-details.svg'
 const FOOTER_H = 160
-
-const PROFILE_POSSESSIVE: Record<string, string> = {
-  '4':  "son's",
-  '5':  "daughter's",
-  '8':  "brother's",
-  '9':  "sister's",
-  '10': "friend's",
-  '11': "relative's",
-}
 
 const FALLBACK_BROTHERS = [
   { key: '1', label: '1' },
@@ -135,7 +128,7 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.screen}>
+    <View style={os.screen}>
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
@@ -144,20 +137,20 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
       />
 
       <ScrollView
-        style={styles.flex1}
+        style={os.flex1}
         contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: FOOTER_H + (Platform.OS === 'ios' ? insets.bottom : 20) + 12 },
+          os.scrollContent,
+          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
         ]}
         showsVerticalScrollIndicator={false}
       >
         <Image
           source={{ uri: CDN_PAGE_ICON }}
-          style={styles.pageIcon}
+          style={os.pageIcon}
           contentFit="contain"
         />
 
-        <Text style={styles.title}>{title}</Text>
+        <Text style={[os.title, { marginBottom: 24 }]}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -219,7 +212,7 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
       {/* Sticky footer */}
       <View
         style={[
-          styles.footer,
+          os.footer,
           { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
         ]}
       >
@@ -258,31 +251,6 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  screen: {
-    flex:            1,
-    backgroundColor: Colors.surface,
-  },
-  flex1: { flex: 1 },
-
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop:        24,
-  },
-
-  pageIcon: {
-    width:        48,
-    height:       48,
-    marginBottom: 24,
-  },
-
-  title: {
-    fontSize:     22,
-    fontWeight:   '600',
-    color:        Colors.textPrimary,
-    lineHeight:   28,
-    marginBottom: 24,
-  },
-
   loader: { marginTop: 48 },
 
   sectionLabel: {
@@ -347,17 +315,6 @@ const styles = StyleSheet.create({
   },
   chipLabelSelected: {
     fontWeight: '500',
-  },
-
-  // Sticky footer
-  footer: {
-    position:          'absolute',
-    bottom:            0,
-    left:              0,
-    right:             0,
-    paddingHorizontal: 24,
-    paddingTop:        20,
-    backgroundColor:   Colors.surface,
   },
 
   skipRow: {

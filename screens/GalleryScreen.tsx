@@ -172,7 +172,7 @@ export default function GalleryScreen({ onDone, maxSelection }: Props) {
   if (loading && assets.length === 0) {
     return (
       <View style={styles.center}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color={Colors.iOSBlue} />
       </View>
     );
   }
@@ -265,7 +265,7 @@ export default function GalleryScreen({ onDone, maxSelection }: Props) {
           contentContainerStyle={styles.grid}
           ListFooterComponent={
             loadingMore
-              ? <ActivityIndicator style={styles.loadingMore} color="#007AFF" />
+              ? <ActivityIndicator style={styles.loadingMore} color={Colors.iOSBlue} />
               : null
           }
         />
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   doneButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: Colors.iOSBlue,
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 8,
@@ -350,7 +350,7 @@ const styles = StyleSheet.create({
     maxHeight: 300,
     borderBottomWidth: 1,
     borderBottomColor: '#333',
-    shadowColor: '#000',
+    shadowColor: Colors.shadow,
     shadowOpacity: 0.4,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   albumRowCheck: {
-    color: '#007AFF',
+    color: Colors.iOSBlue,
     fontSize: 16,
     fontWeight: '700',
     marginLeft: 8,
@@ -417,8 +417,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   badgeSelected: {
-    backgroundColor: '#007AFF',
-    borderColor: '#007AFF',
+    backgroundColor: Colors.iOSBlue,
+    borderColor: Colors.iOSBlue,
   },
   badgeText: {
     color: '#fff',

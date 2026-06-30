@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
   Animated,
-  Dimensions,
   Linking,
   Modal,
   Platform,
@@ -31,21 +30,13 @@ import {
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
+import { PROFILE_POSSESSIVE, PICKER_PANEL_WIDTH } from '../../constants/registration.constants'
+import { os, scrollPaddingBottom } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON  = CDN_REG + 'son-height.svg'
 const FOOTER_H       = 140
-const PANEL_WIDTH    = Dimensions.get('window').width * 0.85
-
-const PROFILE_POSSESSIVE: Record<string, string> = {
-  '4':  "son's",
-  '5':  "daughter's",
-  '8':  "brother's",
-  '9':  "sister's",
-  '10': "friend's",
-  '11': "relative's",
-}
 
 // HEIGHTCATEGORY keys are 101-104 per Angular form-fields logic
 const FALLBACK_CATEGORIES: Category[] = [
@@ -174,7 +165,7 @@ export default function HeightScreen({ navigation }: Props) {
   // Panel slides in from the right
   const panelTranslateX = slideAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [PANEL_WIDTH, 0],
+    outputRange: [PICKER_PANEL_WIDTH, 0],
   })
 
   // ─── Submit ───────────────────────────────────────────────────────────────
@@ -203,7 +194,7 @@ export default function HeightScreen({ navigation }: Props) {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.screen}>
+    <View style={os.screen}>
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
@@ -212,20 +203,20 @@ export default function HeightScreen({ navigation }: Props) {
       />
 
       <ScrollView
-        style={styles.flex1}
+        style={os.flex1}
         contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: FOOTER_H + (Platform.OS === 'ios' ? insets.bottom : 20) + 12 },
+          os.scrollContent,
+          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
         ]}
         showsVerticalScrollIndicator={false}
       >
         <Image
           source={{ uri: CDN_PAGE_ICON }}
-          style={styles.pageIcon}
+          style={os.pageIcon}
           contentFit="contain"
         />
 
-        <Text style={styles.title}>{title}</Text>
+        <Text style={[os.title, { marginBottom: 24 }]}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -294,7 +285,7 @@ export default function HeightScreen({ navigation }: Props) {
       {/* Sticky footer */}
       <View
         style={[
-          styles.footer,
+          os.footer,
           { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
         ]}
       >
@@ -398,35 +389,8 @@ export default function HeightScreen({ navigation }: Props) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const ROW_SELECTED_BG  = '#fff1f5'
-const ROW_BORDER_COLOR = '#e6e6e6'
 
 const styles = StyleSheet.create({
-  screen: {
-    flex:            1,
-    backgroundColor: Colors.surface,
-  },
-  flex1: { flex: 1 },
-
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop:        24,
-  },
-
-  pageIcon: {
-    width:        48,
-    height:       48,
-    marginBottom: 24,
-  },
-
-  title: {
-    fontSize:     22,
-    fontWeight:   '600',
-    color:        Colors.textPrimary,
-    lineHeight:   28,
-    marginBottom: 24,
-  },
-
   loader: { marginTop: 48 },
 
   // Row — negative margin cancels scroll padding so the pink selection bg
@@ -442,10 +406,10 @@ const styles = StyleSheet.create({
   },
   rowBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: ROW_BORDER_COLOR,
+    borderBottomColor: Colors.borderSubtle,
   },
   rowSelected: {
-    backgroundColor: ROW_SELECTED_BG,
+    backgroundColor: Colors.selectionBg,
   },
 
   rowLabels: { flex: 1 },
@@ -516,7 +480,7 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     height:          48,
     borderWidth:     1,
-    borderColor:     '#b0b0b0',
+    borderColor:     Colors.inputBorder,
     borderRadius:    8,
     paddingLeft:     16,
     paddingRight:    12,
@@ -538,16 +502,6 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
 
-  // Sticky footer
-  footer: {
-    position:          'absolute',
-    bottom:            0,
-    left:              0,
-    right:             0,
-    paddingHorizontal: 24,
-    paddingTop:        20,
-    backgroundColor:   Colors.surface,
-  },
   divider: {
     height:          1,
     backgroundColor: Colors.inputBorder,
@@ -569,7 +523,7 @@ const styles = StyleSheet.create({
   helpPhone: {
     fontSize:      14,
     fontWeight:    '500',
-    color:         '#29339b',
+    color:         Colors.link,
     letterSpacing: 0.42,
   },
 
@@ -581,13 +535,13 @@ const styles = StyleSheet.create({
   },
   backdrop: {
     flex:            1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: Colors.scrimMedium,
   },
   panel: {
-    width:           PANEL_WIDTH,
+    width:           PICKER_PANEL_WIDTH,
     backgroundColor: Colors.surface,
     elevation:       8,
-    shadowColor:     '#000',
+    shadowColor:     Colors.shadow,
     shadowOpacity:   0.2,
     shadowOffset:    { width: -2, height: 0 },
     shadowRadius:    8,
@@ -598,7 +552,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical:   16,
     borderBottomWidth: 1,
-    borderBottomColor: ROW_BORDER_COLOR,
+    borderBottomColor: Colors.borderSubtle,
   },
   panelTitle: {
     flex:       1,
@@ -617,7 +571,7 @@ const styles = StyleSheet.create({
   },
   panelEmptyText: {
     fontSize: 14,
-    color:    'rgba(0,0,0,0.4)',
+    color:    Colors.scrimLight,
   },
 
   // Section header inside SectionList (Short / Average Height / Tall)
@@ -626,7 +580,7 @@ const styles = StyleSheet.create({
     paddingVertical:   8,
     backgroundColor:   Colors.surfaceAlt,
     borderBottomWidth: 1,
-    borderBottomColor: ROW_BORDER_COLOR,
+    borderBottomColor: Colors.borderSubtle,
   },
   sectionHeaderText: {
     fontSize:   12,
@@ -643,10 +597,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     height:            52,
     borderBottomWidth: 1,
-    borderBottomColor: '#f2f2f2',
+    borderBottomColor: Colors.surfaceDim,
   },
   heightItemSelected: {
-    backgroundColor: ROW_SELECTED_BG,
+    backgroundColor: Colors.selectionBg,
   },
   heightItemText: {
     flex:       1,

@@ -23,6 +23,8 @@ import { StorageKeys as SK } from '../../constants/storage.keys'
 import { callRegistrationAPI, getRegValue, setRegValue } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
+import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
+import { os, scrollPaddingBottom } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -31,10 +33,6 @@ const FOOTER_H      = 140
 const ITEM_H        = 40   // Figma: each dropdown row is 40px tall
 const MAX_LIST_ITEMS = 7   // how many rows visible before scroll
 
-const PROFILE_POSSESSIVE: Record<string, string> = {
-  '4': "son's", '5': "daughter's", '8': "brother's",
-  '9': "sister's", '10': "friend's", '11': "relative's",
-}
 const AGE_SUBJECT: Record<string, string> = {
   '4': 'son', '5': 'daughter', '8': 'brother',
   '9': 'sister', '10': 'friend', '11': 'relative',
@@ -251,7 +249,7 @@ export default function DOBScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={styles.screen}>
+    <View style={os.screen}>
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
@@ -260,19 +258,19 @@ export default function DOBScreen({ navigation }: Props) {
       />
 
       <ScrollView
-        style={styles.flex1}
+        style={os.flex1}
         contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: FOOTER_H + (Platform.OS === 'ios' ? insets.bottom : 20) + 12 },
+          os.scrollContent,
+          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
         ]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
         {/* Birthday cake icon */}
-        <Image source={{ uri: CDN_PAGE_ICON }} style={styles.pageIcon} contentFit="contain" />
+        <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
         {/* Title */}
-        <Text style={styles.title}>{`Select ${titleLine2}\ndate of birth`}</Text>
+        <Text style={os.title}>{`Select ${titleLine2}\ndate of birth`}</Text>
 
         {/* Three dropdown trigger fields */}
         <View style={styles.fieldsRow}>
@@ -350,7 +348,7 @@ export default function DOBScreen({ navigation }: Props) {
       </ScrollView>
 
       {/* Sticky footer */}
-      <View style={[styles.footer, { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 }]}>
+      <View style={[os.footer, { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 }]}>
         <ButtonRevamp
           label={t('REGISTRATION.NEXTCTA', 'Next')}
           variant="primary"
@@ -462,28 +460,6 @@ export default function DOBScreen({ navigation }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  screen:        { flex: 1, backgroundColor: Colors.surface },
-  flex1:         { flex: 1 },
-
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop:        24,
-  },
-
-  pageIcon: {
-    width:        48,
-    height:       48,
-    marginBottom: 24,
-  },
-
-  title: {
-    fontSize:     22,
-    fontWeight:   '600',
-    color:        Colors.textPrimary,
-    lineHeight:   28,
-    marginBottom: 32,
-  },
-
   // ── Fields row ──────────────────────────────────────────────────────────────
 
   fieldsRow: {
@@ -605,28 +581,19 @@ const styles = StyleSheet.create({
   enterAgeLink: {
     fontSize:           14,
     fontWeight:         '400',
-    color:              '#29339b',
+    color:              Colors.link,
     textDecorationLine: 'underline',
     lineHeight:         20,
   },
   enterAgeCaret: {
     fontSize:   16,
     fontWeight: '600',
-    color:      '#29339b',
+    color:      Colors.link,
     lineHeight: 20,
   },
 
   // ── Sticky footer ─────────────────────────────────────────────────────────────
 
-  footer: {
-    position:          'absolute',
-    bottom:            0,
-    left:              0,
-    right:             0,
-    paddingHorizontal: 24,
-    paddingTop:        20,
-    backgroundColor:   Colors.surface,
-  },
   divider: {
     height:          1,
     backgroundColor: Colors.inputBorder,
@@ -648,7 +615,7 @@ const styles = StyleSheet.create({
   helpPhone: {
     fontSize:      14,
     fontWeight:    '500',
-    color:         '#29339b',
+    color:         Colors.link,
     letterSpacing: 0.42,
   },
 
@@ -664,7 +631,7 @@ const styles = StyleSheet.create({
     // Shadow for depth
     ...Platform.select({
       ios: {
-        shadowColor:   '#000',
+        shadowColor:   Colors.shadow,
         shadowOffset:  { width: 0, height: 4 },
         shadowOpacity: 0.08,
         shadowRadius:  6,
@@ -694,7 +661,7 @@ const styles = StyleSheet.create({
 
   overlay: {
     flex:            1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
+    backgroundColor: Colors.scrimMedium,
   },
 
   // ── Age entry bottom sheet ────────────────────────────────────────────────────
@@ -710,7 +677,7 @@ const styles = StyleSheet.create({
     width:           40,
     height:          4,
     borderRadius:    2,
-    backgroundColor: '#d0d0d0',
+    backgroundColor: Colors.borderSoft,
     alignSelf:       'center',
     marginBottom:    12,
   },

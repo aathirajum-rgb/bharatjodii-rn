@@ -16,6 +16,8 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { callRegistrationAPI, getRegValues, setRegValue } from '../../service/registrationService'
 import { CDN_REG } from '../../constants/cdn'
+import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
+import { os, footerPaddingBottom, scrollPaddingBottom } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -25,17 +27,6 @@ const FOOTER_H = 84
 // SELFGENDER → next page is GENDER (3); OTHERGENDER → skip to MARITALSTATUS (4)
 // Matches Angular getNextUrlForPage2(): SELFGENDER → /onboarding/3, OTHERGENDER → /onboarding/4
 const SELF_GENDER = ['1', '10', '11']
-
-// Possessive label for each createdBy key — used to build the dynamic title
-// '1' (Myself) maps to '' so title reads "Enter your name" (not "Enter your your name")
-const PROFILE_POSSESSIVE: Record<string, string> = {
-  '4':  "son's",
-  '5':  "daughter's",
-  '8':  "brother's",
-  '9':  "sister's",
-  '10': "friend's",
-  '11': "relative's",
-}
 
 // Emoji regex — matches Angular alphabetOnly() which strips emojis from name input
 const EMOJI_REGEX = /(?:[✀-➿]|(?:\ud83c[\udde6-\uddff]){2}|[\ud800-\udbff][\udc00-\udfff]|[#-9]️?⃣|㊙|㊗|〽|〰|Ⓜ|\ud83c[\udd70-\udd71]|\ud83c[\udd7e-\udd7f]|🆎|\ud83c[\udd91-\udd9a]|\ud83c[\udde6-\uddff]|\ud83c[\ude01-\ude02]|🈚|🈯|\ud83c[\ude32-\ude3a]|\ud83c[\ude50-\ude51]|‼|⁉|[▪-▫]|▶|◀|[◻-◾]|©|®|™|ℹ|🀄|[☀-⛿]|⬅|⬆|⬇|⬛|⬜|⭐|⭕|⌚|⌛|⌨|⏏|[⏩-⏳]|[⏸-⏺]|🃏|⤴|⤵|[←-⇿])/g
@@ -126,7 +117,7 @@ export default function NameScreen({ navigation }: Props) {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.screen}>
+    <View style={os.screen}>
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
@@ -135,15 +126,15 @@ export default function NameScreen({ navigation }: Props) {
       />
 
       <KeyboardAvoidingView
-        style={styles.flex1}
+        style={os.flex1}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={insets.top + 56}
       >
         <ScrollView
-          style={styles.flex1}
+          style={os.flex1}
           contentContainerStyle={[
-            styles.scrollContent,
-            { paddingBottom: FOOTER_H + (Platform.OS === 'ios' ? insets.bottom : 20) + 12 },
+            os.scrollContent,
+            { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
           ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
@@ -151,12 +142,12 @@ export default function NameScreen({ navigation }: Props) {
           {/* Page illustration — Angular: ICONTYPE = son-name.svg */}
           <Image
             source={{ uri: CDN_ICON }}
-            style={styles.icon}
+            style={os.pageIcon}
             contentFit="contain"
           />
 
           {/* Dynamic title — "Enter your name" / "Enter your son's name" etc. */}
-          <Text style={styles.title}>{title}</Text>
+          <Text style={os.title}>{title}</Text>
 
           {/* Outlined name input — Figma: 48px height, 8px radius, #b0b0b0 border */}
           <View style={styles.inputOuter}>
@@ -177,14 +168,14 @@ export default function NameScreen({ navigation }: Props) {
           </View>
 
           {/* Inline error */}
-          {!!error && <Text style={styles.errorText}>{error}</Text>}
+          {!!error && <Text style={os.errorText}>{error}</Text>}
         </ScrollView>
 
         {/* Sticky footer */}
         <View
           style={[
-            styles.footer,
-            { paddingBottom: Platform.OS === 'ios' ? insets.bottom : 20 },
+            os.footer,
+            { paddingBottom: footerPaddingBottom(insets.bottom) },
           ]}
         >
           <ButtonRevamp
@@ -205,31 +196,6 @@ export default function NameScreen({ navigation }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  screen: {
-    flex:            1,
-    backgroundColor: Colors.surface,
-  },
-  flex1: { flex: 1 },
-
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop:        24,
-  },
-
-  icon: {
-    width:        48,
-    height:       48,
-    marginBottom: 24,
-  },
-
-  title: {
-    fontSize:     22,
-    fontWeight:   '600',
-    color:        Colors.textPrimary,
-    lineHeight:   28,
-    marginBottom: 32,
-  },
-
   // Outlined input container — extra marginTop leaves room for the label chip above the border
   inputOuter: {
     position:  'relative',
@@ -266,20 +232,4 @@ const styles = StyleSheet.create({
     color:      Colors.textSecondary,
   },
 
-  errorText: {
-    marginTop: 8,
-    fontSize:  12,
-    color:     Colors.inputError,
-    lineHeight: 16,
-  },
-
-  footer: {
-    position:          'absolute',
-    bottom:            0,
-    left:              0,
-    right:             0,
-    paddingHorizontal: 24,
-    paddingTop:        20,
-    backgroundColor:   Colors.surface,
-  },
 })

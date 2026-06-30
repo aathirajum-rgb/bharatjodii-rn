@@ -25,20 +25,13 @@ import {
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
+import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
+import { os, scrollPaddingBottom } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'property.svg'
 const FOOTER_H = 160
-
-const PROFILE_POSSESSIVE: Record<string, string> = {
-  '4':  "son's",
-  '5':  "daughter's",
-  '8':  "brother's",
-  '9':  "sister's",
-  '10': "friend's",
-  '11': "relative's",
-}
 
 const FALLBACK_OPTIONS = [
   { key: '1', label: 'Flat/Apartment' },
@@ -130,7 +123,7 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.screen}>
+    <View style={os.screen}>
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
@@ -139,20 +132,20 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
       />
 
       <ScrollView
-        style={styles.flex1}
+        style={os.flex1}
         contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: FOOTER_H + (Platform.OS === 'ios' ? insets.bottom : 20) + 12 },
+          os.scrollContent,
+          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
         ]}
         showsVerticalScrollIndicator={false}
       >
         <Image
           source={{ uri: CDN_PAGE_ICON }}
-          style={styles.pageIcon}
+          style={os.pageIcon}
           contentFit="contain"
         />
 
-        <Text style={styles.title}>{title}</Text>
+        <Text style={[os.title, { marginBottom: 8 }]}>{title}</Text>
         <Text style={styles.subtitle}>{t('REG.CHOOSEMORE', 'You can choose more than one')}</Text>
 
         {fetching ? (
@@ -186,7 +179,7 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
       {/* Sticky footer */}
       <View
         style={[
-          styles.footer,
+          os.footer,
           { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
         ]}
       >
@@ -225,39 +218,12 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const CHECKED_BG     = 'rgba(181, 0, 51, 0.02)'
-const CHECKED_BORDER = 'rgba(181, 0, 51, 0.4)'
 
 const styles = StyleSheet.create({
-  screen: {
-    flex:            1,
-    backgroundColor: Colors.surface,
-  },
-  flex1: { flex: 1 },
-
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop:        24,
-  },
-
-  pageIcon: {
-    width:        48,
-    height:       48,
-    marginBottom: 24,
-  },
-
-  title: {
-    fontSize:     22,
-    fontWeight:   '600',
-    color:        Colors.textPrimary,
-    lineHeight:   28,
-    marginBottom: 8,
-  },
-
   subtitle: {
     fontSize:     14,
     fontWeight:   '400',
-    color:        Colors.textSecondary ?? '#888',
+    color:        Colors.textSecondary,
     lineHeight:   20,
     marginBottom: 24,
   },
@@ -277,12 +243,12 @@ const styles = StyleSheet.create({
     paddingVertical:   14,
     borderRadius:      12,
     borderWidth:       1,
-    borderColor:       '#d0d0d0',
+    borderColor:       Colors.borderSoft,
     backgroundColor:   Colors.surface,
   },
   checkItemSelected: {
-    borderColor:     CHECKED_BORDER,
-    backgroundColor: CHECKED_BG,
+    borderColor:     Colors.chipBorderActive,
+    backgroundColor: Colors.radioCheckedBg,
   },
 
   checkLabel: {
@@ -302,7 +268,7 @@ const styles = StyleSheet.create({
     height:          24,
     borderRadius:    6,
     borderWidth:     1.5,
-    borderColor:     '#8a8a8a',
+    borderColor:     Colors.borderNeutral,
     alignItems:      'center',
     justifyContent:  'center',
     flexShrink:      0,
@@ -317,17 +283,6 @@ const styles = StyleSheet.create({
     fontSize:   13,
     fontWeight: '700',
     lineHeight: 16,
-  },
-
-  // Sticky footer
-  footer: {
-    position:          'absolute',
-    bottom:            0,
-    left:              0,
-    right:             0,
-    paddingHorizontal: 24,
-    paddingTop:        20,
-    backgroundColor:   Colors.surface,
   },
 
   skipRow: {
@@ -369,7 +324,7 @@ const styles = StyleSheet.create({
   helpPhone: {
     fontSize:      14,
     fontWeight:    '500',
-    color:         '#29339b',
+    color:         Colors.link,
     letterSpacing: 0.42,
   },
 })

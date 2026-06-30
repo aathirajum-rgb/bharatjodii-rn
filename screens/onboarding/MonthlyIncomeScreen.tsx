@@ -26,22 +26,14 @@ import {
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
+import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
+import { os, scrollPaddingBottom } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'income.svg'
 const FOOTER_H      = 140
 const ITEM_H        = 44
-const SELECTED_ROW  = '#fff1f5'
-
-const PROFILE_POSSESSIVE: Record<string, string> = {
-  '4':  "son's",
-  '5':  "daughter's",
-  '8':  "brother's",
-  '9':  "sister's",
-  '10': "friend's",
-  '11': "relative's",
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -162,7 +154,7 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.screen}>
+    <View style={os.screen}>
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
@@ -171,21 +163,21 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
       />
 
       <ScrollView
-        style={styles.flex1}
+        style={os.flex1}
         contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: FOOTER_H + (Platform.OS === 'ios' ? insets.bottom : 20) + 12 },
+          os.scrollContent,
+          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         <Image
           source={{ uri: CDN_PAGE_ICON }}
-          style={styles.pageIcon}
+          style={os.pageIcon}
           contentFit="contain"
         />
 
-        <Text style={styles.title}>{title}</Text>
+        <Text style={[os.title, { marginBottom: 24 }]}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -283,7 +275,7 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
       {/* Sticky footer */}
       <View
         style={[
-          styles.footer,
+          os.footer,
           { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
         ]}
       >
@@ -317,31 +309,6 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  screen: {
-    flex:            1,
-    backgroundColor: Colors.surface,
-  },
-  flex1: { flex: 1 },
-
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop:        24,
-  },
-
-  pageIcon: {
-    width:        48,
-    height:       48,
-    marginBottom: 24,
-  },
-
-  title: {
-    fontSize:     22,
-    fontWeight:   '600',
-    color:        Colors.textPrimary,
-    lineHeight:   28,
-    marginBottom: 24,
-  },
-
   loader: { marginTop: 48 },
 
   // ─── Currency picker ───────────────────────────────────────────────────────
@@ -355,7 +322,7 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     height:          48,
     borderWidth:     1,
-    borderColor:     '#b0b0b0',
+    borderColor:     Colors.inputBorder,
     borderRadius:    8,
     paddingLeft:     16,
     paddingRight:    12,
@@ -391,7 +358,7 @@ const styles = StyleSheet.create({
 
   currencyDropdown: {
     borderWidth:     1,
-    borderColor:     '#b0b0b0',
+    borderColor:     Colors.inputBorder,
     borderRadius:    8,
     backgroundColor: Colors.surface,
     marginTop:       4,
@@ -402,7 +369,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical:   10,
     borderBottomWidth: 1,
-    borderBottomColor: '#e6e6e6',
+    borderBottomColor: Colors.borderSubtle,
     height:            40,
     justifyContent:    'center',
   },
@@ -430,10 +397,10 @@ const styles = StyleSheet.create({
     height:            ITEM_H,
     paddingVertical:   8,
     borderBottomWidth: 1,
-    borderBottomColor: '#e6e6e6',
+    borderBottomColor: Colors.borderSubtle,
   },
   listItemSelected: {
-    backgroundColor: SELECTED_ROW,
+    backgroundColor: Colors.selectionBg,
     marginHorizontal: -24,
     paddingHorizontal: 24,
   },
@@ -458,7 +425,7 @@ const styles = StyleSheet.create({
     height:       20,
     borderRadius: 10,
     borderWidth:  1.5,
-    borderColor:  '#8a8a8a',
+    borderColor:  Colors.borderNeutral,
     alignItems:   'center',
     justifyContent: 'center',
   },
@@ -473,15 +440,6 @@ const styles = StyleSheet.create({
   },
 
   // ─── Footer ───────────────────────────────────────────────────────────────
-  footer: {
-    position:          'absolute',
-    bottom:            0,
-    left:              0,
-    right:             0,
-    paddingHorizontal: 24,
-    paddingTop:        20,
-    backgroundColor:   Colors.surface,
-  },
   divider: {
     height:          1,
     backgroundColor: Colors.inputBorder,
@@ -503,13 +461,13 @@ const styles = StyleSheet.create({
   helpPhone: {
     fontSize:      14,
     fontWeight:    '500',
-    color:         '#29339b',
+    color:         Colors.link,
     letterSpacing: 0.42,
   },
 
   emptyText: {
     fontSize:   14,
-    color:      'rgba(0,0,0,0.4)',
+    color:      Colors.scrimLight,
     marginTop:  24,
     textAlign:  'center',
   },

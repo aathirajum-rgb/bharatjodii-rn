@@ -23,6 +23,7 @@ import { uploadFile } from '../../service/apiClient'
 import { getRegValue } from '../../service/registrationService'
 import { getItem, setItem } from '../../service/storageService'
 import { CDN_IMG } from '../../constants/cdn'
+import { os } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -178,7 +179,7 @@ export default function AddPhotoScreen({ navigation }: Props) {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.screen}>
+    <View style={os.screen}>
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
@@ -187,7 +188,7 @@ export default function AddPhotoScreen({ navigation }: Props) {
       />
 
       <ScrollView
-        style={styles.flex1}
+        style={os.flex1}
         contentContainerStyle={[
           styles.scrollContent,
           { paddingBottom: (Platform.OS === 'ios' ? insets.bottom : 20) + 80 },
@@ -321,12 +322,6 @@ export default function AddPhotoScreen({ navigation }: Props) {
 const PINK_BG = '#fdf0f3'
 
 const styles = StyleSheet.create({
-  screen: {
-    flex:            1,
-    backgroundColor: Colors.surface,
-  },
-  flex1: { flex: 1 },
-
   scrollContent: {
     paddingHorizontal: 24,
     paddingTop:        16,
@@ -387,7 +382,7 @@ const styles = StyleSheet.create({
   cardIntro: {
     fontSize:   13,
     fontWeight: '400',
-    color:      Colors.textSecondary ?? '#888',
+    color:      Colors.textSecondary,
     lineHeight: 18,
   },
   bulletRow: {
@@ -466,7 +461,7 @@ const styles = StyleSheet.create({
   sheetSub: {
     fontSize:   14,
     fontWeight: '400',
-    color:      Colors.textSecondary ?? '#888',
+    color:      Colors.textSecondary,
     lineHeight: 20,
   },
   sheetBtnOutline: {

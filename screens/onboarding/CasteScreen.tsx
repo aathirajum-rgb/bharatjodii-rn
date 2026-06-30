@@ -1,25 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Animated,
-  Dimensions,
-  FlatList,
   Linking,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import RegistrationSuccessSheet from '../../components/registration-success-sheet/RegistrationSuccessSheet'
@@ -34,22 +29,13 @@ import {
 } from '../../service/registrationService'
 import { getItem, setItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
+import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
+import { os, scrollPaddingBottom } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'caste.svg'
 const FOOTER_H      = 140
-const PANEL_WIDTH   = Dimensions.get('window').width * 0.85
-const ITEM_HEIGHT   = 52
-
-const PROFILE_POSSESSIVE: Record<string, string> = {
-  '4':  "son's",
-  '5':  "daughter's",
-  '8':  "brother's",
-  '9':  "sister's",
-  '10': "friend's",
-  '11': "relative's",
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -84,16 +70,12 @@ export default function CasteScreen({ navigation }: Props) {
   const [customerCare,     setCustomerCare]     = useState('')
 
   // Panel state — single modal, one at a time
-  const [activePanel,  setActivePanel]  = useState<ActivePanel>(null)
-  const [search,       setSearch]       = useState('')
-  const [searchFocused, setSearchFocused] = useState(false)
+  const [activePanel, setActivePanel] = useState<ActivePanel>(null)
 
   // Context
   const [createdBy,    setCreatedBy]    = useState('4')
   const [religion,     setReligion]     = useState('')
   const [mothertongue, setMothertongue] = useState('')
-
-  const slideAnim = useRef(new Animated.Value(0)).current
 
   // ─── Init ────────────────────────────────────────────────────────────────
 
@@ -161,52 +143,23 @@ export default function CasteScreen({ navigation }: Props) {
     }
   }
 
-  // ─── Panel ────────────────────────────────────────────────────────────────
-
-  function openPanel(panel: ActivePanel) {
-    setSearch('')
-    setSearchFocused(false)
-    setActivePanel(panel)
-    Animated.timing(slideAnim, {
-      toValue: 1, duration: 280, useNativeDriver: true,
-    }).start()
-  }
-
-  function closePanel() {
-    Animated.timing(slideAnim, {
-      toValue: 0, duration: 230, useNativeDriver: true,
-    }).start(() => setActivePanel(null))
-  }
+  // ─── Selection handlers ───────────────────────────────────────────────────
 
   async function selectCaste(opt: Option) {
     setSelectedCaste(opt)
     setSelectedSubcaste(null)   // clear subcaste when caste changes
     setHasSubcaste(false)
-    closePanel()
     await loadSubcaste(religion, opt.key, mothertongue)
   }
 
   function selectSubcaste(opt: Option) {
     setSelectedSubcaste(opt)
-    closePanel()
   }
 
   // ─── Derived ──────────────────────────────────────────────────────────────
 
-  const possessive      = PROFILE_POSSESSIVE[createdBy] ?? 'their'
-  const title           = `Select ${possessive} caste`
-  const panelTranslateX = slideAnim.interpolate({
-    inputRange: [0, 1], outputRange: [PANEL_WIDTH, 0],
-  })
-
-  const activeOptions = activePanel === 'caste' ? casteOptions : subcasteOptions
-  const panelTitle    = activePanel === 'caste' ? 'Select caste' : 'Select sub caste'
-
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return activeOptions
-    return activeOptions.filter(o => o.label.toLowerCase().includes(q))
-  }, [activeOptions, search])
+  const possessive = PROFILE_POSSESSIVE[createdBy] ?? 'their'
+  const title      = `Select ${possessive} caste`
 
   // ─── Submit ───────────────────────────────────────────────────────────────
 
@@ -241,7 +194,7 @@ export default function CasteScreen({ navigation }: Props) {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.screen}>
+    <View style={os.screen}>
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
@@ -250,21 +203,21 @@ export default function CasteScreen({ navigation }: Props) {
       />
 
       <ScrollView
-        style={styles.flex1}
+        style={os.flex1}
         contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: FOOTER_H + (Platform.OS === 'ios' ? insets.bottom : 20) + 12 },
+          os.scrollContent,
+          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         <Image
           source={{ uri: CDN_PAGE_ICON }}
-          style={styles.pageIcon}
+          style={os.pageIcon}
           contentFit="contain"
         />
 
-        <Text style={styles.title}>{title}</Text>
+        <Text style={[os.title, { marginBottom: 24 }]}>{title}</Text>
 
         {fetchingCaste ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -277,7 +230,7 @@ export default function CasteScreen({ navigation }: Props) {
               </View>
               <Pressable
                 style={styles.selectField}
-                onPress={() => openPanel('caste')}
+                onPress={() => setActivePanel('caste')}
                 accessibilityRole="button"
                 accessibilityLabel="Select caste"
               >
@@ -312,7 +265,7 @@ export default function CasteScreen({ navigation }: Props) {
                   </View>
                   <Pressable
                     style={styles.selectField}
-                    onPress={() => openPanel('subcaste')}
+                    onPress={() => setActivePanel('subcaste')}
                     accessibilityRole="button"
                     accessibilityLabel="Select sub caste"
                   >
@@ -337,7 +290,7 @@ export default function CasteScreen({ navigation }: Props) {
       {/* Sticky footer */}
       <View
         style={[
-          styles.footer,
+          os.footer,
           { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
         ]}
       >
@@ -365,100 +318,16 @@ export default function CasteScreen({ navigation }: Props) {
         )}
       </View>
 
-      {/* Single sliding panel — renders caste or subcaste list based on activePanel */}
-      <Modal
-        transparent
+      {/* Single picker — renders caste or subcaste list based on activePanel */}
+      <SearchablePicker
         visible={activePanel !== null}
-        animationType="none"
-        onRequestClose={closePanel}
-        statusBarTranslucent
-      >
-        <View style={styles.panelContainer}>
-          <Pressable style={styles.backdrop} onPress={closePanel} />
-
-          <Animated.View
-            style={[
-              styles.panel,
-              {
-                paddingBottom: Platform.OS === 'ios' ? insets.bottom : 16,
-                transform: [{ translateX: panelTranslateX }],
-              },
-            ]}
-          >
-            {/* Header */}
-            <View style={styles.panelHeader}>
-              <Text style={styles.panelTitle}>{panelTitle}</Text>
-              <TouchableOpacity onPress={closePanel} hitSlop={8}>
-                <Text style={styles.panelCloseTxt}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Search */}
-            <View style={[styles.searchBox, searchFocused && styles.searchBoxFocused]}>
-              <Text style={styles.searchIcon}>⌕</Text>
-              <TextInput
-                style={styles.searchInput}
-                placeholder={activePanel === 'caste' ? 'Search caste...' : 'Search sub caste...'}
-                placeholderTextColor="rgba(0,0,0,0.35)"
-                value={search}
-                onChangeText={setSearch}
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => setSearchFocused(false)}
-                autoCorrect={false}
-                autoCapitalize="none"
-                returnKeyType="search"
-              />
-              {!!search && (
-                <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
-                  <Text style={styles.searchClear}>✕</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* List */}
-            {filtered.length === 0 ? (
-              <View style={styles.panelEmpty}>
-                <Text style={styles.panelEmptyText}>No results found</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={filtered}
-                keyExtractor={(item: Option) => item.key}
-                getItemLayout={(_: any, index: number) => ({
-                  length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index,
-                })}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                renderItem={({ item }: { item: Option }) => {
-                  const isSelected =
-                    activePanel === 'caste'
-                      ? selectedCaste?.key === item.key
-                      : selectedSubcaste?.key === item.key
-                  return (
-                    <Pressable
-                      style={[styles.item, isSelected && styles.itemSelected]}
-                      onPress={() =>
-                        activePanel === 'caste' ? selectCaste(item) : selectSubcaste(item)
-                      }
-                      accessibilityRole="menuitem"
-                      accessibilityState={{ selected: isSelected }}
-                    >
-                      <Text style={[styles.itemText, isSelected && styles.itemTextSelected]}>
-                        {item.label}
-                      </Text>
-                      {isSelected && (
-                        <View style={styles.itemRadio}>
-                          <Text style={styles.itemRadioTick}>✓</Text>
-                        </View>
-                      )}
-                    </Pressable>
-                  )
-                }}
-              />
-            )}
-          </Animated.View>
-        </View>
-      </Modal>
+        title={activePanel === 'caste' ? 'Select caste' : 'Select sub caste'}
+        placeholder={activePanel === 'caste' ? 'Search caste...' : 'Search sub caste...'}
+        options={activePanel === 'caste' ? casteOptions : subcasteOptions}
+        selectedKey={activePanel === 'caste' ? selectedCaste?.key ?? null : selectedSubcaste?.key ?? null}
+        onSelect={activePanel === 'caste' ? selectCaste : selectSubcaste}
+        onClose={() => setActivePanel(null)}
+      />
 
       <RegistrationSuccessSheet
         visible={successVisible}
@@ -473,35 +342,8 @@ export default function CasteScreen({ navigation }: Props) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const SELECTED_BG  = 'rgba(181,0,51,0.02)'
-const BORDER_COLOR = '#e6e6e6'
 
 const styles = StyleSheet.create({
-  screen: {
-    flex:            1,
-    backgroundColor: Colors.surface,
-  },
-  flex1: { flex: 1 },
-
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop:        24,
-  },
-
-  pageIcon: {
-    width:        48,
-    height:       48,
-    marginBottom: 24,
-  },
-
-  title: {
-    fontSize:     22,
-    fontWeight:   '600',
-    color:        Colors.textPrimary,
-    lineHeight:   28,
-    marginBottom: 24,
-  },
-
   loader:       { marginTop: 48 },
   subcasteLoader: { marginTop: 20, alignSelf: 'flex-start' },
 
@@ -528,13 +370,13 @@ const styles = StyleSheet.create({
   fieldLabelText: {
     fontSize:   12,
     fontWeight: '400',
-    color:      Colors.textSecondary ?? '#666',
+    color:      Colors.textSecondary,
     lineHeight: 16,
   },
   fieldLabelOptional: {
     fontSize:   12,
     fontWeight: '400',
-    color:      Colors.textSecondary ?? '#8a8a8a',
+    color:      Colors.textSecondary,
   },
 
   selectField: {
@@ -542,7 +384,7 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     height:          48,
     borderWidth:     1,
-    borderColor:     '#b0b0b0',
+    borderColor:     Colors.inputBorder,
     borderRadius:    8,
     paddingLeft:     16,
     paddingRight:    12,
@@ -552,7 +394,7 @@ const styles = StyleSheet.create({
     flex:       1,
     fontSize:   14,
     fontWeight: '400',
-    color:      'rgba(0,0,0,0.35)',
+    color:      Colors.scrimSubtle,
   },
   selectFieldTextActive: {
     fontWeight: '500',
@@ -564,16 +406,6 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
 
-  // Footer
-  footer: {
-    position:          'absolute',
-    bottom:            0,
-    left:              0,
-    right:             0,
-    paddingHorizontal: 24,
-    paddingTop:        20,
-    backgroundColor:   Colors.surface,
-  },
   divider: {
     height:          1,
     backgroundColor: Colors.inputBorder,
@@ -595,86 +427,7 @@ const styles = StyleSheet.create({
   helpPhone: {
     fontSize:      14,
     fontWeight:    '500',
-    color:         '#29339b',
+    color:         Colors.link,
     letterSpacing: 0.42,
-  },
-
-  // Panel
-  panelContainer: {
-    flex:           1,
-    flexDirection:  'row',
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    flex:            1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  panel: {
-    width:           PANEL_WIDTH,
-    backgroundColor: Colors.surface,
-    elevation:       8,
-    shadowColor:     '#000',
-    shadowOpacity:   0.2,
-    shadowOffset:    { width: -2, height: 0 },
-    shadowRadius:    8,
-  },
-  panelHeader: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    paddingHorizontal: 20,
-    paddingVertical:   16,
-    borderBottomWidth: 1,
-    borderBottomColor: BORDER_COLOR,
-  },
-  panelTitle: {
-    flex:       1,
-    fontSize:   16,
-    fontWeight: '600',
-    color:      Colors.textPrimary,
-  },
-  panelCloseTxt: {
-    fontSize: 16,
-    color:    Colors.textPrimary,
-    padding:  4,
-  },
-
-  searchBox: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    marginHorizontal:  16,
-    marginVertical:    12,
-    height:            40,
-    borderWidth:       1,
-    borderColor:       BORDER_COLOR,
-    borderRadius:      8,
-    paddingHorizontal: 10,
-    gap:               8,
-    backgroundColor:   Colors.surface,
-  },
-  searchBoxFocused: { borderColor: Colors.primary },
-  searchIcon:  { fontSize: 14 },
-  searchInput: { flex: 1, fontSize: 14, color: Colors.textPrimary, padding: 0 },
-  searchClear: { fontSize: 13, color: 'rgba(0,0,0,0.4)', padding: 2 },
-
-  panelEmpty: { padding: 32, alignItems: 'center' },
-  panelEmptyText: { fontSize: 14, color: 'rgba(0,0,0,0.4)' },
-
-  item: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    paddingHorizontal: 20,
-    height:            ITEM_HEIGHT,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f2f2f2',
-  },
-  itemSelected:     { backgroundColor: SELECTED_BG },
-  itemText:         { flex: 1, fontSize: 14, fontWeight: '400', color: Colors.textPrimary },
-  itemTextSelected: { fontWeight: '500', color: Colors.primaryDark },
-  itemRadio: {
-    width: 20, height: 20, borderRadius: 10,
-    backgroundColor: Colors.primaryDark, alignItems: 'center', justifyContent: 'center',
-  },
-  itemRadioTick: {
-    color: Colors.surface, fontSize: 10, fontWeight: '700', lineHeight: 12,
   },
 })

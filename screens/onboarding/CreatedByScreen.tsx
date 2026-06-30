@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { fetchProfileCreatedByOptions, getRegValue, setRegValues } from '../../service/registrationService'
 import { CDN_REG } from '../../constants/cdn'
+import { os, scrollPaddingBottom, footerPaddingBottom } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -93,7 +93,7 @@ export default function CreatedByScreen({ navigation }: Props) {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.screen}>
+    <View style={os.screen}>
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
@@ -102,22 +102,22 @@ export default function CreatedByScreen({ navigation }: Props) {
       />
 
       <ScrollView
-        style={styles.flex1}
+        style={os.flex1}
         contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: FOOTER_H + (Platform.OS === 'ios' ? insets.bottom : 20) + 12 },
+          os.scrollContent,
+          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
         ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Page illustration — Angular: ICONTYPE = domain + creating-profile.svg */}
         <Image
           source={{ uri: CDN_ICON }}
-          style={styles.icon}
+          style={os.pageIcon}
           contentFit="contain"
         />
 
         {/* Title — i18n: REGISTRATION.CREATEDBY */}
-        <Text style={styles.title}>
+        <Text style={[os.title, { marginBottom: 24 }]}>
           {t('REGISTRATION.CREATEDBY', 'Creating profile for')}
         </Text>
 
@@ -159,8 +159,8 @@ export default function CreatedByScreen({ navigation }: Props) {
       {/* Sticky footer — matches Angular .otp-cta sticky bottom */}
       <View
         style={[
-          styles.footer,
-          { paddingBottom: Platform.OS === 'ios' ? insets.bottom : 20 },
+          os.footer,
+          { paddingBottom: footerPaddingBottom(insets.bottom) },
         ]}
       >
         <ButtonRevamp
@@ -180,33 +180,6 @@ export default function CreatedByScreen({ navigation }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  screen: {
-    flex:            1,
-    backgroundColor: Colors.surface,
-  },
-  flex1: { flex: 1 },
-
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop:        24,
-  },
-
-  // Page icon — CDN SVG (Angular: ICONTYPE → creating-profile.svg)
-  icon: {
-    width:        48,
-    height:       48,
-    marginBottom: 24,
-  },
-
-  // Title — "Creating profile for" (Figma: Poppins SemiBold 22px / lineHeight 24)
-  title: {
-    fontSize:     22,
-    fontWeight:   '600',
-    color:        Colors.textPrimary,
-    lineHeight:   28,
-    marginBottom: 24,
-  },
-
   loader: {
     marginTop: 48,
   },
@@ -269,14 +242,4 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Sticky footer
-  footer: {
-    position:          'absolute',
-    bottom:            0,
-    left:              0,
-    right:             0,
-    paddingHorizontal: 24,
-    paddingTop:        20,
-    backgroundColor:   Colors.surface,
-  },
 })

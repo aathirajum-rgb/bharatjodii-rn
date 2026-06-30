@@ -22,6 +22,7 @@ import {
   setRegValues,
 } from '../../service/registrationService'
 import { CDN_SVG, CDN_REVAMP } from '../../constants/cdn'
+import { os, scrollPaddingBottom, footerPaddingBottom } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -103,7 +104,7 @@ export default function GenderScreen({ navigation }: Props) {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.screen}>
+    <View style={os.screen}>
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
@@ -112,22 +113,22 @@ export default function GenderScreen({ navigation }: Props) {
       />
 
       <ScrollView
-        style={styles.flex1}
+        style={os.flex1}
         contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: FOOTER_H + (Platform.OS === 'ios' ? insets.bottom : 20) + 12 },
+          os.scrollContent,
+          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
         ]}
         showsVerticalScrollIndicator={false}
       >
         {/* Page illustration — Figma: 48×48 gender icon at top-left */}
         <Image
           source={{ uri: CDN_PAGE_ICON }}
-          style={styles.pageIcon}
+          style={os.pageIcon}
           contentFit="contain"
         />
 
         {/* Title — "Select the gender of Ranganathan" (Figma: 22px SemiBold) */}
-        <Text style={styles.title}>{title}</Text>
+        <Text style={os.title}>{title}</Text>
 
         {/* Gender cards — Figma node 3-336: 1px #b0b0b0 border, 16px radius, gap:32 */}
         {fetching ? (
@@ -173,8 +174,8 @@ export default function GenderScreen({ navigation }: Props) {
       {/* Sticky footer */}
       <View
         style={[
-          styles.footer,
-          { paddingBottom: Platform.OS === 'ios' ? insets.bottom : 20 },
+          os.footer,
+          { paddingBottom: footerPaddingBottom(insets.bottom) },
         ]}
       >
         <ButtonRevamp
@@ -194,31 +195,6 @@ export default function GenderScreen({ navigation }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  screen: {
-    flex:            1,
-    backgroundColor: Colors.surface,
-  },
-  flex1: { flex: 1 },
-
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop:        24,
-  },
-
-  pageIcon: {
-    width:        48,
-    height:       48,
-    marginBottom: 24,
-  },
-
-  title: {
-    fontSize:     22,
-    fontWeight:   '600',
-    color:        Colors.textPrimary,
-    lineHeight:   28,
-    marginBottom: 32,
-  },
-
   loader: {
     marginTop: 48,
   },
@@ -286,15 +262,5 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize:  12,
     color:     Colors.inputError,
-  },
-
-  footer: {
-    position:          'absolute',
-    bottom:            0,
-    left:              0,
-    right:             0,
-    paddingHorizontal: 24,
-    paddingTop:        20,
-    backgroundColor:   Colors.surface,
   },
 })

@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native'
+import { Colors } from '../../constants/colors'
 import {
   getCheckoutDetails,
   getPaymentConfig,
@@ -104,7 +105,7 @@ export default function RechargeScreen() {
   if (loading) {
     return (
       <SafeAreaView style={styles.center}>
-        <ActivityIndicator size="large" color="#C62828" />
+        <ActivityIndicator size="large" color={Colors.primary} />
         <Text style={styles.loadingText}>Loading plans…</Text>
       </SafeAreaView>
     )
@@ -180,12 +181,12 @@ export default function RechargeScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: '#fff' },
+  container:    { flex: 1, backgroundColor: Colors.surface },
   center:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText:  { color: '#666', fontSize: 14 },
-  heading:      { fontSize: 22, fontWeight: '700', color: '#1a1a1a', padding: 20, paddingBottom: 8 },
+  loadingText:  { color: Colors.textSecondary, fontSize: 14 },
+  heading:      { fontSize: 22, fontWeight: '700', color: Colors.textStrong, padding: 20, paddingBottom: 8 },
   listContent:  { paddingHorizontal: 16, paddingBottom: 8 },
-  emptyText:    { textAlign: 'center', color: '#999', marginTop: 40 },
+  emptyText:    { textAlign: 'center', color: Colors.textPlaceholder, marginTop: 40 },
 
   card: {
     borderWidth: 1.5,
@@ -193,41 +194,41 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    backgroundColor: '#fafafa',
+    backgroundColor: Colors.surfaceAlt,
   },
-  cardSelected: { borderColor: '#C62828', backgroundColor: '#FFF5F5' },
+  cardSelected: { borderColor: Colors.primary, backgroundColor: Colors.primarySurfaceAlt },
   popularBadge: {
     alignSelf: 'flex-start',
-    backgroundColor: '#C62828',
+    backgroundColor: Colors.primary,
     borderRadius: 4,
     paddingHorizontal: 8,
     paddingVertical: 2,
     marginBottom: 6,
   },
   popularText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  pkgName:     { fontSize: 16, fontWeight: '600', color: '#1a1a1a' },
-  pkgPrice:    { fontSize: 22, fontWeight: '700', color: '#C62828', marginTop: 4 },
-  pkgValidity: { fontSize: 13, color: '#666', marginTop: 2 },
-  pkgDesc:     { fontSize: 12, color: '#888', marginTop: 4 },
+  pkgName:     { fontSize: 16, fontWeight: '600', color: Colors.textStrong },
+  pkgPrice:    { fontSize: 22, fontWeight: '700', color: Colors.primary, marginTop: 4 },
+  pkgValidity: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  pkgDesc:     { fontSize: 12, color: Colors.textTertiary, marginTop: 4 },
 
   methodSection: { paddingHorizontal: 16, paddingVertical: 8 },
   sectionTitle:  { fontSize: 14, fontWeight: '600', color: '#444', marginBottom: 8 },
   methodRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   methodBtn: {
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: Colors.borderLight,
     borderRadius: 8,
     paddingHorizontal: 14,
     paddingVertical: 8,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.surfaceInput,
   },
-  methodBtnSelected: { borderColor: '#C62828', backgroundColor: '#FFF5F5' },
+  methodBtnSelected: { borderColor: Colors.primary, backgroundColor: Colors.primarySurfaceAlt },
   methodText:        { fontSize: 13, color: '#444' },
-  methodTextSelected:{ color: '#C62828', fontWeight: '600' },
+  methodTextSelected:{ color: Colors.primary, fontWeight: '600' },
 
   payBtn: {
     margin: 16,
-    backgroundColor: '#C62828',
+    backgroundColor: Colors.primary,
     borderRadius: 12,
     height: 52,
     alignItems: 'center',

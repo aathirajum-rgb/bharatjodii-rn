@@ -1,25 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Animated,
-  Dimensions,
-  FlatList,
   Linking,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
@@ -33,12 +28,11 @@ import {
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
+import { os } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON  = CDN_REG + 'location.svg'
-const PANEL_WIDTH    = Dimensions.get('window').width * 0.85
-const ITEM_HEIGHT    = 52
 const INDIA_COUNTRY  = '98'
 
 const LOCATION_TITLES: Record<string, string> = {
@@ -87,11 +81,6 @@ export default function LocationScreen({ navigation }: Props) {
   // Panel visibility
   const [panelKind,      setPanelKind]      = useState<PanelKind>('state')
   const [panelVisible,   setPanelVisible]   = useState(false)
-  const [search,         setSearch]         = useState('')
-  const [searchFocused,  setSearchFocused]  = useState(false)
-
-  // Animation
-  const slideAnim = useRef(new Animated.Value(0)).current
 
   // ─── Init ────────────────────────────────────────────────────────────────────
 
@@ -150,22 +139,13 @@ export default function LocationScreen({ navigation }: Props) {
 
   function openPanel(kind: PanelKind) {
     setPanelKind(kind)
-    setSearch('')
     setPanelVisible(true)
-    Animated.timing(slideAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start()
-  }
-
-  function closePanel() {
-    Animated.timing(slideAnim, { toValue: 0, duration: 230, useNativeDriver: true }).start(
-      () => setPanelVisible(false),
-    )
   }
 
   async function onStateSelect(opt: Option) {
     setSelectedState(opt)
     setSelectedCity(null)
     setCities([])
-    closePanel()
 
     // Immediately start loading cities for the newly chosen state
     setLoadingCities(true)
@@ -181,25 +161,14 @@ export default function LocationScreen({ navigation }: Props) {
 
   function onCitySelect(opt: Option) {
     setSelectedCity(opt)
-    closePanel()
   }
 
   // ─── Derived ──────────────────────────────────────────────────────────────────
 
   const title = LOCATION_TITLES[createdBy] ?? `Select where they live`
-  const panelTranslateX = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [PANEL_WIDTH, 0] })
   const isIndianFlow = countryCode === '91'
   const countryLabel = isIndianFlow ? 'India' : 'Other'
-
-  const currentList = panelKind === 'state' ? states : cities
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return currentList
-    return currentList.filter(o => o.label.toLowerCase().includes(q))
-  }, [currentList, search])
-
-  const panelTitle  = panelKind === 'state' ? 'Select state' : 'Select district'
-  const canSubmit   = !!selectedState && !!selectedCity && !submitting
+  const canSubmit    = !!selectedState && !!selectedCity && !submitting
 
   // ─── Submit ────────────────────────────────────────────────────────────────
 
@@ -225,7 +194,7 @@ export default function LocationScreen({ navigation }: Props) {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.screen}>
+    <View style={os.screen}>
       <AppHeader
         type="registration"
         showBackBtn={navigation.canGoBack()}
@@ -234,16 +203,16 @@ export default function LocationScreen({ navigation }: Props) {
       />
 
       <ScrollView
-        style={styles.flex1}
+        style={os.flex1}
         contentContainerStyle={[
-          styles.scrollContent,
+          os.scrollContent,
           { paddingBottom: 160 + (Platform.OS === 'ios' ? insets.bottom : 20) },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <Image source={{ uri: CDN_PAGE_ICON }} style={styles.pageIcon} contentFit="contain" />
-        <Text style={styles.title}>{title}</Text>
+        <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
+        <Text style={os.title}>{title}</Text>
 
         {loadingStates ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -290,7 +259,7 @@ export default function LocationScreen({ navigation }: Props) {
       {/* Sticky footer */}
       <View
         style={[
-          styles.footer,
+          os.footer,
           { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
         ]}
       >
@@ -315,100 +284,16 @@ export default function LocationScreen({ navigation }: Props) {
         )}
       </View>
 
-      {/* Right-side sliding panel — shared for State + District */}
-      <Modal
-        transparent
+      {/* Shared picker for State + District */}
+      <SearchablePicker
         visible={panelVisible}
-        animationType="none"
-        onRequestClose={closePanel}
-        statusBarTranslucent
-      >
-        <View style={styles.panelContainer}>
-          <Pressable style={styles.backdrop} onPress={closePanel} />
-
-          <Animated.View
-            style={[
-              styles.panel,
-              {
-                paddingBottom: Platform.OS === 'ios' ? insets.bottom : 16,
-                transform: [{ translateX: panelTranslateX }],
-              },
-            ]}
-          >
-            {/* Panel header */}
-            <View style={styles.panelHeader}>
-              <Text style={styles.panelTitle}>{panelTitle}</Text>
-              <TouchableOpacity onPress={closePanel} hitSlop={8}>
-                <Text style={styles.panelClose}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Search */}
-            <View style={[styles.searchBox, searchFocused && styles.searchBoxFocused]}>
-              <Text style={styles.searchIcon}>⌕</Text>
-              <TextInput
-                style={styles.searchInput}
-                placeholder={panelKind === 'state' ? 'Search state…' : 'Search district…'}
-                placeholderTextColor="rgba(0,0,0,0.35)"
-                value={search}
-                onChangeText={setSearch}
-                onFocus={() => setSearchFocused(true)}
-                onBlur={() => setSearchFocused(false)}
-                autoCorrect={false}
-                autoCapitalize="none"
-                returnKeyType="search"
-              />
-              {!!search && (
-                <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
-                  <Text style={styles.searchClear}>✕</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {/* List */}
-            {filtered.length === 0 ? (
-              <View style={styles.panelEmpty}>
-                <Text style={styles.panelEmptyText}>No results found</Text>
-              </View>
-            ) : (
-              <FlatList
-                data={filtered}
-                keyExtractor={(item: Option) => item.key}
-                getItemLayout={(_: any, index: number) => ({
-                  length: ITEM_HEIGHT, offset: ITEM_HEIGHT * index, index,
-                })}
-                showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
-                renderItem={({ item }: { item: Option }) => {
-                  const isSelected =
-                    panelKind === 'state'
-                      ? selectedState?.key === item.key
-                      : selectedCity?.key === item.key
-                  return (
-                    <Pressable
-                      style={[styles.item, isSelected && styles.itemSelected]}
-                      onPress={() =>
-                        panelKind === 'state' ? onStateSelect(item) : onCitySelect(item)
-                      }
-                      accessibilityRole="menuitem"
-                      accessibilityState={{ selected: isSelected }}
-                    >
-                      <Text style={[styles.itemText, isSelected && styles.itemTextSelected]}>
-                        {item.label}
-                      </Text>
-                      {isSelected && (
-                        <View style={styles.itemTick}>
-                          <Text style={styles.itemTickText}>✓</Text>
-                        </View>
-                      )}
-                    </Pressable>
-                  )
-                }}
-              />
-            )}
-          </Animated.View>
-        </View>
-      </Modal>
+        title={panelKind === 'state' ? 'Select state' : 'Select district'}
+        placeholder={panelKind === 'state' ? 'Search state…' : 'Search district…'}
+        options={panelKind === 'state' ? states : cities}
+        selectedKey={panelKind === 'state' ? selectedState?.key ?? null : selectedCity?.key ?? null}
+        onSelect={panelKind === 'state' ? onStateSelect : onCitySelect}
+        onClose={() => setPanelVisible(false)}
+      />
     </View>
   )
 }
@@ -470,51 +355,14 @@ function FloatField({ label, value, placeholder, onPress, hasValue, disabled, lo
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const BORDER_COLOR   = '#b0b0b0'
-const SELECTED_BG    = 'rgba(181,0,51,0.02)'
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: Colors.surface,
-  },
-  flex1: { flex: 1 },
-
-  scrollContent: {
-    paddingHorizontal: 24,
-    paddingTop:        24,
-  },
-
-  pageIcon: {
-    width:        48,
-    height:       48,
-    marginBottom: 24,
-  },
-
-  title: {
-    fontSize:     22,
-    fontWeight:   '600',
-    color:        Colors.textPrimary,
-    lineHeight:   28,
-    marginBottom: 32,
-  },
-
   loader: { marginTop: 48 },
 
   fieldsContainer: {
     gap: 24,
   },
 
-  // Footer
-  footer: {
-    position:          'absolute',
-    bottom:            0,
-    left:              0,
-    right:             0,
-    paddingHorizontal: 24,
-    paddingTop:        20,
-    backgroundColor:   Colors.surface,
-  },
   divider: {
     height:          1,
     backgroundColor: Colors.inputBorder,
@@ -535,111 +383,8 @@ const styles = StyleSheet.create({
   helpPhone: {
     fontSize:      14,
     fontWeight:    '500',
-    color:         '#29339b',
+    color:         Colors.link,
     letterSpacing: 0.42,
-  },
-
-  // Right-side sliding panel
-  panelContainer: {
-    flex:          1,
-    flexDirection: 'row',
-  },
-  backdrop: {
-    flex:            1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-  panel: {
-    width:           PANEL_WIDTH,
-    backgroundColor: Colors.surface,
-    elevation:       8,
-    shadowColor:     '#000',
-    shadowOpacity:   0.2,
-    shadowOffset:    { width: -2, height: 0 },
-    shadowRadius:    8,
-  },
-  panelHeader: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    paddingHorizontal: 20,
-    paddingVertical:   16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e6e6e6',
-  },
-  panelTitle: {
-    flex:       1,
-    fontSize:   16,
-    fontWeight: '600',
-    color:      Colors.textPrimary,
-  },
-  panelClose: {
-    fontSize: 16,
-    color:    Colors.textPrimary,
-    padding:  4,
-  },
-
-  // Search
-  searchBox: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    marginHorizontal:  16,
-    marginVertical:    12,
-    height:            40,
-    borderWidth:       1,
-    borderColor:       '#e6e6e6',
-    borderRadius:      8,
-    paddingHorizontal: 10,
-    gap:               8,
-    backgroundColor:   Colors.surface,
-  },
-  searchBoxFocused: {
-    borderColor: Colors.primary,
-  },
-  searchIcon:  { fontSize: 14 },
-  searchInput: {
-    flex:    1,
-    fontSize: 14,
-    color:    Colors.textPrimary,
-    padding:  0,
-  },
-  searchClear: {
-    fontSize: 13,
-    color:    'rgba(0,0,0,0.4)',
-    padding:  2,
-  },
-
-  panelEmpty: { padding: 32, alignItems: 'center' },
-  panelEmptyText: { fontSize: 14, color: 'rgba(0,0,0,0.4)' },
-
-  // List items
-  item: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    paddingHorizontal: 20,
-    height:            ITEM_HEIGHT,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f2f2f2',
-  },
-  itemSelected:     { backgroundColor: SELECTED_BG },
-  itemText: {
-    flex:       1,
-    fontSize:   14,
-    fontWeight: '400',
-    color:      Colors.textPrimary,
-  },
-  itemTextSelected: { fontWeight: '500', color: Colors.primaryDark },
-  itemTick: {
-    width:           20,
-    height:          20,
-    borderRadius:    10,
-    backgroundColor: Colors.primaryDark,
-    alignItems:      'center',
-    justifyContent:  'center',
-  },
-  itemTickText: {
-    color:      Colors.surface,
-    fontSize:   10,
-    fontWeight: '700',
-    lineHeight: 12,
   },
 })
 
@@ -656,15 +401,15 @@ const floatStyles = StyleSheet.create({
     alignItems:      'center',
     height:          48,
     borderWidth:     1,
-    borderColor:     BORDER_COLOR,
+    borderColor:     Colors.inputBorder,
     borderRadius:    8,
     paddingLeft:     16,
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
-  fieldActive:   { borderColor: BORDER_COLOR },
+  fieldActive:   { borderColor: Colors.inputBorder },
   fieldDisabled: {
-    backgroundColor: '#f5f5f5',
+    backgroundColor: Colors.surfaceInput,
     borderColor:     '#d8d8d8',
   },
 
