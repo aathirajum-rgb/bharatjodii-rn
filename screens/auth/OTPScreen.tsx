@@ -53,8 +53,9 @@ export default function OTPScreen({ navigation, route }: Props) {
   const [resending,    setResending]    = useState(false)
   const [showSuccess,  setShowSuccess]  = useState(false)
 
-  // Hold userId until OTPSuccessSheet dismisses so loginUpdate fires after animation
+  // Hold userId + new-user flag until OTPSuccessSheet dismisses
   const pendingUserId = useRef<string>('')
+  const pendingIsNew  = useRef<boolean>(false)
 
   const inputRefs     = useRef<Array<TextInput | null>>(Array(OTP_LENGTH).fill(null))
 
@@ -145,6 +146,10 @@ export default function OTPScreen({ navigation, route }: Props) {
         // Store tokens — wrapped so a storage failure doesn't block the success UI.
         // ATN/RTN are at root of response; WEBVIEWURL carries profile data only.
         try {
+          // Existing registered users have ATN at the root of the response.
+          // New unregistered users have no root ATN — their token is embedded
+          // inside the WEBVIEWURL JSON and extracted by parseAndStoreWebViewURL.
+          pendingIsNew.current = !res.ATN
           if (res.ATN) await setItem(StorageKeys.Auth.TOKEN, res.ATN)
           if (res.RTN) await setItem(StorageKeys.Auth.REFRESH_TOKEN, res.RTN)
           if (res?.RESPONSE?.WEBVIEWURL) {

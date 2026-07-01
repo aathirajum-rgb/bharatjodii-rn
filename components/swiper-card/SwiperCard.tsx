@@ -33,6 +33,13 @@ export interface SwiperItem {
   // Like state
   likedStatus?: '0' | '1' | '2' | '3' | undefined
 
+  // Profile badge fields (used by MatchesScreen, ViewProfile, etc.)
+  isPaidMember?: boolean | undefined    // Angular: FUNC.IsPaidMember(profile)
+  isIdVerified?: boolean | undefined    // Angular: FUNC.IsIDVerifiedMember(profile)
+  occupation?:   string | undefined
+  income?:       string | undefined
+  caste?:        string | undefined
+
   // Labels / dates
   isNewLabel?:          boolean | undefined
   labelContent?:        string | undefined

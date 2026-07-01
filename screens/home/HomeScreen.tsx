@@ -13,6 +13,15 @@ import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter
 import AppHeader, { type ToolbarItem } from '../../components/app-header/AppHeader'
 import SwiperCard, { type SwiperItem } from '../../components/swiper-card/SwiperCard'
 import { Colors } from '../../constants/colors'
+// API imports commented out — will wire up after matches landing page is built
+// import {
+//   fetchHomeSession,
+//   fetchMatches,
+//   refreshSession,
+//   type HomeSession,
+//   type ListingResult,
+//   EMPTY_LISTING,
+// } from '../../service/homeService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -34,10 +43,10 @@ const TOOLBAR: ToolbarItem[] = [
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
 const MOCK_ALL_MATCHES: SwiperItem[] = [
-  { profileId: 'am1', name: 'Meenakshi',      age: '26 Yrs', education: "Bachelor's Degree", isNewlyJoined: false, likedStatus: '0' },
-  { profileId: 'am2', name: 'Dhaarani',        age: '26 Yrs', education: "Bachelor's Degree", isNewlyJoined: false, likedStatus: '0' },
-  { profileId: 'am3', name: 'Keerthana',       age: '26 Yrs', education: "Bachelor's Degree", isNewlyJoined: false, likedStatus: '0' },
-  { profileId: 'am4', name: 'Kavitha',         age: '27 Yrs', education: "Bachelor's Degree", isNewlyJoined: false, likedStatus: '0' },
+  { profileId: 'am1', name: 'Meenakshi',  age: '26 Yrs', education: "Bachelor's Degree", isNewlyJoined: false, likedStatus: '0' },
+  { profileId: 'am2', name: 'Dhaarani',   age: '26 Yrs', education: "Bachelor's Degree", isNewlyJoined: false, likedStatus: '0' },
+  { profileId: 'am3', name: 'Keerthana',  age: '26 Yrs', education: "Bachelor's Degree", isNewlyJoined: false, likedStatus: '0' },
+  { profileId: 'am4', name: 'Kavitha',    age: '27 Yrs', education: "Bachelor's Degree", isNewlyJoined: false, likedStatus: '0' },
 ]
 
 const MOCK_VIEWED_ME: SwiperItem[] = [
@@ -136,6 +145,7 @@ const ob = StyleSheet.create({
 
 export default function HomeScreen({ navigation }: { navigation: any }) {
   const [likedTab, setLikedTab] = useState<'me' | 'them'>('me')
+
   const userName      = 'Deepak Venkatara...'
   const completionPct = 70
   const likesCount    = 37

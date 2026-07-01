@@ -83,7 +83,7 @@ async function handleErrCode(
     // Both tokens invalid — force logout
     const userId = await getItem(StorageKeys.Auth.USER_ID)
     console.warn(`[apiClient] Token expired (ERRCODE 23) — user ${userId} — ${moduleName}`)
-    await clearSession()
+    // await clearSession()
     return null
   }
 

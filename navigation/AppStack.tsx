@@ -29,11 +29,13 @@ import NameScreen from '../screens/onboarding/NameScreen'
 import PaymentSuccessScreen from '../screens/payment/PaymentSuccessScreen'
 import RechargeScreen from '../screens/payment/RechargeScreen'
 import PermissionDemoScreen from '../screens/PermissionDemoScreen'
+import MatchesScreen from '../screens/matches/MatchesScreen'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type AppStackParamList = {
   Home:              undefined
+  Matches:           undefined
   dashboard:         undefined
   onboarding:        { pageNo: string } | undefined
   Permissions:       undefined
@@ -85,8 +87,9 @@ export default function AppStack() {
   return (
     <Stack.Navigator
       screenOptions={{ headerShown: false }}
-      initialRouteName={isNewUser ? 'onboarding' : 'Home'}
+      initialRouteName={isNewUser ? 'onboarding' : 'Matches'}
     >
+      <Stack.Screen name="Matches"   component={MatchesScreen} />
       <Stack.Screen name="Home"      component={HomeScreen} />
       <Stack.Screen name="dashboard" component={HomeScreen} />
       {/* HomeScreen is in screens/home/HomeScreen.tsx — AppHeader + FlatList + AppFooter */}
