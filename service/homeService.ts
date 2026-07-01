@@ -1,5 +1,5 @@
 import { apiCall } from './apiClient'
-import { getItem } from './storageService'
+import { getItem, setJson } from './storageService'
 import { getSession, parseAndStoreWebViewURL } from './registrationService'
 import { Endpoints } from './api.endpoints'
 import { StorageKeys } from '../constants/storage.keys'
@@ -48,21 +48,24 @@ export const EMPTY_LISTING: ListingResult = { items: [], totalCount: 0, newCount
 
 function toProfile(p: Record<string, any>): SwiperItem {
   return {
-    profileId:           p['NBID']                ?? p['ID'],
+    // Angular: profile.MATRIID is the primary ID in matches API response
+    profileId:           p['MATRIID']  ?? p['NBID']  ?? p['ID'],
     name:                p['NAME'],
     age:                 p['AGE']   ? `${p['AGE']} Yrs` : undefined,
     height:              p['HEIGHT'],
     education:           p['EDUCATION'],
-    location:            p['LOCATION']             ?? p['CITY'],
+    // Angular: bindBasicView — LOCATION first, then CITY+STATE
+    location:            p['LOCATION'] || [p['CITY'], p['STATE']].filter(Boolean).join(', ') || '',
     profileImg:          p['THUMBIMG'],
     isPhotoAvailable:    p['PHOTOSTATUS']  === '1',
     isPhotoProtect:      p['PHOTOPRIVACY'] === '1',
     isNewlyJoined:       p['ISNEWLYJOINED'] === '1',
-    likedStatus:         p['LIKEDSTATUS'] as SwiperItem['likedStatus'],
+    // Angular matches card: profile.LIKED (not LIKEDSTATUS) — fallback for other listing APIs
+    likedStatus:         (p['LIKED'] ?? p['LIKEDSTATUS']) as SwiperItem['likedStatus'],
     isNewLabel:          p['ISNEWLABEL']  === '1',
     labelContent:        p['LABELCONTENT'],
     likedViewedDateText: p['LIKEDVIEWEDDATETEXT'] ?? p['VIEWEDDATETEXT'] ?? p['LIKEDDATETEXT'],
-    // Angular: FUNC.IsPaidMember — profile is paid if ENTRYTYPE is not free ('B'/'F')
+    // Angular: FUNC.IsPaidMember — paid if ENTRYTYPE not 'B'/'F'
     isPaidMember:        p['ENTRYTYPE'] !== undefined
                            ? !['B', 'F'].includes(String(p['ENTRYTYPE']))
                            : p['PAIDMEMBER'] === '1',
@@ -75,10 +78,12 @@ function toProfile(p: Record<string, any>): SwiperItem {
 }
 
 function toListingResult(res: Record<string, any>): ListingResult {
-  const raw = res['LIST'] ?? res['LISTDATA'] ?? []
+  // Angular matches API: profiles in res['RESPONSE'] (array), count in res['TOTAL']
+  // Other listing APIs may use res['LIST'] / res['TOTALCOUNT'] — keep fallbacks
+  const raw = res['RESPONSE'] ?? res['LIST'] ?? res['LISTDATA'] ?? []
   return {
     items:      Array.isArray(raw) ? raw.map(toProfile) : [],
-    totalCount: Number(res['TOTALCOUNT'] ?? res['LISTCOUNT'] ?? 0),
+    totalCount: Number(res['TOTAL'] ?? res['TOTALCOUNT'] ?? res['LISTCOUNT'] ?? 0),
     newCount:   Number(res['NEWCOUNT'] ?? 0),
   }
 }
@@ -119,10 +124,22 @@ export async function refreshSession(): Promise<void> {
 }
 
 // ─── Notification count ───────────────────────────────────────────────────────
+// Angular: ID=<NBID>&LOGINGENDER=<LOGINGENDER>&LASTLOGIN=<LASTLOGIN>&COMFLAG=1
+// Response path: res.RESPONSE.NEWCOUNT (NOT top-level res.NEWCOUNT)
 
 export async function fetchNotifCount(): Promise<number> {
-  const res = await apiCall(Endpoints.communication.notificationCount, 'POST', '')
-  return Number(res['NEWCOUNT'] ?? 0)
+  const [userId, gender, session] = await Promise.all([
+    getItem(StorageKeys.Auth.USER_ID),
+    getItem(StorageKeys.User.LOGIN_GENDER),
+    getSession(),                              // LASTLOGIN lives inside USER_SESSION blob
+  ])
+  const lastLogin = session['LASTLOGIN'] ?? ''
+  const params = `ID=${userId ?? ''}&LOGINGENDER=${gender ?? 'M'}&LASTLOGIN=${lastLogin}&COMFLAG=1`
+  const res = await apiCall(Endpoints.communication.notificationCount, 'POST', params)
+  if (res?.RESPONSECODE == 1 && res?.ERRCODE == '0') {
+    return Number(res['RESPONSE']?.['NEWCOUNT'] ?? 0)
+  }
+  return 0
 }
 
 // ─── Payment banner ───────────────────────────────────────────────────────────
@@ -137,17 +154,104 @@ export async function fetchPayBanner(): Promise<BannerData> {
   }
 }
 
-// ─── All Matches ──────────────────────────────────────────────────────────────
-// Angular: callMatchesApi() param string (matches default route)
-// START/LIMIT instead of PAGENO — Angular never sends PAGENO for this endpoint
+// ─── PP set data (member preference) ─────────────────────────────────────────
+// Angular: profileService.getPPSETData(1) → editprofile/getpreference/v1
+// Params: ID=&GENDER= (angular: getApiParams(id, 'getmemberPreference'))
+// Stores full RESPONSE blob in PPSETDATA (read by communicationService for call/whatsapp)
+// Also stores PHOTOCOUNT, PHOTOAVAILABLE, VERIFIEDBYCALLNUM
 
-export async function fetchMatches(start = 0, limit = 20): Promise<ListingResult> {
+export async function fetchAndStorePPSetData(): Promise<Record<string, any>> {
+  const [userId, gender] = await Promise.all([
+    getItem(StorageKeys.Auth.USER_ID),
+    getItem(StorageKeys.User.LOGIN_GENDER),
+  ])
+  const params = `ID=${userId ?? ''}&GENDER=${gender ?? 'M'}`
+  const res = await apiCall(Endpoints.profile.getPreference, 'POST', params)
+  if (res?.RESPONSECODE === '1' && res?.ERRCODE === '0') {
+    const data: Record<string, any> = res.RESPONSE ?? {}
+    await setJson(StorageKeys.App.PP_SET_DATA, data)
+    return data
+  }
+  return {}
+}
+
+// ─── Daily recommendations ────────────────────────────────────────────────────
+// Angular: drService.callingDailyRecommendationAPI(ID)
+// Params: ID&START=0&LIMIT=15&LIKED=1&VIEWED=1&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&MYHOME=1
+// Returns profiles for the swipe-card DR screen (separate route in Angular)
+
+export async function fetchDailyRecommendations(): Promise<SwiperItem[]> {
+  const userId = await getItem(StorageKeys.Auth.USER_ID)
+  const params = `ID=${userId ?? ''}&START=0&LIMIT=15&LIKED=1&VIEWED=1&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&MYHOME=1`
+  const res = await apiCall(Endpoints.listing.dailyRecommendations, 'POST', params)
+  if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0) {
+    const raw = Array.isArray(res.RESPONSE) ? res.RESPONSE : []
+    return raw.map((p: Record<string, any>) => ({
+      profileId:        p['NBID']          ?? p['MATRIID'],
+      name:             p['NAME'],
+      age:              p['AGE'] ? `${p['AGE']} Yrs` : undefined,
+      height:           p['HEIGHT'],
+      education:        p['EDUCATION'],
+      occupation:       p['OCCUPATION'],
+      location:         p['LOCATION'] || [p['CITY'], p['STATE']].filter(Boolean).join(', ') || '',
+      profileImg:       p['THUMBIMG'],
+      isPhotoAvailable: p['PHOTOSTATUS']  === '1',
+      isPhotoProtect:   p['PHOTOPRIVACY'] === '1',
+      likedStatus:      p['LIKEDSTATUS']  as SwiperItem['likedStatus'],
+      isPaidMember:     p['ENTRYTYPE'] !== undefined ? !['B', 'F'].includes(String(p['ENTRYTYPE'])) : p['PAIDMEMBER'] === '1',
+      isIdVerified:     p['IDVERIFY'] === '1' || p['IDVERIFYSTATUS'] === '1',
+      caste:            p['CASTE'],
+      income:           p['INCOME'],
+    }))
+  }
+  return []
+}
+
+// ─── Extended matches count ───────────────────────────────────────────────────
+// Angular: getExtendedMatchesCount() — called after matches load, START=0&LIMIT=1 to get count only
+// Returns 0 if no extended matches or if on a filter page.
+
+export async function fetchExtendedMatchesCount(): Promise<number> {
   const [session, userId] = await Promise.all([
     getSession(),
     getItem(StorageKeys.Auth.USER_ID),
   ])
   const loginCount = session['LOGINCOUNT'] ?? '0'
   const params = [
+    `ID=${userId ?? ''}`,
+    'START=0',
+    'LIMIT=1',
+    'LIKED=1',
+    'VIEWED=0',
+    'REPORTED=1',
+    'BLOCKED=1',
+    'REMOVED=1',
+    'SKIPED=1',
+    'BANNERFLAG=0',
+    `LOGINCOUNT=${loginCount}`,
+  ].join('&')
+  const res = await apiCall(Endpoints.listing.extendedMatches, 'POST', params)
+  if (res['ERRCODE'] === '0' && Number(res['TOTAL']) > 0) {
+    return Number(res['TOTAL'])
+  }
+  return 0
+}
+
+// ─── All Matches ──────────────────────────────────────────────────────────────
+// Angular: callMatchesApi() param string (matches default route)
+// START/LIMIT instead of PAGENO — Angular never sends PAGENO for this endpoint
+
+export async function fetchMatches(start = 0, limit = 20): Promise<ListingResult> {
+  const [session, userId, ekycStatus, gender] = await Promise.all([
+    getSession(),
+    getItem(StorageKeys.Auth.USER_ID),
+    getItem('EKYCSTATUS'),
+    getItem(StorageKeys.User.LOGIN_GENDER),
+  ])
+  const loginCount = session['LOGINCOUNT'] ?? '0'
+  // Angular: EKYCFLAG=1 only for nonIdVerifyUser (EKYCSTATUS=="0" && LOGINGENDER=="M")
+  const nonIdVerifyUser = ekycStatus === '0' && gender === 'M'
+  const parts = [
     `ID=${userId ?? ''}`,
     `START=${start}`,
     `LIMIT=${limit}`,
@@ -160,9 +264,9 @@ export async function fetchMatches(start = 0, limit = 20): Promise<ListingResult
     'BANNERFLAG=1',
     `LOGINCOUNT=${loginCount}`,
     'FREEMATCHFLAG=0',
-    'EKYCFLAG=1',
-  ].join('&')
-  const res = await apiCall(Endpoints.listing.matches, 'POST', params)
+  ]
+  if (nonIdVerifyUser) parts.push('EKYCFLAG=1')
+  const res = await apiCall(Endpoints.listing.matches, 'POST', parts.join('&'))
   return toListingResult(res)
 }
 

@@ -45,8 +45,11 @@ export async function communicationBtnOnClick(
 
   switch (action) {
     case 'like':
-    case 'dislike':
-      return callHttpAction(action, 'POST', `ID=${await userId()}&PARTNERID=${partnerId}&TYPE=${action}`, action)
+    case 'dislike': {
+      // Angular: getApiParams(partnerId, 'communication') → ID&PARTNERID&LOGINGENDER&ENTRYTYPE
+      const params = await getCommParams(partnerId, true)
+      return callHttpAction(action, 'POST', params, action)
+    }
 
     case 'skip':
     case 'dontshow':
@@ -121,14 +124,22 @@ async function showContactDetails(
   oppProfile: any,
   isWhatsapp: boolean,
 ): Promise<CommActionResult> {
-  const loginId   = (await getItem(SK.Auth.USER_ID)) ?? ''
+  // Angular: getApiParams(profileId, 'phoneviewed') → ID&PARTNERID&LOGINGENDER&ENTRYTYPE
   const partnerId = String(oppProfile?.MATRIID ?? '')
-  const params    = `ID=${loginId}&PARTNERID=${partnerId}&TYPE=viewcontact`
-  const result    = await apiCall(Endpoints.communication.viewContact, 'POST', params)
+  const params    = await getCommParams(partnerId, true)
+  const result    = await apiCall(Endpoints.communication.phoneViewed, 'POST', params)
 
-  if (result?.RESPONSECODE === '1' && result?.ERRCODE === '0') {
-    const contact = result.RESPONSE?.CONTACTNUMBER ?? ''
-    return { type: 'show_contact', contact, whatsapp: isWhatsapp }
+  if (result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1) {
+    const det = result.RESPONSE?.PHONEDET?.[0] ?? {}
+    const cc  = det.PriMobileCountryCode ?? '+91'
+    const num = det.MOBILE ?? det.MobileNo ?? det.MOBILENUMBER ?? ''
+    const wa  = String(result.RESPONSE?.WHATSAPP ?? '').replace(/\D/g, '')
+    const contact = num ? `${cc}${num}` : wa
+    return {
+      type:     'show_contact',
+      contact:  isWhatsapp ? (wa || contact) : contact,
+      whatsapp: isWhatsapp,
+    }
   }
   return { type: 'error', message: 'Could not fetch contact' }
 }
@@ -158,8 +169,8 @@ async function handleChat(fromPage: string, oppProfile: any): Promise<CommAction
   }
 
   navigate(ENavigation.CHAT_WINDOW, {
-    partnerId: String(oppProfile?.MATRIID ?? ''),
-    partnerName: oppProfile?.FIRSTNAME ?? '',
+    partnerId:    String(oppProfile?.MATRIID ?? ''),
+    partnerName:  oppProfile?.FIRSTNAME ?? '',
     partnerPhoto: oppProfile?.PHOTOTHUMB ?? '',
   })
 
@@ -173,9 +184,9 @@ async function dontShowSection(
   _oppProfile: any,
   _fromPage: string,
 ): Promise<CommActionResult> {
-  const loginId = (await getItem(SK.Auth.USER_ID)) ?? ''
-  const params  = `ID=${loginId}&PARTNERID=${partnerId}&TYPE=skip`
-  const result  = await apiCall(Endpoints.communication.skipProfile, 'POST', params)
+  // Angular: getApiParams(profileId, 'dontshow') → ID&PARTNERID&LOGINGENDER
+  const params = await getCommParams(partnerId)
+  const result = await apiCall(Endpoints.communication.skipProfile, 'POST', params)
 
   if (result?.RESPONSECODE === '1' && result?.ERRCODE === '0') {
     return { type: 'skip_done' }
@@ -190,9 +201,9 @@ async function callViewLater(
   _oppProfile: any,
   _fromPage: string,
 ): Promise<CommActionResult> {
-  const loginId = (await getItem(SK.Auth.USER_ID)) ?? ''
-  const params  = `ID=${loginId}&PARTNERID=${partnerId}&TYPE=viewlater`
-  const result  = await apiCall(Endpoints.communication.viewLater, 'POST', params)
+  // Angular: getApiParams(partnerId, 'viewlater') → ID&PARTNERID&LOGINGENDER
+  const params = await getCommParams(partnerId)
+  const result = await apiCall(Endpoints.communication.viewLater, 'POST', params)
 
   if (result?.RESPONSECODE === '1') {
     return { type: 'view_later_done' }
@@ -218,6 +229,13 @@ async function callHttpAction(
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function userId(): Promise<string> {
-  return (await getItem(SK.Auth.USER_ID)) ?? ''
+// Angular getApiParams(partnerId, 'communication'/'phoneviewed') → includes ENTRYTYPE
+// Angular getApiParams(partnerId, 'dontshow'/'viewlater')        → no ENTRYTYPE
+async function getCommParams(partnerId: string, includeEntryType = false): Promise<string> {
+  const loginId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const gender  = (await getItem(SK.User.LOGIN_GENDER)) ?? 'M'
+  const base    = `ID=${loginId}&PARTNERID=${partnerId}&LOGINGENDER=${gender}`
+  if (!includeEntryType) return base
+  const entryType = (await getSessionValue('ENTRYTYPE')) ?? 'F'
+  return `${base}&ENTRYTYPE=${entryType}`
 }
