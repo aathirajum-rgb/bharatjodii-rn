@@ -142,11 +142,13 @@ export async function fetchPayBanner(): Promise<BannerData> {
 // START/LIMIT instead of PAGENO — Angular never sends PAGENO for this endpoint
 
 export async function fetchMatches(start = 0, limit = 20): Promise<ListingResult> {
-  // Angular: webview.page.ts stores LOGINCOUNT from backend WEBVIEWURL JSON
-  // In React it goes into USER_SESSION blob via storeWebURLData — read via getSession()
-  const session    = await getSession()
+  const [session, userId] = await Promise.all([
+    getSession(),
+    getItem(StorageKeys.Auth.USER_ID),
+  ])
   const loginCount = session['LOGINCOUNT'] ?? '0'
   const params = [
+    `ID=${userId ?? ''}`,
     `START=${start}`,
     `LIMIT=${limit}`,
     'LIKED=1',
@@ -155,8 +157,10 @@ export async function fetchMatches(start = 0, limit = 20): Promise<ListingResult
     'BLOCKED=1',
     'REMOVED=1',
     'SKIPED=1',
-    'BANNERFLAG=0',
+    'BANNERFLAG=1',
     `LOGINCOUNT=${loginCount}`,
+    'FREEMATCHFLAG=0',
+    'EKYCFLAG=1',
   ].join('&')
   const res = await apiCall(Endpoints.listing.matches, 'POST', params)
   return toListingResult(res)
