@@ -20,7 +20,8 @@ import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
   callRegistrationAPI,
   fetchReligionOptions,
-  getRegValue,
+  getRegValues,
+  prefetchCasteForReligion,
   setRegValue,
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
@@ -52,24 +53,25 @@ export default function ReligionScreen({ navigation }: Props) {
   const [fetching,      setFetching]      = useState(true)
   const [selected,      setSelected]      = useState<Option | null>(null)
   const [createdBy,     setCreatedBy]     = useState('4')
+  const [mothertongue,  setMothertongue]  = useState('')
   const [submitting,    setSubmitting]    = useState(false)
   const [customerCare,  setCustomerCare]  = useState('')
   const [panelVisible,  setPanelVisible]  = useState(false)
 
   useEffect(() => {
     Promise.all([
-      getRegValue('CREATEDBY'),
-      getRegValue('RELIGION'),
+      getRegValues(),
       getItem(SK.App.CUSTOMER_CARE),
-    ]).then(([cb, savedRel, cc]) => {
-      if (cb) setCreatedBy(cb)
+    ]).then(([rv, cc]) => {
+      if (rv.CREATEDBY)     setCreatedBy(rv.CREATEDBY)
+      if (rv.MOTHERTONGUE)  setMothertongue(rv.MOTHERTONGUE)
       if (cc) setCustomerCare(cc)
 
       fetchReligionOptions()
         .then(list => {
           setAllOptions(list)
-          if (savedRel) {
-            const found = list.find(o => o.key === savedRel)
+          if (rv.RELIGION) {
+            const found = list.find(o => o.key === rv.RELIGION)
             if (found) setSelected(found)
           }
         })
@@ -192,7 +194,12 @@ export default function ReligionScreen({ navigation }: Props) {
         placeholder="Search religion..."
         options={allOptions}
         selectedKey={selected?.key ?? null}
-        onSelect={(opt) => setSelected(opt)}
+        onSelect={(opt) => {
+          setSelected(opt)
+          // Angular APIMODULENAME['RELIGION'] = 'CASTE' — fire caste prefetch immediately
+          // so CasteScreen finds the list cached when it mounts.
+          prefetchCasteForReligion(opt.key, mothertongue)
+        }}
         onClose={() => setPanelVisible(false)}
       />
     </View>

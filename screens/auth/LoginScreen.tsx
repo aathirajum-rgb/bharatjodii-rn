@@ -18,7 +18,7 @@ import { CDN_REG, CDN_SVG } from '../../constants/cdn'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys } from '../../constants/storage.keys'
-import { login } from '../../service/registrationService'
+import { callPartialRegistrationAPI, login, setRegValues } from '../../service/registrationService'
 import { getItem, setItem } from '../../service/storageService'
 import { ENavigation } from '../../types/enums/navigation.enum'
 
@@ -109,14 +109,25 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
     setError('')
     try {
       const res = await login('login', { MOBILENO: mobile, MCODE: country.code, NEWREG: '1' })
-      if (res?.RESPONSECODE == 1) {
+
+      if (res?.ERRCODE == '0' && res?.RESPONSECODE == '1') {
+        // Existing user — go straight to OTP verification
         navigation.navigate(ENavigation.OTP, {
           mobile,
           countryCode: country.code,
           matriId: String(res?.RESPONSE?.MATRIID ?? ''),
         })
+      } else if (res?.ERRCODE == '1' && res?.RESPONSECODE == '2' && res?.RESPONSE?.WEBVIEWURL) {
+        // New user — save mobile, fire partial registration, then go to OTP for phone verification
+        await setRegValues({ MOBILENO: mobile, MCODE: country.code })
+        callPartialRegistrationAPI({})  // fire-and-forget, mirrors Angular callPartialRegistrationAPI()
+        navigation.navigate(ENavigation.OTP, {
+          mobile,
+          countryCode: country.code,
+          matriId: '',
+        })
       } else {
-        setError(res?.ERRMSG ?? res?.ERRORMESSAGE ?? t('LOGIN_PAGE.VALID_MOBILENO'))
+        setError(res?.RESPONSE?.MSG ?? res?.ERRMSG ?? res?.ERRORMESSAGE ?? t('LOGIN_PAGE.VALID_MOBILENO'))
       }
     } catch {
       setError(t('GENERAL.NOINTERNET'))

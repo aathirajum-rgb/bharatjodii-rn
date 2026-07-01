@@ -25,7 +25,7 @@ SplashScreen.preventAutoHideAsync()
 // Mirrors what the old native app injected into the WebView URL on launch.
 // Must run before any API call so buildCommonParams reads correct values.
 async function initializeAppConfig(): Promise<void> {
-  const appType = Constants.expoConfig?.extra?.appType ?? process.env.EXPO_PUBLIC_APP_TYPE ?? '115'
+  const appType = String(Constants.expoConfig?.extra?.appType ?? process.env.EXPO_PUBLIC_APP_TYPE ?? '115')
   const version = Constants.expoConfig?.version ?? '1.0.0'
 
   await Promise.all([

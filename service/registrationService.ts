@@ -146,10 +146,9 @@ export async function parseAndStoreWebViewURL(webViewUrl: string): Promise<void>
 // Maps the server object {"1":"Myself","4":"Son's",...} to a typed array.
 // Excludes key "2" (Parents) which is not shown in the revamped UI.
 export async function fetchProfileCreatedByOptions(): Promise<Array<{ key: string; label: string }>> {
-  const ccode   = await getItem(SK.User.COUNTRY_CODE) ?? '91'
-  const lang    = await getItem(SK.Auth.LANG) ?? 'en'
-  const apptype = await getItem(SK.Auth.APP_TYPE) ?? '115'
-  const paramStr = `type=all&ccode=${ccode}&LANG=${lang}&APPTYPE=${apptype}`
+  const ccode    = await getItem(SK.User.COUNTRY_CODE) ?? '91'
+  const lang     = await getItem(SK.Auth.LANG) ?? 'en'
+  const paramStr = `type=all&ccode=${ccode}&LANG=${lang}`
   const res = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
   const raw = res?.RESPONSE?.PROFILECREATEDBY
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
@@ -170,10 +169,9 @@ export type GenderOption = {
 // Fetches gender options for the given createdBy from the initialfetch API.
 // GENDERARRAY[createdBy] contains [{ key, value, IMG, IMG-ACTIVE }] per Angular.
 export async function fetchGenderOptions(createdBy: string): Promise<GenderOption[]> {
-  const ccode   = await getItem(SK.User.COUNTRY_CODE) ?? '91'
-  const lang    = await getItem(SK.Auth.LANG) ?? 'en'
-  const apptype = await getItem(SK.Auth.APP_TYPE) ?? '115'
-  const paramStr = `type=all&ccode=${ccode}&LANG=${lang}&APPTYPE=${apptype}`
+  const ccode    = await getItem(SK.User.COUNTRY_CODE) ?? '91'
+  const lang     = await getItem(SK.Auth.LANG) ?? 'en'
+  const paramStr = `type=all&ccode=${ccode}&LANG=${lang}`
   const res = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
   const genderArray = res?.RESPONSE?.GENDERARRAY
   const list: any[] = genderArray?.[createdBy] ?? genderArray?.['1'] ?? []
@@ -196,10 +194,9 @@ export async function fetchGenderOptions(createdBy: string): Promise<GenderOptio
 export async function fetchMaritalStatusOptions(
   gender: string,
 ): Promise<Array<{ key: string; label: string }>> {
-  const ccode   = await getItem(SK.User.COUNTRY_CODE) ?? '91'
-  const lang    = await getItem(SK.Auth.LANG) ?? 'en'
-  const apptype = await getItem(SK.Auth.APP_TYPE) ?? '115'
-  const paramStr = `type=all&ccode=${ccode}&LANG=${lang}&APPTYPE=${apptype}`
+  const ccode    = await getItem(SK.User.COUNTRY_CODE) ?? '91'
+  const lang     = await getItem(SK.Auth.LANG) ?? 'en'
+  const paramStr = `type=all&ccode=${ccode}&LANG=${lang}`
   const res = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
   const raw = gender === '0'
     ? res?.RESPONSE?.MARITALSTATUSFEMALE
@@ -217,10 +214,9 @@ async function getRegistrationArrays(): Promise<Record<string, any>> {
   if (cached) {
     try { return JSON.parse(cached) } catch {}
   }
-  const ccode   = await getItem(SK.User.COUNTRY_CODE) ?? '91'
-  const lang    = await getItem(SK.Auth.LANG) ?? 'en'
-  const apptype = await getItem(SK.Auth.APP_TYPE) ?? '115'
-  const paramStr = `type=all&ccode=${ccode}&LANG=${lang}&APPTYPE=${apptype}`
+  const ccode    = await getItem(SK.User.COUNTRY_CODE) ?? '91'
+  const lang     = await getItem(SK.Auth.LANG) ?? 'en'
+  const paramStr = `type=all&ccode=${ccode}&LANG=${lang}`
   const res = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
   const data = res?.RESPONSE ?? {}
   if (res?.RESPONSE) await setItem('REGISTRATIONARRAYS', JSON.stringify(res.RESPONSE))
@@ -300,7 +296,8 @@ export async function fetchGothraOptions(): Promise<Array<{ key: string; label: 
     'POST',
     `type=gothra&caste=${caste}&LANG=${lang}`,
   )
-  const gothram = res?.RESPONSE?.GOTHRAM
+  // Angular: responseData["GOTHRAM"] — gothra API returns at root level
+  const gothram = res?.GOTHRAM ?? res?.RESPONSE?.GOTHRAM
 
   if (gothram !== undefined) {
     // Cache it so re-entry is instant
@@ -313,6 +310,25 @@ export async function fetchGothraOptions(): Promise<Array<{ key: string; label: 
 
 // Fetches caste list for a given religion.
 // Angular: type=caste&religion=X&mothertongue=X → RESPONSE.CASTE (plain object or array)
+// Called immediately when user selects a religion (mirrors Angular APIMODULENAME['RELIGION'] = 'CASTE').
+// Clears stale CASTE/SUBCASTE/GOTHRAM from cache, then pre-fetches the new caste list
+// so CasteScreen finds it in cache and loads instantly.
+export async function prefetchCasteForReligion(religion: string, mothertongue: string): Promise<void> {
+  try {
+    const cached = await getItem('REGISTRATIONARRAYS')
+    if (cached) {
+      const arrays = JSON.parse(cached)
+      delete arrays.CASTE
+      delete arrays.SUBCASTE
+      delete arrays.GOTHRAM
+      await setItem('REGISTRATIONARRAYS', JSON.stringify(arrays))
+    }
+    await fetchCasteOptions(religion, mothertongue)
+  } catch {
+    // fire-and-forget — ignore failures
+  }
+}
+
 // Checks REGISTRATIONARRAYS.CASTE cache first; fetches fresh if missing.
 export async function fetchCasteOptions(
   religion: string,
@@ -337,10 +353,12 @@ export async function fetchCasteOptions(
   const lang     = (await getItem(SK.Auth.LANG)) ?? 'en'
   const paramStr = `type=caste&religion=${religion}&mothertongue=${mothertongue}&LANG=${lang}`
   const res      = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
-  const list     = toList(res?.RESPONSE?.CASTE)
+  // Angular: responseData["CASTE"] — caste API returns at root level, not inside RESPONSE
+  const casteData = res?.CASTE ?? res?.RESPONSE?.CASTE
+  const list      = toList(casteData)
 
-  if (res?.RESPONSE?.CASTE) {
-    const updated = { ...arrays, CASTE: res.RESPONSE.CASTE }
+  if (casteData) {
+    const updated = { ...arrays, CASTE: casteData }
     await setItem('REGISTRATIONARRAYS', JSON.stringify(updated))
   }
   return list
@@ -357,7 +375,8 @@ export async function fetchSubcasteOptions(
   const lang     = (await getItem(SK.Auth.LANG)) ?? 'en'
   const paramStr = `type=subcaste&religion=${religion}&caste=${caste}&mothertongue=${mothertongue}&LANG=${lang}`
   const res      = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
-  const raw      = res?.RESPONSE?.SUBCASTE
+  // Angular: responseData["SUBCASTE"] — subcaste API returns at root level
+  const raw      = res?.SUBCASTE ?? res?.RESPONSE?.SUBCASTE
 
   const toList = (r: any) => {
     if (Array.isArray(r)) {
@@ -683,13 +702,14 @@ export async function fetchCities(stateId: string): Promise<Array<{ key: string;
 // else page 10 (Education). Default homePlaceDomain = ['2','14','17','41','4','51']
 export async function getNextPageAfterLocation(): Promise<string> {
   const arrays      = await getRegistrationArrays()
-  const mothertongue = String((await getSessionValue('MOTHERTONGUE')) ?? '')
+  // During onboarding MOTHERTONGUE is saved to REGISTRATION_VALUES, not USER_SESSION
+  const mothertongue = String((await getRegValue('MOTHERTONGUE')) ?? '')
   const domain: string[] = Array.isArray(arrays?.NATIVEPLACEDOMAIN)
     ? arrays.NATIVEPLACEDOMAIN.map(String)
     : ['2', '14', '17', '41', '4', '51']
   const ccode = (await getItem(SK.User.COUNTRY_CODE)) ?? '91'
   if (ccode === '91' && mothertongue && domain.includes(mothertongue)) {
-    return '44'
+    return '46'  // page 46 = Yes/No "Is hometown same as current location?"
   }
   return '10'
 }
@@ -832,12 +852,147 @@ export async function submitPropertyDetails(properties: string[]): Promise<void>
   )
 }
 
+// ─── Horoscope (Star / Raasi / Dosham) ───────────────────────────────────────
+// Angular: registration/zodiacinfo/v1 — POST with ID&STAR&RAASI&DOSHAM
+// Empty values fetches dropdown options; filled values saves the data.
+// Stars filtered by raasi: registrationform/v1 — POST with type=stars&RAASIID=X&LANG=en
+
+export async function fetchRaasiOptions(): Promise<Array<{ key: string; label: string }>> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const lang   = await getItem('LANG') ?? 'en'
+  const res    = await apiCall(
+    Endpoints.registration.updateReligious,
+    'POST',
+    `ID=${userId}&STAR=&RAASI=&DOSHAM=`,
+  )
+  if (res?.RESPONSECODE === '1' && res?.ERRCODE === '0' && res?.RESPONSE?.RAASI) {
+    return objToOptions(res.RESPONSE.RAASI)
+  }
+  // Fallback: fetch from initialfetch endpoint
+  const res2 = await apiCall(
+    Endpoints.registration.initialFetch,
+    'POST',
+    `type=raasi&LANG=${lang}`,
+  )
+  if (res2?.RESPONSECODE === '1' && res2?.ERRCODE === '0' && res2?.RESPONSE) {
+    return objToOptions(res2.RESPONSE)
+  }
+  return []
+}
+
+export async function fetchStarOptions(raasiId: string): Promise<Array<{ key: string; label: string }>> {
+  const lang = await getItem('LANG') ?? 'en'
+  const res  = await apiCall(
+    Endpoints.registration.initialFetch,
+    'POST',
+    `type=stars&RAASIID=${raasiId}&LANG=${lang}`,
+  )
+  if (res?.RESPONSECODE === '1' && res?.ERRCODE === '0' && res?.RESPONSE) {
+    return objToOptions(res.RESPONSE)
+  }
+  return []
+}
+
+export async function fetchDoshamOptions(
+  star: string,
+  raasi: string,
+): Promise<{ dosham: Array<{ key: string; label: string }>; doshamHash: Array<{ key: string; label: string }> }> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const res = await apiCall(
+    Endpoints.registration.updateReligious,
+    'POST',
+    `ID=${userId}&STAR=${star}&RAASI=${raasi}&DOSHAM=`,
+  )
+  if (res?.RESPONSECODE === '1' && res?.ERRCODE === '0' && res?.RESPONSE) {
+    return {
+      dosham:     objToOptions(res.RESPONSE.DOSHAM     ?? {}),
+      doshamHash: objToOptions(res.RESPONSE.DOSHAMHASH ?? {}),
+    }
+  }
+  return { dosham: [], doshamHash: [] }
+}
+
+export async function submitHoroscopeDetails(
+  star: string,
+  raasi: string,
+  dosham: string,
+): Promise<void> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  await apiCall(
+    Endpoints.registration.updateReligious,
+    'POST',
+    `ID=${userId}&STAR=${star}&RAASI=${raasi}&DOSHAM=${dosham}`,
+  )
+}
+
 // ─── Registration update ──────────────────────────────────────────────────────
 
 export async function callRegistrationAPI(params: Record<string, any>): Promise<any> {
   const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
   const paramStr = `ID=${userId}&` + Object.entries(params).map(([k, v]) => `${k}=${v}`).join('&')
   return apiCall(Endpoints.registration.update, 'POST', paramStr)
+}
+
+// ─── Full registration submit ─────────────────────────────────────────────────
+// Called at Caste (no gothra) or Gothra step — mirrors Angular's final callRegistrationAPI
+// which goes to registration/insert/v1 ("registrationupdate" module in Angular httpservice).
+// Angular param name mapping: QUALIFICATION→Education, MCODE→CountryCode, INCOMETYPE→IncomeCurrency.
+// NOTE: no ID in this payload — server creates the profile and returns MATRIID.
+
+export async function submitFullRegistration(): Promise<{ matriId?: string }> {
+  const rv       = await getRegValues()
+  const lang     = (await getItem(SK.Auth.LANG))  ?? 'en'
+  const ipAddress = (await getItem('USERIP'))      ?? ''
+
+  // Angular: LANG first, then all profile fields, then IpAddress/phoneverify/DEVICEID/TYPE
+  // CountryCode → rv.MCODE (LoginScreen stores country code as MCODE in REGISTRATION_VALUES)
+  // Education   → rv.QUALIFICATION (QualificationScreen stores as QUALIFICATION)
+  // TYPE=APPSLREG identifies this as a native-app registration (Angular: isPwaApp ? source : 'APPSLREG')
+  const params = [
+    `LANG=${lang}`,
+    `CountryCode=${rv.MCODE ?? '91'}`,
+    `MobileNo=${rv.MOBILENO ?? ''}`,
+    `ProfileCreatedBy=${rv.CREATEDBY ?? '1'}`,
+    `Gender=${rv.GENDER ?? '1'}`,
+    `Name=${encodeURIComponent(rv.NAME ?? '')}`,
+    `MaritalStatus=${rv.MARITALSTATUS ?? ''}`,
+    `noofchildren=${rv.NOOFCHILDREN ?? ''}`,
+    `EatingHabits=${rv.EATING ?? ''}`,
+    `physicalstatus=${rv.PHYSICALSTATUS ?? '1'}`,
+    `Month=${rv.MONTH ?? ''}`,
+    `Date=${rv.DATE ?? ''}`,
+    `Year=${rv.YEAR ?? ''}`,
+    `Age=${rv.AGE ?? ''}`,
+    `Height=${rv.HEIGHT ?? ''}`,
+    `MotherTongue=${rv.MOTHERTONGUE ?? ''}`,
+    `country=${rv.COUNTRY ?? ''}`,
+    `City=${rv.CITY ?? ''}`,
+    `State=${rv.STATE ?? ''}`,
+    `NativeCountry=${rv.NATIVECOUNTRY ?? ''}`,
+    `NativeState=${rv.NATIVESTATE ?? ''}`,
+    `NativeCity=${rv.NATIVECITY ?? ''}`,
+    `HomeState=${rv.HOMESTATE ?? ''}`,
+    `HomeCity=${rv.HOMECITY ?? ''}`,
+    `Education=${rv.QUALIFICATION ?? ''}`,
+    `Occupation=${rv.OCCUPATION ?? ''}`,
+    `MonthlyIncome=${rv.INCOME ?? ''}`,
+    `IncomeCurrency=${rv.INCOMETYPE ?? ''}`,
+    `Religion=${rv.RELIGION ?? ''}`,
+    `Caste=${rv.CASTE ?? ''}`,
+    `SubCaste=${rv.SUBCASTE ?? ''}`,
+    `Gothram=${rv.GOTHRA ?? ''}`,
+    `IpAddress=${ipAddress}`,
+    `phoneverify=1`,
+    `DEVICEID=`,
+    `TYPE=APPSLREG`,
+  ].join('&')
+
+  // Angular "registrationupdate" module → registration/insert/v1 (creates profile, returns MATRIID)
+  const res = await apiCall(Endpoints.registration.insert, 'POST', params)
+  const matriId = res?.RESPONSE?.MATRIID
+  const result: { matriId?: string } = {}
+  if (matriId) result.matriId = String(matriId)
+  return result
 }
 
 export async function callPartialRegistrationAPI(params: Record<string, any>): Promise<any> {

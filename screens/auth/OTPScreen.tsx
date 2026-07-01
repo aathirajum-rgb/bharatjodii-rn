@@ -33,13 +33,15 @@ const CDN         = CDN_REG
 
 type Props = {
   navigation: any
-  route: { params: { mobile: string; countryCode: string; matriId: string } }
+  route: { params: { mobile: string; countryCode: string; matriId: string; isNewUser?: boolean } }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function OTPScreen({ navigation, route }: Props) {
-  const { mobile, countryCode, matriId } = route.params
+  const { mobile, countryCode, matriId, isNewUser: routeIsNewUser } = route.params
+  // If caller explicitly passes isNewUser, use it; otherwise infer from empty matriId
+  const isRegistrationFlow = routeIsNewUser ?? (matriId === '')
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const { loginUpdate } = useAuth()
@@ -314,13 +316,12 @@ export default function OTPScreen({ navigation, route }: Props) {
           />
         </View>
       </KeyboardAvoidingView>
-      {/* OTP success bottom sheet — auto-closes after 3s then navigates to onboarding */}
-      {/* Success sheet plays for 3s, then loginUpdate fires.
-          AuthContext sets isAuthenticated=true → RootNavigation switches
-          to AppStack which starts at 'onboarding' for new users. */}
+      {/* OTP success bottom sheet — auto-closes after 3s then switches stack.
+          New registration → AppStack opens at 'onboarding' page 1.
+          Existing login    → AppStack opens at 'Home'. */}
       <OTPSuccessSheet
         visible={showSuccess}
-        onDismiss={() => loginUpdate(pendingUserId.current)}
+        onDismiss={() => loginUpdate(pendingUserId.current, isRegistrationFlow)}
       />
     </View>
   )

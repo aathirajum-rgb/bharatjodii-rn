@@ -11,11 +11,14 @@ import GenderScreen from '../screens/onboarding/GenderScreen'
 import HeightScreen from '../screens/onboarding/HeightScreen'
 import MaritalStatusScreen from '../screens/onboarding/MaritalStatusScreen'
 import HomeTownScreen from '../screens/onboarding/HomeTownScreen'
+import HomeTownLocationScreen from '../screens/onboarding/HomeTownLocationScreen'
 import LocationScreen from '../screens/onboarding/LocationScreen'
 import MotherTongueScreen from '../screens/onboarding/MotherTongueScreen'
 import AddPhotoScreen from '../screens/onboarding/AddPhotoScreen'
 import FamilyDetailsScreen from '../screens/onboarding/FamilyDetailsScreen'
 import PropertyDetailsScreen from '../screens/onboarding/PropertyDetailsScreen'
+import StarRaasiScreen from '../screens/onboarding/StarRaasiScreen'
+import DoshamScreen from '../screens/onboarding/DoshamScreen'
 import CasteScreen from '../screens/onboarding/CasteScreen'
 import GothraScreen from '../screens/onboarding/GothraScreen'
 import MonthlyIncomeScreen from '../screens/onboarding/MonthlyIncomeScreen'
@@ -55,7 +58,8 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
     case '38': return <EatingHabitScreen  navigation={navigation} route={route} />
     case '39': return <MotherTongueScreen navigation={navigation} route={route} />
     case '9':  return <LocationScreen       navigation={navigation} route={route} />
-    case '44': return <HomeTownScreen      navigation={navigation} route={route} />
+    case '44': return <HomeTownLocationScreen navigation={navigation} route={route} />
+    case '46': return <HomeTownScreen         navigation={navigation} route={route} />
     case '10': return <QualificationScreen navigation={navigation} route={route} />
     case '11': return <OccupationScreen      navigation={navigation} route={route} />
     case '12': return <MonthlyIncomeScreen  navigation={navigation} route={route} />
@@ -65,6 +69,8 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
     case '20': return <AddPhotoScreen      navigation={navigation} route={route} />
     case '27': return <FamilyDetailsScreen navigation={navigation} route={route} />
     case '28': return <PropertyDetailsScreen navigation={navigation} route={route} />
+    case '29': return <StarRaasiScreen       navigation={navigation} route={route} />
+    case '32': return <DoshamScreen          navigation={navigation} route={route} />
     default:   return <HomeScreen navigation={navigation} />
   }
 }

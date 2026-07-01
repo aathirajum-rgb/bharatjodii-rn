@@ -195,12 +195,18 @@ export const Endpoints = {
 // Media endpoints don't support ID injection in URL
 export const MEDIA_ENDPOINTS = Object.values(Endpoints.media) as string[]
 
-// These endpoints use a different param signature (no ATN/RTN)
+// These endpoints use APPTYPE+LANG but no ATN/RTN (login/OTP flows)
 export const AUTH_ONLY_ENDPOINTS = [
   Endpoints.auth.verifyOtp,
   Endpoints.auth.resendOtp,
   Endpoints.auth.loginTrueCall,
   Endpoints.auth.login,
-  Endpoints.registration.insert,
+] as string[]
+
+// These endpoints add APPTYPE only — LANG is already in the params string, no ATN/RTN needed
+// Matches Angular httpservice: ["initialfetch","registrationupdate"] → params += `&APPTYPE=${APPTYPE}`
+// Angular "registrationupdate" module maps to registration/insert/v1 (same as initialfetch pattern)
+export const APPTYPE_ONLY_ENDPOINTS = [
   Endpoints.registration.initialFetch,
+  Endpoints.registration.insert,
 ] as string[]

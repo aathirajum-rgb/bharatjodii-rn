@@ -26,6 +26,7 @@ import {
   getRegValues,
   setRegValue,
   getRegValue,
+  submitFullRegistration,
 } from '../../service/registrationService'
 import { getItem, setItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
@@ -158,8 +159,11 @@ export default function CasteScreen({ navigation }: Props) {
 
   // ─── Derived ──────────────────────────────────────────────────────────────
 
-  const possessive = PROFILE_POSSESSIVE[createdBy] ?? 'their'
-  const title      = `Select ${possessive} caste`
+  const possessive  = PROFILE_POSSESSIVE[createdBy] ?? 'their'
+  const isChristian = religion === '2'
+  const noun        = isChristian ? 'division' : 'caste'
+  const nounCap     = isChristian ? 'Division'  : 'Caste'
+  const title       = `Select ${possessive} ${noun}`
 
   // ─── Submit ───────────────────────────────────────────────────────────────
 
@@ -168,20 +172,24 @@ export default function CasteScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       await setRegValue('CASTE', selectedCaste.key)
-      let res = await callRegistrationAPI({ CASTE: selectedCaste.key })
-
       if (selectedSubcaste) {
         await setRegValue('SUBCASTE', selectedSubcaste.key)
-        res = await callRegistrationAPI({ SUBCASTE: selectedSubcaste.key })
       }
 
-      const matriId = res?.RESPONSE?.MATRIID
       const nextPage = await getNextPageAfterCaste(selectedCaste.key)
 
-      if (matriId && nextPage === '20') {
-        await setItem(SK.Auth.USER_ID, String(matriId))
-        setSuccessVisible(true)
+      if (nextPage === '20') {
+        // Final step (no gothra) — send full registration payload to get MATRIID
+        const { matriId } = await submitFullRegistration()
+        if (matriId) {
+          await setItem(SK.Auth.USER_ID, matriId)
+          setSuccessVisible(true)
+        } else {
+          navigation.push('onboarding', { pageNo: '20' })
+        }
       } else {
+        // Gothra step follows — just save partial data and proceed
+        await callRegistrationAPI({ CASTE: selectedCaste.key })
         navigation.push('onboarding', { pageNo: nextPage })
       }
     } catch {
@@ -223,16 +231,16 @@ export default function CasteScreen({ navigation }: Props) {
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
         ) : (
           <View style={styles.fields}>
-            {/* ── Caste select field ─────────────────────────────────── */}
+            {/* ── Caste / Division select field ──────────────────────── */}
             <View style={styles.fieldWrapper}>
               <View style={styles.fieldLabelBadge}>
-                <Text style={styles.fieldLabelText}>Caste</Text>
+                <Text style={styles.fieldLabelText}>{nounCap}</Text>
               </View>
               <Pressable
                 style={styles.selectField}
                 onPress={() => setActivePanel('caste')}
                 accessibilityRole="button"
-                accessibilityLabel="Select caste"
+                accessibilityLabel={`Select ${noun}`}
               >
                 <Text
                   style={[
@@ -241,7 +249,7 @@ export default function CasteScreen({ navigation }: Props) {
                   ]}
                   numberOfLines={1}
                 >
-                  {selectedCaste ? selectedCaste.label : 'Select caste'}
+                  {selectedCaste ? selectedCaste.label : `Select ${noun}`}
                 </Text>
                 <Text style={styles.selectFieldArrow}>›</Text>
               </Pressable>
@@ -318,11 +326,11 @@ export default function CasteScreen({ navigation }: Props) {
         )}
       </View>
 
-      {/* Single picker — renders caste or subcaste list based on activePanel */}
+      {/* Single picker — renders caste/division or subcaste list based on activePanel */}
       <SearchablePicker
         visible={activePanel !== null}
-        title={activePanel === 'caste' ? 'Select caste' : 'Select sub caste'}
-        placeholder={activePanel === 'caste' ? 'Search caste...' : 'Search sub caste...'}
+        title={activePanel === 'caste' ? `Select ${noun}` : 'Select sub caste'}
+        placeholder={activePanel === 'caste' ? `Search ${noun}...` : 'Search sub caste...'}
         options={activePanel === 'caste' ? casteOptions : subcasteOptions}
         selectedKey={activePanel === 'caste' ? selectedCaste?.key ?? null : selectedSubcaste?.key ?? null}
         onSelect={activePanel === 'caste' ? selectCaste : selectSubcaste}

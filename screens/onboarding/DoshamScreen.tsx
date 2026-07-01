@@ -14,25 +14,23 @@ import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
-import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import RegistrationSuccessSheet from '../../components/registration-success-sheet/RegistrationSuccessSheet'
 import {
-  fetchGothraOptions,
-  getRegValue,
+  fetchDoshamOptions,
+  getRegValues,
   setRegValue,
-  submitFullRegistration,
+  submitHoroscopeDetails,
 } from '../../service/registrationService'
-import { getItem, setItem } from '../../service/storageService'
+import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os, scrollPaddingBottom } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = CDN_REG + 'gothra.svg'
-const FOOTER_H      = 140
+const CDN_PAGE_ICON = CDN_REG + 'dosham.svg'
+const FOOTER_H      = 160
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,33 +43,33 @@ type Props = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function GothraScreen({ navigation }: Props) {
+export default function DoshamScreen({ navigation }: Props) {
   const { t }  = useTranslation()
   const insets = useSafeAreaInsets()
 
-  const [allOptions,    setAllOptions]    = useState<Option[]>([])
-  const [fetching,      setFetching]      = useState(true)
-  const [selected,      setSelected]      = useState<Option | null>(null)
-  const [createdBy,     setCreatedBy]     = useState('4')
-  const [submitting,    setSubmitting]    = useState(false)
-  const [customerCare,  setCustomerCare]  = useState('')
-  const [panelVisible,   setPanelVisible]   = useState(false)
-  const [successVisible, setSuccessVisible] = useState(false)
+  const [options,      setOptions]      = useState<Option[]>([])
+  const [selected,     setSelected]     = useState<Option | null>(null)
+  const [fetching,     setFetching]     = useState(true)
+  const [submitting,   setSubmitting]   = useState(false)
+  const [customerCare, setCustomerCare] = useState('')
+  const [createdBy,    setCreatedBy]    = useState('1')
+
+  // star + raasi are needed to submit dosham
+  const [star,  setStar]  = useState('')
+  const [raasi, setRaasi] = useState('')
 
   useEffect(() => {
-    Promise.all([
-      getRegValue('CREATEDBY'),
-      getRegValue('GOTHRA'),
-      getItem(SK.App.CUSTOMER_CARE),
-    ]).then(([cb, savedGothra, cc]) => {
-      if (cb) setCreatedBy(cb)
+    Promise.all([getRegValues(), getItem(SK.App.CUSTOMER_CARE)]).then(([rv, cc]) => {
+      if (rv.CREATEDBY) setCreatedBy(rv.CREATEDBY)
       if (cc) setCustomerCare(cc)
+      if (rv.STAR)  setStar(rv.STAR)
+      if (rv.RAASI) setRaasi(rv.RAASI)
 
-      fetchGothraOptions()
-        .then(list => {
-          setAllOptions(list)
-          if (savedGothra) {
-            const found = list.find(o => o.key === savedGothra)
+      fetchDoshamOptions(rv.STAR ?? '', rv.RAASI ?? '')
+        .then(({ dosham }) => {
+          setOptions(dosham)
+          if (rv.DOSHAM && dosham.length) {
+            const found = dosham.find(o => o.key === rv.DOSHAM)
             if (found) setSelected(found)
           }
         })
@@ -80,31 +78,25 @@ export default function GothraScreen({ navigation }: Props) {
     })
   }, [])
 
-  // ─── Derived ──────────────────────────────────────────────────────────────
-
-  const possessive = PROFILE_POSSESSIVE[createdBy] ?? 'their'
-  const title      = `Select ${possessive} gothram`
-
-  // ─── Submit ───────────────────────────────────────────────────────────────
-
   async function handleNext() {
     if (!selected || submitting) return
     setSubmitting(true)
     try {
-      await setRegValue('GOTHRA', selected.key)
-      const { matriId } = await submitFullRegistration()
-      if (matriId) {
-        await setItem(SK.Auth.USER_ID, matriId)
-        setSuccessVisible(true)
-      } else {
-        navigation.push('onboarding', { pageNo: '20' })
-      }
+      await setRegValue('DOSHAM', selected.key)
+      await submitHoroscopeDetails(star, raasi, selected.key)
+      navigation.navigate('Home')
     } catch {
-      // Allow retry
+      // allow retry
     } finally {
       setSubmitting(false)
     }
   }
+
+  function handleSkip() {
+    navigation.navigate('Home')
+  }
+
+  const possessive = PROFILE_POSSESSIVE[createdBy] ?? 'their'
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -124,33 +116,38 @@ export default function GothraScreen({ navigation }: Props) {
           { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
         ]}
         showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
       >
-        <Image
-          source={{ uri: CDN_PAGE_ICON }}
-          style={os.pageIcon}
-          contentFit="contain"
-        />
+        <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
-        <Text style={[os.title, { marginBottom: 24 }]}>{title}</Text>
+        <Text style={[os.title, { marginBottom: 8 }]}>
+          {t('REGISTRATION.SELECTDOSHAM', `Select ${possessive} dosham`)}
+        </Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
         ) : (
-          <Pressable
-            style={styles.selectField}
-            onPress={() => setPanelVisible(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Select gothram"
-          >
-            <Text
-              style={[styles.selectFieldText, !!selected && styles.selectFieldTextActive]}
-              numberOfLines={1}
-            >
-              {selected ? selected.label : 'Select Gothram'}
-            </Text>
-            <Text style={styles.selectFieldArrow}>›</Text>
-          </Pressable>
+          <View style={styles.radioList}>
+            {options.map(opt => {
+              const isSelected = selected?.key === opt.key
+              return (
+                <Pressable
+                  key={opt.key}
+                  style={[styles.radioRow, isSelected && styles.radioRowSelected]}
+                  onPress={() => setSelected(opt)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={opt.label}
+                >
+                  <Text style={[styles.radioLabel, isSelected && styles.radioLabelSelected]}>
+                    {opt.label}
+                  </Text>
+                  <View style={[styles.radio, isSelected && styles.radioChecked]}>
+                    {isSelected && <View style={styles.radioDot} />}
+                  </View>
+                </Pressable>
+              )
+            })}
+          </View>
         )}
       </ScrollView>
 
@@ -161,15 +158,21 @@ export default function GothraScreen({ navigation }: Props) {
           { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
         ]}
       >
-        <ButtonRevamp
-          label={t('REGISTRATION.NEXTCTA', 'Next')}
-          variant="primary"
-          size="standard"
-          fullWidth
-          disabled={!selected}
-          loading={submitting}
-          onPress={handleNext}
-        />
+        {selected ? (
+          <ButtonRevamp
+            label={t('REGISTRATION.NEXTCTA', 'Next')}
+            variant="primary"
+            size="standard"
+            fullWidth
+            loading={submitting}
+            onPress={handleNext}
+          />
+        ) : (
+          <Pressable style={styles.skipRow} onPress={handleSkip}>
+            <Text style={styles.skipText}>{t('REG.DO_LATER', "I'll do this later")}</Text>
+            <Text style={styles.skipArrow}>›</Text>
+          </Pressable>
+        )}
 
         {!!customerCare && (
           <>
@@ -184,59 +187,81 @@ export default function GothraScreen({ navigation }: Props) {
           </>
         )}
       </View>
-
-      <RegistrationSuccessSheet
-        visible={successVisible}
-        onContinue={() => {
-          setSuccessVisible(false)
-          navigation.push('onboarding', { pageNo: '20' })
-        }}
-      />
-
-      {/* Gothram picker */}
-      <SearchablePicker
-        visible={panelVisible}
-        title="Select gothram"
-        placeholder="Search gothram..."
-        options={allOptions}
-        selectedKey={selected?.key ?? null}
-        onSelect={(opt) => setSelected(opt)}
-        onClose={() => setPanelVisible(false)}
-      />
     </View>
   )
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-
 const styles = StyleSheet.create({
   loader: { marginTop: 48 },
 
-  selectField: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    height:          48,
-    borderWidth:     1,
-    borderColor:     Colors.inputBorder,
-    borderRadius:    8,
-    paddingLeft:     16,
-    paddingRight:    12,
-    backgroundColor: Colors.surface,
+  radioList: { gap: 12 },
+
+  radioRow: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
+    paddingHorizontal: 16,
+    paddingVertical:   14,
+    borderRadius:      12,
+    borderWidth:       1,
+    borderColor:       Colors.borderSoft,
+    backgroundColor:   Colors.surface,
   },
-  selectFieldText: {
+  radioRowSelected: {
+    borderColor:     Colors.chipBorderActive,
+    backgroundColor: Colors.radioCheckedBg,
+  },
+
+  radioLabel: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   15,
     fontWeight: '400',
     color:      Colors.textPrimary,
+    lineHeight: 20,
+    marginRight: 12,
   },
-  selectFieldTextActive: {
+  radioLabelSelected: {
     fontWeight: '500',
   },
-  selectFieldArrow: {
-    fontSize:   22,
-    color:      Colors.textPrimary,
-    lineHeight: 26,
+
+  radio: {
+    width:          22,
+    height:         22,
+    borderRadius:   11,
+    borderWidth:    1.5,
+    borderColor:    Colors.borderNeutral,
+    alignItems:     'center',
+    justifyContent: 'center',
+    flexShrink:     0,
+  },
+  radioChecked: {
+    borderColor: Colors.primaryDark,
+  },
+  radioDot: {
+    width:           12,
+    height:          12,
+    borderRadius:    6,
+    backgroundColor: Colors.primaryDark,
+  },
+
+  skipRow: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    justifyContent:  'center',
+    paddingVertical: 14,
+    gap:             4,
+  },
+  skipText: {
+    fontSize:   15,
+    fontWeight: '500',
+    color:      Colors.scrim,
+  },
+  skipArrow: {
+    fontSize:   18,
+    color:      Colors.scrim,
+    lineHeight: 22,
   },
 
   divider: {

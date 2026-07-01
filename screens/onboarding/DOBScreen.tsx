@@ -20,7 +20,7 @@ import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import { callRegistrationAPI, getRegValue, setRegValue } from '../../service/registrationService'
+import { callRegistrationAPI, getRegValue, setRegValue, setRegValues } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
@@ -199,7 +199,7 @@ export default function DOBScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       const dob = `${selYear}-${selMonth.padStart(2, '0')}-${selDate.padStart(2, '0')}`
-      await setRegValue('DATEOFBIRTH', dob)
+      await setRegValues({ DATEOFBIRTH: dob, MONTH: selMonth, DATE: selDate, YEAR: selYear })
       await callRegistrationAPI({ DATE: selDate, MONTH: selMonth, YEAR: selYear })
       navigation.push('onboarding', { pageNo: '43' })
     } catch {

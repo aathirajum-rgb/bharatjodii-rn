@@ -13,7 +13,7 @@ interface AuthState {
 }
 
 interface AuthContextValue extends AuthState {
-  loginUpdate: (userId: string) => void
+  loginUpdate: (userId: string, goToOnboarding?: boolean) => void
   logoutUpdate: () => void
 }
 
@@ -47,12 +47,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })
   }
 
-  function loginUpdate(userId: string) {
+  function loginUpdate(userId: string, goToOnboarding = true) {
     setState({
       isAuthenticated: true,
       userId,
       loading: false,
-      isNewUser: true,      // new login → go to onboarding
+      isNewUser: goToOnboarding,
     })
   }
 

@@ -1,7 +1,7 @@
 import axios, { AxiosRequestConfig } from 'axios'
 import { getItem, setItem, getMultiple, setMultiple, removeMultiple } from './storageService'
 import { StorageKeys } from '../constants/storage.keys'
-import { AUTH_ONLY_ENDPOINTS, MEDIA_ENDPOINTS } from './api.endpoints'
+import { AUTH_ONLY_ENDPOINTS, APPTYPE_ONLY_ENDPOINTS, MEDIA_ENDPOINTS } from './api.endpoints'
 
 // ─────────────────────────────────────────────────────────────
 //  LOGOUT CALLBACK
@@ -43,11 +43,16 @@ async function buildCommonParams(url: string): Promise<string> {
   const token = atn     ?? ''
   const rToken= rtn     ?? ''
 
-  const isAuthOnly = AUTH_ONLY_ENDPOINTS.includes(url)
-  const isRegInsert = url.includes('registration/insert')
+  const isApptypeOnly = APPTYPE_ONLY_ENDPOINTS.includes(url)
+  const isAuthOnly    = AUTH_ONLY_ENDPOINTS.includes(url)
+  const isRegInsert   = url.includes('registration/insert')
 
-  if (isRegInsert) return `&APPTYPE=${type}`
-  if (isAuthOnly)  return `&APPTYPE=${type}&LANG=${l}`
+  // Angular httpservice matches:
+  //   initialfetch → &APPTYPE only (LANG already in params, no ATN/RTN)
+  //   login/otp    → &APPTYPE&LANG (no ATN/RTN)
+  //   everything else → &APPTYPE&LANG&ATN&RTN
+  if (isApptypeOnly || isRegInsert) return `&APPTYPE=${type}`
+  if (isAuthOnly)                   return `&APPTYPE=${type}&LANG=${l}`
   return `&APPTYPE=${type}&LANG=${l}&ATN=${token}&RTN=${rToken}`
 }
 
