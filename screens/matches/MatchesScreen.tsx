@@ -26,7 +26,6 @@ import { Colors } from '../../constants/colors'
 import type { SwiperItem } from '../../components/swiper-card/SwiperCard'
 import {
   fetchMatches,
-  fetchNotifCount,
   fetchExtendedMatchesCount,
   fetchAndStorePPSetData,
   fetchMenuPromo,
@@ -159,15 +158,16 @@ function buildMergedList(
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // Angular: bindBasicView() — order: age | height | caste | education | occupation | location
-function buildBasicViewParts(p: MatchProfile): string[] {
+// (mirrors matches-card.component.ts bindBasicView exactly)
+function buildBasicView(p: MatchProfile): string {
   const parts: string[] = []
   if (p.age)        parts.push(`${p.age} yrs`)
   if (p.height)     parts.push(p.height)
   if (p.caste)      parts.push(p.caste)
   if (p.education)  parts.push(p.education)
   if (p.occupation) parts.push(p.occupation)
-  if (p.location)   parts.push(p.location)
-  return parts
+  if (p.location)   parts.push(p.location)   // location at END (Angular)
+  return parts.join(' | ')
 }
 
 // Angular: FUNC.showLikeCTA(likedStatus) — show Like/Don't Show/View Later when not yet liked/declined
@@ -282,22 +282,17 @@ function MatchCard({
       </View>
 
       {/* ── Basic view text ────────────────────────────────────────────────── */}
-      {/* Figma: Poppins-Regular 14px black, | separators at rgba(0,0,0,0.2), gap 12px below nameRow */}
+      {/* Angular: bindBasicView() — "27 yrs | 5'5" | Brahmin | B.Tech | Engineer | Chennai, TN" */}
       <Pressable onPress={onPress}>
         <Text style={c.basicView} numberOfLines={4}>
-          {buildBasicViewParts(profile).map((part, i) => (
-            <Text key={i}>
-              {i > 0 && <Text style={c.basicViewSep}> | </Text>}
-              {part}
-            </Text>
-          ))}
+          {buildBasicView(profile)}
         </Text>
       </Pressable>
 
       {/* ── View profile link ──────────────────────────────────────────────── */}
-      {/* Figma: "View full profile", #29339B, gap 16px above */}
+      {/* Angular: app-button-revamp [buttonType]="link" — "View profile →" */}
       <Pressable onPress={onPress} style={c.viewProfileBtn}>
-        <Text style={c.viewProfileText}>View full profile</Text>
+        <Text style={c.viewProfileText}>View profile</Text>
       </Pressable>
 
       {/* ── CTA section ────────────────────────────────────────────────────── */}
@@ -644,7 +639,6 @@ export default function MatchesScreen({ navigation }: { navigation: any }) {
   const [totalCount,   setTotalCount]   = useState(0)
   const [loading,      setLoading]      = useState(true)
   const [loadingMore,  setLoadingMore]  = useState(false)
-  const [notifCount,     setNotifCount]     = useState(0)
   const [extendedCount,  setExtendedCount]  = useState(0)
 const [selectedChip,   setSelectedChip]   = useState<string>('')
   const [showPhotoPromotion, setShowPhotoPromotion] = useState(false)
@@ -747,8 +741,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
 
         // Step 3 — Angular: parallel post-matches calls
         // newcount + extendedmatches + ppSetData + dailyRecommendations + menuPromo
-        const [count, extCount, , promo] = await Promise.all([
-          fetchNotifCount(),
+        const [extCount, , promo] = await Promise.all([
           fetchExtendedMatchesCount(),
           fetchAndStorePPSetData().then(async (ppSetData) => {
             const [entryType, reg] = await Promise.all([
@@ -791,7 +784,6 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           fetchMenuPromo(),
         ])
         if (!cancelled) {
-          setNotifCount(count)
           setExtendedCount(extCount)
           if (promo) setMenuPromo(promo)
         }
@@ -966,24 +958,13 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         {/* Title section — Angular: ion-grid pl-24, bottom-border-e5e5e5 */}
         {/* onLayout measures titleH = Angular offsetHt (only the title row that gets hidden) */}
         <View style={s.titleSection} onLayout={handleTitleLayout}>
-          {/* Title row — Angular: ion-row mt-16 mb-16 pr-16 */}
+          {/* Title row — Figma: title left + language button right (no bell) */}
           <View style={s.titleRow}>
-            <Text style={s.title}>{loading ? 'Matches' : `Matches (${totalCount})`}</Text>
-            <View style={s.headerRight}>
-              <Pressable style={s.bellBtn} onPress={() => {}} hitSlop={8}>
-                <SvgUri uri={CDN + 'revamp/home-notification.svg'} width={22} height={22} />
-                {notifCount > 0 && (
-                  <View style={s.badge}>
-                    <Text style={s.badgeText}>{notifCount > 99 ? '99+' : notifCount}</Text>
-                  </View>
-                )}
-              </Pressable>
-              <Pressable style={s.langBtn} onPress={() => navigation.navigate('LanguageSelection')} hitSlop={8}>
-                <SvgUri uri={CDN + 'revamp/lang-change-img.svg'} width={18} height={18} />
-                <Text style={s.langText}>{LANG_LABELS[i18n.language] ?? 'English'}</Text>
-                <Text style={s.langChevron}>{'›'}</Text>
-              </Pressable>
-            </View>
+            <Text style={s.title}>{loading ? 'Matches' : `${totalCount} Matches`}</Text>
+            <Pressable style={s.langBtn} onPress={() => navigation.navigate('LanguageSelection')} hitSlop={8}>
+              <SvgUri uri={CDN + 'revamp/lang-change-img.svg'} width={18} height={18} />
+              <Text style={s.langText}>{LANG_LABELS[i18n.language] ?? 'English'}</Text>
+            </Pressable>
           </View>
         </View>
 
@@ -1095,36 +1076,13 @@ const s = StyleSheet.create({
     fontSize:   18,
     color:      '#333333',
   },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           8,
-  },
-  // Notification bell + badge — Angular: notificationService badge count
-  bellBtn: { position: 'relative', padding: 4 },
-  bellIcon: { width: 22, height: 22 },
-  badge: {
-    position:        'absolute',
-    top:             0,
-    right:           0,
-    minWidth:        16,
-    height:          16,
-    borderRadius:    8,
-    backgroundColor: Colors.primary,
-    alignItems:      'center',
-    justifyContent:  'center',
-    paddingHorizontal: 3,
-  },
-  badgeText: { fontFamily: 'Poppins-SemiBold', fontSize: 9, color: Colors.white },
-  // Angular: app-dropdown languageChanges — lang icon + label + chevron
+  // Figma: language button — globe icon + label, no bell, no chevron
   langBtn: {
     flexDirection: 'row',
     alignItems:    'center',
     gap:           4,
   },
-  langIcon:    { width: 18, height: 18 },
-  langText:    { fontFamily: 'Poppins-Medium', fontSize: 12, color: '#333333' },
-  langChevron: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#333333', transform: [{ rotate: '90deg' }] },
+  langText: { fontFamily: 'Poppins-Medium', fontSize: 12, color: '#333333' },
 
   // Angular: second ion-grid padd0 → div pl-16 mt-4
   prefSection: {
@@ -1287,33 +1245,31 @@ const c = StyleSheet.create({
     paddingHorizontal: 16,
     gap:              12,
   },
-  name:       { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: '#000000' },
+  name:       { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: '#333333' },
   iconBtn:    { flexShrink: 0 },
   nameRowIcon:  { width: 24, height: 24 },
   nameRowIconWa:{ width: 28, height: 28 },
 
-  // Figma: Poppins-Regular 14px, black text, gap 12px below nameRow
+  // Angular: body2-regular-14 mt-2 pl-16 pr-16 bv-minht text-space
   basicView: {
-    fontFamily:        'Poppins-Regular',
-    fontSize:          14,
-    color:             '#000000',
-    lineHeight:        20,
-    marginTop:         12,
+    fontFamily:       'Poppins-Regular',
+    fontSize:         14,
+    color:            '#333333',
+    lineHeight:       22,
+    marginTop:        4,
     paddingHorizontal: 16,
+    minHeight:        40,
   },
-  // Figma: | separators at rgba(0,0,0,0.2)
-  basicViewSep: { color: 'rgba(0,0,0,0.2)' },
 
-  // Figma: "View full profile", #29339B, 16px gap above
+  // Angular: app-button-revamp [buttonSize]="link" — "View profile"
   viewProfileBtn: {
     paddingHorizontal: 16,
-    paddingTop:        16,
-    paddingBottom:     8,
+    paddingVertical:   8,
   },
   viewProfileText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: 'Poppins-Medium',
     fontSize:   14,
-    color:      '#29339B',
+    color:      Colors.primary,
   },
 
   // Angular: Row 1 = tertiary (Don't show) + secondary (View later), Row 2 = primary (Like)

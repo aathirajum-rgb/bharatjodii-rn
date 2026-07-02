@@ -59,9 +59,10 @@ function toProfile(p: Record<string, any>): SwiperItem {
     // Angular: bindBasicView — LOCATION first, then CITY+STATE
     location:            p['LOCATION'] || [p['CITY'], p['STATE']].filter(Boolean).join(', ') || '',
     profileImg:          p['THUMBIMG'],
-    isPhotoAvailable:    p['PHOTOSTATUS']  === '1',
-    isPhotoProtect:      p['PHOTOPRIVACY'] === '1',
-    isNewlyJoined:       p['ISNEWLYJOINED'] === '1',
+    // Angular: IsPhotoAvailable checks PHOTOAVAILABLE == "Y", getPhotoProtect checks PHOTOPROTECTED == 'Y'
+    isPhotoAvailable:    p['PHOTOAVAILABLE']  == 'Y',
+    isPhotoProtect:      p['PHOTOPROTECTED']  == 'Y',
+    isNewlyJoined:       p['ISNEWLYJOINED']   == '1',
     // Angular matches card: profile.LIKED (not LIKEDSTATUS) — fallback for other listing APIs
     likedStatus:         (p['LIKED'] ?? p['LIKEDSTATUS']) as SwiperItem['likedStatus'],
     isNewLabel:          p['ISNEWLABEL']  === '1',
@@ -277,8 +278,8 @@ export async function fetchDailyRecommendations(): Promise<SwiperItem[]> {
       occupation:       p['OCCUPATION'],
       location:         p['LOCATION'] || [p['CITY'], p['STATE']].filter(Boolean).join(', ') || '',
       profileImg:       p['THUMBIMG'],
-      isPhotoAvailable: p['PHOTOSTATUS']  === '1',
-      isPhotoProtect:   p['PHOTOPRIVACY'] === '1',
+      isPhotoAvailable: p['PHOTOAVAILABLE'] == 'Y',
+      isPhotoProtect:   p['PHOTOPROTECTED'] == 'Y',
       likedStatus:      p['LIKEDSTATUS']  as SwiperItem['likedStatus'],
       isPaidMember:     p['ENTRYTYPE'] !== undefined ? !['B', 'F'].includes(String(p['ENTRYTYPE'])) : p['PAIDMEMBER'] === '1',
       isIdVerified:     p['IDVERIFY'] === '1' || p['IDVERIFYSTATUS'] === '1',
