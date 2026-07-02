@@ -156,6 +156,9 @@ export default function OTPScreen({ navigation, route }: Props) {
             await parseAndStoreWebViewURL(res.RESPONSE.WEBVIEWURL)
           }
           pendingUserId.current = (await getItem(StorageKeys.Auth.USER_ID)) ?? ''
+          // Angular authguard: LASTAPPLOGINAT tracks when we last autologined.
+          // Save on every successful login so the 1hr gate in MatchesScreen starts fresh.
+          await setItem('LASTAPPLOGINAT', new Date().toISOString())
         } catch (storageErr) {
           if (__DEV__) console.error('[OTP] storage error (non-fatal):', storageErr)
         }

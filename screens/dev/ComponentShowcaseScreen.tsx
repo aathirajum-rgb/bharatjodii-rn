@@ -1602,7 +1602,7 @@ function AppFooterShowcase() {
         <AppFooter
           activeTab={activeTab}
           exploreCount={5}
-          activityCount={3}
+          likesCount={3}
           chatCount={12}
           upgradeTag="₹200 OFF"
           onTabPress={t => setActiveTab(t)}

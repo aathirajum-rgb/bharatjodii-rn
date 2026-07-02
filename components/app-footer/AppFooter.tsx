@@ -1,4 +1,5 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
@@ -44,8 +45,8 @@ const TAB_LABELS: Record<FooterTab, string> = {
   0: 'Home',
   1: 'Matches',
   2: 'Liked profiles',
-  4: 'Contacted',
-  3: 'Upgrade',
+  4: 'Contacted profiles',
+  3: 'Membership',
 }
 
 // Left → right render order (matches Figma)
@@ -101,9 +102,14 @@ export default function AppFooter({
             >
               {/* ── Upgrade tag above Membership icon (e.g. "₹200 OFF") ── */}
               {tab === 3 && !!upgradeTag && (
-                <View style={styles.upgradeTag}>
+                <LinearGradient
+                  colors={['#33258C', '#751246']}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={styles.upgradeTag}
+                >
                   <Text style={styles.upgradeTagText} numberOfLines={1}>{upgradeTag}</Text>
-                </View>
+                </LinearGradient>
               )}
 
               {/* ── Icon area ── */}
@@ -184,13 +190,13 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontFamily: 'Poppins-Regular',
     fontSize:   10,
-    color:      Colors.textTertiary,
+    color:      '#1F1E1B',
     marginTop:  4,
     lineHeight: 12,
   },
   tabLabelActive: {
     fontFamily: 'Poppins-Medium',
-    color:      Colors.primary,
+    color:      '#B50033',
   },
   // Count badge — "99+" red pill (Figma: Likes tab)
   countBadge: {
@@ -213,13 +219,15 @@ const styles = StyleSheet.create({
     fontSize:   8,
     lineHeight: 12,
   },
-  // "₹200 OFF" upgrade pill above Membership icon
+  // "₹200 OFF" upgrade pill above Membership icon — gradient: #33258C → #751246
   upgradeTag: {
-    backgroundColor:   Colors.primary,
-    borderRadius:      3,
-    paddingVertical:   2,
-    paddingHorizontal: 4,
+    borderRadius:      2,
+    paddingVertical:   1,
+    paddingHorizontal: 5,
     marginBottom:      2,
+    minWidth:          60,
+    alignItems:        'center',
+    justifyContent:    'center',
   },
   upgradeTagText: {
     fontFamily: 'Poppins-SemiBold',

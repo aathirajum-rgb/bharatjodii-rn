@@ -22,7 +22,8 @@ import {
   setRegValue,
   submitHoroscopeDetails,
 } from '../../service/registrationService'
-import { getItem } from '../../service/storageService'
+import { getItem, setItem } from '../../service/storageService'
+import { refreshSession } from '../../service/homeService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os, scrollPaddingBottom } from './onboardingStyles'
@@ -84,6 +85,10 @@ export default function DoshamScreen({ navigation }: Props) {
     try {
       await setRegValue('DOSHAM', selected.key)
       await submitHoroscopeDetails(star, raasi, selected.key)
+      // Angular registration-revamp.component.ts:1375 — autoLogin after registration completes.
+      // Upgrades weak OTP tokens to strong Level-2 tokens. Update timestamp so 1hr gate resets.
+      await refreshSession()
+      await setItem('LASTAPPLOGINAT', new Date().toISOString())
       navigation.navigate('Home')
     } catch {
       // allow retry
@@ -92,7 +97,9 @@ export default function DoshamScreen({ navigation }: Props) {
     }
   }
 
-  function handleSkip() {
+  async function handleSkip() {
+    await refreshSession()
+    await setItem('LASTAPPLOGINAT', new Date().toISOString())
     navigation.navigate('Home')
   }
 

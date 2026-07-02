@@ -209,7 +209,7 @@ export async function fetchMaritalStatusOptions(
 
 // Reads REGISTRATIONARRAYS from cache (AsyncStorage) or fetches fresh from API and saves.
 // Angular stores the full initialfetch response under this key — mirrors that pattern.
-async function getRegistrationArrays(): Promise<Record<string, any>> {
+export async function getRegistrationArrays(): Promise<Record<string, any>> {
   const cached = await getItem('REGISTRATIONARRAYS')
   if (cached) {
     try { return JSON.parse(cached) } catch {}

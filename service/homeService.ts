@@ -1,5 +1,5 @@
 import { apiCall } from './apiClient'
-import { getItem, setJson } from './storageService'
+import { getItem, setItem, setJson } from './storageService'
 import { getSession, parseAndStoreWebViewURL } from './registrationService'
 import { Endpoints } from './api.endpoints'
 import { StorageKeys } from '../constants/storage.keys'
@@ -38,11 +38,12 @@ export interface HelpVideo {
 
 export interface ListingResult {
   items: SwiperItem[]
+  bannerSlots: Array<{ slot: string; insertAfter: number }>
   totalCount: number
   newCount: number
 }
 
-export const EMPTY_LISTING: ListingResult = { items: [], totalCount: 0, newCount: 0 }
+export const EMPTY_LISTING: ListingResult = { items: [], bannerSlots: [], totalCount: 0, newCount: 0 }
 
 // ─── Profile mapper ───────────────────────────────────────────────────────────
 
@@ -52,7 +53,8 @@ function toProfile(p: Record<string, any>): SwiperItem {
     profileId:           p['MATRIID']  ?? p['NBID']  ?? p['ID'],
     name:                p['NAME'],
     age:                 p['AGE']   ? `${p['AGE']} Yrs` : undefined,
-    height:              p['HEIGHT'],
+    // Angular card receives profile.HEIGHTCATEGORY (formatted string like "5'4\"")
+    height:              p['HEIGHTCATEGORY'] ?? p['HEIGHT'],
     education:           p['EDUCATION'],
     // Angular: bindBasicView — LOCATION first, then CITY+STATE
     location:            p['LOCATION'] || [p['CITY'], p['STATE']].filter(Boolean).join(', ') || '',
@@ -81,8 +83,25 @@ function toListingResult(res: Record<string, any>): ListingResult {
   // Angular matches API: profiles in res['RESPONSE'] (array), count in res['TOTAL']
   // Other listing APIs may use res['LIST'] / res['TOTALCOUNT'] — keep fallbacks
   const raw = res['RESPONSE'] ?? res['LIST'] ?? res['LISTDATA'] ?? []
+  const all = Array.isArray(raw) ? raw : []
+
+  const items: SwiperItem[] = []
+  const bannerSlots: Array<{ slot: string; insertAfter: number }> = []
+
+  for (const p of all) {
+    // STATUS 997/999/1000 = loader / end-of-list / hidden placeholders
+    if (p['STATUS'] === '997' || p['STATUS'] === '999' || p['STATUS'] === '1000') continue
+    if (p['BANNERSLOT']) {
+      // Track banner position as "after N profile items"
+      bannerSlots.push({ slot: String(p['BANNERSLOT']), insertAfter: items.length })
+      continue
+    }
+    items.push(toProfile(p))
+  }
+
   return {
-    items:      Array.isArray(raw) ? raw.map(toProfile) : [],
+    items,
+    bannerSlots,
     totalCount: Number(res['TOTAL'] ?? res['TOTALCOUNT'] ?? res['LISTCOUNT'] ?? 0),
     newCount:   Number(res['NEWCOUNT'] ?? 0),
   }
@@ -108,19 +127,64 @@ export async function fetchHomeSession(): Promise<HomeSession> {
 }
 
 // ─── Session refresh ──────────────────────────────────────────────────────────
-// OTP verification gives Level-1 tokens (valid only for registration/onboarding APIs).
-// Listing, communication, and payment APIs require Level-2 tokens.
-// autoLogin upgrades the session: sends the existing token to the server and receives
-// a new WEBVIEWURL payload with fresh Level-2 ATN/RTN stored via parseAndStoreWebViewURL.
-// Call this once at the top of the home screen load, before any listing API calls.
+// Mirrors Angular's autoLogin(skipParse=1, onboardingFlow=false, hasloadWebUrl=true).
+// Angular params: ID&CLIENTIP&DEVICEDETAIL&APPVERSION&MCODE&REGISTERID&DEVICEID&NALLOW&NEWREG=1
+// On ERRCODE=="0": store ATN/RTN from top-level response, then parse WEBVIEWURL if present.
+// On ERRCODE=="1" && RESPONSECODE=="2": session is fully expired — caller handles.
 
-export async function refreshSession(): Promise<void> {
-  const userId = await getItem(StorageKeys.Auth.USER_ID)
-  if (!userId) return
-  const result = await apiCall(Endpoints.auth.autoLogin, 'POST', `ID=${userId}&TYPE=autologin`)
-  if (result?.RESPONSECODE == 1 && result?.RESPONSE?.WEBVIEWURL) {
-    await parseAndStoreWebViewURL(result.RESPONSE.WEBVIEWURL)
+export async function refreshSession(): Promise<boolean> {
+  const [
+    userId,
+    ipAddress,
+    deviceDetail,
+    appVersion,
+    mcode,
+    registerId,
+    deviceId,
+    nallow,
+  ] = await Promise.all([
+    getItem(StorageKeys.Auth.USER_ID),
+    getItem('USERIP'),
+    getItem('DEVICEDETAIL'),
+    getItem(StorageKeys.App.APP_VERSION),
+    getItem(StorageKeys.User.MEMBER_CODE),
+    getItem('REGISTERID'),
+    getItem('DEVICEID'),
+    getItem(StorageKeys.App.NALLOW),
+  ])
+
+  if (!userId) return false
+
+  const params = [
+    `ID=${userId}`,
+    `CLIENTIP=${ipAddress ?? ''}`,
+    `DEVICEDETAIL=${deviceDetail ?? ''}`,
+    `APPVERSION=${appVersion ?? ''}`,
+    `MCODE=${mcode ?? ''}`,
+    `REGISTERID=${registerId ?? ''}`,
+    `DEVICEID=${deviceId ?? ''}`,
+    `NALLOW=${nallow ?? '0'}`,
+    'NEWREG=1',
+  ].join('&')
+
+  const result = await apiCall(Endpoints.auth.autoLogin, 'POST', params)
+
+  if (result?.ERRCODE === '0' || result?.ERRCODE == 0) {
+    // Store tokens from top-level response first (Angular: setLocalStorageUserValue)
+    if (result.ATN) await setItem(StorageKeys.Auth.TOKEN,         result.ATN)
+    if (result.RTN) await setItem(StorageKeys.Auth.REFRESH_TOKEN, result.RTN)
+    // Parse WEBVIEWURL for full session data (user profile, flags, etc.)
+    const webViewUrl = result?.RESPONSE?.WEBVIEWURL
+    if (webViewUrl) await parseAndStoreWebViewURL(webViewUrl)
+    return true
   }
+
+  if (result?.ERRCODE == 1 && result?.RESPONSECODE == 2) {
+    // Both tokens dead — callers should redirect to login
+    return false
+  }
+
+  return false
 }
 
 // ─── Notification count ───────────────────────────────────────────────────────
@@ -154,6 +218,24 @@ export async function fetchPayBanner(): Promise<BannerData> {
   }
 }
 
+// ─── Menu promo (MATCHESSLOT membership banner) ───────────────────────────────
+// Angular: paymentService.getMenuPromo(0) → payment/nbmenu/v1
+// Returns MATCHESSLOT (festival/membership offer), MANYJOBSPROMO, ASSISTEDPROMO, etc.
+// Cached in MENU_PROMO localStorage by Angular — we fetch fresh each session.
+
+export async function fetchMenuPromo(): Promise<any> {
+  const id          = await getItem(StorageKeys.Auth.USER_ID)
+  const renewalFlag = await getItem('RENEWALENABLEKEY') ?? '0'
+  const params = `ID=${id ?? ''}&RENEWALFLAG=${renewalFlag}&AUTOUPIFLAG=0&PAYAPITYPE=7`
+  try {
+    const res = await apiCall(Endpoints.payment.nbMenu, 'POST', params)
+    if (String(res['ERRCODE']) === '0' && res['RESPONSE']) {
+      return res['RESPONSE']
+    }
+  } catch {}
+  return null
+}
+
 // ─── PP set data (member preference) ─────────────────────────────────────────
 // Angular: profileService.getPPSETData(1) → editprofile/getpreference/v1
 // Params: ID=&GENDER= (angular: getApiParams(id, 'getmemberPreference'))
@@ -167,7 +249,7 @@ export async function fetchAndStorePPSetData(): Promise<Record<string, any>> {
   ])
   const params = `ID=${userId ?? ''}&GENDER=${gender ?? 'M'}`
   const res = await apiCall(Endpoints.profile.getPreference, 'POST', params)
-  if (res?.RESPONSECODE === '1' && res?.ERRCODE === '0') {
+  if (String(res?.RESPONSECODE) === '1' && String(res?.ERRCODE) === '0') {
     const data: Record<string, any> = res.RESPONSE ?? {}
     await setJson(StorageKeys.App.PP_SET_DATA, data)
     return data
