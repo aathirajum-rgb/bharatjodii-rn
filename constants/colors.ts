@@ -85,4 +85,22 @@ export const Colors = {
   // ── System (platform) ─────────────────────────────────────────────────────────
   iOSBlue:        '#007AFF',   // iOS system blue (native controls, links)
   iOSGreen:       '#34C759',   // iOS system green (success states)
+
+  // ── Matches card ──────────────────────────────────────────────────────────────
+  scrimStrong:      'rgba(0,0,0,0.7)',      // request-photo overlay card bg (MatchesScreen)
+  overlayBorder:    'rgba(255,255,255,0.4)',// request-photo overlay card border
+  whatsappGreen:    '#25D366',              // WhatsApp CTA background
+  likedStripBg:     '#FFEAF7',              // liked-profile pink strip background
+  likedStripText:   '#96286E',              // liked-profile strip text
+  afterLikeBg:      '#FCEAF0',              // post-like CTA row background
+  afterLikeBorder:  '#F5BDD0',              // post-like CTA row top border
+  extendedCardTitle:'#4C4C4C',              // end-of-list "view more" card title
+
+  // ── Promo banners (MatchesScreen) ────────────────────────────────────────────
+  photoPromoGradientStart: '#FFDDDD',   // free-trial photo-promo banner gradient start (→ white)
+  photoPromoTint:          'rgba(181, 0, 51, 0.05)', // photo-promo banner tint background
+  addPhotoGradientStart:   '#F2F4FF',   // add-photo banner gradient start
+  addPhotoGradientEnd:     '#DCFFF0',   // add-photo banner gradient end
+  addPhotoCtaBg:           '#1C644C',   // add-photo banner CTA fallback background
+  membershipCardBg:        '#FFFBF0',   // membership/festival offer card background
 }

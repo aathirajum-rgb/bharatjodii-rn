@@ -58,7 +58,9 @@ function toProfile(p: Record<string, any>): SwiperItem {
     education:           p['EDUCATION'],
     // Angular: bindBasicView — LOCATION first, then CITY+STATE
     location:            p['LOCATION'] || [p['CITY'], p['STATE']].filter(Boolean).join(', ') || '',
-    profileImg:          p['THUMBIMG'],
+    // Angular: FUNC.getPartnerImg() — prefers the full-size PHOTO[0].IMAGE over the
+    // low-res THUMBIMG, which looked blurry once stretched to near full card width.
+    profileImg:          p['PHOTO']?.[0]?.['IMAGE'] || p['THUMBIMG'],
     // Angular: IsPhotoAvailable checks PHOTOAVAILABLE == "Y", getPhotoProtect checks PHOTOPROTECTED == 'Y'
     isPhotoAvailable:    p['PHOTOAVAILABLE']  == 'Y',
     isPhotoProtect:      p['PHOTOPROTECTED']  == 'Y',
@@ -277,7 +279,8 @@ export async function fetchDailyRecommendations(): Promise<SwiperItem[]> {
       education:        p['EDUCATION'],
       occupation:       p['OCCUPATION'],
       location:         p['LOCATION'] || [p['CITY'], p['STATE']].filter(Boolean).join(', ') || '',
-      profileImg:       p['THUMBIMG'],
+      // Angular: FUNC.getPartnerImg() — prefers the full-size PHOTO[0].IMAGE over THUMBIMG
+      profileImg:       p['PHOTO']?.[0]?.['IMAGE'] || p['THUMBIMG'],
       isPhotoAvailable: p['PHOTOAVAILABLE'] == 'Y',
       isPhotoProtect:   p['PHOTOPROTECTED'] == 'Y',
       likedStatus:      p['LIKEDSTATUS']  as SwiperItem['likedStatus'],

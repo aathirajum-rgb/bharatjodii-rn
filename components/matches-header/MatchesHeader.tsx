@@ -1,4 +1,5 @@
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { SvgUri } from 'react-native-svg'
 import { Colors } from '../../constants/colors'
@@ -63,6 +64,7 @@ export interface MatchesHeaderProps {
   selectedChip:    string
   onChipSelect:    (key: string) => void
   onLanguagePress?: () => void
+  onEditPreferences?: () => void
   onHeaderLayout:  (height: number) => void
   onTitleLayout:   (height: number) => void
 }
@@ -77,9 +79,11 @@ export default function MatchesHeader({
   selectedChip,
   onChipSelect,
   onLanguagePress,
+  onEditPreferences,
   onHeaderLayout,
   onTitleLayout,
 }: MatchesHeaderProps) {
+  const { t } = useTranslation()
   const langLabel = LANG_LABELS[langCode] ?? 'English'
 
   return (
@@ -112,6 +116,20 @@ export default function MatchesHeader({
             </Pressable>
           </View>
         </View>
+
+        {/* Angular: matches.page.html — "#COUNT# profiles based on your preferences." on
+            line 1, "Edit preferences" on line 2 — forced, not width-dependent wrap. */}
+        {!loading && (
+          <View style={s.ppRow}>
+            <Text style={s.ppText}>
+              {t('MATCHES.PROFILE_COUNT').replace('#COUNT#', String(totalCount))}
+            </Text>
+            <Pressable style={s.ppEditBtn} onPress={onEditPreferences} hitSlop={8}>
+              <Text style={s.ppEditText}>{t('MATCHES.EDIT_PP')}</Text>
+              <SvgUri uri={CDN + 'registration-new/edit-pencil.svg'} width={14} height={14} style={{ marginLeft: 4 }} />
+            </Pressable>
+          </View>
+        )}
 
         {/* Filter chips — Figma: top 56 from content start (12 title-top + 24 title + 20 gap) */}
         <FilterChipsRow selected={selectedChip} onSelect={onChipSelect} />
@@ -151,8 +169,32 @@ const s = StyleSheet.create({
     paddingLeft:    24,
     paddingRight:   16,
     marginTop:      12,
-    marginBottom:   20,
+    marginBottom:   8,
     height:         24,
+  },
+  // Angular: matches.page.html — "#COUNT# profiles based on your preferences." then
+  // "Edit preferences" always on its own line below (column, not a wrapping row).
+  ppRow: {
+    flexDirection:     'column',
+    alignItems:        'flex-start',
+    paddingLeft:       24,
+    paddingRight:      16,
+    marginBottom:      12,
+    gap:               2,
+  },
+  ppText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize:   14,
+    color:      Colors.textDark,
+  },
+  ppEditBtn: {
+    flexDirection: 'row',
+    alignItems:    'center',
+  },
+  ppEditText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize:   14,
+    color:      Colors.link,
   },
   // Figma: Poppins-SemiBold 18 #333
   title: {

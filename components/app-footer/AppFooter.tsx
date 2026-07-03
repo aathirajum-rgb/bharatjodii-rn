@@ -40,12 +40,15 @@ const TAB_ICONS: Record<FooterTab, [string, string]> = {
   3: [CDN + 'membership-deactive.svg', CDN + 'membership-active.svg'],
 }
 
-// Labels exactly as shown in Figma screenshot
+// Angular: footer.component.html — two-word labels wrap to 2 lines in the tab
+// bar by design (line-height-12, min-height:56px accommodates it). Forced line
+// break (not auto-wrap) so it always splits "Liked" / "profiles" regardless of
+// tab width.
 const TAB_LABELS: Record<FooterTab, string> = {
   0: 'Home',
   1: 'Matches',
-  2: 'Liked profiles',
-  4: 'Contacted profiles',
+  2: 'Liked\nprofiles',
+  4: 'Contacted\nprofiles',
   3: 'Membership',
 }
 
@@ -133,9 +136,11 @@ export default function AppFooter({
               </View>
 
               {/* ── Label ── */}
+              {/* Angular: two-word labels (Liked profiles / Contacted profiles) wrap
+                  to 2 lines by design — numberOfLines=2 + centered text matches that. */}
               <Text
                 style={[styles.tabLabel, isActive && styles.tabLabelActive]}
-                numberOfLines={1}
+                numberOfLines={2}
               >
                 {label}
               </Text>
@@ -161,16 +166,16 @@ const styles = StyleSheet.create({
   tabBar: {
     flexDirection:     'row',
     justifyContent:    'space-around',
-    alignItems:        'flex-end',
+    alignItems:        'center',
     paddingHorizontal: 4,
     paddingTop:        6,
     paddingBottom:     4,
-    height:            58,
+    height:            66,   // fits icon + 2-line label (Liked profiles / Contacted profiles)
   },
   tabBtn: {
     flex:           1,
     alignItems:     'center',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
     paddingBottom:  2,
     position:       'relative',
   },
@@ -193,6 +198,7 @@ const styles = StyleSheet.create({
     color:      '#1F1E1B',
     marginTop:  4,
     lineHeight: 12,
+    textAlign:  'center',
   },
   tabLabelActive: {
     fontFamily: 'Poppins-Medium',

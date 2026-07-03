@@ -1690,6 +1690,7 @@
         "PAID_MEMBER":"Become a paid member",
         "PAID_MEMBER_CONTENT":"Become a paid member to use Jodii messages to message ##NAME## & 120 other members who match your preferences",
         "MESSAGE_CTA":"Jodii Message",
+        "SEND_INTEREST_CTA":"Send Interest",
         "CALL_CTA":"Call",
         "MESSAGE_USED":"Messages used",
         "MESSAGE_REMAINING":"Remaining messages",

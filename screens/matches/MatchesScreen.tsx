@@ -197,6 +197,7 @@ function MatchCard({
   onCall:     () => void
   onWhatsApp: () => void
 }) {
+  const { t } = useTranslation()
   return (
     <View style={c.card}>
 
@@ -218,11 +219,11 @@ function MatchCard({
             <View style={c.photoOverlay}>
               <View style={c.overlayCard}>
                 <Text style={c.overlayText}>
-                  {`Contact and Get ${oppGender === 'F' ? 'her' : 'his'} Photos on WhatsApp`}
+                  {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', oppGender === 'F' ? 'her' : 'his')}
                 </Text>
                 <Pressable style={c.waBtn} onPress={onWhatsApp}>
                   <WhatsAppIcon width={18} height={18} />
-                  <Text style={c.waBtnText}>WhatsApp</Text>
+                  <Text style={c.waBtnText}>{t('GENERAL.WHATSAPP')}</Text>
                 </Pressable>
               </View>
             </View>
@@ -233,7 +234,7 @@ function MatchCard({
         {profile.isNewlyJoined && (
           <View style={c.newBadge} pointerEvents="none">
             <SvgUri uri={CDN + 'revamp/newly-joined-star.svg'} width={14} height={14} />
-            <Text style={c.newBadgeText}>New</Text>
+            <Text style={c.newBadgeText}>{t('MATCHES.NEW')}</Text>
           </View>
         )}
       </Pressable>
@@ -294,7 +295,7 @@ function MatchCard({
       {/* ── View profile link ──────────────────────────────────────────────── */}
       {/* Angular: app-button-revamp [buttonType]="link" — "View profile →" */}
       <Pressable onPress={onPress} style={c.viewProfileBtn}>
-        <Text style={c.viewProfileText}>View profile</Text>
+        <Text style={c.viewProfileText}>{t('MATCHES.VIEW_PROFILE_CTA')}</Text>
       </Pressable>
 
       {/* ── CTA section ────────────────────────────────────────────────────── */}
@@ -306,16 +307,16 @@ function MatchCard({
           <View style={c.ctaSecRow}>
             <Pressable style={c.ctaDontShow} onPress={onDontShow}>
               <CloseIcon width={16} height={16} />
-              <Text style={c.ctaDontShowText}>Don't Show</Text>
+              <Text style={c.ctaDontShowText}>{t('GENERAL.DONTSHOWCTA')}</Text>
             </Pressable>
             <Pressable style={c.ctaViewLater} onPress={onViewLater}>
               <ViewLaterIcon width={16} height={16} />
-              <Text style={c.ctaViewLaterText}>View Later</Text>
+              <Text style={c.ctaViewLaterText}>{t('GENERAL.VIEWLATER')}</Text>
             </Pressable>
           </View>
           <Pressable style={c.ctaLike} onPress={onLike}>
             <LikeIcon width={20} height={20} />
-            <Text style={c.ctaLikeText}>Like</Text>
+            <Text style={c.ctaLikeText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
           </Pressable>
         </View>
       )}
@@ -324,10 +325,10 @@ function MatchCard({
         // Angular: matches-cta-bg-color (pink gradient bg) + getContentAfterLike() text + "Send interest" CTA
         <View style={c.afterLikeRow}>
           <Text style={c.afterLikeText}>
-            {`Contact ${oppGender === 'F' ? 'her' : 'him'} to connect`}
+            {t('GENERAL.CONTACT')}
           </Text>
           <Pressable style={c.ctaSendInterest} onPress={onPress}>
-            <Text style={c.ctaSendInterestText}>Send Interest</Text>
+            <Text style={c.ctaSendInterestText}>{t('GENERAL.SEND_INTEREST_CTA')}</Text>
           </Pressable>
         </View>
       )}
@@ -351,7 +352,7 @@ function PhotoPromotionBanner({ data, onPress }: { data: any; onPress: () => voi
     // Angular: free-trial-height min-height:38vmin, BGCOLOR gradient #FFDDDD→#FFF
     <Pressable onPress={onPress}>
       <LinearGradient
-        colors={['#FFDDDD', '#FFFFFF']}
+        colors={[Colors.photoPromoGradientStart, Colors.white]}
         start={{ x: 0, y: 0 }}
         end={{ x: 0, y: 1 }}
         style={pb.container}
@@ -396,7 +397,7 @@ function MembershipBanner({ data, onPress }: { data: any; onPress: () => void })
   const valid = stripHtml(data.VALID ?? data.FCONTENT ?? '')
   const benefits: Array<{ IMG?: string; VALUE?: string }> = Array.isArray(data.BENEFITS) ? data.BENEFITS : []
   const isWhite = data.FONTCOLOR === 'white-color'
-  const textColor = isWhite ? '#FFFFFF' : '#1A1A1A'
+  const textColor = isWhite ? Colors.white : Colors.textStrong
 
   return (
     <Pressable style={mb.card} onPress={onPress}>
@@ -473,12 +474,12 @@ function AddPhotoBanner({ data, onPress }: { data: any; onPress: () => void }) {
   const line1   = stripHtml(data.BODY?.CONTENT1 ?? 'You will be able to like matches.')
   const line2   = stripHtml(data.BODY?.CONTENT2 ?? 'Your profile will be visible to matches')
   const cta     = stripHtml(data.CTA ?? 'Add photo now')
-  const ctaBg   = data.CTABGCOLOR || '#1C644C'
+  const ctaBg   = data.CTABGCOLOR || Colors.addPhotoCtaBg
 
   return (
     <Pressable onPress={onPress}>
       <LinearGradient
-        colors={['#F2F4FF', '#DCFFF0']}
+        colors={[Colors.addPhotoGradientStart, Colors.addPhotoGradientEnd]}
         start={{ x: 0, y: 1 }}
         end={{ x: 1, y: 0 }}
         style={ap.container}
@@ -526,6 +527,7 @@ function AddPhotoBanner({ data, onPress }: { data: any; onPress: () => void }) {
 const FEMALE_AVATAR = CDN + 'female_avatar_new.svg'
 
 function ExtendedMatchesCard({ count, onPress }: { count: number; onPress: () => void }) {
+  const { t } = useTranslation()
   return (
     <Pressable style={e.card} onPress={onPress}>
       {/* 3 overlapping avatars + count badge */}
@@ -537,17 +539,16 @@ function ExtendedMatchesCard({ count, onPress }: { count: number; onPress: () =>
         ))}
         <View style={[e.countCircle, { marginLeft: -12 }]}>
           <Text style={e.countNum}>+{count}</Text>
-          <Text style={e.countLabel}>more</Text>
+          <Text style={e.countLabel}>{t('MATCHES.MORE')}</Text>
         </View>
       </View>
 
       {/* Title */}
-      <Text style={e.title}>Continue seeing profiles</Text>
+      <Text style={e.title}>{t('MATCHES.CONTINUE_TITLE')}</Text>
 
       {/* Description */}
       <Text style={e.desc}>
-        You have seen all the matches based on your preferences.
-        View matches as per Jodii recommendation
+        {t('MATCHES.CONTINUE_CONT')}
       </Text>
 
       {/* Progress bar — Angular: ion-progress-bar */}
@@ -690,9 +691,9 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
                 const banner = reg?.PHOTOPUBLISHED?.Banner ?? {}
                 // API sends Angular CSS class names — resolve to real hex colors
                 const resolveBg = (v: string) =>
-                  (!v || v === 'primaryBg') ? '#B50033' : (v.startsWith('#') ? v : '#B50033')
+                  (!v || v === 'primaryBg') ? Colors.primaryDark : (v.startsWith('#') ? v : Colors.primaryDark)
                 const resolveColor = (v: string) =>
-                  (!v || v === 'whiteColor') ? '#FFFFFF' : (v.startsWith('#') ? v : '#FFFFFF')
+                  (!v || v === 'whiteColor') ? Colors.white : (v.startsWith('#') ? v : Colors.white)
                 setShowPhotoPromotion(true)
                 setPhotoBannerData({
                   TITLE:     banner.TITLE     || 'Profile not active yet!',
@@ -701,7 +702,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
                   BANNERIMG: banner.BANNERIMG || '',
                   CTABGCOLOR: resolveBg(banner.CTABGCOLOR),
                   CTACOLOR:   resolveColor(banner.CTACOLOR),
-                  BGCOLOR:    'rgba(181, 0, 51, 0.05)',
+                  BGCOLOR:    Colors.photoPromoTint,
                 })
               }
             } catch (err) {
@@ -884,6 +885,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         selectedChip={selectedChip}
         onChipSelect={setSelectedChip}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
+        onEditPreferences={() => navigation.navigate('Search')}
         onHeaderLayout={handleHeaderLayout}
         onTitleLayout={handleTitleLayout}
       />
@@ -952,7 +954,7 @@ const c = StyleSheet.create({
     backgroundColor:   Colors.white,
     paddingTop:        16,
     borderBottomWidth: 8,
-    borderBottomColor: '#E6E6E6',
+    borderBottomColor: Colors.borderSubtle,
   },
 
   // Angular: img-holder pl-16 pr-16 with brdr-radius (top-left + top-right radius 16)
@@ -961,14 +963,14 @@ const c = StyleSheet.create({
     borderTopLeftRadius:  16,
     borderTopRightRadius: 16,
     overflow:         'hidden',
-    backgroundColor:  '#F0F0F0',
+    backgroundColor:  Colors.divider,
   },
   photo: { width: '100%', height: '100%' },
 
   // Angular no-photo placeholder
   noPhoto:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   noPhotoIcon: { width: 56, height: 56, opacity: 0.35 },
-  noPhotoText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#AAAAAA' },
+  noPhotoText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textMuted },
 
   // Angular: .newly-joined posabsolute — uses newly-joined.svg as bg, top-left of photo
   newBadge: {
@@ -977,7 +979,7 @@ const c = StyleSheet.create({
     left:          0,
     flexDirection: 'row',
     alignItems:    'center',
-    backgroundColor: '#B50033',
+    backgroundColor: Colors.primaryDark,
     paddingVertical:   4,
     paddingLeft:       12,
     paddingRight:      20,
@@ -987,7 +989,7 @@ const c = StyleSheet.create({
   newBadgeText: {
     fontFamily: 'Poppins-Medium',
     fontSize:   12,
-    color:      '#FFFFFF',
+    color:      Colors.white,
   },
 
   // Angular: isActivityLabel row — viewed-icon + LabelText below liked strip
@@ -1001,7 +1003,7 @@ const c = StyleSheet.create({
   activityText: {
     fontFamily: 'Poppins-Medium',
     fontSize:   14,
-    color:      '#000000',
+    color:      Colors.black,
     flex:       1,
   },
 
@@ -1009,7 +1011,7 @@ const c = StyleSheet.create({
   afterLikeText: {
     fontFamily: 'Poppins-Medium',
     fontSize:   14,
-    color:      '#000000',
+    color:      Colors.black,
     textAlign:  'center',
     marginBottom: 8,
   },
@@ -1021,20 +1023,20 @@ const c = StyleSheet.create({
     justifyContent: 'center',
   },
   overlayCard: {
-    backgroundColor:   'rgba(0,0,0,0.7)',
+    backgroundColor:   Colors.scrimStrong,
     marginHorizontal:  24,
     paddingVertical:   8,
     paddingHorizontal: 16,
     borderRadius:      12,
     borderWidth:       1,
-    borderColor:       'rgba(255,255,255,0.4)',
+    borderColor:       Colors.overlayBorder,
     alignItems:        'center',
     width:             '80%',
   },
   overlayText: {
     fontFamily: 'Poppins-Regular',
     fontSize:   13,
-    color:      '#FFFFFF',
+    color:      Colors.white,
     textAlign:  'center',
     lineHeight: 18,
   },
@@ -1042,7 +1044,7 @@ const c = StyleSheet.create({
   waBtn: {
     flexDirection:     'row',
     alignItems:        'center',
-    backgroundColor:   '#25D366',
+    backgroundColor:   Colors.whatsappGreen,
     borderRadius:      8,
     paddingVertical:   8,
     paddingHorizontal: 16,
@@ -1052,7 +1054,7 @@ const c = StyleSheet.create({
   waBtnText: {
     fontFamily: 'Poppins-Medium',
     fontSize:   13,
-    color:      '#FFFFFF',
+    color:      Colors.white,
   },
 
   // Angular: ion-row isProfileBadge d-flex pl-24 mt-16 — BELOW the photo
@@ -1074,13 +1076,13 @@ const c = StyleSheet.create({
     marginHorizontal: 16,
     marginTop:        8,
     borderRadius:     50,
-    backgroundColor:  '#FFEAF7',
+    backgroundColor:  Colors.likedStripBg,
     paddingHorizontal: 8,
     paddingVertical:   4,
     gap:              4,
   },
   likedIcon: { width: 20, height: 20, flexShrink: 0 },
-  likedText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#96286E', flex: 1 },
+  likedText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.likedStripText, flex: 1 },
 
   // Angular: d-flex align-center-item mt-12 pl-16 pr-16
   nameRow: {
@@ -1090,7 +1092,7 @@ const c = StyleSheet.create({
     paddingHorizontal: 16,
     gap:              12,
   },
-  name:       { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: '#333333' },
+  name:       { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.textDark },
   iconBtn:    { flexShrink: 0 },
   nameRowIcon:  { width: 24, height: 24 },
   nameRowIconWa:{ width: 28, height: 28 },
@@ -1099,7 +1101,7 @@ const c = StyleSheet.create({
   basicView: {
     fontFamily:       'Poppins-Regular',
     fontSize:         14,
-    color:            '#333333',
+    color:            Colors.textDark,
     lineHeight:       22,
     marginTop:        4,
     paddingHorizontal: 16,
@@ -1146,11 +1148,11 @@ const c = StyleSheet.create({
     justifyContent: 'center',
     gap:            6,
     borderWidth:    1,
-    borderColor:    '#CCCCCC',
+    borderColor:    Colors.borderLight,
     borderRadius:   8,
     paddingVertical: 12,
   },
-  ctaDontShowText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: '#333333' },
+  ctaDontShowText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.textDark },
 
   ctaViewLater: {
     flex:           1,
@@ -1159,11 +1161,11 @@ const c = StyleSheet.create({
     justifyContent: 'center',
     gap:            6,
     borderWidth:    1,
-    borderColor:    '#CCCCCC',
+    borderColor:    Colors.borderLight,
     borderRadius:   8,
     paddingVertical: 12,
   },
-  ctaViewLaterText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: '#333333' },
+  ctaViewLaterText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.textDark },
 
   ctaLike: {
     flexDirection:   'row',
@@ -1181,9 +1183,9 @@ const c = StyleSheet.create({
   afterLikeRow: {
     paddingHorizontal: 16,
     paddingVertical:   16,
-    backgroundColor:  '#FCEAF0',
+    backgroundColor:  Colors.afterLikeBg,
     borderTopWidth:   1,
-    borderTopColor:   '#F5BDD0',
+    borderTopColor:   Colors.afterLikeBorder,
   },
   ctaSendInterest: {
     backgroundColor: Colors.primary,
@@ -1204,7 +1206,7 @@ const e = StyleSheet.create({
     borderRadius:     16,
     padding:          24,
     alignItems:       'center',
-    shadowColor:      '#000',
+    shadowColor:      Colors.shadow,
     shadowOffset:     { width: 0, height: 2 },
     shadowOpacity:    0.08,
     shadowRadius:     8,
@@ -1223,7 +1225,7 @@ const e = StyleSheet.create({
     overflow:     'hidden',
     borderWidth:  2,
     borderColor:  Colors.white,
-    backgroundColor: '#F0F0F0',
+    backgroundColor: Colors.divider,
   },
   avatarImg: { width: '100%', height: '100%' },
   countCircle: {
@@ -1241,14 +1243,14 @@ const e = StyleSheet.create({
   title: {
     fontFamily: 'Poppins-SemiBold',
     fontSize:   18,
-    color:      '#4C4C4C',
+    color:      Colors.extendedCardTitle,
     textAlign:  'center',
     marginBottom: 8,
   },
   desc: {
     fontFamily: 'Poppins-Regular',
     fontSize:   14,
-    color:      '#666666',
+    color:      Colors.textSecondary,
     textAlign:  'center',
     lineHeight: 22,
     marginBottom: 20,
@@ -1257,7 +1259,7 @@ const e = StyleSheet.create({
     width:           '100%',
     height:          4,
     borderRadius:    2,
-    backgroundColor: '#E6E6E6',
+    backgroundColor: Colors.borderSubtle,
     overflow:        'hidden',
   },
   progressFill: {
@@ -1281,7 +1283,7 @@ const pb = StyleSheet.create({
     paddingBottom:     8,
     minHeight:         140,
     borderBottomWidth: 8,
-    borderBottomColor: '#E6E6E6',
+    borderBottomColor: Colors.borderSubtle,
     overflow:          'hidden',
   },
   // Angular: ion-col size="4", padd0 — image fills full col width/height
@@ -1306,14 +1308,14 @@ const pb = StyleSheet.create({
   title: {
     fontFamily: 'Poppins-SemiBold',
     fontSize:   16,
-    color:      '#000000',
+    color:      Colors.black,
     lineHeight: 22,
   },
   // Angular: mt-8 body3-regular-12 black-color
   body: {
     fontFamily: 'Poppins-Regular',
     fontSize:   12,
-    color:      '#000000',
+    color:      Colors.black,
     marginTop:  8,
     lineHeight: 18,
   },
@@ -1342,7 +1344,7 @@ const ap = StyleSheet.create({
     paddingVertical:   24,
     gap:               12,
     borderBottomWidth: 8,
-    borderBottomColor: '#E6E6E6',
+    borderBottomColor: Colors.borderSubtle,
     overflow:          'hidden',
   },
   // Angular: add-photo-height = 13vh ≈ 87px, auto width, align-items flex-start
@@ -1355,14 +1357,14 @@ const ap = StyleSheet.create({
   title: {
     fontFamily: 'Poppins-SemiBold',
     fontSize:   22,
-    color:      '#000000',
+    color:      Colors.black,
     lineHeight: 32,
   },
   // Angular: body1-medium-14 black-color
   subheader: {
     fontFamily: 'Poppins-Medium',
     fontSize:   14,
-    color:      '#000000',
+    color:      Colors.black,
   },
   // Angular: pl-24, benefits-container gap:12
   bullets: {
@@ -1377,7 +1379,7 @@ const ap = StyleSheet.create({
   // Angular: li::marker color #8A8A8A
   bullet: {
     fontSize:   14,
-    color:      '#8A8A8A',
+    color:      Colors.borderNeutral,
     lineHeight: 22,
     flexShrink: 0,
   },
@@ -1385,7 +1387,7 @@ const ap = StyleSheet.create({
   bulletText: {
     fontFamily: 'Poppins-Regular',
     fontSize:   14,
-    color:      '#000000',
+    color:      Colors.black,
     flex:       1,
     lineHeight: 22,
   },
@@ -1399,7 +1401,7 @@ const ap = StyleSheet.create({
   ctaText: {
     fontFamily: 'Poppins-SemiBold',
     fontSize:   14,
-    color:      '#FFFFFF',
+    color:      Colors.white,
   },
 })
 
@@ -1409,9 +1411,9 @@ const ap = StyleSheet.create({
 const mb = StyleSheet.create({
   // Angular: matches-breather-block — full card with BGIMG as right-side image
   card: {
-    backgroundColor:   '#FFFBF0',
+    backgroundColor:   Colors.membershipCardBg,
     borderBottomWidth: 8,
-    borderBottomColor: '#E6E6E6',
+    borderBottomColor: Colors.borderSubtle,
     minHeight:         220,
     overflow:          'hidden',
   },
@@ -1437,22 +1439,22 @@ const mb = StyleSheet.create({
   title: {
     fontFamily: 'Poppins-SemiBold',
     fontSize:   20,
-    color:      '#1A1A1A',
+    color:      Colors.textStrong,
     lineHeight: 28,
   },
   subtitle: {
     fontFamily: 'Poppins-Medium',
     fontSize:   14,
-    color:      '#333333',
+    color:      Colors.textDark,
     marginTop:  4,
     lineHeight: 22,
   },
   valid: {
     fontFamily:      'Poppins-Regular',
     fontSize:        12,
-    color:           '#2E7D32',
+    color:           Colors.badgeNewText,
     marginTop:       6,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: Colors.badgeNewBg,
     paddingHorizontal: 8,
     paddingVertical:   2,
     borderRadius:    4,
@@ -1476,7 +1478,7 @@ const mb = StyleSheet.create({
   benefitText: {
     fontFamily: 'Poppins-Regular',
     fontSize:   13,
-    color:      '#333333',
+    color:      Colors.textDark,
     flex:       1,
     lineHeight: 18,
   },
