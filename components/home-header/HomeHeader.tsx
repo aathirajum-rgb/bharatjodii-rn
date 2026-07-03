@@ -1,5 +1,6 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { SvgUri } from 'react-native-svg'
 import MenuIcon from '../../assets/icons/MenuIcon'
 import NotificationIcon from '../../assets/icons/NotificationIcon'
 import SearchIcon from '../../assets/icons/SearchIcon'
@@ -16,7 +17,7 @@ const LANG_LABEL: Record<string, string> = {
 
 const ICONS = {
   lang:     CDN + 'revamp/lang-change-img.svg',
-  chevDown: CDN + 'revamp/chevron-down.svg',
+  chevDown: 'https://stgmobile.jodii.app/jodiiapp/svg/chevron-down-outline.svg',
   fwdLink:  CDN + 'revamp/forward-icon-link.svg',
 }
 
@@ -70,9 +71,9 @@ export default function HomeHeader({
         <View style={s.flex1} />
 
         <Pressable style={s.langBtn} onPress={onLanguagePress}>
-          <Image source={{ uri: ICONS.lang }} style={s.langIcon} resizeMode="contain" />
+          <SvgUri uri={ICONS.lang} width={20} height={20} />
           <Text style={s.langText}>{resolvedLangLabel}</Text>
-          <Image source={{ uri: ICONS.chevDown }} style={s.chevIcon} resizeMode="contain" />
+          <SvgUri uri={ICONS.chevDown} width={12} height={12} />
         </Pressable>
 
         {homeToolBar?.filter(t => t.toolType !== 'menu').map(item => (
@@ -85,7 +86,7 @@ export default function HomeHeader({
               ? <NotificationIcon size={18} color={Colors.textPrimary} />
               : item.toolType === 'chat'
               ? <SearchIcon size={18} color={Colors.textPrimary} />
-              : <Image source={{ uri: item.toolImg }} style={s.icon} resizeMode="contain" />
+              : <SvgUri uri={item.toolImg} width={19} height={19} />
             }
             {!!(item.showNotification && item.notifyCount && item.notifyCount !== '0') && (
               <View style={s.badgeWrap}>
@@ -99,10 +100,11 @@ export default function HomeHeader({
       {/* ── Row 2: User bar — avatar + completion % | name + edit profile ── */}
       <View style={s.userBar}>
         <Pressable style={s.avatarWrap} onPress={onAvatarPress}>
-          <Image
-            source={{ uri: userImg ?? CDN + 'revamp/default-avatar.svg' }}
-            style={s.avatar}
-            resizeMode="cover"
+          <SvgUri
+            uri={userImg ?? CDN + 'revamp/default-avatar.svg'}
+            width={48}
+            height={48}
+            style={s.avatarRadius}
           />
           {completionPct !== undefined && (
             <View style={s.completionBadge}>
@@ -115,7 +117,7 @@ export default function HomeHeader({
           <Text style={s.userName} numberOfLines={1}>{userName ?? ''}</Text>
           <View style={s.editRow}>
             <Text style={s.editLabel}>Edit profile</Text>
-            <Image source={{ uri: ICONS.fwdLink }} style={s.editIcon} resizeMode="contain" />
+            <SvgUri uri={ICONS.fwdLink} width={12} height={12} />
           </View>
         </Pressable>
       </View>
@@ -202,7 +204,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     position:       'relative',
   },
-  avatar: { width: 48, height: 48, borderRadius: 24 },
+  avatarRadius: { borderRadius: 24 },
   completionBadge: {
     position:          'absolute',
     bottom:            -6,

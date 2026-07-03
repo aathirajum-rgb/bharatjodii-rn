@@ -2,13 +2,13 @@ import { useCallback, useRef, useState } from 'react'
 import {
   Dimensions,
   FlatList,
-  Image,
   Pressable,
   StyleSheet,
   Text,
   View,
   type ViewToken,
 } from 'react-native'
+import { SvgUri } from 'react-native-svg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import ProfilePhoto from '../profile-photo/ProfilePhoto'
@@ -336,7 +336,7 @@ export default function MatchesCard({
       {/* ── Activity label (shortlisted / viewed / liked sections) ── */}
       {isActivityLabel && !!LabelText && (
         <View style={styles.activityRow}>
-          <Image source={{ uri: ICONS.viewed }} style={styles.activityIcon} resizeMode="contain" />
+          <SvgUri uri={ICONS.viewed} width={16} height={16} style={styles.activityIcon} />
           <Text style={styles.activityText} numberOfLines={2}>{LabelText}</Text>
         </View>
       )}
@@ -344,7 +344,7 @@ export default function MatchesCard({
       {/* ── "You liked this profile on…" label ── */}
       {showLikedLbl && !!LabelText && (
         <View style={styles.likedLblRow}>
-          <Image source={{ uri: ICONS.liked }} style={styles.likedLblIcon} resizeMode="contain" />
+          <SvgUri uri={ICONS.liked} width={20} height={20} style={styles.likedLblIcon} />
           <Text style={styles.likedLblText} numberOfLines={2}>{LabelText}</Text>
         </View>
       )}
@@ -355,10 +355,10 @@ export default function MatchesCard({
           <Text style={styles.nameText} numberOfLines={1}>{name ?? ''}</Text>
         </Pressable>
         <Pressable style={styles.iconBtn} onPress={onCall}>
-          <Image source={{ uri: ICONS.call }} style={styles.rowIcon} resizeMode="contain" />
+          <SvgUri uri={ICONS.call} width={24} height={24} style={styles.rowIcon} />
         </Pressable>
         <Pressable style={styles.iconBtn} onPress={onWhatsApp}>
-          <Image source={{ uri: ICONS.whatsapp }} style={styles.rowIcon} resizeMode="contain" />
+          <SvgUri uri={ICONS.whatsapp} width={24} height={24} style={styles.rowIcon} />
         </Pressable>
       </View>
 

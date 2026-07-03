@@ -1,5 +1,6 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
+import { SvgUri } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
@@ -117,13 +118,10 @@ export default function AppFooter({
 
               {/* ── Icon area ── */}
               <View style={styles.iconWrap}>
-                <Image
-                  source={{ uri: isActive ? activeIcon : inactiveIcon }}
-                  style={[
-                    styles.tabIcon,
-                    tab === 3 && !upgradeTag && styles.tabIconTall,
-                  ]}
-                  resizeMode="contain"
+                <SvgUri
+                  uri={isActive ? activeIcon : inactiveIcon}
+                  width={24}
+                  height={tab === 3 && !upgradeTag ? 28 : 24}
                 />
 
                 {/* Count badge (Home / Likes) */}
@@ -184,13 +182,6 @@ const styles = StyleSheet.create({
     position:       'relative',
     alignItems:     'center',
     justifyContent: 'center',
-  },
-  tabIcon: {
-    width:  24,
-    height: 24,
-  },
-  tabIconTall: {
-    height: 28,
   },
   tabLabel: {
     fontFamily: 'Poppins-Regular',

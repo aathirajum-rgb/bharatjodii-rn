@@ -2,7 +2,6 @@ import Constants from 'expo-constants'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { SvgUri } from 'react-native-svg'
 import AppHeader from '../../components/app-header/AppHeader'
 import OTPSuccessSheet from '../../components/bottom-sheet/OTPSuccessSheet'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
@@ -230,10 +230,11 @@ export default function OTPScreen({ navigation, route }: Props) {
           showsVerticalScrollIndicator={false}
         >
           {/* OTP illustration — CDN SVG (Angular: otpPage.ICONTYPE) */}
-          <Image
-            source={{ uri: CDN + 'otp.svg' }}
+          <SvgUri
+            uri={CDN + 'otp.svg'}
+            width={48}
+            height={48}
             style={styles.icon}
-            resizeMode="contain"
           />
 
           {/* Title — i18n key: LOGIN_PAGE.ENT_OTP */}
@@ -248,10 +249,11 @@ export default function OTPScreen({ navigation, route }: Props) {
             <View style={styles.phoneRow}>
               <Text style={styles.phoneNumber}>{mobile}</Text>
               <Pressable style={styles.editBtn} onPress={handleEdit} hitSlop={8}>
-                <Image
-                  source={{ uri: CDN + 'edit-pencil.svg' }}
+                <SvgUri
+                  uri={CDN + 'edit-pencil.svg'}
+                  width={14}
+                  height={14}
                   style={styles.editIcon}
-                  resizeMode="contain"
                 />
                 <Text style={styles.editText}>{t('LOGIN_PAGE.EDIT', 'Edit')}</Text>
               </Pressable>

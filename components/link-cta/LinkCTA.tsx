@@ -1,4 +1,5 @@
-import { Image, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
+import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
+import { SvgUri } from 'react-native-svg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 
@@ -31,7 +32,7 @@ export default function LinkCTA({ text, contact, onPress, style }: LinkCTAProps)
         onPress={onPress}
         hitSlop={8}
       >
-        <Image source={{ uri: CALL_ICON }} style={styles.callIcon} resizeMode="contain" />
+        <SvgUri uri={CALL_ICON} width={18} height={18} style={styles.callIcon} />
         <Text style={styles.contactText}>{contact}</Text>
       </Pressable>
     </View>
@@ -63,8 +64,6 @@ const styles = StyleSheet.create({
     marginBottom:  2,
   },
   callIcon: {
-    width:  18,
-    height: 18,
     flexShrink: 0,
   },
   // Angular: color-29339B, body1-medium-14, line-height 18, margin-left 4

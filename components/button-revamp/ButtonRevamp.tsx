@@ -1,4 +1,5 @@
-import { ActivityIndicator, Image, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native'
+import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native'
+import { SvgUri } from 'react-native-svg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 
@@ -176,7 +177,7 @@ export default function ButtonRevamp({
       ) : (
         <>
           {iconPosition === 'start' && !!iconUrl && (
-            <Image source={{ uri: iconUrl }} style={styles.icon} resizeMode="contain" />
+            <SvgUri uri={iconUrl} width={20} height={20} style={styles.icon} />
           )}
 
           <Text
@@ -194,7 +195,7 @@ export default function ButtonRevamp({
           </Text>
 
           {iconPosition === 'end' && !!iconUrl && (
-            <Image source={{ uri: iconUrl }} style={styles.icon} resizeMode="contain" />
+            <SvgUri uri={iconUrl} width={20} height={20} style={styles.icon} />
           )}
         </>
       )}

@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Animated,
-  Image,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { SvgUri } from 'react-native-svg'
 import AppHeader from '../../components/app-header/AppHeader'
 import { CDN_REG, CDN_SVG } from '../../constants/cdn'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
@@ -177,10 +177,11 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
           showsVerticalScrollIndicator={false}
         >
           {/* Phone illustration — CDN SVG (same source as Angular signin.config.ts ICONTYPE) */}
-          <Image
-            source={{ uri: CDN_REG + 'mobile.svg' }}
+          <SvgUri
+            uri={CDN_REG + 'mobile.svg'}
+            width={48}
+            height={48}
             style={styles.phoneImg}
-            resizeMode="contain"
           />
 
           {/* Title */}
@@ -208,9 +209,11 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
                 accessibilityLabel={`Country code +${country.code}`}
               >
                 <Text style={styles.codeText}>+{country.code}</Text>
-                <Image
-                  source={{ uri: CDN_SVG + 'chevron_down.svg' }}
-                  style={[styles.chevron, dropOpen && styles.chevronUp]}
+                <SvgUri
+                  uri={CDN_SVG + 'chevron_down.svg'}
+                  width={12}
+                  height={12}
+                  style={[dropOpen && styles.chevronUp]}
                 />
               </Pressable>
 
