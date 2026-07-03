@@ -3,7 +3,6 @@
 // Card layout mirrors matches-card.component.html exactly.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
   Animated,
@@ -14,19 +13,21 @@ import {
   Linking,
   ListRenderItem,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { SvgUri } from 'react-native-svg'
+import { SvgUri, SvgXml } from 'react-native-svg'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
+import MatchesHeader from '../../components/matches-header/MatchesHeader'
 import { Colors } from '../../constants/colors'
-import type { SwiperItem } from '../../components/swiper-card/SwiperCard'
+import { CDN_SVG } from '../../constants/cdn'
+import { matchProfileAdapter } from '../../adapters/matches.adapter'
+import type { MatchProfile, BannerItem, MatchListItem } from '../../types/interfaces/matches.interface'
 import {
   fetchMatches,
   fetchExtendedMatchesCount,
+  fetchNotifCount,
   fetchAndStorePPSetData,
   fetchMenuPromo,
   refreshSession,
@@ -38,51 +39,61 @@ import { getItem } from '../../service/storageService'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
 import { StorageKeys } from '../../constants/storage.keys'
 
-const CDN = 'https://imgs.jodii.app/assets/images/svg/'
+const CDN = CDN_SVG
 
-const LANG_LABELS: Record<string, string> = {
-  en: 'English', tm: 'Tamil', tl: 'Telugu', hi: 'Hindi',
-  ml: 'Malayalam', kn: 'Kannada', bn: 'Bengali', mt: 'Marathi',
-  or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
+// ─── Card icons ────────────────────────────────────────────────────────────────
+// Angular (matches-card.component.html): Call + WhatsApp are <img src="CDN/...svg">
+// (server fetch); Don't-show/View-later/Like render via <ion-icon class="{{iconType}}">
+// — a locally registered/bundled icon, never networked. We mirror that:
+// Call/WhatsApp = SvgUri (always calls the server, no caching), the rest = SvgXml
+// (bundled strings).
+
+const XML_CLOSE = `<svg width="25" height="24" viewBox="0 0 25 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<mask id="mask0_7130_3376" style="mask-type:alpha" maskUnits="userSpaceOnUse" x="4" y="4" width="17" height="16">
+<rect x="4.5" y="4" width="16" height="16" fill="#D9D9D9"/>
+</mask>
+<g mask="url(#mask0_7130_3376)">
+<path d="M18.5 6L6.5 18" stroke="#545454" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M6.5 6L18.5 18" stroke="#545454" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>
+</g>
+</svg>`
+
+const XML_VIEW_LATER = `<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M17.5765 6.34158C14.3389 3.21947 9.07045 3.21947 5.83915 6.34158L5.27719 6.87732V4.88213C5.27719 4.54344 4.98982 4.26633 4.63859 4.26633C4.28737 4.26633 4 4.54344 4 4.88213V8.57693C4 8.91562 4.28737 9.19273 4.63859 9.19273H8.47017C8.82139 9.19273 9.10876 8.91562 9.10876 8.57693C9.10876 8.23824 8.82139 7.96113 8.47017 7.96113H5.96049L6.73957 7.20985C9.47915 4.56808 13.9365 4.56808 16.6761 7.20985C19.4157 9.85163 19.4157 14.1499 16.6761 16.7917C13.9365 19.4335 9.47915 19.4335 6.73957 16.7917C6.49052 16.5515 6.08821 16.5515 5.83915 16.7917C5.5901 17.0318 5.5901 17.4198 5.83915 17.66C7.4548 19.2179 9.58132 20 11.7078 20C13.8344 20 15.9609 19.2179 17.5765 17.66C20.8078 14.5379 20.8078 9.46368 17.5765 6.34158Z" fill="#545454" stroke="#545454" stroke-width="0.505263"/>
+<path d="M12.0527 7.69019C11.7014 7.69019 11.4141 7.9673 11.4141 8.30598V12.0008C11.4141 12.1855 11.5035 12.3641 11.6567 12.4811L14.8497 14.9443C14.9647 15.0367 15.1051 15.0798 15.2456 15.0798C15.4308 15.0798 15.616 14.9997 15.7437 14.8458C15.9609 14.581 15.9162 14.193 15.6416 13.9775L12.6913 11.7052V8.30598C12.6913 7.9673 12.4039 7.69019 12.0527 7.69019Z" fill="#545454" stroke="#545454" stroke-width="0.505263"/>
+</svg>`
+
+const XML_LIKE = `<svg width="18" height="19" viewBox="0 0 18 19" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M18 10.9354C18 10.3361 17.7268 9.76202 17.3047 9.38748C17.6027 8.98799 17.7268 8.48862 17.6772 7.98946C17.5779 6.94089 16.6344 6.09212 15.5421 6.09212H12.3145L12.5132 4.54423C12.5627 4.07 12.5627 3.67052 12.4636 3.27105C12.0911 1.64841 10.6513 0.5 8.98777 0.5C8.61526 0.5 8.24296 0.649701 7.96978 0.924402C7.6966 1.1991 7.54771 1.54855 7.54771 1.92289V3.96994C7.54771 4.86879 7.29951 5.71757 6.82771 6.49143L5.95882 7.88945C5.83472 8.08919 5.66086 8.23889 5.46221 8.33876C5.28835 7.78957 4.79196 7.39009 4.19604 7.39009L1.34072 7.3903C0.595915 7.3903 0 7.98952 0 8.73845V17.1519C0 17.9008 0.595915 18.5 1.34072 18.5H4.24558C4.99039 18.5 5.5863 17.9008 5.5863 17.1519V16.9521C6.23176 17.5262 7.0759 17.8758 7.9946 17.8758H14.3008C14.8718 17.8758 15.4429 17.6263 15.8402 17.2268C16.2374 16.8274 16.4361 16.3031 16.4111 15.7539C16.4111 15.5541 16.3863 15.3793 16.3118 15.1798C16.9821 14.8303 17.4291 14.1312 17.4291 13.3322C17.4291 13.0575 17.3795 12.783 17.2802 12.5333C17.7268 12.1089 18 11.5348 18 10.9355L18 10.9354ZM4.3202 17.1268C4.3202 17.1766 4.27064 17.2267 4.22088 17.2267H1.34075C1.2912 17.2267 1.24143 17.1768 1.24143 17.1268V8.7134C1.24143 8.66357 1.29099 8.61353 1.34075 8.61353H4.24562C4.29518 8.61353 4.34494 8.66337 4.34494 8.7134V17.1268H4.3202ZM16.2873 11.6845C16.0886 11.7843 15.9397 11.9591 15.89 12.1838C15.8404 12.4085 15.89 12.6331 16.0388 12.808C16.1629 12.9577 16.2127 13.1325 16.2127 13.3073C16.2127 13.7068 15.9147 14.0563 15.5174 14.1312C15.2692 14.181 15.0458 14.331 14.9465 14.5805C14.8471 14.8301 14.8719 15.0799 15.021 15.3045C15.1203 15.4293 15.1699 15.6041 15.1699 15.7788C15.1699 15.9785 15.0954 16.2032 14.9465 16.3529C14.7726 16.5277 14.5244 16.6276 14.2762 16.6276H7.97003C6.65406 16.6276 5.56173 15.5541 5.56173 14.2059V9.61245C6.18244 9.46275 6.70381 9.08818 7.05133 8.53901L7.92023 7.14099C8.51614 6.19232 8.83887 5.09394 8.83887 3.97041V1.92336C8.83887 1.87353 8.86365 1.82349 8.88843 1.79857C8.91321 1.77366 8.96297 1.74874 9.01253 1.74874C10.1049 1.74874 11.0235 2.49767 11.2719 3.54624C11.3215 3.7709 11.3465 4.0456 11.2967 4.37013L11.0733 6.11776C11.0237 6.41737 11.1229 6.71697 11.3215 6.96658C11.5201 7.19124 11.8181 7.34115 12.1161 7.34115H15.5423C15.9644 7.34115 16.3864 7.6906 16.4362 8.09008C16.461 8.3897 16.3121 8.6893 16.0637 8.86395C15.8403 9.01365 15.7162 9.28835 15.7409 9.56306C15.7657 9.83776 15.9396 10.0624 16.2126 10.1623C16.5353 10.2871 16.7339 10.5867 16.7339 10.9361C16.7589 11.2601 16.5853 11.5347 16.2873 11.6844L16.2873 11.6845Z" fill="white"/>
+</svg>`
+
+type IconProps = { width?: number; height?: number }
+
+function WhatsAppIcon({ width = 27, height = 27 }: IconProps) {
+  return <SvgUri uri={CDN + 'whatsapp-revamp.svg'} width={width} height={height} />
 }
 
-// ─── Filter chips data ────────────────────────────────────────────────────────
-// Angular: quickFilterList in filter.config.ts — 4 chips in horizontal scroll row.
-// FILTER chip always shows icon on left. Others show icon only when selected (close icon).
-const FILTER_CHIPS = [
-  { key: 'FILTER',             label: 'Filters',         icon: CDN + 'revamp/filter-revamp.svg' },
-  { key: 'PROFILECREATED',     label: 'Recently Joined', icon: CDN + 'menu/filter-profile-created.svg' },
-  { key: 'PHOTOAVAILABLE',     label: 'With photos',     icon: CDN + 'menu/filter-with-photos.svg' },
-  { key: 'HOROSCOPEAVAILABLE', label: 'With Horoscope',  icon: CDN + 'menu/filter-horoscope.svg' },
-] as const
+function CallIcon({ width = 24, height = 25 }: IconProps) {
+  return <SvgUri uri={CDN + 'revamp/call-revamp.svg'} width={width} height={height} />
+}
+
+function CloseIcon({ width = 25, height = 24 }: IconProps) {
+  return <SvgXml xml={XML_CLOSE} width={width} height={height} />
+}
+
+function ViewLaterIcon({ width = 24, height = 24 }: IconProps) {
+  return <SvgXml xml={XML_VIEW_LATER} width={width} height={height} />
+}
+
+function LikeIcon({ width = 18, height = 19 }: IconProps) {
+  return <SvgXml xml={XML_LIKE} width={width} height={height} />
+}
 
 const { width: SW } = Dimensions.get('window')
 // Angular: photoHeight = (scrWidth - 32) + 'px' — matches-card left+right 16px margin each
 const PHOTO_H = SW - 32
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface MatchProfile {
-  profileId:    string
-  name:         string
-  age:          string     // "27"
-  location:     string     // city, state
-  height?:      string
-  education?:   string
-  occupation?:  string
-  income?:      string
-  caste?:       string
-  profileImg?:  string
-  isPaidMember:      boolean
-  isIdVerified:      boolean
-  isPhotoAvailable:  boolean  // PHOTOSTATUS=1
-  isPhotoProtect:    boolean  // PHOTOPRIVACY=1
-  likedStatus:      '0' | '1' | '2' | '3'  // 0=none 1=liked 2=shortlisted 3=declined
-  isNewlyJoined:    boolean
-  isNewLabel:       boolean   // activity label row visible
-  labelContent:     string    // "Viewed on 15 Jan" / "Shortlisted on …"
-  likedDateText?:   string   // "You liked this profile on 16-Jan-2026"
-}
+// Types imported from types/interfaces/matches.interface.ts
 
 // ─── HTML inline renderer ─────────────────────────────────────────────────────
 // Angular uses [innerHTML] for dynamic server HTML. This handles the common cases:
@@ -121,15 +132,6 @@ function HtmlText({ html, style }: { html: string; style?: any }) {
     </Text>
   )
 }
-
-// Banner item (STATUS=599 items injected by API, e.g. BANNERSLOT='1001' = membership)
-interface BannerItem {
-  _isBanner: true
-  bannerSlot: string
-  uid:        string
-}
-
-type MatchListItem = MatchProfile | BannerItem
 
 function isBanner(item: MatchListItem): item is BannerItem {
   return (item as BannerItem)._isBanner === true
@@ -219,7 +221,7 @@ function MatchCard({
                   {`Contact and Get ${oppGender === 'F' ? 'her' : 'his'} Photos on WhatsApp`}
                 </Text>
                 <Pressable style={c.waBtn} onPress={onWhatsApp}>
-                  <SvgUri uri={CDN + 'whatsapp-revamp.svg'} width={18} height={18} />
+                  <WhatsAppIcon width={18} height={18} />
                   <Text style={c.waBtnText}>WhatsApp</Text>
                 </Pressable>
               </View>
@@ -274,10 +276,10 @@ function MatchCard({
           <Text style={c.name} numberOfLines={1}>{profile.name}</Text>
         </Pressable>
         <Pressable style={c.iconBtn} onPress={onCall} hitSlop={8}>
-          <SvgUri uri={CDN + 'revamp/call-revamp.svg'} width={24} height={24} />
+          <CallIcon width={24} height={24} />
         </Pressable>
         <Pressable style={c.iconBtn} onPress={onWhatsApp} hitSlop={8}>
-          <SvgUri uri={CDN + 'whatsapp-revamp.svg'} width={28} height={28} />
+          <WhatsAppIcon width={28} height={28} />
         </Pressable>
       </View>
 
@@ -303,16 +305,16 @@ function MatchCard({
         <View style={c.ctaSection}>
           <View style={c.ctaSecRow}>
             <Pressable style={c.ctaDontShow} onPress={onDontShow}>
-              <SvgUri uri={CDN + 'revamp/close-icon.svg'} width={16} height={16} />
+              <CloseIcon width={16} height={16} />
               <Text style={c.ctaDontShowText}>Don't Show</Text>
             </Pressable>
             <Pressable style={c.ctaViewLater} onPress={onViewLater}>
-              <SvgUri uri={CDN + 'view-later.svg'} width={16} height={16} />
+              <ViewLaterIcon width={16} height={16} />
               <Text style={c.ctaViewLaterText}>View Later</Text>
             </Pressable>
           </View>
           <Pressable style={c.ctaLike} onPress={onLike}>
-            <SvgUri uri={CDN + 'revamp/like-white-revamp.svg'} width={20} height={20} />
+            <LikeIcon width={20} height={20} />
             <Text style={c.ctaLikeText}>Like</Text>
           </Pressable>
         </View>
@@ -334,80 +336,8 @@ function MatchCard({
   )
 }
 
-// ─── SwiperItem → MatchProfile mapper ────────────────────────────────────────
+// Mapping moved to adapters/matches.adapter.ts — use singleton adapter
 
-function toMatchProfile(item: SwiperItem): MatchProfile {
-  // exactOptionalPropertyTypes: assign optional strings only when defined
-  const p: MatchProfile = {
-    profileId:        item.profileId        ?? '',
-    name:             item.name             ?? '',
-    age:              item.age?.replace(/\s*(yrs|years)/i, '').trim() ?? '',
-    location:         item.location         ?? '',
-    isPaidMember:     item.isPaidMember      ?? false,
-    isIdVerified:     item.isIdVerified      ?? false,
-    isPhotoAvailable: item.isPhotoAvailable  ?? false,
-    isPhotoProtect:   item.isPhotoProtect    ?? false,
-    likedStatus:      item.likedStatus       ?? '0',
-    isNewlyJoined:    item.isNewlyJoined     ?? false,
-    isNewLabel:       item.isNewLabel        ?? false,
-    labelContent:     item.labelContent      ?? '',
-  }
-  if (item.height)              p.height       = item.height
-  if (item.education)           p.education    = item.education
-  if (item.occupation)          p.occupation   = item.occupation
-  if (item.income)              p.income       = item.income
-  if (item.caste)               p.caste        = item.caste
-  if (item.profileImg)          p.profileImg   = item.profileImg
-  if (item.likedViewedDateText) p.likedDateText = item.likedViewedDateText
-  return p
-}
-
-// ─── Filter Chips Row ─────────────────────────────────────────────────────────
-// Angular: quickFilterList in filter.config.ts — horizontal swiper row below header.
-// Chip height 40px, border-radius 20px, border #B0B0B0.
-// Selected state: border rgba(181,0,51,0.4), bg #FAE7ED.
-// FILTER chip always shows icon on left. Others show close icon on right when selected.
-
-function FilterChipsRow({
-  selected,
-  onSelect,
-}: {
-  selected: string
-  onSelect: (key: string) => void
-}) {
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={f.row}
-      style={f.scroll}
-    >
-      {FILTER_CHIPS.map(chip => {
-        const isSelected = selected === chip.key
-        const isFilterChip = chip.key === 'FILTER'
-        return (
-          <Pressable
-            key={chip.key}
-            style={[f.chip, isSelected && f.chipSelected]}
-            onPress={() => onSelect(isSelected && !isFilterChip ? '' : chip.key)}
-          >
-            {/* FILTER chip: icon always on left */}
-            {isFilterChip && (
-              <SvgUri uri={chip.icon} width={16} height={16} style={{ marginRight: 4 }} />
-            )}
-            <Text style={[f.chipText, isSelected && f.chipTextSelected]}>
-              {chip.label}
-            </Text>
-            {/* Other chips: icon on right when selected (close/check) */}
-            {!isFilterChip && isSelected && (
-              <SvgUri uri={chip.icon} width={14} height={14} style={{ marginLeft: 4 }} />
-            )}
-          </Pressable>
-        )
-      })}
-    </ScrollView>
-  )
-}
 
 // ─── Photo Promotion Banner ───────────────────────────────────────────────────
 // Angular: home-banner.component.html addPhotoPromotion action (lines 213-237)
@@ -631,15 +561,13 @@ function ExtendedMatchesCard({ count, onPress }: { count: number; onPress: () =>
 // ─── MatchesScreen ────────────────────────────────────────────────────────────
 
 export default function MatchesScreen({ navigation }: { navigation: any }) {
-  const insets = useSafeAreaInsets()
-  const { i18n } = useTranslation()
-
   // ── State ───────────────────────────────────────────────────────────────────
   const [profiles,     setProfiles]     = useState<MatchProfile[]>([])
   const [totalCount,   setTotalCount]   = useState(0)
   const [loading,      setLoading]      = useState(true)
   const [loadingMore,  setLoadingMore]  = useState(false)
   const [extendedCount,  setExtendedCount]  = useState(0)
+  const [notifyCount,    setNotifyCount]    = useState(0)
 const [selectedChip,   setSelectedChip]   = useState<string>('')
   const [showPhotoPromotion, setShowPhotoPromotion] = useState(false)
   const [photoBannerData,    setPhotoBannerData]    = useState<any>(null)
@@ -660,13 +588,11 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   const scrollYRef   = useRef(0)
   const isHiddenRef  = useRef(false)
 
-  function handleTitleLayout(e: any) {
-    const h = e.nativeEvent.layout.height
+  function handleTitleLayout(h: number) {
     if (h > 0) titleHRef.current = h
   }
 
-  function handleHeaderLayout(e: any) {
-    const h = e.nativeEvent.layout.height
+  function handleHeaderLayout(h: number) {
     if (h > 0 && h !== headerHRef.current) {
       headerHRef.current = h
       setHeaderH(h)
@@ -734,15 +660,16 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         const result = await fetchMatches(0, 20)
         if (cancelled) return
 
-        setProfiles(result.items.map(toMatchProfile))
+        setProfiles(result.items.map(matchProfileAdapter.adapt))
         setBannerSlots(result.bannerSlots)
         setTotalCount(result.totalCount)
         apiStartRef.current = result.items.length  // cursor for next page
 
         // Step 3 — Angular: parallel post-matches calls
         // newcount + extendedmatches + ppSetData + dailyRecommendations + menuPromo
-        const [extCount, , promo] = await Promise.all([
+        const [extCount, notifCount, , promo] = await Promise.all([
           fetchExtendedMatchesCount(),
+          fetchNotifCount(),
           fetchAndStorePPSetData().then(async (ppSetData) => {
             const [entryType, reg] = await Promise.all([
               getSessionValue('ENTRYTYPE'),
@@ -785,6 +712,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         ])
         if (!cancelled) {
           setExtendedCount(extCount)
+          setNotifyCount(notifCount)
           if (promo) setMenuPromo(promo)
         }
 
@@ -815,7 +743,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
               ...result.bannerSlots.map(bs => ({ slot: bs.slot, insertAfter: bs.insertAfter + offset })),
             ])
           }
-          return [...prev, ...result.items.map(toMatchProfile)]
+          return [...prev, ...result.items.map(matchProfileAdapter.adapt)] as MatchProfile[]
         })
         apiStartRef.current += result.items.length
       }
@@ -945,43 +873,22 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
-      {/* Angular: ion-header header-shadow (0 8px 16px rgba(0,0,0,0.08)) */}
-      {/* Absolutely positioned so translateY slides it off-screen without shifting list */}
-      <Animated.View
-        style={[s.header, s.headerAbsolute, { transform: [{ translateY: headerAnim }] }]}
-        onLayout={handleHeaderLayout}
-      >
-
-        {/* Title section — Angular: ion-grid pl-24, bottom-border-e5e5e5 */}
-        {/* onLayout measures titleH = Angular offsetHt (only the title row that gets hidden) */}
-        <View style={s.titleSection} onLayout={handleTitleLayout}>
-          {/* Title row — Figma: title left + language button right (no bell) */}
-          <View style={s.titleRow}>
-            <Text style={s.title}>{loading ? 'Matches' : `${totalCount} Matches`}</Text>
-            <Pressable style={s.langBtn} onPress={() => navigation.navigate('LanguageSelection')} hitSlop={8}>
-              <SvgUri uri={CDN + 'revamp/lang-change-img.svg'} width={18} height={18} />
-              <Text style={s.langText}>{LANG_LABELS[i18n.language] ?? 'English'}</Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Pref row — Angular: ion-grid padd0 → div pl-16 mt-4 */}
-        <View style={s.prefSection}>
-          <View style={s.prefRow}>
-            <Text style={s.prefText}>{totalCount} profiles based on your preferences. </Text>
-            <Pressable style={s.editPref} onPress={() => {}} hitSlop={8}>
-              <Text style={s.editPrefText}>Edit preferences</Text>
-              <SvgUri uri={CDN + 'registration-new/edit-pencil.svg'} width={14} height={14} style={{ marginLeft: 4 }} />
-            </Pressable>
-          </View>
-        </View>
-
-        {/* Filter chips — Angular: ion-cust-padding-start = paddingLeft 24 */}
-        <FilterChipsRow selected={selectedChip} onSelect={setSelectedChip} />
-      </Animated.View>
+      {/* Separated component — SafeAreaView edges={["top"]} handles status bar internally */}
+      <MatchesHeader
+        headerAnim={headerAnim}
+        loading={loading}
+        totalCount={totalCount}
+        notifyCount={notifyCount}
+        selectedChip={selectedChip}
+        onChipSelect={setSelectedChip}
+        onNotificationPress={() => navigation.navigate('notification')}
+        onChatPress={() => navigation.navigate('Messages')}
+        onHeaderLayout={handleHeaderLayout}
+        onTitleLayout={handleTitleLayout}
+      />
 
       {/* ── Profile list / loader ──────────────────────────────────────────── */}
       {/* Angular: app-loader while !contentLoaded, cdk-virtual-scroll-viewport when loaded */}
@@ -1038,66 +945,6 @@ const s = StyleSheet.create({
   loaderBox:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
   footerLoader: { marginVertical: 16 },
 
-  // Floats over the list so translateY slides header off without reflowing list
-  headerAbsolute: {
-    position: 'absolute',
-    top:      0,
-    left:     0,
-    right:    0,
-    zIndex:   10,
-  },
-
-  // Angular: ion-header header-shadow = box-shadow 0 8px 16px rgba(0,0,0,0.08)
-  header: {
-    backgroundColor: Colors.white,
-    shadowColor:     '#000000',
-    shadowOffset:    { width: 0, height: 8 },
-    shadowOpacity:   0.08,
-    shadowRadius:    16,
-    elevation:       4,
-  },
-  // Angular: first ion-grid pl-24 + bottom-border-e5e5e5
-  titleSection: {
-    paddingLeft:       24,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e5e5',
-  },
-  // Angular: ion-row mt-16 mb-16 pr-16
-  titleRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'space-between',
-    marginTop:      16,
-    marginBottom:   16,
-    paddingRight:   16,
-  },
-  title: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize:   18,
-    color:      '#333333',
-  },
-  // Figma: language button — globe icon + label, no bell, no chevron
-  langBtn: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           4,
-  },
-  langText: { fontFamily: 'Poppins-Medium', fontSize: 12, color: '#333333' },
-
-  // Angular: second ion-grid padd0 → div pl-16 mt-4
-  prefSection: {
-    paddingLeft: 16,
-    marginTop:   4,
-  },
-  prefRow: {
-    flexDirection: 'row',
-    flexWrap:      'wrap',
-    alignItems:    'center',
-  },
-  prefText:    { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#333333' },
-  editPref:    { flexDirection: 'row', alignItems: 'center' },
-  editPrefText:{ fontFamily: 'Poppins-Regular', fontSize: 14, color: '#29339B' },
-  editPrefIcon:{ width: 14, height: 14, marginLeft: 4 },
 })
 
 // Angular card styles — matches-card.component.scss
@@ -1647,45 +1494,3 @@ const mb = StyleSheet.create({
   },
 })
 
-// ─── Filter chips styles ──────────────────────────────────────────────────────
-// Angular chip.component.scss: height 40, padding 8x16, border-radius 20,
-// border #B0B0B0 default, border rgba(181,0,51,0.4) + bg #FAE7ED selected.
-
-const f = StyleSheet.create({
-  scroll: {
-    flexShrink: 0,
-    height:     58,  // chip 40px + paddingTop 12 + paddingBottom 6 — explicit so parent measures correctly
-  },
-  row: {
-    paddingLeft:   16,
-    paddingRight:  16,
-    paddingTop:    12,
-    paddingBottom: 6,
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           12,
-  },
-  chip: {
-    height:          40,
-    paddingHorizontal: 16,
-    borderRadius:    20,
-    borderWidth:     1,
-    borderColor:     '#B0B0B0',
-    backgroundColor: '#FFFFFF',
-    flexDirection:   'row',
-    alignItems:      'center',
-    flexShrink:      0,
-  },
-  chipSelected: {
-    borderColor:     'rgba(181,0,51,0.4)',
-    backgroundColor: '#FAE7ED',
-  },
-  chipText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize:   14,
-    color:      '#1F1E1B',
-  },
-  chipTextSelected: {
-    color: Colors.primary,
-  },
-})

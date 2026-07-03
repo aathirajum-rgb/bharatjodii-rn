@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
-import AppHeader, { type ToolbarItem } from '../../components/app-header/AppHeader'
+import HomeHeader, { type ToolbarItem } from '../../components/home-header/HomeHeader'
 import SwiperCard, { type SwiperItem } from '../../components/swiper-card/SwiperCard'
 import { Colors } from '../../constants/colors'
 // API imports commented out — will wire up after matches landing page is built
@@ -175,9 +175,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   return (
     <View style={s.screen}>
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <AppHeader
-        type="header1"
+      {/* ── Header — separate component, SafeAreaView edges={['top']} inside ── */}
+      <HomeHeader
         userName={userName}
         completionPct={completionPct}
         homeToolBar={TOOLBAR}

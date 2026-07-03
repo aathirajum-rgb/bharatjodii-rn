@@ -1,5 +1,5 @@
 import { Image, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import MenuIcon from '../../assets/icons/MenuIcon'
 import NotificationIcon from '../../assets/icons/NotificationIcon'
 import SearchIcon from '../../assets/icons/SearchIcon'
@@ -93,8 +93,6 @@ export default function AppHeader({
   onLanguagePress,
   style,
 }: AppHeaderProps) {
-  const insets = useSafeAreaInsets()
-
   // Resolve language label — use explicit prop, else auto-detect from i18n
   const resolvedLangLabel = languageLabel ?? LANG_LABEL[i18n.language] ?? 'Eng'
 
@@ -104,7 +102,7 @@ export default function AppHeader({
   // Background: light periwinkle blue #EBF0FF
   if (type === 'header1') {
     return (
-      <View style={[styles.h1Bg, { paddingTop: insets.top }, style]}>
+      <SafeAreaView edges={['top']} style={[styles.h1Bg, style]}>
 
         {/* ── Row 1: App bar ── */}
         <View style={styles.h1AppBar}>
@@ -169,14 +167,14 @@ export default function AppHeader({
           </Pressable>
         </View>
 
-      </View>
+      </SafeAreaView>
     )
   }
 
   // ── header2: title bar ────────────────────────────────────────────────────
   if (type === 'header2') {
     return (
-      <View style={[styles.wrapper2, { paddingTop: insets.top }, style]}>
+      <SafeAreaView edges={['top']} style={[styles.wrapper2, style]}>
         <View style={styles.titleRow}>
           {showBackIcon && (
             <Pressable style={styles.backBtn} onPress={onBackPress}>
@@ -185,13 +183,13 @@ export default function AppHeader({
           )}
           <Text style={styles.titleText} numberOfLines={1}>{title ?? ''}</Text>
         </View>
-      </View>
+      </SafeAreaView>
     )
   }
 
   // ── registration / signIn ──────────────────────────────────────────────────
   return (
-    <View style={[styles.wrapperAuth, { paddingTop: insets.top }, style]}>
+    <SafeAreaView edges={['top']} style={[styles.wrapperAuth, style]}>
       <View style={styles.authRow}>
         {showBackBtn && (
           <Pressable style={styles.backBtn} onPress={onBackPress}>
@@ -207,7 +205,7 @@ export default function AppHeader({
           <Image source={{ uri: ICONS.chevDown }} style={styles.chevIcon} resizeMode="contain" />
         </Pressable>
       </View>
-    </View>
+    </SafeAreaView>
   )
 }
 
