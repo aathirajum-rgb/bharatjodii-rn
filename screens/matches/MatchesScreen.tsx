@@ -3,6 +3,7 @@
 // Card layout mirrors matches-card.component.html exactly.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
   Animated,
@@ -27,7 +28,6 @@ import type { MatchProfile, BannerItem, MatchListItem } from '../../types/interf
 import {
   fetchMatches,
   fetchExtendedMatchesCount,
-  fetchNotifCount,
   fetchAndStorePPSetData,
   fetchMenuPromo,
   refreshSession,
@@ -561,13 +561,14 @@ function ExtendedMatchesCard({ count, onPress }: { count: number; onPress: () =>
 // ─── MatchesScreen ────────────────────────────────────────────────────────────
 
 export default function MatchesScreen({ navigation }: { navigation: any }) {
+  const { i18n } = useTranslation()
+
   // ── State ───────────────────────────────────────────────────────────────────
   const [profiles,     setProfiles]     = useState<MatchProfile[]>([])
   const [totalCount,   setTotalCount]   = useState(0)
   const [loading,      setLoading]      = useState(true)
   const [loadingMore,  setLoadingMore]  = useState(false)
   const [extendedCount,  setExtendedCount]  = useState(0)
-  const [notifyCount,    setNotifyCount]    = useState(0)
 const [selectedChip,   setSelectedChip]   = useState<string>('')
   const [showPhotoPromotion, setShowPhotoPromotion] = useState(false)
   const [photoBannerData,    setPhotoBannerData]    = useState<any>(null)
@@ -667,9 +668,8 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
 
         // Step 3 — Angular: parallel post-matches calls
         // newcount + extendedmatches + ppSetData + dailyRecommendations + menuPromo
-        const [extCount, notifCount, , promo] = await Promise.all([
+        const [extCount, , promo] = await Promise.all([
           fetchExtendedMatchesCount(),
-          fetchNotifCount(),
           fetchAndStorePPSetData().then(async (ppSetData) => {
             const [entryType, reg] = await Promise.all([
               getSessionValue('ENTRYTYPE'),
@@ -712,7 +712,6 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         ])
         if (!cancelled) {
           setExtendedCount(extCount)
-          setNotifyCount(notifCount)
           if (promo) setMenuPromo(promo)
         }
 
@@ -881,11 +880,10 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         headerAnim={headerAnim}
         loading={loading}
         totalCount={totalCount}
-        notifyCount={notifyCount}
+        langCode={i18n.language}
         selectedChip={selectedChip}
         onChipSelect={setSelectedChip}
-        onNotificationPress={() => navigation.navigate('notification')}
-        onChatPress={() => navigation.navigate('Messages')}
+        onLanguagePress={() => navigation.navigate('LanguageSelection')}
         onHeaderLayout={handleHeaderLayout}
         onTitleLayout={handleTitleLayout}
       />

@@ -1,22 +1,24 @@
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { SvgUri } from 'react-native-svg'
-import NotificationIcon from '../../assets/icons/NotificationIcon'
-import Chip from '../chip/Chip'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 
 const CDN = CDN_SVG
 
-// Figma node 3765:4560 — Filters (always shows filter icon), Age/Location/Caste
-// (forward arrow when unselected, close icon when selected — same as Chip's
-// existing 'forward'/'close' icon types, mirroring Angular's app-chip iconType logic).
+// Figma node 11026:8853 — chips in horizontal scroll, gap 8
 const FILTER_CHIPS = [
-  { key: 'FILTER',   label: 'Filters'  },
-  { key: 'AGE',      label: 'Age'      },
-  { key: 'LOCATION', label: 'Location' },
-  { key: 'CASTE',    label: 'Caste'    },
+  { key: 'FILTER',             label: 'Filters',         icon: CDN + 'revamp/filter-revamp.svg',              hasIcon: true  },
+  { key: 'PROFILECREATED',     label: 'Recently Joined', icon: CDN + 'menu/filter-profile-created.svg',       hasIcon: false },
+  { key: 'PHOTOAVAILABLE',     label: 'With photos',     icon: CDN + 'menu/filter-with-photos.svg',           hasIcon: false },
+  { key: 'HOROSCOPEAVAILABLE', label: 'With Horoscope',  icon: CDN + 'menu/filter-horoscope.svg',             hasIcon: false },
 ] as const
+
+const LANG_LABELS: Record<string, string> = {
+  en: 'English', tm: 'Tamil', tl: 'Telugu', hi: 'Hindi',
+  ml: 'Malayalam', kn: 'Kannada', bn: 'Bengali', mt: 'Marathi',
+  or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
+}
 
 // ─── FilterChipsRow ────────────────────────────────────────────────────────────
 
@@ -32,14 +34,19 @@ function FilterChipsRow({ selected, onSelect }: { selected: string; onSelect: (k
         const isSelected   = selected === chip.key
         const isFilterChip = chip.key === 'FILTER'
         return (
-          <Chip
+          <Pressable
             key={chip.key}
-            label={chip.label}
-            state={isSelected ? 'selected' : 'default'}
-            icon={isFilterChip ? 'filter' : isSelected ? 'close' : 'forward'}
-            iconPosition={isFilterChip ? 'start' : 'end'}
+            style={[f.chip, isSelected && f.chipSelected]}
             onPress={() => onSelect(isSelected && !isFilterChip ? '' : chip.key)}
-          />
+          >
+            {isFilterChip && (
+              <SvgUri uri={chip.icon} width={20} height={20} style={{ marginRight: 4 }} />
+            )}
+            <Text style={[f.chipText, isSelected && f.chipTextSelected]}>{chip.label}</Text>
+            {!isFilterChip && isSelected && (
+              <SvgUri uri={chip.icon} width={16} height={16} style={{ marginLeft: 4 }} />
+            )}
+          </Pressable>
         )
       })}
     </ScrollView>
@@ -52,11 +59,10 @@ export interface MatchesHeaderProps {
   headerAnim:      Animated.Value
   loading:         boolean
   totalCount:      number
-  notifyCount:     number
+  langCode:        string
   selectedChip:    string
   onChipSelect:    (key: string) => void
-  onNotificationPress?: () => void
-  onChatPress?:         () => void
+  onLanguagePress?: () => void
   onHeaderLayout:  (height: number) => void
   onTitleLayout:   (height: number) => void
 }
@@ -67,14 +73,15 @@ export default function MatchesHeader({
   headerAnim,
   loading,
   totalCount,
-  notifyCount,
+  langCode,
   selectedChip,
   onChipSelect,
-  onNotificationPress,
-  onChatPress,
+  onLanguagePress,
   onHeaderLayout,
   onTitleLayout,
 }: MatchesHeaderProps) {
+  const langLabel = LANG_LABELS[langCode] ?? 'English'
+
   return (
     <Animated.View
       style={[s.header, s.headerAbsolute, { transform: [{ translateY: headerAnim }] }]}
@@ -86,7 +93,7 @@ export default function MatchesHeader({
       {/* SafeAreaView pushes content below status bar — same pattern as Love project */}
       <SafeAreaView edges={['top']} style={s.safeTop}>
 
-        {/* Title row — Figma: top 12, height 24, "Matches (49)" left, bell + chat right */}
+        {/* Title row — Figma: top 12, height 24, "Matches (49)" left, icons right */}
         <View
           style={s.titleRow}
           onLayout={e => {
@@ -99,16 +106,9 @@ export default function MatchesHeader({
           </Text>
 
           <View style={s.titleActions}>
-            <Pressable style={s.iconBtn} onPress={onNotificationPress} hitSlop={8}>
-              <NotificationIcon size={20} color={Colors.textDark} />
-              {notifyCount > 0 && (
-                <View style={s.badgeWrap}>
-                  <Text style={s.badgeText} numberOfLines={1}>{notifyCount > 99 ? '99+' : notifyCount}</Text>
-                </View>
-              )}
-            </Pressable>
-            <Pressable style={s.iconBtn} onPress={onChatPress} hitSlop={8}>
-              <SvgUri uri={CDN + 'revamp/chat.svg'} width={20} height={20} />
+            <Pressable style={s.iconBtn} onPress={onLanguagePress} hitSlop={8}>
+              <SvgUri uri={CDN + 'revamp/lang-change-img.svg'} width={24} height={24} />
+              <Text style={s.langText}>{langLabel}</Text>
             </Pressable>
           </View>
         </View>
@@ -164,33 +164,18 @@ const s = StyleSheet.create({
   titleActions: {
     flexDirection: 'row',
     alignItems:    'center',
-    gap:           12,
+    gap:           4,
   },
   iconBtn: {
-    alignItems:     'center',
-    justifyContent: 'center',
-    position:       'relative',
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           4,
+    padding:       4,
   },
-  // Figma: notification badge (#DE2A68) top-right of bell icon
-  badgeWrap: {
-    position:          'absolute',
-    top:               -6,
-    right:             -8,
-    backgroundColor:   '#DE2A68',
-    borderRadius:      10,
-    minWidth:          16,
-    height:            16,
-    alignItems:        'center',
-    justifyContent:    'center',
-    paddingHorizontal: 3,
-    borderWidth:       1,
-    borderColor:       Colors.white,
-  },
-  badgeText: {
-    fontFamily: 'Poppins-Medium',
-    color:      Colors.white,
-    fontSize:   8,
-    lineHeight: 12,
+  langText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize:   12,
+    color:      '#333333',
   },
 })
 
@@ -207,5 +192,31 @@ const f = StyleSheet.create({
     paddingBottom: 8,
     flexDirection: 'row',
     alignItems:    'center',
+    gap:           8,
+  },
+  chip: {
+    height:            40,
+    paddingHorizontal: 16,
+    paddingVertical:   8,
+    borderRadius:      20,
+    borderWidth:       1,
+    borderColor:       '#B0B0B0',
+    backgroundColor:   'rgba(255,255,255,0.2)',
+    flexDirection:     'row',
+    alignItems:        'center',
+    flexShrink:        0,
+  },
+  chipSelected: {
+    borderColor:     'rgba(181,0,51,0.4)',
+    backgroundColor: '#FAE7ED',
+  },
+  chipText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize:   14,
+    lineHeight: 20,
+    color:      '#1F1E1B',
+  },
+  chipTextSelected: {
+    color: Colors.primary,
   },
 })
