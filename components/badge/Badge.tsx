@@ -1,4 +1,5 @@
-import { Image, StyleSheet, Text, View, type ViewStyle } from 'react-native'
+import { StyleSheet, Text, View, type ViewStyle } from 'react-native'
+import { SvgUri } from 'react-native-svg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 
@@ -36,7 +37,7 @@ export default function Badge({ variant, text, imageUrl, hasInfo = false, style 
   return (
     <View style={[styles.container, { backgroundColor: bg }, style]}>
       {!!imageUrl && (
-        <Image source={{ uri: imageUrl }} style={styles.icon} resizeMode="contain" />
+        <SvgUri uri={imageUrl} width={18} height={18} style={styles.icon} />
       )}
 
       <Text style={[styles.label, { color: textColor }]} numberOfLines={1}>
@@ -44,7 +45,7 @@ export default function Badge({ variant, text, imageUrl, hasInfo = false, style 
       </Text>
 
       {hasInfo && (
-        <Image source={{ uri: INFO_ICON }} style={styles.infoIcon} resizeMode="contain" />
+        <SvgUri uri={INFO_ICON} width={14} height={14} style={styles.infoIcon} />
       )}
     </View>
   )
@@ -66,8 +67,6 @@ const styles = StyleSheet.create({
     minWidth:       100,
   },
   icon: {
-    width:  18,
-    height: 18,
     flexShrink: 0,
   },
   label: {
@@ -76,8 +75,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   infoIcon: {
-    width:  14,
-    height: 14,
     flexShrink: 0,
     marginLeft: 2,
   },

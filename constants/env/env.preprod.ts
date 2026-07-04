@@ -8,7 +8,7 @@ const preprod: IEnvConfig = {
   payment:    'https://ppoapi.jodii.app/',
   paymentNg:  'https://ppng.jodii.app/',
   notify:     'https://ppmc.jodii.app',
-  image:      'https://ppimg.jodii.app/',
+  image:      'https://ppimgs.jodii.app/',
 }
 
 export default preprod

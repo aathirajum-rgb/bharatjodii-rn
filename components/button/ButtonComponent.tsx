@@ -7,12 +7,12 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native'
+import { SvgUri } from 'react-native-svg'
 import { Colors } from '../../constants/colors'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
 import { clickingOnBtn } from '../../service/buttonService'
@@ -129,9 +129,10 @@ export default function ButtonComponent({
               style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
               onPress={() => handleAction(isLiked(data?.PROFILE?.LIKED) ? 'dislike' : 'like')}
             >
-              <Image
-                source={{ uri: IMG + (isLiked(data?.PROFILE?.LIKED) ? 'liked-icon.svg' : 'like-icon.svg') }}
-                style={styles.iconImg}
+              <SvgUri
+                uri={IMG + (isLiked(data?.PROFILE?.LIKED) ? 'liked-icon.svg' : 'like-icon.svg')}
+                width={28}
+                height={28}
               />
             </Pressable>
           )}
@@ -139,14 +140,14 @@ export default function ButtonComponent({
             style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
             onPress={() => handleAction('call')}
           >
-            <Image source={{ uri: IMG + 'contact.svg' }} style={styles.iconImg} />
+            <SvgUri uri={IMG + 'contact.svg'} width={28} height={28} />
           </Pressable>
           {showWhatsapp && (
             <Pressable
               style={({ pressed }) => [styles.iconBtn, pressed && styles.pressed]}
               onPress={() => handleAction('whatsapp')}
             >
-              <Image source={{ uri: IMG + 'whatsapp-icon.svg' }} style={styles.iconImg} />
+              <SvgUri uri={IMG + 'whatsapp-icon.svg'} width={28} height={28} />
             </Pressable>
           )}
           {loading && <ActivityIndicator size="small" color={Colors.primary} style={{ marginLeft: 8 }} />}
@@ -229,7 +230,7 @@ export default function ButtonComponent({
             style={({ pressed }) => [styles.menuItem, pressed && styles.pressed]}
             onPress={() => handleAction('moreOption')}
           >
-            <Image source={{ uri: IMG + 'viewprofile/report-profile-img.svg' }} style={styles.menuIcon} />
+            <SvgUri uri={IMG + 'viewprofile/report-profile-img.svg'} width={20} height={20} />
             <Text style={styles.menuText}>Report this Profile</Text>
           </Pressable>
         </View>
@@ -319,7 +320,7 @@ export default function ButtonComponent({
           style={({ pressed }) => [styles.textRow, pressed && styles.pressed]}
           onPress={() => handleAction('moreOption')}
         >
-          <Image source={{ uri: IMG + 'viewprofile/report-profile-img.svg' }} style={styles.textRowIcon} />
+          <SvgUri uri={IMG + 'viewprofile/report-profile-img.svg'} width={20} height={20} />
           <Text style={styles.textRowLabel}>{data?.BTNTEXT ?? 'Report profile'}</Text>
         </Pressable>
       )
@@ -331,7 +332,7 @@ export default function ButtonComponent({
           style={({ pressed }) => [styles.textRow, pressed && styles.pressed]}
           onPress={() => handleAction('call')}
         >
-          <Image source={{ uri: IMG + 'view-profile-message.svg' }} style={styles.textRowIcon} />
+          <SvgUri uri={IMG + 'view-profile-message.svg'} width={20} height={20} />
           <Text style={styles.textRowLabel}>{data?.BTNTEXT ?? 'View Phone'}</Text>
         </Pressable>
       )
@@ -343,7 +344,7 @@ export default function ButtonComponent({
           style={({ pressed }) => [styles.textRow, pressed && styles.pressed]}
           onPress={() => onAction?.('block', data)}
         >
-          <Image source={{ uri: IMG + 'revamp/close-icon.svg' }} style={styles.textRowIcon} />
+          <SvgUri uri={IMG + 'revamp/close-icon.svg'} width={20} height={20} />
           <Text style={styles.textRowLabel}>{data?.BTNTEXT ?? 'Block profile'}</Text>
         </Pressable>
       )
@@ -355,7 +356,7 @@ export default function ButtonComponent({
           style={({ pressed }) => [styles.textRow, pressed && styles.pressed]}
           onPress={() => onAction?.('unblock', data)}
         >
-          <Image source={{ uri: IMG + 'unblock-jodii-chat-img.svg' }} style={styles.textRowIcon} />
+          <SvgUri uri={IMG + 'unblock-jodii-chat-img.svg'} width={20} height={20} />
           <Text style={styles.textRowLabel}>{data?.BTNTEXT ?? 'UnBlock profile'}</Text>
         </Pressable>
       )
@@ -367,7 +368,7 @@ export default function ButtonComponent({
           style={({ pressed }) => [styles.textRow, pressed && styles.pressed]}
           onPress={() => onAction?.('safetyTip', data)}
         >
-          <Image source={{ uri: IMG + 'safety-tips-message.svg' }} style={styles.textRowIcon} />
+          <SvgUri uri={IMG + 'safety-tips-message.svg'} width={20} height={20} />
           <Text style={styles.textRowLabel}>{data?.BTNTEXT ?? 'Safety Tips'}</Text>
         </Pressable>
       )
@@ -380,7 +381,7 @@ export default function ButtonComponent({
           style={({ pressed }) => pressed && styles.pressed}
           onPress={() => handleAction('call')}
         >
-          <Image source={{ uri: IMG + 'matches-call-icon.svg' }} style={styles.iconImg} />
+          <SvgUri uri={IMG + 'matches-call-icon.svg'} width={28} height={28} />
         </Pressable>
       )
     }
@@ -391,7 +392,7 @@ export default function ButtonComponent({
           style={({ pressed }) => [styles.centeredIcon, pressed && styles.pressed]}
           onPress={() => handleAction('jodimessages')}
         >
-          <Image source={{ uri: IMG + 'message-matches.svg' }} style={styles.iconImg} />
+          <SvgUri uri={IMG + 'message-matches.svg'} width={28} height={28} />
         </Pressable>
       )
     }
@@ -402,7 +403,7 @@ export default function ButtonComponent({
           style={({ pressed }) => [styles.iconHdr, pressed && styles.pressed]}
           onPress={() => handleAction('jodimessages')}
         >
-          <Image source={{ uri: IMG + 'message-matches.svg' }} style={styles.iconHdrImg} />
+          <SvgUri uri={IMG + 'message-matches.svg'} width={18} height={18} />
         </Pressable>
       )
     }
@@ -413,7 +414,7 @@ export default function ButtonComponent({
           style={({ pressed }) => [styles.centeredIcon, pressed && styles.pressed]}
           onPress={() => handleAction('call')}
         >
-          <Image source={{ uri: IMG + 'revamp/call-revamp.svg' }} style={styles.iconImg} />
+          <SvgUri uri={IMG + 'revamp/call-revamp.svg'} width={28} height={28} />
         </Pressable>
       )
     }
@@ -424,7 +425,7 @@ export default function ButtonComponent({
           style={({ pressed }) => [styles.iconHdr, pressed && styles.pressed]}
           onPress={() => handleAction('call')}
         >
-          <Image source={{ uri: IMG + 'revamp/call-revamp.svg' }} style={styles.iconHdrImg} />
+          <SvgUri uri={IMG + 'revamp/call-revamp.svg'} width={18} height={18} />
         </Pressable>
       )
     }
@@ -465,7 +466,7 @@ export default function ButtonComponent({
           style={({ pressed }) => pressed && styles.pressed}
           onPress={() => handleAction('call')}
         >
-          <Image source={{ uri: IMG + 'call-message.svg' }} style={styles.iconSmall} />
+          <SvgUri uri={IMG + 'call-message.svg'} width={20} height={20} />
         </Pressable>
       )
     }
@@ -476,7 +477,7 @@ export default function ButtonComponent({
           style={({ pressed }) => pressed && styles.pressed}
           onPress={() => handleAction('whatsapp')}
         >
-          <Image source={{ uri: IMG + 'whatsapp-revamp.svg' }} style={styles.iconImg} />
+          <SvgUri uri={IMG + 'whatsapp-revamp.svg'} width={28} height={28} />
         </Pressable>
       )
     }

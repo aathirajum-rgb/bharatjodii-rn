@@ -8,7 +8,7 @@ const stg: IEnvConfig = {
   payment:    'https://stgoapi.jodii.app/',
   paymentNg:  'https://stgng.jodii.app/',
   notify:     'https://stgmc.jodii.app/',
-  image:      'https://stgimg.jodii.app/',
+  image:      'https://stgimgs.jodii.app/',
 }
 
 export default stg

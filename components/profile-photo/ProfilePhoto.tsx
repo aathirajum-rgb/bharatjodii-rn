@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { BlurView } from 'expo-blur'
 import * as ImagePicker from 'expo-image-picker'
+import { SvgUri } from 'react-native-svg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG, CDN_IMG } from '../../constants/cdn'
 
@@ -117,7 +118,7 @@ function PhotoRequestOverlay({ type, onPress }: PhotoRequestProps) {
 
   return (
     <View style={styles.requestOverlay}>
-      <Image source={{ uri: icon }} style={styles.requestIcon} resizeMode="contain" />
+      <SvgUri uri={icon} width={48} height={48} style={styles.requestIcon} />
       <Text style={styles.requestTitle}>{title}</Text>
       <Text style={styles.requestDesc}>{desc}</Text>
       {!isRequestSent && (
@@ -296,7 +297,7 @@ export default function ProfilePhoto({
       {/* ── Newly-joined badge (top-left ribbon) ── */}
       {isNewlyJoined && (
         <View style={styles.newlyJoinedBadge}>
-          <Image source={{ uri: ICONS.newlyJoinedStar }} style={styles.newlyJoinedStar} resizeMode="contain" />
+          <SvgUri uri={ICONS.newlyJoinedStar} width={14} height={14} style={styles.newlyJoinedStar} />
           <Text style={styles.newlyJoinedText}>New</Text>
         </View>
       )}
@@ -304,10 +305,11 @@ export default function ProfilePhoto({
       {/* ── Shortlist pill (top-right) ── */}
       {isShortlisted && (
         <Pressable style={styles.shortlistPill} onPress={onShortlistPress}>
-          <Image
-            source={{ uri: (likedStatus === '1' || likedStatus === '3') ? ICONS.shortlistOn : ICONS.shortlistOff }}
+          <SvgUri
+            uri={(likedStatus === '1' || likedStatus === '3') ? ICONS.shortlistOn : ICONS.shortlistOff}
+            width={20}
+            height={20}
             style={styles.shortlistIcon}
-            resizeMode="contain"
           />
           <Text style={styles.shortlistText}>
             {(likedStatus === '1' || likedStatus === '3') ? 'Shortlisted' : 'Shortlist'}
@@ -325,7 +327,7 @@ export default function ProfilePhoto({
       {/* ── Don't Show pill (bottom-center) ── */}
       {showDontShow && (
         <Pressable style={styles.dontShowPill} onPress={onDontShowPress}>
-          <Image source={{ uri: ICONS.closeWhite }} style={styles.dontShowIcon} resizeMode="contain" />
+          <SvgUri uri={ICONS.closeWhite} width={16} height={16} style={styles.dontShowIcon} />
           <Text style={styles.dontShowText}>{dontShowLabel}</Text>
         </Pressable>
       )}
@@ -362,7 +364,7 @@ export default function ProfilePhoto({
           ) : (
             <>
               <View style={styles.uploadIconWrap}>
-                <Image source={{ uri: ICONS.camera }} style={styles.uploadIcon} resizeMode="contain" />
+                <SvgUri uri={ICONS.camera} width={28} height={28} />
               </View>
               <Text style={styles.uploadLabel}>
                 {profileImage ? 'Change Photo' : 'Add Photo'}

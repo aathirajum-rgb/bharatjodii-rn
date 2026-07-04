@@ -1,5 +1,6 @@
-import { Image, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
+import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { SvgUri } from 'react-native-svg'
 import MenuIcon from '../../assets/icons/MenuIcon'
 import NotificationIcon from '../../assets/icons/NotificationIcon'
 import SearchIcon from '../../assets/icons/SearchIcon'
@@ -118,9 +119,9 @@ export default function AppHeader({
 
           {/* Language selector pill — always visible, auto-detects language */}
           <Pressable style={styles.h1LangBtn} onPress={onLanguagePress}>
-            <Image source={{ uri: ICONS.lang }} style={styles.h1LangIcon} resizeMode="contain" />
+            <SvgUri uri={ICONS.lang} width={20} height={20} />
             <Text style={styles.h1LangText}>{resolvedLangLabel}</Text>
-            <Image source={{ uri: ICONS.chevDown }} style={styles.h1ChevIcon} resizeMode="contain" />
+            <SvgUri uri={ICONS.chevDown} width={12} height={12} />
           </Pressable>
 
           {/* Notification + chat icon buttons */}
@@ -134,7 +135,7 @@ export default function AppHeader({
                 ? <NotificationIcon size={18} color={Colors.textPrimary} />
                 : item.toolType === 'chat'
                 ? <SearchIcon size={18} color={Colors.textPrimary} />
-                : <Image source={{ uri: item.toolImg }} style={styles.h1Icon} resizeMode="contain" />
+                : <SvgUri uri={item.toolImg} width={19} height={19} />
               }
               {!!(item.showNotification && item.notifyCount && item.notifyCount !== '0') && (
                 <BadgeCount count={item.notifyCount!} />
@@ -146,10 +147,11 @@ export default function AppHeader({
         {/* ── Row 2: User profile bar ── */}
         <View style={styles.h1UserBar}>
           <Pressable style={styles.h1AvatarWrap} onPress={onAvatarPress}>
-            <Image
-              source={{ uri: userImg ?? CDN + 'revamp/default-avatar.svg' }}
-              style={styles.h1Avatar}
-              resizeMode="cover"
+            <SvgUri
+              uri={userImg ?? CDN + 'revamp/default-avatar.svg'}
+              width={48}
+              height={48}
+              style={styles.h1AvatarRadius}
             />
             {completionPct !== undefined && (
               <View style={styles.completionBadge}>
@@ -162,7 +164,7 @@ export default function AppHeader({
             <Text style={styles.h1UserName} numberOfLines={1}>{userName ?? ''}</Text>
             <View style={styles.h1EditRow}>
               <Text style={styles.h1EditLabel}>Edit profile</Text>
-              <Image source={{ uri: ICONS.fwdLink }} style={styles.h1EditIcon} resizeMode="contain" />
+              <SvgUri uri={ICONS.fwdLink} width={12} height={12} />
             </View>
           </Pressable>
         </View>
@@ -200,9 +202,9 @@ export default function AppHeader({
         <View style={styles.flex1} />
 
         <Pressable style={styles.langBtn} onPress={onLanguagePress}>
-          <Image source={{ uri: ICONS.lang }} style={styles.langIcon} resizeMode="contain" />
+          <SvgUri uri={ICONS.lang} width={24} height={24} />
           <Text style={styles.langText}>{resolvedLangLabel}</Text>
-          <Image source={{ uri: ICONS.chevDown }} style={styles.chevIcon} resizeMode="contain" />
+          <SvgUri uri={ICONS.chevDown} width={12} height={12} />
         </Pressable>
       </View>
     </SafeAreaView>
@@ -247,9 +249,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position:       'relative',
   },
-  h1Avatar: {
-    width:        48,
-    height:       48,
+  h1AvatarRadius: {
     borderRadius: 24,
   },
   completionBadge: {

@@ -1,4 +1,5 @@
-import { Image, Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
+import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
+import { SvgUri } from 'react-native-svg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 
@@ -49,7 +50,7 @@ export default function Chip({
   const iconSize = ICON_SIZE[iconPosition]
 
   const iconEl = icon
-    ? <Image source={{ uri: ICON_URL[icon] }} style={{ width: iconSize, height: iconSize }} resizeMode="contain" />
+    ? <SvgUri uri={ICON_URL[icon]} width={iconSize} height={iconSize} />
     : null
 
   return (
