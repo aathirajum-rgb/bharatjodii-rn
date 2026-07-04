@@ -32,7 +32,9 @@ const CDN = CDN_SVG + 'bottom-nav/'
 
 // [inactive, active] icon pairs — Figma bottom nav node 8379:10131
 // Tab order: Home · Matches · Likes · Search · Membership
-const TAB_ICONS: Record<FooterTab, [string, string]> = {
+// Exported so other nav surfaces (e.g. MatchesDesktopNav) reuse the same icon
+// set instead of re-listing overlapping CDN paths.
+export const TAB_ICONS: Record<FooterTab, [string, string]> = {
   0: [CDN + 'home-deactive.svg',       CDN + 'home-active.svg'],
   1: [CDN + 'matches-deactive.svg',    CDN + 'matches-active.svg'],
   2: [CDN + 'like.svg',                CDN + 'like-active.svg'],
