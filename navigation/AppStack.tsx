@@ -9,7 +9,6 @@ import { StorageKeys } from '../constants/storage.keys'
 import { OnboardingCtx, FooterState, FooterHandlers } from '../contexts/OnboardingContext'
 import { getItem } from '../service/storageService'
 import { useAuth } from '../contexts/AuthContext'
-
 import ComponentShowcaseScreen    from '../screens/dev/ComponentShowcaseScreen'
 import HomeScreen                  from '../screens/home/HomeScreen'
 import GalleryScreen               from '../screens/GalleryScreen'
@@ -40,12 +39,15 @@ import PaymentSuccessScreen        from '../screens/payment/PaymentSuccessScreen
 import RechargeScreen              from '../screens/payment/RechargeScreen'
 import PermissionDemoScreen        from '../screens/PermissionDemoScreen'
 import MatchesScreen               from '../screens/matches/MatchesScreen'
+import LanguageSelectionScreen     from '../screens/LanguageSelectionScreen'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type AppStackParamList = {
   Home:              undefined
-  Matches:           undefined
+  // exploreType/exploreLabel — Angular: matches.page.ts explorePage branch (FILTERTYPE
+  // scoped listing, e.g. tapping a Home "Explore matches based on" category tile)
+  Matches:           { exploreType?: string; exploreLabel?: string } | undefined
   dashboard:         undefined
   onboarding:        { pageNo: string } | undefined
   Permissions:       undefined
@@ -53,6 +55,10 @@ export type AppStackParamList = {
   recharge:          { from?: string; paymentId?: string; type?: string } | undefined
   'payment-success': undefined
   ComponentShowcase: undefined
+  // Angular: languageChangeService.languageChange() opens the language screen as a
+  // modal ON TOP of the current page (Matches, onboarding, etc.) — never a full-screen
+  // push. AuthStack's own LanguageSelection route (pre-login, full-screen) is separate.
+  LanguageSelection: undefined
 }
 
 // ─── Onboarding shell ─────────────────────────────────────────────────────────
@@ -285,6 +291,15 @@ export default function AppStack() {
         component={ComponentShowcaseScreen}
         options={{ title: 'Component Library', headerStyle: { backgroundColor: Colors.devAccent }, headerTintColor: Colors.white }}
       />
+
+      {/* Angular: opened as a modal overlay on the current page — never a full push.
+          LanguageSelectionScreen already self-dismisses via navigation.goBack() once
+          canGoBack() is true, so onSelect here is just the (unreachable) fallback. */}
+      <Stack.Screen name="LanguageSelection" options={{ presentation: 'modal', animation: 'slide_from_bottom' }}>
+        {({ navigation }) => (
+          <LanguageSelectionScreen navigation={navigation} onSelect={() => navigation.goBack()} />
+        )}
+      </Stack.Screen>
     </Stack.Navigator>
   )
 }

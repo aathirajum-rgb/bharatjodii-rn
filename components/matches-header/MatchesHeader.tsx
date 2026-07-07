@@ -1,10 +1,11 @@
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import FilterChipsRow, { MOBILE_FILTER_CHIPS } from './FilterChipsRow'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
+import type { ExploreFacet } from '../../service/homeService'
 
 const CDN = CDN_SVG
 
@@ -29,6 +30,13 @@ export interface MatchesHeaderProps {
   onEditPreferences?: () => void
   onHeaderLayout:  (height: number) => void
   onTitleLayout:   (height: number) => void
+  // Explore-by-category mode (#5/#6) — facet refinement chips returned inline by
+  // the explore listing response. Angular: matches.page.html:94-114 facetResponce row.
+  facets?:         ExploreFacet[]
+  onFacetToggle?:  (key: string) => void
+  // Explore-by-category mode — Angular shows the category's own label instead of
+  // "N Matches" as the page title (matches.page.ts pageTitle).
+  titleOverride?:  string | undefined
 }
 
 // ─── MatchesHeader ─────────────────────────────────────────────────────────────
@@ -44,6 +52,9 @@ export default function MatchesHeader({
   onEditPreferences,
   onHeaderLayout,
   onTitleLayout,
+  facets,
+  onFacetToggle,
+  titleOverride,
 }: MatchesHeaderProps) {
   const { t } = useTranslation()
   const langLabel = LANG_LABELS[langCode] ?? 'English'
@@ -67,12 +78,16 @@ export default function MatchesHeader({
             if (h > 0) onTitleLayout(h)
           }}
         >
+          {/* Figma: count-first — "323 Matches", not Angular's "Matches (323)" — so we
+              reuse the bare noun from GENERAL.ICON_1 (also the footer tab label) rather
+              than SEARCH.MATCHES_FOUND, which bakes in Angular's word order/parens. */}
           <Text style={s.title}>
-            {loading ? 'Matches' : `Matches (${totalCount})`}
+            {loading ? (titleOverride ?? t('GENERAL.ICON_1')) : (titleOverride ?? `${totalCount} ${t('GENERAL.ICON_1')}`)}
           </Text>
 
           <View style={s.titleActions}>
-            <Pressable style={s.iconBtn} onPress={onLanguagePress} hitSlop={8}>
+            {/* Figma: bordered pill — 1px black, 8px radius, pl-8/pr-12/py-4, gap-4 */}
+            <Pressable style={s.langPill} onPress={onLanguagePress} hitSlop={8}>
               <CdnSvg uri={CDN + 'revamp/lang-change-img.svg'} width={24} height={24} />
               <Text style={s.langText}>{langLabel}</Text>
             </Pressable>
@@ -88,13 +103,29 @@ export default function MatchesHeader({
             </Text>
             <Pressable style={s.ppEditBtn} onPress={onEditPreferences} hitSlop={8}>
               <Text style={s.ppEditText}>{t('MATCHES.EDIT_PP')}</Text>
-              <CdnSvg uri={CDN + 'registration-new/edit-pencil.svg'} width={14} height={14} style={{ marginLeft: 4 }} />
+              <CdnSvg uri={CDN + 'registration-new/edit-pencil.svg'} width={16} height={16} style={{ marginLeft: 4 }} />
             </Pressable>
           </View>
         )}
 
         {/* Filter chips — Figma: top 56 from content start (12 title-top + 24 title + 20 gap) */}
         <FilterChipsRow chips={MOBILE_FILTER_CHIPS} selected={selectedChip} onSelect={onChipSelect} />
+
+        {/* Facet refinement chips — explore-by-category mode only (#5) */}
+        {facets && facets.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.facetRow}>
+            {facets.map(f => (
+              <Pressable
+                key={f.key}
+                style={[s.facetChip, f.checked && s.facetChipSelected, f.count === 0 && s.facetChipDisabled]}
+                onPress={() => f.count !== 0 && onFacetToggle?.(f.key)}
+                disabled={f.count === 0}
+              >
+                <Text style={[s.facetChipText, f.checked && s.facetChipTextSelected]}>{f.value}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        )}
 
       </SafeAreaView>
     </Animated.View>
@@ -128,7 +159,7 @@ const s = StyleSheet.create({
     flexDirection:  'row',
     alignItems:     'center',
     justifyContent: 'space-between',
-    paddingLeft:    24,
+    paddingLeft:    16,
     paddingRight:   16,
     marginTop:      12,
     marginBottom:   8,
@@ -139,15 +170,16 @@ const s = StyleSheet.create({
   ppRow: {
     flexDirection:     'column',
     alignItems:        'flex-start',
-    paddingLeft:       24,
+    paddingLeft:       16,
     paddingRight:      16,
     marginBottom:      12,
     gap:               2,
   },
+  // Figma: #000000
   ppText: {
     fontFamily: 'Poppins-Regular',
     fontSize:   14,
-    color:      Colors.textDark,
+    color:      '#000000',
   },
   ppEditBtn: {
     flexDirection: 'row',
@@ -158,27 +190,61 @@ const s = StyleSheet.create({
     fontSize:   14,
     color:      Colors.link,
   },
-  // Figma: Poppins-SemiBold 18 #333
+  // Figma: Poppins-SemiBold 18 #000000
   title: {
     fontFamily: 'Poppins-SemiBold',
     fontSize:   18,
     lineHeight: 24,
-    color:      '#333333',
+    color:      '#000000',
   },
   titleActions: {
     flexDirection: 'row',
     alignItems:    'center',
     gap:           4,
   },
-  iconBtn: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           4,
-    padding:       4,
+  // Figma: bordered pill — 1px solid black, 8px radius, pl-8/pr-12/py-4, gap-4
+  langPill: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               4,
+    borderWidth:       1,
+    borderColor:       '#000000',
+    borderRadius:      8,
+    paddingLeft:       8,
+    paddingRight:      12,
+    paddingVertical:   4,
   },
   langText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize:   12,
+    color:      '#000000',
+  },
+  facetRow: {
+    paddingLeft:   16,
+    paddingRight:  16,
+    paddingBottom: 8,
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           8,
+  },
+  facetChip: {
+    height:            32,
+    paddingHorizontal: 12,
+    borderRadius:      16,
+    borderWidth:       1,
+    borderColor:       Colors.inputBorder,
+    justifyContent:    'center',
+    flexShrink:        0,
+  },
+  facetChipSelected: {
+    borderColor:     Colors.chipBorderActive,
+    backgroundColor: Colors.chipSurfaceSelected,
+  },
+  facetChipDisabled: { opacity: 0.4 },
+  facetChipText: {
     fontFamily: 'Poppins-Regular',
     fontSize:   12,
-    color:      '#333333',
+    color:      '#4c4c4c',
   },
+  facetChipTextSelected: { color: Colors.primary },
 })

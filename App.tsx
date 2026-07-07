@@ -1,4 +1,5 @@
 import * as SplashScreen from 'expo-splash-screen'
+import { StatusBar } from 'expo-status-bar'
 import Constants from 'expo-constants'
 import {
   Poppins_400Regular,
@@ -73,6 +74,11 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
+      {/* Set once, centrally — dark icons on the app's white headers by default.
+          Screens with a dark/colored top area (e.g. Splash, LanguageSelection)
+          mount their own <StatusBar> to override; expo-status-bar restores this
+          root setting automatically once that screen unmounts. */}
+      <StatusBar style="dark" />
       <AuthProvider>
         <RootNavigation />
       </AuthProvider>

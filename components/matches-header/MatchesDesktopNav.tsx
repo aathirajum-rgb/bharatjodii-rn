@@ -3,19 +3,15 @@
 // same FooterTab navigation targets as AppFooter so MatchesScreen's existing
 // handleTabPress works unchanged for both layouts.
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
 import CdnSvg from '../cdn-svg/CdnSvg'
-import { TAB_ICONS, type FooterTab } from '../app-footer/AppFooter'
+import { TAB_ICONS, TAB_LABEL_KEYS, type FooterTab } from '../app-footer/AppFooter'
 import { LANG_LABELS } from './MatchesHeader'
 import { Colors } from '../../constants/colors'
 
-// Reuses AppFooter's TAB_ICONS ([inactive, active] pairs) instead of
-// re-listing the same CDN icon filenames a second time.
-const NAV_ITEMS: Array<{ tab: FooterTab; label: string }> = [
-  { tab: 0, label: 'Home' },
-  { tab: 1, label: 'Matches' },
-  { tab: 2, label: 'Liked profiles' },
-  { tab: 4, label: 'Contacted profiles' },
-]
+// Reuses AppFooter's TAB_ICONS ([inactive, active] pairs) and TAB_LABEL_KEYS
+// (i18n keys, translated below via t()) instead of re-listing either a second time.
+const NAV_TABS: FooterTab[] = [0, 1, 2, 4]
 
 type Props = {
   activeTab:        FooterTab
@@ -29,19 +25,20 @@ export default function MatchesDesktopNav({
   activeTab, langCode, upgradeTag = '₹200 OFF', onTabPress, onLanguagePress,
 }: Props) {
   const langLabel = LANG_LABELS[langCode] ?? 'English'
+  const { t } = useTranslation()
 
   return (
     <View style={s.bar}>
       <Text style={s.logo}>Jodii</Text>
 
       <View style={s.links}>
-        {NAV_ITEMS.map(item => {
-          const isActive = activeTab === item.tab
-          const [inactiveIcon, activeIcon] = TAB_ICONS[item.tab]
+        {NAV_TABS.map(tab => {
+          const isActive = activeTab === tab
+          const [inactiveIcon, activeIcon] = TAB_ICONS[tab]
           return (
-            <Pressable key={item.tab} style={s.link} onPress={() => onTabPress(item.tab)}>
+            <Pressable key={tab} style={s.link} onPress={() => onTabPress(tab)}>
               <CdnSvg uri={isActive ? activeIcon : inactiveIcon} width={18} height={18} />
-              <Text style={[s.linkText, isActive && s.linkTextActive]}>{item.label}</Text>
+              <Text style={[s.linkText, isActive && s.linkTextActive]}>{t(TAB_LABEL_KEYS[tab])}</Text>
             </Pressable>
           )
         })}

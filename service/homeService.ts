@@ -36,11 +36,24 @@ export interface HelpVideo {
   videoUrl: string
 }
 
+// Angular: facetResponce (matches.page.ts:1098-1139) — refinement chips returned
+// inline by the explore listing response, e.g. sub-castes/localities found among
+// the current FILTERTYPE results. KEY is the raw filter value sent back in QSEARCH,
+// VALUE is the display label, COUNT===0 disables the chip (matches-card.component.html
+// isn't involved — this is matches.page.html's own facet chip row).
+export interface ExploreFacet {
+  key:     string
+  value:   string
+  count:   number
+  checked: boolean
+}
+
 export interface ListingResult {
   items: SwiperItem[]
   bannerSlots: Array<{ slot: string; insertAfter: number }>
   totalCount: number
   newCount: number
+  facets?: ExploreFacet[]
 }
 
 export const EMPTY_LISTING: ListingResult = { items: [], bannerSlots: [], totalCount: 0, newCount: 0 }
@@ -77,6 +90,10 @@ function toProfile(p: Record<string, any>): SwiperItem {
     // Angular matches card: profile.LIKED (not LIKEDSTATUS) — fallback for other listing APIs
     likedStatus:         (p['LIKED'] ?? p['LIKEDSTATUS']) as SwiperItem['likedStatus'],
     phoneViewed:         p['PHONEVIEWED'],
+    // Angular: FUNC.disableDontShow()/disableViewLater() — '1'/'3' means the action
+    // was already taken (from our side, or both sides) on a re-fetched profile.
+    dontShowStatus:      p['STATUS'],
+    viewLaterStatus:     p['VIEWLATER'],
     isNewLabel:          p['ISNEWLABEL']  === '1',
     labelContent:        p['LABELCONTENT'],
     likedViewedDateText: p['LIKEDVIEWEDDATETEXT'] ?? p['VIEWEDDATETEXT'] ?? p['LIKEDDATETEXT'],
@@ -112,11 +129,22 @@ function toListingResult(res: Record<string, any>): ListingResult {
     items.push(toProfile(p))
   }
 
+  const rawFacets = res['FACETRESPONSE']
+  const facets: ExploreFacet[] | undefined = Array.isArray(rawFacets)
+    ? rawFacets.map((f: Record<string, any>) => ({
+        key:     String(f['KEY']   ?? ''),
+        value:   String(f['VALUE'] ?? ''),
+        count:   Number(f['COUNT'] ?? 0),
+        checked: false,
+      }))
+    : undefined
+
   return {
     items,
     bannerSlots,
     totalCount: Number(res['TOTAL'] ?? res['TOTALCOUNT'] ?? res['LISTCOUNT'] ?? 0),
     newCount:   Number(res['NEWCOUNT'] ?? 0),
+    ...(facets ? { facets } : {}),
   }
 }
 
@@ -380,7 +408,19 @@ export async function fetchExtendedMatches(start = 0, limit = 20): Promise<Listi
 // Angular: callMatchesApi() param string (matches default route)
 // START/LIMIT instead of PAGENO — Angular never sends PAGENO for this endpoint
 
-export async function fetchMatches(start = 0, limit = 20): Promise<ListingResult> {
+// Quick-filter chip fields — Angular: FilterService.getUrlParams() appends these
+// three raw flags onto the listing params once any quick-filter chip is active
+// (matches.page.ts clickOnFilterChip() / filter.service.ts getUrlParams():115).
+// We mirror only these three flags on the existing matches listing endpoint,
+// rather than porting the full Search/Filter preference-encoded (SETPP) endpoint
+// switch — that's a separate, much larger subsystem outside the Matches screen.
+export interface QuickFilters {
+  profileCreated?:     boolean
+  photoAvailable?:      boolean
+  horoscopeAvailable?: boolean
+}
+
+export async function fetchMatches(start = 0, limit = 20, quickFilters?: QuickFilters): Promise<ListingResult> {
   const [session, userId, ekycStatus, gender] = await Promise.all([
     getSession(),
     getItem(StorageKeys.Auth.USER_ID),
@@ -405,7 +445,37 @@ export async function fetchMatches(start = 0, limit = 20): Promise<ListingResult
     'FREEMATCHFLAG=0',
   ]
   if (nonIdVerifyUser) parts.push('EKYCFLAG=1')
+  if (quickFilters?.profileCreated)     parts.push('PROFILECREATED=1')
+  if (quickFilters?.photoAvailable)     parts.push('PHOTOAVAILABLE=1')
+  if (quickFilters?.horoscopeAvailable) parts.push('HOROSCOPEAVAILABLE=1')
   const res = await apiCall(Endpoints.listing.matches, 'POST', parts.join('&'))
+  return toListingResult(res)
+}
+
+// ─── Explore by category ───────────────────────────────────────────────────────
+// Angular: callMatchesApi() explorePage branch (matches.page.ts:988-1002) — same
+// listing shape as fetchMatches, filtered to one category (FILTERTYPE) instead of
+// the default feed. qSearch is the pipe-joined facet KEY selection (pillFilter()),
+// e.g. narrowing "Graduate and above" further by a sub-caste facet chip.
+
+export async function fetchExplore(filterType: string, start = 0, limit = 20, qSearch = ''): Promise<ListingResult> {
+  const userId = await getItem(StorageKeys.Auth.USER_ID)
+  const parts = [
+    `ID=${userId ?? ''}`,
+    `START=${start}`,
+    `LIMIT=${limit}`,
+    `FILTERTYPE=${filterType}`,
+    'LISTTYPE=LIST',
+    'LIKED=1',
+    'VIEWED=0',
+    'REPORTED=1',
+    'BLOCKED=1',
+    'REMOVED=1',
+    'SKIPED=1',
+    'BANNERFLAG=1',
+  ]
+  if (qSearch) parts.push(`QSEARCH=${qSearch}`)
+  const res = await apiCall(Endpoints.listing.explore, 'POST', parts.join('&'))
   return toListingResult(res)
 }
 

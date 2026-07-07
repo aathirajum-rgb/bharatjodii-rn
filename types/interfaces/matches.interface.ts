@@ -21,6 +21,9 @@ export interface MatchProfile {
   labelContent:     string                       // "Viewed on 15 Jan" / "Shortlisted on …"
   likedDateText?:   string                       // "You liked this profile on 16-Jan-2026"
   phoneViewed:      string                       // raw '0'|'1'|'2'|'3' — drives after-like CTA label
+  // Angular: FUNC.disableDontShow()/disableViewLater() — '1'/'3' = action already taken
+  dontShowStatus:   string
+  viewLaterStatus:  string
 }
 
 // STATUS=599 banner items injected by the API (e.g. membership upsell)

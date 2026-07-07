@@ -35,6 +35,10 @@ export interface SwiperItem {
   likedStatus?: '0' | '1' | '2' | '3' | undefined
   phoneViewed?: string | undefined   // raw '0'|'1'|'2'|'3' — drives after-like CTA label
 
+  // Angular: FUNC.disableDontShow()/disableViewLater() — '1'/'3' = action already taken
+  dontShowStatus?:  string | undefined   // raw STATUS
+  viewLaterStatus?: string | undefined   // raw VIEWLATER
+
   // Profile badge fields (used by MatchesScreen, ViewProfile, etc.)
   isPaidMember?: boolean | undefined    // Angular: FUNC.IsPaidMember(profile)
   isIdVerified?: boolean | undefined    // Angular: FUNC.IsIDVerifiedMember(profile)

@@ -9,7 +9,8 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import {
   WhatsAppIcon, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   buildBasicView, showLikeCTA, showAfterLikeCTA,
-  getBlurPhotoUri, NEWLY_JOINED_STAR_URI, PAID_TAG_URI, VERIFIED_TAG_URI,
+  getBlurPhotoUri, NEWLY_JOINED_STAR_URI, ProfileBadge,
+  disableDontShow, disableViewLater,
 } from './matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
@@ -78,10 +79,11 @@ export default function MatchCardDesktop({
         <View style={c.badgeRow}>
           <View style={c.badges}>
             {profile.isPaidMember && (
-              <CdnSvg uri={PAID_TAG_URI} width={72} height={20} />
+              <ProfileBadge variant="paid" text={t('MENU.PAID_BADGE')} />
             )}
-            {profile.isIdVerified && (
-              <CdnSvg uri={VERIFIED_TAG_URI} width={90} height={20} />
+            {/* Angular: FUNC.getLogInGender() == 'F' — oppGender === 'M' means the viewer is female */}
+            {profile.isIdVerified && oppGender === 'M' && (
+              <ProfileBadge variant="verified" text={t('MATCHES.VERIFIED_ID')} />
             )}
           </View>
           <View style={c.contactIcons}>
@@ -103,11 +105,19 @@ export default function MatchCardDesktop({
 
         {showLikeCTA(profile.likedStatus) && (
           <View style={c.ctaRow}>
-            <Pressable style={c.ctaDontShow} onPress={onDontShow}>
+            <Pressable
+              style={[c.ctaDontShow, disableDontShow(profile.dontShowStatus) && c.ctaDisabled]}
+              onPress={onDontShow}
+              disabled={disableDontShow(profile.dontShowStatus)}
+            >
               <CloseIcon width={14} height={14} />
               <Text style={c.ctaDontShowText}>{t('GENERAL.DONTSHOWCTA')}</Text>
             </Pressable>
-            <Pressable style={c.ctaViewLater} onPress={onViewLater}>
+            <Pressable
+              style={[c.ctaViewLater, disableViewLater(profile.viewLaterStatus) && c.ctaDisabled]}
+              onPress={onViewLater}
+              disabled={disableViewLater(profile.viewLaterStatus)}
+            >
               <ViewLaterIcon width={14} height={14} />
               <Text style={c.ctaViewLaterText}>{t('GENERAL.VIEWLATER')}</Text>
             </Pressable>
@@ -282,6 +292,7 @@ const c = StyleSheet.create({
     paddingHorizontal: 14,
   },
   ctaViewLaterText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.textDark },
+  ctaDisabled: { opacity: 0.4 },
   ctaLike: {
     flex:              1,
     flexDirection:     'row',

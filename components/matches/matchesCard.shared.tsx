@@ -83,31 +83,41 @@ export function LikeIcon({ width = 18, height = 19 }: IconProps) {
 // <br> → newline character
 
 // Renders server HTML as styled React Native Text.
-// Handles <span style="color:..."> (colored text) and <br> (newline).
-export function HtmlText({ html, style }: { html: string; style?: any }) {
+// Handles <span style="color:...;font-size:...px"> and <span class="..."> (any
+// span, styled or not) plus <br> (newline). spanStyle is a baseline applied to
+// EVERY span segment (e.g. bumping a discount amount to a bigger/bolder look,
+// matching Angular's convention of giving that span its own CSS class rather
+// than an inline style) — an inline color/font-size on the span itself, when
+// present, overrides spanStyle for that property.
+export function HtmlText({ html, style, spanStyle }: { html: string; style?: any; spanStyle?: any }) {
   if (!html) return null
   const cleaned = html.replace(/<br\s*\/?>/gi, '\n')
-  const segs: Array<{ text: string; color: string | null }> = []
-  const spanRe = /<span[^>]*?style="([^"]*)"[^>]*>([\s\S]*?)<\/span>/gi
+  const segs: Array<{ text: string; segStyle: Record<string, any> | null }> = []
+  const spanRe = /<span([^>]*)>([\s\S]*?)<\/span>/gi
   let last = 0
   let sm: RegExpExecArray | null
   while ((sm = spanRe.exec(cleaned)) !== null) {
     if (sm.index > last) {
-      segs.push({ text: cleaned.slice(last, sm.index).replace(/<[^>]*>/g, ''), color: null })
+      segs.push({ text: cleaned.slice(last, sm.index).replace(/<[^>]*>/g, ''), segStyle: null })
     }
-    const colorM = sm[1].match(/color:\s*([^;]+)/)
-    segs.push({ text: sm[2].replace(/<[^>]*>/g, ''), color: colorM ? colorM[1].trim() : null })
+    const inline    = sm[1].match(/style="([^"]*)"/)?.[1] ?? ''
+    const colorM    = inline.match(/color:\s*([^;]+)/)
+    const fontSizeM = inline.match(/font-size:\s*([\d.]+)px/)
+    const segStyle: Record<string, any> = { ...spanStyle }
+    if (colorM)    segStyle.color    = colorM[1].trim()
+    if (fontSizeM) segStyle.fontSize = Number(fontSizeM[1])
+    segs.push({ text: sm[2].replace(/<[^>]*>/g, ''), segStyle: Object.keys(segStyle).length ? segStyle : null })
     last = sm.index + sm[0].length
   }
   if (last < cleaned.length) {
-    segs.push({ text: cleaned.slice(last).replace(/<[^>]*>/g, ''), color: null })
+    segs.push({ text: cleaned.slice(last).replace(/<[^>]*>/g, ''), segStyle: null })
   }
-  if (segs.length === 0) segs.push({ text: cleaned.replace(/<[^>]*>/g, ''), color: null })
+  if (segs.length === 0) segs.push({ text: cleaned.replace(/<[^>]*>/g, ''), segStyle: null })
   return (
     <Text style={style}>
       {segs.map((seg, i) =>
-        seg.color
-          ? <Text key={i} style={{ color: seg.color }}>{seg.text}</Text>
+        seg.segStyle
+          ? <Text key={i} style={seg.segStyle}>{seg.text}</Text>
           : <Text key={i}>{seg.text}</Text>
       )}
     </Text>
@@ -116,9 +126,29 @@ export function HtmlText({ html, style }: { html: string; style?: any }) {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// The API returns caste/education/occupation/etc. HTML-entity-encoded for non-English
+// locales (e.g. "&#xbb5;&#xbaf;&#xba4;&#xbc1;" for a Tamil word). Angular renders these
+// via [innerHtml], so the browser decodes entities for free; React Native's plain <Text>
+// never parses HTML, so without this the raw entity codes show up on screen verbatim.
+const NAMED_HTML_ENTITIES: Record<string, string> = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+}
+
+export function decodeHtmlEntities(input: string): string {
+  if (!input || input.indexOf('&') === -1) return input
+  return input.replace(/&(#x[0-9a-fA-F]+|#[0-9]+|[a-zA-Z]+);/g, (match, entity: string) => {
+    if (entity[0] === '#') {
+      const isHex = entity[1]?.toLowerCase() === 'x'
+      const code  = isHex ? parseInt(entity.slice(2), 16) : parseInt(entity.slice(1), 10)
+      return Number.isNaN(code) ? match : String.fromCodePoint(code)
+    }
+    return NAMED_HTML_ENTITIES[entity] ?? match
+  })
+}
+
 // Angular: bindBasicView() — order: age | height | caste | education | occupation | location
 // (mirrors matches-card.component.ts bindBasicView exactly)
-export function buildBasicView(p: MatchProfile): string {
+export function buildBasicViewParts(p: MatchProfile): string[] {
   const parts: string[] = []
   if (p.age)        parts.push(`${p.age} yrs`)
   if (p.height)     parts.push(p.height)
@@ -126,7 +156,11 @@ export function buildBasicView(p: MatchProfile): string {
   if (p.education)  parts.push(p.education)
   if (p.occupation) parts.push(p.occupation)
   if (p.location)   parts.push(p.location)   // location at END (Angular)
-  return parts.join(' | ')
+  return parts.map(decodeHtmlEntities)
+}
+
+export function buildBasicView(p: MatchProfile): string {
+  return buildBasicViewParts(p).join(' | ')
 }
 
 // Angular: FUNC.showLikeCTA(likedStatus) — show Like/Don't Show/View Later when not yet liked/declined
@@ -137,6 +171,18 @@ export function showLikeCTA(status: MatchProfile['likedStatus']): boolean {
 // Angular: FUNC.showAfterLikeContent(likedStatus) — show Send Interest / chat CTA after like
 export function showAfterLikeCTA(status: MatchProfile['likedStatus']): boolean {
   return status === '1' || status === '2' || status === '3'
+}
+
+// Angular: FUNC.disableDontShow()/disableViewLater() — '1' = action taken from our
+// side, '3' = action taken from both sides; already-actioned profiles that reappear
+// in a re-fetched list (e.g. explore/extended) render with the button disabled
+// rather than tappable again.
+export function disableDontShow(status: string): boolean {
+  return status === '1' || status === '3'
+}
+
+export function disableViewLater(status: string): boolean {
+  return status === '1' || status === '3'
 }
 
 // ─── After-like CTA state (#22-24) ──────────────────────────────────────────────
@@ -193,6 +239,54 @@ export function showContactsLeftBanner(ctx: AfterLikeCtx): boolean {
 export function showFreeBadge(ctx: AfterLikeCtx): boolean {
   return showAfterLikeCTA(ctx.likedStatus) && ctx.femaleFreeEligible && ctx.entryType === 'F'
 }
+
+// ─── Paid/Verified profile badge ────────────────────────────────────────────────
+// Angular: components/badge — icon overlapping the pill's rounded left cap
+// (left:-10px) + a translated text label on a 10%-opacity tinted pill
+// (paid-member-block color-006C48 / verified-member-block color-0069CA).
+
+export type ProfileBadgeVariant = 'paid' | 'verified'
+
+const BADGE_ICON: Record<ProfileBadgeVariant, string> = {
+  paid:     PAID_TAG_URI,
+  verified: VERIFIED_TAG_URI,
+}
+
+const BADGE_COLOR: Record<ProfileBadgeVariant, string> = {
+  paid:     '#006C48',
+  verified: '#0069CA',
+}
+
+export function ProfileBadge({ variant, text }: { variant: ProfileBadgeVariant; text: string }) {
+  const color = BADGE_COLOR[variant]
+  return (
+    <View style={[badgeStyles.pill, { backgroundColor: color + '1A' }]}>
+      <CdnSvg uri={BADGE_ICON[variant]} width={24} height={24} style={badgeStyles.icon} />
+      <Text style={[badgeStyles.text, { color }]} numberOfLines={1}>{text}</Text>
+    </View>
+  )
+}
+
+const badgeStyles = StyleSheet.create({
+  pill: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    borderRadius:    12,
+    paddingLeft:     20,
+    paddingRight:    16,
+    paddingVertical: 4,
+    minHeight:       24,
+  },
+  icon: {
+    position: 'absolute',
+    left:     -10,
+    top:      0,
+  },
+  text: {
+    fontFamily: 'Poppins-Medium',
+    fontSize:   12,
+  },
+})
 
 // ─── Photo swiper with dots ────────────────────────────────────────────────────
 // Angular: matches-card.component's Swiper (photosSwiperOpt: dynamicBullets pagination).

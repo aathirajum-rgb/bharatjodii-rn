@@ -15,6 +15,7 @@ import MatchCardDesktop from '../../components/matches/MatchCardDesktop'
 import { Colors } from '../../constants/colors'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
+import { EEndCardText } from '../../types/enums/common.enum'
 
 export interface MatchesDesktopLayoutProps {
   langCode:          string
@@ -109,6 +110,17 @@ export default function MatchesDesktopLayout({
               ListFooterComponent={
                 loadingMore ? <ActivityIndicator size="small" color={Colors.primary} style={s.footerLoader} /> : null
               }
+              ListEmptyComponent={
+                totalCount === 0 ? (
+                  <View style={s.emptyBox}>
+                    <Text style={s.emptyTitle}>{t(EEndCardText.noMatches)}</Text>
+                    <Text style={s.emptyDesc}>{t(EEndCardText.modifyPreference)}</Text>
+                    <Pressable style={s.emptyCta} onPress={onEditPreferences}>
+                      <Text style={s.emptyCtaText}>{t(EEndCardText.ctaModifyPreference)}</Text>
+                    </Pressable>
+                  </View>
+                ) : null
+              }
               contentContainerStyle={s.listContent}
             />
           )}
@@ -152,4 +164,36 @@ const s = StyleSheet.create({
   loaderBox:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
   footerLoader: { marginVertical: 16 },
   listContent:  { paddingTop: 16, paddingBottom: 32 },
+  emptyBox: {
+    alignItems:        'center',
+    justifyContent:    'center',
+    paddingTop:        80,
+    paddingHorizontal: 24,
+    gap:               6,
+  },
+  emptyTitle: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize:   16,
+    color:      Colors.textDark,
+    textAlign:  'center',
+  },
+  emptyDesc: {
+    fontFamily: 'Poppins-Regular',
+    fontSize:   14,
+    color:      Colors.textDark,
+    textAlign:  'center',
+  },
+  emptyCta: {
+    marginTop:         16,
+    borderWidth:       1,
+    borderColor:       Colors.primary,
+    borderRadius:      8,
+    paddingHorizontal: 20,
+    paddingVertical:   10,
+  },
+  emptyCtaText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize:   14,
+    color:      Colors.primary,
+  },
 })

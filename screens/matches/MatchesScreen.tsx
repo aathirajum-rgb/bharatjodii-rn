@@ -24,10 +24,11 @@ import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter
 import MatchesHeader from '../../components/matches-header/MatchesHeader'
 import {
   WhatsAppIcon, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
-  HtmlText, buildBasicView, showLikeCTA, showAfterLikeCTA,
-  getBlurPhotoUri, NEWLY_JOINED_STAR_URI, PAID_TAG_URI, VERIFIED_TAG_URI,
+  HtmlText, buildBasicViewParts, showLikeCTA, showAfterLikeCTA,
+  getBlurPhotoUri, NEWLY_JOINED_STAR_URI, ProfileBadge,
   PhotoSwiper,
   getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showContactsLeftBanner, showFreeBadge,
+  disableDontShow, disableViewLater,
   type AfterLikeCtx,
 } from '../../components/matches/matchesCard.shared'
 import MatchesDesktopLayout from './MatchesDesktopLayout'
@@ -36,8 +37,12 @@ import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import type { MatchProfile, BannerItem, MatchListItem } from '../../types/interfaces/matches.interface'
+import { EEndCardText } from '../../types/enums/common.enum'
 import {
   fetchMatches,
+  fetchExplore,
+  type QuickFilters,
+  type ExploreFacet,
   fetchExtendedMatchesCount,
   fetchExtendedMatches,
   fetchAndStorePPSetData,
@@ -128,6 +133,8 @@ const MatchCard = memo(function MatchCard({
   // Angular: photo-new.component.ts getHiddenPhotoContent() — once liked/shortlisted,
   // the "request" is considered sent and only the waiting text remains (no CTA).
   const hiddenPhotoPending = profile.likedStatus === '1' || profile.likedStatus === '3'
+  const dontShowDisabled  = disableDontShow(profile.dontShowStatus)
+  const viewLaterDisabled = disableViewLater(profile.viewLaterStatus)
 
   const ctaCtx: AfterLikeCtx = {
     entryType:   ownEntryType,
@@ -224,14 +231,17 @@ const MatchCard = memo(function MatchCard({
       </View>
 
       {/* ── Paid + Verified badges ─────────────────────────────────────────── */}
-      {/* Angular: ion-row isProfileBadge — BELOW the photo, not overlaid */}
-      {(profile.isPaidMember || profile.isIdVerified) && (
+      {/* Angular: ion-row isProfileBadge — BELOW the photo, not overlaid.
+          Verified badge is gated to female viewers only (matches-card.component.html:
+          *ngIf="isIdVerifiedMember && FUNC.getLogInGender() == 'F'"). oppGender is the
+          viewer's opposite gender, so oppGender === 'M' means the viewer herself is female. */}
+      {(profile.isPaidMember || (profile.isIdVerified && oppGender === 'M')) && (
         <View style={c.badges}>
           {profile.isPaidMember && (
-            <CdnSvg uri={PAID_TAG_URI} width={80} height={24} />
+            <ProfileBadge variant="paid" text={t('MENU.PAID_BADGE')} />
           )}
-          {profile.isIdVerified && (
-            <CdnSvg uri={VERIFIED_TAG_URI} width={100} height={24} />
+          {profile.isIdVerified && oppGender === 'M' && (
+            <ProfileBadge variant="verified" text={t('MATCHES.VERIFIED_ID')} />
           )}
         </View>
       )}
@@ -260,8 +270,9 @@ const MatchCard = memo(function MatchCard({
         <Pressable style={{ flex: 1 }} onPress={onPress}>
           <Text style={c.name} numberOfLines={1}>{profile.name}</Text>
         </Pressable>
-        <Pressable style={c.iconBtn} onPress={onCall} hitSlop={8}>
-          <CallIcon width={24} height={24} />
+        {/* Figma: 24x24 circle, white fill, 1px #006c48 border, 20x20 icon centered inside */}
+        <Pressable style={[c.iconBtn, c.callIconCircle]} onPress={onCall} hitSlop={8}>
+          <CallIcon width={20} height={20} />
         </Pressable>
         <Pressable style={c.iconBtn} onPress={onWhatsApp} hitSlop={8}>
           <WhatsAppIcon width={28} height={28} />
@@ -269,10 +280,16 @@ const MatchCard = memo(function MatchCard({
       </View>
 
       {/* ── Basic view text ────────────────────────────────────────────────── */}
-      {/* Angular: bindBasicView() — "27 yrs | 5'5" | Brahmin | B.Tech | Engineer | Chennai, TN" */}
+      {/* Angular: bindBasicView() — "27 yrs | 5'5" | Brahmin | B.Tech | Engineer | Chennai, TN" —
+          solid black segments, "|" separators alone drop to 20% opacity. */}
       <Pressable onPress={onPress}>
         <Text style={c.basicView} numberOfLines={4}>
-          {buildBasicView(profile)}
+          {buildBasicViewParts(profile).map((part, i) => (
+            <Text key={i}>
+              {i > 0 && <Text style={c.basicViewSep}> | </Text>}
+              {part}
+            </Text>
+          ))}
         </Text>
       </Pressable>
 
@@ -289,17 +306,25 @@ const MatchCard = memo(function MatchCard({
         // Angular: Row 1 = tertiary (Don't show) + secondary (View later), Row 2 = primary (Like) full-width
         <View style={c.ctaSection}>
           <View style={c.ctaSecRow}>
-            <Pressable style={c.ctaDontShow} onPress={onDontShow}>
-              <CloseIcon width={16} height={16} />
+            <Pressable
+              style={[c.ctaDontShow, dontShowDisabled && c.ctaDisabled]}
+              onPress={onDontShow}
+              disabled={dontShowDisabled}
+            >
+              <CloseIcon width={24} height={24} />
               <Text style={c.ctaDontShowText}>{t('GENERAL.DONTSHOWCTA')}</Text>
             </Pressable>
-            <Pressable style={c.ctaViewLater} onPress={onViewLater}>
-              <ViewLaterIcon width={16} height={16} />
+            <Pressable
+              style={[c.ctaViewLater, viewLaterDisabled && c.ctaDisabled]}
+              onPress={onViewLater}
+              disabled={viewLaterDisabled}
+            >
+              <ViewLaterIcon width={24} height={24} />
               <Text style={c.ctaViewLaterText}>{t('GENERAL.VIEWLATER')}</Text>
             </Pressable>
           </View>
           <Pressable style={c.ctaLike} onPress={onLike}>
-            <LikeIcon width={20} height={20} />
+            <LikeIcon width={24} height={24} />
             <Text style={c.ctaLikeText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
           </Pressable>
         </View>
@@ -385,8 +410,21 @@ function PhotoPromotionBanner({ data, onPress }: { data: any; onPress: () => voi
 // Renders the festival/membership offer card mid-list (e.g. "Muhurtham Day Offer!")
 // Layout: background image (BGIMG), title, subtitle/offer tag, benefits list, CTA button
 
-// Angular: app-breather PAYMENT type (BANNERSLOT 1001) — festival/membership offer card
-// BGIMG is positioned on the right side (background-position: right in Angular CSS)
+// Angular: app-breather PAYMENT type (BANNERSLOT 1001) — festival/membership offer card.
+// Figma (file GqYHfj2jHlbhNFKoYQ0W8H, node 9737:16600 "Jodii - Festival Offer Banner")
+// confirms this card is themed per-campaign (Ramadan green, generic pink/red, etc.) —
+// background art, CTA color, pill border/fill all vary by campaign and are server-driven
+// (BGIMG/CTABGCOLOR/OFFERTAG); only the LAYOUT below (sizes/weights/gaps/radii) is fixed
+// across campaigns and is what this component hardcodes.
+//
+// Angular: [ngStyle]="{'background': bannerContent?.BGIMG ? 'url(...)' : ''}" on the
+// WHOLE card — BGIMG is a full-bleed background (the campaign artwork, e.g. the
+// moon+mosque illustration), not a small right-anchored inset image.
+function parseCssColor(style: string | undefined, prop: string): string | undefined {
+  if (!style) return undefined
+  return style.match(new RegExp(`${prop}[^:;]*:[^;]*?(#[0-9a-fA-F]{3,8})`, 'i'))?.[1]
+}
+
 function MembershipBanner({ data, onPress }: { data: any; onPress: () => void }) {
   if (!data) return null
 
@@ -396,15 +434,19 @@ function MembershipBanner({ data, onPress }: { data: any; onPress: () => void })
   const benefits: Array<{ IMG?: string; VALUE?: string }> = Array.isArray(data.BENEFITS) ? data.BENEFITS : []
   const isWhite = data.FONTCOLOR === 'white-color'
   const textColor = isWhite ? Colors.white : Colors.textStrong
+  // Figma: pill is a light gradient fill + 1px border, both campaign-colored (Ramadan:
+  // #218441/mint-green) — RN can't do the two-stop gradient cheaply here, so we take a
+  // flat approximation from OFFERTAG's background color instead (accepted simplification).
+  const validBg     = parseCssColor(data.OFFERTAG, 'background') ?? '#FFF3CD'
+  const validBorder = parseCssColor(data.OFFERTAG, 'border') ?? validBg
 
   return (
     <Pressable style={mb.card} onPress={onPress}>
-      {/* Right-side couple image — Angular: BGIMG positioned right via CSS */}
+      {/* Full-bleed campaign background art (Angular: background: url(BGIMG) on the whole card) */}
       {!!data.BGIMG && (
-        <Image source={{ uri: data.BGIMG }} style={mb.rightImg} resizeMode="contain" />
+        <Image source={{ uri: data.BGIMG }} style={mb.bgImg} resizeMode="cover" />
       )}
 
-      {/* Content occupies left ~65% */}
       <View style={mb.content}>
         {!!data.TITLEIMG && (
           <Image source={{ uri: data.TITLEIMG }} style={mb.titleImg} resizeMode="contain" />
@@ -422,13 +464,24 @@ function MembershipBanner({ data, onPress }: { data: any; onPress: () => void })
           <HtmlText html={data.FESTIVALSUBTITLE} style={[mb.subtitle, { color: textColor }]} />
         )}
 
-        {/* Subtitle — may contain colored <span> (e.g. "₹101 OFF" in red) */}
+        {/* Subtitle — "Get up to <span>₹200 OFF</span> on paid membership!" — Angular gives
+            the amount span its own CSS class (heading-semibold, bigger size) rather than an
+            inline style; spanStyle reproduces that visual emphasis regardless of markup. */}
         {!!data.SUBTITLE && (
-          <HtmlText html={data.SUBTITLE} style={[mb.subtitle, { color: textColor }]} />
+          <HtmlText
+            html={data.SUBTITLE}
+            style={[mb.subtitle, { color: textColor }]}
+            spanStyle={mb.subtitleAmount}
+          />
         )}
 
-        {/* Validity / timer */}
-        {!!valid && <Text style={mb.valid}>{valid}</Text>}
+        {/* Validity / timer pill — ribbon shape: rounded left corners only, no right border
+            (Angular: border-t/border-b/border-l but no border-r, rounded-tl/rounded-bl only) */}
+        {!!valid && (
+          <Text style={[mb.valid, { backgroundColor: validBg, borderColor: validBorder, color: isWhite ? Colors.white : '#000000' }]}>
+            {valid}
+          </Text>
+        )}
 
         {/* Benefits list with icons */}
         {benefits.length > 0 && (
@@ -673,6 +726,59 @@ function ExtendedMatchesCard({ count, onPress }: { count: number; onPress: () =>
   )
 }
 
+// ─── No Matches (empty state) ──────────────────────────────────────────────────
+// Angular: app-end-card [cardType]="'no-data'" — shown when contentLoaded &&
+// profiles.length === 0 (matches.page.html:209-215). CTA navigates to the
+// filter/preferences screen (endCardEventEmit('search') → reDirectSearchPage()).
+
+function NoMatchesCard({ onPress }: { onPress: () => void }) {
+  const { t } = useTranslation()
+  return (
+    <View style={n.card}>
+      <Text style={n.title}>{t(EEndCardText.noMatches)}</Text>
+      <Text style={n.desc}>{t(EEndCardText.modifyPreference)}</Text>
+      <Pressable style={n.cta} onPress={onPress}>
+        <Text style={n.ctaText}>{t(EEndCardText.ctaModifyPreference)}</Text>
+      </Pressable>
+    </View>
+  )
+}
+
+const n = StyleSheet.create({
+  card: {
+    flex:              1,
+    alignItems:        'center',
+    justifyContent:    'center',
+    paddingHorizontal: 24,
+    gap:               6,
+  },
+  title: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize:   16,
+    color:      '#000000',
+    textAlign:  'center',
+  },
+  desc: {
+    fontFamily: 'Poppins-Regular',
+    fontSize:   14,
+    color:      '#000000',
+    textAlign:  'center',
+  },
+  cta: {
+    marginTop:         16,
+    borderWidth:       1,
+    borderColor:       Colors.primary,
+    borderRadius:      8,
+    paddingHorizontal: 20,
+    paddingVertical:   10,
+  },
+  ctaText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize:   14,
+    color:      Colors.primary,
+  },
+})
+
 // BANNERSLOT 1010 — "get ID verified" promo (Angular: matches.page.ts:1208-1210, sent
 // via EKYCFLAG=1 for non-verified male users). Removed live by subscribeIdVerified().
 function IdVerifyBanner({ onPress }: { onPress: () => void }) {
@@ -729,9 +835,23 @@ const iv = StyleSheet.create({
 
 // ─── MatchesScreen ────────────────────────────────────────────────────────────
 
-export default function MatchesScreen({ navigation }: { navigation: any }) {
+export default function MatchesScreen({ navigation, route }: { navigation: any; route?: any }) {
   const { t, i18n } = useTranslation()
   const isDesktop = useIsDesktopWeb()
+
+  // ── Explore-by-category mode (#6) ───────────────────────────────────────────
+  // Angular: callMatchesApi() explorePage branch — set when navigated here from a
+  // Home "Explore matches based on" category tile instead of the bottom-nav tab.
+  const exploreType  = route?.params?.exploreType as string | undefined
+  const exploreLabel = route?.params?.exploreLabel as string | undefined
+  const [facets,  setFacets]  = useState<ExploreFacet[]>([])
+  const [qSearch, setQSearch] = useState('')
+
+  async function fetchList(start: number, limit: number, quickFilters?: QuickFilters) {
+    return exploreType
+      ? fetchExplore(exploreType, start, limit, qSearch)
+      : fetchMatches(start, limit, quickFilters)
+  }
 
   // ── State ───────────────────────────────────────────────────────────────────
   const [profiles,     setProfiles]     = useState<MatchProfile[]>([])
@@ -877,11 +997,14 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   // 1. refreshSession()   → login/autologin/v1        (upgrades OTP token to Level-2)
   // 2. fetchMatches()     → listing/matches/v1        (main matches list)
   // 3. fetchNotifCount()  → communication/newcount/v1 (badge count)
-  useEffect(() => {
-    let cancelled = false
-    let notifTimerRef: ReturnType<typeof setTimeout> | undefined
-
-    async function loadMatches() {
+  //
+  // Pulled out of the effect so a language change can re-run just the data-fetching
+  // core — Angular: changeLanguage() (matches.page.ts:3179-3202) tears down and
+  // rebuilds the ENTIRE page so every server-rendered string (banner copy, promo
+  // text) re-fetches in the new language. includePopups=false skips re-arming the
+  // one-time rating/survey/notification-permission popups — those aren't
+  // language-dependent, and re-firing them on every switch would be a new bug.
+  async function loadMatches(ctrl: { cancelled: boolean; notifTimer?: ReturnType<typeof setTimeout> | undefined }, includePopups: boolean) {
       try {
         // Read login gender once — determines which blur placeholder to show on photo cards
         const lg = await getItem(StorageKeys.User.LOGIN_GENDER)
@@ -890,21 +1013,22 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
 
         // Photo lock screen (#15) — Angular: femaleFreeContactRestrict() (matches-card.component.ts:424-428)
         const ownPhotoCount = Number((await getItem('PHOTOCOUNT')) ?? '0')
-        if (!cancelled) setOwnPhotoLockActive(lg === 'F' && ownPhotoCount === 0)
+        if (!ctrl.cancelled) setOwnPhotoLockActive(lg === 'F' && ownPhotoCount === 0)
 
         // Step 1 — refreshSession() ensures Level-2 tokens before any listing API call.
         // The 1hr gate lives in RootNavigation.tsx (centralized guard) — here we always
         // call it so fetchMatches() is guaranteed to have a valid ATN.
         await refreshSession()
-        if (cancelled) return
+        if (ctrl.cancelled) return
 
-        // Step 2 — Angular: callMatchesApi() → listing/matches/v1
-        const result = await fetchMatches(0, 20)
-        if (cancelled) return
+        // Step 2 — Angular: callMatchesApi() → listing/matches/v1 (or explore/v1 in explore mode)
+        const result = await fetchList(0, 20)
+        if (ctrl.cancelled) return
 
         setProfiles(result.items.map(matchProfileAdapter.adapt))
         setBannerSlots(result.bannerSlots)
         setTotalCount(result.totalCount)
+        setFacets(result.facets ?? [])
         apiStartRef.current = result.items.length  // cursor for next page
 
         // Step 3 — Angular: parallel post-matches calls
@@ -922,7 +1046,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             ])
             const photoStatus = ppSetData?.PI_PHOTOSTATUS ?? 'N'
 
-            if (!cancelled) {
+            if (!ctrl.cancelled) {
               setOwnEntryType(entryType ?? '')
 
               // Free-female-contact eligibility (#24) — Angular: getFree3Contact() && !getfreephoneviewOver()
@@ -946,7 +1070,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             // BANNERSLOT 1014 — paid-verified-no-photo promo, or legacy ADDPROPERTYS
             // fallback (#26). Angular: check_Paid_Verified_Nophoto().
             const isPaidVerifiedMale = entryType === 'P' && ekycStatus === '1' && lg === 'M' && photoStatus !== 'Y'
-            if (!cancelled && isPaidVerifiedMale) {
+            if (!ctrl.cancelled && isPaidVerifiedMale) {
               setPaidNoPhotoBanner(
                 reg?.PHOTOPUBLISHPAID?.Matches
                   ? { dynamic: true, data: reg.PHOTOPUBLISHPAID.Matches }
@@ -957,7 +1081,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             // GAM ad banner params (BANNERSLOT 1020) — Angular: loadGambanner()
             // reads ppSetData.PIINFO.{GENDER,CASTE,DOMAINID}; fall back to the
             // login gender if PIINFO isn't present in this API's response yet.
-            if (!cancelled) {
+            if (!ctrl.cancelled) {
               const piInfo = ppSetData?.PIINFO
               setGamParams({
                 gender: piInfo?.GENDER ?? lg ?? '',
@@ -970,7 +1094,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             // explore.component's actual wiring as the reference (Angular's own Matches
             // page computes this but never renders it). Same naive string/number `<`
             // comparison as Angular — not "fixed" here, to match source behavior.
-            if (!cancelled) {
+            if (!ctrl.cancelled) {
               const forceUpdate  = ppSetData?.APPFORCEUPDATE
               const psUpdateFlag = await getItem('PLAYSTOREUPDATE')
               const appVersion   = Constants.expoConfig?.version ?? '1.0.0'
@@ -1017,7 +1141,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
               // checkAddPhotoPromotion() = PROFILEPUBLISHEDFLAG=='0' && (checkPhotoPromotion()
               // || check_Paid_Verified_Nophoto() || isNonIdVerifyUser()).
               const nonIdVerifyUserGate = entryType === 'P' && lg === 'M' && ekycStatus !== '1'
-              if (!cancelled) {
+              if (!ctrl.cancelled) {
                 setAddPhotoGateActive(flagOk && ((typeOk && freeOk) || isPaidVerifiedMale || nonIdVerifyUserGate))
                 setAddPhotoActionPromoContent(reg?.PHOTOPUBLISHED?.Call ?? null)
               }
@@ -1038,9 +1162,9 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         ])
         // Angular: bulkLike() — show the modal once, only when there are
         // enough candidates and enough total matches (matches.page.ts:3204).
-        const bulkLikeShown = bulkLikeResult.length >= 4 && result.totalCount >= 20
+        const bulkLikeShown = includePopups && bulkLikeResult.length >= 4 && result.totalCount >= 20
 
-        if (!cancelled) {
+        if (!ctrl.cancelled) {
           setExtendedCount(extCount)
           if (promo) setMenuPromo(promo)
           if (bulkLikeShown) {
@@ -1049,79 +1173,99 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           }
         }
 
-        // Payment-failed sticky (#6) — Angular: getContactsData() (matches.page.ts:2254-2310).
-        if (!cancelled && (await getItem('PAYMENTFAILTYPE')) === '1') {
-          const banner  = await getHeroBannerDetails(true, 1)
-          const content = banner?.PAYMENTFAILEDCONTENT
-          const cta     = banner?.PAYMENTFAILEDCTA
-          if (!cancelled && content && cta) {
-            const startMs = Date.parse(banner?.OFFSTTIME ?? '')
-            const endMs   = Date.parse(banner?.OFFEDTIME ?? '')
-            const deadlineMs = !Number.isNaN(startMs) && !Number.isNaN(endMs)
-              ? Date.now() + Math.max(0, endMs - startMs)
-              : Date.now() + 10 * 60 * 1000   // fallback: 10 min if OFFSTTIME/OFFEDTIME are missing
-            setPaymentStickyInfo({ content, ctaLabel: cta, deadlineMs })
+        // One-time popups/stickies (rating, survey, notification-permission, payment-failed) —
+        // only on the initial mount, never re-armed by a language-change reload.
+        if (includePopups) {
+          // Payment-failed sticky (#6) — Angular: getContactsData() (matches.page.ts:2254-2310).
+          if (!ctrl.cancelled && (await getItem('PAYMENTFAILTYPE')) === '1') {
+            const banner  = await getHeroBannerDetails(true, 1)
+            const content = banner?.PAYMENTFAILEDCONTENT
+            const cta     = banner?.PAYMENTFAILEDCTA
+            if (!ctrl.cancelled && content && cta) {
+              const startMs = Date.parse(banner?.OFFSTTIME ?? '')
+              const endMs   = Date.parse(banner?.OFFEDTIME ?? '')
+              const deadlineMs = !Number.isNaN(startMs) && !Number.isNaN(endMs)
+                ? Date.now() + Math.max(0, endMs - startMs)
+                : Date.now() + 10 * 60 * 1000   // fallback: 10 min if OFFSTTIME/OFFEDTIME are missing
+              setPaymentStickyInfo({ content, ctaLabel: cta, deadlineMs })
+            }
           }
+
+          // Angular: ionViewDidEnter() → getNotificationCount(). Feeds both the footer's
+          // live like-count badge (#12) and the rating-popup trigger (#9) below.
+          if (!ctrl.cancelled) {
+            const { comCount } = await fetchNotifCount()
+            if (!ctrl.cancelled) {
+              const likedYou = comCount.find(c => c.comtype === 'likedyou')
+              setLikesCount(Number(likedYou?.newcount ?? 0))
+            }
+
+            // "Rate our app" popup (#9) — Angular: passiveRatingPopup(). Skipped when the
+            // bulk-like modal already claimed this mount's one popup slot (no modal-stacking),
+            // mirroring Angular's SHOW_RATING_POPUP mutual-exclusion.
+            if (!ctrl.cancelled && !bulkLikeShown && await shouldShowRatingPopup(comCount)) {
+              setShowRatingPopup(true)
+              await markRatingPopupShown()
+            }
+          }
+
+          // Survey popup (#11) — Angular: matches.page.ts:740-743, getSurveydetails():2167-2178.
+          // One-time-consume: clear SURVEYPOPUP immediately so it won't fire again without a
+          // fresh server flag on a future login (Angular: removeStorageValue('1','SURVEYPOPUP','')).
+          if (!ctrl.cancelled && !bulkLikeShown) {
+            const [loginCount, surveyFlag, paywallType] = await Promise.all([
+              getItem(StorageKeys.Auth.LOGIN_COUNT),
+              getItem('SURVEYPOPUP'),
+              getItem('PAYWALLTYPE'),
+            ])
+            if (Number(loginCount ?? '0') > 3 && surveyFlag === '1' && paywallType === '0') {
+              await setItem('SURVEYPOPUP', '')
+              const survey = await fetchSurveyPopup()
+              if (!ctrl.cancelled && survey) setSurveyData(survey)
+            }
+          }
+
+          // Notification permission popup (#8) — Angular: notificationStatus(), 40s after
+          // ionViewDidEnter, gated to once per calendar day and stopped once NALLOW='1'.
+          ctrl.notifTimer = setTimeout(async () => {
+            if (ctrl.cancelled || bulkLikeShown) return
+            const [nallow, lastShown] = await Promise.all([
+              getItem(StorageKeys.App.NALLOW),
+              getItem('PN_LAST_SHOWN_DATE'),
+            ])
+            const today = new Date().toISOString().slice(0, 10)
+            if (ctrl.cancelled || nallow === '1' || lastShown === today) return
+            setShowNotificationPopup(true)
+            await setItem('PN_LAST_SHOWN_DATE', today)
+          }, 40000)
         }
-
-        // Angular: ionViewDidEnter() → getNotificationCount(). Feeds both the footer's
-        // live like-count badge (#12) and the rating-popup trigger (#9) below.
-        if (!cancelled) {
-          const { comCount } = await fetchNotifCount()
-          if (!cancelled) {
-            const likedYou = comCount.find(c => c.comtype === 'likedyou')
-            setLikesCount(Number(likedYou?.newcount ?? 0))
-          }
-
-          // "Rate our app" popup (#9) — Angular: passiveRatingPopup(). Skipped when the
-          // bulk-like modal already claimed this mount's one popup slot (no modal-stacking),
-          // mirroring Angular's SHOW_RATING_POPUP mutual-exclusion.
-          if (!cancelled && !bulkLikeShown && await shouldShowRatingPopup(comCount)) {
-            setShowRatingPopup(true)
-            await markRatingPopupShown()
-          }
-        }
-
-        // Survey popup (#11) — Angular: matches.page.ts:740-743, getSurveydetails():2167-2178.
-        // One-time-consume: clear SURVEYPOPUP immediately so it won't fire again without a
-        // fresh server flag on a future login (Angular: removeStorageValue('1','SURVEYPOPUP','')).
-        if (!cancelled && !bulkLikeShown) {
-          const [loginCount, surveyFlag, paywallType] = await Promise.all([
-            getItem(StorageKeys.Auth.LOGIN_COUNT),
-            getItem('SURVEYPOPUP'),
-            getItem('PAYWALLTYPE'),
-          ])
-          if (Number(loginCount ?? '0') > 3 && surveyFlag === '1' && paywallType === '0') {
-            await setItem('SURVEYPOPUP', '')
-            const survey = await fetchSurveyPopup()
-            if (!cancelled && survey) setSurveyData(survey)
-          }
-        }
-
-        // Notification permission popup (#8) — Angular: notificationStatus(), 40s after
-        // ionViewDidEnter, gated to once per calendar day and stopped once NALLOW='1'.
-        notifTimerRef = setTimeout(async () => {
-          if (cancelled || bulkLikeShown) return
-          const [nallow, lastShown] = await Promise.all([
-            getItem(StorageKeys.App.NALLOW),
-            getItem('PN_LAST_SHOWN_DATE'),
-          ])
-          const today = new Date().toISOString().slice(0, 10)
-          if (cancelled || nallow === '1' || lastShown === today) return
-          setShowNotificationPopup(true)
-          await setItem('PN_LAST_SHOWN_DATE', today)
-        }, 40000)
 
       } catch (e) {
         if (__DEV__) console.error('[Matches] load error:', e)
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!ctrl.cancelled) setLoading(false)
       }
-    }
+  }
 
-    loadMatches()
-    return () => { cancelled = true; clearTimeout(notifTimerRef) }
+  useEffect(() => {
+    const ctrl = { cancelled: false, notifTimer: undefined as ReturnType<typeof setTimeout> | undefined }
+    loadMatches(ctrl, true)
+    return () => { ctrl.cancelled = true; clearTimeout(ctrl.notifTimer) }
   }, [])
+
+  // Angular: changeLanguage() (matches.page.ts:3179-3202) — switching language tears
+  // down and rebuilds the whole page so every server-rendered string re-fetches in
+  // the new language. mountedLangRef skips the initial mount (already covered above)
+  // and only reloads on a REAL change, so this doesn't double-fetch on first render.
+  const mountedLangRef = useRef(i18n.language)
+  useEffect(() => {
+    if (i18n.language === mountedLangRef.current) return
+    mountedLangRef.current = i18n.language
+    const ctrl = { cancelled: false, notifTimer: undefined as ReturnType<typeof setTimeout> | undefined }
+    setLoading(true)
+    loadMatches(ctrl, false)
+    return () => { ctrl.cancelled = true }
+  }, [i18n.language])
 
   // ID-verify banner removal (#13) — Angular: IDVerifyStatusObserver subscription
   // (matches.page.ts:588-594). Strips the BANNERSLOT 1010 promo card the instant the
@@ -1138,7 +1282,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     if (loadingMore || apiStartRef.current >= totalCount) return
     setLoadingMore(true)
     try {
-      const result = await fetchMatches(apiStartRef.current, 20)
+      const result = await fetchList(apiStartRef.current, 20)
       if (result.items.length > 0) {
         setProfiles(prev => {
           const offset = prev.length
@@ -1251,7 +1395,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     setShowBulkLike(false)
     apiStartRef.current = 0
     try {
-      const result = await fetchMatches(0, 20)
+      const result = await fetchList(0, 20)
       setProfiles(result.items.map(matchProfileAdapter.adapt))
       setBannerSlots(result.bannerSlots)
       setTotalCount(result.totalCount)
@@ -1327,11 +1471,67 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     await requestPushNotificationPermission()
   }
 
-  // Desktop quick-filter chips are visual-only (no real filtering), matching
-  // the mobile FilterChipsRow's existing behavior — just toggles which chip
-  // is highlighted.
-  function handleDesktopChipSelect(key: string) {
-    setSelectedChip(prev => (prev === key ? '' : key))
+  // Angular: clickOnFilterChip() → applyFilter()/callMatchesApi() — re-queries
+  // the list with the toggled quick-filter flag(s), reset to page 0. 'FILTER'
+  // isn't a togglable flag itself — it opens the full filter/preferences screen
+  // (Angular: type:'searchPage' navigation). Desktop's 'NEARBY' chip has no
+  // Angular Matches-quick-filter equivalent (that's the separate explore-by-
+  // category flow) — toggling it just clears back to the unfiltered list.
+  function quickFilterFor(key: string): QuickFilters | undefined {
+    switch (key) {
+      case 'PROFILECREATED':     return { profileCreated: true }
+      case 'PHOTOAVAILABLE':     return { photoAvailable: true }
+      case 'HOROSCOPEAVAILABLE': return { horoscopeAvailable: true }
+      default:                   return undefined
+    }
+  }
+
+  async function applyQuickFilter(key: string) {
+    if (key === 'FILTER') { navigation.navigate('Search'); return }
+    const next = selectedChip === key ? '' : key
+    setSelectedChip(next)
+    setLoading(true)
+    apiStartRef.current = 0
+    try {
+      const result = await fetchList(0, 20, quickFilterFor(next))
+      setProfiles(result.items.map(matchProfileAdapter.adapt))
+      setBannerSlots(result.bannerSlots)
+      setTotalCount(result.totalCount)
+      apiStartRef.current = result.items.length
+    } catch (e) {
+      if (__DEV__) console.error('[Matches] quick filter error:', e)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Angular: pillFilter() — facet refinement chips, explore mode only (#5). Toggles
+  // one facet's checked state, rejoins all checked KEYs with '~' into QSEARCH, and
+  // re-queries the same FILTERTYPE from page 0 (matches.page.ts:1990-2026).
+  async function toggleFacet(key: string) {
+    if (!exploreType) return
+    const nextFacets = facets.map(f => f.key === key ? { ...f, checked: !f.checked } : f)
+    const nextQSearch = nextFacets.filter(f => f.checked).map(f => f.key).join('~')
+    setFacets(nextFacets)
+    setQSearch(nextQSearch)
+    setLoading(true)
+    apiStartRef.current = 0
+    try {
+      const result = await fetchExplore(exploreType, 0, 20, nextQSearch)
+      setProfiles(result.items.map(matchProfileAdapter.adapt))
+      setBannerSlots(result.bannerSlots)
+      setTotalCount(result.totalCount)
+      if (result.facets) {
+        // Server re-sorts/recomputes counts per new QSEARCH — but keep the just-tapped
+        // chip's checked state instead of trusting the fresh (unchecked) response.
+        setFacets(result.facets.map(f => ({ ...f, checked: nextFacets.some(nf => nf.key === f.key && nf.checked) })))
+      }
+      apiStartRef.current = result.items.length
+    } catch (e) {
+      if (__DEV__) console.error('[Matches] facet filter error:', e)
+    } finally {
+      setLoading(false)
+    }
   }
 
   function handleTabPress(tab: FooterTab) {
@@ -1487,7 +1687,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           loadingMore={loadingMore}
           onLoadMore={loadMore}
           selectedChip={selectedChip}
-          onChipSelect={handleDesktopChipSelect}
+          onChipSelect={applyQuickFilter}
         />
         {activeSticky && (
           <StickyBanner
@@ -1570,11 +1770,14 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         totalCount={totalCount}
         langCode={i18n.language}
         selectedChip={selectedChip}
-        onChipSelect={setSelectedChip}
+        onChipSelect={applyQuickFilter}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
         onEditPreferences={() => navigation.navigate('Search')}
         onHeaderLayout={handleHeaderLayout}
         onTitleLayout={handleTitleLayout}
+        facets={facets}
+        onFacetToggle={toggleFacet}
+        titleOverride={exploreLabel}
       />
 
       {/* ── Profile list / loader ──────────────────────────────────────────── */}
@@ -1582,6 +1785,10 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
       {loading ? (
         <View style={[s.loaderBox, { paddingTop: headerH }]}>
           <ActivityIndicator size="large" color={Colors.primary} />
+        </View>
+      ) : totalCount === 0 ? (
+        <View style={{ flex: 1, paddingTop: headerH }}>
+          <NoMatchesCard onPress={() => navigation.navigate('Search')} />
         </View>
       ) : (
         <FlatList
@@ -1894,21 +2101,35 @@ const c = StyleSheet.create({
     paddingHorizontal: 16,
     gap:              12,
   },
-  name:       { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.textDark },
+  // Figma: #000000
+  name:       { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: '#000000' },
   iconBtn:    { flexShrink: 0 },
   nameRowIcon:  { width: 24, height: 24 },
   nameRowIconWa:{ width: 28, height: 28 },
+  // Figma: 24x24 circle, white fill, 1px #006c48 border
+  callIconCircle: {
+    width:           24,
+    height:          24,
+    borderRadius:    12,
+    borderWidth:     1,
+    borderColor:     '#006c48',
+    backgroundColor: Colors.white,
+    alignItems:      'center',
+    justifyContent:  'center',
+  },
 
   // Angular: body2-regular-14 mt-2 pl-16 pr-16 bv-minht text-space
+  // Figma: solid #000000; the "|" separators alone drop to 20% opacity
   basicView: {
     fontFamily:       'Poppins-Regular',
     fontSize:         14,
-    color:            Colors.textDark,
-    lineHeight:       22,
+    color:            '#000000',
+    lineHeight:       20,
     marginTop:        4,
     paddingHorizontal: 16,
     minHeight:        40,
   },
+  basicViewSep: { color: 'rgba(0,0,0,0.2)' },
 
   // Angular: app-button-revamp [buttonSize]="link" — "View profile"
   viewProfileBtn: {
@@ -1923,15 +2144,19 @@ const c = StyleSheet.create({
 
   // Angular: Row 1 = tertiary (Don't show) + secondary (View later), Row 2 = primary (Like)
   // Angular: pb-24 on the card container — bottom of last CTA to border
+  // Figma: 12px gap between the secondary row and the Like button below it
   ctaSection: {
     marginTop:        8,
     marginBottom:     24,
     paddingHorizontal: 16,
-    gap:              8,
+    gap:              12,
   },
+  // Figma: fixed 158px buttons + 12px gap at the 360px reference width — kept as an
+  // even flex:1 split here instead of a literal 158px so it stays correct at any
+  // device width, not just exactly 360px; the 12px gap is the real fix.
   ctaSecRow: {
     flexDirection: 'row',
-    gap:           8,
+    gap:           12,
   },
   // Keep ctaRow for backwards compat in case anything else references it
   ctaRow: {
@@ -1943,43 +2168,50 @@ const c = StyleSheet.create({
     gap:              8,
   },
 
+  // Figma: height 44, border 1px #545454, label Poppins-Regular 14 #545454
   ctaDontShow: {
     flex:           1,
+    height:         44,
     flexDirection:  'row',
     alignItems:     'center',
     justifyContent: 'center',
     gap:            6,
     borderWidth:    1,
-    borderColor:    Colors.borderLight,
+    borderColor:    '#545454',
     borderRadius:   8,
-    paddingVertical: 12,
   },
-  ctaDontShowText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.textDark },
+  ctaDontShowText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#545454' },
 
   ctaViewLater: {
     flex:           1,
+    height:         44,
     flexDirection:  'row',
     alignItems:     'center',
     justifyContent: 'center',
     gap:            6,
     borderWidth:    1,
-    borderColor:    Colors.borderLight,
+    borderColor:    '#545454',
     borderRadius:   8,
-    paddingVertical: 12,
   },
-  ctaViewLaterText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.textDark },
+  ctaViewLaterText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#545454' },
 
+  // Angular: FUNC.disableDontShow()/disableViewLater() — dimmed, non-tappable once
+  // the action was already taken on a profile that reappears in a re-fetched list.
+  ctaDisabled: { opacity: 0.4 },
+
+  // Figma: height 44, bg #b50033 (Colors.primaryDark, not the app's general primary red),
+  // label Poppins-SemiBold 14 white
   ctaLike: {
+    height:          44,
     flexDirection:   'row',
     alignItems:      'center',
     justifyContent:  'center',
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryDark,
     borderRadius:    8,
-    paddingVertical: 12,
     gap:             6,
   },
-  ctaLikeIcon: { width: 20, height: 20 },
-  ctaLikeText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.white },
+  ctaLikeIcon: { width: 24, height: 24 },
+  ctaLikeText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.white },
 
   // Angular: matches-cta-bg-color (pink gradient) + "Send Interest" primary CTA
   afterLikeRow: {
@@ -2251,7 +2483,7 @@ const ap = StyleSheet.create({
 // Angular: app-breather PAYMENT type — matches-breather-block with BGIMG background
 
 const mb = StyleSheet.create({
-  // Angular: matches-breather-block — full card with BGIMG as right-side image
+  // Angular: matches-breather-block — background: url(BGIMG) covers the WHOLE card
   card: {
     backgroundColor:   Colors.membershipCardBg,
     borderBottomWidth: 8,
@@ -2259,76 +2491,96 @@ const mb = StyleSheet.create({
     minHeight:         220,
     overflow:          'hidden',
   },
-  // BGIMG from API positioned to right side (Angular: background-position right)
-  rightImg: {
+  bgImg: {
     position: 'absolute',
-    right:    0,
     top:      0,
+    left:     0,
+    right:    0,
     bottom:   0,
-    width:    '45%',
   },
-  // Content sits in the left ~65% so it doesn't overlap the right image
+  // Figma: content left="24" top="38" width="282.5" — no right-column reservation;
+  // the campaign art sits behind everything as bgImg, not squeezed beside it
   content: {
-    paddingHorizontal: 20,
-    paddingVertical:   20,
-    width:             '62%',
+    paddingHorizontal: 24,
+    paddingTop:        38,
+    paddingBottom:     24,
+    maxWidth:          283,
   },
   titleImg: {
     width:        140,
     height:       28,
     marginBottom: 8,
   },
+  // Figma: "Ramadan Offer" — 24px Poppins-SemiBold, leading 24 (tight)
   title: {
     fontFamily: 'Poppins-SemiBold',
-    fontSize:   20,
+    fontSize:   24,
     color:      Colors.textStrong,
-    lineHeight: 28,
+    lineHeight: 24,
   },
+  // Figma: "on paid membership!" line — 14px Poppins-Medium, tracking 0.28
   subtitle: {
-    fontFamily: 'Poppins-Medium',
-    fontSize:   14,
-    color:      Colors.textDark,
-    marginTop:  4,
-    lineHeight: 22,
+    fontFamily:    'Poppins-Medium',
+    fontSize:      14,
+    color:         Colors.textDark,
+    marginTop:     8,
+    lineHeight:    20,
+    letterSpacing: 0.28,
   },
+  // Figma: the "₹200 OFF" span specifically — 24px Poppins-SemiBold (vs. the 14/16px
+  // surrounding copy) — applied via HtmlText's spanStyle regardless of server markup
+  subtitleAmount: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize:   24,
+  },
+  // Figma: ribbon pill — 14px Poppins-Regular, h-24 (py-4), rounded left corners only,
+  // border on top/bottom/left but NOT right (open ribbon edge, not a closed pill)
   valid: {
-    fontFamily:      'Poppins-Regular',
-    fontSize:        12,
-    color:           Colors.badgeNewText,
-    marginTop:       6,
-    backgroundColor: Colors.badgeNewBg,
-    paddingHorizontal: 8,
-    paddingVertical:   2,
-    borderRadius:    4,
-    alignSelf:       'flex-start',
+    fontFamily:              'Poppins-Regular',
+    fontSize:                14,
+    lineHeight:              20,
+    marginTop:               11,
+    paddingHorizontal:       8,
+    paddingVertical:         4,
+    borderWidth:             1,
+    borderRightWidth:        0,
+    borderTopLeftRadius:     4,
+    borderBottomLeftRadius:  4,
+    alignSelf:               'flex-start',
   },
+  // Figma: gap-[12px] between rows
   benefitsList: {
-    marginTop: 10,
-    gap:       4,
+    marginTop: 12,
+    gap:       12,
   },
+  // Figma: gap-[8px] between tick and text
   benefitRow: {
     flexDirection: 'row',
     alignItems:    'flex-start',
-    gap:           6,
+    gap:           8,
   },
+  // Figma: Tick is 20×20
   benefitIcon: {
-    width:      18,
-    height:     18,
+    width:      20,
+    height:     20,
     flexShrink: 0,
-    marginTop:  2,
   },
+  // Figma: 14px Poppins-Medium (not Regular/13)
   benefitText: {
-    fontFamily: 'Poppins-Regular',
-    fontSize:   13,
+    fontFamily: 'Poppins-Medium',
+    fontSize:   14,
     color:      Colors.textDark,
     flex:       1,
-    lineHeight: 18,
+    lineHeight: 20,
   },
+  // Figma: h-40 (py-8), px-16, content-sized (not stretched to card width)
   ctaBtn: {
-    marginTop:       16,
-    borderRadius:    8,
-    paddingVertical: 12,
-    alignItems:      'center',
+    marginTop:         16,
+    borderRadius:      8,
+    paddingVertical:   8,
+    paddingHorizontal: 16,
+    alignItems:        'center',
+    alignSelf:         'flex-start',
   },
   ctaText: {
     fontFamily: 'Poppins-Medium',

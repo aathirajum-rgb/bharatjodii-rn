@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
+import { useTranslation } from 'react-i18next'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
@@ -43,16 +44,17 @@ export const TAB_ICONS: Record<FooterTab, [string, string]> = {
   3: [CDN + 'membership-deactive.svg', CDN + 'membership-active.svg'],
 }
 
-// Angular: footer.component.html — two-word labels wrap to 2 lines in the tab
-// bar by design (line-height-12, min-height:56px accommodates it). Forced line
-// break (not auto-wrap) so it always splits "Liked" / "profiles" regardless of
-// tab width.
-const TAB_LABELS: Record<FooterTab, string> = {
-  0: 'Home',
-  1: 'Matches',
-  2: 'Liked\nprofiles',
-  4: 'Contacted\nprofiles',
-  3: 'Membership',
+// Angular: footer.component.ts maps these from res['GENERAL'] as ICON_0/1/3/5/6
+// (ICON_2/ICON_4 belong to the old Messages=5 tab this port replaced with tab 4).
+// Two-word labels wrap to 2 lines in the tab bar by design — numberOfLines={2} on
+// the Text below handles that; no forced '\n' since Tamil/other-language word
+// lengths don't line up with the English break point.
+export const TAB_LABEL_KEYS: Record<FooterTab, string> = {
+  0: 'GENERAL.ICON_0',
+  1: 'GENERAL.ICON_1',
+  2: 'GENERAL.ICON_3',
+  4: 'GENERAL.ICON_5',
+  3: 'GENERAL.ICON_6',
 }
 
 // Left → right render order (matches Figma)
@@ -83,6 +85,7 @@ export default function AppFooter({
   onTabPress,
 }: AppFooterProps) {
   const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
@@ -90,7 +93,7 @@ export default function AppFooter({
         {TAB_ORDER.map(tab => {
           const isActive = activeTab === tab
           const [inactiveIcon, activeIcon] = TAB_ICONS[tab]
-          const label = TAB_LABELS[tab]
+          const label = t(TAB_LABEL_KEYS[tab])
 
           // Count badge per tab (matches Figma: Likes shows 99+)
           let badgeCount: number | undefined
@@ -155,14 +158,16 @@ export default function AppFooter({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  // Figma: drop-shadow 0px -3px 8px rgba(0,0,0,0.08)
   container: {
     backgroundColor: Colors.white,
     shadowColor:     Colors.shadow,
     shadowOffset:    { width: 0, height: -3 },
     shadowOpacity:   0.08,
-    shadowRadius:    16,
+    shadowRadius:    8,
     elevation:       8,
   },
+  // Figma: bar height 56px
   tabBar: {
     flexDirection:     'row',
     justifyContent:    'space-around',
@@ -170,7 +175,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     paddingTop:        6,
     paddingBottom:     4,
-    height:            66,   // fits icon + 2-line label (Liked profiles / Contacted profiles)
+    height:            56,
   },
   tabBtn: {
     flex:           1,
@@ -185,10 +190,11 @@ const styles = StyleSheet.create({
     alignItems:     'center',
     justifyContent: 'center',
   },
+  // Figma: inactive label #545454
   tabLabel: {
     fontFamily: 'Poppins-Regular',
     fontSize:   10,
-    color:      '#1F1E1B',
+    color:      '#545454',
     marginTop:  4,
     lineHeight: 12,
     textAlign:  'center',
