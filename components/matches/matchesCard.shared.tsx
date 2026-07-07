@@ -313,7 +313,12 @@ export function PhotoSwiper({ images, width, height, onPress, renderLockSlide }:
 
   return (
     <View>
+      {/* style overflow:'hidden' here too, not just on the parent photoBox — on Android,
+          a ScrollView/FlatList's own native surface can escape an ancestor's borderRadius
+          clip (a well-known RN/Android quirk), which is why the top corners looked square
+          on a real device install despite the parent already having the radius+overflow. */}
       <FlatList
+        style={{ overflow: 'hidden' }}
         data={images}
         keyExtractor={(_, i) => String(i)}
         horizontal

@@ -155,15 +155,19 @@ const s = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   // Figma: title at top 12, gap below title = 20 before chips (total 56 from content start)
+  // paddingTop/paddingBottom (not margin) so onTitleLayout's measured height
+  // includes them — a View's onLayout reports only its own box, not its margin,
+  // so with margin here the scroll-hide animation only slid the header up by the
+  // bare 24px content height, leaving the 12+8 margin as a visible sliver after
+  // "hiding" instead of the row fully tucking away.
   titleRow: {
     flexDirection:  'row',
     alignItems:     'center',
     justifyContent: 'space-between',
     paddingLeft:    16,
     paddingRight:   16,
-    marginTop:      12,
-    marginBottom:   8,
-    height:         24,
+    paddingTop:     12,
+    paddingBottom:  8,
   },
   // Angular: matches.page.html — "#COUNT# profiles based on your preferences." then
   // "Edit preferences" always on its own line below (column, not a wrapping row).

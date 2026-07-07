@@ -380,10 +380,13 @@ function PhotoPromotionBanner({ data, onPress }: { data: any; onPress: () => voi
         end={{ x: 0, y: 1 }}
         style={pb.container}
       >
-        {/* Left: banner image — Angular ion-col size="4", padd0, img fills col */}
+        {/* Left: banner image — Angular ion-col size="4", padd0, img fills col.
+            CDN icon assets here are SVG — plain RN <Image> can't decode SVG on
+            native (only web's <img> can), which is why this rendered fine in a
+            browser preview but showed nothing on a real device install. */}
         <View style={pb.imageCol}>
           {!!data.BANNERIMG && (
-            <Image source={{ uri: data.BANNERIMG }} style={pb.image} resizeMode="contain" />
+            <CdnSvg uri={data.BANNERIMG} width="100%" height={140} />
           )}
         </View>
 
@@ -448,8 +451,9 @@ function MembershipBanner({ data, onPress }: { data: any; onPress: () => void })
       )}
 
       <View style={mb.content}>
+        {/* TITLEIMG is an SVG logo/icon — CdnSvg (not plain Image) so it decodes on native */}
         {!!data.TITLEIMG && (
-          <Image source={{ uri: data.TITLEIMG }} style={mb.titleImg} resizeMode="contain" />
+          <CdnSvg uri={data.TITLEIMG} width={140} height={28} style={mb.titleImg} />
         )}
 
         {/* Title — plain text */}
@@ -488,8 +492,9 @@ function MembershipBanner({ data, onPress }: { data: any; onPress: () => void })
           <View style={mb.benefitsList}>
             {benefits.slice(0, 4).map((b, i) => (
               <View key={i} style={mb.benefitRow}>
+                {/* Tick icon is an SVG (Figma "Tick" node) — CdnSvg so it decodes on native */}
                 {!!b.IMG && (
-                  <Image source={{ uri: b.IMG }} style={mb.benefitIcon} resizeMode="contain" />
+                  <CdnSvg uri={b.IMG} width={20} height={20} style={mb.benefitIcon} />
                 )}
                 <Text style={[mb.benefitText, { color: textColor }]} numberOfLines={2}>
                   {stripHtml(b.VALUE ?? '')}
@@ -651,9 +656,10 @@ function AddPhotoBanner({ data, onPress }: { data: any; onPress: () => void }) {
         end={{ x: 1, y: 0 }}
         style={ap.container}
       >
-        {/* Image — Angular: add-photo-height = 13vh ≈ 87px, align-items flex-start */}
+        {/* Image — Angular: add-photo-height = 13vh ≈ 87px, align-items flex-start.
+            SVG icon — CdnSvg so it decodes on native (plain Image can't render SVG there). */}
         {!!data.BANNERIMG && (
-          <Image source={{ uri: data.BANNERIMG }} style={ap.image} resizeMode="contain" />
+          <CdnSvg uri={data.BANNERIMG} width={87} height={87} />
         )}
 
         {/* Title — Angular: heading1-semibold-22 black-color line-height-32 */}
