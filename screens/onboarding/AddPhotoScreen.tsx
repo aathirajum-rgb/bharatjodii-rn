@@ -155,7 +155,8 @@ export default function AddPhotoScreen({ navigation }: Props) {
         if (res?.RESPONSE?.PHOTOURL) {
           await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
         }
-        navigation.push('onboarding', { pageNo: '27' })
+        // Go to manage photos screen so user can view uploaded photo + add more
+        navigation.push('onboarding', { pageNo: '21' })
       } else {
         const msg = res?.RESPONSE?.MESSAGE ?? res?.ERRMSG ?? 'Upload failed. Please try again.'
         Alert.alert('Upload failed', msg, [

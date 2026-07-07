@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,26 +9,21 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppHeader from '../../components/app-header/AppHeader'
-import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
-import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
   callRegistrationAPI,
   fetchEatingHabitOptions,
   getRegValue,
   setRegValue,
 } from '../../service/registrationService'
-import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
-import { os, scrollPaddingBottom } from './onboardingStyles'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { os } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'eating-updated.svg'
-const FOOTER_H = 140
 
 const FALLBACK_OPTIONS = [
   { key: '1', label: 'Vegetarian'     },
@@ -50,25 +43,21 @@ type Props = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function EatingHabitScreen({ navigation }: Props) {
-  const { t }  = useTranslation()
-  const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
 
-  const [options,      setOptions]      = useState<Option[]>([])
-  const [fetching,     setFetching]     = useState(true)
-  const [selected,     setSelected]     = useState<string | null>(null)
-  const [createdBy,    setCreatedBy]    = useState('4')
-  const [submitting,   setSubmitting]   = useState(false)
-  const [customerCare, setCustomerCare] = useState('')
+  const [options,    setOptions]    = useState<Option[]>([])
+  const [fetching,   setFetching]   = useState(true)
+  const [selected,   setSelected]   = useState<string | null>(null)
+  const [createdBy,  setCreatedBy]  = useState('4')
+  const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
     Promise.all([
       getRegValue('CREATEDBY'),
       getRegValue('EATING'),
-      getItem(SK.App.CUSTOMER_CARE),
-    ]).then(([cb, savedEating, cc]) => {
+    ]).then(([cb, savedEating]) => {
       if (cb)          setCreatedBy(cb)
       if (savedEating) setSelected(savedEating)
-      if (cc)          setCustomerCare(cc)
 
       fetchEatingHabitOptions()
         .then(list => setOptions(list.length ? list : FALLBACK_OPTIONS))
@@ -77,10 +66,12 @@ export default function EatingHabitScreen({ navigation }: Props) {
     })
   }, [])
 
-  const possessive = PROFILE_POSSESSIVE[createdBy]
-  const title = possessive
-    ? `Select ${possessive} eating habits`
-    : 'Select eating habits'
+  const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
+  const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
+  const title = t('REGISTRATION.EATINGHABITS', 'Select your #PROFILETYPE# eating habits')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace('  ', ' ')
+    .trim()
 
   async function handleNext() {
     if (!selected || submitting) return
@@ -96,30 +87,21 @@ export default function EatingHabitScreen({ navigation }: Props) {
     }
   }
 
+  useOnboardingFooter(
+    { nextDisabled: !selected, nextLoading: submitting, onNext: handleNext },
+    [selected, submitting],
+  )
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={os.screen}>
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation.canGoBack()}
-        onBackPress={() => navigation.goBack()}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-      />
-
+    <View style={os.flex1}>
       <ScrollView
         style={os.flex1}
-        contentContainerStyle={[
-          os.scrollContent,
-          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
-        ]}
+        contentContainerStyle={os.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <Image
-          source={{ uri: CDN_PAGE_ICON }}
-          style={os.pageIcon}
-          contentFit="contain"
-        />
+        <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
         <Text style={os.title}>{title}</Text>
 
@@ -150,37 +132,6 @@ export default function EatingHabitScreen({ navigation }: Props) {
           </View>
         )}
       </ScrollView>
-
-      {/* Sticky footer */}
-      <View
-        style={[
-          os.footer,
-          { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
-        ]}
-      >
-        <ButtonRevamp
-          label={t('REGISTRATION.NEXTCTA', 'Next')}
-          variant="primary"
-          size="standard"
-          fullWidth
-          disabled={!selected}
-          loading={submitting}
-          onPress={handleNext}
-        />
-
-        {!!customerCare && (
-          <>
-            <View style={styles.divider} />
-            <Pressable
-              style={styles.helpRow}
-              onPress={() => Linking.openURL(`tel:${customerCare}`)}
-            >
-              <Text style={styles.helpText}>Need help?  Call</Text>
-              <Text style={styles.helpPhone}>{customerCare}</Text>
-            </Pressable>
-          </>
-        )}
-      </View>
     </View>
   )
 }
@@ -190,7 +141,6 @@ export default function EatingHabitScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   loader: { marginTop: 48 },
 
-  // Pill chip grid — TYPE=type-1, same as MaritalStatus and CreatedBy screens
   chipGrid: {
     flexDirection: 'row',
     flexWrap:      'wrap',
@@ -243,30 +193,5 @@ const styles = StyleSheet.create({
   },
   chipLabelSelected: {
     fontWeight: '500',
-  },
-
-  divider: {
-    height:          1,
-    backgroundColor: Colors.inputBorder,
-    marginTop:       16,
-    marginBottom:    16,
-  },
-  helpRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            6,
-  },
-  helpText: {
-    fontSize:      14,
-    fontWeight:    '400',
-    color:         Colors.textPrimary,
-    letterSpacing: 0.42,
-  },
-  helpPhone: {
-    fontSize:      14,
-    fontWeight:    '500',
-    color:         Colors.link,
-    letterSpacing: 0.42,
   },
 })

@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,9 +9,6 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppHeader from '../../components/app-header/AppHeader'
-import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
@@ -27,7 +22,8 @@ import {
 import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
-import { os, scrollPaddingBottom } from './onboardingStyles'
+import { os } from './onboardingStyles'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -47,8 +43,7 @@ type Props = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function StarRaasiScreen({ navigation }: Props) {
-  const { t }  = useTranslation()
-  const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
 
   const [raasiOptions, setRaasiOptions] = useState<Option[]>([])
   const [starOptions,  setStarOptions]  = useState<Option[]>([])
@@ -126,33 +121,38 @@ export default function StarRaasiScreen({ navigation }: Props) {
     navigation.push('onboarding', { pageNo: '32' })
   }
 
-  const possessive = PROFILE_POSSESSIVE[createdBy] ?? 'their'
+  const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
+  const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
+  const title = t('REGISTRATION.STARRASSI', 'Select your #PROFILETYPE# rassi & star')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace('  ', ' ')
+    .trim()
   const canNext    = !!selectedRaasi && !!selectedStar
+
+  useOnboardingFooter({
+    nextHidden: !canNext,
+    nextDisabled: !canNext,
+    nextLoading: submitting,
+    onNext: handleNext,
+    showSkip: !canNext,
+    skipLabel: t('REG.DO_LATER', "I'll do this later"),
+    onSkip: handleSkip,
+  }, [canNext, submitting])
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <View style={os.screen}>
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation.canGoBack()}
-        onBackPress={() => navigation.goBack()}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-      />
-
       <ScrollView
         style={os.flex1}
-        contentContainerStyle={[
-          os.scrollContent,
-          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
-        ]}
+        contentContainerStyle={os.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
         <Text style={[os.title, { marginBottom: 24 }]}>
-          {t('REG.SELECT_STAR_RAASI', `Select ${possessive} star & raasi`)}
+          {title}
         </Text>
 
         {fetchingRaasi ? (
@@ -210,42 +210,7 @@ export default function StarRaasiScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      {/* Sticky footer */}
-      <View
-        style={[
-          os.footer,
-          { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
-        ]}
-      >
-        {canNext ? (
-          <ButtonRevamp
-            label={t('REGISTRATION.NEXTCTA', 'Next')}
-            variant="primary"
-            size="standard"
-            fullWidth
-            loading={submitting}
-            onPress={handleNext}
-          />
-        ) : (
-          <Pressable style={styles.skipRow} onPress={handleSkip}>
-            <Text style={styles.skipText}>{t('REG.DO_LATER', "I'll do this later")}</Text>
-            <Text style={styles.skipArrow}>›</Text>
-          </Pressable>
-        )}
-
-        {!!customerCare && (
-          <>
-            <View style={styles.divider} />
-            <Pressable
-              style={styles.helpRow}
-              onPress={() => Linking.openURL(`tel:${customerCare}`)}
-            >
-              <Text style={styles.helpText}>Need help?  Call</Text>
-              <Text style={styles.helpPhone}>{customerCare}</Text>
-            </Pressable>
-          </>
-        )}
-      </View>
+      {/* Sticky footer handled globally via useOnboardingFooter */}
 
       {/* Raasi picker */}
       <SearchablePicker

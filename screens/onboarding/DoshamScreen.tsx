@@ -26,7 +26,8 @@ import { getItem, setItem } from '../../service/storageService'
 import { refreshSession } from '../../service/homeService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
-import { os, scrollPaddingBottom } from './onboardingStyles'
+import { os } from './onboardingStyles'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -103,31 +104,36 @@ export default function DoshamScreen({ navigation }: Props) {
     navigation.navigate('Home')
   }
 
-  const possessive = PROFILE_POSSESSIVE[createdBy] ?? 'their'
+  const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
+  const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
+  const title = t('REGISTRATION.SELECTDOSHAM', 'Does your #PROFILETYPE# have dosham?')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace('  ', ' ')
+    .trim()
+
+  useOnboardingFooter({
+    nextHidden: !selected,
+    nextDisabled: !selected,
+    nextLoading: submitting,
+    onNext: handleNext,
+    showSkip: !selected,
+    skipLabel: t('REG.DO_LATER', "I'll do this later"),
+    onSkip: handleSkip
+  }, [selected, submitting])
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <View style={os.screen}>
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation.canGoBack()}
-        onBackPress={() => navigation.goBack()}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-      />
-
       <ScrollView
         style={os.flex1}
-        contentContainerStyle={[
-          os.scrollContent,
-          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
-        ]}
+        contentContainerStyle={os.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
         <Text style={[os.title, { marginBottom: 8 }]}>
-          {t('REGISTRATION.SELECTDOSHAM', `Select ${possessive} dosham`)}
+          {title}
         </Text>
 
         {fetching ? (
@@ -158,42 +164,7 @@ export default function DoshamScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      {/* Sticky footer */}
-      <View
-        style={[
-          os.footer,
-          { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
-        ]}
-      >
-        {selected ? (
-          <ButtonRevamp
-            label={t('REGISTRATION.NEXTCTA', 'Next')}
-            variant="primary"
-            size="standard"
-            fullWidth
-            loading={submitting}
-            onPress={handleNext}
-          />
-        ) : (
-          <Pressable style={styles.skipRow} onPress={handleSkip}>
-            <Text style={styles.skipText}>{t('REG.DO_LATER', "I'll do this later")}</Text>
-            <Text style={styles.skipArrow}>›</Text>
-          </Pressable>
-        )}
-
-        {!!customerCare && (
-          <>
-            <View style={styles.divider} />
-            <Pressable
-              style={styles.helpRow}
-              onPress={() => Linking.openURL(`tel:${customerCare}`)}
-            >
-              <Text style={styles.helpText}>Need help?  Call</Text>
-              <Text style={styles.helpPhone}>{customerCare}</Text>
-            </Pressable>
-          </>
-        )}
-      </View>
+      {/* Sticky footer handled globally via useOnboardingFooter */}
     </View>
   )
 }

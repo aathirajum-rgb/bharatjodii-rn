@@ -167,10 +167,13 @@ export async function uploadFile(
       getItem(StorageKeys.Auth.LANG),
     ])
 
-    formData.append('ATN',      atn      ?? '')
-    formData.append('RTN',      rtn      ?? '')
-    formData.append('APPTYPE',  appType  ?? '115')
-    formData.append('LANG',     lang     ?? 'en')
+    // Media endpoints (image CDN) use a fixed APPTYPE=600; main API uses the app's own type
+    const resolvedAppType = MEDIA_ENDPOINTS.includes(url) ? '600' : (appType ?? '115')
+
+    formData.append('ATN',        atn              ?? '')
+    formData.append('RTN',        rtn              ?? '')
+    formData.append('APPTYPE',    resolvedAppType)
+    formData.append('LANG',       lang             ?? 'en')
     formData.append('OUTPUTTYPE', '1')
 
     const res: ApiResult = (await client.post(url, formData)).data

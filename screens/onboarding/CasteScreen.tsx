@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,9 +9,6 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppHeader from '../../components/app-header/AppHeader'
-import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
@@ -28,10 +23,11 @@ import {
   getRegValue,
   submitFullRegistration,
 } from '../../service/registrationService'
-import { getItem, setItem } from '../../service/storageService'
+import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
-import { os, scrollPaddingBottom } from './onboardingStyles'
+import { os } from './onboardingStyles'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -51,8 +47,7 @@ type Props = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function CasteScreen({ navigation }: Props) {
-  const { t }  = useTranslation()
-  const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
 
   // Options
   const [casteOptions,    setCasteOptions]    = useState<Option[]>([])
@@ -159,11 +154,16 @@ export default function CasteScreen({ navigation }: Props) {
 
   // ─── Derived ──────────────────────────────────────────────────────────────
 
-  const possessive  = PROFILE_POSSESSIVE[createdBy] ?? 'their'
   const isChristian = religion === '2'
   const noun        = isChristian ? 'division' : 'caste'
   const nounCap     = isChristian ? 'Division'  : 'Caste'
-  const title       = `Select ${possessive} ${noun}`
+
+  const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
+  const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
+  const title = t('REGISTRATION.CASTE', 'Select your #PROFILETYPE# caste')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace('  ', ' ')
+    .trim()
 
   // ─── Submit ───────────────────────────────────────────────────────────────
 
@@ -182,11 +182,9 @@ export default function CasteScreen({ navigation }: Props) {
         // Final step (no gothra) — send full registration payload to get MATRIID
         const { matriId } = await submitFullRegistration()
         if (matriId) {
-          await setItem(SK.Auth.USER_ID, matriId)
           setSuccessVisible(true)
-        } else {
-          navigation.push('onboarding', { pageNo: '20' })
         }
+        // else: API cancelled or error — stay on screen so user can retry
       } else {
         // Gothra step follows — just save partial data and proceed
         await callRegistrationAPI({ CASTE: selectedCaste.key })
@@ -199,23 +197,15 @@ export default function CasteScreen({ navigation }: Props) {
     }
   }
 
+  useOnboardingFooter({ nextDisabled: !selectedCaste || submitting, nextLoading: submitting, onNext: handleNext }, [selectedCaste, submitting])
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <View style={os.screen}>
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation.canGoBack()}
-        onBackPress={() => navigation.goBack()}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-      />
-
       <ScrollView
         style={os.flex1}
-        contentContainerStyle={[
-          os.scrollContent,
-          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
-        ]}
+        contentContainerStyle={os.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -295,36 +285,7 @@ export default function CasteScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      {/* Sticky footer */}
-      <View
-        style={[
-          os.footer,
-          { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
-        ]}
-      >
-        <ButtonRevamp
-          label={t('REGISTRATION.NEXTCTA', 'Next')}
-          variant="primary"
-          size="standard"
-          fullWidth
-          disabled={!selectedCaste || submitting}
-          loading={submitting}
-          onPress={handleNext}
-        />
-
-        {!!customerCare && (
-          <>
-            <View style={styles.divider} />
-            <Pressable
-              style={styles.helpRow}
-              onPress={() => Linking.openURL(`tel:${customerCare}`)}
-            >
-              <Text style={styles.helpText}>Need help?  Call</Text>
-              <Text style={styles.helpPhone}>{customerCare}</Text>
-            </Pressable>
-          </>
-        )}
-      </View>
+      {/* Sticky footer handled globally via useOnboardingFooter */}
 
       {/* Single picker — renders caste/division or subcaste list based on activePanel */}
       <SearchablePicker

@@ -13,6 +13,7 @@ export const os = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 24,
     paddingTop:        24,
+    paddingBottom:     24,
   },
 
   pageIcon: {

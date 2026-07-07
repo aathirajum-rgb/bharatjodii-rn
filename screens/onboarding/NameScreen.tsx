@@ -11,18 +11,16 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppHeader from '../../components/app-header/AppHeader'
-import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { callRegistrationAPI, getRegValues, setRegValue } from '../../service/registrationService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
-import { os, footerPaddingBottom, scrollPaddingBottom } from './onboardingStyles'
+import { os } from './onboardingStyles'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_ICON = CDN_REG + 'son-name.svg'
-const FOOTER_H = 84
 
 // SELFGENDER → next page is GENDER (3); OTHERGENDER → skip to MARITALSTATUS (4)
 // Matches Angular getNextUrlForPage2(): SELFGENDER → /onboarding/3, OTHERGENDER → /onboarding/4
@@ -79,10 +77,12 @@ export default function NameScreen({ navigation }: Props) {
   }
 
   // Title: "Enter your name" for Myself, "Enter your son's name" for Son's, etc.
-  const possessive = PROFILE_POSSESSIVE[createdBy]
-  const title = possessive
-    ? `Enter your ${possessive} name`
-    : t('REGISTRATION.NAME', 'Enter your name').replace(' #PROFILETYPE#', '')
+  const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
+  const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
+  const title = t('REGISTRATION.NAME', 'Enter your #PROFILETYPE# name')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace('  ', ' ')
+    .trim()
 
   const isValid = name.trim().length >= 3
 
@@ -114,17 +114,12 @@ export default function NameScreen({ navigation }: Props) {
     }
   }
 
+  useOnboardingFooter({ nextDisabled: !isValid, nextLoading: submitting, onNext: handleNext }, [isValid, submitting])
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={os.screen}>
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation.canGoBack()}
-        onBackPress={() => navigation.goBack()}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-      />
-
+    <View style={os.flex1}>
       <KeyboardAvoidingView
         style={os.flex1}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -132,10 +127,7 @@ export default function NameScreen({ navigation }: Props) {
       >
         <ScrollView
           style={os.flex1}
-          contentContainerStyle={[
-            os.scrollContent,
-            { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
-          ]}
+          contentContainerStyle={os.scrollContent}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -170,24 +162,6 @@ export default function NameScreen({ navigation }: Props) {
           {/* Inline error */}
           {!!error && <Text style={os.errorText}>{error}</Text>}
         </ScrollView>
-
-        {/* Sticky footer */}
-        <View
-          style={[
-            os.footer,
-            { paddingBottom: footerPaddingBottom(insets.bottom) },
-          ]}
-        >
-          <ButtonRevamp
-            label={t('REGISTRATION.NEXTCTA', 'Next')}
-            variant="primary"
-            size="standard"
-            fullWidth
-            disabled={!isValid}
-            loading={submitting}
-            onPress={handleNext}
-          />
-        </View>
       </KeyboardAvoidingView>
     </View>
   )

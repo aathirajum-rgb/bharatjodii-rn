@@ -8,7 +8,7 @@ const uat: IEnvConfig = {
   payment:    'https://stgoapi.jodii.app/',
   paymentNg:  'https://stgng.jodii.app/',
   notify:     'https://stgmc.jodii.app/',
-  image:      'https://stgimgs.jodii.app/',
+  image:      'https://stgimg.jodii.app/',
 }
 
 export default uat

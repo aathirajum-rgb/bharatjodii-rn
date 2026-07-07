@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,29 +9,23 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppHeader from '../../components/app-header/AppHeader'
-import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
-import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
   callRegistrationAPI,
   fetchCities,
   fetchStates,
-  getRegValue,
   getRegValues,
   setRegValues,
 } from '../../service/registrationService'
-import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
-import { os, scrollPaddingBottom } from './onboardingStyles'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { os } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'location.svg'
-const FOOTER_H      = 160
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -48,38 +40,28 @@ type Props = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function HomeTownLocationScreen({ navigation }: Props) {
-  const { t }  = useTranslation()
-  const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
 
   const [createdBy,         setCreatedBy]         = useState('4')
-  const [customerCare,      setCustomerCare]       = useState('')
-
   const [selectedHomeState, setSelectedHomeState]  = useState<Option | null>(null)
   const [selectedHomeCity,  setSelectedHomeCity]   = useState<Option | null>(null)
-
   const [states,            setStates]             = useState<Option[]>([])
   const [cities,            setCities]             = useState<Option[]>([])
-
   const [loadingStates,     setLoadingStates]      = useState(true)
   const [loadingCities,     setLoadingCities]      = useState(false)
   const [submitting,        setSubmitting]         = useState(false)
-
   const [panelKind,         setPanelKind]          = useState<PanelKind>('state')
   const [panelVisible,      setPanelVisible]       = useState(false)
 
-  // ─── Init ─────────────────────────────────────────────────────────────────
-
   useEffect(() => {
-    Promise.all([getRegValues(), getItem(SK.App.CUSTOMER_CARE)]).then(async ([rv, cc]) => {
+    getRegValues().then(async rv => {
       if (rv.CREATEDBY) setCreatedBy(rv.CREATEDBY)
-      if (cc) setCustomerCare(cc)
 
       setLoadingStates(true)
       const stateList = await fetchStates().catch(() => [] as Option[])
       setStates(stateList)
       setLoadingStates(false)
 
-      // Restore previously selected HOMESTATE/HOMECITY (e.g. on back navigation)
       const homeStateKey = rv.HOMESTATE ?? ''
       const homeCityKey  = rv.HOMECITY  ?? ''
       if (homeStateKey) {
@@ -98,8 +80,6 @@ export default function HomeTownLocationScreen({ navigation }: Props) {
       }
     })
   }, [])
-
-  // ─── Panel ────────────────────────────────────────────────────────────────
 
   function openPanel(kind: PanelKind) {
     setPanelKind(kind)
@@ -125,9 +105,13 @@ export default function HomeTownLocationScreen({ navigation }: Props) {
     setSelectedHomeCity(opt)
   }
 
-  // ─── Submit ───────────────────────────────────────────────────────────────
-
-  const canSubmit = !!selectedHomeState && !!selectedHomeCity && !submitting
+  const canSubmit  = !!selectedHomeState && !!selectedHomeCity && !submitting
+  const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
+  const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
+  const title = t('REGISTRATION.HOME_TOWN_TXT', 'Is your #PROFILETYPE# home town same as current location?')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace('  ', ' ')
+    .trim()
 
   async function handleNext() {
     if (!canSubmit || !selectedHomeState || !selectedHomeCity) return
@@ -143,26 +127,18 @@ export default function HomeTownLocationScreen({ navigation }: Props) {
     }
   }
 
+  useOnboardingFooter(
+    { nextDisabled: !canSubmit, nextLoading: submitting, onNext: handleNext },
+    [canSubmit, submitting],
+  )
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
-  const possessive = PROFILE_POSSESSIVE[createdBy] ?? 'their'
-  const title      = t('REGISTRATION.SELECT_HOMETOWN', `Select ${possessive} home town`)
-
   return (
-    <View style={os.screen}>
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation.canGoBack()}
-        onBackPress={() => navigation.goBack()}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-      />
-
+    <View style={os.flex1}>
       <ScrollView
         style={os.flex1}
-        contentContainerStyle={[
-          os.scrollContent,
-          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
-        ]}
+        contentContainerStyle={os.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -199,38 +175,6 @@ export default function HomeTownLocationScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      {/* Sticky footer */}
-      <View
-        style={[
-          os.footer,
-          { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
-        ]}
-      >
-        <ButtonRevamp
-          label={t('REGISTRATION.NEXTCTA', 'Next')}
-          variant="primary"
-          size="standard"
-          fullWidth
-          disabled={!canSubmit}
-          loading={submitting}
-          onPress={handleNext}
-        />
-
-        {!!customerCare && (
-          <>
-            <View style={styles.divider} />
-            <Pressable
-              style={styles.helpRow}
-              onPress={() => Linking.openURL(`tel:${customerCare}`)}
-            >
-              <Text style={styles.helpText}>Need help?  Call</Text>
-              <Text style={styles.helpPhone}>{customerCare}</Text>
-            </Pressable>
-          </>
-        )}
-      </View>
-
-      {/* Shared picker for State + District */}
       <SearchablePicker
         visible={panelVisible}
         title={panelKind === 'state'
@@ -264,10 +208,7 @@ function FloatField({ label, value, placeholder, onPress, hasValue, disabled, lo
   return (
     <View style={floatStyles.wrapper}>
       <Pressable
-        style={[
-          floatStyles.field,
-          disabled && floatStyles.fieldDisabled,
-        ]}
+        style={[floatStyles.field, disabled && floatStyles.fieldDisabled]}
         onPress={disabled ? undefined : onPress}
         accessibilityRole="button"
         accessibilityLabel={label}
@@ -300,33 +241,8 @@ function FloatField({ label, value, placeholder, onPress, hasValue, disabled, lo
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  loader: { marginTop: 32 },
-
+  loader:         { marginTop: 32 },
   fieldsContainer: { gap: 24 },
-
-  divider: {
-    height:          1,
-    backgroundColor: Colors.inputBorder,
-    marginTop:       16,
-    marginBottom:    16,
-  },
-  helpRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            6,
-  },
-  helpText: {
-    fontSize:      14,
-    color:         Colors.textPrimary,
-    letterSpacing: 0.42,
-  },
-  helpPhone: {
-    fontSize:      14,
-    fontWeight:    '500',
-    color:         Colors.link,
-    letterSpacing: 0.42,
-  },
 })
 
 const floatStyles = StyleSheet.create({

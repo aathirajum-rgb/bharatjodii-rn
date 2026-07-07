@@ -24,7 +24,8 @@ import { callRegistrationAPI, getRegValue, setRegValue, setRegValues } from '../
 import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
-import { os, scrollPaddingBottom } from './onboardingStyles'
+import { os } from './onboardingStyles'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -135,7 +136,13 @@ export default function DOBScreen({ navigation }: Props) {
 
   const possessive       = PROFILE_POSSESSIVE[createdBy]
   const ageSubject       = AGE_SUBJECT[createdBy]
-  const titleLine2       = possessive ? `your ${possessive}` : 'your'
+  
+  const possessiveKey = possessive?.toUpperCase()
+  const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
+  const title = t('REGISTRATION.DATEOFBIRTH', 'Select your #PROFILETYPE# date of birth')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace('  ', ' ')
+    .trim()
   const noRemText        = possessive
     ? `If you don't remember your ${possessive}\ndate of birth,`
     : "If you don't remember your\ndate of birth,"
@@ -231,6 +238,8 @@ export default function DOBScreen({ navigation }: Props) {
     }
   }
 
+  useOnboardingFooter({ nextDisabled: !isAllSelected, nextLoading: submitting, onNext: handleNext }, [isAllSelected, submitting])
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   const pickerOptions = pickerField ? getOptions(pickerField) : []
@@ -250,19 +259,9 @@ export default function DOBScreen({ navigation }: Props) {
 
   return (
     <View style={os.screen}>
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation.canGoBack()}
-        onBackPress={() => navigation.goBack()}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-      />
-
       <ScrollView
         style={os.flex1}
-        contentContainerStyle={[
-          os.scrollContent,
-          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
-        ]}
+        contentContainerStyle={os.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
@@ -270,7 +269,7 @@ export default function DOBScreen({ navigation }: Props) {
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
         {/* Title */}
-        <Text style={os.title}>{`Select ${titleLine2}\ndate of birth`}</Text>
+        <Text style={os.title}>{title}</Text>
 
         {/* Three dropdown trigger fields */}
         <View style={styles.fieldsRow}>
@@ -347,27 +346,7 @@ export default function DOBScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      {/* Sticky footer */}
-      <View style={[os.footer, { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 }]}>
-        <ButtonRevamp
-          label={t('REGISTRATION.NEXTCTA', 'Next')}
-          variant="primary"
-          size="standard"
-          fullWidth
-          disabled={!isAllSelected}
-          loading={submitting}
-          onPress={handleNext}
-        />
-        {!!customerCare && (
-          <>
-            <View style={styles.divider} />
-            <Pressable style={styles.helpRow} onPress={() => Linking.openURL(`tel:${customerCare}`)}>
-              <Text style={styles.helpText}>Need help?  Call</Text>
-              <Text style={styles.helpPhone}>{customerCare}</Text>
-            </Pressable>
-          </>
-        )}
-      </View>
+      {/* Sticky footer handled globally via useOnboardingFooter */}
 
       {/* ── Inline dropdown — transparent Modal positioned at field location ── */}
       <Modal

@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,12 +9,8 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppHeader from '../../components/app-header/AppHeader'
-import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
-import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
   callRegistrationAPI,
   fetchReligionOptions,
@@ -24,15 +18,14 @@ import {
   prefetchCasteForReligion,
   setRegValue,
 } from '../../service/registrationService'
-import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
-import { os, scrollPaddingBottom } from './onboardingStyles'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { os } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'religion-updated.svg'
-const FOOTER_H      = 140
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -46,26 +39,20 @@ type Props = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ReligionScreen({ navigation }: Props) {
-  const { t }  = useTranslation()
-  const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
 
-  const [allOptions,    setAllOptions]    = useState<Option[]>([])
-  const [fetching,      setFetching]      = useState(true)
-  const [selected,      setSelected]      = useState<Option | null>(null)
-  const [createdBy,     setCreatedBy]     = useState('4')
-  const [mothertongue,  setMothertongue]  = useState('')
-  const [submitting,    setSubmitting]    = useState(false)
-  const [customerCare,  setCustomerCare]  = useState('')
-  const [panelVisible,  setPanelVisible]  = useState(false)
+  const [allOptions,   setAllOptions]   = useState<Option[]>([])
+  const [fetching,     setFetching]     = useState(true)
+  const [selected,     setSelected]     = useState<Option | null>(null)
+  const [createdBy,    setCreatedBy]    = useState('4')
+  const [mothertongue, setMothertongue] = useState('')
+  const [submitting,   setSubmitting]   = useState(false)
+  const [panelVisible, setPanelVisible] = useState(false)
 
   useEffect(() => {
-    Promise.all([
-      getRegValues(),
-      getItem(SK.App.CUSTOMER_CARE),
-    ]).then(([rv, cc]) => {
-      if (rv.CREATEDBY)     setCreatedBy(rv.CREATEDBY)
-      if (rv.MOTHERTONGUE)  setMothertongue(rv.MOTHERTONGUE)
-      if (cc) setCustomerCare(cc)
+    getRegValues().then(rv => {
+      if (rv.CREATEDBY)    setCreatedBy(rv.CREATEDBY)
+      if (rv.MOTHERTONGUE) setMothertongue(rv.MOTHERTONGUE)
 
       fetchReligionOptions()
         .then(list => {
@@ -80,12 +67,12 @@ export default function ReligionScreen({ navigation }: Props) {
     })
   }, [])
 
-  // ─── Derived ──────────────────────────────────────────────────────────────
-
-  const possessive = PROFILE_POSSESSIVE[createdBy] ?? 'their'
-  const title      = `What is ${possessive} religion?`
-
-  // ─── Submit ───────────────────────────────────────────────────────────────
+  const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
+  const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
+  const title = t('REGISTRATION.RELIGION', 'Select your #PROFILETYPE# religion')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace('  ', ' ')
+    .trim()
 
   async function handleNext() {
     if (!selected || submitting) return
@@ -101,40 +88,29 @@ export default function ReligionScreen({ navigation }: Props) {
     }
   }
 
+  useOnboardingFooter(
+    { nextDisabled: !selected, nextLoading: submitting, onNext: handleNext },
+    [selected, submitting],
+  )
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={os.screen}>
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation.canGoBack()}
-        onBackPress={() => navigation.goBack()}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-      />
-
+    <View style={os.flex1}>
       <ScrollView
         style={os.flex1}
-        contentContainerStyle={[
-          os.scrollContent,
-          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
-        ]}
+        contentContainerStyle={os.scrollContent}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        <Image
-          source={{ uri: CDN_PAGE_ICON }}
-          style={os.pageIcon}
-          contentFit="contain"
-        />
+        <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
         <Text style={[os.title, { marginBottom: 24 }]}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
         ) : (
-          /* "Select religion" floating-label field — opens right-side panel */
           <View style={styles.fieldWrapper}>
-            {/* Floating label */}
             <View style={styles.fieldLabelBadge}>
               <Text style={styles.fieldLabelText}>Religion</Text>
             </View>
@@ -156,38 +132,6 @@ export default function ReligionScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      {/* Sticky footer */}
-      <View
-        style={[
-          os.footer,
-          { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
-        ]}
-      >
-        <ButtonRevamp
-          label={t('REGISTRATION.NEXTCTA', 'Next')}
-          variant="primary"
-          size="standard"
-          fullWidth
-          disabled={!selected}
-          loading={submitting}
-          onPress={handleNext}
-        />
-
-        {!!customerCare && (
-          <>
-            <View style={styles.divider} />
-            <Pressable
-              style={styles.helpRow}
-              onPress={() => Linking.openURL(`tel:${customerCare}`)}
-            >
-              <Text style={styles.helpText}>Need help?  Call</Text>
-              <Text style={styles.helpPhone}>{customerCare}</Text>
-            </Pressable>
-          </>
-        )}
-      </View>
-
-      {/* Religion picker */}
       <SearchablePicker
         visible={panelVisible}
         title="Select religion"
@@ -196,8 +140,6 @@ export default function ReligionScreen({ navigation }: Props) {
         selectedKey={selected?.key ?? null}
         onSelect={(opt) => {
           setSelected(opt)
-          // Angular APIMODULENAME['RELIGION'] = 'CASTE' — fire caste prefetch immediately
-          // so CasteScreen finds the list cached when it mounts.
           prefetchCasteForReligion(opt.key, mothertongue)
         }}
         onClose={() => setPanelVisible(false)}
@@ -208,13 +150,11 @@ export default function ReligionScreen({ navigation }: Props) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-
 const styles = StyleSheet.create({
   loader: { marginTop: 48 },
 
-  // Floating-label field wrapper
   fieldWrapper: {
-    position: 'relative',
+    position:  'relative',
     marginTop: 8,
   },
   fieldLabelBadge: {
@@ -257,30 +197,5 @@ const styles = StyleSheet.create({
     fontSize:   22,
     color:      Colors.textPrimary,
     lineHeight: 26,
-  },
-
-  divider: {
-    height:          1,
-    backgroundColor: Colors.inputBorder,
-    marginTop:       16,
-    marginBottom:    16,
-  },
-  helpRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            6,
-  },
-  helpText: {
-    fontSize:      14,
-    fontWeight:    '400',
-    color:         Colors.textPrimary,
-    letterSpacing: 0.42,
-  },
-  helpPhone: {
-    fontSize:      14,
-    fontWeight:    '500',
-    color:         Colors.link,
-    letterSpacing: 0.42,
   },
 })

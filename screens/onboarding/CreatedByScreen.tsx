@@ -9,18 +9,15 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppHeader from '../../components/app-header/AppHeader'
-import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { fetchProfileCreatedByOptions, getRegValue, setRegValues } from '../../service/registrationService'
 import { CDN_REG } from '../../constants/cdn'
-import { os, scrollPaddingBottom, footerPaddingBottom } from './onboardingStyles'
+import { os } from './onboardingStyles'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_ICON = CDN_REG + 'creating-profile.svg'
-const FOOTER_H = 84
 
 // Gender groups — used to pre-set LOGINGENDER for family-member profiles
 const MALE_GENDER   = ['4', '8']   // son / brother → M
@@ -50,7 +47,6 @@ type Props = {
 
 export default function CreatedByScreen({ navigation }: Props) {
   const { t }  = useTranslation()
-  const insets = useSafeAreaInsets()
 
   const [options,    setOptions]    = useState<Option[]>([])
   const [selected,   setSelected]   = useState<string | null>(null)
@@ -90,23 +86,15 @@ export default function CreatedByScreen({ navigation }: Props) {
     setSubmitting(false)
   }
 
+  useOnboardingFooter({ nextDisabled: !selected, nextLoading: submitting, onNext: handleNext }, [selected, submitting])
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={os.screen}>
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation.canGoBack()}
-        onBackPress={() => navigation.goBack()}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-      />
-
+    <View style={os.flex1}>
       <ScrollView
         style={os.flex1}
-        contentContainerStyle={[
-          os.scrollContent,
-          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
-        ]}
+        contentContainerStyle={os.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Page illustration — Angular: ICONTYPE = domain + creating-profile.svg */}
@@ -155,24 +143,6 @@ export default function CreatedByScreen({ navigation }: Props) {
           </View>
         )}
       </ScrollView>
-
-      {/* Sticky footer — matches Angular .otp-cta sticky bottom */}
-      <View
-        style={[
-          os.footer,
-          { paddingBottom: footerPaddingBottom(insets.bottom) },
-        ]}
-      >
-        <ButtonRevamp
-          label={t('REGISTRATION.NEXTCTA', 'Next')}
-          variant="primary"
-          size="standard"
-          fullWidth
-          disabled={!selected}
-          loading={submitting}
-          onPress={handleNext}
-        />
-      </View>
     </View>
   )
 }

@@ -1,35 +1,45 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import AppHeader from '../components/app-header/AppHeader'
+import ButtonRevamp from '../components/button-revamp/ButtonRevamp'
 import { Colors } from '../constants/colors'
+import { StorageKeys } from '../constants/storage.keys'
+import { OnboardingCtx, FooterState, FooterHandlers } from '../contexts/OnboardingContext'
+import { getItem } from '../service/storageService'
 import { useAuth } from '../contexts/AuthContext'
-import ComponentShowcaseScreen from '../screens/dev/ComponentShowcaseScreen'
-import HomeScreen from '../screens/home/HomeScreen'
-import GalleryScreen from '../screens/GalleryScreen'
-import CreatedByScreen from '../screens/onboarding/CreatedByScreen'
-import DOBScreen from '../screens/onboarding/DOBScreen'
-import EatingHabitScreen from '../screens/onboarding/EatingHabitScreen'
-import GenderScreen from '../screens/onboarding/GenderScreen'
-import HeightScreen from '../screens/onboarding/HeightScreen'
-import MaritalStatusScreen from '../screens/onboarding/MaritalStatusScreen'
-import HomeTownScreen from '../screens/onboarding/HomeTownScreen'
-import HomeTownLocationScreen from '../screens/onboarding/HomeTownLocationScreen'
-import LocationScreen from '../screens/onboarding/LocationScreen'
-import MotherTongueScreen from '../screens/onboarding/MotherTongueScreen'
-import AddPhotoScreen from '../screens/onboarding/AddPhotoScreen'
-import FamilyDetailsScreen from '../screens/onboarding/FamilyDetailsScreen'
-import PropertyDetailsScreen from '../screens/onboarding/PropertyDetailsScreen'
-import StarRaasiScreen from '../screens/onboarding/StarRaasiScreen'
-import DoshamScreen from '../screens/onboarding/DoshamScreen'
-import CasteScreen from '../screens/onboarding/CasteScreen'
-import GothraScreen from '../screens/onboarding/GothraScreen'
-import MonthlyIncomeScreen from '../screens/onboarding/MonthlyIncomeScreen'
-import ReligionScreen from '../screens/onboarding/ReligionScreen'
-import OccupationScreen from '../screens/onboarding/OccupationScreen'
-import QualificationScreen from '../screens/onboarding/QualificationScreen'
-import NameScreen from '../screens/onboarding/NameScreen'
-import PaymentSuccessScreen from '../screens/payment/PaymentSuccessScreen'
-import RechargeScreen from '../screens/payment/RechargeScreen'
-import PermissionDemoScreen from '../screens/PermissionDemoScreen'
-import MatchesScreen from '../screens/matches/MatchesScreen'
+
+import ComponentShowcaseScreen    from '../screens/dev/ComponentShowcaseScreen'
+import HomeScreen                  from '../screens/home/HomeScreen'
+import GalleryScreen               from '../screens/GalleryScreen'
+import CreatedByScreen             from '../screens/onboarding/CreatedByScreen'
+import NameScreen                  from '../screens/onboarding/NameScreen'
+import GenderScreen                from '../screens/onboarding/GenderScreen'
+import MaritalStatusScreen         from '../screens/onboarding/MaritalStatusScreen'
+import DOBScreen                   from '../screens/onboarding/DOBScreen'
+import HeightScreen                from '../screens/onboarding/HeightScreen'
+import EatingHabitScreen           from '../screens/onboarding/EatingHabitScreen'
+import MotherTongueScreen          from '../screens/onboarding/MotherTongueScreen'
+import LocationScreen              from '../screens/onboarding/LocationScreen'
+import HomeTownLocationScreen      from '../screens/onboarding/HomeTownLocationScreen'
+import HomeTownScreen              from '../screens/onboarding/HomeTownScreen'
+import QualificationScreen         from '../screens/onboarding/QualificationScreen'
+import OccupationScreen            from '../screens/onboarding/OccupationScreen'
+import MonthlyIncomeScreen         from '../screens/onboarding/MonthlyIncomeScreen'
+import ReligionScreen              from '../screens/onboarding/ReligionScreen'
+import CasteScreen                 from '../screens/onboarding/CasteScreen'
+import GothraScreen                from '../screens/onboarding/GothraScreen'
+import AddPhotoScreen              from '../screens/onboarding/AddPhotoScreen'
+import ManagePhotosScreen          from '../screens/onboarding/ManagePhotosScreen'
+import FamilyDetailsScreen         from '../screens/onboarding/FamilyDetailsScreen'
+import PropertyDetailsScreen       from '../screens/onboarding/PropertyDetailsScreen'
+import StarRaasiScreen             from '../screens/onboarding/StarRaasiScreen'
+import DoshamScreen                from '../screens/onboarding/DoshamScreen'
+import PaymentSuccessScreen        from '../screens/payment/PaymentSuccessScreen'
+import RechargeScreen              from '../screens/payment/RechargeScreen'
+import PermissionDemoScreen        from '../screens/PermissionDemoScreen'
+import MatchesScreen               from '../screens/matches/MatchesScreen'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -45,37 +55,198 @@ export type AppStackParamList = {
   ComponentShowcase: undefined
 }
 
-
-// ─── Onboarding router ────────────────────────────────────────────────────────
+// ─── Onboarding shell ─────────────────────────────────────────────────────────
+// AppHeader and footer stay mounted across all onboarding screens.
+// Only the content area re-renders on pageNo change.
 
 function OnboardingRouter({ navigation, route }: { navigation: any; route: any }) {
   const pageNo = route.params?.pageNo ?? '1'
-  switch (pageNo) {
-    case '1':  return <CreatedByScreen    navigation={navigation} route={route} />
-    case '2':  return <NameScreen         navigation={navigation} route={route} />
-    case '3':  return <GenderScreen       navigation={navigation} route={route} />
-    case '4':  return <MaritalStatusScreen navigation={navigation} route={route} />
-    case '5':  return <DOBScreen          navigation={navigation} route={route} />
-    case '43': return <HeightScreen       navigation={navigation} route={route} />
-    case '38': return <EatingHabitScreen  navigation={navigation} route={route} />
-    case '39': return <MotherTongueScreen navigation={navigation} route={route} />
-    case '9':  return <LocationScreen       navigation={navigation} route={route} />
-    case '44': return <HomeTownLocationScreen navigation={navigation} route={route} />
-    case '46': return <HomeTownScreen         navigation={navigation} route={route} />
-    case '10': return <QualificationScreen navigation={navigation} route={route} />
-    case '11': return <OccupationScreen      navigation={navigation} route={route} />
-    case '12': return <MonthlyIncomeScreen  navigation={navigation} route={route} />
-    case '13': return <ReligionScreen       navigation={navigation} route={route} />
-    case '14': return <CasteScreen         navigation={navigation} route={route} />
-    case '16': return <GothraScreen        navigation={navigation} route={route} />
-    case '20': return <AddPhotoScreen      navigation={navigation} route={route} />
-    case '27': return <FamilyDetailsScreen navigation={navigation} route={route} />
-    case '28': return <PropertyDetailsScreen navigation={navigation} route={route} />
-    case '29': return <StarRaasiScreen       navigation={navigation} route={route} />
-    case '32': return <DoshamScreen          navigation={navigation} route={route} />
-    default:   return <HomeScreen navigation={navigation} />
+  const insets = useSafeAreaInsets()
+
+  const [footerState, setFooterStateRaw] = useState<FooterState>({
+    nextDisabled: true,
+    nextLoading:  false,
+    nextHidden:   false,
+    showSkip:     false,
+  })
+  const [customerCare, setCustomerCare] = useState('')
+  const handlers = useRef<FooterHandlers>({ onNext: () => {} })
+
+  // Load customer care number once at mount
+  useEffect(() => {
+    getItem(StorageKeys.App.CUSTOMER_CARE).then(cc => { if (cc) setCustomerCare(cc) })
+  }, [])
+
+  // Reset footer to a safe default when the page changes, so the previous
+  // screen's button state doesn't bleed through while the new screen mounts.
+  useEffect(() => {
+    setFooterStateRaw({ nextDisabled: true, nextLoading: false, nextHidden: false, showSkip: false })
+    handlers.current = { onNext: () => {}, onSkip: undefined }
+  }, [pageNo])
+
+  const setFooterState = useCallback((s: FooterState) => {
+    setFooterStateRaw(s)
+  }, [])
+
+  // ── Content router ────────────────────────────────────────────────────────
+
+  function renderContent() {
+    switch (pageNo) {
+      case '1':  return <CreatedByScreen        navigation={navigation} route={route} />
+      case '2':  return <NameScreen             navigation={navigation} route={route} />
+      case '3':  return <GenderScreen           navigation={navigation} route={route} />
+      case '4':  return <MaritalStatusScreen    navigation={navigation} route={route} />
+      case '5':  return <DOBScreen              navigation={navigation} route={route} />
+      case '43': return <HeightScreen           navigation={navigation} route={route} />
+      case '38': return <EatingHabitScreen      navigation={navigation} route={route} />
+      case '39': return <MotherTongueScreen     navigation={navigation} route={route} />
+      case '9':  return <LocationScreen         navigation={navigation} route={route} />
+      case '44': return <HomeTownLocationScreen navigation={navigation} route={route} />
+      case '46': return <HomeTownScreen         navigation={navigation} route={route} />
+      case '10': return <QualificationScreen    navigation={navigation} route={route} />
+      case '11': return <OccupationScreen       navigation={navigation} route={route} />
+      case '12': return <MonthlyIncomeScreen    navigation={navigation} route={route} />
+      case '13': return <ReligionScreen         navigation={navigation} route={route} />
+      case '14': return <CasteScreen            navigation={navigation} route={route} />
+      case '16': return <GothraScreen           navigation={navigation} route={route} />
+      case '20': return <AddPhotoScreen         navigation={navigation} route={route} />
+      case '21': return <ManagePhotosScreen     navigation={navigation} route={route} />
+      case '27': return <FamilyDetailsScreen    navigation={navigation} route={route} />
+      case '28': return <PropertyDetailsScreen  navigation={navigation} route={route} />
+      case '29': return <StarRaasiScreen        navigation={navigation} route={route} />
+      case '32': return <DoshamScreen           navigation={navigation} route={route} />
+      default:   return <HomeScreen             navigation={navigation} />
+    }
   }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  return (
+    <OnboardingCtx.Provider value={{ setFooterState, handlers }}>
+      <View style={shell.screen}>
+
+        {/* Persistent header — never unmounts */}
+        <AppHeader
+          type="registration"
+          showBackBtn={navigation.canGoBack()}
+          onBackPress={() => navigation.goBack()}
+          onLanguagePress={() => navigation.navigate('LanguageSelection')}
+        />
+
+        {/* Swapping content — only this re-renders on pageNo change */}
+        <View style={shell.content}>
+          {renderContent()}
+        </View>
+
+        {/* Persistent footer — driven by OnboardingCtx state */}
+        <View
+          style={[
+            shell.footer,
+            { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
+          ]}
+        >
+          {!footerState.nextHidden && (
+            <ButtonRevamp
+              label={footerState.nextLabel ?? 'Next'}
+              variant="primary"
+              size="standard"
+              fullWidth
+              disabled={footerState.nextDisabled}
+              loading={footerState.nextLoading}
+              onPress={() => handlers.current.onNext()}
+            />
+          )}
+
+          {footerState.showSkip && (
+            <Pressable
+              style={shell.skipRow}
+              onPress={() => handlers.current.onSkip?.()}
+              accessibilityRole="button"
+            >
+              <Text style={shell.skipText}>
+                {footerState.skipLabel ?? "I'll do this later"}
+              </Text>
+              <Text style={shell.skipArrow}> ›</Text>
+            </Pressable>
+          )}
+
+          {!!customerCare && (
+            <>
+              <View style={shell.divider} />
+              <Pressable
+                style={shell.helpRow}
+                onPress={() => Linking.openURL(`tel:${customerCare}`)}
+              >
+                <Text style={shell.helpText}>Need help?  Call</Text>
+                <Text style={shell.helpPhone}>{customerCare}</Text>
+              </Pressable>
+            </>
+          )}
+        </View>
+
+      </View>
+    </OnboardingCtx.Provider>
+  )
 }
+
+// ─── Shell styles ─────────────────────────────────────────────────────────────
+
+const shell = StyleSheet.create({
+  screen: {
+    flex:            1,
+    backgroundColor: Colors.surface,
+  },
+  content: {
+    flex: 1,
+  },
+  footer: {
+    paddingHorizontal: 24,
+    paddingTop:        20,
+    backgroundColor:   Colors.surface,
+    borderTopWidth:    StyleSheet.hairlineWidth,
+    borderTopColor:    Colors.divider,
+  },
+  skipRow: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    justifyContent:  'center',
+    paddingVertical: 12,
+  },
+  skipText: {
+    fontSize:   15,
+    fontWeight: '500',
+    color:      Colors.textMedium,
+  },
+  skipArrow: {
+    fontSize:   18,
+    color:      Colors.textMedium,
+    lineHeight: 22,
+  },
+  divider: {
+    height:          StyleSheet.hairlineWidth,
+    backgroundColor: Colors.border,
+    marginTop:        4,
+    marginBottom:    12,
+  },
+  helpRow: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    justifyContent: 'center',
+    gap:            6,
+  },
+  helpText: {
+    fontSize:      14,
+    fontWeight:    '400',
+    color:         Colors.textPrimary,
+    letterSpacing: 0.42,
+  },
+  helpPhone: {
+    fontSize:      14,
+    fontWeight:    '500',
+    color:         Colors.link,
+    letterSpacing: 0.42,
+  },
+})
 
 // ─── Stack ────────────────────────────────────────────────────────────────────
 
@@ -92,7 +263,6 @@ export default function AppStack() {
       <Stack.Screen name="Matches"   component={MatchesScreen} />
       <Stack.Screen name="Home"      component={HomeScreen} />
       <Stack.Screen name="dashboard" component={HomeScreen} />
-      {/* HomeScreen is in screens/home/HomeScreen.tsx — AppHeader + FlatList + AppFooter */}
       <Stack.Screen name="onboarding" component={OnboardingRouter} />
       <Stack.Screen
         name="Permissions"
@@ -118,4 +288,3 @@ export default function AppStack() {
     </Stack.Navigator>
   )
 }
-

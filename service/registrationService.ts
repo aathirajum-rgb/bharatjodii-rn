@@ -798,8 +798,19 @@ export async function updateRegistrationArray(moduleName: string, data: any): Pr
 // Empty BROTHERS+SISTERS returns the option arrays; filled values save the data.
 
 function objToOptions(raw: any): Array<{ key: string; label: string }> {
-  if (!raw || typeof raw !== 'object') return []
-  return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+  if (!raw) return []
+  if (Array.isArray(raw)) {
+    return raw
+      .map(item => ({
+        key:   String(item.KEY   ?? item.key   ?? item.CKEY ?? ''),
+        label: String(item.VALUE ?? item.value ?? item.LABEL ?? item.label ?? ''),
+      }))
+      .filter(o => o.key)
+  }
+  if (typeof raw === 'object') {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+  }
+  return []
 }
 
 export async function fetchFamilyOptions(): Promise<{
@@ -812,7 +823,7 @@ export async function fetchFamilyOptions(): Promise<{
     'POST',
     `ID=${userId}&PROPERTY=&BROTHERS=&SISTERS=`,
   )
-  if (res?.RESPONSECODE === '1' && res?.ERRCODE === '0' && res?.RESPONSE) {
+  if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0 && res?.RESPONSE) {
     return {
       brothers: objToOptions(res.RESPONSE.BOTHER),
       sisters:  objToOptions(res.RESPONSE.SISTER),
@@ -837,7 +848,7 @@ export async function fetchPropertyOptions(): Promise<Array<{ key: string; label
     'POST',
     `ID=${userId}&PROPERTY=&BROTHERS=&SISTERS=`,
   )
-  if (res?.RESPONSECODE === '1' && res?.ERRCODE === '0' && res?.RESPONSE) {
+  if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0 && res?.RESPONSE) {
     return objToOptions(res.RESPONSE.ASSETS)
   }
   return []
@@ -865,7 +876,7 @@ export async function fetchRaasiOptions(): Promise<Array<{ key: string; label: s
     'POST',
     `ID=${userId}&STAR=&RAASI=&DOSHAM=`,
   )
-  if (res?.RESPONSECODE === '1' && res?.ERRCODE === '0' && res?.RESPONSE?.RAASI) {
+  if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0 && res?.RESPONSE?.RAASI) {
     return objToOptions(res.RESPONSE.RAASI)
   }
   // Fallback: fetch from initialfetch endpoint
@@ -874,7 +885,7 @@ export async function fetchRaasiOptions(): Promise<Array<{ key: string; label: s
     'POST',
     `type=raasi&LANG=${lang}`,
   )
-  if (res2?.RESPONSECODE === '1' && res2?.ERRCODE === '0' && res2?.RESPONSE) {
+  if (res2?.RESPONSECODE == 1 && res2?.ERRCODE == 0 && res2?.RESPONSE) {
     return objToOptions(res2.RESPONSE)
   }
   return []
@@ -887,7 +898,7 @@ export async function fetchStarOptions(raasiId: string): Promise<Array<{ key: st
     'POST',
     `type=stars&RAASIID=${raasiId}&LANG=${lang}`,
   )
-  if (res?.RESPONSECODE === '1' && res?.ERRCODE === '0' && res?.RESPONSE) {
+  if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0 && res?.RESPONSE) {
     return objToOptions(res.RESPONSE)
   }
   return []
@@ -903,7 +914,7 @@ export async function fetchDoshamOptions(
     'POST',
     `ID=${userId}&STAR=${star}&RAASI=${raasi}&DOSHAM=`,
   )
-  if (res?.RESPONSECODE === '1' && res?.ERRCODE === '0' && res?.RESPONSE) {
+  if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0 && res?.RESPONSE) {
     return {
       dosham:     objToOptions(res.RESPONSE.DOSHAM     ?? {}),
       doshamHash: objToOptions(res.RESPONSE.DOSHAMHASH ?? {}),
@@ -939,7 +950,7 @@ export async function callRegistrationAPI(params: Record<string, any>): Promise<
 // Angular param name mapping: QUALIFICATION→Education, MCODE→CountryCode, INCOMETYPE→IncomeCurrency.
 // NOTE: no ID in this payload — server creates the profile and returns MATRIID.
 
-export async function submitFullRegistration(): Promise<{ matriId?: string }> {
+export async function submitFullRegistration(): Promise<{ matriId?: string; responsecode?: string }> {
   const rv       = await getRegValues()
   const lang     = (await getItem(SK.Auth.LANG))  ?? 'en'
   const ipAddress = (await getItem('USERIP'))      ?? ''
@@ -989,9 +1000,17 @@ export async function submitFullRegistration(): Promise<{ matriId?: string }> {
 
   // Angular "registrationupdate" module → registration/insert/v1 (creates profile, returns MATRIID)
   const res = await apiCall(Endpoints.registration.insert, 'POST', params)
-  const matriId = res?.RESPONSE?.MATRIID
-  const result: { matriId?: string } = {}
-  if (matriId) result.matriId = String(matriId)
+  const matriId = res?.MATRIID ?? res?.RESPONSE?.MATRIID
+  const result: { matriId?: string; responsecode?: string } = {
+    responsecode: String(res?.RESPONSECODE ?? ''),
+  }
+  if (matriId) {
+    result.matriId = String(matriId)
+    await setItem(SK.Auth.USER_ID, String(matriId))
+    // Establish auth session (ATN) via autologin so subsequent endpoints
+    // like familyinfo/v1 and starraasi/v1 that require ATN work correctly.
+    await autoLogin(String(matriId), false, false)
+  }
   return result
 }
 

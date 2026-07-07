@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,34 +9,29 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppHeader from '../../components/app-header/AppHeader'
-import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
   fetchPropertyOptions,
-  getRegValue,
   getRegValues,
   setRegValue,
   submitPropertyDetails,
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
-import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
-import { os, scrollPaddingBottom } from './onboardingStyles'
+import { os } from './onboardingStyles'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'property.svg'
-const FOOTER_H = 160
+const FOOTER_H      = 160
 
 const FALLBACK_OPTIONS = [
-  { key: '1', label: 'Flat/Apartment' },
-  { key: '2', label: 'Independent House/Villa' },
-  { key: '3', label: 'Independent/Builder Floor' },
-  { key: '4', label: 'Farm House' },
-  { key: '5', label: 'Agricultural Land' },
+  { key: '1', label: 'Own house' },
+  { key: '2', label: 'Agriculture land' },
+  { key: '3', label: 'Other land' },
+  { key: '4', label: 'Own shop' },
 ]
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -53,13 +46,11 @@ type Props = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PropertyDetailsScreen({ navigation }: Props) {
-  const { t }  = useTranslation()
-  const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
 
   const [options,      setOptions]      = useState<Option[]>([])
   const [fetching,     setFetching]     = useState(true)
   const [selected,     setSelected]     = useState<Set<string>>(new Set())
-  const [createdBy,    setCreatedBy]    = useState('1')
   const [customerCare, setCustomerCare] = useState('')
   const [submitting,   setSubmitting]   = useState(false)
 
@@ -68,10 +59,8 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
       getRegValues(),
       getItem(SK.App.CUSTOMER_CARE),
     ]).then(([regVals, cc]) => {
-      if (regVals.CREATEDBY) setCreatedBy(regVals.CREATEDBY)
       if (cc) setCustomerCare(cc)
 
-      // Restore previously selected properties (stored as array or ~-separated string)
       const existing = regVals.PROPERTIES
       if (existing) {
         const keys = Array.isArray(existing)
@@ -86,11 +75,6 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
         .finally(() => setFetching(false))
     })
   }, [])
-
-  const possessive = PROFILE_POSSESSIVE[createdBy]
-  const title = possessive
-    ? `Select your ${possessive} property details`
-    : 'Select property details'
 
   function toggleOption(key: string) {
     setSelected(prev => {
@@ -120,23 +104,21 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
     navigation.push('onboarding', { pageNo: '29' })
   }
 
+  useOnboardingFooter({
+    nextLoading: submitting,
+    onNext: handleNext,
+    showSkip: true,
+    skipLabel: t('REG.DO_LATER', "I'll do this later"),
+    onSkip: handleSkip,
+  }, [submitting])
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <View style={os.screen}>
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation.canGoBack()}
-        onBackPress={() => navigation.goBack()}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-      />
-
       <ScrollView
         style={os.flex1}
-        contentContainerStyle={[
-          os.scrollContent,
-          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
-        ]}
+        contentContainerStyle={os.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <Image
@@ -145,25 +127,33 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
           contentFit="contain"
         />
 
-        <Text style={[os.title, { marginBottom: 8 }]}>{title}</Text>
-        <Text style={styles.subtitle}>{t('REG.CHOOSEMORE', 'You can choose more than one')}</Text>
+        <Text style={styles.title}>Add property details</Text>
+        <Text style={styles.subtitle}>
+          You can add multiple properties from the below list
+        </Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
         ) : (
-          <View style={styles.checkList}>
-            {options.map(opt => {
+          // Full-width list — marginHorizontal: -24 bleeds out of scrollContent's padding
+          <View style={styles.list}>
+            {options.map((opt, idx) => {
               const isChecked = selected.has(opt.key)
+              const isLast    = idx === options.length - 1
               return (
                 <Pressable
                   key={opt.key}
-                  style={[styles.checkItem, isChecked && styles.checkItemSelected]}
+                  style={[
+                    styles.row,
+                    isChecked && styles.rowSelected,
+                    !isLast   && styles.rowDivider,
+                  ]}
                   onPress={() => toggleOption(opt.key)}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: isChecked }}
                   accessibilityLabel={opt.label}
                 >
-                  <Text style={[styles.checkLabel, isChecked && styles.checkLabelSelected]}>
+                  <Text style={[styles.rowLabel, isChecked && styles.rowLabelSelected]}>
                     {opt.label}
                   </Text>
                   <View style={[styles.checkbox, isChecked && styles.checkboxSelected]}>
@@ -176,91 +166,64 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      {/* Sticky footer */}
-      <View
-        style={[
-          os.footer,
-          { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
-        ]}
-      >
-        {selected.size > 0 ? (
-          <ButtonRevamp
-            label={t('REGISTRATION.NEXTCTA', 'Next')}
-            variant="primary"
-            size="standard"
-            fullWidth
-            loading={submitting}
-            onPress={handleNext}
-          />
-        ) : (
-          <Pressable style={styles.skipRow} onPress={handleSkip}>
-            <Text style={styles.skipText}>{t('REG.DO_LATER', "I'll do this later")}</Text>
-            <Text style={styles.skipArrow}>›</Text>
-          </Pressable>
-        )}
-
-        {!!customerCare && (
-          <>
-            <View style={styles.divider} />
-            <Pressable
-              style={styles.helpRow}
-              onPress={() => Linking.openURL(`tel:${customerCare}`)}
-            >
-              <Text style={styles.helpText}>Need help?  Call</Text>
-              <Text style={styles.helpPhone}>{customerCare}</Text>
-            </Pressable>
-          </>
-        )}
-      </View>
+      {/* Sticky footer handled globally via useOnboardingFooter */}
     </View>
   )
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-
 const styles = StyleSheet.create({
+  title: {
+    fontSize:     24,
+    fontWeight:   '700',
+    color:        Colors.textPrimary,
+    lineHeight:   30,
+    marginBottom: 8,
+  },
+
   subtitle: {
     fontSize:     14,
     fontWeight:   '400',
     color:        Colors.textSecondary,
     lineHeight:   20,
-    marginBottom: 24,
+    marginBottom: 28,
   },
 
   loader: { marginTop: 48 },
 
-  checkList: {
-    gap: 12,
+  // Bleeds out of the 24px horizontal padding of os.scrollContent
+  list: {
+    marginHorizontal: -24,
+    borderTopWidth:    StyleSheet.hairlineWidth,
+    borderTopColor:    Colors.border,
   },
 
-  // Row: label left, checkbox right
-  checkItem: {
+  row: {
     flexDirection:     'row',
     alignItems:        'center',
-    justifyContent:    'space-between',
-    paddingHorizontal: 16,
-    paddingVertical:   14,
-    borderRadius:      12,
-    borderWidth:       1,
-    borderColor:       Colors.borderSoft,
+    paddingHorizontal: 24,
+    paddingVertical:   16,
     backgroundColor:   Colors.surface,
   },
-  checkItemSelected: {
-    borderColor:     Colors.chipBorderActive,
-    backgroundColor: Colors.radioCheckedBg,
+  rowSelected: {
+    backgroundColor: Colors.selectionBg,   // #FFF1F5
+  },
+  rowDivider: {
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: Colors.border,
   },
 
-  checkLabel: {
+  rowLabel: {
     flex:       1,
     fontSize:   15,
     fontWeight: '400',
     color:      Colors.textPrimary,
-    lineHeight: 20,
+    lineHeight: 22,
     marginRight: 12,
   },
-  checkLabelSelected: {
-    fontWeight: '500',
+  rowLabelSelected: {
+    fontWeight: '700',
   },
 
   checkbox: {
@@ -269,6 +232,7 @@ const styles = StyleSheet.create({
     borderRadius:    6,
     borderWidth:     1.5,
     borderColor:     Colors.borderNeutral,
+    backgroundColor: Colors.surface,
     alignItems:      'center',
     justifyContent:  'center',
     flexShrink:      0,
@@ -277,37 +241,36 @@ const styles = StyleSheet.create({
     borderColor:     Colors.primaryDark,
     backgroundColor: Colors.primaryDark,
   },
-
   checkmark: {
-    color:      Colors.surface,
+    color:      Colors.white,
     fontSize:   13,
     fontWeight: '700',
     lineHeight: 16,
   },
 
+  // Skip — always below Next button
   skipRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    gap:            4,
+    flexDirection:   'row',
+    alignItems:      'center',
+    justifyContent:  'center',
+    paddingVertical: 12,
   },
   skipText: {
     fontSize:   15,
     fontWeight: '500',
-    color:      'rgba(0,0,0,0.55)',
+    color:      Colors.textMedium,
   },
   skipArrow: {
     fontSize:   18,
-    color:      'rgba(0,0,0,0.55)',
+    color:      Colors.textMedium,
     lineHeight: 22,
   },
 
   divider: {
-    height:          1,
-    backgroundColor: Colors.inputBorder,
-    marginTop:       16,
-    marginBottom:    16,
+    height:          StyleSheet.hairlineWidth,
+    backgroundColor: Colors.border,
+    marginTop:       4,
+    marginBottom:    12,
   },
   helpRow: {
     flexDirection:  'row',

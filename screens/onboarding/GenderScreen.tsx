@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -10,9 +9,7 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppHeader from '../../components/app-header/AppHeader'
-import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { Colors } from '../../constants/colors'
 import {
   GenderOption,
@@ -22,12 +19,11 @@ import {
   setRegValues,
 } from '../../service/registrationService'
 import { CDN_SVG, CDN_REVAMP } from '../../constants/cdn'
-import { os, scrollPaddingBottom, footerPaddingBottom } from './onboardingStyles'
+import { os } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_SVG + 'gender-registration.svg'
-const FOOTER_H = 84
 
 // Fallback used when the API is unavailable — CDN URLs matched from Angular codebase
 const FALLBACK_OPTIONS: GenderOption[] = [
@@ -57,7 +53,6 @@ type Props = {
 
 export default function GenderScreen({ navigation }: Props) {
   const { t }  = useTranslation()
-  const insets = useSafeAreaInsets()
 
   const [options,    setOptions]    = useState<GenderOption[]>([])
   const [fetching,   setFetching]   = useState(true)
@@ -101,23 +96,15 @@ export default function GenderScreen({ navigation }: Props) {
     }
   }
 
+  useOnboardingFooter({ nextDisabled: !selected, nextLoading: submitting, onNext: handleNext }, [selected, submitting])
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={os.screen}>
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation.canGoBack()}
-        onBackPress={() => navigation.goBack()}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-      />
-
+    <View style={os.flex1}>
       <ScrollView
         style={os.flex1}
-        contentContainerStyle={[
-          os.scrollContent,
-          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
-        ]}
+        contentContainerStyle={os.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Page illustration — Figma: 48×48 gender icon at top-left */}
@@ -153,7 +140,7 @@ export default function GenderScreen({ navigation }: Props) {
                     contentFit="contain"
                   />
 
-                  {/* Label — Figma: 14px Poppins Medium, flex:1 */}
+                  {/* Label — Figma: 14px Medium, stretches between avatar and radio */}
                   <Text style={[styles.cardLabel, isSelected && styles.cardLabelSelected]}>
                     {opt.label}
                   </Text>
@@ -170,24 +157,6 @@ export default function GenderScreen({ navigation }: Props) {
 
         {!!error && <Text style={styles.errorText}>{error}</Text>}
       </ScrollView>
-
-      {/* Sticky footer */}
-      <View
-        style={[
-          os.footer,
-          { paddingBottom: footerPaddingBottom(insets.bottom) },
-        ]}
-      >
-        <ButtonRevamp
-          label={t('REGISTRATION.NEXTCTA', 'Next')}
-          variant="primary"
-          size="standard"
-          fullWidth
-          disabled={!selected}
-          loading={submitting}
-          onPress={handleNext}
-        />
-      </View>
     </View>
   )
 }

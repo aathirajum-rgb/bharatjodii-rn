@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,26 +9,21 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppHeader from '../../components/app-header/AppHeader'
-import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { Colors } from '../../constants/colors'
-import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
   callRegistrationAPI,
   fetchMaritalStatusOptions,
   getRegValues,
   setRegValue,
 } from '../../service/registrationService'
-import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
-import { os, scrollPaddingBottom } from './onboardingStyles'
+import { os } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'son-marital.svg'
-const FOOTER_H = 140   // Next button + "Need help?" section height
 
 // Fallback options when API is unavailable
 const FALLBACK_MALE_OPTIONS   = [
@@ -59,25 +52,19 @@ type Props = {
 
 export default function MaritalStatusScreen({ navigation }: Props) {
   const { t }  = useTranslation()
-  const insets = useSafeAreaInsets()
 
   const [options,      setOptions]      = useState<Option[]>([])
   const [fetching,     setFetching]     = useState(true)
   const [selected,     setSelected]     = useState<string | null>(null)
   const [createdBy,    setCreatedBy]    = useState('1')
   const [submitting,   setSubmitting]   = useState(false)
-  const [customerCare, setCustomerCare] = useState('')
 
   useEffect(() => {
-    Promise.all([
-      getRegValues(),                   // CREATEDBY, GENDER, MARITALSTATUS from reg store
-      getItem(SK.App.CUSTOMER_CARE),    // app-level key — stays in storageService
-    ]).then(([{ CREATEDBY, GENDER, MARITALSTATUS }, cc]) => {
+    getRegValues().then(({ CREATEDBY, GENDER, MARITALSTATUS }) => {
       const cb2 = CREATEDBY ?? '1'
       const g2  = GENDER    ?? '1'
-      if (cb2)          setCreatedBy(cb2)
+      if (cb2)           setCreatedBy(cb2)
       if (MARITALSTATUS) setSelected(MARITALSTATUS)
-      if (cc)           setCustomerCare(cc)
 
       const fallback = g2 === '0' ? FALLBACK_FEMALE_OPTIONS : FALLBACK_MALE_OPTIONS
       fetchMaritalStatusOptions(g2)
@@ -88,10 +75,12 @@ export default function MaritalStatusScreen({ navigation }: Props) {
   }, [])
 
   // Title: "Select your [possessive] marital status" — Angular: REGISTRATION.MARITALSTATUS
-  const possessive = PROFILE_POSSESSIVE[createdBy]
-  const title = possessive
-    ? `Select your ${possessive} marital status`
-    : t('REGISTRATION.MARITALSTATUS', 'Select your marital status').replace(' #PROFILETYPE#', '')
+  const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
+  const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
+  const title = t('REGISTRATION.MARITALSTATUS', 'Select your #PROFILETYPE# marital status')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace('  ', ' ') // handle empty replacement
+    .trim()
 
   async function handleNext() {
     if (!selected || submitting) return
@@ -107,27 +96,15 @@ export default function MaritalStatusScreen({ navigation }: Props) {
     }
   }
 
-  function handleCallPress() {
-    if (customerCare) Linking.openURL(`tel:${customerCare}`)
-  }
+  useOnboardingFooter({ nextDisabled: !selected, nextLoading: submitting, onNext: handleNext }, [selected, submitting])
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={os.screen}>
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation.canGoBack()}
-        onBackPress={() => navigation.goBack()}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-      />
-
+    <View style={os.flex1}>
       <ScrollView
         style={os.flex1}
-        contentContainerStyle={[
-          os.scrollContent,
-          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
-        ]}
+        contentContainerStyle={os.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         {/* Page illustration — Figma: 48×48 ring-heart icon */}
@@ -169,34 +146,6 @@ export default function MaritalStatusScreen({ navigation }: Props) {
           </View>
         )}
       </ScrollView>
-
-      {/* Sticky footer — Next button + "Need help? Call" section */}
-      <View
-        style={[
-          os.footer,
-          { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
-        ]}
-      >
-        <ButtonRevamp
-          label={t('REGISTRATION.NEXTCTA', 'Next')}
-          variant="primary"
-          size="standard"
-          fullWidth
-          disabled={!selected}
-          loading={submitting}
-          onPress={handleNext}
-        />
-
-        {!!customerCare && (
-          <>
-            <View style={styles.divider} />
-            <Pressable style={styles.helpRow} onPress={handleCallPress}>
-              <Text style={styles.helpText}>Need help?  Call</Text>
-              <Text style={styles.helpPhone}>{customerCare}</Text>
-            </Pressable>
-          </>
-        )}
-      </View>
     </View>
   )
 }
@@ -266,31 +215,5 @@ const styles = StyleSheet.create({
   },
   chipLabelSelected: {
     fontWeight: '500',
-  },
-
-  // "Need help?" section — Figma: line + "Need help? Call [number]"
-  divider: {
-    height:          1,
-    backgroundColor: Colors.inputBorder,
-    marginTop:       16,
-    marginBottom:    16,
-  },
-  helpRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            6,
-  },
-  helpText: {
-    fontSize:      14,
-    fontWeight:    '400',
-    color:         Colors.textPrimary,
-    letterSpacing: 0.42,
-  },
-  helpPhone: {
-    fontSize:      14,
-    fontWeight:    '500',
-    color:         Colors.link,
-    letterSpacing: 0.42,
   },
 })

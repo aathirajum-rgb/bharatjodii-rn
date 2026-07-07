@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
   Animated,
-  Linking,
   Modal,
   Platform,
   Pressable,
@@ -16,8 +15,6 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppHeader from '../../components/app-header/AppHeader'
-import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
@@ -31,7 +28,8 @@ import {
 import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE, PICKER_PANEL_WIDTH } from '../../constants/registration.constants'
-import { os, scrollPaddingBottom } from './onboardingStyles'
+import { os } from './onboardingStyles'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -158,8 +156,13 @@ export default function HeightScreen({ navigation }: Props) {
 
   // ─── Derived ──────────────────────────────────────────────────────────────
 
-  const possessive   = PROFILE_POSSESSIVE[createdBy] ?? 'their'
-  const title        = `What is ${possessive} height?`
+  const possessive = PROFILE_POSSESSIVE[createdBy] ?? 'their'
+  const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
+  const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
+  const title = t('REGISTRATION.HEIGHT', 'What is your #PROFILETYPE# height?')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace('  ', ' ')
+    .trim()
   const hasSelection = selectedCategory !== null || selectedHeight !== null
 
   // Panel slides in from the right
@@ -191,23 +194,15 @@ export default function HeightScreen({ navigation }: Props) {
     }
   }
 
+  useOnboardingFooter({ nextDisabled: !hasSelection, nextLoading: submitting, onNext: handleNext }, [hasSelection, submitting])
+
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
     <View style={os.screen}>
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation.canGoBack()}
-        onBackPress={() => navigation.goBack()}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-      />
-
       <ScrollView
         style={os.flex1}
-        contentContainerStyle={[
-          os.scrollContent,
-          { paddingBottom: scrollPaddingBottom(insets.bottom, FOOTER_H) },
-        ]}
+        contentContainerStyle={os.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <Image
@@ -282,36 +277,7 @@ export default function HeightScreen({ navigation }: Props) {
         )}
       </ScrollView>
 
-      {/* Sticky footer */}
-      <View
-        style={[
-          os.footer,
-          { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
-        ]}
-      >
-        <ButtonRevamp
-          label={t('REGISTRATION.NEXTCTA', 'Next')}
-          variant="primary"
-          size="standard"
-          fullWidth
-          disabled={!hasSelection}
-          loading={submitting}
-          onPress={handleNext}
-        />
-
-        {!!customerCare && (
-          <>
-            <View style={styles.divider} />
-            <Pressable
-              style={styles.helpRow}
-              onPress={() => Linking.openURL(`tel:${customerCare}`)}
-            >
-              <Text style={styles.helpText}>Need help?  Call</Text>
-              <Text style={styles.helpPhone}>{customerCare}</Text>
-            </Pressable>
-          </>
-        )}
-      </View>
+      {/* Sticky footer handled globally via useOnboardingFooter */}
 
       {/* Exact height picker — right-side sliding panel */}
       <Modal
