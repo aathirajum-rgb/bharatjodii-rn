@@ -201,6 +201,7 @@ export const AUTH_ONLY_ENDPOINTS = [
   Endpoints.auth.resendOtp,
   Endpoints.auth.loginTrueCall,
   Endpoints.auth.login,
+  Endpoints.auth.autoLogin,   // autologin re-establishes session; server uses ID not ATN/RTN
 ] as string[]
 
 // These endpoints add APPTYPE only — LANG is already in the params string, no ATN/RTN needed

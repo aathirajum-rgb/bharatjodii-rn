@@ -12,7 +12,7 @@ import { Image } from 'expo-image'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
 import {
-  callRegistrationAPI,
+  callPartialRegistrationAPI,
   fetchMotherTongueOptions,
   getRegValue,
   loadAndStoreStatesForMotherTongue,
@@ -85,11 +85,9 @@ export default function MotherTongueScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       await setRegValue('MOTHERTONGUE', selected.key)
-      await Promise.all([
-        callRegistrationAPI({ MOTHERTONGUE: selected.key }),
-        loadAndStoreStatesForMotherTongue(selected.key),
-      ])
+      await loadAndStoreStatesForMotherTongue(selected.key)
       navigation.push('onboarding', { pageNo: '9' })
+      callPartialRegistrationAPI()
     } catch {
       // Allow retry
     } finally {

@@ -11,7 +11,7 @@ import {
 import { Image } from 'expo-image'
 import { Colors } from '../../constants/colors'
 import {
-  callRegistrationAPI,
+  callPartialRegistrationAPI,
   fetchQualificationOptions,
   getRegValue,
   setRegValue,
@@ -72,8 +72,8 @@ export default function QualificationScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       await setRegValue('QUALIFICATION', selected)
-      await callRegistrationAPI({ Education: selected })
       navigation.push('onboarding', { pageNo: '11' })
+      callPartialRegistrationAPI()
     } catch {
       // Allow retry
     } finally {

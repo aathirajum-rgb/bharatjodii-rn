@@ -11,7 +11,7 @@ import {
 import { Image } from 'expo-image'
 import { Colors } from '../../constants/colors'
 import {
-  callRegistrationAPI,
+  callPartialRegistrationAPI,
   fetchEatingHabitOptions,
   getRegValue,
   setRegValue,
@@ -78,8 +78,8 @@ export default function EatingHabitScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       await setRegValue('EATING', selected)
-      await callRegistrationAPI({ EATING: selected })
       navigation.push('onboarding', { pageNo: '39' })
+      callPartialRegistrationAPI()
     } catch {
       // Allow retry
     } finally {

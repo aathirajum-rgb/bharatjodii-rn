@@ -5,7 +5,7 @@ import MenuIcon from '../../assets/icons/MenuIcon'
 import NotificationIcon from '../../assets/icons/NotificationIcon'
 import SearchIcon from '../../assets/icons/SearchIcon'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG } from '../../constants/cdn'
+import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
 import i18n from '../../i18n'
 
 // Maps i18n language codes to their short display labels shown in the header button
@@ -59,9 +59,10 @@ export interface AppHeaderProps {
 const CDN = CDN_SVG
 
 const ICONS = {
-  lang:     CDN + 'revamp/lang-change-img.svg',
-  chevDown: CDN + 'revamp/chevron-down.svg',
-  fwdLink:  CDN + 'revamp/forward-icon-link.svg',
+  lang:      CDN + 'revamp/lang-change-img.svg',
+  chevDown:  CDN_REACT + '/chevronleft.svg',
+  fwdLink:   CDN + 'revamp/forward-icon-link.svg',
+  arrowLeft: CDN_REACT + '/arrowleft.svg',
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -121,7 +122,7 @@ export default function AppHeader({
           <Pressable style={styles.h1LangBtn} onPress={onLanguagePress}>
             <CdnSvg uri={ICONS.lang} width={20} height={20} />
             <Text style={styles.h1LangText}>{resolvedLangLabel}</Text>
-            <CdnSvg uri={ICONS.chevDown} width={12} height={12} />
+            <CdnSvg uri={ICONS.chevDown} width={24} height={24} />
           </Pressable>
 
           {/* Notification + chat icon buttons */}
@@ -180,7 +181,7 @@ export default function AppHeader({
         <View style={styles.titleRow}>
           {showBackIcon && (
             <Pressable style={styles.backBtn} onPress={onBackPress}>
-              <Text style={styles.backChevron}>{'‹'}</Text>
+              <CdnSvg uri={ICONS.arrowLeft} width={24} height={24} />
             </Pressable>
           )}
           <Text style={styles.titleText} numberOfLines={1}>{title ?? ''}</Text>
@@ -195,7 +196,7 @@ export default function AppHeader({
       <View style={styles.authRow}>
         {showBackBtn && (
           <Pressable style={styles.backBtn} onPress={onBackPress}>
-            <Text style={styles.backChevron}>{'‹'}</Text>
+            <CdnSvg uri={ICONS.arrowLeft} width={24} height={24} />
           </Pressable>
         )}
 
@@ -204,7 +205,7 @@ export default function AppHeader({
         <Pressable style={styles.langBtn} onPress={onLanguagePress}>
           <CdnSvg uri={ICONS.lang} width={24} height={24} />
           <Text style={styles.langText}>{resolvedLangLabel}</Text>
-          <CdnSvg uri={ICONS.chevDown} width={12} height={12} />
+          <CdnSvg uri={ICONS.chevDown} width={24} height={24} />
         </Pressable>
       </View>
     </SafeAreaView>
@@ -384,11 +385,6 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
     marginRight:     4,
-  },
-  backChevron: {
-    fontSize:   28,
-    color:      Colors.textDark,
-    lineHeight: 32,
   },
   titleText: {
     fontFamily: 'Poppins-Medium',

@@ -103,10 +103,46 @@ export async function autoLogin(
   _skipParse = false,
   onboardingFlow = false,
 ): Promise<void> {
-  const params = `ID=${userId}&TYPE=autologin`
+  const [
+    ipAddress,
+    deviceDetail,
+    appVersion,
+    mcode,
+    registerId,
+    deviceId,
+    nallow,
+    mobileNo,
+  ] = await Promise.all([
+    getItem('USERIP'),
+    getItem('DEVICEDETAIL'),
+    getItem(SK.App.APP_VERSION),
+    getItem(SK.User.MEMBER_CODE),
+    getItem('REGISTERID'),
+    getItem('DEVICEID'),
+    getItem(SK.App.NALLOW),
+    getRegValue('MOBILENO'),
+  ])
+
+  const params = [
+    `ID=${userId}`,
+    `CLIENTIP=${ipAddress          ?? ''}`,
+    `DEVICEDETAIL=${deviceDetail   ?? ''}`,
+    `APPVERSION=${appVersion       ?? ''}`,
+    `FROMPAGE=REGISTER`,
+    `MCODE=${mcode                 ?? '91'}`,
+    `REGISTERID=${registerId       ?? ''}`,
+    `DEVICEID=${deviceId           ?? ''}`,
+    `NALLOW=${nallow               ?? '0'}`,
+    ...(mobileNo ? [`MOBILENO=${mobileNo}`, 'NEWREG=1'] : []),
+  ].join('&')
+
   const result = await apiCall(Endpoints.auth.autoLogin, 'POST', params)
 
-  if (result?.RESPONSECODE != 1 || result?.ERRCODE != 0) return
+  if (result?.ERRCODE != 0 && result?.ERRCODE !== '0') return
+
+  // Store fresh tokens from top-level response
+  if (result.ATN) await setItem(SK.Auth.TOKEN,         result.ATN)
+  if (result.RTN) await setItem(SK.Auth.REFRESH_TOKEN, result.RTN)
 
   const responseData = result.RESPONSE
   if (responseData?.WEBVIEWURL) {
@@ -1014,10 +1050,68 @@ export async function submitFullRegistration(): Promise<{ matriId?: string; resp
   return result
 }
 
-export async function callPartialRegistrationAPI(params: Record<string, any>): Promise<any> {
-  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-  const paramStr = `ID=${userId}&` + Object.entries(params).map(([k, v]) => `${k}=${v}`).join('&')
-  return apiCall(Endpoints.registration.partialUpdate, 'POST', paramStr)
+// Mirrors Angular's callPartialRegistrationAPI() — sends ALL accumulated reg values
+// to partialreg/v1 as a fire-and-forget progress save on each onboarding step.
+// Call after setRegValue() and navigate immediately — do NOT await this.
+export function callPartialRegistrationAPI(): void {
+  _doPartialReg().catch(() => {})  // fully fire-and-forget
+}
+
+async function _doPartialReg(): Promise<void> {
+  const rv         = await getRegValues()
+  const ipAddress  = (await getItem('USERIP'))      ?? ''
+  const registerId = (await getItem('REGISTERID'))  ?? ''
+  const deviceId   = (await getItem('DEVICEID'))    ?? ''
+  const appVersion = (await getItem('APPVERSION'))  ?? ''
+
+  // Angular: if occupation==8 (student/no income) → income=99
+  //          if religion filled but income empty    → income=99
+  let income = rv.MONTHLYINCOME || rv.INCOME || ''
+  if (rv.OCCUPATION === '8') income = '99'
+  if (rv.RELIGION && !income) income = '99'
+
+  // Angular: country param only sent when STATE is filled
+  const country = rv.STATE ? (rv.COUNTRY ?? '') : ''
+
+  const paramStr = [
+    `CountryCode=${rv.MCODE           ?? ''}`,
+    `MobileNo=${rv.MOBILENO           ?? ''}`,
+    `ProfileCreatedBy=${rv.CREATEDBY  ?? ''}`,
+    `Gender=${rv.GENDER               ?? ''}`,
+    `Name=${encodeURIComponent(rv.NAME ?? '')}`,
+    `MaritalStatus=${rv.MARITALSTATUS ?? ''}`,
+    `noofchildren=${rv.NOOFCHILDREN   ?? ''}`,
+    `EatingHabits=${rv.EATING         ?? rv.EATINGHABITS ?? ''}`,
+    `physicalstatus=${rv.PHYSICALSTATUS ?? '1'}`,
+    `Year=${rv.YEAR   ?? ''}`,
+    `Month=${rv.MONTH ?? ''}`,
+    `Date=${rv.DATE   ?? ''}`,
+    `Age=${rv.AGE     ?? ''}`,
+    `Height=${rv.HEIGHT ?? ''}`,
+    `MotherTongue=${rv.MOTHERTONGUE   ?? ''}`,
+    `country=${country}`,
+    `City=${rv.CITY           ?? ''}`,
+    `State=${rv.STATE         ?? ''}`,
+    `NativeCountry=${rv.NATIVECOUNTRY ?? ''}`,
+    `NativeState=${rv.NATIVESTATE     ?? ''}`,
+    `NativeCity=${rv.NATIVECITY       ?? ''}`,
+    `HomeState=${rv.HOMESTATE         ?? ''}`,
+    `HomeCity=${rv.HOMECITY           ?? ''}`,
+    `Education=${rv.QUALIFICATION     ?? ''}`,
+    `Occupation=${rv.OCCUPATION       ?? ''}`,
+    `MonthlyIncome=${income}`,
+    `IncomeCurrency=${rv.INCOMETYPE   ?? rv.INCOMECURRENCY ?? ''}`,
+    `Religion=${rv.RELIGION   ?? ''}`,
+    `Caste=${rv.CASTE         ?? ''}`,
+    `SubCaste=${rv.SUBCASTE   ?? ''}`,
+    `Gothram=${rv.GOTHRA      ?? ''}`,
+    `IpAddress=${ipAddress}`,
+    `DEVICEID=${deviceId}`,
+    `REGISTERID=${registerId}`,
+    `APPVERSION=${appVersion}`,
+  ].join('&')
+
+  await apiCall(Endpoints.registration.partial, 'POST', paramStr)
 }
 
 export async function callIntermediatePageUpdateApi(pageId: string): Promise<void> {

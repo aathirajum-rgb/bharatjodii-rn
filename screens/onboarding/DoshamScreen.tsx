@@ -11,18 +11,14 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppHeader from '../../components/app-header/AppHeader'
-import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
-import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
   fetchDoshamOptions,
   getRegValues,
   setRegValue,
   submitHoroscopeDetails,
 } from '../../service/registrationService'
-import { getItem, setItem } from '../../service/storageService'
+import { setItem } from '../../service/storageService'
 import { refreshSession } from '../../service/homeService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
@@ -32,7 +28,6 @@ import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'dosham.svg'
-const FOOTER_H      = 160
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,23 +42,20 @@ type Props = {
 
 export default function DoshamScreen({ navigation }: Props) {
   const { t }  = useTranslation()
-  const insets = useSafeAreaInsets()
 
-  const [options,      setOptions]      = useState<Option[]>([])
-  const [selected,     setSelected]     = useState<Option | null>(null)
-  const [fetching,     setFetching]     = useState(true)
-  const [submitting,   setSubmitting]   = useState(false)
-  const [customerCare, setCustomerCare] = useState('')
-  const [createdBy,    setCreatedBy]    = useState('1')
+  const [options,    setOptions]    = useState<Option[]>([])
+  const [selected,   setSelected]   = useState<Option | null>(null)
+  const [fetching,   setFetching]   = useState(true)
+  const [submitting, setSubmitting] = useState(false)
+  const [createdBy,  setCreatedBy]  = useState('1')
 
   // star + raasi are needed to submit dosham
   const [star,  setStar]  = useState('')
   const [raasi, setRaasi] = useState('')
 
   useEffect(() => {
-    Promise.all([getRegValues(), getItem(SK.App.CUSTOMER_CARE)]).then(([rv, cc]) => {
+    getRegValues().then((rv) => {
       if (rv.CREATEDBY) setCreatedBy(rv.CREATEDBY)
-      if (cc) setCustomerCare(cc)
       if (rv.STAR)  setStar(rv.STAR)
       if (rv.RAASI) setRaasi(rv.RAASI)
 
@@ -124,7 +116,7 @@ export default function DoshamScreen({ navigation }: Props) {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={os.screen}>
+    <View style={os.flex1}>
       <ScrollView
         style={os.flex1}
         contentContainerStyle={os.scrollContent}
@@ -222,24 +214,6 @@ const styles = StyleSheet.create({
     height:          12,
     borderRadius:    6,
     backgroundColor: Colors.primaryDark,
-  },
-
-  skipRow: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    justifyContent:  'center',
-    paddingVertical: 14,
-    gap:             4,
-  },
-  skipText: {
-    fontSize:   15,
-    fontWeight: '500',
-    color:      Colors.scrim,
-  },
-  skipArrow: {
-    fontSize:   18,
-    color:      Colors.scrim,
-    lineHeight: 22,
   },
 
   divider: {

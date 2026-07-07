@@ -12,7 +12,7 @@ import {
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
-import { callRegistrationAPI, getRegValues, setRegValue } from '../../service/registrationService'
+import { callPartialRegistrationAPI, getRegValues, setRegValue } from '../../service/registrationService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
@@ -102,11 +102,11 @@ export default function NameScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       await setRegValue('NAME', trimmed)
-      await callRegistrationAPI({ NAME: trimmed })
 
       // SELFGENDER [1,10,11] → page 3 (GENDER); OTHERGENDER [4,5,8,9] → page 4 (MARITALSTATUS)
       const nextPage = SELF_GENDER.includes(createdBy) ? '3' : '4'
       navigation.push('onboarding', { pageNo: nextPage })
+      callPartialRegistrationAPI()
     } catch {
       setError(t('GENERAL.NOINTERNET', 'No internet connection'))
     } finally {

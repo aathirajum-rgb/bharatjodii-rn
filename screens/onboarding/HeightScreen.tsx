@@ -19,7 +19,7 @@ import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
   HeightGroup,
-  callRegistrationAPI,
+  callPartialRegistrationAPI,
   fetchHeightCategoryOptions,
   fetchExactHeightGrouped,
   getRegValue,
@@ -180,13 +180,12 @@ export default function HeightScreen({ navigation }: Props) {
       if (selectedHeight) {
         // Exact height selected — Angular: saves HEIGHT key, clears HEIGHTCATEGORY
         await setRegValues({ HEIGHT: selectedHeight.key, HEIGHTCATEGORY: '' })
-        await callRegistrationAPI({ HEIGHT: selectedHeight.key, HEIGHTCATEGORY: '' })
       } else {
         // Category selected (101-104) — Angular: saves HEIGHTCATEGORY, clears HEIGHT
         await setRegValues({ HEIGHTCATEGORY: selectedCategory!, HEIGHT: '' })
-        await callRegistrationAPI({ HEIGHTCATEGORY: selectedCategory, HEIGHT: '' })
       }
       navigation.push('onboarding', { pageNo: '38' })
+      callPartialRegistrationAPI()
     } catch {
       // Allow retry on next tap
     } finally {

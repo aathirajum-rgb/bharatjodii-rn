@@ -10,7 +10,7 @@ import {
 import { Image } from 'expo-image'
 import { Colors } from '../../constants/colors'
 import {
-  callRegistrationAPI,
+  callPartialRegistrationAPI,
   getRegValues,
   setRegValues,
 } from '../../service/registrationService'
@@ -59,8 +59,8 @@ export default function HomeTownScreen({ navigation }: Props) {
     try {
       if (homeTownSame === 'yes') {
         await setRegValues({ HOMETOWN: '1', HOMESTATE: currentStateKey, HOMECITY: currentCityKey })
-        await callRegistrationAPI({ HOMESTATE: currentStateKey, HOMECITY: currentCityKey })
         navigation.push('onboarding', { pageNo: '10' })
+        callPartialRegistrationAPI()
       } else {
         await setRegValues({ HOMETOWN: '2', HOMESTATE: '', HOMECITY: '' })
         navigation.push('onboarding', { pageNo: '44' })

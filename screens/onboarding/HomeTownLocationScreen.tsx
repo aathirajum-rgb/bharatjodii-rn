@@ -12,7 +12,7 @@ import { Image } from 'expo-image'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
 import {
-  callRegistrationAPI,
+  callPartialRegistrationAPI,
   fetchCities,
   fetchStates,
   getRegValues,
@@ -118,8 +118,8 @@ export default function HomeTownLocationScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       await setRegValues({ HOMESTATE: selectedHomeState.key, HOMECITY: selectedHomeCity.key })
-      await callRegistrationAPI({ HOMESTATE: selectedHomeState.key, HOMECITY: selectedHomeCity.key })
       navigation.push('onboarding', { pageNo: '10' })
+      callPartialRegistrationAPI()
     } catch {
       // allow retry
     } finally {

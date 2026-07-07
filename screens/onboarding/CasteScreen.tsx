@@ -14,7 +14,7 @@ import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import RegistrationSuccessSheet from '../../components/registration-success-sheet/RegistrationSuccessSheet'
 import {
-  callRegistrationAPI,
+  callPartialRegistrationAPI,
   fetchCasteOptions,
   fetchSubcasteOptions,
   getNextPageAfterCaste,
@@ -187,8 +187,8 @@ export default function CasteScreen({ navigation }: Props) {
         // else: API cancelled or error — stay on screen so user can retry
       } else {
         // Gothra step follows — just save partial data and proceed
-        await callRegistrationAPI({ CASTE: selectedCaste.key })
         navigation.push('onboarding', { pageNo: nextPage })
+        callPartialRegistrationAPI()
       }
     } catch {
       // Allow retry

@@ -15,7 +15,7 @@ import SearchablePicker from '../../components/searchable-picker/SearchablePicke
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
-  callRegistrationAPI,
+  callPartialRegistrationAPI,
   fetchCities,
   fetchStates,
   getNextPageAfterLocation,
@@ -174,13 +174,9 @@ export default function LocationScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       await setRegValues({ STATE: selectedState.key, CITY: selectedCity.key, COUNTRY: INDIA_COUNTRY })
-      await callRegistrationAPI({
-        STATE:   selectedState.key,
-        CITY:    selectedCity.key,
-        COUNTRY: INDIA_COUNTRY,
-      })
       const nextPage = await getNextPageAfterLocation()
       navigation.push('onboarding', { pageNo: nextPage })
+      callPartialRegistrationAPI()
     } catch {
       // Allow retry
     } finally {

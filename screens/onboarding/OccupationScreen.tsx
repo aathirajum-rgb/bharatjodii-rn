@@ -12,7 +12,7 @@ import { Image } from 'expo-image'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
 import {
-  callRegistrationAPI,
+  callPartialRegistrationAPI,
   fetchOccupationOptions,
   getRegValues,
   setRegValue,
@@ -84,8 +84,8 @@ export default function OccupationScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       await setRegValue('OCCUPATION', selected.key)
-      await callRegistrationAPI({ OCCUPATION: selected.key })
       navigation.push('onboarding', { pageNo: nextPage })
+      callPartialRegistrationAPI()
     } catch {
       // Allow retry
     } finally {

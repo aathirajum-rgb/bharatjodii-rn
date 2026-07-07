@@ -12,7 +12,7 @@ import { Image } from 'expo-image'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
 import {
-  callRegistrationAPI,
+  callPartialRegistrationAPI,
   fetchReligionOptions,
   getRegValues,
   prefetchCasteForReligion,
@@ -79,8 +79,8 @@ export default function ReligionScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       await setRegValue('RELIGION', selected.key)
-      await callRegistrationAPI({ RELIGION: selected.key })
       navigation.push('onboarding', { pageNo: '14' })
+      callPartialRegistrationAPI()
     } catch {
       // Allow retry
     } finally {

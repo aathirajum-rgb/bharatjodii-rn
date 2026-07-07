@@ -12,7 +12,7 @@ import { Image } from 'expo-image'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { Colors } from '../../constants/colors'
 import {
-  callRegistrationAPI,
+  callPartialRegistrationAPI,
   fetchMaritalStatusOptions,
   getRegValues,
   setRegValue,
@@ -87,8 +87,8 @@ export default function MaritalStatusScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       await setRegValue('MARITALSTATUS', selected)
-      await callRegistrationAPI({ MARITALSTATUS: selected })
       navigation.push('onboarding', { pageNo: '5' })
+      callPartialRegistrationAPI()
     } catch {
       // Allow retry
     } finally {

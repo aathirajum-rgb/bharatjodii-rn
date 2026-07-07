@@ -16,11 +16,10 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppHeader from '../../components/app-header/AppHeader'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import { callRegistrationAPI, getRegValue, setRegValue, setRegValues } from '../../service/registrationService'
+import { callPartialRegistrationAPI, getRegValue, setRegValue, setRegValues } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
@@ -30,7 +29,6 @@ import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'son-birth-date.svg'
-const FOOTER_H      = 140
 const ITEM_H        = 40   // Figma: each dropdown row is 40px tall
 const MAX_LIST_ITEMS = 7   // how many rows visible before scroll
 
@@ -207,8 +205,8 @@ export default function DOBScreen({ navigation }: Props) {
     try {
       const dob = `${selYear}-${selMonth.padStart(2, '0')}-${selDate.padStart(2, '0')}`
       await setRegValues({ DATEOFBIRTH: dob, MONTH: selMonth, DATE: selDate, YEAR: selYear })
-      await callRegistrationAPI({ DATE: selDate, MONTH: selMonth, YEAR: selYear })
       navigation.push('onboarding', { pageNo: '43' })
+      callPartialRegistrationAPI()
     } catch {
       // Allow retry
     } finally {
@@ -229,8 +227,8 @@ export default function DOBScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       await setRegValue('AGE', age)
-      await callRegistrationAPI({ AGE: age })
       navigation.push('onboarding', { pageNo: '43' })
+      callPartialRegistrationAPI()
     } catch {
       // Allow retry
     } finally {
@@ -258,7 +256,7 @@ export default function DOBScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={os.screen}>
+    <View style={os.flex1}>
       <ScrollView
         style={os.flex1}
         contentContainerStyle={os.scrollContent}

@@ -12,7 +12,7 @@ import { Image } from 'expo-image'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
-  callRegistrationAPI,
+  callPartialRegistrationAPI,
   fetchMonthlyIncomeOptions,
   fetchNriIncomeData,
   getRegValues,
@@ -141,8 +141,8 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       await setRegValues({ INCOME: selected, INCOMETYPE: selectedCurrency })
-      await callRegistrationAPI({ INCOME: selected, INCOMETYPE: selectedCurrency })
       navigation.push('onboarding', { pageNo: nextPage })
+      callPartialRegistrationAPI()
     } catch {
       // Allow retry
     } finally {

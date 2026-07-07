@@ -16,9 +16,9 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppHeader from '../../components/app-header/AppHeader'
-import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { os } from './onboardingStyles'
 import { Endpoints } from '../../service/api.endpoints'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { StorageKeys as SK } from '../../constants/storage.keys'
@@ -52,6 +52,12 @@ type Props = {
 
 export default function ManagePhotosScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
+
+  useOnboardingFooter({
+    nextLabel:    'Continue',
+    nextDisabled: false,
+    onNext:       () => navigation.push('onboarding', { pageNo: '27' }),
+  }, [navigation])
 
   const [photos,      setPhotos]      = useState<Photo[]>([])
   const [loading,     setLoading]     = useState(true)
@@ -217,20 +223,10 @@ export default function ManagePhotosScreen({ navigation }: Props) {
   // ─── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <View style={styles.screen}>
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation.canGoBack()}
-        onBackPress={() => navigation.goBack()}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-      />
-
+    <View style={os.flex1}>
       <ScrollView
-        style={styles.flex1}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: (Platform.OS === 'ios' ? insets.bottom : 20) + 104 },
-        ]}
+        style={os.flex1}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.title}>Your photos</Text>
@@ -308,22 +304,6 @@ export default function ManagePhotosScreen({ navigation }: Props) {
         <Text style={styles.hint}>Long-press a photo to set as main or delete</Text>
       </ScrollView>
 
-      {/* Footer */}
-      <View
-        style={[
-          styles.footer,
-          { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
-        ]}
-      >
-        <ButtonRevamp
-          label="Continue"
-          variant="primary"
-          size="standard"
-          fullWidth
-          onPress={() => navigation.push('onboarding', { pageNo: '27' })}
-        />
-      </View>
-
       {/* Photo action sheet */}
       <Modal
         transparent
@@ -371,9 +351,6 @@ export default function ManagePhotosScreen({ navigation }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  screen:        { flex: 1, backgroundColor: Colors.background },
-  flex1:         { flex: 1 },
-
   scrollContent: {
     paddingHorizontal: H_PAD,
     paddingTop:        16,
@@ -490,19 +467,6 @@ const styles = StyleSheet.create({
     color:      Colors.textSecondary,
     textAlign:  'center',
     marginTop:  16,
-  },
-
-  // Footer
-  footer: {
-    position:          'absolute',
-    bottom:            0,
-    left:              0,
-    right:             0,
-    paddingHorizontal: 24,
-    paddingTop:        12,
-    backgroundColor:   Colors.surface,
-    borderTopWidth:    1,
-    borderTopColor:    Colors.divider,
   },
 
   // Action sheet

@@ -13,7 +13,7 @@ import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { Colors } from '../../constants/colors'
 import {
   GenderOption,
-  callRegistrationAPI,
+  callPartialRegistrationAPI,
   fetchGenderOptions,
   getRegValues,
   setRegValues,
@@ -87,8 +87,8 @@ export default function GenderScreen({ navigation }: Props) {
     try {
       const lg = LOGIN_GENDER[selected] ?? 'M'
       await setRegValues({ GENDER: selected, LOGINGENDER: lg })
-      await callRegistrationAPI({ GENDER: selected })
       navigation.push('onboarding', { pageNo: '4' })
+      callPartialRegistrationAPI()
     } catch {
       setError(t('GENERAL.NOINTERNET', 'No internet connection'))
     } finally {

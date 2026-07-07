@@ -19,6 +19,7 @@ import { useOTAUpdate } from './hooks/useOTAUpdate'
 import RootNavigation from './navigation/RootNavigation'
 import { setupNotificationHandlers } from './service/notificationService'
 import { getItem, setItem } from './service/storageService'
+import { loadLangFonts } from './constants/fonts'
 
 // Keep native splash visible until SplashAnimationScreen mounts and calls hideAsync()
 SplashScreen.preventAutoHideAsync()
@@ -42,6 +43,7 @@ async function initializeAppConfig(): Promise<void> {
     await setItem(StorageKeys.Auth.LANG, lang)
   }
   await i18n.changeLanguage(lang)
+  await loadLangFonts(lang)
 }
 
 export default function App() {

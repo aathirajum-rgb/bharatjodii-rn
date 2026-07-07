@@ -15,8 +15,8 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppHeader from '../../components/app-header/AppHeader'
 import { Colors } from '../../constants/colors'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { Endpoints } from '../../service/api.endpoints'
 import { uploadFile } from '../../service/apiClient'
@@ -173,27 +173,21 @@ export default function AddPhotoScreen({ navigation }: Props) {
     }
   }
 
-  function goNext() {
-    openSkipSheet()
-  }
+  useOnboardingFooter({
+    nextHidden: true,
+    showSkip:   true,
+    skipLabel:  "I'll do this later",
+    onNext:     () => {},
+    onSkip:     openSkipSheet,
+  }, [])
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={os.screen}>
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation.canGoBack()}
-        onBackPress={() => navigation.goBack()}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-      />
-
+    <View style={os.flex1}>
       <ScrollView
         style={os.flex1}
-        contentContainerStyle={[
-          styles.scrollContent,
-          { paddingBottom: (Platform.OS === 'ios' ? insets.bottom : 20) + 80 },
-        ]}
+        contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="never"
       >
@@ -253,19 +247,6 @@ export default function AddPhotoScreen({ navigation }: Props) {
           </Pressable>
         </View>
       </ScrollView>
-
-      {/* Skip */}
-      <Pressable
-        style={[
-          styles.skipRow,
-          { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 12 : 24 },
-        ]}
-        onPress={goNext}
-        accessibilityRole="button"
-      >
-        <Text style={styles.skipText}>I'll do this later</Text>
-        <Text style={styles.skipArrow}> ›</Text>
-      </Pressable>
 
       {/* Skip-confirm bottom sheet */}
       <Modal
@@ -491,21 +472,4 @@ const styles = StyleSheet.create({
     color:      Colors.white,
   },
 
-  // Skip
-  skipRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    paddingTop:     16,
-    backgroundColor: Colors.surface,
-  },
-  skipText: {
-    fontSize:   14,
-    fontWeight: '500',
-    color:      Colors.textPrimary,
-  },
-  skipArrow: {
-    fontSize:   18,
-    color:      Colors.textPrimary,
-  },
 })
