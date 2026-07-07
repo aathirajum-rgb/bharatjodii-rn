@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { SvgUri } from 'react-native-svg'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 
@@ -27,7 +27,7 @@ export default function ProfileHeader({
         <Text style={s.title}>{title}</Text>
         {onSettingsPress && (
           <Pressable style={s.iconBtn} onPress={onSettingsPress} hitSlop={8}>
-            <SvgUri
+            <CdnSvg
               uri={CDN + 'revamp/settings-icon.svg'}
               width={24}
               height={24}

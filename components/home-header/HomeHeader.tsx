@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { SvgUri } from 'react-native-svg'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import MenuIcon from '../../assets/icons/MenuIcon'
 import NotificationIcon from '../../assets/icons/NotificationIcon'
 import SearchIcon from '../../assets/icons/SearchIcon'
@@ -71,9 +71,9 @@ export default function HomeHeader({
         <View style={s.flex1} />
 
         <Pressable style={s.langBtn} onPress={onLanguagePress}>
-          <SvgUri uri={ICONS.lang} width={20} height={20} />
+          <CdnSvg uri={ICONS.lang} width={20} height={20} />
           <Text style={s.langText}>{resolvedLangLabel}</Text>
-          <SvgUri uri={ICONS.chevDown} width={12} height={12} />
+          <CdnSvg uri={ICONS.chevDown} width={12} height={12} />
         </Pressable>
 
         {homeToolBar?.filter(t => t.toolType !== 'menu').map(item => (
@@ -86,7 +86,7 @@ export default function HomeHeader({
               ? <NotificationIcon size={18} color={Colors.textPrimary} />
               : item.toolType === 'chat'
               ? <SearchIcon size={18} color={Colors.textPrimary} />
-              : <SvgUri uri={item.toolImg} width={19} height={19} />
+              : <CdnSvg uri={item.toolImg} width={19} height={19} />
             }
             {!!(item.showNotification && item.notifyCount && item.notifyCount !== '0') && (
               <View style={s.badgeWrap}>
@@ -100,7 +100,7 @@ export default function HomeHeader({
       {/* ── Row 2: User bar — avatar + completion % | name + edit profile ── */}
       <View style={s.userBar}>
         <Pressable style={s.avatarWrap} onPress={onAvatarPress}>
-          <SvgUri
+          <CdnSvg
             uri={userImg ?? CDN + 'revamp/default-avatar.svg'}
             width={48}
             height={48}
@@ -117,7 +117,7 @@ export default function HomeHeader({
           <Text style={s.userName} numberOfLines={1}>{userName ?? ''}</Text>
           <View style={s.editRow}>
             <Text style={s.editLabel}>Edit profile</Text>
-            <SvgUri uri={ICONS.fwdLink} width={12} height={12} />
+            <CdnSvg uri={ICONS.fwdLink} width={12} height={12} />
           </View>
         </Pressable>
       </View>

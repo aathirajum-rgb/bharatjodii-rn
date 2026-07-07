@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from 'react-native'
-import { SvgUri } from 'react-native-svg'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import ProfilePhoto, { type PhotoVariant } from '../profile-photo/ProfilePhoto'
@@ -263,7 +263,7 @@ export default function ProfileCard({
         <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]} onPress={onPress}>
           <ProfilePhoto {...photoProps} height={photoH} variant="viewedyou">
             <View style={styles.viewedOverlay}>
-              <SvgUri
+              <CdnSvg
                 uri={IMG_CDN + 'viewed-icon-white.svg'}
                 width={14}
                 height={14}
@@ -359,7 +359,7 @@ export default function ProfileCard({
           <ProfilePhoto {...photoProps} height={photoH}>
             {isNewLabel && !!labelContent && (
               <View style={styles.eyeBadge}>
-                <SvgUri
+                <CdnSvg
                   uri={IMG_CDN + 'revamp/eye-pink.svg'}
                   width={14}
                   height={14}

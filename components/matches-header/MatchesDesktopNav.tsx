@@ -3,7 +3,7 @@
 // same FooterTab navigation targets as AppFooter so MatchesScreen's existing
 // handleTabPress works unchanged for both layouts.
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { SvgUri } from 'react-native-svg'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import { TAB_ICONS, type FooterTab } from '../app-footer/AppFooter'
 import { LANG_LABELS } from './MatchesHeader'
 import { Colors } from '../../constants/colors'
@@ -40,7 +40,7 @@ export default function MatchesDesktopNav({
           const [inactiveIcon, activeIcon] = TAB_ICONS[item.tab]
           return (
             <Pressable key={item.tab} style={s.link} onPress={() => onTabPress(item.tab)}>
-              <SvgUri uri={isActive ? activeIcon : inactiveIcon} width={18} height={18} />
+              <CdnSvg uri={isActive ? activeIcon : inactiveIcon} width={18} height={18} />
               <Text style={[s.linkText, isActive && s.linkTextActive]}>{item.label}</Text>
             </Pressable>
           )

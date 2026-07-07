@@ -3,8 +3,9 @@
 // (screens/matches/MatchesScreen.tsx) so MatchesDesktopLayout can pass the
 // exact same profile/handlers with zero adaptation.
 import { useTranslation } from 'react-i18next'
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
-import { SvgUri } from 'react-native-svg'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Image } from 'expo-image'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import {
   WhatsAppIcon, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   buildBasicView, showLikeCTA, showAfterLikeCTA,
@@ -35,10 +36,17 @@ export default function MatchCardDesktop({
       {/* ── Photo (left) ──────────────────────────────────────────────────── */}
       <Pressable style={c.photoBox} onPress={onPress}>
         {profile.isPhotoAvailable && !profile.isPhotoProtect && profile.profileImg ? (
-          <Image source={{ uri: profile.profileImg }} style={c.photo} resizeMode="cover" />
+          <Image
+            source={{ uri: profile.profileImg }}
+            style={c.photo}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            recyclingKey={profile.profileId}
+            transition={150}
+          />
         ) : (
           <>
-            <SvgUri
+            <CdnSvg
               uri={getBlurPhotoUri(oppGender)}
               width="100%" height="100%"
               style={StyleSheet.absoluteFill}
@@ -59,7 +67,7 @@ export default function MatchCardDesktop({
 
         {profile.isNewlyJoined && (
           <View style={c.newBadge} pointerEvents="none">
-            <SvgUri uri={NEWLY_JOINED_STAR_URI} width={12} height={12} />
+            <CdnSvg uri={NEWLY_JOINED_STAR_URI} width={12} height={12} />
             <Text style={c.newBadgeText}>{t('MATCHES.NEW')}</Text>
           </View>
         )}
@@ -70,10 +78,10 @@ export default function MatchCardDesktop({
         <View style={c.badgeRow}>
           <View style={c.badges}>
             {profile.isPaidMember && (
-              <SvgUri uri={PAID_TAG_URI} width={72} height={20} />
+              <CdnSvg uri={PAID_TAG_URI} width={72} height={20} />
             )}
             {profile.isIdVerified && (
-              <SvgUri uri={VERIFIED_TAG_URI} width={90} height={20} />
+              <CdnSvg uri={VERIFIED_TAG_URI} width={90} height={20} />
             )}
           </View>
           <View style={c.contactIcons}>

@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { SvgUri } from 'react-native-svg'
+import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import AppHeader from '../../components/app-header/AppHeader'
 import OTPSuccessSheet from '../../components/bottom-sheet/OTPSuccessSheet'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
@@ -230,7 +230,7 @@ export default function OTPScreen({ navigation, route }: Props) {
           showsVerticalScrollIndicator={false}
         >
           {/* OTP illustration — CDN SVG (Angular: otpPage.ICONTYPE) */}
-          <SvgUri
+          <CdnSvg
             uri={CDN + 'otp.svg'}
             width={48}
             height={48}
@@ -249,7 +249,7 @@ export default function OTPScreen({ navigation, route }: Props) {
             <View style={styles.phoneRow}>
               <Text style={styles.phoneNumber}>{mobile}</Text>
               <Pressable style={styles.editBtn} onPress={handleEdit} hitSlop={8}>
-                <SvgUri
+                <CdnSvg
                   uri={CDN + 'edit-pencil.svg'}
                   width={14}
                   height={14}

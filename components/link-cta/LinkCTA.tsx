@@ -1,5 +1,5 @@
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
-import { SvgUri } from 'react-native-svg'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 
@@ -32,7 +32,7 @@ export default function LinkCTA({ text, contact, onPress, style }: LinkCTAProps)
         onPress={onPress}
         hitSlop={8}
       >
-        <SvgUri uri={CALL_ICON} width={18} height={18} style={styles.callIcon} />
+        <CdnSvg uri={CALL_ICON} width={18} height={18} style={styles.callIcon} />
         <Text style={styles.contactText}>{contact}</Text>
       </Pressable>
     </View>

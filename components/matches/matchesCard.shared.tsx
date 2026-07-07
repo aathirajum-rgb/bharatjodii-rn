@@ -8,9 +8,15 @@
 // Call/WhatsApp = SvgUri (always calls the server, no caching), the rest = SvgXml
 // (bundled strings).
 
-import { Text } from 'react-native'
-import { SvgUri, SvgXml } from 'react-native-svg'
+import { useRef, useState, type ReactNode } from 'react'
+import {
+  FlatList, Pressable, StyleSheet, Text, View, type ViewToken,
+} from 'react-native'
+import { Image } from 'expo-image'
+import { SvgXml } from 'react-native-svg'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import { CDN_SVG } from '../../constants/cdn'
+import { Colors } from '../../constants/colors'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 
 // ─── Shared card badge/photo CDN URLs ──────────────────────────────────────────
@@ -51,11 +57,11 @@ const XML_LIKE = `<svg width="18" height="19" viewBox="0 0 18 19" fill="none" xm
 export type IconProps = { width?: number; height?: number }
 
 export function WhatsAppIcon({ width = 27, height = 27 }: IconProps) {
-  return <SvgUri uri={CDN + 'whatsapp-revamp.svg'} width={width} height={height} />
+  return <CdnSvg uri={CDN + 'whatsapp-revamp.svg'} width={width} height={height} />
 }
 
 export function CallIcon({ width = 24, height = 25 }: IconProps) {
-  return <SvgUri uri={CDN + 'revamp/call-revamp.svg'} width={width} height={height} />
+  return <CdnSvg uri={CDN + 'revamp/call-revamp.svg'} width={width} height={height} />
 }
 
 export function CloseIcon({ width = 25, height = 24 }: IconProps) {
@@ -130,5 +136,154 @@ export function showLikeCTA(status: MatchProfile['likedStatus']): boolean {
 
 // Angular: FUNC.showAfterLikeContent(likedStatus) — show Send Interest / chat CTA after like
 export function showAfterLikeCTA(status: MatchProfile['likedStatus']): boolean {
-  return status === '1' || status === '2'
+  return status === '1' || status === '2' || status === '3'
 }
+
+// ─── After-like CTA state (#22-24) ──────────────────────────────────────────────
+// Angular: core/functions/common-funtions.ts getButtonInfo()/getContentAfterLike()/
+// showIndirectContact(). The underlying click-time logic (paywall/free-contact
+// resolution) already lives in service/communicationService.ts — these helpers only
+// decide what the card *displays* before the tap; both CTA states below still call
+// the same existing onCall handler.
+
+export interface AfterLikeCtx {
+  entryType:          string                       // logged-in user's own ENTRYTYPE ('P'=paid, 'F'=free, ...)
+  likedStatus:        MatchProfile['likedStatus']
+  phoneViewed:        string                        // raw '0'|'1'|'2'|'3'
+  femaleFreeEligible: boolean
+  indNumbersLeft:     string
+}
+
+function isPhoneAlreadyViewedFree(phoneViewed: string): boolean {
+  return phoneViewed === '1' || phoneViewed === '3'
+}
+
+function showIndirectContact(ctx: AfterLikeCtx): boolean {
+  return ctx.entryType === 'P'
+    && (ctx.likedStatus === '2' || ctx.phoneViewed === '2')
+    && !isPhoneAlreadyViewedFree(ctx.phoneViewed)
+}
+
+function isCallNowState(ctx: AfterLikeCtx): boolean {
+  return ctx.entryType === 'P' || isPhoneAlreadyViewedFree(ctx.phoneViewed) || ctx.femaleFreeEligible
+}
+
+export function getAfterLikeCtaLabel(ctx: AfterLikeCtx, t: (key: string) => string): string {
+  return isCallNowState(ctx) ? t('HOME.CALL_NOW') : t('GENERAL.PAY_NOW')
+}
+
+// Angular: common-funtions.ts getButtonInfo() — iconType = callIconWhite (Call Now)
+// or paidMembership (Pay Now), rendered before the label via ion-icon slot="start".
+export function getAfterLikeCtaIcon(ctx: AfterLikeCtx): string {
+  return isCallNowState(ctx)
+    ? CDN + 'revamp/call-icon-white.svg'
+    : CDN + 'get-paid-membership.svg'
+}
+
+export function getAfterLikeContentText(ctx: AfterLikeCtx, t: (key: string) => string): string {
+  if (showIndirectContact(ctx)) return t('MATCHES.TALK_TEXT')
+  if (ctx.entryType === 'P' || isPhoneAlreadyViewedFree(ctx.phoneViewed)) return t('MATCHES.TALK_TEXT_1')
+  return t('GENERAL.CONTACT')
+}
+
+export function showContactsLeftBanner(ctx: AfterLikeCtx): boolean {
+  return showIndirectContact(ctx) && ctx.indNumbersLeft !== '0' && !isPhoneAlreadyViewedFree(ctx.phoneViewed)
+}
+
+export function showFreeBadge(ctx: AfterLikeCtx): boolean {
+  return showAfterLikeCTA(ctx.likedStatus) && ctx.femaleFreeEligible && ctx.entryType === 'F'
+}
+
+// ─── Photo swiper with dots ────────────────────────────────────────────────────
+// Angular: matches-card.component's Swiper (photosSwiperOpt: dynamicBullets pagination).
+// Shared by the mobile MatchCard (MatchesScreen.tsx) and components/matches-card/MatchesCard.tsx.
+// `renderLockSlide`, when it returns non-null for a given index, replaces that slide entirely
+// (Angular's female-free-photo-restrict lock card is a full slide substitution, not an overlay).
+
+export interface PhotoSwiperProps {
+  images:           string[]
+  width:            number
+  height:           number
+  onPress?:         (() => void) | undefined
+  renderLockSlide?: ((index: number) => ReactNode) | undefined
+}
+
+export function PhotoSwiper({ images, width, height, onPress, renderLockSlide }: PhotoSwiperProps) {
+  const [activeIndex, setActiveIndex] = useState(0)
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
+    if (viewableItems[0] != null) setActiveIndex(viewableItems[0].index ?? 0)
+  }).current
+
+  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current
+
+  return (
+    <View>
+      <FlatList
+        data={images}
+        keyExtractor={(_, i) => String(i)}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
+        renderItem={({ item, index }) => {
+          const lockSlide = renderLockSlide?.(index)
+          if (lockSlide) {
+            return <View style={{ width, height }}>{lockSlide}</View>
+          }
+          return (
+            <Pressable style={{ width, height }} onPress={onPress}>
+              <Image
+                source={{ uri: item }}
+                style={swiperStyles.image}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                recyclingKey={item}
+                transition={150}
+              />
+            </Pressable>
+          )
+        }}
+      />
+
+      {images.length > 1 && (
+        <View style={swiperStyles.dotsRow}>
+          {images.map((_, i) => (
+            <View
+              key={i}
+              style={[swiperStyles.dot, i === activeIndex ? swiperStyles.dotActive : swiperStyles.dotInactive]}
+            />
+          ))}
+        </View>
+      )}
+    </View>
+  )
+}
+
+const swiperStyles = StyleSheet.create({
+  image: {
+    width:  '100%',
+    height: '100%',
+  },
+  dotsRow: {
+    flexDirection:  'row',
+    justifyContent: 'center',
+    alignItems:     'center',
+    marginTop:      8,
+    gap:            4,
+  },
+  dot: {
+    borderRadius: 4,
+    height:       6,
+  },
+  dotActive: {
+    width:           18,
+    backgroundColor: Colors.primary,
+  },
+  dotInactive: {
+    width:           6,
+    backgroundColor: Colors.inputBorder,
+  },
+})

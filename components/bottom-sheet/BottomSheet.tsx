@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Animated,
   Dimensions,
-  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -12,6 +11,7 @@ import {
   type ViewStyle,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
 
@@ -44,6 +44,8 @@ export type BottomSheetType =
   | 'profileRegisterTips'
   | 'successPopup'
   | 'blockProfile'
+  | 'enableNotification'
+  | 'addPhotoPrompt'
 
 // Structured data the sheet renders. Maps to Angular's `componentData` object.
 export interface BottomSheetData {
@@ -166,10 +168,9 @@ export default function BottomSheet({
           style,
         ]}
       >
-        {/* Drag handle */}
-        <View style={styles.handle} />
-
-        {/* Close button */}
+        {/* Close button — Angular: bottomsheet-cross floats ABOVE the sheet
+            (top:-48px, centered), not inside it — no drag handle exists anywhere
+            in Angular's bottom-sheet component, so this port has none either. */}
         {showClose && (
           <Pressable style={styles.closeBtn} onPress={onClose} hitSlop={10}>
             <View style={styles.closeCircle}>
@@ -178,12 +179,16 @@ export default function BottomSheet({
           </Pressable>
         )}
 
-        {/* Top image */}
+        {/* Top image — CdnSvg so CDN-hosted SVG icons (e.g. the "add your photo"
+            alert icon) render correctly on native, not just web. Angular sets no
+            explicit size on this image (it's the source asset's natural size) —
+            64x64 here is a reasonable fixed stand-in. */}
         {hasImage && (
-          <Image
-            source={{ uri: data!.image }}
+          <CdnSvg
+            uri={data!.image!}
+            width={64}
+            height={64}
             style={styles.sheetImage}
-            resizeMode="contain"
           />
         )}
 
@@ -211,13 +216,14 @@ export default function BottomSheet({
           </View>
         )}
 
-        {/* Primary (stacked) */}
+        {/* Primary (stacked) — Angular: .primary-cta-jodii uses #B50033, a darker
+            red than the app's general Colors.primary (#C62828) used elsewhere */}
         {hasPrimary && !sideBySide && (
           <ButtonRevamp
             label={data!.ctaLabel!}
             variant="primary"
             fullWidth
-            style={styles.primaryBtn}
+            style={[styles.primaryBtn, { backgroundColor: Colors.primaryDark }]}
             onPress={onPrimaryPress}
           />
         )}
@@ -249,36 +255,35 @@ export default function BottomSheet({
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
+// Numeric values sourced from Angular's bottom-sheet.component.scss / global.scss
+// (the shared block used by photoPopUp, profileValidation, likePromotion, etc.):
+// card radius 16px (top only), side padding 24px, icon→title/title→CTA gap 16px,
+// title 18px Poppins-Semibold #1f1e1b, CTA #B50033 bg / 8px radius / 44px height.
 const styles = StyleSheet.create({
   sheet: {
     position:             'absolute',
     bottom:               0,
     left:                 0,
     right:                0,
-    backgroundColor:      Colors.surface,
-    borderTopLeftRadius:  20,
-    borderTopRightRadius: 20,
-    paddingHorizontal:    20,
-    paddingTop:           12,
+    maxHeight:            '95%',
+    backgroundColor:      Colors.white,
+    borderTopLeftRadius:  16,
+    borderTopRightRadius: 16,
+    paddingHorizontal:    24,
+    paddingTop:           24,
     shadowColor:          Colors.shadow,
     shadowOpacity:        0.15,
     shadowRadius:         16,
     shadowOffset:         { width: 0, height: -4 },
     elevation:            16,
   },
-  handle: {
-    width:           40,
-    height:          4,
-    backgroundColor: Colors.border,
-    borderRadius:    2,
-    alignSelf:       'center',
-    marginBottom:    16,
-  },
   closeBtn: {
-    position: 'absolute',
-    top:      16,
-    right:    16,
-    zIndex:   10,
+    position:  'absolute',
+    top:       -48,
+    left:      0,
+    right:     0,
+    alignItems: 'center',
+    zIndex:    10,
   },
   closeCircle: {
     width:           28,
@@ -294,26 +299,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   sheetImage: {
-    width:        '100%',
-    height:       160,
+    alignSelf:    'center',
     marginBottom: 16,
   },
   title: {
+    fontFamily:   'Poppins-SemiBold',
     fontSize:     18,
-    fontWeight:   '700',
-    color:        Colors.textPrimary,
+    color:        '#1f1e1b',
     textAlign:    'center',
     marginBottom: 8,
   },
   content: {
+    fontFamily:   'Poppins-Regular',
     fontSize:     14,
-    color:        Colors.textSecondary,
+    color:        '#1f1e1b',
     textAlign:    'center',
     lineHeight:   20,
     marginBottom: 20,
   },
   primaryBtn: {
-    marginTop:    4,
+    marginTop:    16,
     marginBottom: 8,
   },
   secondaryBtn: {

@@ -10,6 +10,7 @@ export interface MatchProfile {
   income?:          string
   caste?:           string
   profileImg?:      string
+  photos:           string[]                     // full photo array — [] when none, [x] for single photo
   isPaidMember:     boolean
   isIdVerified:     boolean
   isPhotoAvailable: boolean                      // PHOTOSTATUS=1
@@ -19,6 +20,7 @@ export interface MatchProfile {
   isNewLabel:       boolean                      // activity label row visible
   labelContent:     string                       // "Viewed on 15 Jan" / "Shortlisted on …"
   likedDateText?:   string                       // "You liked this profile on 16-Jan-2026"
+  phoneViewed:      string                       // raw '0'|'1'|'2'|'3' — drives after-like CTA label
 }
 
 // STATUS=599 banner items injected by the API (e.g. membership upsell)

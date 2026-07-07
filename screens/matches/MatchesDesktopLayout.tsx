@@ -102,6 +102,10 @@ export default function MatchesDesktopLayout({
               )}
               onEndReached={onLoadMore}
               onEndReachedThreshold={0.5}
+              initialNumToRender={6}
+              maxToRenderPerBatch={6}
+              windowSize={7}
+              updateCellsBatchingPeriod={50}
               ListFooterComponent={
                 loadingMore ? <ActivityIndicator size="small" color={Colors.primary} style={s.footerLoader} /> : null
               }

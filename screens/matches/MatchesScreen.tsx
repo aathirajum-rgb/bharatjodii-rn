@@ -2,7 +2,7 @@
 // Landing page for existing users after login (WEBVIEWURL page_id = 60)
 // Card layout mirrors matches-card.component.html exactly.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
@@ -13,18 +13,22 @@ import {
   Image,
   Linking,
   ListRenderItem,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native'
-import { SvgUri } from 'react-native-svg'
+import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import MatchesHeader from '../../components/matches-header/MatchesHeader'
 import {
   WhatsAppIcon, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   HtmlText, buildBasicView, showLikeCTA, showAfterLikeCTA,
   getBlurPhotoUri, NEWLY_JOINED_STAR_URI, PAID_TAG_URI, VERIFIED_TAG_URI,
+  PhotoSwiper,
+  getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showContactsLeftBanner, showFreeBadge,
+  type AfterLikeCtx,
 } from '../../components/matches/matchesCard.shared'
 import MatchesDesktopLayout from './MatchesDesktopLayout'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
@@ -35,16 +39,32 @@ import type { MatchProfile, BannerItem, MatchListItem } from '../../types/interf
 import {
   fetchMatches,
   fetchExtendedMatchesCount,
+  fetchExtendedMatches,
   fetchAndStorePPSetData,
   fetchMenuPromo,
+  fetchNotifCount,
   refreshSession,
 } from '../../service/homeService'
 import {
   communicationBtnOnClick,
 } from '../../service/communicationService'
-import { getItem } from '../../service/storageService'
+import { fetchBulkLikeMatches } from '../../service/profileService'
+import { getHeroBannerDetails } from '../../service/paymentService'
+import { shouldShowRatingPopup, markRatingPopupShown } from '../../service/appRatingService'
+import { requestPushNotificationPermission } from '../../service/permissionService'
+import { fetchSurveyPopup, type SurveyPopupData } from '../../service/surveyService'
+import { subscribeIdVerified } from '../../service/eventBus'
+import { getItem, setItem, getJson } from '../../service/storageService'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
 import { StorageKeys } from '../../constants/storage.keys'
+import Constants from 'expo-constants'
+import GamBanner from '../../components/gam-banner/GamBanner'
+import BulkLikeModal from '../../components/bulk-like/BulkLikeModal'
+import StickyBanner from '../../components/sticky-banner/StickyBanner'
+import AppRatingModal from '../../components/app-rating/AppRatingModal'
+import BottomSheet from '../../components/bottom-sheet/BottomSheet'
+import SurveyPopup from '../../components/survey-popup/SurveyPopup'
+import Toast, { type ToastRequest } from '../../components/toast/Toast'
 
 const CDN = CDN_SVG
 
@@ -81,33 +101,101 @@ function buildMergedList(
 // ─── Match Card ───────────────────────────────────────────────────────────────
 // Mirrors matches-card.component.html structure exactly.
 
-function MatchCard({
-  profile, oppGender, onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp,
+// Wrapped in memo() so unrelated MatchesScreen re-renders (popup timers, sticky
+// countdowns, etc.) don't force every visible card to re-render during scroll —
+// a card only re-renders when its own props actually change.
+const MatchCard = memo(function MatchCard({
+  profile, oppGender, photoLockActive, ownEntryType, femaleFreeEligible, indNumbersLeft,
+  onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp, onAddPhotoPrompt,
 }: {
   profile:    MatchProfile
   oppGender:  'M' | 'F'
+  photoLockActive: boolean
+  ownEntryType:       string
+  femaleFreeEligible: boolean
+  indNumbersLeft:     string
   onPress:    () => void
   onLike:     () => void
   onDontShow: () => void
   onViewLater:() => void
   onCall:     () => void
   onWhatsApp: () => void
+  onAddPhotoPrompt: () => void
 }) {
   const { t } = useTranslation()
+  const hasRealPhoto      = profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0
+  const isHiddenPhoto     = profile.isPhotoAvailable && profile.isPhotoProtect
+  // Angular: photo-new.component.ts getHiddenPhotoContent() — once liked/shortlisted,
+  // the "request" is considered sent and only the waiting text remains (no CTA).
+  const hiddenPhotoPending = profile.likedStatus === '1' || profile.likedStatus === '3'
+
+  const ctaCtx: AfterLikeCtx = {
+    entryType:   ownEntryType,
+    likedStatus: profile.likedStatus,
+    phoneViewed: profile.phoneViewed,
+    femaleFreeEligible,
+    indNumbersLeft,
+  }
+
   return (
     <View style={c.card}>
 
       {/* ── Photo section ──────────────────────────────────────────────────── */}
       {/* Angular: app-photo-new — top border radius 16px */}
-      <Pressable style={[c.photoBox, { height: PHOTO_H }]} onPress={onPress}>
-        {profile.isPhotoAvailable && !profile.isPhotoProtect && profile.profileImg ? (
-          // Normal: actual photo
-          <Image source={{ uri: profile.profileImg }} style={c.photo} resizeMode="cover" />
+      <View style={[c.photoBox, { height: PHOTO_H }]}>
+        {hasRealPhoto ? (
+          // Normal: actual photo(s) — swiper when >1, single Pressable image otherwise.
+          // Angular: matches-card.component's Swiper, femaleFreeContactRestrict() lock slide.
+          <PhotoSwiper
+            images={profile.photos}
+            width={SW - 32}
+            height={PHOTO_H}
+            onPress={onPress}
+            renderLockSlide={photoLockActive ? (index) => index !== 0 ? (
+              <Pressable style={c.lockCard} onPress={onAddPhotoPrompt}>
+                <CdnSvg uri={CDN + 'add-photo-lock.svg'} width={48} height={48} />
+                <Text style={c.lockText}>
+                  {t('MATCHES.ADD_PHOTO_TO_VIEW').replace('##HIS_HER##', oppGender === 'F' ? 'her' : 'his')}
+                </Text>
+                <View style={c.lockCta}>
+                  <CdnSvg uri={CDN + 'add-photo-gallery.svg'} width={16} height={16} />
+                  <Text style={c.lockCtaText}>{t('GENERAL.ADD_PHOTO_TXT')}</Text>
+                </View>
+              </Pressable>
+            ) : null : undefined}
+          />
+        ) : isHiddenPhoto ? (
+          // Photo exists but is protected/hidden — distinct from "no photo at all".
+          // Angular: photo-new.component's viewPhotoRequest block, HORO_HIDDEN_LIKE/
+          // HORO_HIDDEN_PHOTO text driven by likedStatus (not a separate request flag).
+          <Pressable style={c.singlePhotoPressable} onPress={onPress}>
+            <CdnSvg
+              uri={getBlurPhotoUri(oppGender)}
+              width="100%" height="100%"
+              style={StyleSheet.absoluteFill}
+            />
+            <View style={c.photoOverlay}>
+              <View style={c.overlayCard}>
+                <Text style={c.overlayText}>
+                  {t(hiddenPhotoPending ? 'VIEWPROFILE.HORO_HIDDEN_PHOTO' : 'VIEWPROFILE.HORO_HIDDEN_LIKE')
+                    .replace(/##HE_SHE##/g, oppGender === 'F' ? 'She' : 'He')
+                    .replace(/##HIS_HER##/g, oppGender === 'F' ? 'her' : 'his')
+                    .replace(/##he_she##/g, oppGender === 'F' ? 'she' : 'he')}
+                </Text>
+                {!hiddenPhotoPending && (
+                  <Pressable style={c.waBtn} onPress={onLike}>
+                    <LikeIcon width={16} height={16} />
+                    <Text style={c.waBtnText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          </Pressable>
         ) : (
-          // No photo or protected: blur placeholder + WhatsApp overlay
+          // No photo at all: blur placeholder + WhatsApp overlay
           // Angular: getWhatsAppAvatarImg() + request-photo-vp overlay
-          <>
-            <SvgUri
+          <Pressable style={c.singlePhotoPressable} onPress={onPress}>
+            <CdnSvg
               uri={getBlurPhotoUri(oppGender)}
               width="100%" height="100%"
               style={StyleSheet.absoluteFill}
@@ -123,27 +211,27 @@ function MatchCard({
                 </Pressable>
               </View>
             </View>
-          </>
+          </Pressable>
         )}
 
         {/* Angular: .newly-joined posabsolute — star SVG + "New" text, top-left of photo */}
         {profile.isNewlyJoined && (
           <View style={c.newBadge} pointerEvents="none">
-            <SvgUri uri={NEWLY_JOINED_STAR_URI} width={14} height={14} />
+            <CdnSvg uri={NEWLY_JOINED_STAR_URI} width={14} height={14} />
             <Text style={c.newBadgeText}>{t('MATCHES.NEW')}</Text>
           </View>
         )}
-      </Pressable>
+      </View>
 
       {/* ── Paid + Verified badges ─────────────────────────────────────────── */}
       {/* Angular: ion-row isProfileBadge — BELOW the photo, not overlaid */}
       {(profile.isPaidMember || profile.isIdVerified) && (
         <View style={c.badges}>
           {profile.isPaidMember && (
-            <SvgUri uri={PAID_TAG_URI} width={80} height={24} />
+            <CdnSvg uri={PAID_TAG_URI} width={80} height={24} />
           )}
           {profile.isIdVerified && (
-            <SvgUri uri={VERIFIED_TAG_URI} width={100} height={24} />
+            <CdnSvg uri={VERIFIED_TAG_URI} width={100} height={24} />
           )}
         </View>
       )}
@@ -152,7 +240,7 @@ function MatchCard({
       {/* Angular: .liked-profile — pink gradient strip below badges */}
       {!!profile.likedDateText && profile.likedStatus === '1' && (
         <View style={c.likedStrip}>
-          <SvgUri uri={CDN + 'liked-new.svg'} width={20} height={20} />
+          <CdnSvg uri={CDN + 'liked-new.svg'} width={20} height={20} />
           <Text style={c.likedText} numberOfLines={1}>{profile.likedDateText}</Text>
         </View>
       )}
@@ -161,7 +249,7 @@ function MatchCard({
       {/* Angular: isActivityLabel — "Viewed on …" / "Shortlisted on …" with icon */}
       {profile.isNewLabel && !!profile.labelContent && (
         <View style={c.activityRow}>
-          <SvgUri uri={CDN + 'revamp/viewed-icon-updated.svg'} width={16} height={16} style={{ marginTop: 2, flexShrink: 0 }} />
+          <CdnSvg uri={CDN + 'revamp/viewed-icon-updated.svg'} width={16} height={16} style={{ marginTop: 2, flexShrink: 0 }} />
           <Text style={c.activityText}>{profile.labelContent}</Text>
         </View>
       )}
@@ -218,20 +306,34 @@ function MatchCard({
       )}
 
       {showAfterLikeCTA(profile.likedStatus) && (
-        // Angular: matches-cta-bg-color (pink gradient bg) + getContentAfterLike() text + "Send interest" CTA
+        // Angular: matches-cta-bg-color (pink gradient bg) + getContentAfterLike() text +
+        // Call Now/Pay Now CTA (#22) + FREE badge (#24) + contacts-left line (#23).
         <View style={c.afterLikeRow}>
           <Text style={c.afterLikeText}>
-            {t('GENERAL.CONTACT')}
+            {getAfterLikeContentText(ctaCtx, t)}
           </Text>
-          <Pressable style={c.ctaSendInterest} onPress={onPress}>
-            <Text style={c.ctaSendInterestText}>{t('GENERAL.SEND_INTEREST_CTA')}</Text>
-          </Pressable>
+          <View style={c.ctaSendInterestWrap}>
+            {showFreeBadge(ctaCtx) && (
+              <View style={c.freeBadge} pointerEvents="none">
+                <Text style={c.freeBadgeText}>{t('GENERAL.FREE')}</Text>
+              </View>
+            )}
+            <Pressable style={c.ctaSendInterest} onPress={onCall}>
+              <View style={c.ctaSendInterestIconBox}>
+                <CdnSvg uri={getAfterLikeCtaIcon(ctaCtx)} width={18} height={18} />
+              </View>
+              <Text style={c.ctaSendInterestText}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
+            </Pressable>
+          </View>
+          {showContactsLeftBanner(ctaCtx) && (
+            <Text style={c.contactsLeftText}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
+          )}
         </View>
       )}
 
     </View>
   )
-}
+})
 
 // Mapping moved to adapters/matches.adapter.ts — use singleton adapter
 
@@ -356,6 +458,122 @@ function MembershipBanner({ data, onPress }: { data: any; onPress: () => void })
   )
 }
 
+// ─── PCS banner (BANNERSLOTs 1011 "add photo" + 1012 "add horoscope") ─────────
+// Angular: breather.component's breatherType==='PCS' — 1011 and 1012 are verified
+// to share this EXACT template (breather.component.ts:57-69/html:1-17), differing
+// only in icon/copy/button-color/background-gradient, not layout. Centered vertical
+// stack: square icon (44.444vmin ≈ 44% of screen width) → 16px gap → centered 18px
+// Poppins-Semibold black title → 24px gap → full-width 44px/8px-radius colored button.
+function PcsBanner({
+  imageUri, title, cta, ctaBg, gradientColors, onPress,
+}: {
+  imageUri:        string
+  title:           string
+  cta:             string
+  ctaBg:           string
+  gradientColors: [string, string]
+  onPress:         () => void
+}) {
+  const { LinearGradient } = require('expo-linear-gradient')
+  const iconSize = Math.round(SW * 0.4444)
+  return (
+    <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={pcs.container}>
+      <View style={{ width: iconSize, height: iconSize }}>
+        <CdnSvg uri={imageUri} width="100%" height="100%" />
+      </View>
+      <Text style={pcs.title}>{title}</Text>
+      <Pressable style={[pcs.cta, { backgroundColor: ctaBg }]} onPress={onPress}>
+        <Text style={pcs.ctaText}>{cta}</Text>
+      </Pressable>
+    </LinearGradient>
+  )
+}
+
+const pcs = StyleSheet.create({
+  container: {
+    alignItems:        'center',
+    paddingHorizontal: 24,
+    paddingTop:         24,
+    paddingBottom:      24,
+  },
+  title: {
+    marginTop:  16,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize:   18,
+    color:      '#000000',
+    textAlign:  'center',
+  },
+  cta: {
+    marginTop:      24,
+    width:          '100%',
+    height:         44,
+    borderRadius:   8,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  ctaText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize:   14,
+    color:      Colors.white,
+  },
+})
+
+// ─── Simple promo banner (1014's static fallback + 1015) ──────────────────────
+// NOTE: research confirms 1014's fallback and 1015 ("PAYMENT" breatherType — ribbon,
+// benefits list, timer chip) each have their OWN distinct Angular layout, neither
+// matching this generic row. This is a known, flagged simplification — not yet
+// redesigned to match Angular exactly the way PcsBanner above now does for 1011/1012.
+
+function SimplePromoBanner({
+  imageUri, title, cta, ctaBg, onPress,
+}: { imageUri?: string | undefined; title: string; cta: string; ctaBg?: string | undefined; onPress: () => void }) {
+  return (
+    <Pressable style={spb.card} onPress={onPress}>
+      {!!imageUri && <Image source={{ uri: imageUri }} style={spb.image} resizeMode="contain" />}
+      <Text style={spb.title} numberOfLines={2}>{title}</Text>
+      <View style={[spb.cta, ctaBg ? { backgroundColor: ctaBg } : null]}>
+        <Text style={spb.ctaText}>{cta}</Text>
+      </View>
+    </Pressable>
+  )
+}
+
+const spb = StyleSheet.create({
+  card: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    backgroundColor:   Colors.surface,
+    borderRadius:      12,
+    marginHorizontal:  16,
+    marginBottom:      16,
+    padding:           12,
+    gap:               12,
+    shadowColor:       Colors.shadow,
+    shadowOpacity:     0.08,
+    shadowRadius:      8,
+    shadowOffset:      { width: 0, height: 2 },
+    elevation:         2,
+  },
+  image: { width: 40, height: 40 },
+  title: {
+    flex:       1,
+    fontFamily: 'Poppins-Medium',
+    fontSize:   13,
+    color:      Colors.textDark,
+  },
+  cta: {
+    backgroundColor:   Colors.primary,
+    borderRadius:      8,
+    paddingVertical:   8,
+    paddingHorizontal: 12,
+  },
+  ctaText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize:   12,
+    color:      Colors.white,
+  },
+})
+
 // ─── Add Photo Banner (BANNERSLOT 1013) ──────────────────────────────────────
 // Angular: app-breather ADDPHOTO type — data from REGISTRATIONARRAYS.PHOTOPUBLISHED.Matches
 // Layout: image left (4/12) + text right (8/12): TITLE + SUBHEADER + BODY.CONTENT1/CONTENT2 + CTA
@@ -430,7 +648,7 @@ function ExtendedMatchesCard({ count, onPress }: { count: number; onPress: () =>
       <View style={e.avatarRow}>
         {[0, 1, 2].map(i => (
           <View key={i} style={[e.avatarCircle, { marginLeft: i === 0 ? 0 : -12 }]}>
-            <SvgUri uri={FEMALE_AVATAR} width={52} height={52} />
+            <CdnSvg uri={FEMALE_AVATAR} width={52} height={52} />
           </View>
         ))}
         <View style={[e.countCircle, { marginLeft: -12 }]}>
@@ -455,10 +673,64 @@ function ExtendedMatchesCard({ count, onPress }: { count: number; onPress: () =>
   )
 }
 
+// BANNERSLOT 1010 — "get ID verified" promo (Angular: matches.page.ts:1208-1210, sent
+// via EKYCFLAG=1 for non-verified male users). Removed live by subscribeIdVerified().
+function IdVerifyBanner({ onPress }: { onPress: () => void }) {
+  const { t } = useTranslation()
+  return (
+    <Pressable style={iv.card} onPress={onPress}>
+      <CdnSvg uri={CDN + 'id-verify-promo.svg'} width={40} height={40} />
+      <View style={iv.textCol}>
+        <Text style={iv.title}>{t('VERIFY_ID.VERIFY_PROFILE_TXT')}</Text>
+        <Text style={iv.body}>{t('VERIFY_ID.VERIFY_PROFILE_TXT_1')}</Text>
+      </View>
+      <View style={iv.cta}>
+        <Text style={iv.ctaText}>{t('VERIFY_ID.VERIFY_NOW_CTA')}</Text>
+      </View>
+    </Pressable>
+  )
+}
+
+const iv = StyleSheet.create({
+  card: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    backgroundColor:   Colors.badgeVerifiedBg,
+    borderRadius:      12,
+    marginHorizontal:  16,
+    marginBottom:      16,
+    padding:           12,
+    gap:               12,
+  },
+  textCol: { flex: 1 },
+  title: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize:   14,
+    color:      Colors.textDark,
+  },
+  body: {
+    fontFamily: 'Poppins-Regular',
+    fontSize:   12,
+    color:      Colors.textSecondary,
+    marginTop:  2,
+  },
+  cta: {
+    backgroundColor:   Colors.badgeVerifiedText,
+    borderRadius:      8,
+    paddingVertical:   8,
+    paddingHorizontal: 12,
+  },
+  ctaText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize:   12,
+    color:      Colors.white,
+  },
+})
+
 // ─── MatchesScreen ────────────────────────────────────────────────────────────
 
 export default function MatchesScreen({ navigation }: { navigation: any }) {
-  const { i18n } = useTranslation()
+  const { t, i18n } = useTranslation()
   const isDesktop = useIsDesktopWeb()
 
   // ── State ───────────────────────────────────────────────────────────────────
@@ -475,6 +747,71 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   const [addPhotoBannerMatches, setAddPhotoBannerMatches] = useState<any>(null)
   // oppGender = gender of profiles being viewed (opposite of logged-in user)
   const [oppGender, setOppGender] = useState<'M' | 'F'>('F')
+  // Logged-in user's own gender (opposite of oppGender) — needed for the bulk-like
+  // post-send branch (#1): male users mid photo-promotion see a different follow-up.
+  const [loginGender, setLoginGender] = useState<'M' | 'F'>('F')
+
+  // ── GAM ad banner (BANNERSLOT 1020) ────────────────────────────────────────
+  const [gamParams, setGamParams] = useState<{ gender: string; caste: string; domain: string } | null>(null)
+
+  // ── Bulk-like modal ─────────────────────────────────────────────────────────
+  const [showBulkLike,        setShowBulkLike]        = useState(false)
+  const [bulkLikeCandidates,  setBulkLikeCandidates]  = useState<Record<string, any>[]>([])
+  // Angular: fullpage-modalpopup.component.ts sendLikes() — male users mid photo
+  // promotion see a photo-upsell prompt instead of the plain success confirmation.
+  const [showPhotoBulkLikePrompt, setShowPhotoBulkLikePrompt] = useState(false)
+
+  // ── Extended matches ("Continue seeing profiles" end-card) ─────────────────
+  const [loadingExtended, setLoadingExtended] = useState(false)
+  const [extendedLoaded,  setExtendedLoaded]  = useState(false)
+
+  // ── Sticky bottom banner (payment-failed retry / force-update) ─────────────
+  const [forceUpdateInfo,   setForceUpdateInfo]   = useState<{ minVersion: string } | null>(null)
+  const [paymentStickyInfo, setPaymentStickyInfo] = useState<{ content: string; ctaLabel: string; deadlineMs: number } | null>(null)
+  const [stickyDismissed,   setStickyDismissed]   = useState(false)
+
+  // ── Notification permission popup (~40s after landing on Matches) ──────────
+  const [showNotificationPopup, setShowNotificationPopup] = useState(false)
+
+  // ── "Rate our app" popup ────────────────────────────────────────────────────
+  const [showRatingPopup, setShowRatingPopup] = useState(false)
+
+  // ── Survey popup ─────────────────────────────────────────────────────────────
+  const [surveyData, setSurveyData] = useState<SurveyPopupData | null>(null)
+
+  // ── Photo carousel lock screen (female, zero own photos) ────────────────────
+  const [ownPhotoLockActive, setOwnPhotoLockActive] = useState(false)
+  const [showAddPhotoPrompt, setShowAddPhotoPrompt] = useState(false)
+
+  // ── "Add your photo" action gate (Like/Don't-show) ──────────────────────────
+  // Angular: button.service.ts checkAddPhotoPromotion() — blocks these two actions
+  // (not Call/WhatsApp/View-later) when PROFILEPUBLISHEDFLAG=='0' and one of three
+  // sub-conditions applies. Content is server-driven (REGISTRATIONARRAYS.PHOTOPUBLISHED.Call).
+  const [addPhotoGateActive, setAddPhotoGateActive] = useState(false)
+  const [addPhotoActionPromoContent, setAddPhotoActionPromoContent] = useState<any>(null)
+  const [showAddPhotoActionPrompt, setShowAddPhotoActionPrompt] = useState(false)
+
+  // ── Toast (View Later / Don't Show confirmation) ─────────────────────────────
+  const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
+  function showToast(message: string) {
+    setToastRequest({ message, key: Date.now() })
+  }
+
+  // ── Live footer like-count badge ────────────────────────────────────────────
+  const [likesCount, setLikesCount] = useState(0)
+
+  // ── After-like CTA state (#22-24) — read once per mount, same pattern as gamParams ──
+  const [ownEntryType,      setOwnEntryType]      = useState('')
+  const [femaleFreeEligible, setFemaleFreeEligible] = useState(false)
+  const [indNumbersLeft,    setIndNumbersLeft]    = useState('0')
+
+  // ── Extra promo banners (#26: 1011/1012/1014/1015 + hero-banner extension) ──────
+  const [addPhotoPromoActive, setAddPhotoPromoActive] = useState(false)
+  const [addHoroActive,       setAddHoroActive]       = useState(false)
+  const [paidNoPhotoBanner,   setPaidNoPhotoBanner]   = useState<any>(null)   // reg.PHOTOPUBLISHPAID.Matches, or {} for the static ADDPROPERTYS fallback
+  // Hero banner header (ListHeaderComponent) — extends the existing photo-promo
+  // banner to Angular's other two variants. 'target' picks the onPress destination.
+  const [heroBannerTarget, setHeroBannerTarget] = useState<'Gallery' | 'verifyid'>('Gallery')
 
   // ── Header hide-on-scroll ────────────────────────────────────────────────────
   // Angular: offsetHt = this.header?.el?.offsetHeight where #header = the TITLE ion-row only.
@@ -542,12 +879,18 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   // 3. fetchNotifCount()  → communication/newcount/v1 (badge count)
   useEffect(() => {
     let cancelled = false
+    let notifTimerRef: ReturnType<typeof setTimeout> | undefined
 
     async function loadMatches() {
       try {
         // Read login gender once — determines which blur placeholder to show on photo cards
         const lg = await getItem(StorageKeys.User.LOGIN_GENDER)
         setOppGender(lg === 'F' ? 'M' : 'F')
+        setLoginGender(lg === 'M' ? 'M' : 'F')
+
+        // Photo lock screen (#15) — Angular: femaleFreeContactRestrict() (matches-card.component.ts:424-428)
+        const ownPhotoCount = Number((await getItem('PHOTOCOUNT')) ?? '0')
+        if (!cancelled) setOwnPhotoLockActive(lg === 'F' && ownPhotoCount === 0)
 
         // Step 1 — refreshSession() ensures Level-2 tokens before any listing API call.
         // The 1hr gate lives in RootNavigation.tsx (centralized guard) — here we always
@@ -566,13 +909,76 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
 
         // Step 3 — Angular: parallel post-matches calls
         // newcount + extendedmatches + ppSetData + dailyRecommendations + menuPromo
-        const [extCount, , promo] = await Promise.all([
+        const [extCount, , promo, bulkLikeResult] = await Promise.all([
           fetchExtendedMatchesCount(),
           fetchAndStorePPSetData().then(async (ppSetData) => {
-            const [entryType, reg] = await Promise.all([
+            const [entryType, reg, femaleFreeRaw, horoAvailable, contactDetail, ekycStatus] = await Promise.all([
               getSessionValue('ENTRYTYPE'),
               getRegistrationArrays(),
+              getSessionValue('FEMALEFREECONACT'),
+              getSessionValue('HOROSCOPEAVAILABLE'),
+              getJson<Record<string, any>>('CONTACT_DETAIL'),
+              getItem('PI_EKYCSTATUS'),
             ])
+            const photoStatus = ppSetData?.PI_PHOTOSTATUS ?? 'N'
+
+            if (!cancelled) {
+              setOwnEntryType(entryType ?? '')
+
+              // Free-female-contact eligibility (#24) — Angular: getFree3Contact() && !getfreephoneviewOver()
+              const femaleFree: any = femaleFreeRaw
+              setFemaleFreeEligible(
+                String(femaleFree?.FLAG) === '1' && lg === 'F' && String(femaleFree?.Left ?? '0') !== '0'
+              )
+
+              // Remaining-contacts count (#23) — Angular: getIndNumbersLeft(). CONTACT_DETAIL
+              // isn't written anywhere in this port yet (no phone-view-details flow ported),
+              // so this reads '0' until that's built — wired correctly, dormant for now.
+              setIndNumbersLeft(String(contactDetail?.IndNumbersLeft ?? '0'))
+
+              // BANNERSLOT 1011 — add-photo generic promo (#26)
+              setAddPhotoPromoActive(!['P', 'Y'].includes(photoStatus))
+
+              // BANNERSLOT 1012 — add-horoscope promo (#26)
+              setAddHoroActive(horoAvailable !== '1')
+            }
+
+            // BANNERSLOT 1014 — paid-verified-no-photo promo, or legacy ADDPROPERTYS
+            // fallback (#26). Angular: check_Paid_Verified_Nophoto().
+            const isPaidVerifiedMale = entryType === 'P' && ekycStatus === '1' && lg === 'M' && photoStatus !== 'Y'
+            if (!cancelled && isPaidVerifiedMale) {
+              setPaidNoPhotoBanner(
+                reg?.PHOTOPUBLISHPAID?.Matches
+                  ? { dynamic: true, data: reg.PHOTOPUBLISHPAID.Matches }
+                  : { dynamic: false }
+              )
+            }
+
+            // GAM ad banner params (BANNERSLOT 1020) — Angular: loadGambanner()
+            // reads ppSetData.PIINFO.{GENDER,CASTE,DOMAINID}; fall back to the
+            // login gender if PIINFO isn't present in this API's response yet.
+            if (!cancelled) {
+              const piInfo = ppSetData?.PIINFO
+              setGamParams({
+                gender: piInfo?.GENDER ?? lg ?? '',
+                caste:  piInfo?.CASTE  ?? '',
+                domain: piInfo?.DOMAINID ?? '',
+              })
+            }
+
+            // Force-update sticky (#10) — Angular: matches.page.ts:719-728, using
+            // explore.component's actual wiring as the reference (Angular's own Matches
+            // page computes this but never renders it). Same naive string/number `<`
+            // comparison as Angular — not "fixed" here, to match source behavior.
+            if (!cancelled) {
+              const forceUpdate  = ppSetData?.APPFORCEUPDATE
+              const psUpdateFlag = await getItem('PLAYSTOREUPDATE')
+              const appVersion   = Constants.expoConfig?.version ?? '1.0.0'
+              if (forceUpdate?.APPVERSION && psUpdateFlag !== '1' && appVersion < forceUpdate.APPVERSION) {
+                setForceUpdateInfo({ minVersion: forceUpdate.APPVERSION })
+              }
+            }
+
             // Angular matches.page.ts:705 — show add-photo banner when:
             // PROFILEPUBLISHEDFLAG=0 (photo not added) + PROFILEPUBLISHEDTYPE 1|2 (promotion active) + ENTRYTYPE=F (free user)
             try {
@@ -580,18 +986,18 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
               if (reg?.PHOTOPUBLISHED?.Matches) {
                 setAddPhotoBannerMatches(reg.PHOTOPUBLISHED.Matches)
               }
-              // Header photo promo banner — PHOTOPUBLISHED.Banner (free users only)
-              const flagOk = String(ppSetData?.PROFILEPUBLISHEDFLAG) === '0'
-              const typeOk = ['1', '2'].includes(String(ppSetData?.PROFILEPUBLISHEDTYPE))
-              const freeOk = entryType === 'F'
-              if (flagOk && typeOk && freeOk) {
-                const banner = reg?.PHOTOPUBLISHED?.Banner ?? {}
-                // API sends Angular CSS class names — resolve to real hex colors
-                const resolveBg = (v: string) =>
-                  (!v || v === 'primaryBg') ? Colors.primaryDark : (v.startsWith('#') ? v : Colors.primaryDark)
-                const resolveColor = (v: string) =>
-                  (!v || v === 'whiteColor') ? Colors.white : (v.startsWith('#') ? v : Colors.white)
+              // Header hero banner — Angular: matches.page.ts:705-717, checked in this exact
+              // if/else-if order (free-photo promo, then non-ID-verify promo, then
+              // paid-verified-no-photo promo). Same PhotoPromotionBanner component throughout —
+              // only the data source and onPress destination (heroBannerTarget) differ.
+              // API sends Angular CSS class names — resolve to real hex colors.
+              const resolveBg = (v: string) =>
+                (!v || v === 'primaryBg') ? Colors.primaryDark : (v.startsWith('#') ? v : Colors.primaryDark)
+              const resolveColor = (v: string) =>
+                (!v || v === 'whiteColor') ? Colors.white : (v.startsWith('#') ? v : Colors.white)
+              const applyHeroBanner = (banner: Record<string, any>, target: 'Gallery' | 'verifyid') => {
                 setShowPhotoPromotion(true)
+                setHeroBannerTarget(target)
                 setPhotoBannerData({
                   TITLE:     banner.TITLE     || 'Profile not active yet!',
                   BODY:      banner.BODY      || 'Upload your photo to activate profile and let matches see you',
@@ -602,16 +1008,109 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
                   BGCOLOR:    Colors.photoPromoTint,
                 })
               }
+
+              const flagOk = String(ppSetData?.PROFILEPUBLISHEDFLAG) === '0'
+              const typeOk = ['1', '2'].includes(String(ppSetData?.PROFILEPUBLISHEDTYPE))
+              const freeOk = entryType === 'F'
+
+              // "Add your photo" action gate (Like/Don't-show) — Angular:
+              // checkAddPhotoPromotion() = PROFILEPUBLISHEDFLAG=='0' && (checkPhotoPromotion()
+              // || check_Paid_Verified_Nophoto() || isNonIdVerifyUser()).
+              const nonIdVerifyUserGate = entryType === 'P' && lg === 'M' && ekycStatus !== '1'
+              if (!cancelled) {
+                setAddPhotoGateActive(flagOk && ((typeOk && freeOk) || isPaidVerifiedMale || nonIdVerifyUserGate))
+                setAddPhotoActionPromoContent(reg?.PHOTOPUBLISHED?.Call ?? null)
+              }
+
+              if (flagOk && typeOk && freeOk) {
+                applyHeroBanner(reg?.PHOTOPUBLISHED?.Banner ?? {}, 'Gallery')
+              } else if (reg?.PROFILEVERIFYPAID?.Banner && ekycStatus !== '1') {
+                applyHeroBanner(reg.PROFILEVERIFYPAID.Banner, 'verifyid')
+              } else if (reg?.PHOTOPUBLISHPAID?.Banner && isPaidVerifiedMale) {
+                applyHeroBanner(reg.PHOTOPUBLISHPAID.Banner, 'Gallery')
+              }
             } catch (err) {
               console.log('[PhotoBanner] error in banner check:', err)
             }
           }),
           fetchMenuPromo(),
+          fetchBulkLikeMatches(),
         ])
+        // Angular: bulkLike() — show the modal once, only when there are
+        // enough candidates and enough total matches (matches.page.ts:3204).
+        const bulkLikeShown = bulkLikeResult.length >= 4 && result.totalCount >= 20
+
         if (!cancelled) {
           setExtendedCount(extCount)
           if (promo) setMenuPromo(promo)
+          if (bulkLikeShown) {
+            setBulkLikeCandidates(bulkLikeResult)
+            setShowBulkLike(true)
+          }
         }
+
+        // Payment-failed sticky (#6) — Angular: getContactsData() (matches.page.ts:2254-2310).
+        if (!cancelled && (await getItem('PAYMENTFAILTYPE')) === '1') {
+          const banner  = await getHeroBannerDetails(true, 1)
+          const content = banner?.PAYMENTFAILEDCONTENT
+          const cta     = banner?.PAYMENTFAILEDCTA
+          if (!cancelled && content && cta) {
+            const startMs = Date.parse(banner?.OFFSTTIME ?? '')
+            const endMs   = Date.parse(banner?.OFFEDTIME ?? '')
+            const deadlineMs = !Number.isNaN(startMs) && !Number.isNaN(endMs)
+              ? Date.now() + Math.max(0, endMs - startMs)
+              : Date.now() + 10 * 60 * 1000   // fallback: 10 min if OFFSTTIME/OFFEDTIME are missing
+            setPaymentStickyInfo({ content, ctaLabel: cta, deadlineMs })
+          }
+        }
+
+        // Angular: ionViewDidEnter() → getNotificationCount(). Feeds both the footer's
+        // live like-count badge (#12) and the rating-popup trigger (#9) below.
+        if (!cancelled) {
+          const { comCount } = await fetchNotifCount()
+          if (!cancelled) {
+            const likedYou = comCount.find(c => c.comtype === 'likedyou')
+            setLikesCount(Number(likedYou?.newcount ?? 0))
+          }
+
+          // "Rate our app" popup (#9) — Angular: passiveRatingPopup(). Skipped when the
+          // bulk-like modal already claimed this mount's one popup slot (no modal-stacking),
+          // mirroring Angular's SHOW_RATING_POPUP mutual-exclusion.
+          if (!cancelled && !bulkLikeShown && await shouldShowRatingPopup(comCount)) {
+            setShowRatingPopup(true)
+            await markRatingPopupShown()
+          }
+        }
+
+        // Survey popup (#11) — Angular: matches.page.ts:740-743, getSurveydetails():2167-2178.
+        // One-time-consume: clear SURVEYPOPUP immediately so it won't fire again without a
+        // fresh server flag on a future login (Angular: removeStorageValue('1','SURVEYPOPUP','')).
+        if (!cancelled && !bulkLikeShown) {
+          const [loginCount, surveyFlag, paywallType] = await Promise.all([
+            getItem(StorageKeys.Auth.LOGIN_COUNT),
+            getItem('SURVEYPOPUP'),
+            getItem('PAYWALLTYPE'),
+          ])
+          if (Number(loginCount ?? '0') > 3 && surveyFlag === '1' && paywallType === '0') {
+            await setItem('SURVEYPOPUP', '')
+            const survey = await fetchSurveyPopup()
+            if (!cancelled && survey) setSurveyData(survey)
+          }
+        }
+
+        // Notification permission popup (#8) — Angular: notificationStatus(), 40s after
+        // ionViewDidEnter, gated to once per calendar day and stopped once NALLOW='1'.
+        notifTimerRef = setTimeout(async () => {
+          if (cancelled || bulkLikeShown) return
+          const [nallow, lastShown] = await Promise.all([
+            getItem(StorageKeys.App.NALLOW),
+            getItem('PN_LAST_SHOWN_DATE'),
+          ])
+          const today = new Date().toISOString().slice(0, 10)
+          if (cancelled || nallow === '1' || lastShown === today) return
+          setShowNotificationPopup(true)
+          await setItem('PN_LAST_SHOWN_DATE', today)
+        }, 40000)
 
       } catch (e) {
         if (__DEV__) console.error('[Matches] load error:', e)
@@ -621,7 +1120,16 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     }
 
     loadMatches()
-    return () => { cancelled = true }
+    return () => { cancelled = true; clearTimeout(notifTimerRef) }
+  }, [])
+
+  // ID-verify banner removal (#13) — Angular: IDVerifyStatusObserver subscription
+  // (matches.page.ts:588-594). Strips the BANNERSLOT 1010 promo card the instant the
+  // logged-in user's own ID verification completes, no refetch needed.
+  useEffect(() => {
+    return subscribeIdVerified(() => {
+      setBannerSlots(prev => prev.filter(b => b.slot !== '1010'))
+    })
   }, [])
 
   // ── Pagination ──────────────────────────────────────────────────────────────
@@ -655,6 +1163,9 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   // All use communicationBtnOnClick → same params as Angular communicationBtnOnClick
 
   async function handleLike(profile: MatchProfile) {
+    // Angular: button.service.ts checkAddPhotoPromotion() — blocks Like/Don't-show
+    // (not Call/WhatsApp/View-later) when the logged-in user has no published photo.
+    if (addPhotoGateActive) { setShowAddPhotoActionPrompt(true); return }
     // Optimistic UI: flip card to "liked" state immediately
     setProfiles(prev => prev.map(p =>
       p.profileId === profile.profileId ? { ...p, likedStatus: '1' as const } : p
@@ -673,12 +1184,15 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   }
 
   async function handleDontShow(profile: MatchProfile) {
+    if (addPhotoGateActive) { setShowAddPhotoActionPrompt(true); return }
     // Optimistic UI: remove card immediately (matches Angular removeProfile)
     setProfiles(prev => prev.filter(p => p.profileId !== profile.profileId))
     setTotalCount(prev => Math.max(0, prev - 1))
     apiStartRef.current = Math.max(0, apiStartRef.current - 1)
     try {
       await communicationBtnOnClick('matches', 'skip', { MATRIID: profile.profileId })
+      // Angular: communication.service.ts afterHttpServiceResponse() → presentToast(msg, 2000)
+      showToast(t('VIEWPROFILE.SKIP_PROFILE'))
     } catch (e) {
       if (__DEV__) console.error('[Matches] dont show error:', e)
     }
@@ -691,6 +1205,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     apiStartRef.current = Math.max(0, apiStartRef.current - 1)
     try {
       await communicationBtnOnClick('matches', 'viewlater', { MATRIID: profile.profileId })
+      showToast(t('GENERAL.PROFILE_LATER'))
     } catch (e) {
       if (__DEV__) console.error('[Matches] view later error:', e)
     }
@@ -724,6 +1239,94 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     }
   }
 
+  // ── Bulk-like modal ──────────────────────────────────────────────────────────
+  // Angular: openFullpageModal()'s onDidDismiss — reload the matches list from
+  // start=0 only when likes were actually sent; a plain close/skip doesn't reload.
+
+  function handleBulkLikeClose() {
+    setShowBulkLike(false)
+  }
+
+  async function handleBulkLikeSent() {
+    setShowBulkLike(false)
+    apiStartRef.current = 0
+    try {
+      const result = await fetchMatches(0, 20)
+      setProfiles(result.items.map(matchProfileAdapter.adapt))
+      setBannerSlots(result.bannerSlots)
+      setTotalCount(result.totalCount)
+      apiStartRef.current = result.items.length
+    } catch (e) {
+      if (__DEV__) console.error('[Matches] reload after bulk-like error:', e)
+    }
+  }
+
+  function handleBulkLikeNeedsPhoto() {
+    setShowBulkLike(false)
+    setShowPhotoBulkLikePrompt(true)
+  }
+
+  // Angular's photo-upsell sheet has two exits (add photo now / do it later) that
+  // both eventually reload the matches list — simplified here to always reload
+  // regardless of which button closed it (Angular's own "added a photo" exit has
+  // a genuine dismiss-payload race in the source, so this is a deliberate cleanup,
+  // not a missed edge case).
+  function handleBulkLikePhotoPromptDismiss() {
+    setShowPhotoBulkLikePrompt(false)
+    handleBulkLikeSent()
+  }
+
+  // ── Extended matches ("Continue seeing profiles" end-card) ──────────────────
+  // Angular: endCardBtnEmit() → getExtendedMatches() → appends profiles +
+  // shows the "You are now seeing matches recommended by Jodii" intro banner
+  // on the first extended profile (rendered here via a synthetic bannerSlot).
+
+  async function handleLoadExtendedMatches() {
+    if (loadingExtended || extendedLoaded) return
+    setLoadingExtended(true)
+    try {
+      const result = await fetchExtendedMatches(0, 20)
+      if (result.items.length > 0) {
+        const introInsertAt = profiles.length
+        setBannerSlots(existing => [...existing, { slot: 'EXTENDED_INTRO', insertAfter: introInsertAt }])
+        setProfiles(prev => [...prev, ...result.items.map(matchProfileAdapter.adapt)])
+        apiStartRef.current += result.items.length
+        setExtendedLoaded(true)
+      }
+    } catch (e) {
+      if (__DEV__) console.error('[Matches] extended matches error:', e)
+    } finally {
+      setLoadingExtended(false)
+    }
+  }
+
+  // ── Sticky bottom banner (force-update takes priority over payment-failed —
+  // a judgment call, since Angular's two sticky slots don't establish a shared
+  // precedence to copy) ───────────────────────────────────────────────────────
+  const activeSticky: 'forceUpdate' | 'paymentFailed' | null =
+    stickyDismissed ? null : forceUpdateInfo ? 'forceUpdate' : paymentStickyInfo ? 'paymentFailed' : null
+
+  function handleStickyPress() {
+    if (activeSticky === 'forceUpdate') {
+      const url = String(Constants.expoConfig?.extra?.['playStoreUrl'] ?? 'https://play.google.com/store/apps/details?id=jodii.app')
+      Linking.openURL(url)
+    } else {
+      navigation.navigate('recharge')
+    }
+  }
+
+  function handleStickyClose() {
+    if (activeSticky === 'forceUpdate') {
+      setItem('PLAYSTOREUPDATE', '2')   // Angular: "show again next login"
+    }
+    setStickyDismissed(true)
+  }
+
+  async function handleNotificationCta() {
+    setShowNotificationPopup(false)
+    await requestPushNotificationPermission()
+  }
+
   // Desktop quick-filter chips are visual-only (no real filtering), matching
   // the mobile FilterChipsRow's existing behavior — just toggles which chip
   // is highlighted.
@@ -740,7 +1343,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     }
   }
 
-  const renderItem: ListRenderItem<MatchListItem> = ({ item }) => {
+  const renderItem: ListRenderItem<MatchListItem> = useCallback(({ item }) => {
     if (isBanner(item)) {
       // BANNERSLOT 1001 — festival/membership offer (e.g. "Muhurtham Day Offer!")
       if (item.bannerSlot === '1001' && menuPromo?.MATCHESSLOT) {
@@ -760,47 +1363,199 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           />
         )
       }
+      // BANNERSLOT 1020 — GAM ad banner (Angular: <iframe [src]="gamBannerUrl">)
+      if (item.bannerSlot === '1020' && gamParams) {
+        return <GamBanner {...gamParams} />
+      }
+      // BANNERSLOT 1010 — "get ID verified" promo (removed live on ID-verify event)
+      if (item.bannerSlot === '1010') {
+        return <IdVerifyBanner onPress={() => navigation.navigate('verifyid')} />
+      }
+      // BANNERSLOT 1011 — add-photo generic promo (#26)
+      if (item.bannerSlot === '1011' && addPhotoPromoActive) {
+        return (
+          <PcsBanner
+            imageUri={CDN + 'revamp/add-photo-banner-revamp.svg'}
+            title={t('MATCHES.ADDPHOTO')}
+            cta={t('MATCHES.ADDPHOTOCTA')}
+            ctaBg="#802000"
+            gradientColors={['#FFF6F2', '#FFFFFF']}
+            onPress={() => navigation.navigate('Gallery')}
+          />
+        )
+      }
+      // BANNERSLOT 1012 — add-horoscope promo (#26)
+      if (item.bannerSlot === '1012' && addHoroActive) {
+        return (
+          <PcsBanner
+            imageUri={CDN + 'revamp/horoscope-revamp.svg'}
+            title={t('MATCHES.ADDHORO')}
+            cta={t('MATCHES.ADDHOROCTA')}
+            ctaBg="#2A4FA5"
+            gradientColors={['#F3F7FF', '#FFFFFF']}
+            onPress={() => navigation.navigate('onboarding', { pageNo: '22' })}
+          />
+        )
+      }
+      // BANNERSLOT 1014 — paid-verified-no-photo promo (dynamic), else legacy
+      // ADDPROPERTYS fallback (#26) — Angular reuses this slot for two different concepts.
+      if (item.bannerSlot === '1014' && paidNoPhotoBanner) {
+        return paidNoPhotoBanner.dynamic ? (
+          <AddPhotoBanner
+            data={paidNoPhotoBanner.data}
+            onPress={() => navigation.navigate('Gallery')}
+          />
+        ) : (
+          <SimplePromoBanner
+            title={t('MATCHES.ADDPROPERTYS')}
+            cta={t('MATCHES.ADDPROPERTYS_CTA')}
+            onPress={() => navigation.navigate('onboarding', { pageNo: '28' })}
+          />
+        )
+      }
+      // BANNERSLOT 1015 — Many Jobs cross-promo (#26). Angular's tap action is a native-bridge
+      // call to an internal app code (common.redirectPlayStore('507')), not a known Play
+      // Store URL — no such mapping exists anywhere in this port, so this opens whatever URL
+      // the promo payload itself provides rather than inventing one.
+      if (item.bannerSlot === '1015' && menuPromo?.MANYJOBSPROMO) {
+        const jobsPromo = menuPromo.MANYJOBSPROMO
+        const jobsUrl   = jobsPromo.URL ?? jobsPromo.LINK
+        return (
+          <SimplePromoBanner
+            imageUri={jobsPromo.BANNERIMG}
+            title={jobsPromo.TITLE ?? ''}
+            cta={jobsPromo.CTA ?? ''}
+            onPress={() => { if (jobsUrl) Linking.openURL(jobsUrl) }}
+          />
+        )
+      }
+      // Synthetic banner (not a real BANNERSLOT) — inserted locally right where
+      // extended-matches profiles begin. Angular: card html ISEXTENDEDMATCHES
+      // flag shows this text on the first extended profile.
+      if (item.bannerSlot === 'EXTENDED_INTRO') {
+        return (
+          <Text style={s.extendedIntroText}>{t('MATCHES.SEEINGMATCHES')}</Text>
+        )
+      }
       return null
     }
     return (
       <MatchCard
         profile={item}
         oppGender={oppGender}
+        photoLockActive={ownPhotoLockActive}
+        ownEntryType={ownEntryType}
+        femaleFreeEligible={femaleFreeEligible}
+        indNumbersLeft={indNumbersLeft}
         onPress={() => navigation.navigate('viewprofile', { id: item.profileId })}
         onLike={() => handleLike(item)}
         onDontShow={() => handleDontShow(item)}
         onViewLater={() => handleViewLater(item)}
         onCall={() => handleCall(item)}
         onWhatsApp={() => handleWhatsApp(item)}
+        onAddPhotoPrompt={() => setShowAddPhotoPrompt(true)}
       />
     )
-  }
+  }, [
+    menuPromo, addPhotoBannerMatches, gamParams, addPhotoPromoActive, addHoroActive,
+    paidNoPhotoBanner, oppGender, ownPhotoLockActive, ownEntryType, femaleFreeEligible,
+    indNumbersLeft, navigation, handleLike, handleDontShow, handleViewLater, handleCall,
+    handleWhatsApp, t,
+  ])
 
   // ── Desktop web layout (Figma "Jodii Desktop") ──────────────────────────────
   // Wide browser window only — mobile/native/narrow-web keep the JSX below,
   // untouched, sharing all the same state/handlers defined above.
   if (isDesktop) {
     return (
-      <MatchesDesktopLayout
-        langCode={i18n.language}
-        onTabPress={handleTabPress}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
-        loading={loading}
-        totalCount={totalCount}
-        profiles={profiles}
-        oppGender={oppGender}
-        onProfilePress={p => navigation.navigate('viewprofile', { id: p.profileId })}
-        onLike={handleLike}
-        onDontShow={handleDontShow}
-        onViewLater={handleViewLater}
-        onCall={handleCall}
-        onWhatsApp={handleWhatsApp}
-        onEditPreferences={() => navigation.navigate('Search')}
-        loadingMore={loadingMore}
-        onLoadMore={loadMore}
-        selectedChip={selectedChip}
-        onChipSelect={handleDesktopChipSelect}
-      />
+      <>
+        <MatchesDesktopLayout
+          langCode={i18n.language}
+          onTabPress={handleTabPress}
+          onLanguagePress={() => navigation.navigate('LanguageSelection')}
+          loading={loading}
+          totalCount={totalCount}
+          profiles={profiles}
+          oppGender={oppGender}
+          onProfilePress={p => navigation.navigate('viewprofile', { id: p.profileId })}
+          onLike={handleLike}
+          onDontShow={handleDontShow}
+          onViewLater={handleViewLater}
+          onCall={handleCall}
+          onWhatsApp={handleWhatsApp}
+          onEditPreferences={() => navigation.navigate('Search')}
+          loadingMore={loadingMore}
+          onLoadMore={loadMore}
+          selectedChip={selectedChip}
+          onChipSelect={handleDesktopChipSelect}
+        />
+        {activeSticky && (
+          <StickyBanner
+            text={activeSticky === 'forceUpdate' ? t('APP_UPDATE.NOTE') : paymentStickyInfo!.content}
+            ctaLabel={activeSticky === 'forceUpdate' ? t('APP_UPDATE.CTA') : paymentStickyInfo!.ctaLabel}
+            onPress={handleStickyPress}
+            onClose={handleStickyClose}
+            {...(activeSticky === 'paymentFailed' ? { countdownDeadlineMs: paymentStickyInfo!.deadlineMs } : {})}
+          />
+        )}
+        <BulkLikeModal
+          visible={showBulkLike}
+          candidates={bulkLikeCandidates}
+          showPhotoPromo={loginGender === 'M' && showPhotoPromotion}
+          onClose={handleBulkLikeClose}
+          onSent={handleBulkLikeSent}
+          onSentNeedsPhoto={handleBulkLikeNeedsPhoto}
+        />
+        <BottomSheet
+          visible={showPhotoBulkLikePrompt}
+          type="photoBulkLike"
+          data={{
+            title:         t('MATCHES.BULK_LIKE_TITLE_1').replace(/<br\s*\/?>/gi, ' '),
+            ctaLabel:      t('MATCHES.ADD_PHOTO'),
+            linkCtaLabel:  t('MATCHES.LATER_CTA'),
+            showClose:     false,
+          }}
+          onClose={handleBulkLikePhotoPromptDismiss}
+          onPrimaryPress={() => { setShowPhotoBulkLikePrompt(false); navigation.navigate('Gallery'); handleBulkLikeSent() }}
+          onLinkPress={handleBulkLikePhotoPromptDismiss}
+        />
+        <BottomSheet
+          visible={showNotificationPopup}
+          type="enableNotification"
+          data={{
+            title:    t('PN_SETTINGS.HEADER'),
+            content:  t('PN_SETTINGS.BODY'),
+            ctaLabel: t('PN_SETTINGS.CTA'),
+          }}
+          onClose={() => setShowNotificationPopup(false)}
+          onPrimaryPress={handleNotificationCta}
+        />
+        <BottomSheet
+          visible={showAddPhotoPrompt}
+          type="addPhotoPrompt"
+          data={{
+            title:    t('MATCHES.ADD_PHOTO_TO_VIEW').replace('##HIS_HER##', oppGender === 'F' ? 'her' : 'his'),
+            ctaLabel: t('GENERAL.ADD_PHOTO_TXT'),
+          }}
+          onClose={() => setShowAddPhotoPrompt(false)}
+          onPrimaryPress={() => { setShowAddPhotoPrompt(false); navigation.navigate('Gallery') }}
+        />
+        <AppRatingModal visible={showRatingPopup} onClose={() => setShowRatingPopup(false)} />
+        <SurveyPopup visible={!!surveyData} data={surveyData} onClose={() => setSurveyData(null)} />
+        <BottomSheet
+          visible={showAddPhotoActionPrompt}
+          type="photoPopUp"
+          data={{
+            image:    addPhotoActionPromoContent?.IMG || (CDN + 'revamp/alert-circle.svg'),
+            title:    (addPhotoActionPromoContent?.TITLE ?? '').replace(/<[^>]*>/g, '') || t('GENERAL.ADD_PHOTO_TXT'),
+            content:  (addPhotoActionPromoContent?.CONTENT ?? '').replace(/<[^>]*>/g, ''),
+            ctaLabel: (addPhotoActionPromoContent?.CTA ?? '').replace(/<[^>]*>/g, '') || t('GENERAL.ADD_PHOTO_TXT'),
+          }}
+          onClose={() => setShowAddPhotoActionPrompt(false)}
+          onPrimaryPress={() => { setShowAddPhotoActionPrompt(false); navigation.navigate('Gallery') }}
+        />
+        <Toast request={toastRequest} />
+      </>
     )
   }
 
@@ -841,31 +1596,108 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           // Angular: doInfinite() on scroll end — load next 20 when within 50% of end
           onEndReached={loadMore}
           onEndReachedThreshold={0.5}
+          // Virtualization tuning for smoother scroll — render a small window around
+          // the visible area instead of the default (larger) window, and batch new
+          // rows in smaller groups so mounting them doesn't cause a frame drop.
+          initialNumToRender={4}
+          maxToRenderPerBatch={4}
+          windowSize={7}
+          updateCellsBatchingPeriod={50}
+          removeClippedSubviews={Platform.OS !== 'web'}
           ListHeaderComponent={
             showPhotoPromotion && photoBannerData ? (
               <PhotoPromotionBanner
                 data={photoBannerData}
-                onPress={() => navigation.navigate('Gallery')}
+                onPress={() => navigation.navigate(heroBannerTarget)}
               />
             ) : null
           }
           ListFooterComponent={
-            loadingMore
+            loadingMore || loadingExtended
               ? <ActivityIndicator size="small" color={Colors.primary} style={s.footerLoader} />
-              : extendedCount > 0
-                ? <ExtendedMatchesCard count={extendedCount} onPress={() => {}} />
+              : extendedCount > 0 && !extendedLoaded
+                ? <ExtendedMatchesCard count={extendedCount} onPress={handleLoadExtendedMatches} />
                 : null
           }
+        />
+      )}
+
+      {/* ── Sticky bottom banner (payment-failed retry / force-update) ──────── */}
+      {activeSticky && (
+        <StickyBanner
+          text={activeSticky === 'forceUpdate' ? t('APP_UPDATE.NOTE') : paymentStickyInfo!.content}
+          ctaLabel={activeSticky === 'forceUpdate' ? t('APP_UPDATE.CTA') : paymentStickyInfo!.ctaLabel}
+          onPress={handleStickyPress}
+          onClose={handleStickyClose}
+          {...(activeSticky === 'paymentFailed' ? { countdownDeadlineMs: paymentStickyInfo!.deadlineMs } : {})}
         />
       )}
 
       {/* ── Footer ─────────────────────────────────────────────────────────── */}
       <AppFooter
         activeTab={1}
-        likesCount={37}
+        likesCount={likesCount}
         upgradeTag="₹200 OFF"
         onTabPress={handleTabPress}
       />
+
+      <BulkLikeModal
+        visible={showBulkLike}
+        candidates={bulkLikeCandidates}
+        showPhotoPromo={loginGender === 'M' && showPhotoPromotion}
+        onClose={handleBulkLikeClose}
+        onSent={handleBulkLikeSent}
+        onSentNeedsPhoto={handleBulkLikeNeedsPhoto}
+      />
+      <BottomSheet
+        visible={showPhotoBulkLikePrompt}
+        type="photoBulkLike"
+        data={{
+          title:         t('MATCHES.BULK_LIKE_TITLE_1').replace(/<br\s*\/?>/gi, ' '),
+          ctaLabel:      t('MATCHES.ADD_PHOTO'),
+          linkCtaLabel:  t('MATCHES.LATER_CTA'),
+          showClose:     false,
+        }}
+        onClose={handleBulkLikePhotoPromptDismiss}
+        onPrimaryPress={() => { setShowPhotoBulkLikePrompt(false); navigation.navigate('Gallery'); handleBulkLikeSent() }}
+        onLinkPress={handleBulkLikePhotoPromptDismiss}
+      />
+      <BottomSheet
+        visible={showNotificationPopup}
+        type="enableNotification"
+        data={{
+          title:    t('PN_SETTINGS.HEADER'),
+          content:  t('PN_SETTINGS.BODY'),
+          ctaLabel: t('PN_SETTINGS.CTA'),
+        }}
+        onClose={() => setShowNotificationPopup(false)}
+        onPrimaryPress={handleNotificationCta}
+      />
+      <BottomSheet
+        visible={showAddPhotoPrompt}
+        type="addPhotoPrompt"
+        data={{
+          title:    t('MATCHES.ADD_PHOTO_TO_VIEW').replace('##HIS_HER##', oppGender === 'F' ? 'her' : 'his'),
+          ctaLabel: t('GENERAL.ADD_PHOTO_TXT'),
+        }}
+        onClose={() => setShowAddPhotoPrompt(false)}
+        onPrimaryPress={() => { setShowAddPhotoPrompt(false); navigation.navigate('Gallery') }}
+      />
+      <AppRatingModal visible={showRatingPopup} onClose={() => setShowRatingPopup(false)} />
+      <SurveyPopup visible={!!surveyData} data={surveyData} onClose={() => setSurveyData(null)} />
+      <BottomSheet
+        visible={showAddPhotoActionPrompt}
+        type="photoPopUp"
+        data={{
+          image:    addPhotoActionPromoContent?.IMG || (CDN + 'revamp/alert-circle.svg'),
+          title:    (addPhotoActionPromoContent?.TITLE ?? '').replace(/<[^>]*>/g, '') || t('GENERAL.ADD_PHOTO_TXT'),
+          content:  (addPhotoActionPromoContent?.CONTENT ?? '').replace(/<[^>]*>/g, ''),
+          ctaLabel: (addPhotoActionPromoContent?.CTA ?? '').replace(/<[^>]*>/g, '') || t('GENERAL.ADD_PHOTO_TXT'),
+        }}
+        onClose={() => setShowAddPhotoActionPrompt(false)}
+        onPrimaryPress={() => { setShowAddPhotoActionPrompt(false); navigation.navigate('Gallery') }}
+      />
+      <Toast request={toastRequest} />
     </View>
   )
 }
@@ -876,6 +1708,14 @@ const s = StyleSheet.create({
   screen:       { flex: 1, backgroundColor: Colors.white },
   loaderBox:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
   footerLoader: { marginVertical: 16 },
+  extendedIntroText: {
+    fontFamily:        'Poppins-SemiBold',
+    fontSize:          18,
+    color:             Colors.black,
+    textAlign:         'center',
+    paddingHorizontal: 16,
+    paddingVertical:   24,
+  },
 })
 
 // Angular card styles — matches-card.component.scss
@@ -896,7 +1736,38 @@ const c = StyleSheet.create({
     overflow:         'hidden',
     backgroundColor:  Colors.divider,
   },
-  photo: { width: '100%', height: '100%' },
+  singlePhotoPressable: { width: '100%', height: '100%' },
+
+  // ── Female-free-photo-restrict lock slide (Angular: femaleFreeContactRestrict) ──
+  lockCard: {
+    flex:              1,
+    alignItems:        'center',
+    justifyContent:    'center',
+    backgroundColor:   Colors.surfaceDim,
+    paddingHorizontal: 24,
+    gap:               10,
+  },
+  lockText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize:   14,
+    color:      Colors.textDark,
+    textAlign:  'center',
+  },
+  lockCta: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               6,
+    backgroundColor:   Colors.primary,
+    borderRadius:      8,
+    paddingVertical:   8,
+    paddingHorizontal: 16,
+    marginTop:         4,
+  },
+  lockCtaText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize:   13,
+    color:      Colors.white,
+  },
 
   // Angular no-photo placeholder
   noPhoto:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
@@ -1118,13 +1989,53 @@ const c = StyleSheet.create({
     borderTopWidth:   1,
     borderTopColor:   Colors.afterLikeBorder,
   },
+  ctaSendInterestWrap: {
+    position: 'relative',
+  },
   ctaSendInterest: {
+    flexDirection:   'row',
     backgroundColor: Colors.primary,
     borderRadius:    8,
     paddingVertical: 12,
     alignItems:      'center',
+    justifyContent:  'center',
+    gap:             8,
   },
-  ctaSendInterestText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.white },
+  ctaSendInterestIconBox: {
+    width:          20,
+    height:         20,
+    flexShrink:     0,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  ctaSendInterestText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize:   14,
+    color:      Colors.white,
+    lineHeight: 20,
+  },
+  freeBadge: {
+    position:          'absolute',
+    top:               -10,
+    right:             12,
+    zIndex:            1,
+    backgroundColor:   Colors.badgeNewBg,
+    borderRadius:      10,
+    paddingHorizontal: 8,
+    paddingVertical:   2,
+  },
+  freeBadgeText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize:   10,
+    color:      Colors.badgeNewText,
+  },
+  contactsLeftText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize:   11,
+    color:      Colors.textSecondary,
+    textAlign:  'center',
+    marginTop:  8,
+  },
 })
 
 

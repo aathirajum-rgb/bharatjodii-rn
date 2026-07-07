@@ -21,6 +21,7 @@ export interface SwiperItem {
   location?:   string | undefined
   profileImg?: string | undefined
   avatarImg?:  string | undefined
+  photos?:     string[] | undefined   // full PHOTO array (Matches carousel) — profileImg is photos[0]
 
   // Photo states
   isPhotoAvailable?:    boolean | undefined
@@ -32,6 +33,7 @@ export interface SwiperItem {
 
   // Like state
   likedStatus?: '0' | '1' | '2' | '3' | undefined
+  phoneViewed?: string | undefined   // raw '0'|'1'|'2'|'3' — drives after-like CTA label
 
   // Profile badge fields (used by MatchesScreen, ViewProfile, etc.)
   isPaidMember?: boolean | undefined    // Angular: FUNC.IsPaidMember(profile)

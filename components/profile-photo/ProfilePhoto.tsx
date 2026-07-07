@@ -12,7 +12,7 @@ import {
 } from 'react-native'
 import { BlurView } from 'expo-blur'
 import * as ImagePicker from 'expo-image-picker'
-import { SvgUri } from 'react-native-svg'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG, CDN_IMG } from '../../constants/cdn'
 
@@ -118,7 +118,7 @@ function PhotoRequestOverlay({ type, onPress }: PhotoRequestProps) {
 
   return (
     <View style={styles.requestOverlay}>
-      <SvgUri uri={icon} width={48} height={48} style={styles.requestIcon} />
+      <CdnSvg uri={icon} width={48} height={48} style={styles.requestIcon} />
       <Text style={styles.requestTitle}>{title}</Text>
       <Text style={styles.requestDesc}>{desc}</Text>
       {!isRequestSent && (
@@ -297,7 +297,7 @@ export default function ProfilePhoto({
       {/* ── Newly-joined badge (top-left ribbon) ── */}
       {isNewlyJoined && (
         <View style={styles.newlyJoinedBadge}>
-          <SvgUri uri={ICONS.newlyJoinedStar} width={14} height={14} style={styles.newlyJoinedStar} />
+          <CdnSvg uri={ICONS.newlyJoinedStar} width={14} height={14} style={styles.newlyJoinedStar} />
           <Text style={styles.newlyJoinedText}>New</Text>
         </View>
       )}
@@ -305,7 +305,7 @@ export default function ProfilePhoto({
       {/* ── Shortlist pill (top-right) ── */}
       {isShortlisted && (
         <Pressable style={styles.shortlistPill} onPress={onShortlistPress}>
-          <SvgUri
+          <CdnSvg
             uri={(likedStatus === '1' || likedStatus === '3') ? ICONS.shortlistOn : ICONS.shortlistOff}
             width={20}
             height={20}
@@ -327,7 +327,7 @@ export default function ProfilePhoto({
       {/* ── Don't Show pill (bottom-center) ── */}
       {showDontShow && (
         <Pressable style={styles.dontShowPill} onPress={onDontShowPress}>
-          <SvgUri uri={ICONS.closeWhite} width={16} height={16} style={styles.dontShowIcon} />
+          <CdnSvg uri={ICONS.closeWhite} width={16} height={16} style={styles.dontShowIcon} />
           <Text style={styles.dontShowText}>{dontShowLabel}</Text>
         </Pressable>
       )}
@@ -364,7 +364,7 @@ export default function ProfilePhoto({
           ) : (
             <>
               <View style={styles.uploadIconWrap}>
-                <SvgUri uri={ICONS.camera} width={28} height={28} />
+                <CdnSvg uri={ICONS.camera} width={28} height={28} />
               </View>
               <Text style={styles.uploadLabel}>
                 {profileImage ? 'Change Photo' : 'Add Photo'}

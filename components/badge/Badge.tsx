@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, type ViewStyle } from 'react-native'
-import { SvgUri } from 'react-native-svg'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 
@@ -37,7 +37,7 @@ export default function Badge({ variant, text, imageUrl, hasInfo = false, style 
   return (
     <View style={[styles.container, { backgroundColor: bg }, style]}>
       {!!imageUrl && (
-        <SvgUri uri={imageUrl} width={18} height={18} style={styles.icon} />
+        <CdnSvg uri={imageUrl} width={18} height={18} style={styles.icon} />
       )}
 
       <Text style={[styles.label, { color: textColor }]} numberOfLines={1}>
@@ -45,7 +45,7 @@ export default function Badge({ variant, text, imageUrl, hasInfo = false, style 
       </Text>
 
       {hasInfo && (
-        <SvgUri uri={INFO_ICON} width={14} height={14} style={styles.infoIcon} />
+        <CdnSvg uri={INFO_ICON} width={14} height={14} style={styles.infoIcon} />
       )}
     </View>
   )

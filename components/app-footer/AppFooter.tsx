@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
-import { SvgUri } from 'react-native-svg'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
@@ -120,7 +120,7 @@ export default function AppFooter({
 
               {/* ── Icon area ── */}
               <View style={styles.iconWrap}>
-                <SvgUri
+                <CdnSvg
                   uri={isActive ? activeIcon : inactiveIcon}
                   width={24}
                   height={tab === 3 && !upgradeTag ? 28 : 24}

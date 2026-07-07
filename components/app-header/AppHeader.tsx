@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { SvgUri } from 'react-native-svg'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import MenuIcon from '../../assets/icons/MenuIcon'
 import NotificationIcon from '../../assets/icons/NotificationIcon'
 import SearchIcon from '../../assets/icons/SearchIcon'
@@ -119,9 +119,9 @@ export default function AppHeader({
 
           {/* Language selector pill — always visible, auto-detects language */}
           <Pressable style={styles.h1LangBtn} onPress={onLanguagePress}>
-            <SvgUri uri={ICONS.lang} width={20} height={20} />
+            <CdnSvg uri={ICONS.lang} width={20} height={20} />
             <Text style={styles.h1LangText}>{resolvedLangLabel}</Text>
-            <SvgUri uri={ICONS.chevDown} width={12} height={12} />
+            <CdnSvg uri={ICONS.chevDown} width={12} height={12} />
           </Pressable>
 
           {/* Notification + chat icon buttons */}
@@ -135,7 +135,7 @@ export default function AppHeader({
                 ? <NotificationIcon size={18} color={Colors.textPrimary} />
                 : item.toolType === 'chat'
                 ? <SearchIcon size={18} color={Colors.textPrimary} />
-                : <SvgUri uri={item.toolImg} width={19} height={19} />
+                : <CdnSvg uri={item.toolImg} width={19} height={19} />
               }
               {!!(item.showNotification && item.notifyCount && item.notifyCount !== '0') && (
                 <BadgeCount count={item.notifyCount!} />
@@ -147,7 +147,7 @@ export default function AppHeader({
         {/* ── Row 2: User profile bar ── */}
         <View style={styles.h1UserBar}>
           <Pressable style={styles.h1AvatarWrap} onPress={onAvatarPress}>
-            <SvgUri
+            <CdnSvg
               uri={userImg ?? CDN + 'revamp/default-avatar.svg'}
               width={48}
               height={48}
@@ -164,7 +164,7 @@ export default function AppHeader({
             <Text style={styles.h1UserName} numberOfLines={1}>{userName ?? ''}</Text>
             <View style={styles.h1EditRow}>
               <Text style={styles.h1EditLabel}>Edit profile</Text>
-              <SvgUri uri={ICONS.fwdLink} width={12} height={12} />
+              <CdnSvg uri={ICONS.fwdLink} width={12} height={12} />
             </View>
           </Pressable>
         </View>
@@ -202,9 +202,9 @@ export default function AppHeader({
         <View style={styles.flex1} />
 
         <Pressable style={styles.langBtn} onPress={onLanguagePress}>
-          <SvgUri uri={ICONS.lang} width={24} height={24} />
+          <CdnSvg uri={ICONS.lang} width={24} height={24} />
           <Text style={styles.langText}>{resolvedLangLabel}</Text>
-          <SvgUri uri={ICONS.chevDown} width={12} height={12} />
+          <CdnSvg uri={ICONS.chevDown} width={12} height={12} />
         </Pressable>
       </View>
     </SafeAreaView>

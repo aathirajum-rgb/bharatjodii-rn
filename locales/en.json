@@ -2163,8 +2163,16 @@
     },
     "STAR_RATING":{
         "SUGGESTIONS": "Any other suggestions?",
-        "TEXTAREA": "Type your comment here.",        
-        "SUBMIT": "Submit"
+        "TEXTAREA": "Type your comment here.",
+        "SUBMIT": "Submit",
+        "HDR_RATING": "How would you rate your experience with Jodii?",
+        "SKIP": "Skip",
+        "THANK_YOU": "Thank you!",
+        "PLAY_STORE_CNT": "Please support us by giving us a 5-star rating on Play Store.",
+        "RATE_US": "Rate us",
+        "FEEDBACK_TITLE": "Please tell us what went wrong?",
+        "RATING_THANK": "Thanks for your feedback!",
+        "THANK_NOTE": "We will use your feedback to serve you better"
     },
     "VERIFY_BLOCKER": {
         "VERIFY_IDENTITY": "Verify your identity!",

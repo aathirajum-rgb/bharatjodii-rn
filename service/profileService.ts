@@ -2,6 +2,7 @@ import { apiCall } from './apiClient'
 import { Endpoints } from './api.endpoints'
 import { getItem, setItem, getJson, setJson } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
+import { getSessionValue } from './registrationService'
 
 // ─── getPPSetData ─────────────────────────────────────────────────────────────
 // Angular's getPPSETData — single source of truth for profile + paywall state.
@@ -120,4 +121,18 @@ export async function fetchBulkLikeMatches(start = 0, limit = 20): Promise<any[]
     return result.RESPONSE ?? []
   }
   return []
+}
+
+// ─── sendBulkLikes ────────────────────────────────────────────────────────────
+// Angular: CommunicationService.sendBulkLikes(ids) → communication/bulklike/v1
+// Params mirror communicationService.ts's getCommParams(), except PARTNERID is
+// a '~'-joined list of profile IDs instead of a single one.
+
+export async function sendBulkLikes(ids: string[]): Promise<boolean> {
+  const loginId   = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const gender    = (await getItem(SK.User.LOGIN_GENDER)) ?? 'M'
+  const entryType = (await getSessionValue('ENTRYTYPE')) ?? 'F'
+  const params = `ID=${loginId}&PARTNERID=${ids.join('~')}&LOGINGENDER=${gender}&ENTRYTYPE=${entryType}`
+  const result = await apiCall(Endpoints.communication.sendBulkLike, 'POST', params)
+  return result?.RESPONSECODE == 1 && result?.ERRCODE == 0
 }

@@ -2,7 +2,7 @@
 // MatchesHeader (MOBILE_FILTER_CHIPS) and the desktop MatchesDesktopLayout
 // (DESKTOP_FILTER_CHIPS), which use different chip sets but the same component.
 import { Pressable, ScrollView, StyleSheet, Text } from 'react-native'
-import { SvgUri } from 'react-native-svg'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 
@@ -58,11 +58,11 @@ export default function FilterChipsRow({
             onPress={() => onSelect(isSelected && !isLeadingIcon ? '' : chip.key)}
           >
             {isLeadingIcon && chip.icon && (
-              <SvgUri uri={chip.icon} width={20} height={20} style={{ marginRight: 4 }} />
+              <CdnSvg uri={chip.icon} width={20} height={20} style={{ marginRight: 4 }} />
             )}
             <Text style={[f.chipText, isSelected && f.chipTextSelected]}>{chip.label}</Text>
             {chip.iconPosition === 'onSelect' && chip.icon && isSelected && (
-              <SvgUri uri={chip.icon} width={16} height={16} style={{ marginLeft: 4 }} />
+              <CdnSvg uri={chip.icon} width={16} height={16} style={{ marginLeft: 4 }} />
             )}
           </Pressable>
         )

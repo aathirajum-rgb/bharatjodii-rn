@@ -1,7 +1,7 @@
 import { Animated, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { SvgUri } from 'react-native-svg'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import FilterChipsRow, { MOBILE_FILTER_CHIPS } from './FilterChipsRow'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
@@ -73,7 +73,7 @@ export default function MatchesHeader({
 
           <View style={s.titleActions}>
             <Pressable style={s.iconBtn} onPress={onLanguagePress} hitSlop={8}>
-              <SvgUri uri={CDN + 'revamp/lang-change-img.svg'} width={24} height={24} />
+              <CdnSvg uri={CDN + 'revamp/lang-change-img.svg'} width={24} height={24} />
               <Text style={s.langText}>{langLabel}</Text>
             </Pressable>
           </View>
@@ -88,7 +88,7 @@ export default function MatchesHeader({
             </Text>
             <Pressable style={s.ppEditBtn} onPress={onEditPreferences} hitSlop={8}>
               <Text style={s.ppEditText}>{t('MATCHES.EDIT_PP')}</Text>
-              <SvgUri uri={CDN + 'registration-new/edit-pencil.svg'} width={14} height={14} style={{ marginLeft: 4 }} />
+              <CdnSvg uri={CDN + 'registration-new/edit-pencil.svg'} width={14} height={14} style={{ marginLeft: 4 }} />
             </Pressable>
           </View>
         )}

@@ -23,6 +23,8 @@ export class MatchProfileAdapter implements Adapter<MatchProfile> {
       isNewlyJoined:    item.isNewlyJoined     ?? false,
       isNewLabel:       item.isNewLabel        ?? false,
       labelContent:     item.labelContent      ?? '',
+      photos:           item.photos            ?? [],
+      phoneViewed:      item.phoneViewed        ?? '0',
     }
 
     // Optional fields — only set when present so strictNullChecks stays happy

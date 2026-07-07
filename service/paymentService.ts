@@ -105,13 +105,14 @@ export async function getRechargePackages(): Promise<any[]> {
 
 // ─── Hero banner ──────────────────────────────────────────────────────────────
 
-export async function getHeroBannerDetails(force = false): Promise<any> {
+export async function getHeroBannerDetails(force = false, bannerType?: number): Promise<any> {
   if (!force) {
     const cached = await getJson(PAYMENT_CACHE_KEYS.HERO_BANNER)
     if (cached) return cached
   }
-  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-  const result = await apiCall(Endpoints.payment.payBanner, 'POST', `ID=${userId}&TYPE=MYHOME`)
+  const userId    = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const bannerQs  = bannerType != null ? `&BANNERTYPE=${bannerType}` : ''
+  const result = await apiCall(Endpoints.payment.payBanner, 'POST', `ID=${userId}&TYPE=MYHOME${bannerQs}`)
   if (result?.RESPONSECODE === '1') {
     await setJson(PAYMENT_CACHE_KEYS.HERO_BANNER, result.RESPONSE)
     return result.RESPONSE

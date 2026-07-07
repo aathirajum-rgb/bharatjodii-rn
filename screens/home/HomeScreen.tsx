@@ -9,7 +9,7 @@ import {
   Text,
   View,
 } from 'react-native'
-import { SvgUri } from 'react-native-svg'
+import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import HomeHeader, { type ToolbarItem } from '../../components/home-header/HomeHeader'
 import SwiperCard, { type SwiperItem } from '../../components/swiper-card/SwiperCard'
@@ -122,7 +122,7 @@ function OfferBanner({ onPlayNow }: { onPlayNow?: () => void }) {
         </Pressable>
       </View>
       <View style={ob.right}>
-        <SvgUri uri={CDN + 'revamp/gift-box.svg'} width={90} height={90} />
+        <CdnSvg uri={CDN + 'revamp/gift-box.svg'} width={90} height={90} />
       </View>
     </View>
   )
@@ -231,7 +231,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           <View style={s.cpCard}>
             <Pressable style={s.cpRow} onPress={() => navigation.navigate('onboarding', { pageNo: '16' })}>
               <View style={s.cpIcon}>
-                <SvgUri uri={CDN + 'revamp/horoscope-icon.svg'} width={24} height={24} />
+                <CdnSvg uri={CDN + 'revamp/horoscope-icon.svg'} width={24} height={24} />
               </View>
               <Text style={s.cpText}>Add horoscope details</Text>
               <Text style={s.cpAdd}>Add {'>'}</Text>
@@ -239,7 +239,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <View style={s.cpDivider} />
             <Pressable style={s.cpRow} onPress={() => navigation.navigate('onboarding', { pageNo: '27' })}>
               <View style={s.cpIcon}>
-                <SvgUri uri={CDN + 'revamp/star-icon.svg'} width={24} height={24} />
+                <CdnSvg uri={CDN + 'revamp/star-icon.svg'} width={24} height={24} />
               </View>
               <Text style={s.cpText}>Add star/raasi details</Text>
               <Text style={s.cpAdd}>Add {'>'}</Text>
@@ -397,11 +397,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           <Text style={s.helpSub}>Feel free to connect with us everyday{'\n'}from 8 AM to 9 PM</Text>
           <View style={s.helpActions}>
             <Pressable style={s.callBtn} onPress={() => {}}>
-              <SvgUri uri={CDN + 'revamp/call-icon.svg'} width={22} height={22} />
+              <CdnSvg uri={CDN + 'revamp/call-icon.svg'} width={22} height={22} />
               <Text style={s.callBtnText}>Call us +91 9876543210</Text>
             </Pressable>
             <Pressable style={s.waBtn} onPress={() => {}}>
-              <SvgUri uri={CDN + 'revamp/whatsapp-icon.svg'} width={22} height={22} />
+              <CdnSvg uri={CDN + 'revamp/whatsapp-icon.svg'} width={22} height={22} />
               <Text style={s.waBtnText}>WhatsApp</Text>
             </Pressable>
           </View>

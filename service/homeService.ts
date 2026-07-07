@@ -56,17 +56,27 @@ function toProfile(p: Record<string, any>): SwiperItem {
     // Angular card receives profile.HEIGHTCATEGORY (formatted string like "5'4\"")
     height:              p['HEIGHTCATEGORY'] ?? p['HEIGHT'],
     education:           p['EDUCATION'],
-    // Angular: bindBasicView — LOCATION first, then CITY+STATE
-    location:            p['LOCATION'] || [p['CITY'], p['STATE']].filter(Boolean).join(', ') || '',
+    // Angular: bindBasicView() — NRI profiles show "{NRISTATE}, {NRICOUNTRY}" instead of
+    // city/state when both are present; otherwise LOCATION first, then CITY+STATE.
+    location:            (p['NRISTATE'] && p['NRICOUNTRY'])
+                            ? `${p['NRISTATE']}, ${p['NRICOUNTRY']}`
+                            : p['LOCATION'] || [p['CITY'], p['STATE']].filter(Boolean).join(', ') || '',
     // Angular: FUNC.getPartnerImg() — prefers the full-size PHOTO[0].IMAGE over the
     // low-res THUMBIMG, which looked blurry once stretched to near full card width.
     profileImg:          p['PHOTO']?.[0]?.['IMAGE'] || p['THUMBIMG'],
+    // Full photo array for the multi-photo swiper (Angular: matches-card.component's
+    // profileImageArr). Falls back to a single-item array from profileImg/THUMBIMG so
+    // callers can always treat `photos` as the source of truth.
+    photos: Array.isArray(p['PHOTO']) && p['PHOTO'].length > 0
+      ? p['PHOTO'].map((ph: any) => ph?.['IMAGE']).filter(Boolean)
+      : [p['THUMBIMG']].filter(Boolean),
     // Angular: IsPhotoAvailable checks PHOTOAVAILABLE == "Y", getPhotoProtect checks PHOTOPROTECTED == 'Y'
     isPhotoAvailable:    p['PHOTOAVAILABLE']  == 'Y',
     isPhotoProtect:      p['PHOTOPROTECTED']  == 'Y',
     isNewlyJoined:       p['ISNEWLYJOINED']   == '1',
     // Angular matches card: profile.LIKED (not LIKEDSTATUS) — fallback for other listing APIs
     likedStatus:         (p['LIKED'] ?? p['LIKEDSTATUS']) as SwiperItem['likedStatus'],
+    phoneViewed:         p['PHONEVIEWED'],
     isNewLabel:          p['ISNEWLABEL']  === '1',
     labelContent:        p['LABELCONTENT'],
     likedViewedDateText: p['LIKEDVIEWEDDATETEXT'] ?? p['VIEWEDDATETEXT'] ?? p['LIKEDDATETEXT'],
@@ -194,7 +204,19 @@ export async function refreshSession(): Promise<boolean> {
 // Angular: ID=<NBID>&LOGINGENDER=<LOGINGENDER>&LASTLOGIN=<LASTLOGIN>&COMFLAG=1
 // Response path: res.RESPONSE.NEWCOUNT (NOT top-level res.NEWCOUNT)
 
-export async function fetchNotifCount(): Promise<number> {
+export interface ComCountEntry {
+  comtype:    string
+  newcount:   string
+  cardType:   string
+  totalCount: string
+}
+
+export interface NotifCountResult {
+  newCount: number
+  comCount: ComCountEntry[]
+}
+
+export async function fetchNotifCount(): Promise<NotifCountResult> {
   const [userId, gender, session] = await Promise.all([
     getItem(StorageKeys.Auth.USER_ID),
     getItem(StorageKeys.User.LOGIN_GENDER),
@@ -204,9 +226,12 @@ export async function fetchNotifCount(): Promise<number> {
   const params = `ID=${userId ?? ''}&LOGINGENDER=${gender ?? 'M'}&LASTLOGIN=${lastLogin}&COMFLAG=1`
   const res = await apiCall(Endpoints.communication.notificationCount, 'POST', params)
   if (res?.RESPONSECODE == 1 && res?.ERRCODE == '0') {
-    return Number(res['RESPONSE']?.['NEWCOUNT'] ?? 0)
+    return {
+      newCount: Number(res['RESPONSE']?.['NEWCOUNT'] ?? 0),
+      comCount: res['RESPONSE']?.['COMCOUNT'] ?? [],
+    }
   }
-  return 0
+  return { newCount: 0, comCount: [] }
 }
 
 // ─── Payment banner ───────────────────────────────────────────────────────────
@@ -321,6 +346,34 @@ export async function fetchExtendedMatchesCount(): Promise<number> {
     return Number(res['TOTAL'])
   }
   return 0
+}
+
+// ─── Extended matches (real fetch, not just the count) ───────────────────────
+// Angular: getExtendedMatches() — same endpoint as the count check above, but
+// with a real start/limit to actually fetch the extended-matches profiles for
+// the "Continue seeing profiles" end-card tap.
+
+export async function fetchExtendedMatches(start = 0, limit = 20): Promise<ListingResult> {
+  const [session, userId] = await Promise.all([
+    getSession(),
+    getItem(StorageKeys.Auth.USER_ID),
+  ])
+  const loginCount = session['LOGINCOUNT'] ?? '0'
+  const params = [
+    `ID=${userId ?? ''}`,
+    `START=${start}`,
+    `LIMIT=${limit}`,
+    'LIKED=1',
+    'VIEWED=0',
+    'REPORTED=1',
+    'BLOCKED=1',
+    'REMOVED=1',
+    'SKIPED=1',
+    'BANNERFLAG=0',
+    `LOGINCOUNT=${loginCount}`,
+  ].join('&')
+  const res = await apiCall(Endpoints.listing.extendedMatches, 'POST', params)
+  return toListingResult(res)
 }
 
 // ─── All Matches ──────────────────────────────────────────────────────────────
