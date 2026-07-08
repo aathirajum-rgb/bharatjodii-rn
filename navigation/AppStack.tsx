@@ -30,6 +30,7 @@ import ReligionScreen              from '../screens/onboarding/ReligionScreen'
 import CasteScreen                 from '../screens/onboarding/CasteScreen'
 import GothraScreen                from '../screens/onboarding/GothraScreen'
 import AddPhotoScreen              from '../screens/onboarding/AddPhotoScreen'
+import CustomGalleryScreen         from '../screens/onboarding/CustomGalleryScreen'
 import ManagePhotosScreen          from '../screens/onboarding/ManagePhotosScreen'
 import FamilyDetailsScreen         from '../screens/onboarding/FamilyDetailsScreen'
 import PropertyDetailsScreen       from '../screens/onboarding/PropertyDetailsScreen'
@@ -86,7 +87,7 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
   // Reset footer to a safe default when the page changes, so the previous
   // screen's button state doesn't bleed through while the new screen mounts.
   useEffect(() => {
-    setFooterStateRaw({ nextDisabled: true, nextLoading: false, nextHidden: false, showSkip: false })
+    setFooterStateRaw({ nextDisabled: true, nextLoading: false, nextHidden: true, showSkip: false })
     handlers.current = { onNext: () => {}, onSkip: undefined }
   }, [pageNo])
 
@@ -116,6 +117,7 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
       case '14': return <CasteScreen            navigation={navigation} route={route} />
       case '16': return <GothraScreen           navigation={navigation} route={route} />
       case '20': return <AddPhotoScreen         navigation={navigation} route={route} />
+      case '22': return <CustomGalleryScreen    navigation={navigation} route={route} />
       case '21': return <ManagePhotosScreen     navigation={navigation} route={route} />
       case '27': return <FamilyDetailsScreen    navigation={navigation} route={route} />
       case '28': return <PropertyDetailsScreen  navigation={navigation} route={route} />

@@ -1,10 +1,6 @@
-import * as ImagePicker from 'expo-image-picker'
 import { Image } from 'expo-image'
 import { useEffect, useRef, useState } from 'react'
 import {
-  ActionSheetIOS,
-  ActivityIndicator,
-  Alert,
   Animated,
   Modal,
   Platform,
@@ -17,11 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
-import { StorageKeys as SK } from '../../constants/storage.keys'
-import { Endpoints } from '../../service/api.endpoints'
-import { uploadFile } from '../../service/apiClient'
 import { getRegValue } from '../../service/registrationService'
-import { getItem, setItem } from '../../service/storageService'
 import { CDN_IMG } from '../../constants/cdn'
 import { os } from './onboardingStyles'
 
@@ -34,7 +26,7 @@ const CDN_FEMALE_PLACEHOLDER = CDN_IMG + 'female_silhouette.png'
 
 type Props = {
   navigation: any
-  route: { params?: { pageNo?: string } }
+  route:      { params?: { pageNo?: string } }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -42,10 +34,8 @@ type Props = {
 export default function AddPhotoScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
 
-  const [gender,       setGender]       = useState('1')
-  const [createdBy,    setCreatedBy]    = useState('4')
-  const [photoUri,       setPhotoUri]       = useState<string | null>(null)
-  const [uploading,      setUploading]      = useState(false)
+  const [gender,    setGender]    = useState('1')
+  const [createdBy, setCreatedBy] = useState('4')
   const [skipSheetVisible, setSkipSheetVisible] = useState(false)
 
   const slideAnim = useRef(new Animated.Value(300)).current
@@ -76,109 +66,16 @@ export default function AddPhotoScreen({ navigation }: Props) {
     })
   }, [])
 
-  // ─── Derived ──────────────────────────────────────────────────────────────
+  const isFemale = gender === '2' || ['5', '9'].includes(createdBy)
 
-  const isFemale  = gender === '2' || ['5', '9'].includes(createdBy)
-
-  // ─── Photo picker ─────────────────────────────────────────────────────────
-
-  async function requestPermission(source: 'camera' | 'library'): Promise<boolean> {
-    if (source === 'camera') {
-      const { status } = await ImagePicker.requestCameraPermissionsAsync()
-      return status === 'granted'
-    }
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    return status === 'granted'
-  }
-
-  async function pickFromCamera() {
-    if (!await requestPermission('camera')) {
-      Alert.alert('Permission required', 'Camera access is needed to take a photo.')
-      return
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true, aspect: [3, 4], quality: 0.85,
-    })
-    if (!result.canceled) handlePickedAsset(result.assets[0])
-  }
-
-  async function pickFromGallery() {
-    if (!await requestPermission('library')) {
-      Alert.alert('Permission required', 'Photo library access is needed to select a photo.')
-      return
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images', allowsEditing: true, aspect: [3, 4], quality: 0.85,
-    })
-    if (!result.canceled) handlePickedAsset(result.assets[0])
-  }
-
-  function handlePickedAsset(asset: ImagePicker.ImagePickerAsset) {
-    setPhotoUri(asset.uri)
-    uploadPhoto(asset)
-  }
-
-  function openPhotoPicker() {
-    if (uploading) return
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Cancel', 'Take Photo', 'Choose from Library'], cancelButtonIndex: 0 },
-        (idx) => { if (idx === 1) pickFromCamera(); if (idx === 2) pickFromGallery() },
-      )
-    } else {
-      Alert.alert('Add photo', 'Choose a source', [
-        { text: 'Camera',  onPress: pickFromCamera },
-        { text: 'Gallery', onPress: pickFromGallery },
-        { text: 'Cancel',  style: 'cancel' },
-      ])
-    }
-  }
-
-  // ─── Upload ───────────────────────────────────────────────────────────────
-
-  async function uploadPhoto(asset: ImagePicker.ImagePickerAsset) {
-    setUploading(true)
-    try {
-      const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-
-      const formData = new FormData()
-      formData.append('ID', userId)
-      formData.append('UPLOADPHOTO', {
-        uri:  asset.uri,
-        type: asset.mimeType ?? 'image/jpeg',
-        name: asset.fileName ?? 'photo.jpg',
-      } as any)
-
-      const res = await uploadFile(Endpoints.media.addProfilePic, formData)
-
-      if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0) {
-        if (res?.RESPONSE?.PHOTOURL) {
-          await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
-        }
-        // Go to manage photos screen so user can view uploaded photo + add more
-        navigation.push('onboarding', { pageNo: '21' })
-      } else {
-        const msg = res?.RESPONSE?.MESSAGE ?? res?.ERRMSG ?? 'Upload failed. Please try again.'
-        Alert.alert('Upload failed', msg, [
-          { text: 'Retry', onPress: openPhotoPicker },
-          { text: 'Skip',  onPress: openSkipSheet },
-        ])
-        setPhotoUri(null)
-      }
-    } catch {
-      Alert.alert('Error', 'Something went wrong. Please try again.')
-      setPhotoUri(null)
-    } finally {
-      setUploading(false)
-    }
+  function openGallery() {
+    navigation.push('onboarding', { pageNo: '22' })
   }
 
   useOnboardingFooter({
     nextHidden: true,
-    showSkip:   true,
-    skipLabel:  "I'll do this later",
+    showSkip:   false,
     onNext:     () => {},
-    onSkip:     openSkipSheet,
   }, [])
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -195,25 +92,15 @@ export default function AddPhotoScreen({ navigation }: Props) {
         <View style={styles.photoAreaWrapper}>
           <Pressable
             style={styles.photoArea}
-            onPress={openPhotoPicker}
+            onPress={openGallery}
             accessibilityRole="button"
             accessibilityLabel="Add photo"
           >
-            {uploading ? (
-              <ActivityIndicator color={Colors.primary} size="large" />
-            ) : photoUri ? (
-              <Image
-                source={{ uri: photoUri }}
-                style={styles.photoPreview}
-                contentFit="cover"
-              />
-            ) : (
-              <Image
-                source={{ uri: isFemale ? CDN_FEMALE_PLACEHOLDER : CDN_MALE_PLACEHOLDER }}
-                style={styles.silhouette}
-                contentFit="contain"
-              />
-            )}
+            <Image
+              source={{ uri: isFemale ? CDN_FEMALE_PLACEHOLDER : CDN_MALE_PLACEHOLDER }}
+              style={styles.silhouette}
+              contentFit="contain"
+            />
           </Pressable>
         </View>
 
@@ -236,17 +123,25 @@ export default function AddPhotoScreen({ navigation }: Props) {
 
           {/* Add photo button inside card */}
           <Pressable
-            style={[styles.addBtn, uploading && styles.addBtnDisabled]}
-            onPress={openPhotoPicker}
+            style={styles.addBtn}
+            onPress={openGallery}
             accessibilityRole="button"
           >
-            {uploading
-              ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={styles.addBtnLabel}>Add photo now</Text>
-            }
+            <Text style={styles.addBtnLabel}>Add photo now</Text>
           </Pressable>
         </View>
+
       </ScrollView>
+
+      {/* "I'll do this later" pinned at bottom */}
+      <Pressable
+        style={[styles.laterRow, { paddingBottom: insets.bottom > 0 ? insets.bottom : 16 }]}
+        onPress={openSkipSheet}
+        hitSlop={12}
+      >
+        <Text style={styles.laterText}>I'll do this later</Text>
+        <Text style={styles.laterChevron}>›</Text>
+      </Pressable>
 
       {/* Skip-confirm bottom sheet */}
       <Modal
@@ -264,7 +159,6 @@ export default function AddPhotoScreen({ navigation }: Props) {
                 transform: [{ translateY: slideAnim }] },
             ]}
           >
-            {/* Warning icon */}
             <View style={styles.warnIconCircle}>
               <Text style={styles.warnIconText}>!</Text>
             </View>
@@ -274,7 +168,6 @@ export default function AddPhotoScreen({ navigation }: Props) {
             </Text>
             <Text style={styles.sheetSub}>Do you want to add photo?</Text>
 
-            {/* Outlined — skip */}
             <Pressable
               style={styles.sheetBtnOutline}
               onPress={() => closeSkipSheet(true)}
@@ -282,13 +175,9 @@ export default function AddPhotoScreen({ navigation }: Props) {
               <Text style={styles.sheetBtnOutlineLabel}>I'll do this later</Text>
             </Pressable>
 
-            {/* Solid — add photo */}
             <Pressable
               style={styles.sheetBtnSolid}
-              onPress={() => {
-                closeSkipSheet(false)
-                openPhotoPicker()
-              }}
+              onPress={() => { closeSkipSheet(false); openGallery() }}
             >
               <Text style={styles.sheetBtnSolidLabel}>Yes, add photo</Text>
             </Pressable>
@@ -310,7 +199,6 @@ const styles = StyleSheet.create({
     alignItems:        'center',
   },
 
-  // Photo
   photoAreaWrapper: {
     alignItems:    'center',
     marginBottom:  24,
@@ -330,12 +218,7 @@ const styles = StyleSheet.create({
     width:  '100%',
     height: '100%',
   },
-  photoPreview: {
-    width:  '100%',
-    height: '100%',
-  },
 
-  // Title
   title: {
     fontSize:      24,
     fontWeight:    '700',
@@ -345,7 +228,6 @@ const styles = StyleSheet.create({
     marginBottom:  24,
   },
 
-  // Benefits card
   card: {
     width:             '100%',
     backgroundColor:   Colors.surface,
@@ -388,7 +270,6 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // Add button (inside card)
   addBtn: {
     height:          52,
     backgroundColor: Colors.primaryDark,
@@ -397,14 +278,32 @@ const styles = StyleSheet.create({
     justifyContent:  'center',
     marginTop:       4,
   },
-  addBtnDisabled: { opacity: 0.7 },
   addBtnLabel: {
     fontSize:   16,
     fontWeight: '600',
     color:      Colors.white,
   },
 
-  // Skip-confirm sheet
+  laterRow: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'center',
+    paddingTop:        14,
+    paddingHorizontal: 24,
+    gap:               4,
+    backgroundColor:   Colors.surface,
+  },
+  laterText: {
+    fontSize:   14,
+    fontFamily: 'Poppins-Regular',
+    color:      '#333333',
+  },
+  laterChevron: {
+    fontSize:   18,
+    color:      '#333333',
+    lineHeight: 22,
+  },
+
   sheetOverlay: {
     flex:            1,
     backgroundColor: Colors.scrim,
@@ -471,5 +370,4 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color:      Colors.white,
   },
-
 })

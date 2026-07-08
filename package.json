@@ -92,6 +92,7 @@
     "assemble:jodii": "cross-env EXPO_PUBLIC_APP_FLAVOR=jodii EXPO_PUBLIC_APP_TYPE=115 ./android/gradlew -p android assembleJodiiRelease",
     "assemble:tamil": "cross-env EXPO_PUBLIC_APP_FLAVOR=tamil EXPO_PUBLIC_APP_TYPE=116 ./android/gradlew -p android assembleTamilRelease",
     "assemble:malayalam": "cross-env EXPO_PUBLIC_APP_FLAVOR=malayalam EXPO_PUBLIC_APP_TYPE=118 ./android/gradlew -p android assembleMalayalamRelease",
+    "assemble:tamil:stg": "node scripts/setup-env.js stg && cross-env EXPO_PUBLIC_APP_ENV=stg EXPO_PUBLIC_APP_FLAVOR=tamil EXPO_PUBLIC_APP_TYPE=116 ./android/gradlew -p android assembleTamilRelease",
     "assemble:tamil:dev": "node scripts/setup-env.js dev && cross-env EXPO_PUBLIC_APP_ENV=dev EXPO_PUBLIC_APP_FLAVOR=tamil EXPO_PUBLIC_APP_TYPE=116 ./android/gradlew -p android assembleTamilRelease",
     "assemble:tamil:uat": "node scripts/setup-env.js uat && cross-env EXPO_PUBLIC_APP_ENV=uat EXPO_PUBLIC_APP_FLAVOR=tamil EXPO_PUBLIC_APP_TYPE=116 ./android/gradlew -p android assembleTamilRelease",
     "assemble:tamil:preprod": "node scripts/setup-env.js preprod && cross-env EXPO_PUBLIC_APP_ENV=preprod EXPO_PUBLIC_APP_FLAVOR=tamil EXPO_PUBLIC_APP_TYPE=116 ./android/gradlew -p android assembleTamilRelease",

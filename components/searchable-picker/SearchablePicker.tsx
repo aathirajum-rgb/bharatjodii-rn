@@ -95,7 +95,6 @@ export default function SearchablePicker({
           </View>
 
           <View style={[styles.searchBox, searchFocused && styles.searchBoxFocused]}>
-            <Text style={styles.searchIcon}>⌕</Text>
             <TextInput
               style={styles.searchInput}
               placeholder={placeholder}
@@ -208,7 +207,6 @@ const styles = StyleSheet.create({
     backgroundColor:   Colors.surface,
   },
   searchBoxFocused: { borderColor: Colors.primary },
-  searchIcon:       { fontSize: 14 },
   searchInput:      { flex: 1, fontSize: 14, color: Colors.textPrimary, padding: 0 },
   searchClear:      { fontSize: 13, color: Colors.scrimLight, padding: 2 },
   emptyBox:         { padding: 32, alignItems: 'center' },

@@ -105,10 +105,19 @@ android {
             keyPassword 'android'
         }
         release {
-            storeFile file(System.getenv('JODII_KEYSTORE_FILE') ?: 'jodii-release.keystore')
-            storePassword System.getenv('JODII_STORE_PASSWORD') ?: ''
-            keyAlias System.getenv('JODII_KEY_ALIAS') ?: 'jodii-release'
-            keyPassword System.getenv('JODII_KEY_PASSWORD') ?: ''
+            def keystoreName = System.getenv('JODII_KEYSTORE_FILE') ?: 'jodii-release.keystore'
+            if (file(keystoreName).exists()) {
+                storeFile file(keystoreName)
+                storePassword System.getenv('JODII_STORE_PASSWORD') ?: ''
+                keyAlias System.getenv('JODII_KEY_ALIAS') ?: 'jodii-release'
+                keyPassword System.getenv('JODII_KEY_PASSWORD') ?: ''
+            } else {
+                // No release keystore — fall back to debug signing so the build succeeds
+                storeFile file('debug.keystore')
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
         }
     }
     flavorDimensions "appType"

@@ -49,11 +49,12 @@ async function initializeAppConfig(): Promise<void> {
 export default function App() {
   useOTAUpdate()
   const [appReady, setAppReady] = useState(false)
+  const [fontTimeout, setFontTimeout] = useState(false)
 
   // Load Poppins — all weights used across the Figma design.
   // Keys match themes/typography.ts FontFamilies.english so every component
   // that sets fontFamily: 'Poppins-Regular' etc. gets the real typeface.
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontsError] = useFonts({
     'Poppins-Regular':  Poppins_400Regular,
     'Poppins-Medium':   Poppins_500Medium,
     'Poppins-SemiBold': Poppins_600SemiBold,
@@ -67,12 +68,23 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    // Config must finish before AuthProvider mounts and reads storage
-    initializeAppConfig().then(() => setAppReady(true))
+    // Config must finish before AuthProvider mounts and reads storage.
+    // Catch any failure so the app never gets stuck on a black screen.
+    initializeAppConfig()
+      .catch(() => {})
+      .finally(() => setAppReady(true))
   }, [])
 
-  // Wait for both app config AND fonts before rendering anything
-  if (!appReady || !fontsLoaded) return null
+  useEffect(() => {
+    // Safety net: if Poppins hasn't loaded in 3 s (error or hung), proceed anyway.
+    // The system fallback font renders until Poppins resolves on the next launch.
+    const t = setTimeout(() => setFontTimeout(true), 3000)
+    return () => clearTimeout(t)
+  }, [])
+
+  // Wait for app config. For fonts: proceed if loaded, errored, or timed out.
+  const fontsReady = fontsLoaded || !!fontsError || fontTimeout
+  if (!appReady || !fontsReady) return null
 
   return (
     <SafeAreaProvider>

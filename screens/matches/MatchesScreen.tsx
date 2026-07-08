@@ -19,6 +19,7 @@ import {
   Text,
   View,
 } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import MatchesHeader from '../../components/matches-header/MatchesHeader'
@@ -984,32 +985,34 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   }
 
   function handleScroll(e: any) {
-    const current = e.nativeEvent.contentOffset.y | 0
-    const delta   = current - scrollYRef.current
-    if (Math.abs(delta) < 10) return
-    scrollYRef.current = current
-
-    // Angular: hide when scrollY > 100 && scrolling down, show when delta < -15 || scrollY < 50
-    const shouldHide = current > 100 && delta > 0
-    const shouldShow = delta < -15 || current < 50
-
-    if (shouldHide && !isHiddenRef.current) {
-      isHiddenRef.current = true
-      Animated.timing(headerAnim, {
-        toValue:         -(titleHRef.current || 56),  // slide by title row height only
-        duration:        300,
-        easing:          Easing.ease,
-        useNativeDriver: true,
-      }).start()
-    } else if (shouldShow && isHiddenRef.current) {
-      isHiddenRef.current = false
-      Animated.timing(headerAnim, {
-        toValue:         0,
-        duration:        300,
-        easing:          Easing.ease,
-        useNativeDriver: true,
-      }).start()
-    }
+    // Header hide-on-scroll animation disabled per request — header now stays fixed.
+    // (Original Angular-mirroring slide logic kept here, commented out, in case it's revisited.)
+    // const current = e.nativeEvent.contentOffset.y | 0
+    // const delta   = current - scrollYRef.current
+    // if (Math.abs(delta) < 10) return
+    // scrollYRef.current = current
+    //
+    // // Angular: hide when scrollY > 100 && scrolling down, show when delta < -15 || scrollY < 50
+    // const shouldHide = current > 100 && delta > 0
+    // const shouldShow = delta < -15 || current < 50
+    //
+    // if (shouldHide && !isHiddenRef.current) {
+    //   isHiddenRef.current = true
+    //   Animated.timing(headerAnim, {
+    //     toValue:         -(titleHRef.current || 56),  // slide by title row height only
+    //     duration:        300,
+    //     easing:          Easing.ease,
+    //     useNativeDriver: true,
+    //   }).start()
+    // } else if (shouldShow && isHiddenRef.current) {
+    //   isHiddenRef.current = false
+    //   Animated.timing(headerAnim, {
+    //     toValue:         0,
+    //     duration:        300,
+    //     easing:          Easing.ease,
+    //     useNativeDriver: true,
+    //   }).start()
+    // }
   }
 
   // Merged list of profiles + inline banner slots (e.g. BANNERSLOT 1001 = membership promo)
@@ -1796,6 +1799,8 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   }
 
   return (
+    // top/bottom insets are already applied inside MatchesHeader/AppFooter —
+    // only guard the side edges here (landscape notch/rounded-corner devices).
     <View style={s.screen}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}

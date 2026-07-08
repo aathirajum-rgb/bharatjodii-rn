@@ -1,72 +1,145 @@
-import * as ImagePicker from 'expo-image-picker'
 import { Image } from 'expo-image'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
-  ActionSheetIOS,
   ActivityIndicator,
   Alert,
-  Animated,
   Dimensions,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Svg, { Path, Polyline, Rect, Line } from 'react-native-svg'
 import { Colors } from '../../constants/colors'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
 import { Endpoints } from '../../service/api.endpoints'
-import { apiCall, uploadFile } from '../../service/apiClient'
+import { apiCall } from '../../service/apiClient'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
+import { getRegValue } from '../../service/registrationService'
 
-// ─── Layout constants ──────────────────────────────────────────────────────────
+// ─── Layout ───────────────────────────────────────────────────────────────────
 
-const MAX_PHOTOS  = 10
-const COLS        = 3
-const H_PAD       = 16
-const GAP         = 8
-const SCREEN_W    = Dimensions.get('window').width
-const SLOT_W      = Math.floor((SCREEN_W - H_PAD * 2 - GAP * (COLS - 1)) / COLS)
-const SLOT_H      = Math.floor(SLOT_W * 4 / 3)
+const SCREEN_W  = Dimensions.get('window').width
+const H_PAD     = 16
+const GAP        = 4
+const LARGE_W    = Math.floor((SCREEN_W - H_PAD * 2) * 0.60)
+const SMALL_W    = (SCREEN_W - H_PAD * 2) - LARGE_W - GAP
+const LARGE_H    = Math.floor(LARGE_W * 1.35)
+const SMALL_H    = Math.floor((LARGE_H - GAP) / 2)
+const GRID_CELL  = Math.floor((SCREEN_W - H_PAD * 2 - GAP * 2) / 3)
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type Photo = {
   PHOTOID:     string
   PHOTOTHUMB:  string
-  MAINPHOTO:   number   // 1 = main photo
-  PHOTOSTATUS: number   // 0 = under review, 1 = approved
+  MAINPHOTO:   number
+  PHOTOSTATUS: number
 }
 
 type Props = {
   navigation: any
-  route:      { params?: { pageNo?: string } }
+  route:      { params?: { pageNo?: string; pendingUri?: string } }
 }
 
-// ─── Component ─────────────────────────────────────────────────────────────────
+// ─── Title helpers ────────────────────────────────────────────────────────────
 
-export default function ManagePhotosScreen({ navigation }: Props) {
-  const insets = useSafeAreaInsets()
+const CREATED_BY_LABEL: Record<string, string> = {
+  '1':  'your',
+  '4':  "son's",
+  '5':  "daughter's",
+  '8':  "brother's",
+  '9':  "sister's",
+  '10': "friend's",
+  '11': "relative's",
+}
+
+function getTitle(createdBy: string): string {
+  const who = CREATED_BY_LABEL[createdBy] ?? 'your'
+  return `Add ${who} photos`
+}
+
+function getSubtitle(createdBy: string): string {
+  const who = CREATED_BY_LABEL[createdBy] ?? 'your'
+  return `Add ${who} photo and get 3x more responses from matches`
+}
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+
+function PersonCardIcon() {
+  return (
+    <Svg width={40} height={40} viewBox="0 0 24 24" fill="none">
+      <Rect x={2} y={4} width={20} height={16} rx={2} stroke="#111" strokeWidth={1.6} />
+      <Path
+        d="M8 12a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"
+        stroke="#111"
+        strokeWidth={1.5}
+      />
+      <Path
+        d="M4 19c0-2.21 1.79-4 4-4h1"
+        stroke="#111"
+        strokeWidth={1.5}
+        strokeLinecap="round"
+      />
+      <Line x1={14} y1={9} x2={20} y2={9} stroke="#111" strokeWidth={1.5} strokeLinecap="round" />
+      <Line x1={14} y1={13} x2={18} y2={13} stroke="#111" strokeWidth={1.5} strokeLinecap="round" />
+    </Svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
+      <Polyline points="3 6 5 6 21 6" stroke="#555" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <Path
+        d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"
+        stroke="#555"
+        strokeWidth={2}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Path d="M10 11v6M14 11v6" stroke="#555" strokeWidth={2} strokeLinecap="round" />
+      <Path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" stroke="#555" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+    </Svg>
+  )
+}
+
+function InfoIcon() {
+  return (
+    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M12 22c5.52 0 10-4.48 10-10S17.52 2 12 2 2 6.48 2 12s4.48 10 10 10z"
+        stroke="#555"
+        strokeWidth={1.8}
+      />
+      <Line x1={12} y1={16} x2={12} y2={12} stroke="#555" strokeWidth={2} strokeLinecap="round" />
+      <Line x1={12} y1={8} x2={12.01} y2={8} stroke="#555" strokeWidth={2} strokeLinecap="round" />
+    </Svg>
+  )
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+
+export default function ManagePhotosScreen({ navigation, route }: Props) {
+  const pendingUri = (route.params as any)?.pendingUri as string | undefined
+
+  const [photos,    setPhotos]    = useState<Photo[]>([])
+  const [loading,   setLoading]   = useState(true)
+  const [createdBy, setCreatedBy] = useState('1')
 
   useOnboardingFooter({
-    nextLabel:    'Continue',
+    nextLabel:    'Confirm',
     nextDisabled: false,
     onNext:       () => navigation.push('onboarding', { pageNo: '27' }),
   }, [navigation])
 
-  const [photos,      setPhotos]      = useState<Photo[]>([])
-  const [loading,     setLoading]     = useState(true)
-  const [uploading,   setUploading]   = useState(false)
-  const [actionPhoto, setActionPhoto] = useState<Photo | null>(null)
-
-  const slideAnim = useRef(new Animated.Value(300)).current
-
-  useEffect(() => { loadPhotos() }, [])
+  useEffect(() => {
+    getRegValue('CREATEDBY').then(v => { if (v) setCreatedBy(v) })
+    loadPhotos()
+  }, [])
 
   // ─── Data ──────────────────────────────────────────────────────────────────
 
@@ -78,7 +151,7 @@ export default function ManagePhotosScreen({ navigation }: Props) {
         setPhotos(res.RESPONSE.PHOTOS)
       }
     } catch {
-      // keep empty state, user can retry by coming back
+      // silently keep empty
     } finally {
       setLoading(false)
     }
@@ -86,112 +159,14 @@ export default function ManagePhotosScreen({ navigation }: Props) {
 
   // ─── Upload ────────────────────────────────────────────────────────────────
 
-  async function pickFromCamera() {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Camera access is needed.')
-      return
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true, aspect: [3, 4], quality: 0.85,
-    })
-    if (!result.canceled) doUpload(result.assets[0])
+  async function pickAndUpload() {
+    navigation.push('onboarding', { pageNo: '22' })
   }
 
-  async function pickFromGallery() {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Photo library access is needed.')
-      return
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images', allowsEditing: true, aspect: [3, 4], quality: 0.85,
-    })
-    if (!result.canceled) doUpload(result.assets[0])
-  }
-
-  function openPicker() {
-    if (uploading || photos.length >= MAX_PHOTOS) return
-    if (Platform.OS === 'ios') {
-      ActionSheetIOS.showActionSheetWithOptions(
-        { options: ['Cancel', 'Take Photo', 'Choose from Library'], cancelButtonIndex: 0 },
-        (idx) => { if (idx === 1) pickFromCamera(); if (idx === 2) pickFromGallery() },
-      )
-    } else {
-      Alert.alert('Add photo', 'Choose a source', [
-        { text: 'Camera',  onPress: pickFromCamera },
-        { text: 'Gallery', onPress: pickFromGallery },
-        { text: 'Cancel',  style: 'cancel' },
-      ])
-    }
-  }
-
-  async function doUpload(asset: ImagePicker.ImagePickerAsset) {
-    setUploading(true)
-    try {
-      const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-      const formData = new FormData()
-      formData.append('ID', userId)
-      formData.append('UPLOADPHOTO', {
-        uri:  asset.uri,
-        type: asset.mimeType ?? 'image/jpeg',
-        name: asset.fileName  ?? 'photo.jpg',
-      } as any)
-
-      const res = await uploadFile(Endpoints.media.addProfilePic, formData)
-      if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0) {
-        await loadPhotos()
-      } else {
-        Alert.alert('Upload failed', res?.RESPONSE?.MESSAGE ?? 'Please try again.')
-      }
-    } catch {
-      Alert.alert('Error', 'Something went wrong. Please try again.')
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  // ─── Photo actions ─────────────────────────────────────────────────────────
-
-  function openActions(photo: Photo) {
-    if (photo.PHOTOSTATUS === 0) {
-      Alert.alert('Photo under review', 'This photo is being verified. You can delete it if needed.', [
-        { text: 'Delete', style: 'destructive', onPress: () => confirmDelete(photo) },
-        { text: 'Cancel', style: 'cancel' },
-      ])
-      return
-    }
-    setActionPhoto(photo)
-    Animated.spring(slideAnim, {
-      toValue: 0, useNativeDriver: true, bounciness: 0, speed: 20,
-    }).start()
-  }
-
-  function closeActions(cb?: () => void) {
-    Animated.timing(slideAnim, {
-      toValue: 300, duration: 220, useNativeDriver: true,
-    }).start(() => {
-      setActionPhoto(null)
-      cb?.()
-    })
-  }
-
-  async function handleSetMain(photo: Photo) {
-    closeActions()
-    try {
-      const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-      const res = await apiCall(
-        Endpoints.profile.setMainPhoto, 'POST',
-        `ID=${userId}&PHOTOID=${photo.PHOTOID}`,
-      )
-      if (res?.RESPONSECODE == 1) await loadPhotos()
-    } catch {
-      Alert.alert('Error', 'Could not update main photo. Please try again.')
-    }
-  }
+  // ─── Delete ────────────────────────────────────────────────────────────────
 
   function confirmDelete(photo: Photo) {
-    Alert.alert('Delete photo', 'Are you sure you want to delete this photo?', [
+    Alert.alert('Delete photo', 'Remove this photo from your profile?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete', style: 'destructive',
@@ -204,21 +179,113 @@ export default function ManagePhotosScreen({ navigation }: Props) {
             )
             if (res?.RESPONSECODE == 1) await loadPhotos()
           } catch {
-            Alert.alert('Error', 'Could not delete photo. Please try again.')
+            Alert.alert('Error', 'Could not delete photo.')
           }
         },
       },
     ])
   }
 
-  function handleDelete(photo: Photo) {
-    closeActions(() => confirmDelete(photo))
+  // ─── Set main ─────────────────────────────────────────────────────────────
+
+  async function setAsMain(photo: Photo) {
+    try {
+      const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+      const res = await apiCall(
+        Endpoints.profile.setMainPhoto, 'POST',
+        `ID=${userId}&PHOTOID=${photo.PHOTOID}`,
+      )
+      if (res?.RESPONSECODE == 1) await loadPhotos()
+    } catch {
+      Alert.alert('Error', 'Could not set main photo.')
+    }
   }
 
-  // ─── Grid slots ────────────────────────────────────────────────────────────
-  // Filled photos + one "Add" slot (if under limit) + dimmed placeholder slots
+  // ─── Optimistic list ───────────────────────────────────────────────────────
+  // While the server list loads, show the just-uploaded photo immediately.
+  const displayPhotos: (Photo | 'pending')[] = loading && pendingUri
+    ? ['pending']
+    : photos
 
-  const canAddMore = photos.length < MAX_PHOTOS
+  const mainPhoto  = displayPhotos[0]
+  const rightPhotos = displayPhotos.slice(1, 3)
+  const gridPhotos  = displayPhotos.slice(3)
+
+  const title    = getTitle(createdBy)
+  const subtitle = getSubtitle(createdBy)
+
+  // ─── Photo card helper ─────────────────────────────────────────────────────
+
+  function PhotoCard({
+    item,
+    style,
+    imgStyle,
+    isMain,
+  }: {
+    item:     Photo | 'pending'
+    style?:   object
+    imgStyle?: object
+    isMain?:  boolean
+  }) {
+    if (item === 'pending') {
+      return (
+        <View style={[styles.photoCard, style, isMain && styles.mainPhotoCard]}>
+          <Image
+            source={pendingUri ? { uri: pendingUri } : null}
+            style={[styles.photoImg, imgStyle]}
+            contentFit="cover"
+          />
+          <View style={styles.processingOverlay}>
+            <ActivityIndicator color="#fff" size="small" />
+            <Text style={styles.processingText}>Processing…</Text>
+          </View>
+          {isMain && (
+            <View style={styles.profileLabel}>
+              <Text style={styles.profileLabelText}>Profile Picture</Text>
+            </View>
+          )}
+        </View>
+      )
+    }
+
+    const uri = item.PHOTOTHUMB
+    return (
+      <Pressable
+        style={[styles.photoCard, style, isMain && styles.mainPhotoCard]}
+        onPress={isMain ? undefined : () => setAsMain(item)}
+        onLongPress={() => confirmDelete(item)}
+      >
+        <Image
+          source={{ uri }}
+          style={[styles.photoImg, imgStyle]}
+          contentFit="cover"
+        />
+
+        {/* Under-review overlay */}
+        {item.PHOTOSTATUS === 0 && (
+          <View style={styles.reviewOverlay}>
+            <Text style={styles.reviewText}>Under review</Text>
+          </View>
+        )}
+
+        {/* Profile Picture label on main */}
+        {isMain && (
+          <View style={styles.profileLabel}>
+            <Text style={styles.profileLabelText}>Profile Picture</Text>
+          </View>
+        )}
+
+        {/* Trash delete button */}
+        <Pressable
+          style={styles.trashBtn}
+          onPress={() => confirmDelete(item)}
+          hitSlop={6}
+        >
+          <TrashIcon />
+        </Pressable>
+      </Pressable>
+    )
+  }
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -226,124 +293,103 @@ export default function ManagePhotosScreen({ navigation }: Props) {
     <View style={os.flex1}>
       <ScrollView
         style={os.flex1}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.title}>Your photos</Text>
-        <Text style={styles.subtitle}>
-          {photos.length}/{MAX_PHOTOS} photos added
-          {canAddMore ? ' · Add more for better responses' : ''}
-        </Text>
+        {/* Icon */}
+        <View style={styles.iconRow}>
+          <PersonCardIcon />
+        </View>
 
-        {loading ? (
-          <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
+        {/* Title + subtitle */}
+        <Text style={styles.title}>{title}</Text>
+        <Text style={styles.subtitle}>{subtitle}</Text>
+
+        {/* Loading state (no pending URI) */}
+        {loading && !pendingUri ? (
+          <ActivityIndicator color={Colors.primary} size="large" style={{ marginTop: 40 }} />
+        ) : displayPhotos.length === 0 ? (
+          <Text style={styles.emptyHint}>No photos yet. Go back and add one.</Text>
         ) : (
-          <View style={styles.grid}>
-            {/* Existing photos */}
-            {photos.map((photo) => (
-              <Pressable
-                key={photo.PHOTOID}
-                style={styles.slot}
-                onLongPress={() => openActions(photo)}
-                delayLongPress={300}
-              >
-                <Image
-                  source={{ uri: photo.PHOTOTHUMB }}
-                  style={styles.slotImage}
-                  contentFit="cover"
+          <>
+            {/* ── Top section: large main + 2 small stacked ── */}
+            <View style={styles.topRow}>
+              {/* Main photo */}
+              {mainPhoto !== undefined && (
+                <PhotoCard
+                  item={mainPhoto}
+                  style={{ width: LARGE_W, height: LARGE_H }}
+                  imgStyle={{ width: LARGE_W, height: LARGE_H }}
+                  isMain
                 />
+              )}
 
-                {/* Main badge */}
-                {photo.MAINPHOTO === 1 && (
-                  <View style={styles.mainBadge}>
-                    <Text style={styles.mainBadgeText}>★ Main</Text>
-                  </View>
+              {/* Right column */}
+              <View style={styles.rightCol}>
+                {rightPhotos.map((photo, i) => (
+                  <PhotoCard
+                    key={photo === 'pending' ? `pending-${i}` : photo.PHOTOID}
+                    item={photo}
+                    style={{ width: SMALL_W, height: SMALL_H }}
+                    imgStyle={{ width: SMALL_W, height: SMALL_H }}
+                  />
+                ))}
+
+                {/* Empty slot placeholders if < 3 photos */}
+                {Array.from({ length: Math.max(0, 2 - rightPhotos.length) }).map((_, i) => (
+                  <Pressable
+                    key={`slot-r-${i}`}
+                    style={[styles.emptySlot, { width: SMALL_W, height: SMALL_H }]}
+                    onPress={pickAndUpload}
+                  >
+                    <Text style={styles.slotPlus}>+</Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            {/* ── Bottom grid: photos 4+ ── */}
+            {gridPhotos.length > 0 && (
+              <View style={styles.gridRow}>
+                {gridPhotos.map((photo, i) => (
+                  <PhotoCard
+                    key={photo === 'pending' ? `pending-g-${i}` : photo.PHOTOID}
+                    item={photo}
+                    style={{ width: GRID_CELL, height: GRID_CELL }}
+                    imgStyle={{ width: GRID_CELL, height: GRID_CELL }}
+                  />
+                ))}
+
+                {/* Empty add-more slot */}
+                {gridPhotos.length < 7 && (
+                  <Pressable
+                    style={[styles.emptySlot, { width: GRID_CELL, height: GRID_CELL }]}
+                    onPress={pickAndUpload}
+                  >
+                    <Text style={styles.slotPlus}>+</Text>
+                  </Pressable>
                 )}
-
-                {/* Under-review overlay */}
-                {photo.PHOTOSTATUS === 0 && (
-                  <View style={styles.reviewOverlay}>
-                    <Text style={styles.reviewText}>Under review</Text>
-                  </View>
-                )}
-
-                {/* Long-press hint dot */}
-                <View style={styles.dotsHint}>
-                  <Text style={styles.dotsHintText}>···</Text>
-                </View>
-              </Pressable>
-            ))}
-
-            {/* Add more slot */}
-            {canAddMore && (
-              <Pressable
-                style={[styles.slot, styles.addSlot]}
-                onPress={openPicker}
-                disabled={uploading}
-              >
-                {uploading ? (
-                  <ActivityIndicator color={Colors.primary} size="large" />
-                ) : (
-                  <>
-                    <Text style={styles.addIcon}>+</Text>
-                    <Text style={styles.addLabel}>Add photo</Text>
-                  </>
-                )}
-              </Pressable>
+              </View>
             )}
 
-            {/* Dimmed placeholder slots to fill the grid visually */}
-            {Array.from({
-              length: COLS - ((photos.length + (canAddMore ? 1 : 0)) % COLS || COLS),
-            }).map((_, i) => (
-              <View key={`ph-${i}`} style={[styles.slot, styles.phantomSlot]} />
-            ))}
-          </View>
+            {/* Add more if top section is complete but no grid yet */}
+            {gridPhotos.length === 0 && rightPhotos.length >= 2 && (
+              <Pressable style={styles.addMoreRow} onPress={pickAndUpload}>
+                <Text style={styles.addMoreText}>+ Add more photos</Text>
+              </Pressable>
+            )}
+          </>
         )}
 
-        <Text style={styles.hint}>Long-press a photo to set as main or delete</Text>
-      </ScrollView>
-
-      {/* Photo action sheet */}
-      <Modal
-        transparent
-        visible={actionPhoto !== null}
-        animationType="none"
-        onRequestClose={() => closeActions()}
-        statusBarTranslucent
-      >
-        <Pressable style={styles.sheetOverlay} onPress={() => closeActions()}>
-          <Animated.View
-            style={[
-              styles.sheet,
-              {
-                paddingBottom: Platform.OS === 'ios' ? insets.bottom + 16 : 24,
-                transform: [{ translateY: slideAnim }],
-              },
-            ]}
-          >
-            <Text style={styles.sheetTitle}>Photo options</Text>
-
-            {actionPhoto?.MAINPHOTO !== 1 && (
-              <Pressable
-                style={styles.sheetOption}
-                onPress={() => actionPhoto && handleSetMain(actionPhoto)}
-              >
-                <Text style={styles.sheetOptionText}>Set as main photo</Text>
-              </Pressable>
-            )}
-
-            <View style={styles.sheetDivider} />
-
-            <Pressable
-              style={styles.sheetOption}
-              onPress={() => actionPhoto && handleDelete(actionPhoto)}
-            >
-              <Text style={[styles.sheetOptionText, styles.sheetOptionDanger]}>Delete photo</Text>
-            </Pressable>
-          </Animated.View>
+        {/* Photo guidelines */}
+        <Pressable
+          style={styles.guidelinesRow}
+          onPress={() => Alert.alert('Photo guidelines', 'Use clear, recent photos with good lighting. Avoid group photos, blurry images, or photos with glasses.')}
+        >
+          <InfoIcon />
+          <Text style={styles.guidelinesText}>Check out our photo guidelines</Text>
         </Pressable>
-      </Modal>
+      </ScrollView>
     </View>
   )
 }
@@ -351,157 +397,165 @@ export default function ManagePhotosScreen({ navigation }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  scrollContent: {
+  scroll: {
     paddingHorizontal: H_PAD,
     paddingTop:        16,
+    paddingBottom:     24,
+  },
+
+  iconRow: {
+    marginBottom: 12,
   },
 
   title: {
-    fontSize:     22,
+    fontSize:     24,
     fontWeight:   '700',
-    color:        Colors.textPrimary,
-    marginBottom: 4,
+    color:        '#111',
+    marginBottom: 6,
   },
   subtitle: {
     fontSize:     14,
     fontWeight:   '400',
-    color:        Colors.textSecondary,
+    color:        '#555',
+    lineHeight:   20,
     marginBottom: 20,
   },
 
-  loader: { marginTop: 60 },
-
-  // Grid
-  grid: {
-    flexDirection:  'row',
-    flexWrap:       'wrap',
-    gap:            GAP,
+  topRow: {
+    flexDirection: 'row',
+    gap:           GAP,
+    marginBottom:  GAP,
   },
 
-  slot: {
-    width:        SLOT_W,
-    height:       SLOT_H,
+  rightCol: {
+    flexDirection: 'column',
+    gap:           GAP,
+  },
+
+  gridRow: {
+    flexDirection: 'row',
+    flexWrap:      'wrap',
+    gap:           GAP,
+    marginBottom:  GAP,
+  },
+
+  // Photo card
+  photoCard: {
     borderRadius: 12,
     overflow:     'hidden',
+    position:     'relative',
   },
-
-  slotImage: {
-    width:  '100%',
-    height: '100%',
+  mainPhotoCard: {
+    borderWidth:  2,
+    borderColor:  Colors.primary,
+    borderRadius: 12,
   },
-
-  // Main badge
-  mainBadge: {
-    position:          'absolute',
-    bottom:            0,
-    left:              0,
-    right:             0,
-    backgroundColor:   'rgba(0,0,0,0.55)',
-    paddingVertical:   4,
-    alignItems:        'center',
-  },
-  mainBadgeText: {
-    fontSize:   11,
-    fontWeight: '700',
-    color:      '#FFD700',
+  photoImg: {
+    borderRadius: 12,
   },
 
   // Under-review overlay
   reviewOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.50)',
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.45)',
     alignItems:      'center',
     justifyContent:  'center',
-    padding:         8,
   },
   reviewText: {
     fontSize:   12,
     fontWeight: '600',
     color:      '#fff',
-    textAlign:  'center',
   },
 
-  // Three-dot long-press hint
-  dotsHint: {
-    position:        'absolute',
-    top:             4,
-    right:           6,
-  },
-  dotsHintText: {
-    fontSize:   16,
-    fontWeight: '700',
-    color:      'rgba(255,255,255,0.8)',
-    letterSpacing: 1,
-  },
-
-  // Add slot
-  addSlot: {
-    backgroundColor: Colors.background,
-    borderWidth:     1.5,
-    borderStyle:     'dashed',
-    borderColor:     Colors.primary,
+  // Processing overlay (pending upload)
+  processingOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.4)',
     alignItems:      'center',
     justifyContent:  'center',
-    gap:             4,
+    gap:             6,
   },
-  addIcon: {
-    fontSize:   32,
+  processingText: {
+    fontSize:   12,
+    color:      '#fff',
+    fontWeight: '500',
+  },
+
+  // "Profile Picture" label
+  profileLabel: {
+    position:        'absolute',
+    bottom:          0,
+    left:            0,
+    right:           0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    paddingVertical: 6,
+    paddingLeft:     10,
+  },
+  profileLabelText: {
+    fontSize:   13,
+    fontWeight: '700',
+    color:      '#fff',
+  },
+
+  // Trash button
+  trashBtn: {
+    position:        'absolute',
+    bottom:          8,
+    right:           8,
+    width:           32,
+    height:          32,
+    borderRadius:    8,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    alignItems:      'center',
+    justifyContent:  'center',
+  },
+
+  // Empty add slot
+  emptySlot: {
+    borderRadius:    12,
+    backgroundColor: '#f4f4f6',
+    borderWidth:     1.5,
+    borderStyle:     'dashed',
+    borderColor:     '#ccc',
+    alignItems:      'center',
+    justifyContent:  'center',
+  },
+  slotPlus: {
+    fontSize:   28,
     fontWeight: '300',
-    color:      Colors.primary,
-    lineHeight: 38,
-  },
-  addLabel: {
-    fontSize:   12,
-    fontWeight: '500',
-    color:      Colors.primary,
+    color:      '#aaa',
   },
 
-  // Invisible phantom slot to keep grid aligned
-  phantomSlot: {
-    backgroundColor: 'transparent',
-    borderWidth:     0,
-  },
-
-  hint: {
-    fontSize:   12,
-    color:      Colors.textSecondary,
-    textAlign:  'center',
-    marginTop:  16,
-  },
-
-  // Action sheet
-  sheetOverlay: {
-    flex:            1,
-    backgroundColor: Colors.scrim,
-    justifyContent:  'flex-end',
-  },
-  sheet: {
-    backgroundColor:      Colors.surface,
-    borderTopLeftRadius:  24,
-    borderTopRightRadius: 24,
-    paddingHorizontal:    24,
-    paddingTop:           20,
-  },
-  sheetTitle: {
-    fontSize:     16,
-    fontWeight:   '700',
-    color:        Colors.textPrimary,
-    marginBottom: 16,
-  },
-  sheetDivider: {
-    height:          1,
-    backgroundColor: Colors.divider,
-    marginVertical:  4,
-  },
-  sheetOption: {
+  // Add more row
+  addMoreRow: {
+    alignItems:   'center',
     paddingVertical: 14,
+    marginBottom: 8,
   },
-  sheetOptionText: {
-    fontSize:   16,
-    fontWeight: '500',
-    color:      Colors.textPrimary,
+  addMoreText: {
+    fontSize:   14,
+    fontWeight: '600',
+    color:      Colors.primary,
   },
-  sheetOptionDanger: {
-    color: '#E53935',
+
+  // Photo guidelines
+  guidelinesRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           8,
+    marginTop:     16,
+    paddingVertical: 4,
+  },
+  guidelinesText: {
+    fontSize:          14,
+    color:             '#444',
+    textDecorationLine: 'underline',
+  },
+
+  emptyHint: {
+    fontSize:  14,
+    color:     '#999',
+    textAlign: 'center',
+    marginTop: 40,
   },
 })

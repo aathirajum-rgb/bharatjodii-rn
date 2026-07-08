@@ -170,13 +170,22 @@ export async function uploadFile(
     // Media endpoints (image CDN) use a fixed APPTYPE=600; main API uses the app's own type
     const resolvedAppType = MEDIA_ENDPOINTS.includes(url) ? '600' : (appType ?? '115')
 
-    formData.append('ATN',        atn              ?? '')
-    formData.append('RTN',        rtn              ?? '')
-    formData.append('APPTYPE',    resolvedAppType)
-    formData.append('LANG',       lang             ?? 'en')
-    formData.append('OUTPUTTYPE', '1')
+    // Only append common fields on the first attempt — retries reuse the same
+    // FormData object and FormData.append() accumulates duplicates.
+    if (!_retrying) {
+      formData.append('ATN',        atn              ?? '')
+      formData.append('RTN',        rtn              ?? '')
+      formData.append('APPTYPE',    resolvedAppType)
+      formData.append('LANG',       lang             ?? 'en')
+      formData.append('OUTPUTTYPE', '1')
+    }
 
-    const res: ApiResult = (await client.post(url, formData)).data
+    // Pass Content-Type: undefined so React Native's native XHR layer sets the
+    // correct multipart/form-data boundary — the axios instance default
+    // (application/x-www-form-urlencoded) would otherwise override it.
+    const res: ApiResult = (await client.post(url, formData, {
+      headers: { 'Content-Type': undefined },
+    })).data
 
     if (!res) return errorResponse(url)
 
