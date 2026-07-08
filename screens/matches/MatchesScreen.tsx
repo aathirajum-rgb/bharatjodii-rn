@@ -267,7 +267,10 @@ const MatchCard = memo(function MatchCard({
       {/* ── Name + Call icon + WhatsApp icon ───────────────────────────────── */}
       {/* Angular: d-flex row: heading2-semibold-18 name + phone-icon + matches-whatsapp */}
       <View style={c.nameRow}>
-        <Pressable style={{ flex: 1 }} onPress={onPress}>
+        {/* flexShrink (not flex:1) — the name sits at its own width so the icons land
+            right next to it, not pushed to the far edge of the row. Still truncates
+            via numberOfLines if the name itself is too long for the row. */}
+        <Pressable style={{ flexShrink: 1 }} onPress={onPress}>
           <Text style={c.name} numberOfLines={1}>{profile.name}</Text>
         </Pressable>
         {/* Figma: 24x24 circle, white fill, 1px #006c48 border, 20x20 icon centered inside */}
@@ -396,7 +399,7 @@ function PhotoPromotionBanner({ data, onPress }: { data: any; onPress: () => voi
           {!!data.BODY  && <Text style={pb.body}>{stripHtml(String(data.BODY))}</Text>}
           {!!data.CTA   && (
             <Pressable
-              style={[pb.ctaBtn, { backgroundColor: data.CTABGCOLOR || Colors.primary }]}
+              style={[pb.ctaBtn, { backgroundColor: data.CTABGCOLOR || Colors.primaryDark }]}
               onPress={onPress}
             >
               <Text style={[pb.ctaText, { color: data.CTACOLOR || Colors.white }]}>{stripHtml(data.CTA)}</Text>
@@ -428,6 +431,17 @@ function parseCssColor(style: string | undefined, prop: string): string | undefi
   return style.match(new RegExp(`${prop}[^:;]*:[^;]*?(#[0-9a-fA-F]{3,8})`, 'i'))?.[1]
 }
 
+// Angular sometimes sends a CSS class-name token ('primaryBg'/'whiteColor') instead of
+// a real hex for CTABGCOLOR/CTACOLOR — RN can't resolve a class name, so it silently
+// fails to apply it (the text/button just falls back to its inherited default color
+// instead of the intended one). Anything that isn't a real #hex is treated as unresolved.
+function resolveCtaBg(v: string | undefined): string {
+  return v && v.startsWith('#') ? v : Colors.primaryDark
+}
+function resolveCtaTextColor(v: string | undefined): string {
+  return v && v.startsWith('#') ? v : Colors.white
+}
+
 function MembershipBanner({ data, onPress }: { data: any; onPress: () => void }) {
   if (!data) return null
 
@@ -456,7 +470,11 @@ function MembershipBanner({ data, onPress }: { data: any; onPress: () => void })
           <CdnSvg uri={data.TITLEIMG} width={140} height={28} style={mb.titleImg} />
         )}
 
-        {/* Title — plain text */}
+        {/* Title — plain text. Angular's [innerHTML] title has no forced single-line/
+            ellipsis styling — it just wraps naturally if genuinely too narrow, so we
+            don't force numberOfLines here either. (adjustsFontSizeToFit was tried but
+            doesn't work on React Native Web — it silently no-ops there, so numberOfLines={1}
+            alone just truncated the text with "..." instead of shrinking to fit.) */}
         {!!data.TITLE && (
           <Text style={[mb.title, { color: textColor }]}>
             {stripHtml(data.TITLE)}
@@ -506,10 +524,10 @@ function MembershipBanner({ data, onPress }: { data: any; onPress: () => void })
 
         {/* CTA button */}
         <Pressable
-          style={[mb.ctaBtn, { backgroundColor: data.CTABGCOLOR || Colors.primary }]}
+          style={[mb.ctaBtn, { backgroundColor: resolveCtaBg(data.CTABGCOLOR) }]}
           onPress={onPress}
         >
-          <Text style={[mb.ctaText, { color: data.CTACOLOR || Colors.white }]}>{cta}</Text>
+          <Text style={[mb.ctaText, { color: resolveCtaTextColor(data.CTACOLOR) }]}>{cta}</Text>
         </Pressable>
       </View>
     </Pressable>
@@ -620,7 +638,9 @@ const spb = StyleSheet.create({
     color:      Colors.textDark,
   },
   cta: {
-    backgroundColor:   Colors.primary,
+    // Fallback only — ctaBg prop overrides this when the server provides a color.
+    // Angular's own fallback CTA color is primaryBg (#B50033 = Colors.primaryDark).
+    backgroundColor:   Colors.primaryDark,
     borderRadius:      8,
     paddingVertical:   8,
     paddingHorizontal: 12,
@@ -773,7 +793,9 @@ const n = StyleSheet.create({
   cta: {
     marginTop:         16,
     borderWidth:       1,
-    borderColor:       Colors.primary,
+    // Matches ButtonRevamp's own 'secondary' variant convention (outline buttons
+    // border/text on Colors.primaryDark, not the unrelated general Colors.primary).
+    borderColor:       Colors.primaryDark,
     borderRadius:      8,
     paddingHorizontal: 20,
     paddingVertical:   10,
@@ -781,7 +803,7 @@ const n = StyleSheet.create({
   ctaText: {
     fontFamily: 'Poppins-Medium',
     fontSize:   14,
-    color:      Colors.primary,
+    color:      Colors.primaryDark,
   },
 })
 
@@ -1511,12 +1533,12 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     }
   }
 
-  // Angular: pillFilter() — facet refinement chips, explore mode only (#5). Toggles
-  // one facet's checked state, rejoins all checked KEYs with '~' into QSEARCH, and
-  // re-queries the same FILTERTYPE from page 0 (matches.page.ts:1990-2026).
-  async function toggleFacet(key: string) {
+  // Angular: pillFilter() — facet refinement, explore mode only (#5). Rejoins all
+  // checked KEYs with '~' into QSEARCH and re-queries the same FILTERTYPE from page 0
+  // (matches.page.ts:1990-2026). Shared by both the single-tap inline chip and the
+  // "View more" modal's bulk Apply.
+  async function applyFacetKeys(nextFacets: typeof facets) {
     if (!exploreType) return
-    const nextFacets = facets.map(f => f.key === key ? { ...f, checked: !f.checked } : f)
     const nextQSearch = nextFacets.filter(f => f.checked).map(f => f.key).join('~')
     setFacets(nextFacets)
     setQSearch(nextQSearch)
@@ -1528,8 +1550,8 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
       setBannerSlots(result.bannerSlots)
       setTotalCount(result.totalCount)
       if (result.facets) {
-        // Server re-sorts/recomputes counts per new QSEARCH — but keep the just-tapped
-        // chip's checked state instead of trusting the fresh (unchecked) response.
+        // Server re-sorts/recomputes counts per new QSEARCH — but keep the just-applied
+        // checked state instead of trusting the fresh (unchecked) response.
         setFacets(result.facets.map(f => ({ ...f, checked: nextFacets.some(nf => nf.key === f.key && nf.checked) })))
       }
       apiStartRef.current = result.items.length
@@ -1538,6 +1560,14 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     } finally {
       setLoading(false)
     }
+  }
+
+  function toggleFacet(key: string) {
+    applyFacetKeys(facets.map(f => f.key === key ? { ...f, checked: !f.checked } : f))
+  }
+
+  function applyFacetSelection(checkedKeys: string[]) {
+    applyFacetKeys(facets.map(f => ({ ...f, checked: checkedKeys.includes(f.key) })))
   }
 
   function handleTabPress(tab: FooterTab) {
@@ -1783,7 +1813,9 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         onTitleLayout={handleTitleLayout}
         facets={facets}
         onFacetToggle={toggleFacet}
+        onFacetsApply={applyFacetSelection}
         titleOverride={exploreLabel}
+        isExploreMode={!!exploreType}
       />
 
       {/* ── Profile list / loader ──────────────────────────────────────────── */}
@@ -1970,7 +2002,7 @@ const c = StyleSheet.create({
     flexDirection:     'row',
     alignItems:        'center',
     gap:               6,
-    backgroundColor:   Colors.primary,
+    backgroundColor:   Colors.primaryDark,
     borderRadius:      8,
     paddingVertical:   8,
     paddingHorizontal: 16,
@@ -2232,7 +2264,7 @@ const c = StyleSheet.create({
   },
   ctaSendInterest: {
     flexDirection:   'row',
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryDark,
     borderRadius:    8,
     paddingVertical: 12,
     alignItems:      'center',
@@ -2504,23 +2536,26 @@ const mb = StyleSheet.create({
     right:    0,
     bottom:   0,
   },
-  // Figma: content left="24" top="38" width="282.5" — no right-column reservation;
-  // the campaign art sits behind everything as bgImg, not squeezed beside it
+  // Figma content top/padding — but NOT a maxWidth: that 283 figure came from measuring
+  // one screenshot ("Ramadan Offer", 13 chars) and was too tight for longer titles like
+  // "Become a paid member" (21 chars), wrapping it to 2 lines. bgImg is a full-bleed
+  // background (the campaign art), not a competing right column, so text can use the
+  // full card width minus padding.
   content: {
     paddingHorizontal: 24,
     paddingTop:        38,
     paddingBottom:     24,
-    maxWidth:          283,
   },
   titleImg: {
     width:        140,
     height:       28,
     marginBottom: 8,
   },
-  // Figma: "Ramadan Offer" — 24px Poppins-SemiBold, leading 24 (tight)
+  // Angular: breather.component.html:38 — heading1-semibold-22 (English/most languages),
+  // heading2-semibold-18 for tm/ml. 22px, not 24 — that was from a different Figma node.
   title: {
     fontFamily: 'Poppins-SemiBold',
-    fontSize:   24,
+    fontSize:   22,
     color:      Colors.textStrong,
     lineHeight: 24,
   },
@@ -2540,12 +2575,13 @@ const mb = StyleSheet.create({
     fontSize:   24,
   },
   // Figma: ribbon pill — 14px Poppins-Regular, h-24 (py-4), rounded left corners only,
-  // border on top/bottom/left but NOT right (open ribbon edge, not a closed pill)
+  // border on top/bottom/left but NOT right (open ribbon edge, not a closed pill).
+  // Angular: breather.component.scss .offerTag { margin-top: 10px } (English)
   valid: {
     fontFamily:              'Poppins-Regular',
     fontSize:                14,
     lineHeight:              20,
-    marginTop:               11,
+    marginTop:               10,
     paddingHorizontal:       8,
     paddingVertical:         4,
     borderWidth:             1,
@@ -2554,9 +2590,10 @@ const mb = StyleSheet.create({
     borderBottomLeftRadius:  4,
     alignSelf:               'flex-start',
   },
-  // Figma: gap-[12px] between rows
+  // Angular: breather.component.scss .benefits { margin-top: 16px } (English);
+  // gap-[12px] between individual rows matches Figma + Angular's .benefitItem margin-top
   benefitsList: {
-    marginTop: 12,
+    marginTop: 16,
     gap:       12,
   },
   // Figma: gap-[8px] between tick and text
@@ -2579,14 +2616,18 @@ const mb = StyleSheet.create({
     flex:       1,
     lineHeight: 20,
   },
-  // Figma: h-40 (py-8), px-16, content-sized (not stretched to card width)
+  // Angular: breather.component.scss .get-paid-membership { height:40px; width:100% }
+  // — 100% of its OWN column, which is ion-col size="7.2" (7.2/12 = 60% of the row).
+  // The Figma mockup's compact/content-sized look doesn't match the real Angular CSS —
+  // this follows the actual implementation, not the mockup.
   ctaBtn: {
     marginTop:         16,
+    height:            40,
+    width:             '60%',
     borderRadius:      8,
-    paddingVertical:   8,
     paddingHorizontal: 16,
     alignItems:        'center',
-    alignSelf:         'flex-start',
+    justifyContent:    'center',
   },
   ctaText: {
     fontFamily: 'Poppins-Medium',

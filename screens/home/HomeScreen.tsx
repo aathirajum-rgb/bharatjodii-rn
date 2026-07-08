@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   Dimensions,
   FlatList,
@@ -14,6 +14,10 @@ import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter
 import HomeHeader, { type ToolbarItem } from '../../components/home-header/HomeHeader'
 import SwiperCard, { type SwiperItem } from '../../components/swiper-card/SwiperCard'
 import { Colors } from '../../constants/colors'
+// The rest of this screen's data is still mock (see MOCK_* below) — this section
+// is the one exception, now that the Matches screen it hands off to can actually
+// consume a real FILTERTYPE via fetchExplore().
+import { fetchExploreCategories, type ExploreCategory } from '../../service/homeService'
 // API imports commented out — will wire up after matches landing page is built
 // import {
 //   fetchHomeSession,
@@ -90,9 +94,7 @@ const MOCK_STORIES: SwiperItem[] = [
   { profileId: 's3', name: 'Srikanth & Ramya',  location: 'Chennai',    date: 'Posted on 28th Oct 2025' },
 ]
 
-interface ExploreCategory {
-  id: string; label: string; count: number; imageUrl: string
-}
+// ExploreCategory type imported from homeService — same shape, real fetch backs it now.
 const MOCK_CATEGORIES: ExploreCategory[] = [
   { id: 'c1', label: 'Diploma and below',    count: 33,  imageUrl: '' },
   { id: 'c2', label: 'Graduate and above',   count: 55,  imageUrl: '' },
@@ -146,6 +148,15 @@ const ob = StyleSheet.create({
 
 export default function HomeScreen({ navigation }: { navigation: any }) {
   const [likedTab, setLikedTab] = useState<'me' | 'them'>('me')
+  const [categories, setCategories] = useState<ExploreCategory[]>(MOCK_CATEGORIES)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchExploreCategories().then(result => {
+      if (!cancelled && result.length > 0) setCategories(result)
+    })
+    return () => { cancelled = true }
+  }, [])
 
   const userName      = 'Deepak Venkatara...'
   const completionPct = 70
@@ -322,8 +333,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         <View style={s.section}>
           <Text style={s.sectionTitle}>Explore matches based on</Text>
           <View style={s.catGrid}>
-            {MOCK_CATEGORIES.map((cat, idx) => (
-              <Pressable key={cat.id} style={s.catTile} onPress={() => {}}>
+            {categories.map((cat, idx) => (
+              <Pressable
+                key={cat.id}
+                style={s.catTile}
+                onPress={() => navigation.navigate('Matches', { exploreType: cat.id, exploreLabel: cat.label })}
+              >
                 <View style={s.catImgBox}>
                   {cat.imageUrl
                     ? <Image source={{ uri: cat.imageUrl }} style={s.catImg} resizeMode="cover" />

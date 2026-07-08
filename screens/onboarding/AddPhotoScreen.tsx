@@ -391,7 +391,7 @@ const styles = StyleSheet.create({
   // Add button (inside card)
   addBtn: {
     height:          52,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryDark,
     borderRadius:    8,
     alignItems:      'center',
     justifyContent:  'center',
@@ -450,19 +450,19 @@ const styles = StyleSheet.create({
     height:          52,
     borderRadius:    8,
     borderWidth:     1.5,
-    borderColor:     Colors.primary,
+    borderColor:     Colors.primaryDark,
     alignItems:      'center',
     justifyContent:  'center',
   },
   sheetBtnOutlineLabel: {
     fontSize:   16,
     fontWeight: '600',
-    color:      Colors.primary,
+    color:      Colors.primaryDark,
   },
   sheetBtnSolid: {
     height:          52,
     borderRadius:    8,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryDark,
     alignItems:      'center',
     justifyContent:  'center',
   },

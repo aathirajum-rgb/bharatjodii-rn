@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import FilterChipsRow, { MOBILE_FILTER_CHIPS } from './FilterChipsRow'
+import FacetFilterModal from './FacetFilterModal'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import type { ExploreFacet } from '../../service/homeService'
@@ -34,9 +36,16 @@ export interface MatchesHeaderProps {
   // the explore listing response. Angular: matches.page.html:94-114 facetResponce row.
   facets?:         ExploreFacet[]
   onFacetToggle?:  (key: string) => void
+  // "View more" modal Apply — Angular: pillFilter() with all checked facet KEYs
+  // joined by '~' (matches.page.ts:1952-1988), not one-at-a-time like onFacetToggle.
+  onFacetsApply?:  (checkedKeys: string[]) => void
   // Explore-by-category mode — Angular shows the category's own label instead of
   // "N Matches" as the page title (matches.page.ts pageTitle).
   titleOverride?:  string | undefined
+  // Angular: matches.page.html gates BOTH the "#COUNT# profiles..."/Edit-preferences
+  // row AND the quick-filter chip row on `!isExploreMatches` — neither applies once
+  // you're inside a category (only the facet refinement chips make sense there).
+  isExploreMode?:  boolean
 }
 
 // ─── MatchesHeader ─────────────────────────────────────────────────────────────
@@ -54,10 +63,19 @@ export default function MatchesHeader({
   onTitleLayout,
   facets,
   onFacetToggle,
+  onFacetsApply,
   titleOverride,
+  isExploreMode = false,
 }: MatchesHeaderProps) {
   const { t } = useTranslation()
   const langLabel = LANG_LABELS[langCode] ?? 'English'
+  const [showFacetModal, setShowFacetModal] = useState(false)
+
+  // Angular: matches.page.ts facetChipLimit = 3 — always slice(0, 3) inline,
+  // plus a "View more" chip when there are more than that (matches.page.html:94-114).
+  const allFacets       = facets ?? []
+  const visibleFacets   = allFacets.slice(0, 3)
+  const hasMoreFacets   = allFacets.length > 3
 
   return (
     <Animated.View
@@ -95,8 +113,9 @@ export default function MatchesHeader({
         </View>
 
         {/* Angular: matches.page.html — "#COUNT# profiles based on your preferences." on
-            line 1, "Edit preferences" on line 2 — forced, not width-dependent wrap. */}
-        {!loading && (
+            line 1, "Edit preferences" on line 2 — forced, not width-dependent wrap.
+            Angular: *ngIf="!isExploreMatches && contentLoaded" — hidden inside a category. */}
+        {!loading && !isExploreMode && (
           <View style={s.ppRow}>
             <Text style={s.ppText}>
               {t('MATCHES.PROFILE_COUNT').replace('#COUNT#', String(totalCount))}
@@ -108,13 +127,26 @@ export default function MatchesHeader({
           </View>
         )}
 
-        {/* Filter chips — Figma: top 56 from content start (12 title-top + 24 title + 20 gap) */}
-        <FilterChipsRow chips={MOBILE_FILTER_CHIPS} selected={selectedChip} onSelect={onChipSelect} />
+        {/* Filter chips — Figma: top 56 from content start (12 title-top + 24 title + 20 gap).
+            Angular: *ngIf="!isExploreMatches && hdrSearchList.length > 0" — same gate. */}
+        {!isExploreMode && (
+          <FilterChipsRow chips={MOBILE_FILTER_CHIPS} selected={selectedChip} onSelect={onChipSelect} />
+        )}
 
-        {/* Facet refinement chips — explore-by-category mode only (#5) */}
-        {facets && facets.length > 0 && (
+        {/* Facet refinement chips — explore-by-category mode only (#5). Angular:
+            "View more" chip appears first when there are more than facetChipLimit (3),
+            opening a modal with ALL facets; the same first 3 still show inline too. */}
+        {allFacets.length > 0 && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.facetRow}>
-            {facets.map(f => (
+            {hasMoreFacets && (
+              <Pressable style={s.facetChip} onPress={() => setShowFacetModal(true)}>
+                <CdnSvg uri={CDN + 'discover-matches/filter-image-discover.svg'} width={16} height={16} style={{ marginRight: 4 }} />
+                <Text style={s.facetChipText}>
+                  {t('SEARCH.VIEW_MORE').replace('#COUNT#', String(allFacets.length - 2))}
+                </Text>
+              </Pressable>
+            )}
+            {visibleFacets.map(f => (
               <Pressable
                 key={f.key}
                 style={[s.facetChip, f.checked && s.facetChipSelected, f.count === 0 && s.facetChipDisabled]}
@@ -128,6 +160,16 @@ export default function MatchesHeader({
         )}
 
       </SafeAreaView>
+
+      <FacetFilterModal
+        visible={showFacetModal}
+        facets={allFacets}
+        onClose={() => setShowFacetModal(false)}
+        onApply={checkedKeys => {
+          setShowFacetModal(false)
+          onFacetsApply?.(checkedKeys)
+        }}
+      />
     </Animated.View>
   )
 }

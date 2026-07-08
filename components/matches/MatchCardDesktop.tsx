@@ -298,7 +298,9 @@ const c = StyleSheet.create({
     flexDirection:     'row',
     alignItems:        'center',
     justifyContent:    'center',
-    backgroundColor:   Colors.primary,
+    // Angular/Figma: Like CTA uses primaryBg (#B50033 = Colors.primaryDark), matching
+    // the mobile card's ctaLike (MatchesScreen.tsx) — was inconsistent with it here.
+    backgroundColor:   Colors.primaryDark,
     borderRadius:      8,
     paddingVertical:   10,
     gap:               6,
@@ -323,7 +325,8 @@ const c = StyleSheet.create({
     color:      Colors.black,
   },
   ctaSendInterest: {
-    backgroundColor:   Colors.primary,
+    // Angular: matches-card.component.html's after-like CTA also uses primaryBg (primaryDark)
+    backgroundColor:   Colors.primaryDark,
     borderRadius:      8,
     paddingVertical:   8,
     paddingHorizontal: 16,

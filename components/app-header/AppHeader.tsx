@@ -41,6 +41,9 @@ export interface AppHeaderProps {
 
   // ── registration / signIn ───────────────────────────────────────────────
   showBackBtn?:       boolean | undefined
+  // Renders '×' instead of '‹' — for when this screen is presented as a modal
+  // sheet (e.g. the mid-app language switcher) rather than pushed onto a stack.
+  closeIcon?:         boolean | undefined
   languageLabel?:     string  | undefined   // auto-computed from i18n.language if omitted
 
   // ── Callbacks ────────────────────────────────────────────────────────────
@@ -63,6 +66,7 @@ const ICONS = {
   chevDown:  CDN_REACT + '/chevronleft.svg',
   fwdLink:   CDN + 'revamp/forward-icon-link.svg',
   arrowLeft: CDN_REACT + '/arrowleft.svg',
+  close:     CDN + 'revamp/close-icon.svg',
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -87,6 +91,7 @@ export default function AppHeader({
   title,
   showBackIcon = true,
   showBackBtn  = true,
+  closeIcon    = false,
   languageLabel,
   onAvatarPress,
   onEditProfilePress,
@@ -196,7 +201,7 @@ export default function AppHeader({
       <View style={styles.authRow}>
         {showBackBtn && (
           <Pressable style={styles.backBtn} onPress={onBackPress}>
-            <CdnSvg uri={ICONS.arrowLeft} width={24} height={24} />
+            <CdnSvg uri={closeIcon ? ICONS.close : ICONS.arrowLeft} width={24} height={24} />
           </Pressable>
         )}
 

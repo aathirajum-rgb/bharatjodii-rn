@@ -228,7 +228,9 @@ const styles = StyleSheet.create({
 
   payBtn: {
     margin: 16,
-    backgroundColor: Colors.primary,
+    // Angular: recharge.page.html Pay Now button uses primaryBg (#B50033 = Colors.primaryDark),
+    // not Colors.primary — same fix as ButtonRevamp's primary variant.
+    backgroundColor: Colors.primaryDark,
     borderRadius: 12,
     height: 52,
     alignItems: 'center',

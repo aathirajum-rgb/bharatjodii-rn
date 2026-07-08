@@ -297,7 +297,7 @@ export default function AppStack() {
           canGoBack() is true, so onSelect here is just the (unreachable) fallback. */}
       <Stack.Screen name="LanguageSelection" options={{ presentation: 'modal', animation: 'slide_from_bottom' }}>
         {({ navigation }) => (
-          <LanguageSelectionScreen navigation={navigation} onSelect={() => navigation.goBack()} />
+          <LanguageSelectionScreen navigation={navigation} onSelect={() => navigation.goBack()} presentedAsModal />
         )}
       </Stack.Screen>
     </Stack.Navigator>

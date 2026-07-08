@@ -79,7 +79,10 @@ type VariantTokens = {
 
 const VARIANT_TOKENS: Record<BtnVariant, VariantTokens> = {
   primary: {
-    bg: Colors.primary, textColor: Colors.white,
+    // Angular: variables.scss --ion-color-primary: #B50033 (Colors.primaryDark) — every
+    // primary/Pay-Now CTA in Angular uses this ONE color via button.config.ts's PRIMARY_BTN.
+    // Colors.primary (#C62828) is an unrelated general-accent value, not Angular's button color.
+    bg: Colors.primaryDark, textColor: Colors.white,
     borderColor: undefined, borderWidth: 0,
   },
   secondary: {

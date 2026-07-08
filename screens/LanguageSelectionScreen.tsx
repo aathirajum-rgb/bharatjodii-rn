@@ -26,9 +26,9 @@ const LANGUAGES = [
 
 type LangId = (typeof LANGUAGES)[number]['id'];
 
-type Props = { onSelect: (langId: string) => void; navigation?: any };
+type Props = { onSelect: (langId: string) => void; navigation?: any; presentedAsModal?: boolean };
 
-export default function LanguageSelectionScreen({ onSelect, navigation }: Props) {
+export default function LanguageSelectionScreen({ onSelect, navigation, presentedAsModal = false }: Props) {
   const [selected, setSelected]   = useState<LangId | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const insets = useSafeAreaInsets();
@@ -56,6 +56,7 @@ export default function LanguageSelectionScreen({ onSelect, navigation }: Props)
       <AppHeader
         type="registration"
         showBackBtn={navigation?.canGoBack() ?? false}
+        closeIcon={presentedAsModal}
         onBackPress={() => navigation?.goBack()}
       />
 
