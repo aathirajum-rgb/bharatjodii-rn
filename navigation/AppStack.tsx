@@ -40,6 +40,7 @@ import PaymentSuccessScreen        from '../screens/payment/PaymentSuccessScreen
 import RechargeScreen              from '../screens/payment/RechargeScreen'
 import PermissionDemoScreen        from '../screens/PermissionDemoScreen'
 import MatchesScreen               from '../screens/matches/MatchesScreen'
+import ActivityScreen               from '../screens/activity/ActivityScreen'
 import LanguageSelectionScreen     from '../screens/LanguageSelectionScreen'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -60,6 +61,7 @@ export type AppStackParamList = {
   // modal ON TOP of the current page (Matches, onboarding, etc.) — never a full-screen
   // push. AuthStack's own LanguageSelection route (pre-login, full-screen) is separate.
   LanguageSelection: undefined
+  Activity:          undefined
 }
 
 // ─── Onboarding shell ─────────────────────────────────────────────────────────
@@ -288,6 +290,7 @@ export default function AppStack() {
         options={{ headerShown: true, title: 'Membership Plans', headerStyle: { backgroundColor: Colors.primary }, headerTintColor: Colors.white }}
       />
       <Stack.Screen name="payment-success" component={PaymentSuccessScreen} />
+      <Stack.Screen name="Activity" component={ActivityScreen} />
       <Stack.Screen
         name="ComponentShowcase"
         component={ComponentShowcaseScreen}

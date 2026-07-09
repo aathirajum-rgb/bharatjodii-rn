@@ -1,0 +1,126 @@
+// Web fallback — expo-media-library is native-only.
+// On web we use a plain <input type="file"> and the existing upload API.
+
+import { useRef, useState } from 'react'
+import {
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
+import { Colors } from '../../constants/colors'
+import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { Endpoints } from '../../service/api.endpoints'
+import { uploadFile } from '../../service/apiClient'
+import { StorageKeys as SK } from '../../constants/storage.keys'
+import { getItem, setItem } from '../../service/storageService'
+import { os } from './onboardingStyles'
+
+type Props = { navigation: any; route: any }
+
+export default function CustomGalleryScreen({ navigation }: Props) {
+  const [uploading, setUploading] = useState(false)
+  const inputRef   = useRef<HTMLInputElement | null>(null)
+
+  useOnboardingFooter({ nextHidden: true, showSkip: false, onNext: () => {} }, [])
+
+  async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
+
+    setUploading(true)
+    try {
+      const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+      let firstUri: string | undefined
+
+      for (const file of files) {
+        const formData = new FormData()
+        formData.append('ID', userId)
+        formData.append('UPLOADPHOTO', file, file.name)
+
+        const res = await uploadFile(Endpoints.media.addProfilePic, formData)
+        if (res?.RESPONSECODE == 1) {
+          if (res?.RESPONSE?.PHOTOURL) {
+            await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
+          }
+          if (!firstUri) firstUri = URL.createObjectURL(file)
+        }
+      }
+
+      navigation.push('onboarding', { pageNo: '21', pendingUri: firstUri })
+    } catch {
+      Alert.alert('Error', 'Upload failed. Please try again.')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <View style={os.flex1}>
+      <View style={styles.center}>
+        <Text style={styles.title}>Add your photo</Text>
+        <Text style={styles.subtitle}>Select up to 10 photos from your device</Text>
+
+        {/* Hidden native file input */}
+        <input
+          ref={inputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ display: 'none' }}
+          onChange={handleFiles}
+        />
+
+        <Pressable
+          style={[styles.btn, uploading && styles.btnDisabled]}
+          onPress={() => inputRef.current?.click()}
+          disabled={uploading}
+        >
+          {uploading
+            ? <ActivityIndicator color="#fff" size="small" />
+            : <Text style={styles.btnLabel}>Choose photos</Text>
+          }
+        </Pressable>
+      </View>
+    </View>
+  )
+}
+
+const styles = StyleSheet.create({
+  center: {
+    flex:              1,
+    alignItems:        'center',
+    justifyContent:    'center',
+    paddingHorizontal: 32,
+    gap:               16,
+  },
+  title: {
+    fontSize:   22,
+    fontWeight: '700',
+    color:      '#111',
+    textAlign:  'center',
+  },
+  subtitle: {
+    fontSize:   14,
+    color:      '#666',
+    textAlign:  'center',
+    lineHeight: 20,
+  },
+  btn: {
+    height:          52,
+    width:           '100%',
+    backgroundColor: Colors.primary,
+    borderRadius:    12,
+    alignItems:      'center',
+    justifyContent:  'center',
+    marginTop:       8,
+  },
+  btnDisabled: { opacity: 0.6 },
+  btnLabel: {
+    fontSize:   16,
+    fontWeight: '600',
+    color:      '#fff',
+  },
+})
