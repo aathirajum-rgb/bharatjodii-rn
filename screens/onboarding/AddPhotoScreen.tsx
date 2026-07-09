@@ -14,13 +14,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { getRegValue } from '../../service/registrationService'
-import { CDN_IMG } from '../../constants/cdn'
+import { CDN_SVG } from '../../constants/cdn'
 import { os } from './onboardingStyles'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_MALE_PLACEHOLDER   = CDN_IMG + 'male_silhouette.png'
-const CDN_FEMALE_PLACEHOLDER = CDN_IMG + 'female_silhouette.png'
+const CDN_MALE_PLACEHOLDER   = CDN_SVG + 'add-photo.svg'
+const CDN_FEMALE_PLACEHOLDER = CDN_SVG + 'add-photo.svg'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -190,8 +190,6 @@ export default function AddPhotoScreen({ navigation }: Props) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const PINK_BG = '#fdf0f3'
-
 const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 24,
@@ -204,15 +202,11 @@ const styles = StyleSheet.create({
     marginBottom:  24,
   },
   photoArea: {
-    width:           180,
-    height:          200,
-    backgroundColor: PINK_BG,
-    borderRadius:    20,
-    overflow:        'hidden',
+    width:    180,
+    height:   200,
+    overflow: 'hidden',
     alignItems:      'center',
     justifyContent:  'center',
-    borderWidth:     1,
-    borderColor:     '#f5cdd8',
   },
   silhouette: {
     width:  '100%',

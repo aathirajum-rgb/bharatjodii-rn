@@ -4,7 +4,7 @@
 //   https://...#/login/<JSON_BASE64>/2
 // In RN we call this same API and parse the same payload — no WebView needed.
 
-import { apiCall } from './apiClient'
+import { apiCall, fetchUserIp } from './apiClient'
 import { Endpoints } from './api.endpoints'
 import { getItem, setItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
@@ -104,14 +104,13 @@ export async function autoLogin(
   onboardingFlow = false,
 ): Promise<void> {
   const [
-    ipAddress,
+    cachedIp,
     deviceDetail,
     appVersion,
     mcode,
     registerId,
     deviceId,
     nallow,
-    mobileNo,
   ] = await Promise.all([
     getItem('USERIP'),
     getItem('DEVICEDETAIL'),
@@ -120,20 +119,22 @@ export async function autoLogin(
     getItem('REGISTERID'),
     getItem('DEVICEID'),
     getItem(SK.App.NALLOW),
-    getRegValue('MOBILENO'),
   ])
+
+  // Fetch live IP if not already cached (CLIENTIP is required by the server)
+  const ipAddress = cachedIp ?? (await fetchUserIp()) ?? ''
 
   const params = [
     `ID=${userId}`,
-    `CLIENTIP=${ipAddress          ?? ''}`,
+    `CLIENTIP=${ipAddress}`,
     `DEVICEDETAIL=${deviceDetail   ?? ''}`,
-    `APPVERSION=${appVersion       ?? ''}`,
+    `APPVERSION=${appVersion       ?? '7.4'}`,
     `FROMPAGE=REGISTER`,
     `MCODE=${mcode                 ?? '91'}`,
     `REGISTERID=${registerId       ?? ''}`,
     `DEVICEID=${deviceId           ?? ''}`,
     `NALLOW=${nallow               ?? '0'}`,
-    ...(mobileNo ? [`MOBILENO=${mobileNo}`, 'NEWREG=1'] : []),
+    'NEWREG=1',
   ].join('&')
 
   const result = await apiCall(Endpoints.auth.autoLogin, 'POST', params)
@@ -922,7 +923,7 @@ export async function fetchRaasiOptions(): Promise<Array<{ key: string; label: s
     `type=raasi&LANG=${lang}`,
   )
   if (res2?.RESPONSECODE == 1 && res2?.ERRCODE == 0 && res2?.RESPONSE) {
-    return objToOptions(res2.RESPONSE)
+    return objToOptions(res2.RESPONSE.RAASI ?? res2.RESPONSE)
   }
   return []
 }
@@ -943,6 +944,7 @@ export async function fetchStarOptions(raasiId: string): Promise<Array<{ key: st
 export async function fetchDoshamOptions(
   star: string,
   raasi: string,
+  motherTongue?: string,
 ): Promise<{ dosham: Array<{ key: string; label: string }>; doshamHash: Array<{ key: string; label: string }> }> {
   const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
   const res = await apiCall(
@@ -951,9 +953,14 @@ export async function fetchDoshamOptions(
     `ID=${userId}&STAR=${star}&RAASI=${raasi}&DOSHAM=`,
   )
   if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0 && res?.RESPONSE) {
+    const hash = res.RESPONSE.DOSHAMHASH
+    // Angular: Tamil mother tongue (key "47") uses TAMIL branch, all others use OTHER
+    const filteredHash = hash
+      ? ((motherTongue === '47' ? hash.TAMIL : hash.OTHER) ?? hash)
+      : {}
     return {
-      dosham:     objToOptions(res.RESPONSE.DOSHAM     ?? {}),
-      doshamHash: objToOptions(res.RESPONSE.DOSHAMHASH ?? {}),
+      dosham:     objToOptions(res.RESPONSE.DOSHAM ?? {}),
+      doshamHash: objToOptions(filteredHash),
     }
   }
   return { dosham: [], doshamHash: [] }
@@ -989,7 +996,8 @@ export async function callRegistrationAPI(params: Record<string, any>): Promise<
 export async function submitFullRegistration(): Promise<{ matriId?: string; responsecode?: string }> {
   const rv       = await getRegValues()
   const lang     = (await getItem(SK.Auth.LANG))  ?? 'en'
-  const ipAddress = (await getItem('USERIP'))      ?? ''
+  const cachedIp = await getItem('USERIP')
+  const ipAddress = cachedIp ?? (await fetchUserIp()) ?? ''
 
   // Angular: LANG first, then all profile fields, then IpAddress/phoneverify/DEVICEID/TYPE
   // CountryCode → rv.MCODE (LoginScreen stores country code as MCODE in REGISTRATION_VALUES)
@@ -1058,8 +1066,9 @@ export function callPartialRegistrationAPI(): void {
 }
 
 async function _doPartialReg(): Promise<void> {
-  const rv         = await getRegValues()
-  const ipAddress  = (await getItem('USERIP'))      ?? ''
+  const rv          = await getRegValues()
+  const cachedIp2   = await getItem('USERIP')
+  const ipAddress   = cachedIp2 ?? (await fetchUserIp()) ?? ''
   const registerId = (await getItem('REGISTERID'))  ?? ''
   const deviceId   = (await getItem('DEVICEID'))    ?? ''
   const appVersion = (await getItem('APPVERSION'))  ?? ''
@@ -1154,3 +1163,4 @@ export function getMatchedItem(
 ): string {
   return list.find(item => item.KEY === keyToFind)?.VALUE ?? ''
 }
+

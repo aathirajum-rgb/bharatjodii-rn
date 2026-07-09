@@ -86,10 +86,9 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
     getItem(StorageKeys.App.CUSTOMER_CARE).then(cc => { if (cc) setCustomerCare(cc) })
   }, [])
 
-  // Reset footer to a safe default when the page changes, so the previous
-  // screen's button state doesn't bleed through while the new screen mounts.
+  // Reset only the handler ref when the page changes — each screen sets its
+  // own visual footer state via useOnboardingFooter on mount.
   useEffect(() => {
-    setFooterStateRaw({ nextDisabled: true, nextLoading: false, nextHidden: true, showSkip: false })
     handlers.current = { onNext: () => {}, onSkip: undefined }
   }, [pageNo])
 
@@ -213,8 +212,6 @@ const shell = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop:        20,
     backgroundColor:   Colors.surface,
-    borderTopWidth:    StyleSheet.hairlineWidth,
-    borderTopColor:    Colors.divider,
   },
   skipRow: {
     flexDirection:   'row',

@@ -35,7 +35,8 @@ const GRID_CELL  = Math.floor((SCREEN_W - H_PAD * 2 - GAP * 2) / 3)
 
 type Photo = {
   PHOTOID:     string
-  PHOTOTHUMB:  string
+  PHOTOURL:    string
+  PHOTOTHUMB?: string
   MAINPHOTO:   number
   PHOTOSTATUS: number
 }
@@ -147,6 +148,7 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
     try {
       const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
       const res = await apiCall(Endpoints.profile.managePhoto, 'POST', `ID=${userId}`)
+      console.log('DBG_MANAGEPHOTO userId=', userId, 'res=', JSON.stringify(res))
       if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOS) {
         setPhotos(res.RESPONSE.PHOTOS)
       }
@@ -160,7 +162,7 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
   // ─── Upload ────────────────────────────────────────────────────────────────
 
   async function pickAndUpload() {
-    navigation.push('onboarding', { pageNo: '22' })
+    navigation.push('onboarding', { pageNo: '22', existingCount: photos.length })
   }
 
   // ─── Delete ────────────────────────────────────────────────────────────────
@@ -248,7 +250,7 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
       )
     }
 
-    const uri = item.PHOTOTHUMB
+    const uri = item.PHOTOURL || item.PHOTOTHUMB || ''
     return (
       <Pressable
         style={[styles.photoCard, style, isMain && styles.mainPhotoCard]}

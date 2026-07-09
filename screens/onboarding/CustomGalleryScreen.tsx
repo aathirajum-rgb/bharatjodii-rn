@@ -101,8 +101,10 @@ function CheckBadge() {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function CustomGalleryScreen({ navigation }: Props) {
-  const insets = useSafeAreaInsets()
+export default function CustomGalleryScreen({ navigation, route }: Props) {
+  const insets        = useSafeAreaInsets()
+  const existingCount = (route.params?.existingCount as number | undefined) ?? 0
+  const remaining     = Math.max(0, MAX_PHOTOS - existingCount)
 
   const [permissionGranted, setPermissionGranted] = useState<boolean | null>(null)
   const [assets,            setAssets]            = useState<Asset[]>([])
@@ -203,7 +205,7 @@ export default function CustomGalleryScreen({ navigation }: Props) {
       if (prev.has(id)) {
         const next = new Set(prev); next.delete(id); return next
       }
-      if (prev.size >= MAX_PHOTOS) return prev
+      if (prev.size >= remaining) return prev
       return new Set(prev).add(id)
     })
   }
@@ -257,6 +259,7 @@ export default function CustomGalleryScreen({ navigation }: Props) {
         } as any)
 
         const res = await uploadFile(Endpoints.media.addProfilePic, formData)
+        console.log('DBG_UPLOAD userId=', userId, 'res=', JSON.stringify(res))
         if (res?.RESPONSECODE == 1) {
           if (res?.RESPONSE?.PHOTOURL) {
             await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
@@ -355,7 +358,7 @@ export default function CustomGalleryScreen({ navigation }: Props) {
       {/* Bottom bar */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 16 }]}>
         <Text style={styles.limitText}>
-          You can select a maximum of {MAX_PHOTOS} photos.
+          You can select up to {remaining} more photo{remaining !== 1 ? 's' : ''}.
         </Text>
         <Pressable
           style={[styles.nextBtn, !canProceed && styles.nextBtnDisabled]}

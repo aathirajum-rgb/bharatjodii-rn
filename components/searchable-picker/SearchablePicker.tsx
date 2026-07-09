@@ -136,14 +136,9 @@ export default function SearchablePicker({
                     accessibilityRole="menuitem"
                     accessibilityState={{ selected: isSelected }}
                   >
-                    <Text style={[styles.itemText, isSelected && styles.itemTextSelected]}>
+                    <Text style={styles.itemText}>
                       {item.label}
                     </Text>
-                    {isSelected && (
-                      <View style={styles.itemRadio}>
-                        <Text style={styles.itemRadioTick}>✓</Text>
-                      </View>
-                    )}
                   </Pressable>
                 )
               }}
@@ -221,19 +216,4 @@ const styles = StyleSheet.create({
   },
   itemSelected:     { backgroundColor: Colors.radioCheckedBg },
   itemText:         { flex: 1, fontSize: 14, fontWeight: '400', color: Colors.textPrimary },
-  itemTextSelected: { fontWeight: '500', color: Colors.primaryDark },
-  itemRadio: {
-    width:           20,
-    height:          20,
-    borderRadius:    10,
-    backgroundColor: Colors.primaryDark,
-    alignItems:      'center',
-    justifyContent:  'center',
-  },
-  itemRadioTick: {
-    color:      Colors.surface,
-    fontSize:   10,
-    fontWeight: '700',
-    lineHeight: 12,
-  },
 })

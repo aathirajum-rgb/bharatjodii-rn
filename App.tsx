@@ -24,11 +24,25 @@ import { loadLangFonts } from './constants/fonts'
 // Keep native splash visible until SplashAnimationScreen mounts and calls hideAsync()
 SplashScreen.preventAutoHideAsync()
 
+function makeDeviceId(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
+  })
+}
+
 // Mirrors what the old native app injected into the WebView URL on launch.
 // Must run before any API call so buildCommonParams reads correct values.
 async function initializeAppConfig(): Promise<void> {
   const appType = String(Constants.expoConfig?.extra?.appType ?? process.env.EXPO_PUBLIC_APP_TYPE ?? '115')
-  const version = Constants.expoConfig?.version ?? '1.0.0'
+  const version = '7.4'
+
+  // Persist a stable device ID on first install; reuse on subsequent launches
+  let deviceId = await getItem('DEVICEID')
+  if (!deviceId) {
+    deviceId = makeDeviceId()
+    await setItem('DEVICEID', deviceId)
+  }
 
   await Promise.all([
     setItem(StorageKeys.Auth.APP_TYPE, appType),

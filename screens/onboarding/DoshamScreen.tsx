@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -41,45 +39,72 @@ type Props = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function DoshamScreen({ navigation }: Props) {
-  const { t }  = useTranslation()
+  const { t } = useTranslation()
 
-  const [options,    setOptions]    = useState<Option[]>([])
-  const [selected,   setSelected]   = useState<Option | null>(null)
-  const [fetching,   setFetching]   = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-  const [createdBy,  setCreatedBy]  = useState('1')
-
-  // star + raasi are needed to submit dosham
-  const [star,  setStar]  = useState('')
-  const [raasi, setRaasi] = useState('')
+  // null = step 1 (yes/no not answered); true = step 2 (yes); false = submitted no
+  const [hasDosham,    setHasDosham]    = useState<boolean | null>(null)
+  const [doshamTypes,  setDoshamTypes]  = useState<Option[]>([])
+  // multi-select — set of selected keys
+  const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
+  const [fetching,     setFetching]     = useState(false)
+  const [submitting,   setSubmitting]   = useState(false)
+  const [createdBy,    setCreatedBy]    = useState('1')
+  const [star,         setStar]         = useState('')
+  const [raasi,        setRaasi]        = useState('')
+  const [motherTongue, setMotherTongue] = useState('47')
 
   useEffect(() => {
-    getRegValues().then((rv) => {
-      if (rv.CREATEDBY) setCreatedBy(rv.CREATEDBY)
-      if (rv.STAR)  setStar(rv.STAR)
-      if (rv.RAASI) setRaasi(rv.RAASI)
-
-      fetchDoshamOptions(rv.STAR ?? '', rv.RAASI ?? '')
-        .then(({ dosham }) => {
-          setOptions(dosham)
-          if (rv.DOSHAM && dosham.length) {
-            const found = dosham.find(o => o.key === rv.DOSHAM)
-            if (found) setSelected(found)
-          }
-        })
-        .catch(() => {})
-        .finally(() => setFetching(false))
+    getRegValues().then(rv => {
+      if (rv.CREATEDBY)    setCreatedBy(rv.CREATEDBY)
+      if (rv.STAR)         setStar(rv.STAR)
+      if (rv.RAASI)        setRaasi(rv.RAASI)
+      if (rv.MOTHERTONGUE) setMotherTongue(rv.MOTHERTONGUE)
     })
   }, [])
 
-  async function handleNext() {
-    if (!selected || submitting) return
+  async function handleYes() {
+    setHasDosham(true)
+    setFetching(true)
+    try {
+      const { doshamHash } = await fetchDoshamOptions(star, raasi, motherTongue)
+      setDoshamTypes(doshamHash)
+    } catch {
+      // stay on step 2 with empty list; user can skip
+    } finally {
+      setFetching(false)
+    }
+  }
+
+  async function handleNo() {
+    if (submitting) return
     setSubmitting(true)
     try {
-      await setRegValue('DOSHAM', selected.key)
-      await submitHoroscopeDetails(star, raasi, selected.key)
-      // Angular registration-revamp.component.ts:1375 — autoLogin after registration completes.
-      // Upgrades weak OTP tokens to strong Level-2 tokens. Update timestamp so 1hr gate resets.
+      await setRegValue('DOSHAM', '2')
+      await submitHoroscopeDetails(star, raasi, '2')
+      await refreshSession()
+      await setItem('LASTAPPLOGINAT', new Date().toISOString())
+      navigation.navigate('Home')
+    } catch {
+      setSubmitting(false)
+    }
+  }
+
+  function toggleDoshamType(key: string) {
+    setSelectedKeys(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  async function handleNext() {
+    if (selectedKeys.size === 0 || submitting) return
+    setSubmitting(true)
+    const doshamValue = Array.from(selectedKeys).join('~')
+    try {
+      await setRegValue('DOSHAM', doshamValue)
+      await submitHoroscopeDetails(star, raasi, doshamValue)
       await refreshSession()
       await setItem('LASTAPPLOGINAT', new Date().toISOString())
       navigation.navigate('Home')
@@ -104,14 +129,14 @@ export default function DoshamScreen({ navigation }: Props) {
     .trim()
 
   useOnboardingFooter({
-    nextHidden: !selected,
-    nextDisabled: !selected,
-    nextLoading: submitting,
-    onNext: handleNext,
-    showSkip: !selected,
-    skipLabel: t('REG.DO_LATER', "I'll do this later"),
-    onSkip: handleSkip
-  }, [selected, submitting])
+    nextHidden:   hasDosham !== true,
+    nextDisabled: selectedKeys.size === 0,
+    nextLoading:  submitting,
+    onNext:       handleNext,
+    showSkip:     true,
+    skipLabel:    t('REG.DO_LATER', "I'll do this later"),
+    onSkip:       handleSkip,
+  }, [hasDosham, selectedKeys.size, submitting])
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -124,39 +149,76 @@ export default function DoshamScreen({ navigation }: Props) {
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
-        <Text style={[os.title, { marginBottom: 8 }]}>
+        <Text style={[os.title, { marginBottom: 24 }]}>
           {title}
         </Text>
 
-        {fetching ? (
-          <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
-        ) : (
-          <View style={styles.radioList}>
-            {options.map(opt => {
-              const isSelected = selected?.key === opt.key
-              return (
-                <Pressable
-                  key={opt.key}
-                  style={[styles.radioRow, isSelected && styles.radioRowSelected]}
-                  onPress={() => setSelected(opt)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: isSelected }}
-                  accessibilityLabel={opt.label}
-                >
-                  <Text style={[styles.radioLabel, isSelected && styles.radioLabelSelected]}>
-                    {opt.label}
-                  </Text>
-                  <View style={[styles.radio, isSelected && styles.radioChecked]}>
-                    {isSelected && <View style={styles.radioDot} />}
-                  </View>
-                </Pressable>
-              )
-            })}
+        {/* ── Step 1: Yes / No ── */}
+        {hasDosham !== true && (
+          <View style={styles.yesNoRow}>
+            <Pressable
+              style={[styles.yesNoBtn, hasDosham === false && styles.yesNoBtnActive]}
+              onPress={handleNo}
+              disabled={submitting}
+              accessibilityRole="button"
+            >
+              {submitting && hasDosham === false ? (
+                <ActivityIndicator color={Colors.primary} />
+              ) : (
+                <Text style={[styles.yesNoBtnText, hasDosham === false && styles.yesNoBtnTextActive]}>
+                  No
+                </Text>
+              )}
+            </Pressable>
+
+            <Pressable
+              style={[styles.yesNoBtn, hasDosham === true && styles.yesNoBtnActive]}
+              onPress={handleYes}
+              disabled={submitting}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.yesNoBtnText, hasDosham === true && styles.yesNoBtnTextActive]}>
+                Yes
+              </Text>
+            </Pressable>
           </View>
         )}
-      </ScrollView>
 
-      {/* Sticky footer handled globally via useOnboardingFooter */}
+        {/* ── Step 2: Dosham type multi-select ── */}
+        {hasDosham === true && (
+          <>
+            <Text style={styles.subTitle}>
+              {t('DOSHAM_SUBCONTENT', 'You can choose one or more dosham')}
+            </Text>
+
+            {fetching ? (
+              <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
+            ) : (
+              <View style={styles.checkList}>
+                {doshamTypes.map(opt => {
+                  const checked = selectedKeys.has(opt.key)
+                  return (
+                    <Pressable
+                      key={opt.key}
+                      style={[styles.checkRow, checked && styles.checkRowActive]}
+                      onPress={() => toggleDoshamType(opt.key)}
+                      accessibilityRole="checkbox"
+                      accessibilityState={{ checked }}
+                    >
+                      <Text style={[styles.checkLabel, checked && styles.checkLabelActive]}>
+                        {opt.label}
+                      </Text>
+                      <View style={[styles.checkbox, checked && styles.checkboxChecked]}>
+                        {checked && <Text style={styles.checkmark}>✓</Text>}
+                      </View>
+                    </Pressable>
+                  )
+                })}
+              </View>
+            )}
+          </>
+        )}
+      </ScrollView>
     </View>
   )
 }
@@ -166,9 +228,45 @@ export default function DoshamScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   loader: { marginTop: 48 },
 
-  radioList: { gap: 12 },
+  subTitle: {
+    fontSize:     13,
+    fontWeight:   '400',
+    color:        Colors.textMedium,
+    marginBottom: 16,
+  },
 
-  radioRow: {
+  // ── Yes / No ──
+  yesNoRow: {
+    flexDirection: 'row',
+    gap:           16,
+  },
+  yesNoBtn: {
+    flex:            1,
+    paddingVertical: 18,
+    borderRadius:    12,
+    borderWidth:     1.5,
+    borderColor:     Colors.borderSoft,
+    backgroundColor: Colors.surface,
+    alignItems:      'center',
+    justifyContent:  'center',
+  },
+  yesNoBtnActive: {
+    borderColor:     Colors.chipBorderActive,
+    backgroundColor: Colors.radioCheckedBg,
+  },
+  yesNoBtnText: {
+    fontSize:   16,
+    fontWeight: '500',
+    color:      Colors.textPrimary,
+  },
+  yesNoBtnTextActive: {
+    color: Colors.primaryDark,
+  },
+
+  // ── Dosham type checkboxes ──
+  checkList: { gap: 12 },
+
+  checkRow: {
     flexDirection:     'row',
     alignItems:        'center',
     justifyContent:    'space-between',
@@ -179,65 +277,40 @@ const styles = StyleSheet.create({
     borderColor:       Colors.borderSoft,
     backgroundColor:   Colors.surface,
   },
-  radioRowSelected: {
+  checkRowActive: {
     borderColor:     Colors.chipBorderActive,
     backgroundColor: Colors.radioCheckedBg,
   },
-
-  radioLabel: {
-    flex:       1,
-    fontSize:   15,
-    fontWeight: '400',
-    color:      Colors.textPrimary,
-    lineHeight: 20,
+  checkLabel: {
+    flex:        1,
+    fontSize:    15,
+    fontWeight:  '400',
+    color:       Colors.textPrimary,
+    lineHeight:  20,
     marginRight: 12,
   },
-  radioLabelSelected: {
+  checkLabelActive: {
     fontWeight: '500',
+    color:      Colors.primaryDark,
   },
-
-  radio: {
+  checkbox: {
     width:          22,
     height:         22,
-    borderRadius:   11,
+    borderRadius:   6,
     borderWidth:    1.5,
     borderColor:    Colors.borderNeutral,
     alignItems:     'center',
     justifyContent: 'center',
     flexShrink:     0,
   },
-  radioChecked: {
-    borderColor: Colors.primaryDark,
-  },
-  radioDot: {
-    width:           12,
-    height:          12,
-    borderRadius:    6,
+  checkboxChecked: {
+    borderColor:     Colors.primaryDark,
     backgroundColor: Colors.primaryDark,
   },
-
-  divider: {
-    height:          1,
-    backgroundColor: Colors.inputBorder,
-    marginTop:       16,
-    marginBottom:    16,
-  },
-  helpRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            6,
-  },
-  helpText: {
-    fontSize:      14,
-    fontWeight:    '400',
-    color:         Colors.textPrimary,
-    letterSpacing: 0.42,
-  },
-  helpPhone: {
-    fontSize:      14,
-    fontWeight:    '500',
-    color:         Colors.link,
-    letterSpacing: 0.42,
+  checkmark: {
+    fontSize:   13,
+    fontWeight: '700',
+    color:      Colors.white,
+    lineHeight: 16,
   },
 })

@@ -145,7 +145,8 @@ export async function apiCall(
     }
 
     return res
-  } catch {
+  } catch (err: any) {
+    console.log('DBG_APICALL_ERR', url, err?.message, err?.code, JSON.stringify(err?.toJSON?.()))
     return errorResponse(url)
   }
 }
