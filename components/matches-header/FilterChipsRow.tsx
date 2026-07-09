@@ -40,21 +40,24 @@ export const MOBILE_FILTER_CHIPS: ChipConfig[] = [
 ]
 
 // Desktop "Jodii Desktop" Figma quick-filter row — plain text chips, no icons.
-// React-only design (no Angular desktop equivalent), so these use the same
-// selectedData literals as mobile rather than inventing different wording.
+// React-only design (no Angular desktop equivalent). Labels match the Figma
+// desktop wording exactly (confirmed via get_design_context on node 783:54671),
+// reusing existing i18n keys where they already carry that exact copy.
 export const DESKTOP_FILTER_CHIPS: ChipConfig[] = [
-  { key: 'NEARBY',             labelKey: 'HOME.NEARBY' },
-  { key: 'PROFILECREATED',     labelKey: 'Recently Joined' },
-  { key: 'PHOTOAVAILABLE',     labelKey: 'Matches who have added photos' },
-  { key: 'HOROSCOPEAVAILABLE', labelKey: 'Matches who have horoscope' },
+  { key: 'NEARBY',             labelKey: 'MATCHES.NEARBY_CHIP' },
+  { key: 'PROFILECREATED',     labelKey: 'HOME.NEWLY_JOINED_HEADER' },
+  { key: 'PHOTOAVAILABLE',     labelKey: 'MATCHES.PHOTOS_CHIP' },
+  { key: 'HOROSCOPEAVAILABLE', labelKey: 'MATCHES.HOROSCOPE_CHIP' },
 ]
 
 export default function FilterChipsRow({
-  chips, selected, onSelect,
+  chips, selected, onSelect, selectedBg, selectedTextColor,
 }: {
-  chips:    ChipConfig[]
-  selected: string
-  onSelect: (key: string) => void
+  chips:              ChipConfig[]
+  selected:           string
+  onSelect:           (key: string) => void
+  selectedBg?:         string | undefined   // override for the selected-chip background (default = mobile's Figma value)
+  selectedTextColor?: string | undefined   // override for the selected-chip label color (default = mobile's Figma value)
 }) {
   const { t } = useTranslation()
   return (
@@ -70,13 +73,25 @@ export default function FilterChipsRow({
         return (
           <Pressable
             key={chip.key}
-            style={[f.chip, isSelected && f.chipSelected]}
+            style={[
+              f.chip,
+              isSelected && f.chipSelected,
+              isSelected && selectedBg != null && { backgroundColor: selectedBg },
+            ]}
             onPress={() => onSelect(isSelected && !isLeadingIcon ? '' : chip.key)}
           >
             {isLeadingIcon && chip.icon && (
               <CdnSvg uri={chip.icon} width={20} height={20} style={{ marginRight: 4 }} />
             )}
-            <Text style={[f.chipText, isSelected && f.chipTextSelected]}>{t(chip.labelKey)}</Text>
+            <Text
+              style={[
+                f.chipText,
+                isSelected && f.chipTextSelected,
+                isSelected && selectedTextColor != null && { color: selectedTextColor },
+              ]}
+            >
+              {t(chip.labelKey)}
+            </Text>
             {chip.iconPosition === 'onSelect' && chip.icon && isSelected && (
               <CdnSvg uri={chip.icon} width={16} height={16} style={{ marginLeft: 4 }} />
             )}

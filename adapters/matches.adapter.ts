@@ -12,8 +12,10 @@ export class MatchProfileAdapter implements Adapter<MatchProfile> {
     const profile: MatchProfile = {
       profileId:        item.profileId        ?? '',
       name:             item.name             ?? '',
-      // Strip trailing "yrs"/"years" — API returns "27 Yrs", UI only needs "27"
-      age:              item.age?.replace(/\s*(yrs|years)/i, '').trim() ?? '',
+      // Strip trailing "yrs"/"years" — API returns "27 Yrs", UI only needs "27".
+      // Global flag: some sources double up the unit (see homeService.ts's toProfile),
+      // and a non-global replace here would leave one occurrence behind uncaught.
+      age:              item.age?.replace(/\s*(yrs|years)/gi, '').trim() ?? '',
       location:         item.location         ?? '',
       isPaidMember:     item.isPaidMember      ?? false,
       isIdVerified:     item.isIdVerified      ?? false,

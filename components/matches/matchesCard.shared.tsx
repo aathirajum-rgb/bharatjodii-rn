@@ -8,9 +8,9 @@
 // Call/WhatsApp = SvgUri (always calls the server, no caching), the rest = SvgXml
 // (bundled strings).
 
-import { useRef, useState, type ReactNode } from 'react'
+import { useRef, useState } from 'react'
 import {
-  FlatList, Pressable, StyleSheet, Text, View, type ViewToken,
+  Animated, PanResponder, Pressable, StyleSheet, Text, View,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { SvgXml } from 'react-native-svg'
@@ -59,6 +59,43 @@ export type IconProps = { width?: number; height?: number }
 export function WhatsAppIcon({ width = 27, height = 27 }: IconProps) {
   return <CdnSvg uri={CDN + 'whatsapp-revamp.svg'} width={width} height={height} />
 }
+
+// Figma "Jodii Desktop" node 606:6251 — WhatsApp-unlock overlay CTA. 160x40 pill,
+// gradient #4AC14B→#06853A, radius 8, 24x24 icon, Poppins-Medium 14 white label.
+// Shared by mobile MatchCard's and desktop MatchCardDesktop's no-photo overlay.
+export function WhatsAppUnlockButton({ label, onPress }: { label: string; onPress: () => void }) {
+  const { LinearGradient } = require('expo-linear-gradient')
+  return (
+    <Pressable onPress={onPress}>
+      <LinearGradient
+        colors={['#4AC14B', '#06853A']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={waButtonStyles.btn}
+      >
+        <WhatsAppIcon width={24} height={24} />
+        <Text style={waButtonStyles.text}>{label}</Text>
+      </LinearGradient>
+    </Pressable>
+  )
+}
+
+const waButtonStyles = StyleSheet.create({
+  btn: {
+    width:           160,
+    height:          40,
+    borderRadius:    8,
+    flexDirection:   'row',
+    alignItems:      'center',
+    justifyContent:  'center',
+    gap:             4,
+  },
+  text: {
+    fontFamily: 'Poppins-Medium',
+    fontSize:   14,
+    color:      Colors.white,
+  },
+})
 
 export function CallIcon({ width = 24, height = 25 }: IconProps) {
   return <CdnSvg uri={CDN + 'revamp/call-revamp.svg'} width={width} height={height} />
@@ -271,6 +308,7 @@ const badgeStyles = StyleSheet.create({
   pill: {
     flexDirection:   'row',
     alignItems:      'center',
+    alignSelf:       'flex-start',   // content-sized pill, NOT full-width (same fix as MatchesScreen.tsx's ctaBtn)
     borderRadius:    12,
     paddingLeft:     20,
     paddingRight:    16,
@@ -291,70 +329,159 @@ const badgeStyles = StyleSheet.create({
 // ─── Photo swiper with dots ────────────────────────────────────────────────────
 // Angular: matches-card.component's Swiper (photosSwiperOpt: dynamicBullets pagination).
 // Shared by the mobile MatchCard (MatchesScreen.tsx) and components/matches-card/MatchesCard.tsx.
-// `renderLockSlide`, when it returns non-null for a given index, replaces that slide entirely
-// (Angular's female-free-photo-restrict lock card is a full slide substitution, not an overlay).
+// No lock/restriction on swiping through a match's photos — confirmed against the real
+// Angular app. A previous pass here had a `renderLockSlide` escape hatch for exactly
+// that (misattributed to femaleFreeContactRestrict(), which actually gates CONTACT
+// actions, not photo viewing) — removed since nothing legitimate needs it.
 
 export interface PhotoSwiperProps {
-  images:           string[]
-  width:            number
-  height:           number
-  onPress?:         (() => void) | undefined
-  renderLockSlide?: ((index: number) => ReactNode) | undefined
+  images:   string[]
+  width:    number
+  height:   number
+  onPress?: (() => void) | undefined
 }
 
-export function PhotoSwiper({ images, width, height, onPress, renderLockSlide }: PhotoSwiperProps) {
+export function PhotoSwiper({ images, width, height, onPress }: PhotoSwiperProps) {
   const [activeIndex, setActiveIndex] = useState(0)
+  const translateX = useRef(new Animated.Value(0)).current
+  const dragBaseX = useRef(0)
 
-  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: ViewToken[] }) => {
-    if (viewableItems[0] != null) setActiveIndex(viewableItems[0].index ?? 0)
-  }).current
+  // Refs mirroring the latest render's values — the PanResponder below is created ONCE
+  // (via useRef) so its gesture callbacks close over whatever these were at creation time;
+  // reading through a ref instead keeps them current across re-renders (e.g. images changing).
+  const activeIndexRef = useRef(0)
+  const imagesLenRef   = useRef(images.length)
+  const widthRef       = useRef(width)
+  const onPressRef     = useRef(onPress)
+  activeIndexRef.current = activeIndex
+  imagesLenRef.current   = images.length
+  widthRef.current       = width
+  onPressRef.current     = onPress
 
-  const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current
+  function animateTo(index: number) {
+    const clamped = Math.max(0, Math.min(imagesLenRef.current - 1, index))
+    activeIndexRef.current = clamped
+    setActiveIndex(clamped)
+    Animated.spring(translateX, {
+      toValue:         -clamped * widthRef.current,
+      useNativeDriver: true,
+      tension:         60,
+      friction:        12,
+    }).start()
+  }
+
+  // Drag-to-swipe — Angular's Swiper.js handles mouse-drag on web and touch-swipe on
+  // mobile through one abstraction. PanResponder (built into RN, no extra dependency)
+  // gives the same cross-platform behavior — react-native-web maps mouse events into
+  // PanResponder's gesture state the same way it maps touch events.
+  const panResponder = useRef(
+    PanResponder.create({
+      // Must claim on start (not just on move) even with a single photo — otherwise a
+      // plain tap-with-no-movement never reaches onPanResponderRelease below, and
+      // tap-to-view-profile silently stops working for every single-photo card.
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: (_evt, gestureState) =>
+        imagesLenRef.current > 1 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
+      // Yield back to an ancestor (the vertical Matches list) if it wants the gesture —
+      // e.g. a drag that turns out to be more vertical than horizontal.
+      onPanResponderTerminationRequest: () => true,
+      onPanResponderGrant: () => {
+        dragBaseX.current = -activeIndexRef.current * widthRef.current
+        translateX.stopAnimation()
+      },
+      onPanResponderMove: (_evt, gestureState) => {
+        translateX.setValue(dragBaseX.current + gestureState.dx)
+      },
+      onPanResponderRelease: (_evt, gestureState) => {
+        const TAP_THRESHOLD = 5
+        if (Math.abs(gestureState.dx) < TAP_THRESHOLD && Math.abs(gestureState.dy) < TAP_THRESHOLD) {
+          onPressRef.current?.()
+          animateTo(activeIndexRef.current)
+          return
+        }
+        const swipeThreshold = widthRef.current * 0.2
+        if (gestureState.dx < -swipeThreshold) {
+          animateTo(activeIndexRef.current + 1)
+        } else if (gestureState.dx > swipeThreshold) {
+          animateTo(activeIndexRef.current - 1)
+        } else {
+          animateTo(activeIndexRef.current)
+        }
+      },
+    })
+  ).current
 
   return (
     <View>
-      {/* style overflow:'hidden' here too, not just on the parent photoBox — on Android,
-          a ScrollView/FlatList's own native surface can escape an ancestor's borderRadius
-          clip (a well-known RN/Android quirk), which is why the top corners looked square
-          on a real device install despite the parent already having the radius+overflow. */}
-      <FlatList
-        style={{ overflow: 'hidden' }}
-        data={images}
-        keyExtractor={(_, i) => String(i)}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onViewableItemsChanged={onViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
-        getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
-        renderItem={({ item, index }) => {
-          const lockSlide = renderLockSlide?.(index)
-          if (lockSlide) {
-            return <View style={{ width, height }}>{lockSlide}</View>
-          }
-          return (
-            <Pressable style={{ width, height }} onPress={onPress}>
-              <Image
-                source={{ uri: item }}
-                style={swiperStyles.image}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                recyclingKey={item}
-                transition={150}
-              />
-            </Pressable>
-          )
-        }}
-      />
+      {/* Sized wrapper so the arrows below can center on the PHOTO itself (width x height),
+          not the photo+dots stack — position:absolute anchors to this, not the outer View. */}
+      <View style={{ width, height }}>
+        {/* overflow:'hidden' here too, not just on the parent photoBox — on Android, a
+            ScrollView/FlatList's own native surface could escape an ancestor's borderRadius
+            clip (a well-known RN/Android quirk); the manual Animated row below inherits the
+            same risk, so the clip stays applied at this level regardless of scroll mechanism. */}
+        <View style={swiperStyles.clip} {...panResponder.panHandlers}>
+          <Animated.View
+            style={[
+              swiperStyles.track,
+              { width: width * images.length, height, transform: [{ translateX }] },
+            ]}
+          >
+            {images.map((uri, index) => {
+              return (
+                <View key={index} style={{ width, height }}>
+                  <Image
+                    source={{ uri }}
+                    style={swiperStyles.image}
+                    contentFit="cover"
+                    cachePolicy="memory-disk"
+                    recyclingKey={uri}
+                    transition={150}
+                  />
+                </View>
+              )
+            })}
+          </Animated.View>
+        </View>
 
+        {images.length > 1 && activeIndex > 0 && (
+          <Pressable
+            style={[swiperStyles.arrowBtn, swiperStyles.arrowLeft]}
+            onPress={() => animateTo(activeIndex - 1)}
+            hitSlop={8}
+          >
+            <Text style={swiperStyles.arrowText}>{'‹'}</Text>
+          </Pressable>
+        )}
+        {images.length > 1 && activeIndex < images.length - 1 && (
+          <Pressable
+            style={[swiperStyles.arrowBtn, swiperStyles.arrowRight]}
+            onPress={() => animateTo(activeIndex + 1)}
+            hitSlop={8}
+          >
+            <Text style={swiperStyles.arrowText}>{'›'}</Text>
+          </Pressable>
+        )}
+      </View>
+
+      {/* Dynamic bullets — Angular's Swiper.js `dynamicBullets` pagination scales the
+          active dot up and shrinks neighbors by distance, rather than uniform-size dots. */}
       {images.length > 1 && (
         <View style={swiperStyles.dotsRow}>
-          {images.map((_, i) => (
-            <View
-              key={i}
-              style={[swiperStyles.dot, i === activeIndex ? swiperStyles.dotActive : swiperStyles.dotInactive]}
-            />
-          ))}
+          {images.map((_, i) => {
+            const distance = Math.abs(i - activeIndex)
+            const scale = distance === 0 ? 1 : distance === 1 ? 0.7 : 0.45
+            return (
+              <View
+                key={i}
+                style={[
+                  swiperStyles.dot,
+                  i === activeIndex ? swiperStyles.dotActive : swiperStyles.dotInactive,
+                  { transform: [{ scale }] },
+                ]}
+              />
+            )
+          })}
         </View>
       )}
     </View>
@@ -362,6 +489,14 @@ export function PhotoSwiper({ images, width, height, onPress, renderLockSlide }:
 }
 
 const swiperStyles = StyleSheet.create({
+  clip: {
+    width:     '100%',
+    height:    '100%',
+    overflow:  'hidden',
+  },
+  track: {
+    flexDirection: 'row',
+  },
   image: {
     width:  '100%',
     height: '100%',
@@ -371,18 +506,37 @@ const swiperStyles = StyleSheet.create({
     justifyContent: 'center',
     alignItems:     'center',
     marginTop:      8,
-    gap:            4,
+    gap:            6,
   },
+  // Uniform circular base — dynamicBullets sizing comes entirely from the transform:scale
+  // applied per-dot at render time (active=1, neighbors shrink by distance), not fixed widths.
   dot: {
+    width:        8,
+    height:       8,
     borderRadius: 4,
-    height:       6,
   },
   dotActive: {
-    width:           18,
     backgroundColor: Colors.primary,
   },
   dotInactive: {
-    width:           6,
     backgroundColor: Colors.inputBorder,
+  },
+  arrowBtn: {
+    position:        'absolute',
+    top:              '50%',
+    marginTop:        -16,
+    width:            32,
+    height:           32,
+    borderRadius:     16,
+    backgroundColor:  'rgba(0,0,0,0.35)',
+    alignItems:       'center',
+    justifyContent:   'center',
+  },
+  arrowLeft:  { left:  8 },
+  arrowRight: { right: 8 },
+  arrowText: {
+    color:      Colors.white,
+    fontSize:   20,
+    lineHeight: 20,
   },
 })

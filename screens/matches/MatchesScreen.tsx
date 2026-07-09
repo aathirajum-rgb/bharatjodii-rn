@@ -24,7 +24,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import MatchesHeader from '../../components/matches-header/MatchesHeader'
 import {
-  WhatsAppIcon, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
+  WhatsAppIcon, WhatsAppUnlockButton, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   HtmlText, buildBasicViewParts, showLikeCTA, showAfterLikeCTA,
   getBlurPhotoUri, NEWLY_JOINED_STAR_URI, ProfileBadge,
   PhotoSwiper,
@@ -33,11 +33,12 @@ import {
   type AfterLikeCtx,
 } from '../../components/matches/matchesCard.shared'
 import MatchesDesktopLayout from './MatchesDesktopLayout'
+import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
-import type { MatchProfile, BannerItem, MatchListItem } from '../../types/interfaces/matches.interface'
+import { isBanner, type MatchProfile, type BannerItem, type MatchListItem } from '../../types/interfaces/matches.interface'
 import { EEndCardText } from '../../types/enums/common.enum'
 import {
   fetchMatches,
@@ -80,10 +81,6 @@ const PHOTO_H = SW - 32
 
 // Types imported from types/interfaces/matches.interface.ts
 
-function isBanner(item: MatchListItem): item is BannerItem {
-  return (item as BannerItem)._isBanner === true
-}
-
 // Interleave banner items at their API-reported positions.
 // bannerSlots[].insertAfter = number of profile items that appear before this banner.
 function buildMergedList(
@@ -111,12 +108,11 @@ function buildMergedList(
 // countdowns, etc.) don't force every visible card to re-render during scroll —
 // a card only re-renders when its own props actually change.
 const MatchCard = memo(function MatchCard({
-  profile, oppGender, photoLockActive, ownEntryType, femaleFreeEligible, indNumbersLeft,
-  onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp, onAddPhotoPrompt,
+  profile, oppGender, ownEntryType, femaleFreeEligible, indNumbersLeft,
+  onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp,
 }: {
   profile:    MatchProfile
   oppGender:  'M' | 'F'
-  photoLockActive: boolean
   ownEntryType:       string
   femaleFreeEligible: boolean
   indNumbersLeft:     string
@@ -126,7 +122,6 @@ const MatchCard = memo(function MatchCard({
   onViewLater:() => void
   onCall:     () => void
   onWhatsApp: () => void
-  onAddPhotoPrompt: () => void
 }) {
   const { t } = useTranslation()
   const hasRealPhoto      = profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0
@@ -153,24 +148,16 @@ const MatchCard = memo(function MatchCard({
       <View style={[c.photoBox, { height: PHOTO_H }]}>
         {hasRealPhoto ? (
           // Normal: actual photo(s) — swiper when >1, single Pressable image otherwise.
-          // Angular: matches-card.component's Swiper, femaleFreeContactRestrict() lock slide.
+          // Angular: matches-card.component's Swiper. No lock/restriction on swiping
+          // through a match's photos — confirmed against the real Angular app; a
+          // previous pass here mistakenly gated photo 2+ behind an "add your own
+          // photo" card, misattributing femaleFreeContactRestrict() (which actually
+          // restricts CONTACT actions, not photo viewing — see femaleFreeEligible).
           <PhotoSwiper
             images={profile.photos}
             width={SW - 32}
             height={PHOTO_H}
             onPress={onPress}
-            renderLockSlide={photoLockActive ? (index) => index !== 0 ? (
-              <Pressable style={c.lockCard} onPress={onAddPhotoPrompt}>
-                <CdnSvg uri={CDN + 'add-photo-lock.svg'} width={48} height={48} />
-                <Text style={c.lockText}>
-                  {t('MATCHES.ADD_PHOTO_TO_VIEW').replace('##HIS_HER##', oppGender === 'F' ? 'her' : 'his')}
-                </Text>
-                <View style={c.lockCta}>
-                  <CdnSvg uri={CDN + 'add-photo-gallery.svg'} width={16} height={16} />
-                  <Text style={c.lockCtaText}>{t('GENERAL.ADD_PHOTO_TXT')}</Text>
-                </View>
-              </Pressable>
-            ) : null : undefined}
           />
         ) : isHiddenPhoto ? (
           // Photo exists but is protected/hidden — distinct from "no photo at all".
@@ -213,10 +200,7 @@ const MatchCard = memo(function MatchCard({
                 <Text style={c.overlayText}>
                   {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', oppGender === 'F' ? 'her' : 'his')}
                 </Text>
-                <Pressable style={c.waBtn} onPress={onWhatsApp}>
-                  <WhatsAppIcon width={18} height={18} />
-                  <Text style={c.waBtnText}>{t('GENERAL.WHATSAPP')}</Text>
-                </Pressable>
+                <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={onWhatsApp} />
               </View>
             </View>
           </Pressable>
@@ -928,10 +912,6 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   // ── Survey popup ─────────────────────────────────────────────────────────────
   const [surveyData, setSurveyData] = useState<SurveyPopupData | null>(null)
 
-  // ── Photo carousel lock screen (female, zero own photos) ────────────────────
-  const [ownPhotoLockActive, setOwnPhotoLockActive] = useState(false)
-  const [showAddPhotoPrompt, setShowAddPhotoPrompt] = useState(false)
-
   // ── "Add your photo" action gate (Like/Don't-show) ──────────────────────────
   // Angular: button.service.ts checkAddPhotoPromotion() — blocks these two actions
   // (not Call/WhatsApp/View-later) when PROFILEPUBLISHEDFLAG=='0' and one of three
@@ -948,6 +928,9 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
 
   // ── Live footer like-count badge ────────────────────────────────────────────
   const [likesCount, setLikesCount] = useState(0)
+
+  // ── WhatsApp "pay now" paywall modal (free/non-paid user tapped WhatsApp) ──
+  const [whatsappPaywallProfile, setWhatsappPaywallProfile] = useState<MatchProfile | null>(null)
 
   // ── After-like CTA state (#22-24) — read once per mount, same pattern as gamParams ──
   const [ownEntryType,      setOwnEntryType]      = useState('')
@@ -1023,6 +1006,10 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
 
   // apiStart tracks the cursor for pagination (how many profiles we've fetched from API)
   const apiStartRef = useRef(0)
+  // Guards loadMore against re-entrant calls — onEndReached can fire again before the
+  // `loadingMore` state update from the first call has committed, re-fetching the same
+  // page and appending duplicate profiles (duplicate FlatList keys).
+  const loadingMoreRef = useRef(false)
 
   // ── Angular sequence: ionViewDidEnter → API calls ───────────────────────────
   // 1. refreshSession()   → login/autologin/v1        (upgrades OTP token to Level-2)
@@ -1037,14 +1024,17 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   // language-dependent, and re-firing them on every switch would be a new bug.
   async function loadMatches(ctrl: { cancelled: boolean; notifTimer?: ReturnType<typeof setTimeout> | undefined }, includePopups: boolean) {
       try {
-        // Read login gender once — determines which blur placeholder to show on photo cards
+        // Read login gender once — determines which blur placeholder to show on photo cards,
+        // and gates the opposite profile's Verified badge (oppGender === 'M'). Only commit it
+        // on a successful, still-current read — a transient/empty storage read must never
+        // clobber an already-correct oppGender with the wrong default (this was previously
+        // unconditional, unlike every other setter below, and could flip the Verified badge
+        // off on a reload where this particular read raced or came back empty).
         const lg = await getItem(StorageKeys.User.LOGIN_GENDER)
-        setOppGender(lg === 'F' ? 'M' : 'F')
-        setLoginGender(lg === 'M' ? 'M' : 'F')
-
-        // Photo lock screen (#15) — Angular: femaleFreeContactRestrict() (matches-card.component.ts:424-428)
-        const ownPhotoCount = Number((await getItem('PHOTOCOUNT')) ?? '0')
-        if (!ctrl.cancelled) setOwnPhotoLockActive(lg === 'F' && ownPhotoCount === 0)
+        if (!ctrl.cancelled && lg) {
+          setOppGender(lg === 'F' ? 'M' : 'F')
+          setLoginGender(lg === 'M' ? 'M' : 'F')
+        }
 
         // Step 1 — refreshSession() ensures Level-2 tokens before any listing API call.
         // The 1hr gate lives in RootNavigation.tsx (centralized guard) — here we always
@@ -1099,13 +1089,20 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             }
 
             // BANNERSLOT 1014 — paid-verified-no-photo promo, or legacy ADDPROPERTYS
-            // fallback (#26). Angular: check_Paid_Verified_Nophoto().
-            const isPaidVerifiedMale = entryType === 'P' && ekycStatus === '1' && lg === 'M' && photoStatus !== 'Y'
-            if (!ctrl.cancelled && isPaidVerifiedMale) {
+            // fallback (#26). Angular: check_Paid_Verified_Nophoto(). "No photo" here must
+            // match BANNERSLOT 1011's own definition of it two lines above — a photo pending
+            // approval ('P') already counts as having one, not just an approved one ('Y').
+            const isPaidVerifiedMale = entryType === 'P' && ekycStatus === '1' && lg === 'M' && !['P', 'Y'].includes(photoStatus)
+            // Always recompute (never just set-and-leave) — otherwise a reload where this
+            // account no longer qualifies can't clear a banner a PREVIOUS load already set,
+            // since useState<any>(null) has no reset path other than an explicit null here.
+            if (!ctrl.cancelled) {
               setPaidNoPhotoBanner(
-                reg?.PHOTOPUBLISHPAID?.Matches
-                  ? { dynamic: true, data: reg.PHOTOPUBLISHPAID.Matches }
-                  : { dynamic: false }
+                isPaidVerifiedMale
+                  ? (reg?.PHOTOPUBLISHPAID?.Matches
+                      ? { dynamic: true, data: reg.PHOTOPUBLISHPAID.Matches }
+                      : { dynamic: false })
+                  : null
               )
             }
 
@@ -1137,10 +1134,10 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             // Angular matches.page.ts:705 — show add-photo banner when:
             // PROFILEPUBLISHEDFLAG=0 (photo not added) + PROFILEPUBLISHEDTYPE 1|2 (promotion active) + ENTRYTYPE=F (free user)
             try {
-              // BANNERSLOT 1013 inline banner — PHOTOPUBLISHED.Matches
-              if (reg?.PHOTOPUBLISHED?.Matches) {
-                setAddPhotoBannerMatches(reg.PHOTOPUBLISHED.Matches)
-              }
+              // BANNERSLOT 1013 inline banner — PHOTOPUBLISHED.Matches. Always recomputed
+              // (not just set-when-present) so a reload where this account no longer
+              // qualifies actually clears a banner a previous load already set.
+              setAddPhotoBannerMatches(reg?.PHOTOPUBLISHED?.Matches ?? null)
               // Header hero banner — Angular: matches.page.ts:705-717, checked in this exact
               // if/else-if order (free-photo promo, then non-ID-verify promo, then
               // paid-verified-no-photo promo). Same PhotoPromotionBanner component throughout —
@@ -1179,10 +1176,15 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
 
               if (flagOk && typeOk && freeOk) {
                 applyHeroBanner(reg?.PHOTOPUBLISHED?.Banner ?? {}, 'Gallery')
-              } else if (reg?.PROFILEVERIFYPAID?.Banner && ekycStatus !== '1') {
+              } else if (reg?.PROFILEVERIFYPAID?.Banner && nonIdVerifyUserGate) {
                 applyHeroBanner(reg.PROFILEVERIFYPAID.Banner, 'verifyid')
               } else if (reg?.PHOTOPUBLISHPAID?.Banner && isPaidVerifiedMale) {
                 applyHeroBanner(reg.PHOTOPUBLISHPAID.Banner, 'Gallery')
+              } else if (!ctrl.cancelled) {
+                // None of the 3 hero-banner conditions hold this load — must actually clear
+                // it, not leave whatever a PREVIOUS load set. setShowPhotoPromotion(true) had
+                // no corresponding false-path anywhere in this file before this.
+                setShowPhotoPromotion(false)
               }
             } catch (err) {
               console.log('[PhotoBanner] error in banner check:', err)
@@ -1310,12 +1312,16 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   // ── Pagination ──────────────────────────────────────────────────────────────
   // Angular: doInfinite() → calls callMatchesApi() when scroll reaches end
   async function loadMore() {
-    if (loadingMore || apiStartRef.current >= totalCount) return
+    if (loadingMoreRef.current || apiStartRef.current >= totalCount) return
+    loadingMoreRef.current = true
     setLoadingMore(true)
     try {
       const result = await fetchList(apiStartRef.current, 20)
       if (result.items.length > 0) {
         setProfiles(prev => {
+          const seen = new Set(prev.map(p => p.profileId))
+          const fresh = result.items.map(matchProfileAdapter.adapt).filter(p => !seen.has(p.profileId))
+          if (fresh.length === 0) return prev
           const offset = prev.length
           if (result.bannerSlots.length > 0) {
             setBannerSlots(existing => [
@@ -1323,13 +1329,14 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
               ...result.bannerSlots.map(bs => ({ slot: bs.slot, insertAfter: bs.insertAfter + offset })),
             ])
           }
-          return [...prev, ...result.items.map(matchProfileAdapter.adapt)] as MatchProfile[]
+          return [...prev, ...fresh] as MatchProfile[]
         })
         apiStartRef.current += result.items.length
       }
     } catch (e) {
       if (__DEV__) console.error('[Matches] load more error:', e)
     } finally {
+      loadingMoreRef.current = false
       setLoadingMore(false)
     }
   }
@@ -1407,11 +1414,18 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         const num = result.contact.replace(/\D/g, '')
         if (num) Linking.openURL(`https://wa.me/${num}`)
       } else if (result.type === 'payment_promo') {
-        navigation.navigate('recharge')
+        // Confirmation modal first (Figma "Jodii Desktop" node 867:12515) — "Pay now"
+        // inside it is what actually navigates to recharge, not this tap.
+        setWhatsappPaywallProfile(profile)
       }
     } catch (e) {
       if (__DEV__) console.error('[Matches] whatsapp error:', e)
     }
+  }
+
+  function handleWhatsappPaywallPayNow() {
+    setWhatsappPaywallProfile(null)
+    navigation.navigate('recharge')
   }
 
   // ── Bulk-like modal ──────────────────────────────────────────────────────────
@@ -1582,8 +1596,10 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     }
   }
 
-  const renderItem: ListRenderItem<MatchListItem> = useCallback(({ item }) => {
-    if (isBanner(item)) {
+  // Shared by mobile's own FlatList (below) and the desktop layout (as a render-prop) —
+  // one source of truth for which banner shows under which condition, at whatever
+  // position `buildMergedList` placed it from the real API `bannerSlots` data.
+  const renderBannerItem = useCallback((item: BannerItem) => {
       // BANNERSLOT 1001 — festival/membership offer (e.g. "Muhurtham Day Offer!")
       if (item.bannerSlot === '1001' && menuPromo?.MATCHESSLOT) {
         return (
@@ -1677,12 +1693,17 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         )
       }
       return null
-    }
+  }, [
+    menuPromo, addPhotoBannerMatches, gamParams, addPhotoPromoActive, addHoroActive,
+    paidNoPhotoBanner, navigation, t,
+  ])
+
+  const renderItem: ListRenderItem<MatchListItem> = useCallback(({ item }) => {
+    if (isBanner(item)) return renderBannerItem(item)
     return (
       <MatchCard
         profile={item}
         oppGender={oppGender}
-        photoLockActive={ownPhotoLockActive}
         ownEntryType={ownEntryType}
         femaleFreeEligible={femaleFreeEligible}
         indNumbersLeft={indNumbersLeft}
@@ -1692,14 +1713,12 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         onViewLater={() => handleViewLater(item)}
         onCall={() => handleCall(item)}
         onWhatsApp={() => handleWhatsApp(item)}
-        onAddPhotoPrompt={() => setShowAddPhotoPrompt(true)}
       />
     )
   }, [
-    menuPromo, addPhotoBannerMatches, gamParams, addPhotoPromoActive, addHoroActive,
-    paidNoPhotoBanner, oppGender, ownPhotoLockActive, ownEntryType, femaleFreeEligible,
+    renderBannerItem, oppGender, ownEntryType, femaleFreeEligible,
     indNumbersLeft, navigation, handleLike, handleDontShow, handleViewLater, handleCall,
-    handleWhatsApp, t,
+    handleWhatsApp,
   ])
 
   // ── Desktop web layout (Figma "Jodii Desktop") ──────────────────────────────
@@ -1714,7 +1733,8 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           onLanguagePress={() => navigation.navigate('LanguageSelection')}
           loading={loading}
           totalCount={totalCount}
-          profiles={profiles}
+          listData={listData}
+          renderBanner={renderBannerItem}
           oppGender={oppGender}
           onProfilePress={p => navigation.navigate('viewprofile', { id: p.profileId })}
           onLike={handleLike}
@@ -1727,6 +1747,8 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           onLoadMore={loadMore}
           selectedChip={selectedChip}
           onChipSelect={applyQuickFilter}
+          addPhotoBannerMatches={addPhotoBannerMatches}
+          onActivateProfile={() => navigation.navigate('Gallery')}
         />
         {activeSticky && (
           <StickyBanner
@@ -1769,16 +1791,6 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           onClose={() => setShowNotificationPopup(false)}
           onPrimaryPress={handleNotificationCta}
         />
-        <BottomSheet
-          visible={showAddPhotoPrompt}
-          type="addPhotoPrompt"
-          data={{
-            title:    t('MATCHES.ADD_PHOTO_TO_VIEW').replace('##HIS_HER##', oppGender === 'F' ? 'her' : 'his'),
-            ctaLabel: t('GENERAL.ADD_PHOTO_TXT'),
-          }}
-          onClose={() => setShowAddPhotoPrompt(false)}
-          onPrimaryPress={() => { setShowAddPhotoPrompt(false); navigation.navigate('Gallery') }}
-        />
         <AppRatingModal visible={showRatingPopup} onClose={() => setShowRatingPopup(false)} />
         <SurveyPopup visible={!!surveyData} data={surveyData} onClose={() => setSurveyData(null)} />
         <BottomSheet
@@ -1793,6 +1805,13 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           onClose={() => setShowAddPhotoActionPrompt(false)}
           onPrimaryPress={() => { setShowAddPhotoActionPrompt(false); navigation.navigate('Gallery') }}
         />
+        <WhatsAppPaywallModal
+          visible={!!whatsappPaywallProfile}
+          profile={whatsappPaywallProfile}
+          oppGender={oppGender}
+          onClose={() => setWhatsappPaywallProfile(null)}
+          onPayNow={handleWhatsappPaywallPayNow}
+        />
         <Toast request={toastRequest} />
       </>
     )
@@ -1801,7 +1820,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   return (
     // top/bottom insets are already applied inside MatchesHeader/AppFooter —
     // only guard the side edges here (landscape notch/rounded-corner devices).
-    <View style={s.screen}>
+                                                                                                                                                                                                                                    <View style={s.screen}>
 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       {/* Separated component — SafeAreaView edges={["top"]} handles status bar internally */}
@@ -1923,16 +1942,6 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         onClose={() => setShowNotificationPopup(false)}
         onPrimaryPress={handleNotificationCta}
       />
-      <BottomSheet
-        visible={showAddPhotoPrompt}
-        type="addPhotoPrompt"
-        data={{
-          title:    t('MATCHES.ADD_PHOTO_TO_VIEW').replace('##HIS_HER##', oppGender === 'F' ? 'her' : 'his'),
-          ctaLabel: t('GENERAL.ADD_PHOTO_TXT'),
-        }}
-        onClose={() => setShowAddPhotoPrompt(false)}
-        onPrimaryPress={() => { setShowAddPhotoPrompt(false); navigation.navigate('Gallery') }}
-      />
       <AppRatingModal visible={showRatingPopup} onClose={() => setShowRatingPopup(false)} />
       <SurveyPopup visible={!!surveyData} data={surveyData} onClose={() => setSurveyData(null)} />
       <BottomSheet
@@ -1946,6 +1955,13 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         }}
         onClose={() => setShowAddPhotoActionPrompt(false)}
         onPrimaryPress={() => { setShowAddPhotoActionPrompt(false); navigation.navigate('Gallery') }}
+      />
+      <WhatsAppPaywallModal
+        visible={!!whatsappPaywallProfile}
+        profile={whatsappPaywallProfile}
+        oppGender={oppGender}
+        onClose={() => setWhatsappPaywallProfile(null)}
+        onPayNow={handleWhatsappPaywallPayNow}
       />
       <Toast request={toastRequest} />
     </View>
@@ -1987,37 +2003,6 @@ const c = StyleSheet.create({
     backgroundColor:  Colors.divider,
   },
   singlePhotoPressable: { width: '100%', height: '100%' },
-
-  // ── Female-free-photo-restrict lock slide (Angular: femaleFreeContactRestrict) ──
-  lockCard: {
-    flex:              1,
-    alignItems:        'center',
-    justifyContent:    'center',
-    backgroundColor:   Colors.surfaceDim,
-    paddingHorizontal: 24,
-    gap:               10,
-  },
-  lockText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize:   14,
-    color:      Colors.textDark,
-    textAlign:  'center',
-  },
-  lockCta: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    gap:               6,
-    backgroundColor:   Colors.primaryDark,
-    borderRadius:      8,
-    paddingVertical:   8,
-    paddingHorizontal: 16,
-    marginTop:         4,
-  },
-  lockCtaText: {
-    fontFamily: 'Poppins-SemiBold',
-    fontSize:   13,
-    color:      Colors.white,
-  },
 
   // Angular no-photo placeholder
   noPhoto:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
@@ -2084,6 +2069,7 @@ const c = StyleSheet.create({
     borderColor:       Colors.overlayBorder,
     alignItems:        'center',
     width:             '80%',
+    gap:               12,
   },
   overlayText: {
     fontFamily: 'Poppins-Regular',

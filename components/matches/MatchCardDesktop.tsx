@@ -7,7 +7,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import {
-  WhatsAppIcon, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
+  WhatsAppIcon, WhatsAppUnlockButton, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   buildBasicView, showLikeCTA, showAfterLikeCTA,
   getBlurPhotoUri, NEWLY_JOINED_STAR_URI, ProfileBadge,
   disableDontShow, disableViewLater,
@@ -57,10 +57,7 @@ export default function MatchCardDesktop({
                 <Text style={c.overlayText}>
                   {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', oppGender === 'F' ? 'her' : 'his')}
                 </Text>
-                <Pressable style={c.waBtn} onPress={onWhatsApp}>
-                  <WhatsAppIcon width={16} height={16} />
-                  <Text style={c.waBtnText}>{t('GENERAL.WHATSAPP')}</Text>
-                </Pressable>
+                <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={onWhatsApp} />
               </View>
             </View>
           </>
@@ -68,8 +65,10 @@ export default function MatchCardDesktop({
 
         {profile.isNewlyJoined && (
           <View style={c.newBadge} pointerEvents="none">
-            <CdnSvg uri={NEWLY_JOINED_STAR_URI} width={12} height={12} />
-            <Text style={c.newBadgeText}>{t('MATCHES.NEW')}</Text>
+            <CdnSvg uri={NEWLY_JOINED_STAR_URI} width={16} height={16} />
+            {/* Figma "Jodii Desktop" node 783:54270 — full "Newly joined" text (desktop-only;
+                mobile intentionally keeps the shorter Angular-matched "New"). */}
+            <Text style={c.newBadgeText}>{t('HOME.NEWLY_JOINED_HEADER')}</Text>
           </View>
         )}
       </Pressable>
@@ -168,16 +167,18 @@ const c = StyleSheet.create({
     left:          0,
     flexDirection: 'row',
     alignItems:    'center',
+    justifyContent: 'center',
     backgroundColor: Colors.primaryDark,
-    paddingVertical:   3,
+    height:        24,
     paddingLeft:       8,
     paddingRight:      12,
+    borderTopLeftRadius: 10,
     borderBottomRightRadius: 10,
-    gap: 3,
+    gap: 4,
   },
   newBadgeText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize:   10,
+    fontFamily: 'Poppins-Regular',
+    fontSize:   12,
     color:      Colors.white,
   },
 
@@ -189,12 +190,12 @@ const c = StyleSheet.create({
   overlayCard: {
     backgroundColor:   Colors.scrimStrong,
     marginHorizontal:  12,
-    paddingVertical:   8,
-    paddingHorizontal: 12,
-    borderRadius:      10,
+    padding:           16,
+    borderRadius:      12,
     borderWidth:       1,
     borderColor:       Colors.overlayBorder,
     alignItems:        'center',
+    gap:               16,
   },
   overlayText: {
     fontFamily: 'Poppins-Regular',
@@ -203,22 +204,6 @@ const c = StyleSheet.create({
     textAlign:  'center',
     lineHeight: 16,
   },
-  waBtn: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    backgroundColor:   Colors.whatsappGreen,
-    borderRadius:      6,
-    paddingVertical:   6,
-    paddingHorizontal: 12,
-    marginTop:         6,
-    gap:               4,
-  },
-  waBtnText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize:   11,
-    color:      Colors.white,
-  },
-
   info: { flex: 1, justifyContent: 'flex-start' },
 
   badgeRow: {

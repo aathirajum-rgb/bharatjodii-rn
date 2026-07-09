@@ -35,3 +35,7 @@ export interface BannerItem {
 
 // Union used in the merged FlatList data array
 export type MatchListItem = MatchProfile | BannerItem
+
+export function isBanner(item: MatchListItem): item is BannerItem {
+  return (item as BannerItem)._isBanner === true
+}

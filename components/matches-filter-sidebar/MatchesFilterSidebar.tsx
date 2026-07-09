@@ -1,8 +1,11 @@
-// Desktop Matches sidebar (Figma "Jodii Desktop", node 225:2522) — visual
-// design only, no filtering functionality. Rows are static "Any" values,
-// checkboxes are unchecked, Reset/Apply are decorative. Matching real matches
-// (like/don't-show/view-later/call/whatsapp) already work elsewhere on the
-// page — this sidebar intentionally does not add a second, separate feature.
+// Desktop Matches sidebar (Figma "Jodii Desktop", node 225:2522).
+// The 14 preference rows (Age/Location/.../Profile created) have no live
+// per-field "current value" data source anywhere in the app — they keep the
+// Figma-mock display values, but are now real entry points into the same
+// `onEditPreferences` action the "Edit preferences" link above already uses.
+// The two checkboxes reuse the SAME single-select quick-filter state as the
+// chips above (PHOTOAVAILABLE/HOROSCOPEAVAILABLE are the same keys) — there's
+// no separate multi-value facet system behind this sidebar.
 import { useTranslation } from 'react-i18next'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import FilterFieldRow from './FilterFieldRow'
@@ -17,39 +20,50 @@ const FIELD_KEYS = [
 
 const noop = () => {}
 
-export default function MatchesFilterSidebar() {
+export default function MatchesFilterSidebar({
+  totalCount, selectedChip, onChipSelect, onEditPreferences,
+}: {
+  totalCount:         number
+  selectedChip:       string
+  onChipSelect:       (key: string) => void
+  onEditPreferences?: (() => void) | undefined
+}) {
   const { t } = useTranslation()
+  const editPreferences = onEditPreferences ?? noop
 
   return (
     <View style={s.container}>
       <View style={s.header}>
         <Text style={s.title}>{t('FILTER.FILTER_HEADER')}</Text>
-        <Pressable onPress={noop}>
+        <Pressable onPress={() => onChipSelect('')}>
           <Text style={s.reset}>{t('FILTER.RESET_HEADER')}</Text>
         </Pressable>
       </View>
 
       <ScrollView style={s.list} showsVerticalScrollIndicator={false}>
         {FIELD_KEYS.map(key => (
-          <FilterFieldRow key={key} label={t(`FILTER.${key}`)} value="Any" onPress={noop} />
+          <FilterFieldRow key={key} label={t(`FILTER.${key}`)} value="Any" onPress={editPreferences} />
         ))}
 
         <CheckboxGroup
           style={s.checkboxes}
           options={[
-            { key: 'PHOTOAVAILABLE',     value: t('MATCHES.PP_ADDED_PHOTOS_CHECKBOX') },
-            { key: 'HOROSCOPEAVAILABLE', value: t('MATCHES.PP_HOROSCOPE_CHECKBOX') },
+            { key: 'PHOTOAVAILABLE',     value: t('MATCHES.PP_ADDED_PHOTOS_CHECKBOX'), checked: selectedChip === 'PHOTOAVAILABLE' },
+            { key: 'HOROSCOPEAVAILABLE', value: t('MATCHES.PP_HOROSCOPE_CHECKBOX'),    checked: selectedChip === 'HOROSCOPEAVAILABLE' },
           ]}
-          onToggle={noop}
+          onToggle={key => onChipSelect(selectedChip === key ? '' : key)}
         />
 
-        <View style={s.actions}>
-          <Pressable style={s.resetBtn} onPress={noop}>
-            <Text style={s.resetBtnText}>{t('FILTER.RESET_HEADER')}</Text>
-          </Pressable>
-          <Pressable style={s.applyBtn} onPress={noop}>
-            <Text style={s.applyBtnText}>{t('GENERAL.APPLY')}</Text>
-          </Pressable>
+        <View style={s.footer}>
+          <Text style={s.matchCount}>{t('MATCHES.MATCHES_PREVIEW_COUNT').replace('#COUNT#', String(totalCount))}</Text>
+          <View style={s.actions}>
+            <Pressable style={s.resetBtn} onPress={() => onChipSelect('')}>
+              <Text style={s.resetBtnText}>{t('FILTER.RESET_HEADER')}</Text>
+            </Pressable>
+            <Pressable style={s.applyBtn} onPress={() => onChipSelect(selectedChip)}>
+              <Text style={s.applyBtnText}>{t('GENERAL.APPLY')}</Text>
+            </Pressable>
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -91,34 +105,48 @@ const s = StyleSheet.create({
   checkboxes: {
     marginTop: 8,
   },
-  actions: {
-    flexDirection:  'row',
-    gap:            8,
-    marginVertical: 16,
+  footer: {
+    borderTopWidth: 1,
+    borderTopColor: Colors.borderSubtle,
+    marginTop:      16,
+    paddingTop:     16,
+    paddingBottom:  16,
+    gap:            12,
   },
-  resetBtn: {
-    flex:              1,
-    borderWidth:       1,
-    borderColor:       Colors.borderLight,
-    borderRadius:      8,
-    paddingVertical:   12,
-    alignItems:        'center',
-  },
-  resetBtnText: {
-    fontFamily: 'Poppins-Medium',
+  matchCount: {
+    fontFamily: 'Poppins-SemiBold',
     fontSize:   14,
     color:      Colors.textDark,
   },
+  actions: {
+    flexDirection: 'row',
+    gap:           12,
+  },
+  resetBtn: {
+    flex:              1,
+    height:            40,
+    borderWidth:       1,
+    borderColor:       Colors.primaryDark,
+    borderRadius:      4,
+    alignItems:        'center',
+    justifyContent:    'center',
+  },
+  resetBtnText: {
+    fontFamily: 'Poppins-Medium',
+    fontSize:   12,
+    color:      Colors.primaryDark,
+  },
   applyBtn: {
     flex:            1,
-    backgroundColor: Colors.primary,
-    borderRadius:    8,
-    paddingVertical: 12,
+    height:          40,
+    backgroundColor: Colors.primaryDark,
+    borderRadius:    4,
     alignItems:      'center',
+    justifyContent:  'center',
   },
   applyBtnText: {
     fontFamily: 'Poppins-Medium',
-    fontSize:   14,
+    fontSize:   12,
     color:      Colors.white,
   },
 })

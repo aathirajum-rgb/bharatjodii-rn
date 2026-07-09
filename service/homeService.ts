@@ -65,7 +65,10 @@ function toProfile(p: Record<string, any>): SwiperItem {
     // Angular: profile.MATRIID is the primary ID in matches API response
     profileId:           p['MATRIID']  ?? p['NBID']  ?? p['ID'],
     name:                p['NAME'],
-    age:                 p['AGE']   ? `${p['AGE']} Yrs` : undefined,
+    // Some listing endpoints (e.g. pagination/explore) send AGE already suffixed
+    // ("27 Yrs"), others send a bare number ("27") — strip any existing unit before
+    // appending our own, or a pre-suffixed value doubles up ("27 Yrs" + " Yrs").
+    age:                 p['AGE']   ? `${String(p['AGE']).replace(/\s*(yrs|years)/i, '').trim()} Yrs` : undefined,
     // Angular card receives profile.HEIGHTCATEGORY (formatted string like "5'4\"")
     height:              p['HEIGHTCATEGORY'] ?? p['HEIGHT'],
     education:           p['EDUCATION'],
@@ -97,14 +100,20 @@ function toProfile(p: Record<string, any>): SwiperItem {
     isNewLabel:          p['ISNEWLABEL']  === '1',
     labelContent:        p['LABELCONTENT'],
     likedViewedDateText: p['LIKEDVIEWEDDATETEXT'] ?? p['VIEWEDDATETEXT'] ?? p['LIKEDDATETEXT'],
-    // Angular: FUNC.IsPaidMember — paid if ENTRYTYPE not 'B'/'F'
-    isPaidMember:        p['ENTRYTYPE'] !== undefined
-                           ? !['B', 'F'].includes(String(p['ENTRYTYPE']))
-                           : p['PAIDMEMBER'] === '1',
-    // Angular: FUNC.IsIDVerifiedMember
-    isIdVerified:        p['IDVERIFY'] === '1' || p['IDVERIFYSTATUS'] === '1',
+    // Angular: FUNC.IsPaidMember — paid if ENTRYTYPE not 'B'/'F'. MEMBERSHIPTYPE is a
+    // confirmed alternate name for the same value (registrationService.ts:768 maps it
+    // to ENTRYTYPE the same way) — some listing shapes send that one instead.
+    isPaidMember:        (p['ENTRYTYPE'] ?? p['MEMBERSHIPTYPE']) !== undefined
+                           ? !['B', 'F'].includes(String(p['ENTRYTYPE'] ?? p['MEMBERSHIPTYPE']))
+                           : p['PAIDMEMBER'] == '1',
+    // Angular: FUNC.IsIDVerifiedMember. IDVERIFIED is a third field name confirmed
+    // via live debugging — some listing shapes send that instead of either of the
+    // other two.
+    isIdVerified:        p['IDVERIFY'] == '1' || p['IDVERIFYSTATUS'] == '1' || p['IDVERIFIED'] == '1',
     occupation:          p['OCCUPATION'],
-    income:              p['INCOME'],
+    // Some listing shapes send MONTHLYINCOME instead of INCOME for the same value
+    // (registrationService.ts's own profile mapper already falls back the same way).
+    income:              p['INCOME'] ?? p['MONTHLYINCOME'],
     caste:               p['CASTE'],
   }
 }
@@ -337,10 +346,10 @@ export async function fetchDailyRecommendations(): Promise<SwiperItem[]> {
       isPhotoAvailable: p['PHOTOAVAILABLE'] == 'Y',
       isPhotoProtect:   p['PHOTOPROTECTED'] == 'Y',
       likedStatus:      p['LIKEDSTATUS']  as SwiperItem['likedStatus'],
-      isPaidMember:     p['ENTRYTYPE'] !== undefined ? !['B', 'F'].includes(String(p['ENTRYTYPE'])) : p['PAIDMEMBER'] === '1',
-      isIdVerified:     p['IDVERIFY'] === '1' || p['IDVERIFYSTATUS'] === '1',
+      isPaidMember:     (p['ENTRYTYPE'] ?? p['MEMBERSHIPTYPE']) !== undefined ? !['B', 'F'].includes(String(p['ENTRYTYPE'] ?? p['MEMBERSHIPTYPE'])) : p['PAIDMEMBER'] == '1',
+      isIdVerified:     p['IDVERIFY'] == '1' || p['IDVERIFYSTATUS'] == '1' || p['IDVERIFIED'] == '1',
       caste:            p['CASTE'],
-      income:           p['INCOME'],
+      income:           p['INCOME'] ?? p['MONTHLYINCOME'],
     }))
   }
   return []

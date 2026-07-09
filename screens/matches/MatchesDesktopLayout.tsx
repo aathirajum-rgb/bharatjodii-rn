@@ -3,18 +3,24 @@
 // all data-loading/state/action-handler logic and passes it down as props; this
 // file only lays out the top nav + filter sidebar + card list.
 //
-// Scoped out of this pass: the mobile promo banners (membership/add-photo/
-// photo-promotion) aren't shown here — the Figma desktop design doesn't include
-// them, only the plain filtered match list.
+// `listData`/`renderBanner` are the SAME merged-list + banner-render-callback
+// mobile's own FlatList uses (MatchesScreen.tsx) — every BANNERSLOT shows under
+// the exact same condition and at the exact same API-reported position as
+// mobile. The one thing this layout does differently: BANNERSLOT 1013 gets a
+// Figma-accurate desktop treatment (ActivationBanner) since that's the only
+// slot with a desktop design reference; the other slots fall back to
+// `renderBanner`, i.e. mobile's own presentational components.
 import { useTranslation } from 'react-i18next'
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
+import type { ReactElement } from 'react'
 import MatchesDesktopNav from '../../components/matches-header/MatchesDesktopNav'
 import FilterChipsRow, { DESKTOP_FILTER_CHIPS } from '../../components/matches-header/FilterChipsRow'
 import MatchesFilterSidebar from '../../components/matches-filter-sidebar/MatchesFilterSidebar'
 import MatchCardDesktop from '../../components/matches/MatchCardDesktop'
+import { ActivationBannerRich } from '../../components/matches/ActivationBanner'
 import { Colors } from '../../constants/colors'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
-import type { MatchProfile } from '../../types/interfaces/matches.interface'
+import { isBanner, type MatchProfile, type BannerItem, type MatchListItem } from '../../types/interfaces/matches.interface'
 import { EEndCardText } from '../../types/enums/common.enum'
 
 export interface MatchesDesktopLayoutProps {
@@ -24,7 +30,8 @@ export interface MatchesDesktopLayoutProps {
 
   loading:           boolean
   totalCount:        number
-  profiles:          MatchProfile[]
+  listData:          MatchListItem[]
+  renderBanner:      (item: BannerItem) => ReactElement | null
   oppGender:         'M' | 'F'
 
   onProfilePress:    (profile: MatchProfile) => void
@@ -40,14 +47,18 @@ export interface MatchesDesktopLayoutProps {
 
   selectedChip:       string
   onChipSelect:       (key: string) => void
+
+  addPhotoBannerMatches?: any
+  onActivateProfile:      () => void
 }
 
 export default function MatchesDesktopLayout({
   langCode, onTabPress, onLanguagePress,
-  loading, totalCount, profiles, oppGender,
+  loading, totalCount, listData, renderBanner, oppGender,
   onProfilePress, onLike, onDontShow, onViewLater, onCall, onWhatsApp,
   onEditPreferences, loadingMore, onLoadMore,
   selectedChip, onChipSelect,
+  addPhotoBannerMatches, onActivateProfile,
 }: MatchesDesktopLayoutProps) {
   const { t } = useTranslation()
 
@@ -61,7 +72,12 @@ export default function MatchesDesktopLayout({
       />
 
       <View style={s.body}>
-        <MatchesFilterSidebar />
+        <MatchesFilterSidebar
+          totalCount={totalCount}
+          selectedChip={selectedChip}
+          onChipSelect={onChipSelect}
+          onEditPreferences={onEditPreferences}
+        />
 
         <View style={s.main}>
           <Text style={s.title}>
@@ -79,7 +95,13 @@ export default function MatchesDesktopLayout({
             </View>
           )}
 
-          <FilterChipsRow chips={DESKTOP_FILTER_CHIPS} selected={selectedChip} onSelect={onChipSelect} />
+          <FilterChipsRow
+            chips={DESKTOP_FILTER_CHIPS}
+            selected={selectedChip}
+            onSelect={onChipSelect}
+            selectedBg={Colors.radioCheckedBg}
+            selectedTextColor={Colors.black}
+          />
 
           {loading ? (
             <View style={s.loaderBox}>
@@ -87,20 +109,27 @@ export default function MatchesDesktopLayout({
             </View>
           ) : (
             <FlatList
-              data={profiles}
-              keyExtractor={p => p.profileId}
-              renderItem={({ item }) => (
-                <MatchCardDesktop
-                  profile={item}
-                  oppGender={oppGender}
-                  onPress={() => onProfilePress(item)}
-                  onLike={() => onLike(item)}
-                  onDontShow={() => onDontShow(item)}
-                  onViewLater={() => onViewLater(item)}
-                  onCall={() => onCall(item)}
-                  onWhatsApp={() => onWhatsApp(item)}
-                />
-              )}
+              data={listData}
+              keyExtractor={item => isBanner(item) ? item.uid : item.profileId}
+              renderItem={({ item }) => {
+                if (isBanner(item)) {
+                  return item.bannerSlot === '1013'
+                    ? <ActivationBannerRich data={addPhotoBannerMatches} onPress={onActivateProfile} />
+                    : renderBanner(item)
+                }
+                return (
+                  <MatchCardDesktop
+                    profile={item}
+                    oppGender={oppGender}
+                    onPress={() => onProfilePress(item)}
+                    onLike={() => onLike(item)}
+                    onDontShow={() => onDontShow(item)}
+                    onViewLater={() => onViewLater(item)}
+                    onCall={() => onCall(item)}
+                    onWhatsApp={() => onWhatsApp(item)}
+                  />
+                )
+              }}
               onEndReached={onLoadMore}
               onEndReachedThreshold={0.5}
               initialNumToRender={6}
