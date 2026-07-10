@@ -227,6 +227,21 @@ async function callHttpAction(
   return { type: 'error', message: result?.ERRORMESSAGE ?? 'Action failed' }
 }
 
+// ─── Report + block (3-dot menu) ───────────────────────────────────────────────
+// Angular: GENERAL.REPORT_BLOCK_CTA ("Report and Block") bundles both actions
+// under one confirm — ViewProfileScreen's 3-dot menu triggers this directly rather
+// than the full reasons-picker flow (deferred — see plan).
+
+export async function reportAndBlockProfile(partnerId: string): Promise<boolean> {
+  const params = await getCommParams(partnerId)
+  const [reportRes, blockRes] = await Promise.all([
+    apiCall(Endpoints.communication.reportProfile, 'POST', params),
+    apiCall(Endpoints.communication.blockProfile, 'POST', params),
+  ])
+  const ok = (r: any) => r?.RESPONSECODE === '1' || r?.RESPONSECODE == 1
+  return ok(reportRes) || ok(blockRes)
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // Angular getApiParams(partnerId, 'communication'/'phoneviewed') → includes ENTRYTYPE

@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import Carousel, { type ICarouselInstance } from 'react-native-reanimated-carousel'
+import type { PanGesture } from 'react-native-gesture-handler'
 import { SvgXml } from 'react-native-svg'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { CDN_SVG } from '../../constants/cdn'
@@ -31,6 +32,9 @@ export function getBlurPhotoUri(oppGender: 'M' | 'F'): string {
 export const NEWLY_JOINED_STAR_URI = CDN_SVG + 'revamp/newly-joined-star.svg'
 export const PAID_TAG_URI          = CDN_SVG + 'revamp/paid-tag-revamp.svg'
 export const VERIFIED_TAG_URI      = CDN_SVG + 'viewprofile/verified-tag-img.svg'
+// Angular: button-revamp.component.html's IsShowAnimation() branch — "View full profile"
+// uses iconType 'forward-animation-link', which swaps the static ion-icon for this GIF.
+export const RIGHT_ARROW_ANIMATION_URI = CDN_SVG + 'revamp/animation/right-arrow-animation.gif'
 
 const CDN = CDN_SVG
 
@@ -373,6 +377,23 @@ export interface PhotoSwiperProps {
   showArrows?:  boolean | undefined
 }
 
+// Instagram-style gesture disambiguation: a real Swiper.js (and Instagram's own
+// feed) recognizes "this is a horizontal swipe" vs. "this is a vertical scroll"
+// from the same finger-down, immediately — never a noticeable wait. Reanimated
+// Carousel's default PanGesture doesn't do this out of the box: nested inside a
+// vertical FlatList, it can contest/hold the gesture on ANY touch starting over a
+// photo, which is what made scrolling feel like it "waits" for the swipe first.
+// activeOffsetX only lets the carousel claim the gesture once horizontal movement
+// clearly dominates; failOffsetY makes it back off immediately once vertical
+// movement dominates instead, releasing the touch to the parent FlatList/ScrollView
+// — the same race Instagram's own gesture stack resolves.
+// Defined at module scope (not inline in JSX) so the callback reference is stable
+// across renders — react-native-reanimated-carousel rebuilds its gesture object
+// whenever this prop identity changes.
+function configureSwiperPanGesture(pan: PanGesture): void {
+  pan.activeOffsetX([-10, 10]).failOffsetY([-10, 10])
+}
+
 export function PhotoSwiper({ images, width, height, onPress, showArrows }: PhotoSwiperProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const carouselRef = useRef<ICarouselInstance>(null)
@@ -388,6 +409,7 @@ export function PhotoSwiper({ images, width, height, onPress, showArrows }: Phot
         width={width}
         height={height}
         loop={false}
+        onConfigurePanGesture={configureSwiperPanGesture}
         onSnapToItem={setActiveIndex}
         renderItem={({ item }) => (
           <Pressable style={{ width, height }} onPress={onPress}>

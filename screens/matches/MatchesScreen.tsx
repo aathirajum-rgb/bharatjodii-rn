@@ -26,7 +26,7 @@ import MatchesHeader from '../../components/matches-header/MatchesHeader'
 import {
   WhatsAppIcon, WhatsAppUnlockButton, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   HtmlText, buildBasicViewParts, showLikeCTA, showAfterLikeCTA,
-  getBlurPhotoUri, NEWLY_JOINED_STAR_URI, ProfileBadge,
+  getBlurPhotoUri, NEWLY_JOINED_STAR_URI, RIGHT_ARROW_ANIMATION_URI, ProfileBadge,
   PhotoSwiper,
   getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showContactsLeftBanner, showFreeBadge,
   disableDontShow, disableViewLater,
@@ -56,6 +56,7 @@ import {
   communicationBtnOnClick,
 } from '../../service/communicationService'
 import { fetchBulkLikeMatches } from '../../service/profileService'
+import { redirectToViewProfile } from '../../service/buttonService'
 import { getHeroBannerDetails } from '../../service/paymentService'
 import { shouldShowRatingPopup, markRatingPopupShown } from '../../service/appRatingService'
 import { requestPushNotificationPermission } from '../../service/permissionService'
@@ -283,9 +284,11 @@ const MatchCard = memo(function MatchCard({
       </Pressable>
 
       {/* ── View profile link ──────────────────────────────────────────────── */}
-      {/* Angular: app-button-revamp [buttonType]="link" — "View profile →" */}
+      {/* Angular: app-button-revamp [iconType]="forwardAnimation" — swaps the plain
+          chevron for this animated GIF (button-revamp.component.html IsShowAnimation()). */}
       <Pressable onPress={onPress} style={c.viewProfileBtn}>
         <Text style={c.viewProfileText}>{t('MATCHES.VIEW_PROFILE_CTA')}</Text>
+        <Image source={{ uri: RIGHT_ARROW_ANIMATION_URI }} style={c.viewProfileArrow} />
       </Pressable>
 
       {/* ── CTA section ────────────────────────────────────────────────────── */}
@@ -1708,7 +1711,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         ownEntryType={ownEntryType}
         femaleFreeEligible={femaleFreeEligible}
         indNumbersLeft={indNumbersLeft}
-        onPress={() => navigation.navigate('viewprofile', { id: item.profileId })}
+        onPress={() => redirectToViewProfile('', item.profileId, 'matches')}
         onLike={() => handleLike(item)}
         onDontShow={() => handleDontShow(item)}
         onViewLater={() => handleViewLater(item)}
@@ -1740,7 +1743,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           ownEntryType={ownEntryType}
           femaleFreeEligible={femaleFreeEligible}
           indNumbersLeft={indNumbersLeft}
-          onProfilePress={p => navigation.navigate('viewprofile', { id: p.profileId })}
+          onProfilePress={p => redirectToViewProfile('', p.profileId, 'matches')}
           onLike={handleLike}
           onDontShow={handleDontShow}
           onViewLater={handleViewLater}
@@ -2166,14 +2169,18 @@ const c = StyleSheet.create({
 
   // Angular: app-button-revamp [buttonSize]="link" — "View profile"
   viewProfileBtn: {
+    flexDirection:     'row',
+    alignItems:        'center',
     paddingHorizontal: 16,
     paddingVertical:   8,
+    gap:               2,
   },
   viewProfileText: {
     fontFamily: 'Poppins-Medium',
     fontSize:   14,
-    color:      Colors.primary,
+    color:      Colors.link,
   },
+  viewProfileArrow: { width: 20, height: 16 },
 
   // Angular: Row 1 = tertiary (Don't show) + secondary (View later), Row 2 = primary (Like)
   // Angular: pb-24 on the card container — bottom of last CTA to border

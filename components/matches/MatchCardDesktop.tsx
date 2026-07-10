@@ -3,12 +3,12 @@
 // (screens/matches/MatchesScreen.tsx) so MatchesDesktopLayout can pass the
 // exact same profile/handlers with zero adaptation.
 import { useTranslation } from 'react-i18next'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import {
   WhatsAppIcon, WhatsAppUnlockButton, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   buildBasicView, showLikeCTA, showAfterLikeCTA,
-  getBlurPhotoUri, NEWLY_JOINED_STAR_URI, ProfileBadge, PhotoSwiper,
+  getBlurPhotoUri, NEWLY_JOINED_STAR_URI, RIGHT_ARROW_ANIMATION_URI, ProfileBadge, PhotoSwiper,
   getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showContactsLeftBanner, showFreeBadge,
   disableDontShow, disableViewLater,
   type AfterLikeCtx,
@@ -119,7 +119,12 @@ export default function MatchCardDesktop({
           <Text style={c.name} numberOfLines={1}>{profile.name}</Text>
           <Text style={c.jodiId}>{t('MATCHES.JODI_ID').replace('#ID#', profile.profileId)}</Text>
           <Text style={c.basicView} numberOfLines={2}>{buildBasicView(profile)}</Text>
-          <Text style={c.viewProfile}>{t('MATCHES.VIEW_PROFILE_CTA')} {'›'}</Text>
+          <View style={c.viewProfileRow}>
+            <Text style={c.viewProfile}>{t('MATCHES.VIEW_PROFILE_CTA')}</Text>
+            {/* Angular: button-revamp.component.html's IsShowAnimation() branch — real
+                Jodii swaps the plain chevron for this animated GIF, not a static arrow. */}
+            <Image source={{ uri: RIGHT_ARROW_ANIMATION_URI }} style={c.viewProfileArrow} />
+          </View>
         </Pressable>
 
         {showLikeCTA(profile.likedStatus) && (
@@ -279,12 +284,18 @@ const c = StyleSheet.create({
     lineHeight: 20,
     marginTop:  8,
   },
+  viewProfileRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           2,
+    marginTop:     8,
+  },
   viewProfile: {
     fontFamily: 'Poppins-Medium',
     fontSize:   13,
     color:      Colors.link,
-    marginTop:  8,
   },
+  viewProfileArrow: { width: 18, height: 15 },
 
   ctaRow: {
     flexDirection: 'row',
