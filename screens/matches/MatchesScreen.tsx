@@ -174,9 +174,9 @@ const MatchCard = memo(function MatchCard({
               <View style={c.overlayCard}>
                 <Text style={c.overlayText}>
                   {t(hiddenPhotoPending ? 'VIEWPROFILE.HORO_HIDDEN_PHOTO' : 'VIEWPROFILE.HORO_HIDDEN_LIKE')
-                    .replace(/##HE_SHE##/g, oppGender === 'F' ? 'She' : 'He')
-                    .replace(/##HIS_HER##/g, oppGender === 'F' ? 'her' : 'his')
-                    .replace(/##he_she##/g, oppGender === 'F' ? 'she' : 'he')}
+                    .replace(/##HE_SHE##/g, t(`PRONOUN.${oppGender}.heshe`))
+                    .replace(/##HIS_HER##/g, t(`PRONOUN.${oppGender}.hisher`))
+                    .replace(/##he_she##/g, t(`PRONOUN.${oppGender}.heshe`).toLowerCase())}
                 </Text>
                 {!hiddenPhotoPending && (
                   <Pressable style={c.waBtn} onPress={onLike}>
@@ -199,7 +199,7 @@ const MatchCard = memo(function MatchCard({
             <View style={c.photoOverlay}>
               <View style={c.overlayCard}>
                 <Text style={c.overlayText}>
-                  {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', oppGender === 'F' ? 'her' : 'his')}
+                  {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
                 </Text>
                 <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={onWhatsApp} />
               </View>
@@ -1737,6 +1737,9 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           listData={listData}
           renderBanner={renderBannerItem}
           oppGender={oppGender}
+          ownEntryType={ownEntryType}
+          femaleFreeEligible={femaleFreeEligible}
+          indNumbersLeft={indNumbersLeft}
           onProfilePress={p => navigation.navigate('viewprofile', { id: p.profileId })}
           onLike={handleLike}
           onDontShow={handleDontShow}

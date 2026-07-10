@@ -7,7 +7,9 @@ import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../../constants/colors'
 
-const TIMER_TOKEN = '{{TIMER}}'
+// Angular: matches.page.ts:2317 / home-banner.component.ts:108 / recharge.page.ts:739 —
+// the real PAYMENTFAILEDCONTENT string from the content API uses this literal token.
+const TIMER_TOKEN = '##TIMER##'
 
 function formatRemaining(deadlineMs: number): string {
   const remainingMs = Math.max(0, deadlineMs - Date.now())

@@ -9,7 +9,9 @@ import {
   WhatsAppIcon, WhatsAppUnlockButton, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   buildBasicView, showLikeCTA, showAfterLikeCTA,
   getBlurPhotoUri, NEWLY_JOINED_STAR_URI, ProfileBadge, PhotoSwiper,
+  getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showContactsLeftBanner, showFreeBadge,
   disableDontShow, disableViewLater,
+  type AfterLikeCtx,
 } from './matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
@@ -18,10 +20,14 @@ const PHOTO_W = 220
 const PHOTO_H = 260
 
 export default function MatchCardDesktop({
-  profile, oppGender, onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp,
+  profile, oppGender, ownEntryType, femaleFreeEligible, indNumbersLeft,
+  onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp,
 }: {
-  profile:     MatchProfile
-  oppGender:   'M' | 'F'
+  profile:            MatchProfile
+  oppGender:          'M' | 'F'
+  ownEntryType:       string
+  femaleFreeEligible: boolean
+  indNumbersLeft:     string
   onPress:     () => void
   onLike:      () => void
   onDontShow:  () => void
@@ -30,6 +36,19 @@ export default function MatchCardDesktop({
   onWhatsApp:  () => void
 }) {
   const { t } = useTranslation()
+
+  // Same context mobile's MatchCard builds (MatchesScreen.tsx) — drives the after-like
+  // CTA's dynamic content/label/icon/FREE-badge/contacts-left line below. Previously
+  // this card just hardcoded static "Contact"/"Send Interest" text regardless of any
+  // of this — a real, confirmed gap, not a design choice.
+  const ctaCtx: AfterLikeCtx = {
+    entryType:   ownEntryType,
+    likedStatus: profile.likedStatus,
+    phoneViewed: profile.phoneViewed,
+    femaleFreeEligible,
+    indNumbersLeft,
+    oppGender,
+  }
 
   return (
     <View style={c.card}>
@@ -56,7 +75,7 @@ export default function MatchCardDesktop({
             <View style={c.photoOverlay}>
               <View style={c.overlayCard}>
                 <Text style={c.overlayText}>
-                  {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', oppGender === 'F' ? 'her' : 'his')}
+                  {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
                 </Text>
                 <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={onWhatsApp} />
               </View>
@@ -129,11 +148,29 @@ export default function MatchCardDesktop({
         )}
 
         {showAfterLikeCTA(profile.likedStatus) && (
+          // Angular: matches-cta-bg-color + getContentAfterLike() text + Call Now/Pay Now
+          // CTA + FREE badge + contacts-left line — same content mobile's MatchCard shows
+          // (MatchesScreen.tsx), previously hardcoded static text here instead.
           <View style={c.afterLikeRow}>
-            <Text style={c.afterLikeText}>{t('GENERAL.CONTACT')}</Text>
-            <Pressable style={c.ctaSendInterest} onPress={onPress}>
-              <Text style={c.ctaSendInterestText}>{t('GENERAL.SEND_INTEREST_CTA')}</Text>
-            </Pressable>
+            <View style={c.afterLikeTopRow}>
+              <Text style={c.afterLikeText}>{getAfterLikeContentText(ctaCtx, t)}</Text>
+              <View style={c.ctaSendInterestWrap}>
+                {showFreeBadge(ctaCtx) && (
+                  <View style={c.freeBadge} pointerEvents="none">
+                    <Text style={c.freeBadgeText}>{t('GENERAL.FREE')}</Text>
+                  </View>
+                )}
+                <Pressable style={c.ctaSendInterest} onPress={onCall}>
+                  <View style={c.ctaSendInterestIconBox}>
+                    <CdnSvg uri={getAfterLikeCtaIcon(ctaCtx)} width={16} height={16} />
+                  </View>
+                  <Text style={c.ctaSendInterestText}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
+                </Pressable>
+              </View>
+            </View>
+            {showContactsLeftBanner(ctaCtx) && (
+              <Text style={c.contactsLeftText}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
+            )}
           </View>
         )}
       </View>
@@ -294,9 +331,6 @@ const c = StyleSheet.create({
   ctaLikeText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.white },
 
   afterLikeRow: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    justifyContent:    'space-between',
     backgroundColor:   Colors.afterLikeBg,
     borderRadius:      8,
     borderWidth:       1,
@@ -305,17 +339,46 @@ const c = StyleSheet.create({
     paddingVertical:   10,
     marginTop:         16,
   },
+  afterLikeTopRow: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    justifyContent: 'space-between',
+    gap:            12,
+  },
   afterLikeText: {
+    flex:       1,
     fontFamily: 'Poppins-Medium',
     fontSize:   13,
     color:      Colors.black,
   },
+  ctaSendInterestWrap: { position: 'relative', flexShrink: 0 },
   ctaSendInterest: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'center',
+    gap:               6,
     // Angular: matches-card.component.html's after-like CTA also uses primaryBg (primaryDark)
     backgroundColor:   Colors.primaryDark,
     borderRadius:      8,
     paddingVertical:   8,
     paddingHorizontal: 16,
   },
+  ctaSendInterestIconBox: {
+    width: 16, height: 16, flexShrink: 0,
+    alignItems: 'center', justifyContent: 'center',
+  },
   ctaSendInterestText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.white },
+  freeBadge: {
+    position: 'absolute', top: -10, right: 8, zIndex: 1,
+    backgroundColor: Colors.badgeNewBg, borderRadius: 10,
+    paddingHorizontal: 8, paddingVertical: 2,
+  },
+  freeBadgeText: { fontFamily: 'Poppins-SemiBold', fontSize: 10, color: Colors.badgeNewText },
+  contactsLeftText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize:   11,
+    color:      Colors.textSecondary,
+    textAlign:  'center',
+    marginTop:  8,
+  },
 })

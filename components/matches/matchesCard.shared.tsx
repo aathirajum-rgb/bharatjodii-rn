@@ -270,8 +270,11 @@ export function getAfterLikeCtaIcon(ctx: AfterLikeCtx): string {
 // version returned t()'s output as-is, so the literal token showed up on screen instead
 // of "him"/"her". Same convention used everywhere else in this file for gendered copy.
 export function getAfterLikeContentText(ctx: AfterLikeCtx, t: (key: string) => string): string {
-  const heShe  = ctx.oppGender === 'F' ? 'She' : 'He'
-  const himHer = ctx.oppGender === 'F' ? 'her' : 'him'
+  // Angular: getGenderPrefix_He_She()/getGenderPrefix_Him_Her() pull the localized word
+  // via translate.instant() (common-funtions.ts) — hardcoding the English word here would
+  // leave "He"/"him" stuck mid-sentence when the app language isn't English.
+  const heShe  = t(`PRONOUN.${ctx.oppGender}.heshe`)
+  const himHer = t(`PRONOUN.${ctx.oppGender}.himhers`)
   const raw = showIndirectContact(ctx)
     ? t('MATCHES.TALK_TEXT')
     : ctx.entryType === 'P' || isPhoneAlreadyViewedFree(ctx.phoneViewed)

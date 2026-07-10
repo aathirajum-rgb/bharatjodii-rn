@@ -33,6 +33,9 @@ export interface MatchesDesktopLayoutProps {
   listData:          MatchListItem[]
   renderBanner:      (item: BannerItem) => ReactElement | null
   oppGender:         'M' | 'F'
+  ownEntryType:       string
+  femaleFreeEligible: boolean
+  indNumbersLeft:     string
 
   onProfilePress:    (profile: MatchProfile) => void
   onLike:            (profile: MatchProfile) => void
@@ -55,6 +58,7 @@ export interface MatchesDesktopLayoutProps {
 export default function MatchesDesktopLayout({
   langCode, onTabPress, onLanguagePress,
   loading, totalCount, listData, renderBanner, oppGender,
+  ownEntryType, femaleFreeEligible, indNumbersLeft,
   onProfilePress, onLike, onDontShow, onViewLater, onCall, onWhatsApp,
   onEditPreferences, loadingMore, onLoadMore,
   selectedChip, onChipSelect,
@@ -121,6 +125,9 @@ export default function MatchesDesktopLayout({
                   <MatchCardDesktop
                     profile={item}
                     oppGender={oppGender}
+                    ownEntryType={ownEntryType}
+                    femaleFreeEligible={femaleFreeEligible}
+                    indNumbersLeft={indNumbersLeft}
                     onPress={() => onProfilePress(item)}
                     onLike={() => onLike(item)}
                     onDontShow={() => onDontShow(item)}

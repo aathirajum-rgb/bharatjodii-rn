@@ -34,9 +34,12 @@ export default function WhatsAppPaywallModal({
   const { t } = useTranslation()
   if (!profile) return null
 
-  const heShe  = oppGender === 'F' ? 'She' : 'He'
-  const hisHer = oppGender === 'F' ? 'her' : 'his'
-  const himHer = oppGender === 'F' ? 'her' : 'him'
+  // Localized via the same PRONOUN.M/F.* keys Angular resolves through translate.instant()
+  // (common-funtions.ts getGenderPrefix_*) — a hardcoded English word here would show up
+  // mid-sentence even when the app language is Hindi/Tamil/etc.
+  const heShe  = t(`PRONOUN.${oppGender}.heshe`)
+  const hisHer = t(`PRONOUN.${oppGender}.hisher`)
+  const himHer = t(`PRONOUN.${oppGender}.himhers`)
 
   const bodyText = t('MATCHES.WHATSAPP_PAYWALL_TEXT')
     .replace(/##HE_SHE##/g, heShe)
