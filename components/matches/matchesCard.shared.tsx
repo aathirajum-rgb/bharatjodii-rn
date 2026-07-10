@@ -449,7 +449,17 @@ export function PhotoSwiper({ images, width, height, onPress, showArrows }: Phot
   // Web fallback — mouse AND touch, entirely separate from PanResponder above. Listens
   // on `window` (not just the swiper element) for move/end so the drag keeps tracking
   // even if the cursor/finger leaves the small photo area mid-drag.
-  const webDrag = useRef<{ startX: number; startY: number } | null>(null)
+  //
+  // `committed`/`rejected` reproduce what PanResponder's onMoveShouldSetPanResponder did
+  // natively: don't touch translateX (or block the page) on the very first pixels of
+  // movement — wait until the gesture is CLEARLY more horizontal than vertical before
+  // treating it as a photo-swipe. Committing immediately on mousedown/touchstart (the
+  // previous version) hijacked every vertical page-scroll that happened to start over
+  // the photo, producing a shake instead of a normal scroll.
+  const MOVE_THRESHOLD = 6
+  const webDrag = useRef<{
+    startX: number; startY: number; committed: boolean; rejected: boolean
+  } | null>(null)
 
   useEffect(() => {
     if (Platform.OS !== 'web') return undefined
@@ -460,23 +470,36 @@ export function PhotoSwiper({ images, width, height, onPress, showArrows }: Phot
       return null
     }
     function onMove(e: any) {
-      if (!webDrag.current) return
+      const drag = webDrag.current
+      if (!drag || drag.rejected) return
       const p = pointFromEvent(e)
       if (!p) return
-      translateX.setValue(dragBaseX.current + (p.x - webDrag.current.startX))
+      const dx = p.x - drag.startX
+      const dy = p.y - drag.startY
+      if (!drag.committed) {
+        if (Math.abs(dx) <= MOVE_THRESHOLD && Math.abs(dy) <= MOVE_THRESHOLD) return
+        if (Math.abs(dy) > Math.abs(dx)) {
+          drag.rejected = true   // vertical gesture — leave it to the page's native scroll
+          return
+        }
+        drag.committed = true
+        dragBaseX.current = -activeIndexRef.current * widthRef.current
+        translateX.stopAnimation()
+      }
+      e.preventDefault?.()   // stop the page also scrolling horizontally once committed
+      translateX.setValue(dragBaseX.current + dx)
     }
     function onEnd(e: any) {
-      if (!webDrag.current) return
-      const { startX, startY } = webDrag.current
-      // touchend has no `touches`/no clientX of its own — falls back to `changedTouches`
-      // inside pointFromEvent; if even that's unavailable, treat as zero movement (a tap).
-      const p = pointFromEvent(e) ?? { x: startX, y: startY }
+      const drag = webDrag.current
+      if (!drag) return
       webDrag.current = null
-      handleDragEnd(p.x - startX, p.y - startY)
+      if (drag.rejected) return   // page handled the scroll; not a tap or a swipe
+      const p = pointFromEvent(e) ?? { x: drag.startX, y: drag.startY }
+      handleDragEnd(p.x - drag.startX, p.y - drag.startY)
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onEnd)
-    window.addEventListener('touchmove', onMove)
+    window.addEventListener('touchmove', onMove, { passive: false })
     window.addEventListener('touchend', onEnd)
     return () => {
       window.removeEventListener('mousemove', onMove)
@@ -491,9 +514,7 @@ export function PhotoSwiper({ images, width, height, onPress, showArrows }: Phot
     const touch = e.nativeEvent?.touches?.[0]
     const x = touch ? touch.clientX : e.nativeEvent?.clientX ?? e.clientX
     const y = touch ? touch.clientY : e.nativeEvent?.clientY ?? e.clientY
-    dragBaseX.current = -activeIndexRef.current * widthRef.current
-    translateX.stopAnimation()
-    webDrag.current = { startX: x, startY: y }
+    webDrag.current = { startX: x, startY: y, committed: false, rejected: false }
   }
 
   return (
@@ -626,7 +647,11 @@ const swiperStyles = StyleSheet.create({
     height:       8,
     borderRadius: 4,
   },
+  // Active bullet is a wider pill/rounded-rect, not just a bigger circle — confirmed
+  // against the real Angular app (its active bullet is visibly "square-like"/elongated,
+  // inactive ones stay small round dots). Overrides `dot`'s width; height/radius inherited.
   dotActive: {
+    width:           16,
     backgroundColor: Colors.white,
   },
   dotInactive: {
