@@ -8,9 +8,9 @@
 // Call/WhatsApp = SvgUri (always calls the server, no caching), the rest = SvgXml
 // (bundled strings).
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
-  Animated, PanResponder, Pressable, StyleSheet, Text, View,
+  Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { SvgXml } from 'react-native-svg'
@@ -235,6 +235,7 @@ export interface AfterLikeCtx {
   phoneViewed:        string                        // raw '0'|'1'|'2'|'3'
   femaleFreeEligible: boolean
   indNumbersLeft:     string
+  oppGender:          'M' | 'F'                     // gender of the profile being viewed — drives #HIMHER#/##HE_SHE##
 }
 
 function isPhoneAlreadyViewedFree(phoneViewed: string): boolean {
@@ -263,10 +264,19 @@ export function getAfterLikeCtaIcon(ctx: AfterLikeCtx): string {
     : CDN + 'get-paid-membership.svg'
 }
 
+// Angular's own TALK_TEXT/TALK_TEXT_1 strings carry raw ##HE_SHE##/#HIMHER# placeholder
+// tokens (see locales/en.json) that were never being substituted here — the previous
+// version returned t()'s output as-is, so the literal token showed up on screen instead
+// of "him"/"her". Same convention used everywhere else in this file for gendered copy.
 export function getAfterLikeContentText(ctx: AfterLikeCtx, t: (key: string) => string): string {
-  if (showIndirectContact(ctx)) return t('MATCHES.TALK_TEXT')
-  if (ctx.entryType === 'P' || isPhoneAlreadyViewedFree(ctx.phoneViewed)) return t('MATCHES.TALK_TEXT_1')
-  return t('GENERAL.CONTACT')
+  const heShe  = ctx.oppGender === 'F' ? 'She' : 'He'
+  const himHer = ctx.oppGender === 'F' ? 'her' : 'him'
+  const raw = showIndirectContact(ctx)
+    ? t('MATCHES.TALK_TEXT')
+    : ctx.entryType === 'P' || isPhoneAlreadyViewedFree(ctx.phoneViewed)
+      ? t('MATCHES.TALK_TEXT_1')
+      : t('GENERAL.CONTACT')
+  return raw.replace(/##HE_SHE##/g, heShe).replace(/#HIMHER#/g, himHer)
 }
 
 export function showContactsLeftBanner(ctx: AfterLikeCtx): boolean {
@@ -334,14 +344,25 @@ const badgeStyles = StyleSheet.create({
 // that (misattributed to femaleFreeContactRestrict(), which actually gates CONTACT
 // actions, not photo viewing) — removed since nothing legitimate needs it.
 
+// Swiper.js's dynamicBullets caps the dot row at a fixed number of visible bullets and
+// slides that window as the active slide moves, rather than growing the row with photo
+// count — this is that cap. Not yet confirmed against the real Figma spec (pending
+// re-auth on the Figma connection); 5 is a reasonable, commonly-used Swiper default.
+const DYNAMIC_BULLET_WINDOW = 5
+
 export interface PhotoSwiperProps {
-  images:   string[]
-  width:    number
-  height:   number
-  onPress?: (() => void) | undefined
+  images:       string[]
+  width:        number
+  height:       number
+  onPress?:     (() => void) | undefined
+  // Desktop-only, opt-in — mobile stays swipe-only (matches Angular, and touch-drag is
+  // confirmed reliable there). Desktop's mouse-drag has been unreliable across a couple
+  // of fix attempts in this RNW version, so MatchCardDesktop passes this to give desktop
+  // users a working click-based fallback alongside the (still present) drag attempt.
+  showArrows?:  boolean | undefined
 }
 
-export function PhotoSwiper({ images, width, height, onPress }: PhotoSwiperProps) {
+export function PhotoSwiper({ images, width, height, onPress, showArrows }: PhotoSwiperProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const translateX = useRef(new Animated.Value(0)).current
   const dragBaseX = useRef(0)
@@ -370,17 +391,44 @@ export function PhotoSwiper({ images, width, height, onPress }: PhotoSwiperProps
     }).start()
   }
 
-  // Drag-to-swipe — Angular's Swiper.js handles mouse-drag on web and touch-swipe on
-  // mobile through one abstraction. PanResponder (built into RN, no extra dependency)
-  // gives the same cross-platform behavior — react-native-web maps mouse events into
-  // PanResponder's gesture state the same way it maps touch events.
+  // Shared tap-vs-swipe decision at the end of a drag — used by both the PanResponder
+  // path below (touch, confirmed working on real devices) and the raw-mouse-event web
+  // fallback further down. Reads everything through refs, so it's safe to call from
+  // either regardless of which render's closure captured it.
+  function handleDragEnd(dx: number, dy: number) {
+    const TAP_THRESHOLD = 5
+    if (Math.abs(dx) < TAP_THRESHOLD && Math.abs(dy) < TAP_THRESHOLD) {
+      onPressRef.current?.()
+      animateTo(activeIndexRef.current)
+      return
+    }
+    const swipeThreshold = widthRef.current * 0.2
+    if (dx < -swipeThreshold) {
+      animateTo(activeIndexRef.current + 1)
+    } else if (dx > swipeThreshold) {
+      animateTo(activeIndexRef.current - 1)
+    } else {
+      animateTo(activeIndexRef.current)
+    }
+  }
+
+  // Drag-to-swipe. Two completely separate implementations, gated by platform so they
+  // never both try to drive the same gesture at once (having both partially active
+  // simultaneously — PanResponder's own imperfect web mouse-mapping fighting the manual
+  // web listeners below over the same translateX — was producing the "gets stuck partway,
+  // one direction barely works" symptom):
+  // - Native (iOS/Android app): PanResponder — confirmed working correctly on real touch.
+  // - Web (desktop mouse AND mobile-web touch): raw DOM listeners on `window`, completely
+  //   bypassing PanResponder, since RNW doesn't reliably map either event type into its
+  //   gesture state in this version.
   const panResponder = useRef(
     PanResponder.create({
       // Must claim on start (not just on move) even with a single photo — otherwise a
       // plain tap-with-no-movement never reaches onPanResponderRelease below, and
       // tap-to-view-profile silently stops working for every single-photo card.
-      onStartShouldSetPanResponder: () => true,
+      onStartShouldSetPanResponder: () => Platform.OS !== 'web',
       onMoveShouldSetPanResponder: (_evt, gestureState) =>
+        Platform.OS !== 'web' &&
         imagesLenRef.current > 1 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
       // Yield back to an ancestor (the vertical Matches list) if it wants the gesture —
       // e.g. a drag that turns out to be more vertical than horizontal.
@@ -393,96 +441,154 @@ export function PhotoSwiper({ images, width, height, onPress }: PhotoSwiperProps
         translateX.setValue(dragBaseX.current + gestureState.dx)
       },
       onPanResponderRelease: (_evt, gestureState) => {
-        const TAP_THRESHOLD = 5
-        if (Math.abs(gestureState.dx) < TAP_THRESHOLD && Math.abs(gestureState.dy) < TAP_THRESHOLD) {
-          onPressRef.current?.()
-          animateTo(activeIndexRef.current)
-          return
-        }
-        const swipeThreshold = widthRef.current * 0.2
-        if (gestureState.dx < -swipeThreshold) {
-          animateTo(activeIndexRef.current + 1)
-        } else if (gestureState.dx > swipeThreshold) {
-          animateTo(activeIndexRef.current - 1)
-        } else {
-          animateTo(activeIndexRef.current)
-        }
+        handleDragEnd(gestureState.dx, gestureState.dy)
       },
     })
   ).current
 
-  return (
-    <View>
-      {/* Sized wrapper so the arrows below can center on the PHOTO itself (width x height),
-          not the photo+dots stack — position:absolute anchors to this, not the outer View. */}
-      <View style={{ width, height }}>
-        {/* overflow:'hidden' here too, not just on the parent photoBox — on Android, a
-            ScrollView/FlatList's own native surface could escape an ancestor's borderRadius
-            clip (a well-known RN/Android quirk); the manual Animated row below inherits the
-            same risk, so the clip stays applied at this level regardless of scroll mechanism. */}
-        <View style={swiperStyles.clip} {...panResponder.panHandlers}>
-          <Animated.View
-            style={[
-              swiperStyles.track,
-              { width: width * images.length, height, transform: [{ translateX }] },
-            ]}
-          >
-            {images.map((uri, index) => {
-              return (
-                <View key={index} style={{ width, height }}>
-                  <Image
-                    source={{ uri }}
-                    style={swiperStyles.image}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                    recyclingKey={uri}
-                    transition={150}
-                  />
-                </View>
-              )
-            })}
-          </Animated.View>
-        </View>
+  // Web fallback — mouse AND touch, entirely separate from PanResponder above. Listens
+  // on `window` (not just the swiper element) for move/end so the drag keeps tracking
+  // even if the cursor/finger leaves the small photo area mid-drag.
+  const webDrag = useRef<{ startX: number; startY: number } | null>(null)
 
-        {images.length > 1 && activeIndex > 0 && (
-          <Pressable
-            style={[swiperStyles.arrowBtn, swiperStyles.arrowLeft]}
-            onPress={() => animateTo(activeIndex - 1)}
-            hitSlop={8}
-          >
-            <Text style={swiperStyles.arrowText}>{'‹'}</Text>
-          </Pressable>
-        )}
-        {images.length > 1 && activeIndex < images.length - 1 && (
-          <Pressable
-            style={[swiperStyles.arrowBtn, swiperStyles.arrowRight]}
-            onPress={() => animateTo(activeIndex + 1)}
-            hitSlop={8}
-          >
-            <Text style={swiperStyles.arrowText}>{'›'}</Text>
-          </Pressable>
-        )}
-      </View>
+  useEffect(() => {
+    if (Platform.OS !== 'web') return undefined
+    function pointFromEvent(e: any): { x: number; y: number } | null {
+      if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY }
+      if (e.changedTouches && e.changedTouches[0]) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY }
+      if (typeof e.clientX === 'number') return { x: e.clientX, y: e.clientY }
+      return null
+    }
+    function onMove(e: any) {
+      if (!webDrag.current) return
+      const p = pointFromEvent(e)
+      if (!p) return
+      translateX.setValue(dragBaseX.current + (p.x - webDrag.current.startX))
+    }
+    function onEnd(e: any) {
+      if (!webDrag.current) return
+      const { startX, startY } = webDrag.current
+      // touchend has no `touches`/no clientX of its own — falls back to `changedTouches`
+      // inside pointFromEvent; if even that's unavailable, treat as zero movement (a tap).
+      const p = pointFromEvent(e) ?? { x: startX, y: startY }
+      webDrag.current = null
+      handleDragEnd(p.x - startX, p.y - startY)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onEnd)
+    window.addEventListener('touchmove', onMove)
+    window.addEventListener('touchend', onEnd)
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onEnd)
+      window.removeEventListener('touchmove', onMove)
+      window.removeEventListener('touchend', onEnd)
+    }
+  }, [])
+
+  function onDragStartWeb(e: any) {
+    if (Platform.OS !== 'web') return
+    const touch = e.nativeEvent?.touches?.[0]
+    const x = touch ? touch.clientX : e.nativeEvent?.clientX ?? e.clientX
+    const y = touch ? touch.clientY : e.nativeEvent?.clientY ?? e.clientY
+    dragBaseX.current = -activeIndexRef.current * widthRef.current
+    translateX.stopAnimation()
+    webDrag.current = { startX: x, startY: y }
+  }
+
+  return (
+    // overflow:'hidden' here too, not just on the parent photoBox — on Android, a
+    // ScrollView/FlatList's own native surface could escape an ancestor's borderRadius
+    // clip (a well-known RN/Android quirk); the manual Animated row below inherits the
+    // same risk, so the clip stays applied at this level regardless of scroll mechanism.
+    <View
+      style={[swiperStyles.clip, { width, height }]}
+      {...panResponder.panHandlers}
+      {...(Platform.OS === 'web' ? { onMouseDown: onDragStartWeb, onTouchStart: onDragStartWeb } : null)}
+    >
+      <Animated.View
+        style={[
+          swiperStyles.track,
+          { width: width * images.length, height, transform: [{ translateX }] },
+        ]}
+      >
+        {images.map((uri, index) => {
+          return (
+            <View key={index} style={{ width, height }}>
+              <Image
+                source={{ uri }}
+                style={swiperStyles.image}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                recyclingKey={uri}
+                transition={150}
+              />
+            </View>
+          )
+        })}
+      </Animated.View>
 
       {/* Dynamic bullets — Angular's Swiper.js `dynamicBullets` pagination scales the
-          active dot up and shrinks neighbors by distance, rather than uniform-size dots. */}
-      {images.length > 1 && (
-        <View style={swiperStyles.dotsRow}>
-          {images.map((_, i) => {
-            const distance = Math.abs(i - activeIndex)
-            const scale = distance === 0 ? 1 : distance === 1 ? 0.7 : 0.45
-            return (
-              <View
-                key={i}
-                style={[
-                  swiperStyles.dot,
-                  i === activeIndex ? swiperStyles.dotActive : swiperStyles.dotInactive,
-                  { transform: [{ scale }] },
-                ]}
-              />
-            )
-          })}
-        </View>
+          active dot up and shrinks neighbors by distance, AND caps the visible dot count
+          to a sliding window (it never lets the dot row grow wider than a fixed size,
+          however many photos there are) — both parts replicated here, not just the scale.
+          Positioned as an absolute overlay INSIDE the photo bounds (Swiper.js's own real
+          default: `.swiper-pagination` sits `position:absolute; bottom:10px` over the
+          slide, not as extra content below it) — a previous version rendered this as a
+          plain sibling below the photo, which the parent card's fixed-height+overflow:
+          hidden photoBox was silently clipping off entirely. */}
+      {images.length > 1 && (() => {
+        const WINDOW_SIZE = Math.min(DYNAMIC_BULLET_WINDOW, images.length)
+        const half = Math.floor(WINDOW_SIZE / 2)
+        const windowStart = Math.max(0, Math.min(activeIndex - half, images.length - WINDOW_SIZE))
+        const windowEnd = windowStart + WINDOW_SIZE
+        const hasMoreBefore = windowStart > 0
+        const hasMoreAfter  = windowEnd < images.length
+
+        return (
+          <View style={swiperStyles.dotsRow} pointerEvents="none">
+            {images.slice(windowStart, windowEnd).map((_, wi) => {
+              const i = windowStart + wi
+              const distance = Math.abs(i - activeIndex)
+              // Edge dot of the visible window, with more photos beyond it, shrinks
+              // further still — Swiper's own hint that the row continues off-screen.
+              const atShrunkEdge = (wi === 0 && hasMoreBefore) || (wi === WINDOW_SIZE - 1 && hasMoreAfter)
+              const scale = atShrunkEdge ? 0.3 : distance === 0 ? 1 : distance === 1 ? 0.7 : 0.45
+              return (
+                <View
+                  key={i}
+                  style={[
+                    swiperStyles.dot,
+                    i === activeIndex ? swiperStyles.dotActive : swiperStyles.dotInactive,
+                    { transform: [{ scale }] },
+                  ]}
+                />
+              )
+            })}
+          </View>
+        )
+      })()}
+
+      {/* Desktop-only click fallback (see `showArrows` doc comment above) — sits
+          alongside the dots, not instead of them, matching how a real Swiper.js
+          `navigation` module coexists with its `pagination` module. */}
+      {showArrows && images.length > 1 && activeIndex > 0 && (
+        <Pressable
+          style={[swiperStyles.arrowBtn, swiperStyles.arrowLeft]}
+          onPress={() => animateTo(activeIndex - 1)}
+          hitSlop={8}
+        >
+          <Text style={swiperStyles.arrowText}>{'‹'}</Text>
+        </Pressable>
+      )}
+      {showArrows && images.length > 1 && activeIndex < images.length - 1 && (
+        <Pressable
+          style={[swiperStyles.arrowBtn, swiperStyles.arrowRight]}
+          onPress={() => animateTo(activeIndex + 1)}
+          hitSlop={8}
+        >
+          <Text style={swiperStyles.arrowText}>{'›'}</Text>
+        </Pressable>
       )}
     </View>
   )
@@ -490,9 +596,7 @@ export function PhotoSwiper({ images, width, height, onPress }: PhotoSwiperProps
 
 const swiperStyles = StyleSheet.create({
   clip: {
-    width:     '100%',
-    height:    '100%',
-    overflow:  'hidden',
+    overflow: 'hidden',
   },
   track: {
     flexDirection: 'row',
@@ -501,36 +605,43 @@ const swiperStyles = StyleSheet.create({
     width:  '100%',
     height: '100%',
   },
+  // Absolute overlay at the bottom of the photo — matches Swiper.js's own default
+  // `.swiper-pagination` positioning (over the slide, not flow content below it).
   dotsRow: {
+    position:       'absolute',
+    bottom:         8,
+    left:           0,
+    right:          0,
     flexDirection:  'row',
     justifyContent: 'center',
     alignItems:     'center',
-    marginTop:      8,
     gap:            6,
   },
   // Uniform circular base — dynamicBullets sizing comes entirely from the transform:scale
   // applied per-dot at render time (active=1, neighbors shrink by distance), not fixed widths.
+  // White/translucent-white, not a brand color — this overlays a photo of unknown
+  // background color, not a plain white card surface.
   dot: {
     width:        8,
     height:       8,
     borderRadius: 4,
   },
   dotActive: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.white,
   },
   dotInactive: {
-    backgroundColor: Colors.inputBorder,
+    backgroundColor: 'rgba(255,255,255,0.5)',
   },
   arrowBtn: {
     position:        'absolute',
-    top:              '50%',
-    marginTop:        -16,
-    width:            32,
-    height:           32,
-    borderRadius:     16,
-    backgroundColor:  'rgba(0,0,0,0.35)',
-    alignItems:       'center',
-    justifyContent:   'center',
+    top:             '50%',
+    marginTop:       -16,
+    width:           32,
+    height:          32,
+    borderRadius:    16,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems:      'center',
+    justifyContent:  'center',
   },
   arrowLeft:  { left:  8 },
   arrowRight: { right: 8 },

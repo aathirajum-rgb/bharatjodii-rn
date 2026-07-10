@@ -138,6 +138,7 @@ const MatchCard = memo(function MatchCard({
     phoneViewed: profile.phoneViewed,
     femaleFreeEligible,
     indNumbersLeft,
+    oppGender,
   }
 
   return (

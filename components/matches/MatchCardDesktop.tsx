@@ -4,12 +4,11 @@
 // exact same profile/handlers with zero adaptation.
 import { useTranslation } from 'react-i18next'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { Image } from 'expo-image'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import {
   WhatsAppIcon, WhatsAppUnlockButton, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   buildBasicView, showLikeCTA, showAfterLikeCTA,
-  getBlurPhotoUri, NEWLY_JOINED_STAR_URI, ProfileBadge,
+  getBlurPhotoUri, NEWLY_JOINED_STAR_URI, ProfileBadge, PhotoSwiper,
   disableDontShow, disableViewLater,
 } from './matchesCard.shared'
 import { Colors } from '../../constants/colors'
@@ -35,18 +34,20 @@ export default function MatchCardDesktop({
   return (
     <View style={c.card}>
       {/* ── Photo (left) ──────────────────────────────────────────────────── */}
-      <Pressable style={c.photoBox} onPress={onPress}>
-        {profile.isPhotoAvailable && !profile.isPhotoProtect && profile.profileImg ? (
-          <Image
-            source={{ uri: profile.profileImg }}
-            style={c.photo}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            recyclingKey={profile.profileId}
-            transition={150}
+      {/* Plain View, not Pressable — PhotoSwiper below owns its own tap/drag gesture
+          handling (PanResponder); nesting it inside another Pressable would make the
+          two compete for the same touch, breaking drag-to-swipe. */}
+      <View style={c.photoBox}>
+        {profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0 ? (
+          <PhotoSwiper
+            images={profile.photos}
+            width={PHOTO_W}
+            height={PHOTO_H}
+            onPress={onPress}
+            showArrows
           />
         ) : (
-          <>
+          <Pressable style={c.singlePhotoPressable} onPress={onPress}>
             <CdnSvg
               uri={getBlurPhotoUri(oppGender)}
               width="100%" height="100%"
@@ -60,7 +61,7 @@ export default function MatchCardDesktop({
                 <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={onWhatsApp} />
               </View>
             </View>
-          </>
+          </Pressable>
         )}
 
         {profile.isNewlyJoined && (
@@ -71,7 +72,7 @@ export default function MatchCardDesktop({
             <Text style={c.newBadgeText}>{t('HOME.NEWLY_JOINED_HEADER')}</Text>
           </View>
         )}
-      </Pressable>
+      </View>
 
       {/* ── Info (right) ──────────────────────────────────────────────────── */}
       <View style={c.info}>
@@ -159,7 +160,7 @@ const c = StyleSheet.create({
     backgroundColor:  Colors.divider,
     flexShrink:       0,
   },
-  photo: { width: '100%', height: '100%' },
+  singlePhotoPressable: { width: '100%', height: '100%' },
 
   newBadge: {
     position:      'absolute',
