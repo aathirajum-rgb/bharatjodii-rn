@@ -42,6 +42,8 @@ import PermissionDemoScreen        from '../screens/PermissionDemoScreen'
 import MatchesScreen               from '../screens/matches/MatchesScreen'
 import ActivityScreen               from '../screens/activity/ActivityScreen'
 import LanguageSelectionScreen     from '../screens/LanguageSelectionScreen'
+import MenuScreen                  from '../screens/menu/MenuScreen'
+import SettingsScreen              from '../screens/settings/SettingsScreen'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -62,6 +64,8 @@ export type AppStackParamList = {
   // push. AuthStack's own LanguageSelection route (pre-login, full-screen) is separate.
   LanguageSelection: undefined
   Activity:          undefined
+  Menu:              undefined
+  Settings:          undefined
 }
 
 // ─── Onboarding shell ─────────────────────────────────────────────────────────
@@ -288,6 +292,8 @@ export default function AppStack() {
       />
       <Stack.Screen name="payment-success" component={PaymentSuccessScreen} />
       <Stack.Screen name="Activity" component={ActivityScreen} />
+      <Stack.Screen name="Menu" component={MenuScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen
         name="ComponentShowcase"
         component={ComponentShowcaseScreen}

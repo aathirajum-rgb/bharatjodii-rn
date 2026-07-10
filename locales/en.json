@@ -407,7 +407,16 @@
         "PHONE_PRIVACY":"Phone Privacy Settings",
         "PHONE_PRIVACY_SUB":"You can control who can view your phone number",
         "WELCOME_TEXT":"Welcome",
-        "RENEW_PLAN":"Renew Plan"
+        "RENEW_PLAN":"Renew Plan",
+        "EDIT_PROFILE": "Edit Profile",
+        "SEARCH_BY_ID": "Search Profile by ID",
+        "DOWNLOAD_BIODATA": "Download your biodata",
+        "SUCCESS_STORIES": "Jodii Success Stories",
+        "IGNORED_PROFILES": "Ignored Profiles",
+        "SETTINGS": "Settings",
+        "CUSTOMER_SUPPORT": "Contact Customer support",
+        "MEMBERSHIP_TILL": "Membership valid till",
+        "APPVERSION_LBL": "App Version"
 
     },
     "PRIVACY":{ 
@@ -491,7 +500,10 @@
         "LOGOUT_MSG_2":"If you logout from your account, you will no longer be able to view, like & contact matches and get notifications",
         "KEEPME_LOGIN": "Keep me logged in",
         "SELECTED_LANGUAGE": "English",
-        "LOGOUT_CTA_POPUP": "Logout"
+        "LOGOUT_CTA_POPUP": "Logout",
+        "PRIVACY_POLICY": "Privacy Policy",
+        "TERMS_CONDITIONS": "Terms & Conditions",
+        "LOGOUT_SHEET_MSG": "By logging out, you will miss out on receiving instant updates and notifications from your matches. Do you still wish to continue?"
     },
     "PROFILES":{
         "PROFILES_1":"Profile#PLURAL# that you viewed in detail",
