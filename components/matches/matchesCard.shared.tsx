@@ -8,11 +8,12 @@
 // Call/WhatsApp = SvgUri (always calls the server, no caching), the rest = SvgXml
 // (bundled strings).
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import {
-  Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View,
+  Pressable, StyleSheet, Text, View,
 } from 'react-native'
 import { Image } from 'expo-image'
+import Carousel, { type ICarouselInstance } from 'react-native-reanimated-carousel'
 import { SvgXml } from 'react-native-svg'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { CDN_SVG } from '../../constants/cdn'
@@ -343,6 +344,15 @@ const badgeStyles = StyleSheet.create({
 // Angular app. A previous pass here had a `renderLockSlide` escape hatch for exactly
 // that (misattributed to femaleFreeContactRestrict(), which actually gates CONTACT
 // actions, not photo viewing) — removed since nothing legitimate needs it.
+//
+// The actual drag/swipe mechanics are react-native-reanimated-carousel (built on
+// react-native-gesture-handler + react-native-reanimated) — several rounds of a
+// hand-rolled PanResponder/window-listener implementation kept re-surfacing new
+// gesture-disambiguation bugs (mouse-drag unreliable on RNW, then a scroll-vs-swipe
+// conflict once that was patched). A dedicated gesture library solves the same
+// touch/mouse/scroll-conflict problem Swiper.js itself solves for Angular, instead of
+// re-solving it by hand. Only the dot/arrow UI below is still custom — that part was
+// never the problem.
 
 // Swiper.js's dynamicBullets caps the dot row at a fixed number of visible bullets and
 // slides that window as the active slide moves, rather than growing the row with photo
@@ -355,203 +365,40 @@ export interface PhotoSwiperProps {
   width:        number
   height:       number
   onPress?:     (() => void) | undefined
-  // Desktop-only, opt-in — mobile stays swipe-only (matches Angular, and touch-drag is
-  // confirmed reliable there). Desktop's mouse-drag has been unreliable across a couple
-  // of fix attempts in this RNW version, so MatchCardDesktop passes this to give desktop
-  // users a working click-based fallback alongside the (still present) drag attempt.
+  // Desktop-only, opt-in — mobile stays swipe-only (matches Angular). Gives desktop a
+  // click-based alternative to dragging, alongside it, not instead of it.
   showArrows?:  boolean | undefined
 }
 
 export function PhotoSwiper({ images, width, height, onPress, showArrows }: PhotoSwiperProps) {
   const [activeIndex, setActiveIndex] = useState(0)
-  const translateX = useRef(new Animated.Value(0)).current
-  const dragBaseX = useRef(0)
-
-  // Refs mirroring the latest render's values — the PanResponder below is created ONCE
-  // (via useRef) so its gesture callbacks close over whatever these were at creation time;
-  // reading through a ref instead keeps them current across re-renders (e.g. images changing).
-  const activeIndexRef = useRef(0)
-  const imagesLenRef   = useRef(images.length)
-  const widthRef       = useRef(width)
-  const onPressRef     = useRef(onPress)
-  activeIndexRef.current = activeIndex
-  imagesLenRef.current   = images.length
-  widthRef.current       = width
-  onPressRef.current     = onPress
-
-  function animateTo(index: number) {
-    const clamped = Math.max(0, Math.min(imagesLenRef.current - 1, index))
-    activeIndexRef.current = clamped
-    setActiveIndex(clamped)
-    Animated.spring(translateX, {
-      toValue:         -clamped * widthRef.current,
-      useNativeDriver: true,
-      tension:         60,
-      friction:        12,
-    }).start()
-  }
-
-  // Shared tap-vs-swipe decision at the end of a drag — used by both the PanResponder
-  // path below (touch, confirmed working on real devices) and the raw-mouse-event web
-  // fallback further down. Reads everything through refs, so it's safe to call from
-  // either regardless of which render's closure captured it.
-  function handleDragEnd(dx: number, dy: number) {
-    const TAP_THRESHOLD = 5
-    if (Math.abs(dx) < TAP_THRESHOLD && Math.abs(dy) < TAP_THRESHOLD) {
-      onPressRef.current?.()
-      animateTo(activeIndexRef.current)
-      return
-    }
-    // 12%, not 20% — a mouse drag tends to cover less distance than a full physical
-    // finger swipe, and falling short of the threshold springs back to the same photo
-    // (looks like "moves a little then shakes back" rather than a completed swipe).
-    const swipeThreshold = widthRef.current * 0.12
-    if (dx < -swipeThreshold) {
-      animateTo(activeIndexRef.current + 1)
-    } else if (dx > swipeThreshold) {
-      animateTo(activeIndexRef.current - 1)
-    } else {
-      animateTo(activeIndexRef.current)
-    }
-  }
-
-  // Drag-to-swipe. Two completely separate implementations, gated by platform so they
-  // never both try to drive the same gesture at once (having both partially active
-  // simultaneously — PanResponder's own imperfect web mouse-mapping fighting the manual
-  // web listeners below over the same translateX — was producing the "gets stuck partway,
-  // one direction barely works" symptom):
-  // - Native (iOS/Android app): PanResponder — confirmed working correctly on real touch.
-  // - Web (desktop mouse AND mobile-web touch): raw DOM listeners on `window`, completely
-  //   bypassing PanResponder, since RNW doesn't reliably map either event type into its
-  //   gesture state in this version.
-  const panResponder = useRef(
-    PanResponder.create({
-      // Must claim on start (not just on move) even with a single photo — otherwise a
-      // plain tap-with-no-movement never reaches onPanResponderRelease below, and
-      // tap-to-view-profile silently stops working for every single-photo card.
-      onStartShouldSetPanResponder: () => Platform.OS !== 'web',
-      onMoveShouldSetPanResponder: (_evt, gestureState) =>
-        Platform.OS !== 'web' &&
-        imagesLenRef.current > 1 && Math.abs(gestureState.dx) > Math.abs(gestureState.dy),
-      // Yield back to an ancestor (the vertical Matches list) if it wants the gesture —
-      // e.g. a drag that turns out to be more vertical than horizontal.
-      onPanResponderTerminationRequest: () => true,
-      onPanResponderGrant: () => {
-        dragBaseX.current = -activeIndexRef.current * widthRef.current
-        translateX.stopAnimation()
-      },
-      onPanResponderMove: (_evt, gestureState) => {
-        translateX.setValue(dragBaseX.current + gestureState.dx)
-      },
-      onPanResponderRelease: (_evt, gestureState) => {
-        handleDragEnd(gestureState.dx, gestureState.dy)
-      },
-    })
-  ).current
-
-  // Web fallback — mouse AND touch, entirely separate from PanResponder above. Listens
-  // on `window` (not just the swiper element) for move/end so the drag keeps tracking
-  // even if the cursor/finger leaves the small photo area mid-drag.
-  //
-  // `committed`/`rejected` reproduce what PanResponder's onMoveShouldSetPanResponder did
-  // natively: don't touch translateX (or block the page) on the very first pixels of
-  // movement — wait until the gesture is CLEARLY more horizontal than vertical before
-  // treating it as a photo-swipe. Committing immediately on mousedown/touchstart (the
-  // previous version) hijacked every vertical page-scroll that happened to start over
-  // the photo, producing a shake instead of a normal scroll.
-  const MOVE_THRESHOLD = 6
-  const webDrag = useRef<{
-    startX: number; startY: number; committed: boolean; rejected: boolean
-  } | null>(null)
-
-  useEffect(() => {
-    if (Platform.OS !== 'web') return undefined
-    function pointFromEvent(e: any): { x: number; y: number } | null {
-      if (e.touches && e.touches[0]) return { x: e.touches[0].clientX, y: e.touches[0].clientY }
-      if (e.changedTouches && e.changedTouches[0]) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY }
-      if (typeof e.clientX === 'number') return { x: e.clientX, y: e.clientY }
-      return null
-    }
-    function onMove(e: any) {
-      const drag = webDrag.current
-      if (!drag || drag.rejected) return
-      const p = pointFromEvent(e)
-      if (!p) return
-      const dx = p.x - drag.startX
-      const dy = p.y - drag.startY
-      if (!drag.committed) {
-        if (Math.abs(dx) <= MOVE_THRESHOLD && Math.abs(dy) <= MOVE_THRESHOLD) return
-        if (Math.abs(dy) > Math.abs(dx)) {
-          drag.rejected = true   // vertical gesture — leave it to the page's native scroll
-          return
-        }
-        drag.committed = true
-        dragBaseX.current = -activeIndexRef.current * widthRef.current
-        translateX.stopAnimation()
-      }
-      e.preventDefault?.()   // stop the page also scrolling horizontally once committed
-      translateX.setValue(dragBaseX.current + dx)
-    }
-    function onEnd(e: any) {
-      const drag = webDrag.current
-      if (!drag) return
-      webDrag.current = null
-      if (drag.rejected) return   // page handled the scroll; not a tap or a swipe
-      const p = pointFromEvent(e) ?? { x: drag.startX, y: drag.startY }
-      handleDragEnd(p.x - drag.startX, p.y - drag.startY)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onEnd)
-    window.addEventListener('touchmove', onMove, { passive: false })
-    window.addEventListener('touchend', onEnd)
-    return () => {
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onEnd)
-      window.removeEventListener('touchmove', onMove)
-      window.removeEventListener('touchend', onEnd)
-    }
-  }, [])
-
-  function onDragStartWeb(e: any) {
-    if (Platform.OS !== 'web') return
-    const touch = e.nativeEvent?.touches?.[0]
-    const x = touch ? touch.clientX : e.nativeEvent?.clientX ?? e.clientX
-    const y = touch ? touch.clientY : e.nativeEvent?.clientY ?? e.clientY
-    webDrag.current = { startX: x, startY: y, committed: false, rejected: false }
-  }
+  const carouselRef = useRef<ICarouselInstance>(null)
 
   return (
-    // overflow:'hidden' here too, not just on the parent photoBox — on Android, a
-    // ScrollView/FlatList's own native surface could escape an ancestor's borderRadius
-    // clip (a well-known RN/Android quirk); the manual Animated row below inherits the
-    // same risk, so the clip stays applied at this level regardless of scroll mechanism.
-    <View
-      style={[swiperStyles.clip, { width, height }]}
-      {...(Platform.OS === 'web'
-        ? { onMouseDown: onDragStartWeb, onTouchStart: onDragStartWeb }
-        : panResponder.panHandlers)}
-    >
-      <Animated.View
-        style={[
-          swiperStyles.track,
-          { width: width * images.length, height, transform: [{ translateX }] },
-        ]}
-      >
-        {images.map((uri, index) => {
-          return (
-            <View key={index} style={{ width, height }}>
-              <Image
-                source={{ uri }}
-                style={swiperStyles.image}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                recyclingKey={uri}
-                transition={150}
-              />
-            </View>
-          )
-        })}
-      </Animated.View>
+    // overflow:'hidden' here too, not just on the parent photoBox — on Android, the
+    // carousel's own native scroll surface could escape an ancestor's borderRadius clip
+    // (a well-known RN/Android quirk).
+    <View style={[swiperStyles.clip, { width, height }]}>
+      <Carousel
+        ref={carouselRef}
+        data={images}
+        width={width}
+        height={height}
+        loop={false}
+        onSnapToItem={setActiveIndex}
+        renderItem={({ item }) => (
+          <Pressable style={{ width, height }} onPress={onPress}>
+            <Image
+              source={{ uri: item }}
+              style={swiperStyles.image}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              recyclingKey={item}
+              transition={150}
+            />
+          </Pressable>
+        )}
+      />
 
       {/* Dynamic bullets — Angular's Swiper.js `dynamicBullets` pagination scales the
           active dot up and shrinks neighbors by distance, AND caps the visible dot count
@@ -600,7 +447,7 @@ export function PhotoSwiper({ images, width, height, onPress, showArrows }: Phot
       {showArrows && images.length > 1 && activeIndex > 0 && (
         <Pressable
           style={[swiperStyles.arrowBtn, swiperStyles.arrowLeft]}
-          onPress={() => animateTo(activeIndex - 1)}
+          onPress={() => carouselRef.current?.prev()}
           hitSlop={8}
         >
           <Text style={swiperStyles.arrowText}>{'‹'}</Text>
@@ -609,7 +456,7 @@ export function PhotoSwiper({ images, width, height, onPress, showArrows }: Phot
       {showArrows && images.length > 1 && activeIndex < images.length - 1 && (
         <Pressable
           style={[swiperStyles.arrowBtn, swiperStyles.arrowRight]}
-          onPress={() => animateTo(activeIndex + 1)}
+          onPress={() => carouselRef.current?.next()}
           hitSlop={8}
         >
           <Text style={swiperStyles.arrowText}>{'›'}</Text>
@@ -622,9 +469,6 @@ export function PhotoSwiper({ images, width, height, onPress, showArrows }: Phot
 const swiperStyles = StyleSheet.create({
   clip: {
     overflow: 'hidden',
-  },
-  track: {
-    flexDirection: 'row',
   },
   image: {
     width:  '100%',
