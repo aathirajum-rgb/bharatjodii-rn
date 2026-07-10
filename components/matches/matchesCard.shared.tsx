@@ -402,7 +402,10 @@ export function PhotoSwiper({ images, width, height, onPress, showArrows }: Phot
       animateTo(activeIndexRef.current)
       return
     }
-    const swipeThreshold = widthRef.current * 0.2
+    // 12%, not 20% — a mouse drag tends to cover less distance than a full physical
+    // finger swipe, and falling short of the threshold springs back to the same photo
+    // (looks like "moves a little then shakes back" rather than a completed swipe).
+    const swipeThreshold = widthRef.current * 0.12
     if (dx < -swipeThreshold) {
       animateTo(activeIndexRef.current + 1)
     } else if (dx > swipeThreshold) {
@@ -524,8 +527,9 @@ export function PhotoSwiper({ images, width, height, onPress, showArrows }: Phot
     // same risk, so the clip stays applied at this level regardless of scroll mechanism.
     <View
       style={[swiperStyles.clip, { width, height }]}
-      {...panResponder.panHandlers}
-      {...(Platform.OS === 'web' ? { onMouseDown: onDragStartWeb, onTouchStart: onDragStartWeb } : null)}
+      {...(Platform.OS === 'web'
+        ? { onMouseDown: onDragStartWeb, onTouchStart: onDragStartWeb }
+        : panResponder.panHandlers)}
     >
       <Animated.View
         style={[
