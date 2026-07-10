@@ -196,7 +196,7 @@ export default function SettingsScreen({ navigation }: Props) {
         <SettingsRow
           icon={ICON.deleteAccount}
           title={t('ACCOUNT.DEL_PRO')}
-          onPress={() => stub('Delete Profile')}
+          onPress={() => navigation.navigate('DeleteProfile')}
         />
         <SettingsRow
           icon={ICON.privacy}

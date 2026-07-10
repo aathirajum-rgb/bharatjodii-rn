@@ -44,6 +44,9 @@ import ActivityScreen               from '../screens/activity/ActivityScreen'
 import LanguageSelectionScreen     from '../screens/LanguageSelectionScreen'
 import MenuScreen                  from '../screens/menu/MenuScreen'
 import SettingsScreen              from '../screens/settings/SettingsScreen'
+import DeleteProfileScreen         from '../screens/delete-profile/DeleteProfileScreen'
+import DeleteProfileMrgReasonScreen    from '../screens/delete-profile/DeleteProfileMrgReasonScreen'
+import DeleteProfileShareDetailsScreen from '../screens/delete-profile/DeleteProfileShareDetailsScreen'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -66,6 +69,9 @@ export type AppStackParamList = {
   Activity:          undefined
   Menu:              undefined
   Settings:          undefined
+  DeleteProfile:         undefined
+  DeleteProfileMrgReason:    { reason: string }
+  DeleteProfileShareDetails: { reason: string; mrgReason: string }
 }
 
 // ─── Onboarding shell ─────────────────────────────────────────────────────────
@@ -93,7 +99,7 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
   // Reset only the handler ref when the page changes — each screen sets its
   // own visual footer state via useOnboardingFooter on mount.
   useEffect(() => {
-    handlers.current = { onNext: () => {}, onSkip: undefined }
+    handlers.current = { onNext: () => {} }
   }, [pageNo])
 
   const setFooterState = useCallback((s: FooterState) => {
@@ -294,6 +300,9 @@ export default function AppStack() {
       <Stack.Screen name="Activity" component={ActivityScreen} />
       <Stack.Screen name="Menu" component={MenuScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="DeleteProfile" component={DeleteProfileScreen} />
+      <Stack.Screen name="DeleteProfileMrgReason" component={DeleteProfileMrgReasonScreen} />
+      <Stack.Screen name="DeleteProfileShareDetails" component={DeleteProfileShareDetailsScreen} />
       <Stack.Screen
         name="ComponentShowcase"
         component={ComponentShowcaseScreen}

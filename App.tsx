@@ -11,6 +11,7 @@ import {
 } from '@expo-google-fonts/poppins'
 import { useEffect, useState } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
+import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import './i18n'
 import i18n from './i18n'
 import { StorageKeys } from './constants/storage.keys'
@@ -101,15 +102,20 @@ export default function App() {
   if (!appReady || !fontsReady) return null
 
   return (
-    <SafeAreaProvider>
-      {/* Set once, centrally — dark icons on the app's white headers by default.
-          Screens with a dark/colored top area (e.g. Splash, LanguageSelection)
-          mount their own <StatusBar> to override; expo-status-bar restores this
-          root setting automatically once that screen unmounts. */}
-      <StatusBar style="dark" />
-      <AuthProvider>
-        <RootNavigation />
-      </AuthProvider>
-    </SafeAreaProvider>
+    // Required by react-native-gesture-handler (used by the Matches photo carousel) —
+    // must sit as close to the actual app root as possible, or gestures anywhere in
+    // the tree silently fail to be recognized.
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        {/* Set once, centrally — dark icons on the app's white headers by default.
+            Screens with a dark/colored top area (e.g. Splash, LanguageSelection)
+            mount their own <StatusBar> to override; expo-status-bar restores this
+            root setting automatically once that screen unmounts. */}
+        <StatusBar style="dark" />
+        <AuthProvider>
+          <RootNavigation />
+        </AuthProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   )
 }
