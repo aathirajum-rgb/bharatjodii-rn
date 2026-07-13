@@ -32,7 +32,7 @@ import PhotoViewerModal from '../../components/matches/PhotoViewerModal'
 import ReportProfileModal from '../../components/matches/ReportProfileModal'
 import {
   getViewProfile, markProfileViewed, getSimilarProfiles, requestHoroscope, viewHoroscope, getStarMatch,
-  getBioDataLink,
+  getBioDataLink, getEnlargedPhotos,
   _debugLastViewProfileResult,
   type SimilarProfileCard,
 } from '../../service/viewProfileService'
@@ -281,6 +281,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // pinch/pan HostListeners (:2359-2490) collapse into one full-screen modal here.
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false)
   const [photoViewerIndex, setPhotoViewerIndex] = useState(0)
+  // Angular: viewprofile.page.ts:761-768 — full-resolution photo URLs, fetched
+  // once per profile-view page load, swapped in for the thumbnail array only
+  // once opened for viewing (see PhotoViewerModal's images prop below); falls
+  // back to profile.photos (thumbnails) if this hasn't resolved yet or failed.
+  const [enlargedPhotos, setEnlargedPhotos] = useState<string[] | null>(null)
   // Feature 8: one-time "tap to move to next profile" coach-mark.
   const [showCoachMark, setShowCoachMark] = useState(false)
   // Feature 5: report-profile reasons-picker modal.
@@ -316,6 +321,13 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
       if (raw) {
         const adapted = viewProfileAdapter.adapt(raw)
         setProfile(adapted)
+        setEnlargedPhotos(null)
+        // Angular: viewprofile.page.ts:761 — gated on PHOTOAVAILABLE=='Y', fired
+        // once per page load, fire-and-forget (no loading UI, no .catch in
+        // Angular either — matched here with a silent .catch for RN hygiene).
+        if (adapted.isPhotoAvailable) {
+          getEnlargedPhotos(matriId).then(urls => { if (!cancelled) setEnlargedPhotos(urls) }).catch(() => {})
+        }
         // Angular: assignProfileDtl() skips viewedtrack for same-gender/own-profile views.
         if (adapted.gender !== gender && adapted.profileId !== '') {
           markProfileViewed(matriId, isDrMode).catch(() => {})
@@ -1157,9 +1169,10 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 
       <PhotoViewerModal
         visible={photoViewerOpen}
-        images={profile.photos}
+        images={enlargedPhotos && enlargedPhotos.length > 0 ? enlargedPhotos : profile.photos}
         initialIndex={photoViewerIndex}
         onClose={() => setPhotoViewerOpen(false)}
+        renderFooter={ownProfile ? renderBiodataCta : renderCtaBlock}
       />
 
       <ReportProfileModal

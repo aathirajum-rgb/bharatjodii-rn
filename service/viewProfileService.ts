@@ -58,6 +58,32 @@ export async function markProfileViewed(matriId: string, isDr = false): Promise<
   await apiCall(Endpoints.profile.viewedTrack, 'POST', params)
 }
 
+// Angular: viewprofile.page.ts:761-768 — fired once per profile-view page load
+// (only when PHOTOAVAILABLE=='Y'), fire-and-forget, no loading UI. Returns the
+// full-resolution photo URLs, which albumView() (:1318-1357) swaps in for the
+// main carousel's thumbnail array — but only if this already resolved
+// (`if (this.enlargePhoto) { this.userPhotos = this.enlargePhoto }`); on
+// failure/still-pending it silently keeps showing the thumbnails already
+// loaded from the main view/profile/v1 response. Same fallback shape here:
+// callers should use this result if present, else keep using profile.photos.
+// (Angular's separate album-view.page.ts also called this endpoint, but it's
+// dead code — unreachable from any template — confirmed not to be ported.)
+export async function getEnlargedPhotos(partnerId: string): Promise<string[] | null> {
+  const [userId, entryType, gender] = await Promise.all([
+    getItem(SK.Auth.USER_ID),
+    getItem(SK.Auth.ENTRY_TYPE),
+    getItem(SK.User.LOGIN_GENDER),
+  ])
+  const params = `ID=${userId ?? ''}&PARTNERID=${partnerId}&ENTRYTYPE=${entryType ?? ''}&LOGINGENDER=${gender ?? ''}`
+  const result = await apiCall(Endpoints.communication.enlargePhoto, 'POST', params)
+  const ok = (result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1)
+    && (result?.ERRCODE === '0' || result?.ERRCODE == 0)
+  if (!ok) return null
+  const photoDet: Array<{ IMAGE?: string }> = result?.RESPONSE?.PHOTODET ?? []
+  const urls = photoDet.map(p => p.IMAGE).filter((u): u is string => !!u)
+  return urls.length > 0 ? urls : null
+}
+
 // Feature 6 — Angular: Nbcommon.getBioDataLink() (services/common.ts:1807-1830):
 // `${DOMAIN}biodata/v1?MATRIID=&LANG=&ATN=&RTN=&THEME=`. Endpoints.profile.bioData
 // is already `${api}biodata/v1` on the same confirmed domain (EnvConfig.api ===

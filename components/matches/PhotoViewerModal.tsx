@@ -101,9 +101,15 @@ export interface PhotoViewerModalProps {
   images:       string[]
   initialIndex: number
   onClose:      () => void
+  // Angular's albumView() (viewprofile.page.ts:1318-1357) just toggles CSS
+  // classes on the SAME page — the Don't show/View later/Like CTA row stays
+  // visible below the enlarged photo (confirmed against a real screenshot),
+  // it's not hidden behind a full-screen takeover. Callers pass their own CTA
+  // block through so this modal can show the same thing below the photo.
+  renderFooter?: (() => React.ReactNode) | undefined
 }
 
-export default function PhotoViewerModal({ visible, images, initialIndex, onClose }: PhotoViewerModalProps) {
+export default function PhotoViewerModal({ visible, images, initialIndex, onClose, renderFooter }: PhotoViewerModalProps) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const { width, height } = useWindowDimensions()
@@ -114,12 +120,42 @@ export default function PhotoViewerModal({ visible, images, initialIndex, onClos
     if (visible) { setIndex(initialIndex); setZoomed(false) }
   }, [visible, initialIndex])
 
+  // Angular: albumView()'s `slideGaOpt` (viewprofile.page.ts:1326-1336) —
+  // slidesPerView 1.2, spaceBetween 20, centeredSlides — the active photo fills
+  // most of the width with the next one peeking at the edge, not a full-bleed
+  // single slide (that's the INLINE swiper's separate `ptofilephotoslide` config).
+  const SPACE_BETWEEN = 20
+  const SLIDE_WIDTH = width / 1.2
+  const SLIDE_STRIDE = SLIDE_WIDTH + SPACE_BETWEEN
+  const SIDE_INSET = (width - SLIDE_WIDTH) / 2
+  // Computed directly from this modal's own known layout (header/footer sizes
+  // are fixed by our own styles, not measured via onLayout) — a measured value
+  // starts wrong on the very first frame (nothing measured yet) and only
+  // self-corrects a frame later, which is exactly the "photo looks too small"
+  // symptom a real device would show. header ≈ insets.top + 8 (paddingTop) +
+  // 28 (back-button row) + 12 (paddingBottom); footer ≈ renderCtaBlock's own
+  // Like-row layout (44 + 12 gap + 44 = 100) + its 16 marginTop + this modal's
+  // footer paddingBottom (16).
+  const HEADER_HEIGHT = insets.top + 48
+  const FOOTER_HEIGHT = renderFooter ? 140 : 0
+  const PHOTO_AREA_HEIGHT = height - HEADER_HEIGHT - FOOTER_HEIGHT
+  // global.scss:26077-26092 — `.show-album-view .swiper-slide { height: 92% }`
+  // — 92% of the photo area actually available, not 92% of the whole screen.
+  const CARD_HEIGHT = PHOTO_AREA_HEIGHT * 0.92
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      {/* Angular: albumView() (viewprofile.page.ts:1318-1357) just toggles CSS
+          classes on the SAME page — the underlying white page background stays,
+          it's not a black full-screen native-gallery-style overlay. Confirmed
+          against a real screenshot (white background, no black backdrop at all). */}
       <View style={s.backdrop}>
-        {/* Angular: viewprofile.page.html:1-8,20-25 — a proper header bar (back
-            button + "Photo (1/2)"), not a floating close-X. `ngClass="{'hidden':
-            isZoomed}"` hides it while pinch-zoomed — same here via `!zoomed`. */}
+        {/* A normal flow header (not a floating overlay) — matches how
+            ViewProfileScreen's own header pushes the photo down rather than
+            floating on top of it (same established pattern, applied here too
+            so the header never covers/"crops" the top of the photo card).
+            Angular: viewprofile.page.html:1-8,20-25 — back button + "Photo
+            (1/2)"; `ngClass="{'hidden': isZoomed}"` hides it while zoomed. */}
         {!zoomed && (
           <View style={[s.header, { paddingTop: insets.top + 8 }]}>
             <Pressable style={s.backBtn} onPress={onClose} hitSlop={8}>
@@ -132,33 +168,52 @@ export default function PhotoViewerModal({ visible, images, initialIndex, onClos
           </View>
         )}
 
-        <FlatList
-          data={images}
-          horizontal
-          pagingEnabled
-          scrollEnabled={!zoomed}
-          showsHorizontalScrollIndicator={false}
-          initialScrollIndex={initialIndex}
-          getItemLayout={(_, i) => ({ length: width, offset: width * i, index: i })}
-          keyExtractor={(uri, i) => `${uri}-${i}`}
-          onMomentumScrollEnd={e => setIndex(Math.round(e.nativeEvent.contentOffset.x / width))}
-          renderItem={({ item }) => (
-            <ZoomablePhoto uri={item} width={width} height={height} onZoomChange={setZoomed} />
-          )}
-        />
+        <View style={s.photoArea}>
+          <FlatList
+            data={images}
+            horizontal
+            scrollEnabled={!zoomed}
+            showsHorizontalScrollIndicator={false}
+            snapToInterval={SLIDE_STRIDE}
+            decelerationRate="fast"
+            contentContainerStyle={{ paddingHorizontal: SIDE_INSET, alignItems: 'center' }}
+            initialScrollIndex={initialIndex}
+            getItemLayout={(_, i) => ({ length: SLIDE_STRIDE, offset: SLIDE_STRIDE * i, index: i })}
+            keyExtractor={(uri, i) => `${uri}-${i}`}
+            onMomentumScrollEnd={e => setIndex(Math.round(e.nativeEvent.contentOffset.x / SLIDE_STRIDE))}
+            renderItem={({ item, index: i }) => (
+              <View style={[s.slideCard, { width: SLIDE_WIDTH, height: CARD_HEIGHT, marginRight: i === images.length - 1 ? 0 : SPACE_BETWEEN }]}>
+                <ZoomablePhoto uri={item} width={SLIDE_WIDTH} height={CARD_HEIGHT} onZoomChange={setZoomed} />
+              </View>
+            )}
+          />
+        </View>
+
+        {!!renderFooter && !zoomed && (
+          <View style={s.footer}>{renderFooter()}</View>
+        )}
       </View>
     </Modal>
   )
 }
 
 const s = StyleSheet.create({
-  backdrop: { flex: 1, backgroundColor: '#000' },
+  backdrop: { flex: 1, backgroundColor: Colors.white },
   header: {
-    position: 'absolute', top: 0, left: 0, right: 0, zIndex: 2,
     flexDirection: 'row', alignItems: 'center', gap: 12,
     paddingHorizontal: 16, paddingBottom: 12,
     backgroundColor: Colors.white,
   },
   backBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: '#333333' },
+  // Takes the remaining space between the header and the footer CTA (if any) —
+  // the photo card's own height is measured off this, not a raw screen-height %.
+  photoArea: { flex: 1, justifyContent: 'center' },
+  // global.scss:26077-26092 — `.show-album-view .swiper-slide`/`img { border-radius:
+  // 16px }`, `overflow: hidden` clips the photo to those rounded corners.
+  slideCard: { borderRadius: 16, overflow: 'hidden', backgroundColor: Colors.divider },
+  // Angular keeps the Like/Don't show/View later CTA visible below the photo
+  // in album view (confirmed against a real screenshot) — same horizontal
+  // padding as ViewProfileScreen's own CTA block so it lines up identically.
+  footer: { paddingHorizontal: 24, paddingBottom: 16 },
 })
