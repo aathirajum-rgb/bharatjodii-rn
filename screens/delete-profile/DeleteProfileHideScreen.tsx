@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
@@ -15,7 +15,7 @@ import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { StorageKeys } from '../../constants/storage.keys'
-import { getMultiple } from '../../service/storageService'
+import { getItem, getMultiple } from '../../service/storageService'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
 
@@ -23,17 +23,21 @@ import { Endpoints } from '../../service/api.endpoints'
 
 const R = CDN_REACT + '/'
 
-const ICON = {
-  back: R + 'menu_back_arrow.svg',
-}
+const ICON = { back: R + 'menu_back_arrow.svg' }
+
+// ─── Fallback options if REGISTRATIONARRAYS not loaded ────────────────────────
+
+const FALLBACK_OPTIONS = [
+  { KEY: '1', VALUE: '15 days' },
+  { KEY: '2', VALUE: '1 month' },
+  { KEY: '3', VALUE: '3 months' },
+  { KEY: '4', VALUE: '6 months' },
+]
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Props = { navigation: any; route: any }
-
-// MRGFIXEDREASON KEYs (Angular page 2)
-const MRG_KEYS = ['1', '2', '3'] as const
-type MrgKey = typeof MRG_KEYS[number]
+type HideOption = { KEY: string; VALUE: string }
 
 // ─── RadioCard ────────────────────────────────────────────────────────────────
 
@@ -51,9 +55,7 @@ function RadioCard({ label, selected, onPress }: RadioCardProps) {
       accessibilityRole="radio"
       accessibilityState={{ selected }}
     >
-      <Text style={[s.cardLabel, selected && s.cardLabelSelected]} numberOfLines={2}>
-        {label}
-      </Text>
+      <Text style={[s.cardLabel, selected && s.cardLabelSelected]}>{label}</Text>
       <View style={s.radioOuter}>
         <View style={[s.radioRing, selected ? s.radioRingSelected : s.radioRingUnselected]}>
           {selected && <View style={s.radioDot} />}
@@ -63,51 +65,73 @@ function RadioCard({ label, selected, onPress }: RadioCardProps) {
   )
 }
 
-// ─── DeleteProfileMrgReasonScreen ─────────────────────────────────────────────
+// ─── DeleteProfileHideScreen ──────────────────────────────────────────────────
 
-export default function DeleteProfileMrgReasonScreen({ navigation, route }: Props) {
+export default function DeleteProfileHideScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
   const { t }  = useTranslation()
 
-  const [selectedMrgReason, setSelectedMrgReason] = useState<MrgKey>('1')
-  const [deleting,          setDeleting]          = useState(false)
+  const { reasonName = '' } = route.params ?? {}
 
-  // Angular page 2: MRGFIXEDREASON '3' → callDeleteAPI('2') directly
-  async function handleDirectDelete() {
-    if (deleting) return
-    setDeleting(true)
+  const [options,       setOptions]       = useState<HideOption[]>([])
+  const [selectedKey,   setSelectedKey]   = useState('')
+  const [hidingProfile, setHidingProfile] = useState(false)
+  const [deletingDirect,setDeletingDirect]= useState(false)
+
+  // Load HIDDENDAYS options from cached registration arrays
+  useEffect(() => {
+    getItem('REGISTRATIONARRAYS').then(raw => {
+      try {
+        const arrays  = raw ? JSON.parse(raw) : {}
+        const page4   = arrays?.DELETEPROFILE?.PAGE4
+        setOptions(Array.isArray(page4) && page4.length > 0 ? page4 : FALLBACK_OPTIONS)
+      } catch {
+        setOptions(FALLBACK_OPTIONS)
+      }
+    })
+  }, [])
+
+  // ── API helpers ───────────────────────────────────────────────────────────
+
+  async function callUpload() {
+    const vals = await getMultiple([
+      StorageKeys.Auth.USER_ID,
+      StorageKeys.User.LOGIN_GENDER,
+    ])
+    const userId = vals[StorageKeys.Auth.USER_ID] ?? ''
+    const gender = vals[StorageKeys.User.LOGIN_GENDER] ?? ''
+
+    const formData = new FormData()
+    formData.append('MatriId',        userId)
+    formData.append('DELETEDID',      userId)
+    formData.append('REASON',         reasonName || t('DELETE_PROFILE.REASON_3'))
+    formData.append('MRGFIXEDREASON', '')
+    formData.append('PARTNERNAME',    '')
+    formData.append('DATEFIX',        '')
+    formData.append('MRGDATE',        '')
+    formData.append('MRGINMONTHS',    '')
+    formData.append('ADDRESS',        '')
+    formData.append('HIDDENDAYS',     selectedKey)
+    formData.append('UPLOADIMAGE',    '')
+
+    await uploadFile(Endpoints.media.deleteProfile, formData)
+    return { userId, gender }
+  }
+
+  // "Hide my profile" → TYPE=6, DELETIONTYPE=3, BREAK=selectedKey
+  async function handleHideProfile() {
+    if (hidingProfile || !selectedKey) return
+    setHidingProfile(true)
     try {
-      const vals = await getMultiple([
-        StorageKeys.Auth.USER_ID,
-        StorageKeys.User.LOGIN_GENDER,
-      ])
-      const userId = vals[StorageKeys.Auth.USER_ID] ?? ''
-      const gender = vals[StorageKeys.User.LOGIN_GENDER] ?? ''
-
-      const formData = new FormData()
-      formData.append('MatriId',        userId)
-      formData.append('DELETEDID',      userId)
-      formData.append('REASON',         t('DELETE_PROFILE.MRG_REASON_3'))
-      formData.append('MRGFIXEDREASON', t('DELETE_PROFILE.MRG_REASON_3'))
-      formData.append('PARTNERNAME',    '')
-      formData.append('DATEFIX',        '')
-      formData.append('MRGDATE',        '')
-      formData.append('MRGINMONTHS',    '')
-      formData.append('ADDRESS',        '')
-      formData.append('WEBSITENAME',    '')
-      formData.append('UPLOADIMAGE',    '')
-
-      await uploadFile(Endpoints.media.deleteProfile, formData)
-
-      const reason = t('DELETE_PROFILE.MRG_REASON_3')
-      const params = `ID=${userId}&GENDER=${gender}&REASON=${encodeURIComponent(reason)}&TYPE=2&DELETIONTYPE=2`
+      const { userId, gender } = await callUpload()
+      const reason = reasonName || t('DELETE_PROFILE.REASON_3')
+      const params = `ID=${userId}&GENDER=${gender}&REASON=${encodeURIComponent(reason)}&TYPE=6&DELETIONTYPE=3&BREAK=${selectedKey}&REPORTEDID=${userId}`
       const res    = await apiCall(Endpoints.auth.deleteProfile, 'POST', params)
 
       if (String(res['RESPONSECODE']) === '1' && String(res['ERRCODE']) === '0') {
         const msg = res['RESPONSE']?.['MSG'] ?? {}
         navigation.navigate('DeleteProfileSuccess', {
-          successMsgImage: msg['SUCCESS_MSG_IMAGE'] ?? '',
-          successMsg:      msg['SUCCESS_MSG']       ?? 'Your profile has been successfully deleted',
+          successMsg: msg['SUCCESS_MSG'] ?? 'Your profile has been hidden.',
         })
       } else {
         const errMsg = res['RESPONSE']?.['MSG']
@@ -116,36 +140,39 @@ export default function DeleteProfileMrgReasonScreen({ navigation, route }: Prop
     } catch {
       Alert.alert('Error', 'Something went wrong. Please try again.')
     } finally {
-      setDeleting(false)
+      setHidingProfile(false)
     }
   }
 
-  function handleNext() {
-    // Angular landingDetails.MRGFIXEDREASON maps:
-    //   '1' (Found on Jodii)           → page 3 (partner name + marriage date)
-    //   '2' (Found on another website) → page 10 (enter website/app name)
-    //   '3' (Found from other sources) → callDeleteAPI('2') — directly deletes profile
-    if (selectedMrgReason === '1') {
-      navigation.navigate('DeleteProfileShareDetails', {
-        reason:        route.params?.reason ?? '1',
-        mrgReason:     '1',
-        reasonName:    route.params?.reasonName    ?? '',
-        mrgReasonName: t('DELETE_PROFILE.MRG_REASON_1'),
-      })
-    } else if (selectedMrgReason === '2') {
-      navigation.navigate('DeleteProfileWebsiteName', {
-        mrgReasonName: t('DELETE_PROFILE.MRG_REASON_2'),
-      })
-    } else {
-      // option '3': directly call delete API (TYPE=2)
-      handleDirectDelete()
+  // "tap here" — direct delete, TYPE=2
+  async function handleDirectDelete() {
+    if (deletingDirect) return
+    setDeletingDirect(true)
+    try {
+      const { userId, gender } = await callUpload()
+      const reason = reasonName || t('DELETE_PROFILE.REASON_3')
+      const params = `ID=${userId}&GENDER=${gender}&REASON=${encodeURIComponent(reason)}&TYPE=2&DELETIONTYPE=2`
+      const res    = await apiCall(Endpoints.auth.deleteProfile, 'POST', params)
+
+      if (String(res['RESPONSECODE']) === '1' && String(res['ERRCODE']) === '0') {
+        const msg = res['RESPONSE']?.['MSG'] ?? {}
+        navigation.navigate('DeleteProfileSuccess', {
+          successMsg: msg['SUCCESS_MSG'] ?? 'Your profile has been successfully deleted',
+        })
+      } else {
+        const errMsg = res['RESPONSE']?.['MSG']
+        Alert.alert('Error', typeof errMsg === 'string' ? errMsg : 'Something went wrong. Please try again.')
+      }
+    } catch {
+      Alert.alert('Error', 'Something went wrong. Please try again.')
+    } finally {
+      setDeletingDirect(false)
     }
   }
 
-  const options: { key: MrgKey; label: string }[] = MRG_KEYS.map(k => ({
-    key:   k,
-    label: t(`DELETE_PROFILE.MRG_REASON_${k}`),
-  }))
+  const isLoading = hidingProfile || deletingDirect
+
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
@@ -166,45 +193,57 @@ export default function DeleteProfileMrgReasonScreen({ navigation, route }: Prop
       {/* Content */}
       <ScrollView
         style={s.flex1}
-        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[s.scroll, { paddingBottom: insets.bottom + 120 }]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Congratulations! */}
-        <Text style={s.congratsTitle}>{t('DELETE_PROFILE.CONGRAT_HEADER')}</Text>
+        <Text style={s.sectionTitle}>{t('DELETE_PROFILE.HIDE_CONTENT')}</Text>
 
-        {/* Sub-text */}
-        <Text style={s.congratsSub}>{t('DELETE_PROFILE.CONGRAT_CONTENT')}</Text>
-
-        {/* "How did you find your partner?" */}
-        <Text style={s.sectionTitle}>{t('DELETE_PROFILE.CONGRAT_SUB_HEADER')}</Text>
-
-        {/* Radio cards */}
+        {/* Duration options */}
         <View style={s.radioList}>
-          {options.map(({ key, label }) => (
+          {options.map(opt => (
             <RadioCard
-              key={key}
-              label={label}
-              selected={selectedMrgReason === key}
-              onPress={() => setSelectedMrgReason(key)}
+              key={opt.KEY}
+              label={opt.VALUE}
+              selected={selectedKey === opt.KEY}
+              onPress={() => setSelectedKey(opt.KEY)}
             />
           ))}
         </View>
       </ScrollView>
 
-      {/* Next / Delete CTA — fixed at bottom */}
+      {/* Footer */}
       <View style={[s.footer, { paddingBottom: insets.bottom + 16 }]}>
-        {deleting ? (
+        {/* "Hide my profile" primary CTA */}
+        {hidingProfile ? (
           <View style={s.loadingBtn}>
             <ActivityIndicator color={Colors.white} size="small" />
           </View>
         ) : (
           <ButtonRevamp
-            label={selectedMrgReason === '3' ? t('DELETE_PROFILE.DELETE_CTA') : t('DELETE_PROFILE.NEXT_CTA')}
+            label={t('DELETE_PROFILE.NEXT_CTA')}
             variant="primary"
             fullWidth
-            onPress={handleNext}
+            disabled={!selectedKey || isLoading}
+            onPress={handleHideProfile}
           />
         )}
+
+        {/* "If you still wish to delete, tap here" */}
+        <Pressable
+          style={s.deleteLink}
+          onPress={handleDirectDelete}
+          disabled={isLoading}
+          accessibilityRole="button"
+        >
+          {deletingDirect ? (
+            <ActivityIndicator color={PRIMARY} size="small" />
+          ) : (
+            <Text style={s.deleteLinkText}>
+              {t('DELETE_PROFILE.HIDE_CTA1')}
+              <Text style={s.deleteLinkUnderline}>{t('DELETE_PROFILE.HIDE_CTA2')}</Text>
+            </Text>
+          )}
+        </Pressable>
       </View>
 
     </View>
@@ -216,11 +255,11 @@ export default function DeleteProfileMrgReasonScreen({ navigation, route }: Prop
 const PRIMARY = '#b50033'
 
 const s = StyleSheet.create({
+  flex1: { flex: 1 },
   screen: {
     flex:            1,
     backgroundColor: Colors.white,
   },
-  flex1: { flex: 1 },
 
   // ── Header ──
   header: {
@@ -242,6 +281,7 @@ const s = StyleSheet.create({
     marginLeft:     14,
   },
   headerTitle: {
+    flex:       1,
     fontSize:   16,
     fontWeight: '500',
     color:      '#333333',
@@ -249,46 +289,31 @@ const s = StyleSheet.create({
   },
 
   // ── Content ──
-  content: {
+  scroll: {
     paddingHorizontal: 24,
     paddingTop:        24,
   },
-
-  congratsTitle: {
-    fontSize:   24,
-    fontWeight: '600',
-    color:      '#000000',
-  },
-  congratsSub: {
-    fontSize:   14,
-    fontWeight: '400',
-    color:      '#000000',
-    marginTop:  8,
-    lineHeight: 20,
-  },
   sectionTitle: {
-    fontSize:   18,
-    fontWeight: '600',
-    color:      '#000000',
-    marginTop:  24,
+    fontSize:     18,
+    fontWeight:   '600',
+    color:        '#000000',
+    marginBottom: 16,
   },
 
   // ── Radio list ──
   radioList: {
-    marginTop: 16,
-    gap:       12,
+    gap: 12,
   },
 
   // ── Radio cards ──
   card: {
-    minHeight:      64,
+    height:         64,
     borderRadius:   8,
     borderWidth:    1,
     flexDirection:  'row',
     alignItems:     'center',
     paddingLeft:    16,
     paddingRight:   4,
-    paddingVertical: 12,
     gap:            16,
   },
   cardUnselected: {
@@ -304,19 +329,15 @@ const s = StyleSheet.create({
     fontSize:   14,
     fontWeight: '400',
     color:      '#000000',
-    lineHeight: 20,
   },
   cardLabelSelected: {
     fontWeight: '500',
   },
-
-  // ── Radio button ──
   radioOuter: {
     width:          44,
     height:         44,
     alignItems:     'center',
     justifyContent: 'center',
-    flexShrink:     0,
   },
   radioRing: {
     width:          24,
@@ -356,5 +377,22 @@ const s = StyleSheet.create({
     backgroundColor: PRIMARY,
     alignItems:      'center',
     justifyContent:  'center',
+  },
+  deleteLink: {
+    marginTop:      16,
+    alignItems:     'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+  },
+  deleteLinkText: {
+    fontSize:   12,
+    fontWeight: '400',
+    color:      '#000000',
+    textAlign:  'center',
+  },
+  deleteLinkUnderline: {
+    fontSize:   12,
+    fontWeight: '500',
+    color:      Colors.link,
   },
 })

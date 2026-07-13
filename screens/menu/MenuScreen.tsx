@@ -208,7 +208,7 @@ export default function MenuScreen({ navigation }: Props) {
           <MenuRow
             icon={ICON.wedding}
             title={t('MENU.SUCCESS_STORIES')}
-            onPress={() => stub('Success Stories')}
+            onPress={() => navigation.navigate('SuccessStories')}
             showDivider
           />
           <MenuRow

@@ -45,9 +45,16 @@ import ActivityScreen               from '../screens/activity/ActivityScreen'
 import LanguageSelectionScreen     from '../screens/LanguageSelectionScreen'
 import MenuScreen                  from '../screens/menu/MenuScreen'
 import SettingsScreen              from '../screens/settings/SettingsScreen'
-import DeleteProfileScreen         from '../screens/delete-profile/DeleteProfileScreen'
+import DeleteProfileScreen             from '../screens/delete-profile/DeleteProfileScreen'
 import DeleteProfileMrgReasonScreen    from '../screens/delete-profile/DeleteProfileMrgReasonScreen'
-import DeleteProfileShareDetailsScreen from '../screens/delete-profile/DeleteProfileShareDetailsScreen'
+import DeleteProfileHideScreen         from '../screens/delete-profile/DeleteProfileHideScreen'
+import DeleteProfileShareDetailsScreen  from '../screens/delete-profile/DeleteProfileShareDetailsScreen'
+import DeleteProfileWebsiteNameScreen   from '../screens/delete-profile/DeleteProfileWebsiteNameScreen'
+import DeleteProfileUploadPhotoScreen       from '../screens/delete-profile/DeleteProfileUploadPhotoScreen'
+import DeleteProfileUnsatisfactoryScreen   from '../screens/delete-profile/DeleteProfileUnsatisfactoryScreen'
+import DeleteProfileOtherReasonScreen      from '../screens/delete-profile/DeleteProfileOtherReasonScreen'
+import DeleteProfileSuccessScreen          from '../screens/delete-profile/DeleteProfileSuccessScreen'
+import SuccessStoriesScreen               from '../screens/success-stories/SuccessStoriesScreen'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,8 +78,25 @@ export type AppStackParamList = {
   Menu:              undefined
   Settings:          undefined
   DeleteProfile:         undefined
-  DeleteProfileMrgReason:    { reason: string }
-  DeleteProfileShareDetails: { reason: string; mrgReason: string }
+  DeleteProfileMrgReason:    { reason: string; reasonName?: string }
+  DeleteProfileHide:              { reasonName: string }
+  DeleteProfileUnsatisfactory:    { reasonName: string }
+  DeleteProfileOtherReason:       { reasonName: string }
+  DeleteProfileWebsiteName:       { mrgReasonName: string }
+  DeleteProfileShareDetails: { reason: string; mrgReason: string; reasonName?: string; mrgReasonName?: string }
+  DeleteProfileUploadPhoto: {
+    partnerName:     string
+    dateFixType:     string
+    mrgDate:         string
+    mrgInMonthsName: string
+    reasonName:      string
+    mrgReasonName:   string
+  }
+  DeleteProfileSuccess: {
+    successMsgImage: string
+    successMsg:      string
+  }
+  SuccessStories: undefined
   // Angular: viewprofile.page.ts route params (:module/:id) — fromPage drives the
   // "from" context communicationBtnOnClick needs for its paywall/report-popup logic.
   viewProfile: { matriId: string; fromPage: string; showRating?: boolean } | undefined
@@ -307,7 +331,14 @@ export default function AppStack() {
       <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="DeleteProfile" component={DeleteProfileScreen} />
       <Stack.Screen name="DeleteProfileMrgReason" component={DeleteProfileMrgReasonScreen} />
+      <Stack.Screen name="DeleteProfileHide" component={DeleteProfileHideScreen} />
+      <Stack.Screen name="DeleteProfileUnsatisfactory" component={DeleteProfileUnsatisfactoryScreen} />
+      <Stack.Screen name="DeleteProfileOtherReason" component={DeleteProfileOtherReasonScreen} />
+      <Stack.Screen name="DeleteProfileWebsiteName" component={DeleteProfileWebsiteNameScreen} />
       <Stack.Screen name="DeleteProfileShareDetails" component={DeleteProfileShareDetailsScreen} />
+      <Stack.Screen name="DeleteProfileUploadPhoto" component={DeleteProfileUploadPhotoScreen} />
+      <Stack.Screen name="DeleteProfileSuccess" component={DeleteProfileSuccessScreen} options={{ gestureEnabled: false }} />
+      <Stack.Screen name="SuccessStories" component={SuccessStoriesScreen} />
       <Stack.Screen
         name="ComponentShowcase"
         component={ComponentShowcaseScreen}
