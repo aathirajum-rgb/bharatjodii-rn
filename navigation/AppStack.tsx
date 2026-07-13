@@ -41,6 +41,7 @@ import RechargeScreen              from '../screens/payment/RechargeScreen'
 import PermissionDemoScreen        from '../screens/PermissionDemoScreen'
 import MatchesScreen               from '../screens/matches/MatchesScreen'
 import ViewProfileScreen           from '../screens/viewprofile/ViewProfileScreen'
+import StarMatchingScreen          from '../screens/star-matching/StarMatchingScreen'
 import ActivityScreen               from '../screens/activity/ActivityScreen'
 import LanguageSelectionScreen     from '../screens/LanguageSelectionScreen'
 import MenuScreen                  from '../screens/menu/MenuScreen'
@@ -99,7 +100,14 @@ export type AppStackParamList = {
   SuccessStories: undefined
   // Angular: viewprofile.page.ts route params (:module/:id) — fromPage drives the
   // "from" context communicationBtnOnClick needs for its paywall/report-popup logic.
-  viewProfile: { matriId: string; fromPage: string; showRating?: boolean } | undefined
+  viewProfile: { matriId: string; fromPage: string; showRating?: boolean; profileIds?: string[] } | undefined
+  // Angular: redirectiontoStarMatchReport() passes the already-fetched result via
+  // router state to skip a redundant API call — same idea here via route params.
+  'star-matching': {
+    partnerId: string; partnerName?: string; partnerPhoto?: string
+    ownStar?: string; ownRaasi?: string; partnerStar?: string; partnerRaasi?: string
+    percentage: number; isNorth: boolean
+  } | undefined
 }
 
 // ─── Onboarding shell ─────────────────────────────────────────────────────────
@@ -307,6 +315,7 @@ export default function AppStack() {
     >
       <Stack.Screen name="Matches"   component={MatchesScreen} />
       <Stack.Screen name="viewProfile" component={ViewProfileScreen} />
+      <Stack.Screen name="star-matching" component={StarMatchingScreen} />
       <Stack.Screen name="Home"      component={HomeScreen} />
       <Stack.Screen name="dashboard" component={HomeScreen} />
       <Stack.Screen name="onboarding" component={OnboardingRouter} />

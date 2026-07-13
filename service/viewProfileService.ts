@@ -44,9 +44,185 @@ export async function getViewProfile(matriId: string): Promise<Record<string, an
 
 // Angular: communicationService.viewedTrackProfile() — marks a profile as viewed
 // once it's actually rendered (skipped for same-gender/own-profile, handled by the
-// caller). Uses the existing communication/viewedtrack endpoint already wired for
-// other listing screens' "mark as viewed" flows.
-export async function markProfileViewed(matriId: string): Promise<void> {
+// caller). Confirmed against api-params-functions.ts's viewedtrack/viewedtrackDR
+// cases: param is PARTNERID (not VIEWEDID), and DR views additionally send
+// TYPE=DR (Angular picks viewedtrackDR vs viewedtrack based on the DR route).
+export async function markProfileViewed(matriId: string, isDr = false): Promise<void> {
+  const [userId, gender, entryType] = await Promise.all([
+    getItem(SK.Auth.USER_ID),
+    getItem(SK.User.LOGIN_GENDER),
+    getItem(SK.Auth.ENTRY_TYPE),
+  ])
+  const params = `ID=${userId ?? ''}&PARTNERID=${matriId}&LOGINGENDER=${gender ?? ''}&ENTRYTYPE=${entryType ?? ''}`
+    + (isDr ? '&TYPE=DR' : '')
+  await apiCall(Endpoints.profile.viewedTrack, 'POST', params)
+}
+
+// Feature 6 — Angular: Nbcommon.getBioDataLink() (services/common.ts:1807-1830):
+// `${DOMAIN}biodata/v1?MATRIID=&LANG=&ATN=&RTN=&THEME=`. Endpoints.profile.bioData
+// is already `${api}biodata/v1` on the same confirmed domain (EnvConfig.api ===
+// Angular's `${ENVIRONMENT}_DOMAIN`), so only the query params need building here.
+export async function getBioDataLink(matriId: string): Promise<string> {
+  const [atn, rtn, lang, themeId] = await Promise.all([
+    getItem(SK.Auth.TOKEN),
+    getItem(SK.Auth.REFRESH_TOKEN),
+    getItem(SK.Auth.LANG),
+    getItem('THEMEID'),
+  ])
+  const params = `MATRIID=${matriId}&LANG=${lang ?? 'en'}&ATN=${atn ?? ''}&RTN=${rtn ?? ''}&THEME=${themeId ?? '1'}`
+  return `${Endpoints.profile.bioData}?${params}`
+}
+
+// ─── Horoscope request/view ─────────────────────────────────────────────────────
+// Angular: viewprofile.page.ts:1299-1316 (requestHoro) / :1518-1529 (viewHoro,
+// inside callNative('view_horoscope')).
+
+export async function requestHoroscope(partnerId: string): Promise<boolean> {
+  const [userId, gender] = await Promise.all([
+    getItem(SK.Auth.USER_ID),
+    getItem(SK.User.LOGIN_GENDER),
+  ])
+  const params = `ID=${userId ?? ''}&PARTNERID=${partnerId}&LOGINGENDER=${gender ?? 'M'}`
+  const result = await apiCall(Endpoints.communication.requestHoro, 'POST', params)
+  return result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1
+}
+
+// Angular opens the horoscope via a native-webview bridge event
+// (appNativeEvent({event_name:'view_horoscope', URL})) — RN has no such bridge;
+// Linking.openURL is the direct analog for opening an external document/image URL.
+export async function viewHoroscope(partnerId: string, profileVerified: boolean): Promise<string | null> {
   const userId = await getItem(SK.Auth.USER_ID)
-  await apiCall(Endpoints.profile.viewedTrack, 'POST', `ID=${userId ?? ''}&VIEWEDID=${matriId}`)
+  const params = `ID=${userId ?? ''}&VIEWEDID=${partnerId}&PROFILEVERIFIED=${profileVerified ? '1' : '0'}`
+  const result = await apiCall(Endpoints.profile.viewHoro, 'POST', params)
+  const ok = result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1
+  return ok ? (result?.RESPONSE?.HOROSCOPEURL ?? null) : null
+}
+
+// ─── Star matching ("View details" full report) ────────────────────────────────
+// Angular: viewprofile.page.ts:1882-1915 (getStarMatch, paid users only — free
+// users see a static teaser instead, unchanged/already correct elsewhere on this
+// screen) and star-matching.component.ts (the report screen this feeds).
+
+export interface StarMatchResult {
+  percentage:  number
+  isNorth:     boolean   // North India → percentage bar; South India → 10-star row
+  ownStar?:    string    | undefined
+  ownRaasi?:   string    | undefined
+  partnerStar?:  string  | undefined
+  partnerRaasi?: string  | undefined
+}
+
+export async function getStarMatch(
+  partnerId: string, star: string, raasi: string, motherTongue: string,
+): Promise<StarMatchResult | null> {
+  const userId = await getItem(SK.Auth.USER_ID)
+  const params = `ID=${userId ?? ''}&VIEWEDID=${partnerId}&STAR=${star}&RAASI=${raasi}&MOTHERTONGUE=${motherTongue}`
+  const result = await apiCall(Endpoints.profile.starMatch, 'POST', params)
+  const ok = (result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1)
+    && (result?.ERRCODE === '0' || result?.ERRCODE == 0)
+  if (!ok) return null
+
+  // Exact field names haven't been debug-captured live yet (this call has never
+  // been wired before) — mirrors Angular's own state var names
+  // (poruthamPercentage/poruthamPercentageNorth/starMatchType) with a defensive
+  // fallback chain rather than committing to one guess.
+  const res = result?.RESPONSE ?? {}
+  const isNorth = String(res['DOMAIN'] ?? res['starMatchType'] ?? '').toLowerCase().includes('north')
+  const percentage = Number(
+    res['PORUTHAM_PERCENTAGE'] ?? res['PORUTHAMPERCENTAGE'] ?? res['PERCENTAGE'] ?? 0,
+  )
+  return {
+    percentage: Number.isFinite(percentage) ? percentage : 0,
+    isNorth,
+    ownStar:      res['OWNSTAR'] ?? undefined,
+    ownRaasi:     res['OWNRAASI'] ?? undefined,
+    partnerStar:  res['STAR'] ?? star ?? undefined,
+    partnerRaasi: res['RAASI'] ?? raasi ?? undefined,
+  }
+}
+
+// ─── Similar profiles ("Other profiles like X") ────────────────────────────────
+// Angular: viewprofile.page.ts:1384 — 'viewsimilar' POST with ID/STLIMIT/ENDLIMIT/
+// VIEWEDID. Confirmed live (debug capture): this call alone often returns only 1-2
+// results — Angular's own fallback (viewprofile.page.ts:1408-1417) kicks in exactly
+// here, re-querying the plain 'matches' listing (same shape fetchMatches/
+// fetchExplore already use) and fully REPLACING similarProfiles with that broader
+// result set when the primary call comes back too sparse (TOTALFOUND<=2). Skipped
+// entirely on Daily-Recommendation landings in Angular — not applicable yet, no DR
+// mode built.
+
+export interface SimilarProfileCard {
+  matriId:          string
+  name:             string
+  age?:             string | undefined
+  education?:       string | undefined
+  photoUri?:        string | undefined
+  isPhotoAvailable: boolean
+}
+
+// TEMP DEBUG — remove once the fallback's real behavior is confirmed live.
+let _lastSimilarDebug: any = null
+export function _debugLastSimilarProfilesResult(): any {
+  return _lastSimilarDebug
+}
+
+function toSimilarCard(p: Record<string, any>): SimilarProfileCard {
+  return {
+    matriId:          String(p['MATRIID'] ?? p['MATRID'] ?? p['NBID'] ?? ''),
+    name:             p['NAME'] ?? '',
+    age:              p['AGE'] ? String(p['AGE']).replace(/\s*(yrs|years)/i, '').trim() : undefined,
+    education:        p['EDUCATION'] || undefined,
+    photoUri:         (Array.isArray(p['PHOTO']) && p['PHOTO'][0]?.IMAGE) || p['THUMBIMG'] || p['PROFILEIMG'] || undefined,
+    // Angular / homeService.ts's own toProfile() mapper for this exact raw shape:
+    // PHOTOAVAILABLE=='Y' ALONE decides it — no OR-fallback to "PHOTO array has an
+    // entry". The listing API sends a placeholder/default silhouette PHOTO entry
+    // even for members with no real photo, so that fallback was wrongly treating
+    // the placeholder as a real photo (rendered as a flat gray image instead of the
+    // WhatsApp-request overlay it should show).
+    isPhotoAvailable: p['PHOTOAVAILABLE'] === 'Y',
+  }
+}
+
+export async function getSimilarProfiles(matriId: string): Promise<SimilarProfileCard[]> {
+  const userId = await getItem(SK.Auth.USER_ID)
+  const params = `ID=${userId ?? ''}&STLIMIT=0&ENDLIMIT=10&VIEWEDID=${matriId}`
+  const result = await apiCall(Endpoints.profile.similar, 'POST', params)
+
+  const ok = (result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1)
+    && (result?.ERRCODE === '0' || result?.ERRCODE == 0)
+
+  const raw = ok
+    ? (result?.RESPONSE?.MATCHES ?? result?.RESPONSE?.REPONSE?.MATCHES
+        ?? (Array.isArray(result?.RESPONSE) ? result.RESPONSE : []) ?? [])
+    : []
+  const rawArr = Array.isArray(raw) ? raw : []
+  const primary = rawArr
+    .filter((p: any) => p && !p['BANNERSLOT'])
+    .map(toSimilarCard)
+    .filter(p => p.matriId)
+
+  if (primary.length > 2) {
+    _lastSimilarDebug = { source: 'primary', primaryCount: primary.length }
+    return primary
+  }
+
+  // Angular: falls back to the plain matches listing — 'ID='+NBID+'&START=0&LIMIT=10
+  // &LIKED=1&VIEWED=1&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&BANNERFLAG=0' — and
+  // fully replaces similarProfiles with this broader result (not merged with primary).
+  const fallbackParams = `ID=${userId ?? ''}&START=0&LIMIT=10&LIKED=1&VIEWED=1&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&BANNERFLAG=0`
+  const fallbackResult = await apiCall(Endpoints.listing.matches, 'POST', fallbackParams)
+  const fallbackOk = (fallbackResult?.RESPONSECODE === '1' || fallbackResult?.RESPONSECODE == 1)
+    && (fallbackResult?.ERRCODE === '0' || fallbackResult?.ERRCODE == 0)
+  const fallbackRaw = fallbackOk && Array.isArray(fallbackResult?.RESPONSE) ? fallbackResult.RESPONSE : []
+  const fallback = fallbackRaw
+    .filter((p: any) => p && !p['BANNERSLOT'])
+    .map(toSimilarCard)
+    .filter((p: SimilarProfileCard) => p.matriId)
+
+  _lastSimilarDebug = {
+    source: 'fallback', primaryCount: primary.length, fallbackCount: fallback.length,
+  }
+  if (__DEV__) console.log('DBG_SIMILARPROFILES', JSON.stringify(_lastSimilarDebug))
+
+  return fallback.length > 0 ? fallback : primary
 }

@@ -5,13 +5,15 @@
 // photo gestures, prev/next profile swipe + cache, Daily-Recommendation mode,
 // horoscope request/upload, similar-profiles carousel, report-profile popover,
 // self-preview/edit-profile mode, and GAM ads (no RN equivalent, dropped for good).
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, Alert, Dimensions, Linking,
+  ActivityIndicator, Dimensions, FlatList, Linking,
   NativeScrollEvent, NativeSyntheticEvent,
   Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
+import { Image } from 'expo-image'
+import { LinearGradient } from 'expo-linear-gradient'
 import { StatusBar } from 'expo-status-bar'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
@@ -25,17 +27,36 @@ import {
 } from '../../components/matches/matchesCard.shared'
 import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import StickyBanner from '../../components/sticky-banner/StickyBanner'
-import { getViewProfile, markProfileViewed, _debugLastViewProfileResult } from '../../service/viewProfileService'
+import MembershipBanner from '../../components/matches/MembershipBanner'
+import PhotoViewerModal from '../../components/matches/PhotoViewerModal'
+import ReportProfileModal from '../../components/matches/ReportProfileModal'
+import {
+  getViewProfile, markProfileViewed, getSimilarProfiles, requestHoroscope, viewHoroscope, getStarMatch,
+  getBioDataLink,
+  _debugLastViewProfileResult,
+  type SimilarProfileCard,
+} from '../../service/viewProfileService'
+import { ENavigation } from '../../types/enums/navigation.enum'
+import { navigate as navigateGlobal } from '../../utils/navigationRef'
 import { viewProfileAdapter } from '../../adapters/viewProfile.adapter'
-import { communicationBtnOnClick, reportAndBlockProfile } from '../../service/communicationService'
+import { communicationBtnOnClick } from '../../service/communicationService'
 import { getHeroBannerDetails } from '../../service/paymentService'
+import { fetchMenuPromo } from '../../service/homeService'
 import { getItem, getJson } from '../../service/storageService'
 import { getSessionValue } from '../../service/registrationService'
+import { redirectToViewProfile } from '../../service/buttonService'
+import { shouldShowCoachMark, markCoachMarkShown } from '../../service/coachMarkService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG } from '../../constants/cdn'
+import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
 import i18n from '../../i18n'
 import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interface'
+
+// Angular's real back button is Ionic's bundled `icon="arrow-back"` (ships in the
+// app's own JS bundle, not a network fetch) — this app's own established equivalent
+// for that same "local back-arrow icon" slot is a CDN-hosted SVG fetched via
+// CdnSvg, already used this exact way by AppHeader.tsx (registration/login screens).
+const BACK_ICON_URI = CDN_REACT + '/arrowleft.svg'
 
 // Angular: viewprofile.page.html — one <img> per detail row, under assets/images/svg/
 // (most under a viewprofile/ subfolder, two — children/physical-status — are not).
@@ -70,6 +91,19 @@ const ICON = {
 // not the rounded/cropped rectangle Matches cards use.
 const SCREEN_WIDTH = Dimensions.get('window').width
 const PHOTO_HEIGHT = SCREEN_WIDTH
+
+// Angular: "Other profiles like X" is <app-swiper> — Swiper.js with its navigation
+// module (arrow buttons) + per-card snapping, not a freely-scrolling list. One
+// swipe/arrow-tap advances exactly one card width, revealing the next card peeking
+// at the edge (not a single full-bleed slide like the photo swiper). Confirmed
+// against src/app/core/config/home.config.ts's `similarprofiles` swiper config:
+// `{ slidesPerView: 1.628, spaceBetween: 16, freeMode: true }` — a FRACTIONAL
+// slidesPerView, not a fixed card width, is what makes ~1 card fill the screen
+// plus a partial peek of the next (a fixed 140px card let 3 fit on wider screens,
+// which is the bug this replaced — confirmed against a real screenshot).
+const SIMILAR_CARD_GAP   = 16
+const SIMILAR_CARD_WIDTH = Math.round(SCREEN_WIDTH / 1.628)
+const SIMILAR_CARD_STRIDE = SIMILAR_CARD_WIDTH + SIMILAR_CARD_GAP
 
 // ─── Gendered placeholder substitution ─────────────────────────────────────────
 // Angular's real content carries BOTH single-# (#HESHE#/#HISHER#/#HIMHER#) and
@@ -129,12 +163,83 @@ function DetailRow({
   )
 }
 
+// Angular: app-swiper's similar-profiles card — when the profile has no photo, an
+// `app-photo-request` overlay shows GENERAL.REQUEST_ADD_PHOTO_WHATSAPP ("Contact and
+// Get #HER_HIS# Photos on WhatsApp") + a WhatsApp CTA on top of the blurred placeholder
+// (photo-new.component.html:76-93). No name/other text on the card itself.
+function SimilarProfileCardItem({
+  card, oppGender, t, onPress,
+}: { card: SimilarProfileCard; oppGender: 'M' | 'F'; t: (key: string) => string; onPress: () => void }) {
+  return (
+    <Pressable style={s.similarCard} onPress={onPress}>
+      {card.isPhotoAvailable && card.photoUri ? (
+        <>
+          <Image source={{ uri: card.photoUri }} style={s.similarCardImg} contentFit="cover" />
+          {/* Angular: app-profile-card caption — name, age, education over a bottom
+              gradient scrim, shown only for cards that actually have a photo
+              (confirmed against screenshot — no-photo/WhatsApp-request cards carry
+              no caption at all). */}
+          {!!card.name && (
+            <View style={s.similarCardCaption} pointerEvents="none">
+              <Text style={s.similarCardName} numberOfLines={1}>{card.name}</Text>
+              {(card.age || card.education) && (
+                <Text style={s.similarCardMeta} numberOfLines={1}>
+                  {[card.age && `${card.age} years`, card.education].filter(Boolean).join(', ')}
+                </Text>
+              )}
+            </View>
+          )}
+        </>
+      ) : (
+        <>
+          <CdnSvg uri={getBlurPhotoUri(oppGender)} width="100%" height="100%" />
+          <View style={s.similarCardOverlay}>
+            <Text style={s.similarCardOverlayText}>
+              {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
+            </Text>
+            <View style={s.similarCardWaBtn}>
+              <WhatsAppIcon width={16} height={16} />
+              <Text style={s.similarCardWaBtnText}>{t('GENERAL.WHATSAPP')}</Text>
+            </View>
+          </View>
+        </>
+      )}
+    </Pressable>
+  )
+}
+
 // ─── Screen ─────────────────────────────────────────────────────────────────────
 
 export default function ViewProfileScreen({ navigation, route }: { navigation: any; route: any }) {
   const { t } = useTranslation()
-  const matriId  = route?.params?.matriId ?? ''
+  // Feature 2 (prev/next profile swipe): matriId is now state, not a plain const —
+  // navigating to a neighbor profile just swaps this and lets the existing load
+  // effect (keyed on it) re-run, instead of a real navigation/screen remount.
+  const [matriId, setMatriId] = useState(route?.params?.matriId ?? '')
   const fromPage = route?.params?.fromPage ?? 'matches'
+  // Feature 6: self-preview mode — viewing your own profile. Angular:
+  // `this.viewedid == this.NBID` (viewprofile.page.ts:414-426) — a plain id
+  // comparison against the logged-in user's own id.
+  const [ownUserId, setOwnUserId] = useState('')
+  const ownProfile = !!ownUserId && ownUserId === matriId
+  // Feature 3 — Angular: checkDRCardLanding() gates on the DR route + this
+  // exact frm_page value (confirmed: EQueryModuleName.dailyRecommendation ===
+  // 'dailyrecommendations'). Disables prev/next entirely and skips similar-
+  // profiles/membership-banner, regardless of paid/free status.
+  const isDrMode = fromPage === 'dailyrecommendations'
+  // Angular's prev/next-swipe cache is keyed off the list the user came from —
+  // RN equivalent: the ordered id list is passed as a nav param (see
+  // redirectToViewProfile's profileIds param / MatchesScreen's call sites).
+  // Angular hides the prev/next arrows entirely for own-profile too
+  // (viewprofile.page.html:1497 — `*ngIf="... && !ownProfile"`).
+  const profileIds: string[] = route?.params?.profileIds ?? []
+  const profileIndex = profileIds.indexOf(matriId)
+  const hasPrevProfile = !isDrMode && !ownProfile && profileIndex > 0
+  const hasNextProfile = !isDrMode && !ownProfile && profileIndex >= 0 && profileIndex < profileIds.length - 1
+  // In-memory one-ahead/one-behind prefetch (not persisted — Angular's
+  // localStorage-backed cache is more than this screen needs) so swiping to a
+  // neighbor already fetched shows instantly instead of a loading flash.
+  const prefetchCache = useRef<Map<string, Record<string, any>>>(new Map())
 
   const [profile, setProfile] = useState<ViewProfileModel | null>(null)
   const [loading, setLoading] = useState(true)
@@ -151,35 +256,89 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // dead CSS classes an earlier code-only pass had wrongly ruled out).
   const [scrolled, setScrolled] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  const [similarProfiles, setSimilarProfiles] = useState<SimilarProfileCard[]>([])
+  const [menuPromo, setMenuPromo] = useState<any>(null)
+  // Angular: loginHoroAvail mirrors localStorage.HOROSCOPEAVAILABLE — the LOGGED-IN
+  // user's own horoscope-availability flag ('1'/'0'), not the viewed profile's.
+  const [loginHoroAvail, setLoginHoroAvail] = useState('0')
+  // Angular: vpdata.COMMINFO.ADDHOROSCOPE flipped locally on a successful
+  // requestHoro() call, never refetched (viewprofile.page.ts:1299-1316).
+  const [horoscopeRequested, setHoroscopeRequested] = useState(false)
+  // Angular: the top CTA row is `position: sticky; bottom: 0` (viewprofile.page.scss
+  // .sticky-btm) — it rides along pinned to the screen bottom for as long as the
+  // detail sections keep scrolling past underneath it, and only stops once the
+  // SECOND (plain, non-sticky) CTA copy — right before Similar Profiles — reaches
+  // that same on-screen position naturally. RN has no bottom-sticky-until-displaced
+  // primitive, so this approximates it: render the top CTA as a floating bottom
+  // overlay until scroll reaches the second CTA's own measured position, then hide
+  // the overlay so the second (inline, already-visible) CTA takes over seamlessly.
+  const [scrollY, setScrollY] = useState(0)
+  const [viewportHeight, setViewportHeight] = useState(0)
+  const [cta2Y, setCta2Y] = useState<number | null>(null)
+  const [similarIndex, setSimilarIndex] = useState(0)
+  const similarListRef = useRef<FlatList<SimilarProfileCard>>(null)
+  // Angular's albumView()/goToalbum() (viewprofile.page.ts:1318-1372) + the
+  // pinch/pan HostListeners (:2359-2490) collapse into one full-screen modal here.
+  const [photoViewerOpen, setPhotoViewerOpen] = useState(false)
+  const [photoViewerIndex, setPhotoViewerIndex] = useState(0)
+  // Feature 8: one-time "tap to move to next profile" coach-mark.
+  const [showCoachMark, setShowCoachMark] = useState(false)
+  // Feature 5: report-profile reasons-picker modal.
+  const [reportModalOpen, setReportModalOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
 
     async function load() {
       setLoading(true)
-      const [lg, entryType, femaleFreeRaw, contactDetail] = await Promise.all([
+      const [lg, entryType, femaleFreeRaw, contactDetail, horoAvail, userId] = await Promise.all([
         getItem(StorageKeys.User.LOGIN_GENDER),
         getSessionValue('ENTRYTYPE'),
         getSessionValue('FEMALEFREECONACT'),
         getJson<Record<string, any>>('CONTACT_DETAIL'),
+        getSessionValue('HOROSCOPEAVAILABLE'),
+        getItem(StorageKeys.Auth.USER_ID),
       ])
       if (cancelled) return
+      setOwnUserId(userId ?? '')
       const gender = lg === 'M' ? 'M' : 'F'
       setLoginGender(gender)
       setOwnEntryType(entryType ?? '')
       const femaleFree: any = femaleFreeRaw
       setFemaleFreeEligible(String(femaleFree?.FLAG) === '1' && gender === 'F' && String(femaleFree?.Left ?? '0') !== '0')
       setIndNumbersLeft(String(contactDetail?.IndNumbersLeft ?? '0'))
+      setLoginHoroAvail(String(horoAvail ?? '0'))
 
-      const raw = await getViewProfile(matriId)
+      const cached = prefetchCache.current.get(matriId)
+      const raw = cached ?? await getViewProfile(matriId)
+      prefetchCache.current.delete(matriId)
       if (cancelled) return
       if (raw) {
         const adapted = viewProfileAdapter.adapt(raw)
         setProfile(adapted)
         // Angular: assignProfileDtl() skips viewedtrack for same-gender/own-profile views.
         if (adapted.gender !== gender && adapted.profileId !== '') {
-          markProfileViewed(matriId).catch(() => {})
+          markProfileViewed(matriId, isDrMode).catch(() => {})
         }
+        // Angular: skipped for same-gender/own-profile (viewprofile.page.ts:530-534),
+        // and — Feature 3 — also skipped entirely in DR mode (Angular: "Hide the
+        // 'Other profiles like X' section in DR page only"). Both fetched eagerly
+        // here rather than Angular's on-first-scroll/onViewDidEnter lazy triggers,
+        // a reasonable simplification since neither call is expensive.
+        if (adapted.gender !== gender && !isDrMode) {
+          getSimilarProfiles(matriId).then(list => { if (!cancelled) setSimilarProfiles(list) }).catch(() => {})
+          fetchMenuPromo().then(promo => { if (!cancelled) setMenuPromo(promo) }).catch(() => {})
+        }
+        // Feature 2 prefetch: warm the immediate prev/next neighbor(s) now so
+        // tapping a chevron swaps instantly instead of showing a loading flash.
+        // Skipped in DR mode, which has no prev/next affordance at all.
+        const idx = profileIds.indexOf(matriId)
+        const neighborIds = isDrMode ? [] : [profileIds[idx - 1], profileIds[idx + 1]].filter(
+          (id): id is string => !!id && !prefetchCache.current.has(id),
+        )
+        neighborIds.forEach(id => {
+          getViewProfile(id).then(res => { if (res) prefetchCache.current.set(id, res) }).catch(() => {})
+        })
       }
       setLoading(false)
 
@@ -203,12 +362,48 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     return () => { cancelled = true }
   }, [matriId])
 
+  // Feature 8: show the coach-mark once ever, only when there's actually a
+  // neighbor profile to tap to (no point advertising the arrows otherwise),
+  // and never on a same-gender view (which hides the arrows entirely anyway).
+  useEffect(() => {
+    if (!profile || profile.gender === loginGender) return
+    if (!hasPrevProfile && !hasNextProfile) return
+    let cancelled = false
+    shouldShowCoachMark().then(should => { if (!cancelled && should) setShowCoachMark(true) })
+    return () => { cancelled = true }
+  }, [profile, loginGender, hasPrevProfile, hasNextProfile])
+
+  function dismissCoachMark() {
+    setShowCoachMark(false)
+    markCoachMarkShown().catch(() => {})
+  }
+
   const insets = useSafeAreaInsets()
 
+  // Feature 2 prev/next-profile navigation. Angular does this via a swipe
+  // gesture on the photo, but PhotoSwiper already owns a horizontal pan on
+  // that exact surface for browsing this profile's OWN photos — competing
+  // gestures there is a documented Angular bug class (swiping a photo card
+  // accidentally triggering profile navigation), so this uses tap chevrons
+  // instead, reusing PhotoSwiper's own dark-circle/white-chevron arrow style.
+  function goToPrev() {
+    if (!hasPrevProfile) return
+    setMatriId(profileIds[profileIndex - 1])
+  }
+  function goToNext() {
+    if (!hasNextProfile) return
+    setMatriId(profileIds[profileIndex + 1])
+  }
+
   function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    const isScrolled = e.nativeEvent.contentOffset.y > PHOTO_HEIGHT - 80
+    const y = e.nativeEvent.contentOffset.y
+    // Angular: `(this.scrWidth - 64) <= offset` (viewprofile.page.ts:1428-1441) —
+    // the header switches to name+call+3-dot once scrolled ~one photo-height
+    // (scrWidth, same as PHOTO_HEIGHT here) minus 64px, not a fixed constant.
+    const isScrolled = y > PHOTO_HEIGHT - 64
     setScrolled(isScrolled)
     if (!isScrolled) setShowMenu(false)
+    setScrollY(y)
   }
 
   // ── Actions — same communicationBtnOnClick plumbing Matches uses ─────────────
@@ -269,28 +464,106 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     navigation.navigate('recharge')
   }
 
-  // Angular: MATCHES.MORE_OPT_2 ("Report this profile") + GENERAL.REPORT_BLOCK_CTA
-  // ("Report and Block") — the 3-dot menu's report action bundles report+block under
-  // one confirm. The full reasons-picker form (GENERAL.REPORTING_REASON, attachments,
-  // etc.) is a separate, larger feature — deferred; this is the direct confirm+submit.
+  // Angular: clickOnViewProfile('similarprofiles', MATRIID) — opens that profile's
+  // own View Profile page (app-swiper.component.ts:392-437).
+  function handleSimilarProfilePress(card: SimilarProfileCard) {
+    redirectToViewProfile('', card.matriId, 'similarprofiles')
+  }
+
+  function handleMembershipBannerPress() {
+    navigation.navigate('recharge')
+  }
+
+  // ── Horoscope actions — Angular: viewprofile.page.ts requestHoro()/callNative
+  // ('view_horoscope')/goToEdit('22') ─────────────────────────────────────────
+
+  function handleAddHoroscope() {
+    // Angular: goToEdit(pageNo) → router.navigate(['editform-vp/'+pageNo]).
+    // Reuses the exact same (currently unregistered, pre-existing) navigation
+    // call biodataService.ts's goToEditScreen() already makes for this same
+    // page — not a new gap introduced here.
+    navigateGlobal(ENavigation.EDIT_FORM, { pageNo: 22, frm_page: 'viewprofile' })
+  }
+
+  async function handleRequestHoroscope() {
+    if (!profile) return
+    const ok = await requestHoroscope(profile.profileId)
+    if (ok) setHoroscopeRequested(true)
+  }
+
+  async function handleViewHoroscope() {
+    if (!profile) return
+    if (ownEntryType !== 'P') {
+      // Angular: paymentPromoPopUp() for free users — mirrors the existing
+      // paid-gate pattern already used for the star-match "View details" teaser.
+      navigation.navigate('recharge')
+      return
+    }
+    const url = await viewHoroscope(profile.profileId, profile.isIdVerified)
+    if (url) Linking.openURL(url)
+  }
+
+  // ── Feature 6 self-preview actions — Angular: clickAddMoreDetails('27'|'28')
+  // (viewprofile.page.ts:2502-2523), same EDIT_FORM pageNo mapping biodataService.ts's
+  // PI_BROTHERS/PI_SISTERS(28) and PI_PROPERTY(21) fields already use ─────────────
+
+  function handleAddFamilyDetails() {
+    navigateGlobal(ENavigation.EDIT_FORM, { pageNo: 28, frm_page: 'viewprofile' })
+  }
+
+  function handleAddPropertyDetails() {
+    navigateGlobal(ENavigation.EDIT_FORM, { pageNo: 21, frm_page: 'viewprofile' })
+  }
+
+  // Angular: a plain `<a [href]="getBioDataLink()" download>` — Linking.openURL
+  // is the RN analog (triggers the OS download/share sheet for a direct file URL).
+  async function handleDownloadBiodata() {
+    if (!profile) return
+    const url = await getBioDataLink(profile.profileId)
+    Linking.openURL(url)
+  }
+
+  // Angular: redirectiontoStarMatchReport() — paid-only; passes the already-fetched
+  // result via router state to skip a redundant API call on the report screen.
+  async function handleViewStarMatchDetails() {
+    if (!profile) return
+    const result = await getStarMatch(profile.profileId, profile.star ?? '', profile.raasi ?? '', profile.motherTongue ?? '')
+    navigation.navigate('star-matching', {
+      partnerId: profile.profileId,
+      partnerName: profile.name,
+      partnerPhoto: profile.photos[0],
+      ownRaasi: undefined,
+      ownStar: undefined,
+      partnerRaasi: result?.partnerRaasi ?? profile.raasi,
+      partnerStar: result?.partnerStar ?? profile.star,
+      percentage: result?.percentage ?? 0,
+      isNorth: result?.isNorth ?? false,
+    })
+  }
+
+  // Arrow-button navigation for the Similar Profiles carousel — mirrors the exact
+  // same "advance by one card, clamp at the ends" behavior Swiper.js's navigation
+  // module gives Angular's <app-swiper>.
+  function scrollSimilarBy(delta: number) {
+    const nextIndex = Math.max(0, Math.min(similarProfiles.length - 1, similarIndex + delta))
+    similarListRef.current?.scrollToOffset({ offset: nextIndex * SIMILAR_CARD_STRIDE, animated: true })
+    setSimilarIndex(nextIndex)
+  }
+
+  function onSimilarScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    setSimilarIndex(Math.round(e.nativeEvent.contentOffset.x / SIMILAR_CARD_STRIDE))
+  }
+
+  // Feature 5 — Angular: pages/report-profile (routed page there; a modal here).
+  // Opens the full reasons-picker form instead of a direct confirm+submit.
   function handleReportProfile() {
     setShowMenu(false)
-    if (!profile) return
-    Alert.alert(
-      t('MESSAGES.REPORT_PROFILE'),
-      t('GENERAL.REPORT_NOTE'),
-      [
-        { text: t('REG.CANCEL'), style: 'cancel' },
-        {
-          text: t('GENERAL.REPORT_BLOCK_CTA'),
-          style: 'destructive',
-          onPress: async () => {
-            const ok = await reportAndBlockProfile(profile.profileId)
-            if (ok) navigation.goBack()
-          },
-        },
-      ],
-    )
+    setReportModalOpen(true)
+  }
+
+  function handleReportSubmitted() {
+    setReportModalOpen(false)
+    navigation.goBack()
   }
 
   // ── Loading / not-found ───────────────────────────────────────────────────────
@@ -337,6 +610,94 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 
   const activeSticky = !stickyDismissed && paymentStickyInfo
 
+  // Angular duplicates this exact CTA markup TWICE — once right after the name/ID
+  // row (`position: sticky; bottom: 0` — stays pinned to the screen bottom through
+  // the whole detail-sections scroll), once again after all detail sections, right
+  // before Similar Profiles (plain inline, not sticky — confirmed against real
+  // screenshots: more content visibly continues below it in the same shot). The
+  // floating-overlay-until-displaced rendering for the FIRST copy lives further
+  // down (topCtaVisible); this helper builds the shared JSX both copies use.
+  function renderCtaBlock() {
+    // TS can't narrow `profile` through this closure — re-guard explicitly (the
+    // caller only ever invokes this after the outer `if (!profile) return` above).
+    if (!profile || sameGender) return null
+    return (
+      <View style={s.ctaBlock}>
+        {/* Same layout/design as Matches' own MatchCard CTA (MatchesScreen.tsx) —
+            Row 1: Don't show + View later (flex:1 each); Row 2: Like, full width. */}
+        {showLikeCTA(profile.likedStatus) && (
+          <View style={s.ctaSection}>
+            <View style={s.ctaSecRow}>
+              <Pressable
+                style={[s.ctaDontShow, disableDontShow(profile.dontShowStatus) && s.ctaDisabled]}
+                onPress={handleDontShow}
+                disabled={disableDontShow(profile.dontShowStatus)}
+              >
+                <CloseIcon width={24} height={24} />
+                <Text style={s.ctaDontShowText}>{t('GENERAL.DONTSHOWCTA')}</Text>
+              </Pressable>
+              <Pressable
+                style={[s.ctaViewLater, disableViewLater(profile.viewLaterStatus) && s.ctaDisabled]}
+                onPress={handleViewLater}
+                disabled={disableViewLater(profile.viewLaterStatus)}
+              >
+                <ViewLaterIcon width={24} height={24} />
+                <Text style={s.ctaViewLaterText}>{t('GENERAL.VIEWLATER')}</Text>
+              </Pressable>
+            </View>
+            <Pressable style={s.ctaLike} onPress={handleLike}>
+              <LikeIcon width={24} height={24} />
+              <Text style={s.ctaLikeText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
+            </Pressable>
+          </View>
+        )}
+
+        {showAfterLikeCTA(profile.likedStatus) && (
+          <View style={s.afterLikeRow}>
+            <View style={s.afterLikeTopRow}>
+              <Text style={s.afterLikeText}>{getAfterLikeContentText(ctaCtx, t)}</Text>
+              <View style={s.ctaSendInterestWrap}>
+                {showFreeBadge(ctaCtx) && (
+                  <View style={s.freeBadge} pointerEvents="none">
+                    <Text style={s.freeBadgeText}>{t('GENERAL.FREE')}</Text>
+                  </View>
+                )}
+                <Pressable style={s.ctaSendInterest} onPress={handleCall}>
+                  <CdnSvg uri={getAfterLikeCtaIcon(ctaCtx)} width={16} height={16} />
+                  <Text style={s.ctaSendInterestText}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
+                </Pressable>
+              </View>
+            </View>
+            {showContactsLeftBanner(ctaCtx) && (
+              <Text style={s.contactsLeftText}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
+            )}
+          </View>
+        )}
+      </View>
+    )
+  }
+
+  // Feature 6 — replaces renderCtaBlock() entirely for own-profile views
+  // (Angular: viewprofile.page.html:1262-1281 swaps the whole Like/Contact CTA
+  // grid for this single "Download Biodata for FREE" button when profilePreview/
+  // ownProfile). Angular duplicates its normal CTA for the sticky-until-displaced
+  // effect; that nuance doesn't apply here since this is a plain one-off download
+  // action, not a Like/Contact flow — rendered once, inline, not floating.
+  function renderBiodataCta() {
+    if (!ownProfile) return null
+    return (
+      <Pressable style={s.biodataCta} onPress={handleDownloadBiodata}>
+        <Text style={s.biodataCtaText}>{t('BIO_DATA.BIODATA_DOWNLOAD_FREE')}</Text>
+      </Pressable>
+    )
+  }
+
+  // Floating top-CTA overlay stays visible until the scroll position reaches where
+  // the second (plain, inline) CTA copy naturally sits — approximating Angular's
+  // sticky-until-displaced behavior. Visible by default (cta2Y===null) until that
+  // second block's onLayout has actually reported a position.
+  const topCtaVisible = cta2Y === null || scrollY + viewportHeight < cta2Y
+
   return (
     <View style={s.screen}>
       <StatusBar style="dark" />
@@ -347,12 +708,14 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           + a 3-dot report/don't-show menu. */}
       <View style={[s.headerBar, { paddingTop: insets.top + 8 }]}>
         <Pressable style={s.headerBackBtn} onPress={() => navigation.goBack()} hitSlop={8}>
-          <Text style={s.backIcon}>{'‹'}</Text>
+          <CdnSvg uri={BACK_ICON_URI} width={22} height={22} />
         </Pressable>
 
         {scrolled && (
           <>
-            <Text style={s.headerName} numberOfLines={1}>{profile.name}</Text>
+            <Text style={s.headerName} numberOfLines={1}>
+              {ownProfile ? t('VIEWPROFILE.PROFILE_PREVIEW') : profile.name}
+            </Text>
             {!sameGender && (
               <Pressable style={s.headerIconBtn} onPress={handleCall} hitSlop={8}>
                 <CallIcon width={20} height={21} />
@@ -373,7 +736,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           </Text>
         </Pressable>
 
-        {scrolled && (
+        {scrolled && !ownProfile && (
           <View>
             <Pressable style={s.headerIconBtn} onPress={() => setShowMenu(v => !v)} hitSlop={8}>
               <Text style={s.menuDots}>⋮</Text>
@@ -397,34 +760,78 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 
       <ScrollView
         style={s.scrollView}
+        onLayout={e => setViewportHeight(e.nativeEvent.layout.height)}
         onScroll={onScroll}
         scrollEventThrottle={32}
-        contentContainerStyle={[s.scrollContent, { paddingBottom: 32 + insets.bottom }]}
+        /* No extra fixed buffer here — Angular's page just ends flush after its last
+           section (breather card's own border-bottom is the visual end-cap); a fixed
+           +32 padding left a dead white gap below MembershipBanner. insets.bottom
+           alone still covers the safe-area/home-indicator clearance that's needed. */
+        contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom }]}
       >
         {/* ── Photo ──────────────────────────────────────────────────────────── */}
-        <View style={s.photoBox}>
-          {profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0 ? (
-            <PhotoSwiper images={profile.photos} width={SCREEN_WIDTH} height={PHOTO_HEIGHT} />
-          ) : (
-            <View>
-              <CdnSvg uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} />
-              {!sameGender && (
-                <View style={s.photoOverlay}>
-                  <View style={s.overlayCard}>
-                    <Text style={s.overlayText}>
-                      {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
-                    </Text>
-                    <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={handleWhatsApp} />
+        {/* Angular: prev/next-profile arrows sit in a sibling div AFTER the photo/
+            ion-content, positioned `top: calc(100vw + 32px)` — i.e. just below the
+            square (100vw-tall) photo, not overlaid on top of it. photoWrap is the
+            positioning ancestor that reproduces that (viewprofile.page.html:1495-1512,
+            .scss:512,523). */}
+        <View style={s.photoWrap}>
+          <View style={s.photoBox}>
+            {profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0 ? (
+              <PhotoSwiper
+                images={profile.photos}
+                width={SCREEN_WIDTH}
+                height={PHOTO_HEIGHT}
+                onPress={i => { setPhotoViewerIndex(i); setPhotoViewerOpen(true) }}
+              />
+            ) : (
+              <View>
+                <CdnSvg uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} />
+                {!sameGender && (
+                  <View style={s.photoOverlay}>
+                    <View style={s.overlayCard}>
+                      <Text style={s.overlayText}>
+                        {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
+                      </Text>
+                      <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={handleWhatsApp} />
+                    </View>
                   </View>
+                )}
+              </View>
+            )}
+            {/* Figma (363:10859): top+bottom dark gradient over the photo — improves
+                legibility of the badges/dots overlaid on it, absent from the older
+                plain-photo version this screen started with. */}
+            <LinearGradient
+              colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.8)']}
+              locations={[0, 0.2, 0.8, 1]}
+              style={StyleSheet.absoluteFill}
+              pointerEvents="none"
+            />
+            {profile.isNewlyJoined && !ownProfile && (
+              <View style={s.newBadge} pointerEvents="none">
+                <CdnSvg uri={NEWLY_JOINED_STAR_URI} width={14} height={14} />
+                <Text style={s.newBadgeText}>{t('MATCHES.NEW')}</Text>
+              </View>
+            )}
+            {showCoachMark && (
+              <Pressable style={s.coachMarkOverlay} onPress={dismissCoachMark}>
+                <View style={s.coachMarkCard}>
+                  <Text style={s.coachMarkText}>{t('VIEWPROFILE.GUIDEMOVENEXT')}</Text>
+                  <Text style={s.coachMarkDismiss}>{t('GENERAL.OK_PENDING')}</Text>
                 </View>
-              )}
-            </View>
+              </Pressable>
+            )}
+          </View>
+          {hasPrevProfile && (
+            <Pressable style={[s.profileArrowBtn, s.profileArrowLeft]} onPress={goToPrev} hitSlop={8}>
+              <Text style={s.profileArrowText}>{'‹'}</Text>
+            </Pressable>
           )}
-          {profile.isNewlyJoined && (
-            <View style={s.newBadge} pointerEvents="none">
-              <CdnSvg uri={NEWLY_JOINED_STAR_URI} width={14} height={14} />
-              <Text style={s.newBadgeText}>{t('MATCHES.NEW')}</Text>
-            </View>
+          {hasNextProfile && (
+            <Pressable style={[s.profileArrowBtn, s.profileArrowRight]} onPress={goToNext} hitSlop={8}>
+              <Text style={s.profileArrowText}>{'›'}</Text>
+            </Pressable>
           )}
         </View>
 
@@ -437,18 +844,38 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
             )}
           </View>
 
+          {/* Angular: viewprofile.page.html:460-496 — Call/WhatsApp icon buttons sit
+              inline beside the name (confirmed against a real screenshot; the earlier
+              Figma-only "Contact details" card below was dead markup in Angular's own
+              template — a comment with no content between it and Professional
+              details — so it's been removed rather than kept as an extra copy). */}
           <View style={s.nameRow}>
             <Text style={s.name} numberOfLines={1}>{profile.name}</Text>
             {!sameGender && (
-              <View style={s.contactIcons}>
-                <Pressable onPress={handleCall} hitSlop={8}><CallIcon width={22} height={22} /></Pressable>
-                <Pressable onPress={handleWhatsApp} hitSlop={8}><WhatsAppIcon width={24} height={24} /></Pressable>
+              <View style={s.nameIconsRow}>
+                <Pressable style={s.nameIconBtn} onPress={handleCall} hitSlop={8}>
+                  <CallIcon width={24} height={24} />
+                </Pressable>
+                <Pressable style={s.nameIconBtn} onPress={handleWhatsApp} hitSlop={8}>
+                  <WhatsAppIcon width={24} height={24} />
+                </Pressable>
               </View>
             )}
           </View>
           <Text style={s.jodiId}>{t('EDITPROFILE.JODIIID')} : {profile.profileId}</Text>
 
-          {profile.likedMsg && <Text style={s.likedMsg}>{profile.likedMsg}</Text>}
+          {/* !! coerces to a real boolean — the adapter's `?? undefined` doesn't
+              catch a raw API value of "" (empty but present, not null/undefined),
+              and `'' && <Text/>` evaluates to '' itself: a bare empty-string text
+              node landing directly under this View, which is exactly what React
+              Native Web's "Unexpected text node ... cannot be a child of a <View>"
+              warning is about. */}
+          {!!profile.likedMsg && <Text style={s.likedMsg}>{profile.likedMsg}</Text>}
+
+          {/* The top CTA is NOT rendered inline here — Angular's copy of it is
+              `position: sticky; bottom: 0`, so it rides pinned to the screen bottom
+              through the whole detail-sections scroll instead of sitting inline
+              right here. Rendered as a floating overlay below (see topCtaVisible). */}
 
           {/* ── Basic details ────────────────────────────────────────────────── */}
           <SectionHeader title={t('VIEWPROFILE.BASIC_DETAILS')} />
@@ -485,20 +912,80 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               <DetailRow icon={ICON.raasi} label={t('VIEWPROFILE.RAASIIS')} value={profile.raasi} />
               <DetailRow icon={ICON.star} label={t('VIEWPROFILE.STARIS')} value={profile.star} />
               <DetailRow icon={ICON.dosham} label={t('VIEWPROFILE.DOSHAMIS')} value={profile.dosham?.join(', ')} isLast />
-              {/* Star-match porutham teaser — paid users with both raasi+star see the real
-                  compatibility value; free users see a static teaser (Angular's own
-                  paywall-teaser trick, preserved deliberately per the plan). */}
+              {/* Star-match porutham teaser — paid VIEWERS (ownEntryType, not the
+                  viewed profile's own paid status — that was a pre-existing mix-up,
+                  fixed here) with both raasi+star see the real compatibility value
+                  plus a "View details" link into the full report; free viewers see
+                  a static teaser (Angular's own paywall-teaser trick). */}
               {profile.hasStarMatchInputs && (
-                profile.isPaidMember && profile.horoCompatibility ? (
-                  <Text style={s.starMatchText}>
-                    {withPronouns(t('VIEWPROFILE.HOROCOMPATIBILITY'), oppGender, t).replace('#COMPARE#', profile.horoCompatibility)}
-                  </Text>
+                ownEntryType === 'P' ? (
+                  <Pressable onPress={handleViewStarMatchDetails}>
+                    <Text style={s.starMatchText}>
+                      {withPronouns(t('VIEWPROFILE.HOROCOMPATIBILITY'), oppGender, t).replace('#COMPARE#', profile.horoCompatibility ?? '')}
+                    </Text>
+                    <Text style={s.starMatchTeaser}>{t('VIEWPROFILE.PAID_MEMBER_REPORT')}</Text>
+                  </Pressable>
                 ) : (
                   <Pressable onPress={() => navigation.navigate('recharge')}>
                     <Text style={s.starMatchTeaser}>{t('VIEWPROFILE.FREE_MEMBER_REPORT')}</Text>
                   </Pressable>
                 )
               )}
+            </>
+          )}
+
+          {/* ── Horoscope details — Angular orders this right after Religious
+              details, before Life style (confirmed against real screenshots). */}
+          {profile.showHoroSection && !sameGender ? (
+            <>
+              <SectionHeader title={t('VIEWPROFILE.HORO_DETAILS')} />
+              <View style={s.detailRow}>
+                <View style={s.detailIconCol}>
+                  <CdnSvg uri={ICON.horoscope} width={20} height={20} />
+                </View>
+                <View style={s.detailTextCol}>
+                  <Text style={s.detailLabel}>{t('VIEWPROFILE.HOROSCOPE')}</Text>
+                  {profile.horoscopeAvailable ? (
+                    loginHoroAvail === '1' ? (
+                      <Pressable onPress={handleViewHoroscope}>
+                        <Text style={s.horoActionLink}>{t('GENERAL.ADD_HOROSCOPE')}</Text>
+                      </Pressable>
+                    ) : (
+                      <>
+                        <Text style={s.detailValue}>
+                          {t('VIEWPROFILE.ADDYOURHORO').replace('#HIMHER#', t(`PRONOUN.${oppGender}.himhers`))}
+                        </Text>
+                        <Pressable onPress={handleAddHoroscope}>
+                          <Text style={s.horoActionLink}>{t('GENERAL.ADD_HOROSCOPE')}</Text>
+                        </Pressable>
+                      </>
+                    )
+                  ) : (
+                    <>
+                      <Text style={s.detailValue}>{withPronouns(t('VIEWPROFILE.HOROSCOPE_REQ'), oppGender, t)}</Text>
+                      {horoscopeRequested ? (
+                        <Text style={s.horoRequestedText}>{withPronouns(t('VIEWPROFILE.HORO_REQUESTED'), oppGender, t)}</Text>
+                      ) : (
+                        <Pressable onPress={handleRequestHoroscope}>
+                          <Text style={s.horoActionLink}>{withPronouns(t('VIEWPROFILE.HOROSCOPE_SEND'), oppGender, t)}</Text>
+                        </Pressable>
+                      )}
+                    </>
+                  )}
+                </View>
+              </View>
+            </>
+          ) : ownProfile && loginHoroAvail !== '1' && (
+            // Feature 6 — Angular's own onboarding "add horoscope" prompt for own-
+            // profile empty sections (viewprofile.page.html:901-902), simplified:
+            // Angular gates this on a separate OnboardScreen (/myprofile route)
+            // flag this port has no route for yet, so ownProfile stands in for it.
+            <>
+              <SectionHeader title={t('VIEWPROFILE.HORO_DETAILS')} />
+              <Pressable style={s.addDetailPrompt} onPress={handleAddHoroscope}>
+                <CdnSvg uri={ICON.horoscope} width={20} height={20} />
+                <Text style={s.addDetailPromptText}>{t('GENERAL.ADD_HOROSCOPE')}</Text>
+              </Pressable>
             </>
           )}
 
@@ -513,7 +1000,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           )}
 
           {/* ── Family details ────────────────────────────────────────────────── */}
-          {(profile.brothers !== undefined || profile.sisters !== undefined) && (
+          {(profile.brothers !== undefined || profile.sisters !== undefined) ? (
             <>
               <SectionHeader title={t('VIEWPROFILE.FAMILYDETAIL')} />
               <DetailRow
@@ -534,10 +1021,18 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                 isLast
               />
             </>
+          ) : ownProfile && (
+            <>
+              <SectionHeader title={t('VIEWPROFILE.FAMILYDETAIL')} />
+              <Pressable style={s.addDetailPrompt} onPress={handleAddFamilyDetails}>
+                <CdnSvg uri={ICON.brother} width={20} height={20} />
+                <Text style={s.addDetailPromptText}>{t('GENERAL.ADD_FAMILY_DETAILS')}</Text>
+              </Pressable>
+            </>
           )}
 
           {/* ── Property details ──────────────────────────────────────────────── */}
-          {(profile.property.length > 0 || profile.vehicle.length > 0) && (
+          {(profile.property.length > 0 || profile.vehicle.length > 0) ? (
             <>
               <SectionHeader title={t('VIEWPROFILE.PROPERTY_DETAILS')} />
               <DetailRow
@@ -552,22 +1047,95 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                 isLast
               />
             </>
-          )}
-
-          {/* ── Horoscope details (display only) ─────────────────────────────── */}
-          {profile.showHoroSection && (
+          ) : ownProfile && (
             <>
-              <SectionHeader title={t('VIEWPROFILE.HORO_DETAILS')} />
-              <DetailRow
-                icon={ICON.horoscope}
-                label={t('VIEWPROFILE.HOROSCOPE')}
-                value={profile.horoscopeAvailable ? t('VIEWPROFILE.VERIFIED_PROFILE') : undefined}
-                isLast
-              />
+              <SectionHeader title={t('VIEWPROFILE.PROPERTY_DETAILS')} />
+              <Pressable style={s.addDetailPrompt} onPress={handleAddPropertyDetails}>
+                <CdnSvg uri={ICON.property} width={20} height={20} />
+                <Text style={s.addDetailPromptText}>{t('BIO_DATA.ADD_PROPERTY_DETAILS')}</Text>
+              </Pressable>
             </>
           )}
+
         </View>
+
+        {/* Second CTA — Angular repeats this exact block right after Property
+            details, before Similar Profiles (confirmed against real screenshots).
+            A direct ScrollView-content sibling (own horizontal padding, not
+            infoCard's) so onLayout's `y` lands in the same coordinate space as
+            onScroll's contentOffset.y — needed to know when to hide the floating
+            top CTA below. */}
+        <View style={s.ctaBlockOuter} onLayout={e => setCta2Y(e.nativeEvent.layout.y)}>
+          {ownProfile ? renderBiodataCta() : renderCtaBlock()}
+        </View>
+
+        {/* ── Other profiles like X — Angular: app-swiper similarprofiles carousel.
+            Renders outside infoCard's padding — the card row bleeds to the screen
+            edges, only the header text lines up with the rest of the padded content.
+            Angular: app-swiper.component.html:1-2 — the whole grid (header+cards) is
+            `.similar-profile-bg` (linear-gradient(136deg, #E6F5F0 0%, transparent 100%))
+            with `pt-32` above the header — not a plain white background with no gap. */}
+        {similarProfiles.length > 0 && (
+          <LinearGradient
+            colors={['#E6F5F0', 'rgba(230,245,240,0)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={s.similarSection}
+          >
+            <Text style={s.similarHeader}>
+              {t('VIEWPROFILE.SIMILARPROFILES').replace('#NAME#', profile.name)}
+            </Text>
+            <View>
+              <FlatList
+                ref={similarListRef}
+                data={similarProfiles}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={SIMILAR_CARD_STRIDE}
+                decelerationRate="fast"
+                onScroll={onSimilarScroll}
+                scrollEventThrottle={32}
+                keyExtractor={item => item.matriId}
+                contentContainerStyle={s.similarListContent}
+                renderItem={({ item }) => (
+                  <SimilarProfileCardItem
+                    card={item}
+                    oppGender={oppGender}
+                    t={t}
+                    onPress={() => handleSimilarProfilePress(item)}
+                  />
+                )}
+              />
+              {/* Angular: <app-swiper>'s navigation-module arrows — same dark
+                  circular button look as the photo swiper's desktop arrows. */}
+              {similarIndex > 0 && (
+                <Pressable style={[s.similarArrowBtn, s.similarArrowLeft]} onPress={() => scrollSimilarBy(-1)} hitSlop={8}>
+                  <Text style={s.similarArrowText}>{'‹'}</Text>
+                </Pressable>
+              )}
+              {similarIndex < similarProfiles.length - 1 && (
+                <Pressable style={[s.similarArrowBtn, s.similarArrowRight]} onPress={() => scrollSimilarBy(1)} hitSlop={8}>
+                  <Text style={s.similarArrowText}>{'›'}</Text>
+                </Pressable>
+              )}
+            </View>
+          </LinearGradient>
+        )}
+
+        {/* ── "Become a paid member" promo — Angular: app-breather BANNERSLOT 1001,
+            same component/data source Matches already uses (MembershipBanner). */}
+        {!sameGender && menuPromo?.MATCHESSLOT && (
+          <MembershipBanner data={menuPromo.MATCHESSLOT} onPress={handleMembershipBannerPress} />
+        )}
       </ScrollView>
+
+      {/* Floating top CTA — see topCtaVisible comment above for why this exists
+          instead of rendering inline. */}
+      {topCtaVisible && (
+        <View style={[s.floatingCtaBar, { paddingBottom: 12 + insets.bottom }]}>
+          {renderCtaBlock()}
+        </View>
+      )}
 
       {activeSticky && (
         <StickyBanner
@@ -579,66 +1147,27 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         />
       )}
 
-      {/* ── Fixed bottom CTA bar — Angular: .button-banner/.sticky-btm, position:sticky
-          bottom:0, white bg, shadow — ALWAYS visible regardless of scroll position,
-          not inline scrolling content (confirmed against the real app). */}
-      {!sameGender && showLikeCTA(profile.likedStatus) && (
-        <View style={[s.bottomCtaBar, { paddingBottom: 12 + insets.bottom }]}>
-          <View style={s.ctaRow}>
-            <Pressable
-              style={[s.ctaDontShow, disableDontShow(profile.dontShowStatus) && s.ctaDisabled]}
-              onPress={handleDontShow}
-              disabled={disableDontShow(profile.dontShowStatus)}
-            >
-              <CloseIcon width={14} height={14} />
-              <Text style={s.ctaDontShowText}>{t('GENERAL.DONTSHOWCTA')}</Text>
-            </Pressable>
-            <Pressable
-              style={[s.ctaViewLater, disableViewLater(profile.viewLaterStatus) && s.ctaDisabled]}
-              onPress={handleViewLater}
-              disabled={disableViewLater(profile.viewLaterStatus)}
-            >
-              <ViewLaterIcon width={14} height={14} />
-              <Text style={s.ctaViewLaterText}>{t('GENERAL.VIEWLATER')}</Text>
-            </Pressable>
-            <Pressable style={s.ctaLike} onPress={handleLike}>
-              <LikeIcon width={16} height={17} />
-              <Text style={s.ctaLikeText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
-            </Pressable>
-          </View>
-        </View>
-      )}
-
-      {!sameGender && showAfterLikeCTA(profile.likedStatus) && (
-        <View style={[s.bottomCtaBar, { paddingBottom: 12 + insets.bottom }]}>
-          <View style={s.afterLikeRow}>
-            <View style={s.afterLikeTopRow}>
-              <Text style={s.afterLikeText}>{getAfterLikeContentText(ctaCtx, t)}</Text>
-              <View style={s.ctaSendInterestWrap}>
-                {showFreeBadge(ctaCtx) && (
-                  <View style={s.freeBadge} pointerEvents="none">
-                    <Text style={s.freeBadgeText}>{t('GENERAL.FREE')}</Text>
-                  </View>
-                )}
-                <Pressable style={s.ctaSendInterest} onPress={handleCall}>
-                  <CdnSvg uri={getAfterLikeCtaIcon(ctaCtx)} width={16} height={16} />
-                  <Text style={s.ctaSendInterestText}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
-                </Pressable>
-              </View>
-            </View>
-            {showContactsLeftBanner(ctaCtx) && (
-              <Text style={s.contactsLeftText}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
-            )}
-          </View>
-        </View>
-      )}
-
       <WhatsAppPaywallModal
         visible={whatsappPaywallOpen}
         profile={profile}
         oppGender={oppGender}
         onClose={() => setWhatsappPaywallOpen(false)}
         onPayNow={handleWhatsappPaywallPayNow}
+      />
+
+      <PhotoViewerModal
+        visible={photoViewerOpen}
+        images={profile.photos}
+        initialIndex={photoViewerIndex}
+        onClose={() => setPhotoViewerOpen(false)}
+      />
+
+      <ReportProfileModal
+        visible={reportModalOpen}
+        partnerId={profile.profileId}
+        partnerName={profile.name}
+        onClose={() => setReportModalOpen(false)}
+        onSubmitted={handleReportSubmitted}
       />
     </View>
   )
@@ -647,16 +1176,21 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 const s = StyleSheet.create({
   screen:       { flex: 1, backgroundColor: Colors.background },
   loaderScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: Colors.background },
-  notFoundText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.textSecondary },
+  notFoundText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 14, color: Colors.textSecondary },
   backBtnInline:     { paddingHorizontal: 16, paddingVertical: 8 },
-  backBtnInlineText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.link },
+  backBtnInlineText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 14, color: Colors.link },
   debugBox:   { maxHeight: 300, width: '100%', paddingHorizontal: 16 },
-  debugLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: Colors.primary, marginTop: 8 },
-  debugText:  { fontFamily: 'Poppins-Regular', fontSize: 11, color: Colors.textSecondary },
+  debugLabel: { fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 12, color: Colors.primary, marginTop: 8 },
+  debugText:  { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 11, color: Colors.textSecondary },
 
   scrollView:    { flex: 1 },
   scrollContent: {},
 
+  // photoWrap is the positioning ancestor for the prev/next-profile arrows (see
+  // the JSX comment above) — sized only by photoBox (its one in-flow child);
+  // the arrows are absolutely positioned past that height on purpose, exactly
+  // like Angular's own `top: calc(100vw + 32px)` overlapping into the content below.
+  photoWrap: { position: 'relative' },
   // Flat, full-bleed square — Angular has no border-radius on this photo (unlike
   // the rounded Matches-card photo), confirmed against viewprofile.page.scss.
   photoBox: { width: SCREEN_WIDTH, height: PHOTO_HEIGHT, backgroundColor: Colors.divider },
@@ -666,7 +1200,41 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primaryDark, height: 24,
     paddingLeft: 8, paddingRight: 12, borderBottomRightRadius: 10, gap: 4,
   },
-  newBadgeText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.white },
+  newBadgeText: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 12, color: Colors.white },
+  // Feature 2 prev/next-profile chevrons — same dark-circle/white-chevron style
+  // as PhotoSwiper's own desktop arrow fallback (matchesCard.shared.tsx). Angular:
+  // viewprofile.page.scss:512,523 `top: calc(100vw + 32px)` — just below the square
+  // (100vw-tall) photo, not overlaid on it (confirmed: these are the prev/next-
+  // PROFILE arrows, a separate sibling element from the photo swiper's own arrows).
+  profileArrowBtn: {
+    position: 'absolute', top: PHOTO_HEIGHT + 32,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.35)',
+    alignItems: 'center', justifyContent: 'center',
+    zIndex: 2,
+  },
+  profileArrowLeft:  { left: 8 },
+  profileArrowRight: { right: 8 },
+  profileArrowText: { color: Colors.white, fontSize: 20, lineHeight: 20 },
+  // Feature 8 coach-mark — a dismiss-anywhere dark scrim over the photo, one
+  // time ever, pointing at the tap-chevron affordance just below the photo.
+  coachMarkOverlay: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    alignItems: 'center', justifyContent: 'center',
+    zIndex: 3,
+  },
+  coachMarkCard: {
+    backgroundColor: Colors.white, borderRadius: 12,
+    paddingHorizontal: 20, paddingVertical: 16,
+    alignItems: 'center', gap: 12, maxWidth: '80%',
+  },
+  coachMarkText: {
+    fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: Colors.black, textAlign: 'center',
+  },
+  coachMarkDismiss: {
+    fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 14, color: Colors.primaryDark,
+  },
   photoOverlay: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center', justifyContent: 'center',
@@ -677,7 +1245,7 @@ const s = StyleSheet.create({
     alignItems: 'center', gap: 16,
   },
   overlayText: {
-    fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.white,
+    fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 12, color: Colors.white,
     textAlign: 'center', lineHeight: 17,
   },
 
@@ -693,69 +1261,91 @@ const s = StyleSheet.create({
 
   nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   // Angular: heading1-semibold-22 black-color
-  name:    { flex: 1, fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black },
-  contactIcons: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  name:    { flex: 1, fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 22, color: Colors.black },
   // Angular: body2-regular-14 black-color
-  jodiId:  { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, marginTop: 4 },
-  likedMsg: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.likedStripText, marginTop: 6 },
+  jodiId:  { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: Colors.black, marginTop: 4 },
+  likedMsg: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 12, color: Colors.likedStripText, marginTop: 6 },
 
-  // Angular: .button-banner/.sticky-btm — the CTA row is a FIXED bottom bar (white
-  // bg, shadow), always visible regardless of scroll position — not inline content.
-  bottomCtaBar: {
-    backgroundColor: Colors.surface,
-    paddingHorizontal: 24, paddingTop: 12,
+  // Angular: viewprofile.page.html:469-489 — Call/WhatsApp icon buttons beside the name.
+  nameIconsRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  nameIconBtn: { alignItems: 'center', justifyContent: 'center' },
+
+  // Angular: .button-banner — regular inline content (NOT position:fixed/sticky —
+  // confirmed against real screenshots showing more content, incl. a second copy of
+  // this exact block, both above and below it in the normal scroll flow).
+  ctaBlock: { marginTop: 16 },
+  // Second CTA's own wrapper — matches infoCard's horizontal padding since it now
+  // sits outside infoCard (see the onLayout comment at its call site).
+  ctaBlockOuter: { paddingHorizontal: 24 },
+  // Floating top-CTA overlay — Angular: .sticky-btm { position:sticky; bottom:0;
+  // background:#fff }, .button-banner's shadow. Pinned to the screen bottom, shown/
+  // hidden via topCtaVisible rather than true CSS position:sticky (no RN equivalent
+  // for "sticky within a scroll region until the next in-flow sticky candidate
+  // arrives").
+  floatingCtaBar: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    backgroundColor: Colors.surface, paddingHorizontal: 24, paddingTop: 12,
     shadowColor: '#000000', shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: 0, height: -4 },
     elevation: 12,
   },
 
-  // Angular: <app-button-revamp> default buttonSize.standard — 44px height, 8px
-  // radius, body2-regular-14 text (button-revamp.component.scss). Don't Show/View
-  // Later = tertiaryBtn: white bg, 1px #545454 border, #545454 text. Like =
-  // primaryBtn: primaryBg (#B50033) / noBorder / white text.
-  ctaRow: { flexDirection: 'row', gap: 8 },
+  // Same design as Matches' own MatchCard CTA (MatchesScreen.tsx ctaSection/
+  // ctaSecRow/ctaDontShow/ctaViewLater/ctaLike) — Row 1: Don't show + View later,
+  // each flex:1, 44px/8px-radius/1px-#545454-border/white bg. Row 2: Like, full
+  // width, primaryDark bg, Poppins-SemiBold white text, 24×24 icons throughout.
+  ctaSection: { gap: 12 },
+  ctaSecRow: { flexDirection: 'row', gap: 12 },
   ctaDontShow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, backgroundColor: Colors.white,
-    borderWidth: 1, borderColor: '#545454', borderRadius: 8, paddingHorizontal: 14,
+    borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
-  ctaDontShowText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#545454' },
+  ctaDontShowText: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: '#545454' },
   ctaViewLater: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
+    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, backgroundColor: Colors.white,
-    borderWidth: 1, borderColor: '#545454', borderRadius: 8, paddingHorizontal: 14,
+    borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
-  ctaViewLaterText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#545454' },
+  ctaViewLaterText: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: '#545454' },
   ctaDisabled: { opacity: 0.4 },
   ctaLike: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    height: 44, backgroundColor: Colors.primaryDark, borderRadius: 8, gap: 6,
+    height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.primaryDark, borderRadius: 8, gap: 6,
   },
-  ctaLikeText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.white },
+  ctaLikeText: { fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 14, color: Colors.white },
+
+  // Feature 6 — same pill styling as ctaLike, standing in for the normal
+  // Like/Contact CTA when viewing your own profile.
+  biodataCta: {
+    height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.primaryDark, borderRadius: 8, marginTop: 16,
+  },
+  biodataCtaText: { fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 14, color: Colors.white },
 
   afterLikeRow: {
     backgroundColor: Colors.afterLikeBg, borderRadius: 8, borderWidth: 1,
     borderColor: Colors.afterLikeBorder, paddingHorizontal: 14, paddingVertical: 10,
   },
   afterLikeTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  afterLikeText:   { flex: 1, fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.black },
+  afterLikeText:   { flex: 1, fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 13, color: Colors.black },
   ctaSendInterestWrap: { position: 'relative', flexShrink: 0 },
   ctaSendInterest: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, backgroundColor: Colors.primaryDark, borderRadius: 8, paddingHorizontal: 16,
   },
-  ctaSendInterestText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.white },
+  ctaSendInterestText: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: Colors.white },
   freeBadge: {
     position: 'absolute', top: -10, right: 8, zIndex: 1,
     backgroundColor: Colors.badgeNewBg, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2,
   },
-  freeBadgeText: { fontFamily: 'Poppins-SemiBold', fontSize: 10, color: Colors.badgeNewText },
+  freeBadgeText: { fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 10, color: Colors.badgeNewText },
   contactsLeftText: {
-    fontFamily: 'Poppins-Regular', fontSize: 11, color: Colors.textSecondary, textAlign: 'center', marginTop: 8,
+    fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 11, color: Colors.textSecondary, textAlign: 'center', marginTop: 8,
   },
 
   // Angular: heading1-semibold-20 black-color, line-height:16, mt-24 mb-4
   sectionHeader: {
-    fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.black,
+    fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 20, color: Colors.black,
     marginTop: 24, marginBottom: 4,
   },
   // Angular: icon column (ion-col size="1") + text column (size="11", pl-12) —
@@ -765,11 +1355,62 @@ const s = StyleSheet.create({
   detailRowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(204,204,204,0.5)' },
   detailIconCol: { width: 20, flexShrink: 0 },
   detailTextCol: { flex: 1, paddingLeft: 12 },
-  detailLabel: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
-  detailValue: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.black, marginTop: 8 },
+  detailLabel: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: Colors.black },
+  detailValue: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 14, color: Colors.black, marginTop: 8 },
 
-  starMatchText:   { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.textDark, marginTop: 8 },
-  starMatchTeaser: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.link, marginTop: 8 },
+  starMatchText:   { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 13, color: Colors.textDark, marginTop: 8 },
+  starMatchTeaser: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 13, color: Colors.link, marginTop: 8 },
+
+  horoActionLink:    { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: Colors.link, marginTop: 8 },
+  horoRequestedText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 14, color: Colors.black, marginTop: 8 },
+  // Feature 6 — own-profile "add missing section" prompts, replacing a section
+  // that would otherwise render nothing when its data is empty.
+  addDetailPrompt: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
+  addDetailPromptText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 14, color: Colors.link },
+
+  // Angular: app-swiper.component.html:2 — `ion-row class="pt-32 ... pb-24"` — header
+  // text aligned with the rest of the padded content, but the card row itself bleeds
+  // to the screen edges.
+  similarSection: { paddingTop: 32, paddingBottom: 24 },
+  similarHeader: {
+    fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 20, color: Colors.black,
+    marginBottom: 12, paddingHorizontal: 24,
+  },
+  similarListContent: { paddingHorizontal: 24, gap: SIMILAR_CARD_GAP },
+  // Angular: profile-card.component.scss's `.card-ht2` (vmin-based, equal
+  // width/height) — a SQUARE card, not the 140x180 rectangle this used to be.
+  similarCard: {
+    width: SIMILAR_CARD_WIDTH, height: SIMILAR_CARD_WIDTH, borderRadius: 12, overflow: 'hidden',
+    backgroundColor: Colors.divider,
+  },
+  similarCardImg: { width: '100%', height: '100%' },
+  similarCardOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.scrimStrong, padding: 10, gap: 8,
+  },
+  similarCardOverlayText: {
+    fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 11, color: Colors.white, textAlign: 'center', lineHeight: 15,
+  },
+  similarCardWaBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    backgroundColor: Colors.whatsappGreen, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6,
+  },
+  similarCardWaBtnText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 12, color: Colors.white },
+  similarCardCaption: {
+    position: 'absolute', left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 8,
+  },
+  similarCardName: { fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 13, color: Colors.white },
+  similarCardMeta: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 11, color: Colors.white, marginTop: 2 },
+  similarArrowBtn: {
+    position: 'absolute', top: '50%', marginTop: -16,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center',
+  },
+  similarArrowLeft:  { left: 8 },
+  similarArrowRight: { right: 8 },
+  similarArrowText: { color: Colors.white, fontSize: 20, lineHeight: 20 },
 
   // Header — a SEPARATE solid white bar in normal flow above the photo (never
   // overlaying it) — confirmed against the real app's screenshots. Content swaps
@@ -781,9 +1422,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingBottom: 10,
   },
   headerBackBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  backIcon: { fontSize: 22, lineHeight: 22, color: '#333333' },
   headerSpacer: { flex: 1 },
-  headerName: { flex: 1, fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black },
+  // Angular: `.vp-profile-name` (global.scss:22188-22192) — font16 (~16px),
+  // Poppins-Medium, `--gray-color1` (#1f1e1b) — not SemiBold/pure-black.
+  headerName: { flex: 1, fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 16, color: '#1f1e1b' },
   headerIconBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   menuDots: { fontSize: 20, lineHeight: 20, color: '#333333', fontWeight: '700' },
 
@@ -794,7 +1436,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white, maxWidth: 120,
   },
   langPillCompact: { maxWidth: 84, paddingRight: 8 },
-  langPillText: { fontFamily: 'Poppins-Medium', fontSize: 12, color: '#000000' },
+  langPillText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 12, color: '#000000' },
 
   menuDropdown: {
     position: 'absolute', top: 34, right: 0, minWidth: 200,
@@ -803,6 +1445,6 @@ const s = StyleSheet.create({
     elevation: 6, zIndex: 10,
   },
   menuItem: { paddingHorizontal: 16, paddingVertical: 12 },
-  menuItemText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textDark },
+  menuItemText: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: Colors.textDark },
   menuItemDanger: { color: Colors.primary },
 })

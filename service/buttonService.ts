@@ -77,10 +77,16 @@ export async function redirectToViewProfile(
   profileStatus: string,
   matriId: string,
   fromPage = 'matches',
+  // Angular: the whole prev/next-profile-swipe cache is keyed off the list the
+  // user came from — the RN equivalent is passing that list's ids along so
+  // ViewProfileScreen can swipe within the same ordering, without needing
+  // Angular's full localStorage-persisted cache.
+  profileIds?: string[],
 ): Promise<void> {
   navigate(ENavigation.VIEW_PROFILE, {
     matriId,
     fromPage,
     showRating: profileStatus === 'active',
+    profileIds,
   })
 }

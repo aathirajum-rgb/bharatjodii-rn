@@ -371,7 +371,10 @@ export interface PhotoSwiperProps {
   images:       string[]
   width:        number
   height:       number
-  onPress?:     (() => void) | undefined
+  // Receives the currently-active photo index — callers that don't need it
+  // (existing Matches cards) can keep declaring a zero-arg handler; TS allows
+  // passing a function with fewer params where more are provided.
+  onPress?:     ((index: number) => void) | undefined
   // Desktop-only, opt-in — mobile stays swipe-only (matches Angular). Gives desktop a
   // click-based alternative to dragging, alongside it, not instead of it.
   showArrows?:  boolean | undefined
@@ -411,8 +414,8 @@ export function PhotoSwiper({ images, width, height, onPress, showArrows }: Phot
         loop={false}
         onConfigurePanGesture={configureSwiperPanGesture}
         onSnapToItem={setActiveIndex}
-        renderItem={({ item }) => (
-          <Pressable style={{ width, height }} onPress={onPress}>
+        renderItem={({ item, index }) => (
+          <Pressable style={{ width, height }} onPress={() => onPress?.(index)}>
             <Image
               source={{ uri: item }}
               style={swiperStyles.image}
@@ -523,8 +526,9 @@ const swiperStyles = StyleSheet.create({
   // Active bullet is a wider pill/rounded-rect, not just a bigger circle — confirmed
   // against the real Angular app (its active bullet is visibly "square-like"/elongated,
   // inactive ones stay small round dots). Overrides `dot`'s width; height/radius inherited.
+  // Figma (363:10859 "Jodii View Profile Revamp"): active pill is 24px wide.
   dotActive: {
-    width:           16,
+    width:           24,
     backgroundColor: Colors.white,
   },
   dotInactive: {
