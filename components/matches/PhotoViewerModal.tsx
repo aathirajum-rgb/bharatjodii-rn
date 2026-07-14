@@ -25,8 +25,12 @@ const MIN_SCALE = 1
 const MAX_SCALE = 4
 
 function ZoomablePhoto({
-  uri, width, height, onZoomChange,
-}: { uri: string; width: number; height: number; onZoomChange: (zoomed: boolean) => void }) {
+  uri, width, height, onZoomChange, onNaturalSize,
+}: {
+  uri: string; width: number; height: number
+  onZoomChange: (zoomed: boolean) => void
+  onNaturalSize?: ((size: { width: number; height: number }) => void) | undefined
+}) {
   const scale = useSharedValue(1)
   const savedScale = useSharedValue(1)
   const translateX = useSharedValue(0)
@@ -90,7 +94,17 @@ function ZoomablePhoto({
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View style={[{ width, height }, style]}>
-        <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="contain" />
+        {/* The card this photo sits in is now sized to the photo's OWN aspect
+            ratio (see onNaturalSize below), so contentFit is close to a no-op
+            in the common case — "cover" just guards against float rounding
+            leaving a hairline gap, without actually cropping anything since
+            the box already matches the photo's shape. */}
+        <Image
+          source={{ uri }}
+          style={StyleSheet.absoluteFill}
+          contentFit="cover"
+          onLoad={e => onNaturalSize?.({ width: e.source.width, height: e.source.height })}
+        />
       </Animated.View>
     </GestureDetector>
   )
@@ -115,9 +129,15 @@ export default function PhotoViewerModal({ visible, images, initialIndex, onClos
   const { width, height } = useWindowDimensions()
   const [index, setIndex] = useState(initialIndex)
   const [zoomed, setZoomed] = useState(false)
+  // Per-photo natural size, captured once each image finishes loading — used
+  // to size the rounded card to the photo's OWN shape (see fitCard below),
+  // instead of a fixed box that leaves visible empty space around photos with
+  // a different aspect ratio (confirmed against a real Angular screenshot:
+  // it never shows a visible placeholder-colored gap around the photo).
+  const [naturalSizes, setNaturalSizes] = useState<Record<number, { width: number; height: number }>>({})
 
   useEffect(() => {
-    if (visible) { setIndex(initialIndex); setZoomed(false) }
+    if (visible) { setIndex(initialIndex); setZoomed(false); setNaturalSizes({}) }
   }, [visible, initialIndex])
 
   // Angular: albumView()'s `slideGaOpt` (viewprofile.page.ts:1326-1336) —
@@ -143,6 +163,17 @@ export default function PhotoViewerModal({ visible, images, initialIndex, onClos
   // — 92% of the photo area actually available, not 92% of the whole screen.
   const CARD_HEIGHT = PHOTO_AREA_HEIGHT * 0.92
 
+  // Shrinks the rounded card to the photo's own aspect ratio, bounded by the
+  // max slot size (SLIDE_WIDTH × CARD_HEIGHT) — so the card only ever covers
+  // exactly the photo, never a bigger box with visible empty space around it.
+  // Falls back to the full max box before the natural size is known (first
+  // paint / still loading).
+  function fitCardSize(natural: { width: number; height: number } | undefined) {
+    if (!natural || !natural.width || !natural.height) return { width: SLIDE_WIDTH, height: CARD_HEIGHT }
+    const scale = Math.min(SLIDE_WIDTH / natural.width, CARD_HEIGHT / natural.height)
+    return { width: natural.width * scale, height: natural.height * scale }
+  }
+
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       {/* Angular: albumView() (viewprofile.page.ts:1318-1357) just toggles CSS
@@ -161,9 +192,10 @@ export default function PhotoViewerModal({ visible, images, initialIndex, onClos
             <Pressable style={s.backBtn} onPress={onClose} hitSlop={8}>
               <CdnSvg uri={BACK_ICON_URI} width={22} height={22} />
             </Pressable>
+            {/* Angular shows the count even for a single photo — "Photo (1/1)",
+                not just "Photo" — confirmed against a real screenshot. */}
             <Text style={s.headerTitle}>
-              {t('EDITPROFILE.PHOTOS')}
-              {images.length > 1 ? ` (${index + 1}/${images.length})` : ''}
+              {t('EDITPROFILE.PHOTOS')} ({index + 1}/{images.length})
             </Text>
           </View>
         )}
@@ -181,11 +213,25 @@ export default function PhotoViewerModal({ visible, images, initialIndex, onClos
             getItemLayout={(_, i) => ({ length: SLIDE_STRIDE, offset: SLIDE_STRIDE * i, index: i })}
             keyExtractor={(uri, i) => `${uri}-${i}`}
             onMomentumScrollEnd={e => setIndex(Math.round(e.nativeEvent.contentOffset.x / SLIDE_STRIDE))}
-            renderItem={({ item, index: i }) => (
-              <View style={[s.slideCard, { width: SLIDE_WIDTH, height: CARD_HEIGHT, marginRight: i === images.length - 1 ? 0 : SPACE_BETWEEN }]}>
-                <ZoomablePhoto uri={item} width={SLIDE_WIDTH} height={CARD_HEIGHT} onZoomChange={setZoomed} />
-              </View>
-            )}
+            renderItem={({ item, index: i }) => {
+              const fitted = fitCardSize(naturalSizes[i])
+              return (
+                // Slot: fixed width, transparent — owns the FlatList paging math
+                // only. The rounded/colored card lives entirely inside it, sized
+                // to the photo, so no visibly "boxed" empty space ever shows.
+                <View style={[s.slideSlot, { width: SLIDE_WIDTH, height: CARD_HEIGHT, marginRight: i === images.length - 1 ? 0 : SPACE_BETWEEN }]}>
+                  <View style={[s.slideCard, fitted]}>
+                    <ZoomablePhoto
+                      uri={item}
+                      width={fitted.width}
+                      height={fitted.height}
+                      onZoomChange={setZoomed}
+                      onNaturalSize={size => setNaturalSizes(prev => (prev[i] ? prev : { ...prev, [i]: size }))}
+                    />
+                  </View>
+                </View>
+              )
+            }}
           />
         </View>
 
@@ -209,8 +255,13 @@ const s = StyleSheet.create({
   // Takes the remaining space between the header and the footer CTA (if any) —
   // the photo card's own height is measured off this, not a raw screen-height %.
   photoArea: { flex: 1, justifyContent: 'center' },
+  // Fixed-width paging slot — transparent, no radius/background of its own.
+  // Owns the FlatList snap math only; the actual rounded card centers inside it.
+  slideSlot: { alignItems: 'center', justifyContent: 'center' },
   // global.scss:26077-26092 — `.show-album-view .swiper-slide`/`img { border-radius:
-  // 16px }`, `overflow: hidden` clips the photo to those rounded corners.
+  // 16px }`, `overflow: hidden` clips the photo to those rounded corners. Sized
+  // to the photo's own aspect ratio (fitCardSize) — never bigger than the photo
+  // itself, so there's no empty space left showing this background color.
   slideCard: { borderRadius: 16, overflow: 'hidden', backgroundColor: Colors.divider },
   // Angular keeps the Like/Don't show/View later CTA visible below the photo
   // in album view (confirmed against a real screenshot) — same horizontal

@@ -126,6 +126,7 @@ const MatchCard = memo(function MatchCard({
   onWhatsApp: () => void
 }) {
   const { t } = useTranslation()
+  const { LinearGradient } = require('expo-linear-gradient')
   const hasRealPhoto      = profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0
   const isHiddenPhoto     = profile.isPhotoAvailable && profile.isPhotoProtect
   // Angular: photo-new.component.ts getHiddenPhotoContent() — once liked/shortlisted,
@@ -181,9 +182,20 @@ const MatchCard = memo(function MatchCard({
                     .replace(/##he_she##/g, t(`PRONOUN.${oppGender}.heshe`).toLowerCase())}
                 </Text>
                 {!hiddenPhotoPending && (
-                  <Pressable style={c.waBtn} onPress={onLike}>
-                    <LikeIcon width={16} height={16} />
-                    <Text style={c.waBtnText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
+                  <Pressable onPress={onLike}>
+                    {/* Angular: EButtonBackground.whatsApp = --ion-color-whatsapp-bg =
+                        linear-gradient(180deg, #4AC14B 0%, #06853A 100%) (theme/variables
+                        .scss:63) — a gradient, not the flat WhatsApp-brand green (#25D366)
+                        this used before. */}
+                    <LinearGradient
+                      colors={['#4AC14B', '#06853A']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 0, y: 1 }}
+                      style={c.waBtn}
+                    >
+                      <LikeIcon width={16} height={16} />
+                      <Text style={c.waBtnText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
+                    </LinearGradient>
                   </Pressable>
                 )}
               </View>
@@ -1967,11 +1979,13 @@ const c = StyleSheet.create({
     textAlign:  'center',
     lineHeight: 18,
   },
-  // Angular: EButtonBackground.whatsApp — green WhatsApp CTA
+  // Angular: EButtonBackground.whatsApp — theme/variables.scss:63's
+  // linear-gradient(180deg, #4AC14B 0%, #06853A 100%), applied via LinearGradient
+  // at the call site — not a flat backgroundColor here.
   waBtn: {
     flexDirection:     'row',
     alignItems:        'center',
-    backgroundColor:   Colors.whatsappGreen,
+    justifyContent:    'center',
     borderRadius:      8,
     paddingVertical:   8,
     paddingHorizontal: 16,

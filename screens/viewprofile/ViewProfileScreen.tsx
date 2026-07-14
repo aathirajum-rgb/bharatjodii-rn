@@ -197,10 +197,18 @@ function SimilarProfileCardItem({
             <Text style={s.similarCardOverlayText}>
               {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
             </Text>
-            <View style={s.similarCardWaBtn}>
+            {/* Angular: --ion-color-whatsapp-bg = linear-gradient(180deg, #4AC14B 0%,
+                #06853A 100%) (theme/variables.scss:63, button-revamp.component.scss:264) —
+                a gradient, not the flat WhatsApp-brand green (#25D366) this used before. */}
+            <LinearGradient
+              colors={['#4AC14B', '#06853A']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={s.similarCardWaBtn}
+            >
               <WhatsAppIcon width={16} height={16} />
               <Text style={s.similarCardWaBtnText}>{t('GENERAL.WHATSAPP')}</Text>
-            </View>
+            </LinearGradient>
           </View>
         </>
       )}
@@ -326,7 +334,18 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         // once per page load, fire-and-forget (no loading UI, no .catch in
         // Angular either — matched here with a silent .catch for RN hygiene).
         if (adapted.isPhotoAvailable) {
-          getEnlargedPhotos(matriId).then(urls => { if (!cancelled) setEnlargedPhotos(urls) }).catch(() => {})
+          // Fetching the URLs only tells the app WHERE the full-resolution photos
+          // are — it doesn't download the actual image bytes. Without prefetching,
+          // that download only starts the moment the viewer opens, which is why
+          // tapping the photo felt slow even though this API call had long since
+          // finished. Prefetching here warms expo-image's cache in the background
+          // while the user is still reading the profile, so by the time they tap
+          // the photo, PhotoViewerModal's <Image> resolves from cache instantly.
+          getEnlargedPhotos(matriId).then(urls => {
+            if (cancelled) return
+            setEnlargedPhotos(urls)
+            if (urls && urls.length > 0) Image.prefetch(urls).catch(() => {})
+          }).catch(() => {})
         }
         // Angular: assignProfileDtl() skips viewedtrack for same-gender/own-profile views.
         if (adapted.gender !== gender && adapted.profileId !== '') {
@@ -1407,7 +1426,7 @@ const s = StyleSheet.create({
   },
   similarCardWaBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
-    backgroundColor: Colors.whatsappGreen, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6,
+    borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6,
   },
   similarCardWaBtnText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 12, color: Colors.white },
   similarCardCaption: {
