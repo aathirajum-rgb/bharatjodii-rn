@@ -45,7 +45,6 @@ import StarMatchingScreen          from '../screens/star-matching/StarMatchingSc
 import ActivityScreen               from '../screens/activity/ActivityScreen'
 import LanguageSelectionScreen     from '../screens/LanguageSelectionScreen'
 import MenuScreen                  from '../screens/menu/MenuScreen'
-import SettingsScreen              from '../screens/settings/SettingsScreen'
 import DeleteProfileScreen             from '../screens/delete-profile/DeleteProfileScreen'
 import DeleteProfileMrgReasonScreen    from '../screens/delete-profile/DeleteProfileMrgReasonScreen'
 import DeleteProfileHideScreen         from '../screens/delete-profile/DeleteProfileHideScreen'
@@ -56,6 +55,12 @@ import DeleteProfileUnsatisfactoryScreen   from '../screens/delete-profile/Delet
 import DeleteProfileOtherReasonScreen      from '../screens/delete-profile/DeleteProfileOtherReasonScreen'
 import DeleteProfileSuccessScreen          from '../screens/delete-profile/DeleteProfileSuccessScreen'
 import SuccessStoriesScreen               from '../screens/success-stories/SuccessStoriesScreen'
+import HelpCenterScreen                   from '../screens/help-center/HelpCenterScreen'
+import SearchScreen                       from '../screens/search/SearchScreen'
+import FaqScreen                          from '../screens/help-center/FaqScreen'
+import IgnoredProfilesScreen               from '../screens/ignored-profiles/IgnoredProfilesScreen'
+import SearchByIdScreen                    from '../screens/search-by-id/SearchByIdScreen'
+import ExternalPageScreen                  from '../screens/external-page/ExternalPageScreen'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -63,9 +68,12 @@ export type AppStackParamList = {
   Home:              undefined
   // exploreType/exploreLabel — Angular: matches.page.ts explorePage branch (FILTERTYPE
   // scoped listing, e.g. tapping a Home "Explore matches based on" category tile)
-  Matches:           { exploreType?: string; exploreLabel?: string } | undefined
+  Matches:           { exploreType?: string; exploreLabel?: string; searchParams?: string } | undefined
   dashboard:         undefined
-  onboarding:        { pageNo: string } | undefined
+  // standalone — set when entering page 21 (ManagePhotosScreen) from outside the
+  // onboarding wizard (e.g. Help Center's "Add Photo" quick link); its Confirm
+  // button goes back to the caller instead of continuing to page 27.
+  onboarding:        { pageNo: string; standalone?: boolean } | undefined
   Permissions:       undefined
   Gallery:           undefined
   recharge:          { from?: string; paymentId?: string; type?: string } | undefined
@@ -77,7 +85,6 @@ export type AppStackParamList = {
   LanguageSelection: undefined
   Activity:          undefined
   Menu:              undefined
-  Settings:          undefined
   DeleteProfile:         undefined
   DeleteProfileMrgReason:    { reason: string; reasonName?: string }
   DeleteProfileHide:              { reasonName: string }
@@ -98,6 +105,12 @@ export type AppStackParamList = {
     successMsg:      string
   }
   SuccessStories: undefined
+  HelpCenter: undefined
+  Search: undefined
+  Faq: { type: 'PROFILE' | 'CONTACTMATCHES' | 'PAYMENT'; itemId?: number }
+  IgnoredProfiles: undefined
+  SearchById: undefined
+  ExternalPage: { url: string; title: string }
   // Angular: viewprofile.page.ts route params (:module/:id) — fromPage drives the
   // "from" context communicationBtnOnClick needs for its paywall/report-popup logic.
   viewProfile: { matriId: string; fromPage: string; showRating?: boolean; profileIds?: string[] } | undefined
@@ -337,7 +350,6 @@ export default function AppStack() {
       <Stack.Screen name="payment-success" component={PaymentSuccessScreen} />
       <Stack.Screen name="Activity" component={ActivityScreen} />
       <Stack.Screen name="Menu" component={MenuScreen} />
-      <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="DeleteProfile" component={DeleteProfileScreen} />
       <Stack.Screen name="DeleteProfileMrgReason" component={DeleteProfileMrgReasonScreen} />
       <Stack.Screen name="DeleteProfileHide" component={DeleteProfileHideScreen} />
@@ -348,6 +360,12 @@ export default function AppStack() {
       <Stack.Screen name="DeleteProfileUploadPhoto" component={DeleteProfileUploadPhotoScreen} />
       <Stack.Screen name="DeleteProfileSuccess" component={DeleteProfileSuccessScreen} options={{ gestureEnabled: false }} />
       <Stack.Screen name="SuccessStories" component={SuccessStoriesScreen} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+      <Stack.Screen name="Search" component={SearchScreen} />
+      <Stack.Screen name="Faq" component={FaqScreen} />
+      <Stack.Screen name="IgnoredProfiles" component={IgnoredProfilesScreen} />
+      <Stack.Screen name="SearchById" component={SearchByIdScreen} />
+      <Stack.Screen name="ExternalPage" component={ExternalPageScreen} />
       <Stack.Screen
         name="ComponentShowcase"
         component={ComponentShowcaseScreen}

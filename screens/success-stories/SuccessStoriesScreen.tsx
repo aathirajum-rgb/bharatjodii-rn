@@ -203,8 +203,14 @@ export default function SuccessStoriesScreen({ navigation }: Props) {
         const incoming: Story[] = data['SUCCESSSTORY'] ?? []
         const total    = parseInt(data['SSCOUNT'] ?? '0', 10)
 
-        if (reset) setStories(incoming)
-        else setStories(prev => [...prev, ...incoming])
+        if (reset) {
+          setStories(incoming)
+        } else {
+          setStories(prev => {
+            const seen = new Set(prev.map(s => s.MatriId))
+            return [...prev, ...incoming.filter(s => !seen.has(s.MatriId))]
+          })
+        }
 
         if (!contentSetRef.current) {
           contentSetRef.current = true
@@ -273,7 +279,7 @@ export default function SuccessStoriesScreen({ navigation }: Props) {
       ) : (
         <FlatList
           data={stories}
-          keyExtractor={item => item.MatriId}
+          keyExtractor={(item, index) => `${item.MatriId}_${index}`}
           ListHeaderComponent={<HeroSection title={heroTitle} sub={heroSub} />}
           contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
           ItemSeparatorComponent={() => <View style={{ height: 24 }} />}

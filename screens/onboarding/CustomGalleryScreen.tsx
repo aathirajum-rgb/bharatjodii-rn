@@ -268,7 +268,7 @@ export default function CustomGalleryScreen({ navigation, route }: Props) {
         }
       }
 
-      navigation.push('onboarding', { pageNo: '21', pendingUri: firstPendingUri })
+      navigation.push('onboarding', { pageNo: '21', pendingUri: firstPendingUri, standalone: route.params?.standalone })
     } catch {
       Alert.alert('Error', 'Upload failed. Please try again.')
     } finally {

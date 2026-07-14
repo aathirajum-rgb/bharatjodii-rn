@@ -466,6 +466,40 @@ export async function fetchReligionOptions(): Promise<Array<{ key: string; label
   return []
 }
 
+// Fetches physical status options from REGISTRATIONARRAYS.PHYSICALSTATUS.
+// Used by the Search/Filter screen only — no onboarding screen collects this field.
+export async function fetchPhysicalStatusOptions(): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const raw  = data?.PHYSICALSTATUS
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => ({
+      key:   String(item.KEY   ?? item.key   ?? ''),
+      label: String(item.VALUE ?? item.value ?? ''),
+    })).filter(o => o.key !== '')
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+  }
+  return []
+}
+
+// Fetches the Division list (Angular's caste substitute shown when RELIGION === '2' / Islam)
+// from REGISTRATIONARRAYS.DIVISION. Used by the Search/Filter screen only.
+export async function fetchDivisionOptions(): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const raw  = data?.DIVISION
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => ({
+      key:   String(item.KEY   ?? item.key   ?? ''),
+      label: String(item.VALUE ?? item.value ?? ''),
+    })).filter(o => o.key !== '')
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+  }
+  return []
+}
+
 // Fetches monthly income options from REGISTRATIONARRAYS.MONTHLYINCOME
 // Angular: apiResponse["MONTHLYINCOME"] → array of { CKEY, VALUE }
 export async function fetchMonthlyIncomeOptions(): Promise<Array<{ key: string; label: string }>> {

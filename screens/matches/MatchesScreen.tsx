@@ -44,6 +44,7 @@ import { EEndCardText } from '../../types/enums/common.enum'
 import {
   fetchMatches,
   fetchExplore,
+  fetchSearchResults,
   type QuickFilters,
   type ExploreFacet,
   fetchExtendedMatchesCount,
@@ -749,12 +750,21 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   // ── Explore-by-category mode (#6) ───────────────────────────────────────────
   // Angular: callMatchesApi() explorePage branch — set when navigated here from a
   // Home "Explore matches based on" category tile instead of the bottom-nav tab.
-  const exploreType  = route?.params?.exploreType as string | undefined
-  const exploreLabel = route?.params?.exploreLabel as string | undefined
+  const exploreType   = route?.params?.exploreType as string | undefined
+  const exploreLabel  = route?.params?.exploreLabel as string | undefined
+  // Set by SearchScreen's "Show matches" CTA (filterService.buildSearchParams()) —
+  // Angular: search.component.ts applyFilter() → router.navigate(['matches'], {state:{SEARCH_URL}})
+  const searchParams  = route?.params?.searchParams as string | undefined
   const [facets,  setFacets]  = useState<ExploreFacet[]>([])
   const [qSearch, setQSearch] = useState('')
 
   async function fetchList(start: number, limit: number, quickFilters?: QuickFilters) {
+    if (searchParams) {
+      // Filtered search results aren't paginated past the first page yet — the
+      // params string is pre-built with its own START/LIMIT by SearchScreen.
+      if (start > 0) return { items: [], bannerSlots: [], totalCount: 0, newCount: 0 }
+      return fetchSearchResults(searchParams)
+    }
     return exploreType
       ? fetchExplore(exploreType, start, limit, qSearch)
       : fetchMatches(start, limit, quickFilters)

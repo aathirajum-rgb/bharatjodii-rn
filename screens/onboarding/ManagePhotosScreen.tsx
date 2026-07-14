@@ -43,7 +43,7 @@ type Photo = {
 
 type Props = {
   navigation: any
-  route:      { params?: { pageNo?: string; pendingUri?: string } }
+  route:      { params?: { pageNo?: string; pendingUri?: string; standalone?: boolean } }
 }
 
 // ─── Title helpers ────────────────────────────────────────────────────────────
@@ -125,7 +125,8 @@ function InfoIcon() {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ManagePhotosScreen({ navigation, route }: Props) {
-  const pendingUri = (route.params as any)?.pendingUri as string | undefined
+  const pendingUri  = (route.params as any)?.pendingUri as string | undefined
+  const standalone  = !!(route.params as any)?.standalone
 
   const [photos,    setPhotos]    = useState<Photo[]>([])
   const [loading,   setLoading]   = useState(true)
@@ -134,8 +135,11 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
   useOnboardingFooter({
     nextLabel:    'Confirm',
     nextDisabled: false,
-    onNext:       () => navigation.push('onboarding', { pageNo: '27' }),
-  }, [navigation])
+    // Angular: editform/20 (help-center.component.ts PageNavigation 'Add Photo')
+    // returns to frm_page on save — standalone entry mirrors that instead of
+    // always continuing the signup wizard to page 27.
+    onNext:       () => standalone ? navigation.goBack() : navigation.push('onboarding', { pageNo: '27' }),
+  }, [navigation, standalone])
 
   useEffect(() => {
     getRegValue('CREATEDBY').then(v => { if (v) setCreatedBy(v) })
@@ -162,7 +166,7 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
   // ─── Upload ────────────────────────────────────────────────────────────────
 
   async function pickAndUpload() {
-    navigation.push('onboarding', { pageNo: '22', existingCount: photos.length })
+    navigation.push('onboarding', { pageNo: '22', existingCount: photos.length, standalone })
   }
 
   // ─── Delete ────────────────────────────────────────────────────────────────

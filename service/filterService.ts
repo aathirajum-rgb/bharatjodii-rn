@@ -42,6 +42,17 @@ export async function getSearchPPCheckBox(): Promise<string[]> {
   return (await getJson<string[]>(K.PPCHECK)) ?? [...DEFAULT_PP_CHECKBOX]
 }
 
+// 'filter' = lighter/temporary quick-filter mode (Matches screen's "FILTER" chip);
+// anything else = PP (Partner Preference) mode, the default when opened from Menu.
+export async function getFilterEventType(): Promise<'filter' | 'pp'> {
+  return (await getItem(K.EVTYPE)) === 'filter' ? 'filter' : 'pp'
+}
+
+export async function setFilterEventType(eventType: 'filter' | 'pp'): Promise<void> {
+  if (eventType === 'filter') await setItem(K.EVTYPE, 'filter')
+  else await removeItem(K.EVTYPE)
+}
+
 export async function saveFilterState(
   obj: Record<string, any>,
   ppCheckBox: string[],
@@ -98,7 +109,7 @@ function incomeParams(obj: Record<string, any>): string {
   return 'STARTINCOME=0&ENDINCOME='
 }
 
-export async function buildSearchParams(matriId: string): Promise<string> {
+export async function buildSearchParams(matriId: string, start = 0, limit = 20): Promise<string> {
   const obj       = await getSelectedObject()
   const ppCheckBox = await getSearchPPCheckBox()
   const isFilter  = (await getItem(K.EVTYPE)) === 'filter'
@@ -111,7 +122,7 @@ export async function buildSearchParams(matriId: string): Promise<string> {
     setPP = [...DEFAULT_PP_CHECKBOX, '0', '0', '0']
   }
 
-  const params = `ID=${matriId}&START=0&LIMIT=20&LIKED=1&VIEWED=1&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&BANNERFLAG=0&${baseParams(obj)}&${incomeParams(obj)}${extra}&SETPP=${setPP.join('|')}&FILTERPP=${ppCheckBox.join('|')}`
+  const params = `ID=${matriId}&START=${start}&LIMIT=${limit}&LIKED=1&VIEWED=1&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&BANNERFLAG=0&${baseParams(obj)}&${incomeParams(obj)}${extra}&SETPP=${setPP.join('|')}&FILTERPP=${ppCheckBox.join('|')}`
   await setItem(K.PARAMS, params)
   return params
 }

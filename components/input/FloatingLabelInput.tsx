@@ -9,10 +9,14 @@ import {
   View,
 } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
+import CdnSvg from '../cdn-svg/CdnSvg'
+
+const CLEAR_ICON = CDN_SVG + 'revamp/close-icon.svg'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type InputVariant = 'text' | 'name' | 'age' | 'email' | 'phone' | 'password'
+export type InputVariant = 'text' | 'name' | 'age' | 'email' | 'phone' | 'password' | 'id'
 
 export interface FloatingLabelInputProps
   extends Omit<TextInputProps, 'value' | 'onChangeText' | 'placeholder' | 'secureTextEntry'> {
@@ -109,6 +113,7 @@ export default function FloatingLabelInput({
     if (variant === 'name')  out = text.replace(EMOJI_RE, '')
     if (variant === 'age')   out = text.replace(/\D/g, '').slice(0, 3)
     if (variant === 'phone') out = text.replace(/[^\d+\s-]/g, '')
+    if (variant === 'id')    out = text.replace(/\D/g, '').slice(0, 12)
     onChangeText(out)
   }
 
@@ -127,6 +132,7 @@ export default function FloatingLabelInput({
 
   const keyboardType =
     variant === 'age'   ? 'number-pad'    :
+    variant === 'id'    ? 'number-pad'    :
     variant === 'phone' ? 'phone-pad'     :
     variant === 'email' ? 'email-address' : 'default'
 
@@ -161,6 +167,14 @@ export default function FloatingLabelInput({
         {variant === 'password' && (
           <Pressable style={styles.eyeBtn} onPress={() => setShowPassword(p => !p)} hitSlop={8}>
             <Text style={styles.eyeText}>{showPassword ? 'Hide' : 'Show'}</Text>
+          </Pressable>
+        )}
+
+        {/* Clear button — Angular: search.page.ts closeSearchById(), shown inside
+            the searchbar to reset the ID field in one tap. */}
+        {variant === 'id' && value.length > 0 && (
+          <Pressable style={styles.clearBtn} onPress={() => onChangeText('')} hitSlop={8}>
+            <CdnSvg uri={CLEAR_ICON} width={14} height={14} />
           </Pressable>
         )}
       </View>
@@ -205,6 +219,9 @@ const styles = StyleSheet.create({
     alignSelf: 'center',          // web / iOS
   },
   eyeBtn: {
+    paddingLeft: 8,
+  },
+  clearBtn: {
     paddingLeft: 8,
   },
   eyeText: {

@@ -488,6 +488,17 @@ export async function fetchExplore(filterType: string, start = 0, limit = 20, qS
   return toListingResult(res)
 }
 
+// ─── Search / Filter results ────────────────────────────────────────────────────
+// Angular: search.component.ts applyFilter()/getMatchesCount() — both hit
+// search/searchform/v1, the former for the final "show matches" list, the latter
+// (LIMIT=1) purely to read back RESPONSE.TOTAL for the live "Show N matches" CTA.
+// `searchParams` is the pre-built query string from filterService.buildSearchParams().
+
+export async function fetchSearchResults(searchParams: string): Promise<ListingResult> {
+  const res = await apiCall(Endpoints.search.form, 'POST', searchParams)
+  return toListingResult(res)
+}
+
 // ─── Profiles who viewed me ───────────────────────────────────────────────────
 
 export async function fetchViewedYou(): Promise<ListingResult> {

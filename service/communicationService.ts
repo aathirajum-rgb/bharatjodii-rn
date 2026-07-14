@@ -242,6 +242,14 @@ export async function reportAndBlockProfile(partnerId: string): Promise<boolean>
   return ok(reportRes) || ok(blockRes)
 }
 
+// ─── Unblock (Ignored Profiles → "Blocked profiles" tab) ───────────────────────
+
+export async function unblockProfile(partnerId: string): Promise<boolean> {
+  const params = await getCommParams(partnerId)
+  const res = await apiCall(Endpoints.communication.unblock, 'POST', params)
+  return res?.RESPONSECODE === '1' || res?.RESPONSECODE == 1
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // Angular getApiParams(partnerId, 'communication'/'phoneviewed') → includes ENTRYTYPE
