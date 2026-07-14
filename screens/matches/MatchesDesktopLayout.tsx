@@ -75,6 +75,15 @@ export default function MatchesDesktopLayout({
         onLanguagePress={onLanguagePress}
       />
 
+      {/* Live desktop-web testing (not just the static Figma reference) showed
+          the Filters sidebar and match list need to scroll INDEPENDENTLY, each
+          with their own scrollbar — a shared single page-scroll left the
+          sidebar's column blank once scrolled past its own short content,
+          since the match list is far longer. `body` keeps its default row
+          alignItems ('stretch'), so both MatchesFilterSidebar (self-scrolling
+          via its own internal ScrollView) and this FlatList get stretched to
+          the exact same height — the full space below the nav — and each
+          scrolls on its own within that. */}
       <View style={s.body}>
         <MatchesFilterSidebar
           totalCount={totalCount}
@@ -84,37 +93,53 @@ export default function MatchesDesktopLayout({
         />
 
         <View style={s.main}>
-          <Text style={s.title}>
-            {loading ? 'New Matches' : t('MATCHES.NEW_MATCHES_TITLE').replace('#COUNT#', String(totalCount))}
-          </Text>
-
-          {!loading && (
-            <View style={s.ppRow}>
-              <Text style={s.ppText}>
-                {t('MATCHES.PROFILE_COUNT').replace('#COUNT#', String(totalCount))}
-              </Text>
-              <Pressable onPress={onEditPreferences}>
-                <Text style={s.ppEditText}>{t('MATCHES.EDIT_PP')}</Text>
-              </Pressable>
-            </View>
-          )}
-
-          <FilterChipsRow
-            chips={DESKTOP_FILTER_CHIPS}
-            selected={selectedChip}
-            onSelect={onChipSelect}
-            selectedBg={Colors.radioCheckedBg}
-            selectedTextColor={Colors.black}
-          />
-
           {loading ? (
-            <View style={s.loaderBox}>
-              <ActivityIndicator size="large" color={Colors.primary} />
-            </View>
+            <>
+              <Text style={s.title}>New Matches</Text>
+              <FilterChipsRow
+                chips={DESKTOP_FILTER_CHIPS}
+                selected={selectedChip}
+                onSelect={onChipSelect}
+                selectedBg={Colors.radioCheckedBg}
+                selectedTextColor={Colors.black}
+              />
+              <View style={s.loaderBox}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+              </View>
+            </>
           ) : (
+            // "New Matches (N)" + "N profiles..." + the filter chips now live in
+            // ListHeaderComponent — the FIRST item of the FlatList's own
+            // scrollable content — so scrolling the match list scrolls this
+            // heading block away with it, same as it did in the shared-scroll
+            // version, but WITHOUT touching MatchesFilterSidebar's independent
+            // scroll (that column is a completely separate ScrollView, untouched
+            // by anything happening in this FlatList).
             <FlatList
               data={listData}
               keyExtractor={item => isBanner(item) ? item.uid : item.profileId}
+              ListHeaderComponent={
+                <View style={s.listHeader}>
+                  <Text style={s.title}>
+                    {t('MATCHES.NEW_MATCHES_TITLE').replace('#COUNT#', String(totalCount))}
+                  </Text>
+                  <View style={s.ppRow}>
+                    <Text style={s.ppText}>
+                      {t('MATCHES.PROFILE_COUNT').replace('#COUNT#', String(totalCount))}
+                    </Text>
+                    <Pressable onPress={onEditPreferences}>
+                      <Text style={s.ppEditText}>{t('MATCHES.EDIT_PP')}</Text>
+                    </Pressable>
+                  </View>
+                  <FilterChipsRow
+                    chips={DESKTOP_FILTER_CHIPS}
+                    selected={selectedChip}
+                    onSelect={onChipSelect}
+                    selectedBg={Colors.radioCheckedBg}
+                    selectedTextColor={Colors.black}
+                  />
+                </View>
+              }
               renderItem={({ item }) => {
                 if (isBanner(item)) {
                   return item.bannerSlot === '1013'
@@ -168,6 +193,11 @@ export default function MatchesDesktopLayout({
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
+  // flex:1 fills the remaining height below the nav; default row alignItems
+  // ('stretch') gives BOTH MatchesFilterSidebar and `main` that exact same
+  // height, so the sidebar's own internal ScrollView (flex:1 inside it) and
+  // this FlatList each get a real bounded height to scroll independently
+  // within, instead of either being sized to its own content.
   body: {
     flex:              1,
     flexDirection:     'row',
@@ -176,6 +206,10 @@ const s = StyleSheet.create({
     gap:               24,
   },
   main:  { flex: 1 },
+  // Wraps title/ppRow/chips when they're FlatList's ListHeaderComponent —
+  // same bottom gap before the first card that listContent's paddingTop used
+  // to provide back when this block sat outside the FlatList entirely.
+  listHeader: { marginBottom: 16 },
   title: {
     fontFamily: 'Poppins-SemiBold',
     fontSize:   24,

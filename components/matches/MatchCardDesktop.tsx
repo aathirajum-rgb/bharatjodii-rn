@@ -187,7 +187,9 @@ const c = StyleSheet.create({
   card: {
     flexDirection:     'row',
     backgroundColor:   Colors.white,
-    borderRadius:      12,
+    // Figma node 606:2243: 16px radius (this used 12 — a plausible-looking guess
+    // made before the design context was actually pulled).
+    borderRadius:      16,
     borderWidth:       1,
     borderColor:       Colors.borderSubtle,
     padding:           16,

@@ -131,7 +131,9 @@ export function LikeIcon({ width = 18, height = 19 }: IconProps) {
 // matching Angular's convention of giving that span its own CSS class rather
 // than an inline style) — an inline color/font-size on the span itself, when
 // present, overrides spanStyle for that property.
-export function HtmlText({ html, style, spanStyle }: { html: string; style?: any; spanStyle?: any }) {
+export function HtmlText({
+  html, style, spanStyle, numberOfLines,
+}: { html: string; style?: any; spanStyle?: any; numberOfLines?: number | undefined }) {
   if (!html) return null
   const cleaned = html.replace(/<br\s*\/?>/gi, '\n')
   const segs: Array<{ text: string; segStyle: Record<string, any> | null }> = []
@@ -156,7 +158,7 @@ export function HtmlText({ html, style, spanStyle }: { html: string; style?: any
   }
   if (segs.length === 0) segs.push({ text: cleaned.replace(/<[^>]*>/g, ''), segStyle: null })
   return (
-    <Text style={style}>
+    <Text style={style} numberOfLines={numberOfLines}>
       {segs.map((seg, i) =>
         seg.segStyle
           ? <Text key={i} style={seg.segStyle}>{seg.text}</Text>

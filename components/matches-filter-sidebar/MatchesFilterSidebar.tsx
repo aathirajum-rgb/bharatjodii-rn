@@ -40,6 +40,18 @@ export default function MatchesFilterSidebar({
         </Pressable>
       </View>
 
+      {/* Live desktop-web testing showed the previous "scroll away with the
+          page" version go completely blank once scrolled past the sidebar's
+          own (short, fixed) content — the match list kept going far longer
+          than the filter fields do, so the shared-scroll page eventually left
+          this whole column with nothing in it. Real requirement (confirmed
+          against the actual running app, overriding the earlier design-only
+          read): the Filters panel scrolls INDEPENDENTLY of the match list,
+          each with its own scrollbar, side by side — this `list` is now the
+          sidebar's own internal ScrollView again, sized to fill whatever
+          height MatchesDesktopLayout's row stretches `container` to (flex:1,
+          not a fixed content height), so it never runs out of its own content
+          and never depends on how far the match list has scrolled. */}
       <ScrollView style={s.list} showsVerticalScrollIndicator={false}>
         {FIELD_KEYS.map(key => (
           <FilterFieldRow key={key} label={t(`FILTER.${key}`)} value="Any" onPress={editPreferences} />
@@ -73,10 +85,16 @@ export default function MatchesFilterSidebar({
 const s = StyleSheet.create({
   container: {
     width:            280,
+    // Stretched to match MatchesDesktopLayout's row height (its default
+    // cross-axis alignItems is 'stretch') rather than sized to this panel's
+    // own content — `list` below then fills that with flex:1 so it gets a
+    // real bounded height to scroll within, instead of an arbitrary maxHeight.
     backgroundColor:  Colors.surface,
     borderWidth:      1,
     borderColor:      Colors.borderSubtle,
-    borderRadius:     12,
+    // Figma node 467:294: 8px radius (this used 12 — a plausible-looking guess
+    // made before the design context was actually pulled).
+    borderRadius:     8,
     overflow:         'hidden',
   },
   header: {
@@ -99,8 +117,8 @@ const s = StyleSheet.create({
     color:      Colors.link,
   },
   list: {
+    flex:              1,
     paddingHorizontal: 16,
-    maxHeight:         600,
   },
   checkboxes: {
     marginTop: 8,

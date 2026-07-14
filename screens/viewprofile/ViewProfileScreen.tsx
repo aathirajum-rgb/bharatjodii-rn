@@ -29,7 +29,10 @@ import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import StickyBanner from '../../components/sticky-banner/StickyBanner'
 import MembershipBanner from '../../components/matches/MembershipBanner'
 import PhotoViewerModal from '../../components/matches/PhotoViewerModal'
+import PhotoViewerModalDesktop from '../../components/matches/PhotoViewerModalDesktop'
 import ReportProfileModal from '../../components/matches/ReportProfileModal'
+import ViewProfileDesktopLayout from './ViewProfileDesktopLayout'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import {
   getViewProfile, markProfileViewed, getSimilarProfiles, requestHoroscope, viewHoroscope, getStarMatch,
   getBioDataLink, getEnlargedPhotos,
@@ -60,7 +63,9 @@ const BACK_ICON_URI = CDN_REACT + '/arrowleft.svg'
 
 // Angular: viewprofile.page.html — one <img> per detail row, under assets/images/svg/
 // (most under a viewprofile/ subfolder, two — children/physical-status — are not).
-const ICON = {
+// Exported so ViewProfileDesktopLayout's own detail rows (different inline layout,
+// same icon set) don't need a second copy of these CDN paths.
+export const ICON = {
   createdFor:     CDN_SVG + 'viewprofile/profile-created-icon.svg',
   age:            CDN_SVG + 'viewprofile/age-icon.svg',
   height:         CDN_SVG + 'viewprofile/height-icon.svg',
@@ -111,7 +116,7 @@ const SIMILAR_CARD_STRIDE = SIMILAR_CARD_WIDTH + SIMILAR_CARD_GAP
 // on one specific string) token conventions across VIEWPROFILE.* strings — same
 // underlying pronoun slots, just spelled differently by string. Substituted via
 // the existing PRONOUN.{M|F}.* keys (established pattern from Matches).
-function withPronouns(raw: string, oppGender: 'M' | 'F', t: (key: string) => string): string {
+export function withPronouns(raw: string, oppGender: 'M' | 'F', t: (key: string) => string): string {
   const heshe   = t(`PRONOUN.${oppGender}.heshe`)
   const hisher  = t(`PRONOUN.${oppGender}.hisher`)
   const himhers = t(`PRONOUN.${oppGender}.himhers`)
@@ -122,7 +127,7 @@ function withPronouns(raw: string, oppGender: 'M' | 'F', t: (key: string) => str
 }
 
 // Angular: none/1/many/"more than 5" text variants for brothers/sisters counts.
-function familyCountText(
+export function familyCountText(
   count: string | undefined,
   t: (key: string) => string,
   keys: { none: string; one: string; many: string; moreThan: string },
@@ -167,11 +172,21 @@ function DetailRow({
 // `app-photo-request` overlay shows GENERAL.REQUEST_ADD_PHOTO_WHATSAPP ("Contact and
 // Get #HER_HIS# Photos on WhatsApp") + a WhatsApp CTA on top of the blurred placeholder
 // (photo-new.component.html:76-93). No name/other text on the card itself.
-function SimilarProfileCardItem({
-  card, oppGender, t, onPress,
-}: { card: SimilarProfileCard; oppGender: 'M' | 'F'; t: (key: string) => string; onPress: () => void }) {
+export function SimilarProfileCardItem({
+  card, oppGender, t, onPress, size,
+}: {
+  card: SimilarProfileCard; oppGender: 'M' | 'F'; t: (key: string) => string; onPress: () => void
+  // Mobile omits this and gets s.similarCard's own SIMILAR_CARD_WIDTH (derived
+  // from Dimensions.get('window').width). Desktop MUST pass an explicit size —
+  // on web that same Dimensions call returns the full browser width, which
+  // silently rendered a card hundreds of pixels wider/taller than its 180×180
+  // grid slot; wrapping it in an overflow:hidden box only clipped a corner of
+  // that oversized card instead of actually resizing it (the extreme-zoom /
+  // missing-caption bug a real screenshot caught).
+  size?: number | undefined
+}) {
   return (
-    <Pressable style={s.similarCard} onPress={onPress}>
+    <Pressable style={[s.similarCard, size ? { width: size, height: size } : null]} onPress={onPress}>
       {card.isPhotoAvailable && card.photoUri ? (
         <>
           <Image source={{ uri: card.photoUri }} style={s.similarCardImg} contentFit="cover" />
@@ -220,6 +235,7 @@ function SimilarProfileCardItem({
 
 export default function ViewProfileScreen({ navigation, route }: { navigation: any; route: any }) {
   const { t } = useTranslation()
+  const isDesktop = useIsDesktopWeb()
   // Feature 2 (prev/next profile swipe): matriId is now state, not a plain const —
   // navigating to a neighbor profile just swaps this and lets the existing load
   // effect (keyed on it) re-run, instead of a real navigation/screen remount.
@@ -248,6 +264,9 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // localStorage-backed cache is more than this screen needs) so swiping to a
   // neighbor already fetched shows instantly instead of a loading flash.
   const prefetchCache = useRef<Map<string, Record<string, any>>>(new Map())
+  // Desktop-only Previous/Next avatar+name preview (see the neighbor-prefetch
+  // effect below) — mobile's chevrons only need hasPrevProfile/hasNextProfile.
+  const [neighborPreviews, setNeighborPreviews] = useState<Record<string, { name: string; photoUri?: string }>>({})
 
   const [profile, setProfile] = useState<ViewProfileModel | null>(null)
   const [loading, setLoading] = useState(true)
@@ -368,7 +387,16 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           (id): id is string => !!id && !prefetchCache.current.has(id),
         )
         neighborIds.forEach(id => {
-          getViewProfile(id).then(res => { if (res) prefetchCache.current.set(id, res) }).catch(() => {})
+          getViewProfile(id).then(res => {
+            if (!res) return
+            prefetchCache.current.set(id, res)
+            // Desktop-only: the Previous/Next buttons show a small avatar+name for
+            // the neighbor profile (Figma "Jodii Desktop" node 86:2167) — reuses
+            // this same prefetch, just also keeping the adapted name/photo around
+            // for display instead of only caching the raw response.
+            const preview = viewProfileAdapter.adapt(res)
+            setNeighborPreviews(prev => ({ ...prev, [id]: { name: preview.name, photoUri: preview.photos[0] } }))
+          }).catch(() => {})
         })
       }
       setLoading(false)
@@ -728,6 +756,84 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // sticky-until-displaced behavior. Visible by default (cta2Y===null) until that
   // second block's onLayout has actually reported a position.
   const topCtaVisible = cta2Y === null || scrollY + viewportHeight < cta2Y
+
+  // Desktop/laptop web gets the Figma "Jodii Desktop" two-column layout (see
+  // ViewProfileDesktopLayout.tsx); native iOS/Android and narrow mobile-web keep
+  // the mobile JSX below completely untouched — same isDesktop early-return
+  // split MatchesScreen.tsx already uses for MatchesDesktopLayout.
+  if (isDesktop) {
+    const prevId = hasPrevProfile ? profileIds[profileIndex - 1] : undefined
+    const nextId = hasNextProfile ? profileIds[profileIndex + 1] : undefined
+    return (
+      <View style={s.screen}>
+        <ViewProfileDesktopLayout
+          profile={profile}
+          oppGender={oppGender}
+          sameGender={sameGender}
+          ownProfile={ownProfile}
+          loginGender={loginGender}
+          hasReligiousInfo={hasReligiousInfo}
+          ownEntryType={ownEntryType}
+          femaleFreeEligible={femaleFreeEligible}
+          indNumbersLeft={indNumbersLeft}
+          loginHoroAvail={loginHoroAvail}
+          horoscopeRequested={horoscopeRequested}
+          similarProfiles={similarProfiles}
+          menuPromo={menuPromo}
+          hasPrevProfile={hasPrevProfile}
+          hasNextProfile={hasNextProfile}
+          profileIndex={profileIndex}
+          totalProfiles={profileIds.length}
+          prevPreview={prevId ? neighborPreviews[prevId] : undefined}
+          nextPreview={nextId ? neighborPreviews[nextId] : undefined}
+          langCode={i18n.language}
+          onBack={() => navigation.goBack()}
+          onGoToPrev={goToPrev}
+          onGoToNext={goToNext}
+          onLanguagePress={() => navigation.navigate('LanguageSelection')}
+          onLike={handleLike}
+          onDontShow={handleDontShow}
+          onViewLater={handleViewLater}
+          onCall={handleCall}
+          onWhatsApp={handleWhatsApp}
+          onOpenPhotoViewer={i => { setPhotoViewerIndex(i); setPhotoViewerOpen(true) }}
+          onSimilarProfilePress={handleSimilarProfilePress}
+          onMembershipBannerPress={handleMembershipBannerPress}
+          onAddHoroscope={handleAddHoroscope}
+          onRequestHoroscope={handleRequestHoroscope}
+          onViewHoroscope={handleViewHoroscope}
+          onAddFamilyDetails={handleAddFamilyDetails}
+          onAddPropertyDetails={handleAddPropertyDetails}
+          onDownloadBiodata={handleDownloadBiodata}
+          onViewStarMatchDetails={handleViewStarMatchDetails}
+          onReportProfile={handleReportProfile}
+        />
+
+        <WhatsAppPaywallModal
+          visible={whatsappPaywallOpen}
+          profile={profile}
+          oppGender={oppGender}
+          onClose={() => setWhatsappPaywallOpen(false)}
+          onPayNow={handleWhatsappPaywallPayNow}
+        />
+
+        <PhotoViewerModalDesktop
+          visible={photoViewerOpen}
+          images={enlargedPhotos && enlargedPhotos.length > 0 ? enlargedPhotos : profile.photos}
+          initialIndex={photoViewerIndex}
+          onClose={() => setPhotoViewerOpen(false)}
+        />
+
+        <ReportProfileModal
+          visible={reportModalOpen}
+          partnerId={profile.profileId}
+          partnerName={profile.name}
+          onClose={() => setReportModalOpen(false)}
+          onSubmitted={handleReportSubmitted}
+        />
+      </View>
+    )
+  }
 
   return (
     <View style={s.screen}>

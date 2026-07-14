@@ -49,8 +49,13 @@ export class ViewProfileAdapter implements Adapter<ViewProfileModel> {
       ? photo['PHOTO'].map((p: any) => p?.IMAGE).filter(Boolean)
       : []
 
+    // Angular: viewprofile.page.ts:770-781 — each RELIGIOUSINFO.DOSHAM array item
+    // is an object carrying its own display text under a `DOSHAM` sub-key (e.g.
+    // `{DOSHAM: "Rahu"}`), not a plain string. `.map(String)` on the raw objects
+    // was stringifying the whole object instead of reading that field, which is
+    // why this rendered as the literal text "[object Object]" on screen.
     const dosham: string[] = Array.isArray(religious['DOSHAM'])
-      ? religious['DOSHAM'].filter(Boolean).map(String)
+      ? religious['DOSHAM'].map((d: any) => d?.DOSHAM).filter(Boolean).map(String)
       : []
 
     // Same field-name-inconsistency pattern found repeatedly in Matches listing
