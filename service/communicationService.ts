@@ -17,7 +17,9 @@ import { redirectToIntermediatePage } from './paymentService'
 // Components switch on `type` to show the correct modal / sheet / alert.
 
 export type CommActionResult =
-  | { type: 'api_success';       data: any; action: string }
+  // message: Angular's like/dislike success toast text (data.RESPONSE.MSG) —
+  // optional since most OTHER api_success actions (paynow, etc.) don't carry one.
+  | { type: 'api_success';       data: any; action: string; message?: string | undefined }
   // `contact`/`whatsapp` are the original fields (kept so the two call sites
   // that haven't been migrated to the full Contact Details sheet yet —
   // ViewProfileScreen.tsx — keep working unchanged). The rest are the fields
@@ -392,10 +394,17 @@ async function callHttpAction(
 ): Promise<CommActionResult> {
   const url = (Endpoints.communication as Record<string, string>)[endpoint] ?? endpoint
   const result = await apiCall(url, method, params)
+  // Angular communication.service.ts's afterHttpServiceResponse() — like/dislike
+  // shows a toast built from `data.RESPONSE.MSG` on BOTH success ("You have
+  // liked X's profile...") and failure ("You have already liked ." — the exact
+  // case a live test hit) — this previously read a nonexistent `ERRORMESSAGE`
+  // field, so no real message ever surfaced; the actual field is MSG (either
+  // top-level or nested under RESPONSE depending on the response shape).
+  const msg = result?.RESPONSE?.MSG ?? result?.MSG
   if (result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1) {
-    return { type: 'api_success', data: result.RESPONSE, action }
+    return { type: 'api_success', data: result.RESPONSE, action, message: msg ? String(msg) : undefined }
   }
-  return { type: 'error', message: result?.ERRORMESSAGE ?? 'Action failed' }
+  return { type: 'error', message: msg ? String(msg) : 'Action failed' }
 }
 
 // ─── Report + block (3-dot menu) ───────────────────────────────────────────────

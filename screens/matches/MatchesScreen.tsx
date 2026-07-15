@@ -830,10 +830,13 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   const [addPhotoActionPromoContent, setAddPhotoActionPromoContent] = useState<any>(null)
   const [showAddPhotoActionPrompt, setShowAddPhotoActionPrompt] = useState(false)
 
-  // ── Toast (View Later / Don't Show confirmation) ─────────────────────────────
+  // ── Toast (View Later / Don't Show confirmation, Like's Undo toast) ──────────
   const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
-  function showToast(message: string) {
-    setToastRequest({ message, key: Date.now() })
+  // onUndo/duration are optional — ONLY the Like toast passes them (Angular:
+  // communication.service.ts's showCustomToaster(), 1500ms + Undo button;
+  // every other toast in this screen uses the 2000ms default with no button).
+  function showToast(message: string, onUndo?: () => void, duration?: number) {
+    setToastRequest({ message, key: Date.now(), onUndo, duration })
   }
 
   // ── Live footer like-count badge ────────────────────────────────────────────
@@ -1013,13 +1016,14 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             // was previously never called anywhere, so indNumbersLeft always
             // read the '0' fallback.
             await fetchContactDetails().catch(() => {})
-            const [entryType, reg, femaleFreeRaw, horoAvailable, contactDetail, ekycStatus] = await Promise.all([
+            const [entryType, reg, femaleFreeRaw, horoAvailable, contactDetail, ekycStatus, paidFlag] = await Promise.all([
               getSessionValue('ENTRYTYPE'),
               getRegistrationArrays(),
               getSessionValue('FEMALEFREECONACT'),
               getSessionValue('HOROSCOPEAVAILABLE'),
               getJson<Record<string, any>>('CONTACT_DETAIL'),
               getItem('PI_EKYCSTATUS'),
+              getItem(StorageKeys.Payment.PAY_P_FLAG),
             ])
             const photoStatus = ppSetData?.PI_PHOTOSTATUS ?? 'N'
 
@@ -1129,7 +1133,14 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
               // "Add your photo" action gate (Like/Don't-show) — Angular:
               // checkAddPhotoPromotion() = PROFILEPUBLISHEDFLAG=='0' && (checkPhotoPromotion()
               // || check_Paid_Verified_Nophoto() || isNonIdVerifyUser()).
-              const nonIdVerifyUserGate = entryType === 'P' && lg === 'M' && ekycStatus !== '1'
+              // Angular common-funtions.ts:362-364 check_Paid_NonVerifyIdUser() requires
+              // PAYPFLAG=='1' too — a separate feature-enablement flag from ENTRYTYPE,
+              // not redundant with it. Missing this was a confirmed real bug (found via
+              // the identical gate in communicationService.ts's showCallOrWhatsApp):
+              // it made this fire — and the "Activate your paid membership / Call us to
+              // verify" hero banner below show — for real accounts whose PAYPFLAG isn't
+              // '1', where Angular's own condition doesn't trigger it at all.
+              const nonIdVerifyUserGate = entryType === 'P' && lg === 'M' && ekycStatus !== '1' && paidFlag === '1'
               if (!ctrl.cancelled) {
                 setAddPhotoGateActive(flagOk && ((typeOk && freeOk) || isPaidVerifiedMale || nonIdVerifyUserGate))
                 setAddPhotoActionPromoContent(reg?.PHOTOPUBLISHED?.Call ?? null)
@@ -1305,6 +1316,20 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   // ── Profile action handlers ─────────────────────────────────────────────────
   // All use communicationBtnOnClick → same params as Angular communicationBtnOnClick
 
+  // Angular communication.service.ts's showCustomToaster() Undo button handler
+  // — tapping Undo fires a plain `dislike` call (button-role 'cancel' dismisses
+  // the toast immediately, independent of whether this call succeeds).
+  async function handleUndoLike(profile: MatchProfile) {
+    setProfiles(prev => prev.map(p =>
+      p.profileId === profile.profileId ? { ...p, likedStatus: '0' as const } : p
+    ))
+    try {
+      await communicationBtnOnClick('matches', 'dislike', { MATRIID: profile.profileId })
+    } catch (e) {
+      if (__DEV__) console.error('[Matches] undo-like error:', e)
+    }
+  }
+
   async function handleLike(profile: MatchProfile) {
     // Angular: button.service.ts checkAddPhotoPromotion() — blocks Like/Don't-show
     // (not Call/WhatsApp/View-later) when the logged-in user has no published photo.
@@ -1320,6 +1345,14 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         setProfiles(prev => prev.map(p =>
           p.profileId === profile.profileId ? { ...p, likedStatus: '0' as const } : p
         ))
+        // Angular communication.service.ts's showCustomToaster() — this fires
+        // on the SAME toast (with the SAME Undo button) for both success and
+        // failure-with-message (e.g. a real response: {RESPONSECODE:"2",
+        // ERRCODE:"1", MSG:"You have already liked ."}) — 1500ms, not the
+        // 2000ms default used by every other toast in this screen.
+        showToast(result.message, () => handleUndoLike(profile), 1500)
+      } else if (result.type === 'api_success' && result.message) {
+        showToast(result.message, () => handleUndoLike(profile), 1500)
       }
     } catch (e) {
       if (__DEV__) console.error('[Matches] like error:', e)
@@ -2236,7 +2269,9 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         onSecondaryPress={handlePhoneInfoSecondaryPress}
         onLinkPress={handlePhoneInfoClose}
       />
-      <Toast request={toastRequest} />
+      {/* AppFooter's tab bar is 56px tall (+ its own safe-area padding) — the
+          Toast's default 24px clearance alone left it overlapping the footer. */}
+      <Toast request={toastRequest} bottomOffset={56 + 16} />
     </View>
   )
 }

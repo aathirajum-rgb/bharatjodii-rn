@@ -53,11 +53,13 @@ export async function checkAddPhotoPromotion(): Promise<boolean> {
   const publishedFlag = await getItem('PROFILEPUBLISHEDFLAG')
   if (publishedFlag !== '0') return false
 
-  const [isPhotoPromo, photoCount, ekycStatus, entryType] = await Promise.all([
+  const [isPhotoPromo, photoCount, ekycStatus, entryType, gender, paidFlag] = await Promise.all([
     checkPhotoPromotion(),
     getItem('PHOTOCOUNT'),
     getItem('PI_EKYCSTATUS'),
     getItem(SK.Auth.ENTRY_TYPE),
+    getItem(SK.User.LOGIN_GENDER),
+    getItem(SK.Payment.PAY_P_FLAG),
   ])
 
   if (isPhotoPromo) return true
@@ -66,8 +68,13 @@ export async function checkAddPhotoPromotion(): Promise<boolean> {
   const isPaidVerifiedNoPhoto = entryType === 'P' && ekycStatus === '1' && (!photoCount || photoCount === '0')
   if (isPaidVerifiedNoPhoto) return true
 
-  // Non-ID verified user
-  const isNonIdVerify = ekycStatus !== '1' && entryType === 'P'
+  // Non-ID verified user — Angular common-funtions.ts:362-364
+  // check_Paid_NonVerifyIdUser() = entryType=='P' && ekycStatus=='0' &&
+  // gender=='M' && PAYPFLAG=='1'. This previously matched entryType+ekycStatus
+  // only — missing BOTH the gender check and the PAYPFLAG check (the same
+  // PAYPFLAG bug found and fixed in communicationService.ts and
+  // MatchesScreen.tsx's own local copy of this same condition).
+  const isNonIdVerify = ekycStatus !== '1' && entryType === 'P' && gender === 'M' && paidFlag === '1'
   return isNonIdVerify
 }
 
