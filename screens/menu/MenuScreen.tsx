@@ -284,7 +284,7 @@ export default function MenuScreen({ navigation }: Props) {
           <MenuRow
             icon={ICON.edit}
             title={t('MENU.EDIT_PROFILE')}
-            onPress={() => stub('Edit Profile')}
+            onPress={() => navigation.navigate('EditProfile')}
             showDivider
           />
           <MenuRow

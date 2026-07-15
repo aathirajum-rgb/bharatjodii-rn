@@ -78,5 +78,11 @@ module.exports = ({ config }) => ({
     welcomeText: f.welcomeText,
     playStoreUrl: f.playStoreUrl,
   },
-  plugins: ['./plugins/withAndroidFlavors', 'expo-image', 'expo-splash-screen'],
+  plugins: [
+    './plugins/withAndroidFlavors',
+    'expo-image',
+    'expo-splash-screen',
+    'expo-video',
+    ['expo-camera', { barcodeScannerEnabled: false }],
+  ],
 });

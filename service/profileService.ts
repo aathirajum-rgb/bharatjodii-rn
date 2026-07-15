@@ -66,13 +66,14 @@ export async function getPPSetData(force = false): Promise<any> {
 export async function updateProfile(
   type: string,
   selectedValue: any,
-  oldValue?: any,
+  existingValue?: any,
 ): Promise<any> {
   const userId = await getItem(SK.Auth.USER_ID)
   if (!userId) return null
 
-  let params = `ID=${userId}&TYPE=${type}&VALUE=${selectedValue}`
-  if (oldValue !== undefined) params += `&OLDVALUE=${oldValue}`
+  // Angular: registration.page.ts's editform save — "ID=..&TYPE=..&VALUE=..&EXISTINGVALUE=..".
+  // Confirmed against a live network capture of this exact call.
+  const params = `ID=${userId}&TYPE=${type}&VALUE=${selectedValue}&EXISTINGVALUE=${existingValue ?? ''}`
 
   const result = await apiCall(Endpoints.profile.updateInfo, 'POST', params)
   return result

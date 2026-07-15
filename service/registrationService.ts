@@ -297,6 +297,40 @@ export async function fetchEatingHabitOptions(): Promise<Array<{ key: string; la
   return []
 }
 
+// Angular: registration.page.ts:1334-1338 — profileDrinkingHabits/profileSmokingHabits
+// come from the same initialfetch response as EATINGHABITS (apiResponse["DRINKINGHABITS"]/
+// ["SMOKINGHABITS"]), not a hardcoded list. Mirrors fetchEatingHabitOptions() exactly.
+
+export async function fetchDrinkingHabitOptions(): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const raw  = data?.DRINKINGHABITS
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => ({
+      key:   String(item.KEY   ?? item.key   ?? ''),
+      label: String(item.VALUE ?? item.value ?? ''),
+    })).filter(o => o.key !== '')
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+  }
+  return []
+}
+
+export async function fetchSmokingHabitOptions(): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const raw  = data?.SMOKINGHABITS
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => ({
+      key:   String(item.KEY   ?? item.key   ?? ''),
+      label: String(item.VALUE ?? item.value ?? ''),
+    })).filter(o => o.key !== '')
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+  }
+  return []
+}
+
 // Fetches gothram options for the selected caste.
 // Angular: type=gothra&caste=${CASTE}&LANG=${lang} → RESPONSE.GOTHRAM (plain object)
 // Key '998' = "All except your gothra" — excluded from registration list.
