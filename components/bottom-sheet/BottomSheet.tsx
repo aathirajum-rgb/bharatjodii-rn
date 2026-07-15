@@ -46,6 +46,7 @@ export type BottomSheetType =
   | 'blockProfile'
   | 'enableNotification'
   | 'addPhotoPrompt'
+  | 'viewPhoneConfirm'
 
 // Structured data the sheet renders. Maps to Angular's `componentData` object.
 export interface BottomSheetData {

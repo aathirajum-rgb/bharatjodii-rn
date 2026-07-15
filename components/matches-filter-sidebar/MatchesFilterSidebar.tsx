@@ -89,6 +89,12 @@ const s = StyleSheet.create({
     // cross-axis alignItems is 'stretch') rather than sized to this panel's
     // own content — `list` below then fills that with flex:1 so it gets a
     // real bounded height to scroll within, instead of an arbitrary maxHeight.
+    //
+    // marginTop (not the parent row's paddingTop) gives this card its 24px gap
+    // below the nav — this panel is a static bordered card that should just
+    // sit in place, unlike the match list's own top spacing, which needs to
+    // live INSIDE its scrollable content so it can scroll away.
+    marginTop:        24,
     backgroundColor:  Colors.surface,
     borderWidth:      1,
     borderColor:      Colors.borderSubtle,

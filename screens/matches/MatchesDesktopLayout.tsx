@@ -94,7 +94,10 @@ export default function MatchesDesktopLayout({
 
         <View style={s.main}>
           {loading ? (
-            <>
+            // This branch isn't inside the FlatList, so it needs its own top
+            // offset now that `body` no longer supplies one — matches
+            // listContent's paddingTop:24 for the same at-rest position.
+            <View style={s.loadingWrap}>
               <Text style={s.title}>New Matches</Text>
               <FilterChipsRow
                 chips={DESKTOP_FILTER_CHIPS}
@@ -106,7 +109,7 @@ export default function MatchesDesktopLayout({
               <View style={s.loaderBox}>
                 <ActivityIndicator size="large" color={Colors.primary} />
               </View>
-            </>
+            </View>
           ) : (
             // "New Matches (N)" + "N profiles..." + the filter chips now live in
             // ListHeaderComponent — the FIRST item of the FlatList's own
@@ -198,14 +201,23 @@ const s = StyleSheet.create({
   // height, so the sidebar's own internal ScrollView (flex:1 inside it) and
   // this FlatList each get a real bounded height to scroll independently
   // within, instead of either being sized to its own content.
+  //
+  // No paddingTop here on purpose: `body` itself never scrolls (only its two
+  // children do, each independently), so any paddingTop placed HERE is a
+  // permanent gap that no amount of scrolling can ever close — the actual
+  // cause of the match list never being able to reach flush against the nav.
+  // The 24px top offset now lives inside each scrollable region instead:
+  // MatchesFilterSidebar's `container` gets its own marginTop (that card's
+  // static position is fine staying fixed), and `listContent` below gets its
+  // own paddingTop (that one DOES need to scroll away with the list).
   body: {
     flex:              1,
     flexDirection:     'row',
     paddingHorizontal: 32,
-    paddingTop:        24,
     gap:               24,
   },
   main:  { flex: 1 },
+  loadingWrap: { paddingTop: 24 },
   // Wraps title/ppRow/chips when they're FlatList's ListHeaderComponent —
   // same bottom gap before the first card that listContent's paddingTop used
   // to provide back when this block sat outside the FlatList entirely.
@@ -233,7 +245,10 @@ const s = StyleSheet.create({
   },
   loaderBox:    { flex: 1, alignItems: 'center', justifyContent: 'center', paddingTop: 60 },
   footerLoader: { marginVertical: 16 },
-  listContent:  { paddingTop: 16, paddingBottom: 32 },
+  // paddingTop matches the sidebar's marginTop (both 24, so they still line up
+  // visually at rest) — but being inside the FlatList's own scrollable content,
+  // THIS one scrolls away with the list, unlike a paddingTop on `body` would.
+  listContent:  { paddingTop: 24, paddingBottom: 32 },
   emptyBox: {
     alignItems:        'center',
     justifyContent:    'center',

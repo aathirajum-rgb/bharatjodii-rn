@@ -11,6 +11,12 @@ export type FemaleFreeAction =
   | 'femaleFree-PhotoAdded'
   | 'femaleFree-PhotoFail'
   | 'callVerification'
+  // Angular communication.service.ts's PHONENOLIMIT case — photo added AND
+  // ID-verified, but the free-contact quota itself is used up. Not produced by
+  // resolveFemaleFreeAction() below (that only branches on photo/ekyc status,
+  // returning null once verified) — callers must separately check
+  // getFemaleContactStatus().canViewContact when this returns null.
+  | 'femaleFree-LimitOver'
   | null
 
 // photoStatus: N=no photo, P=pending, Y=approved, R=rejected

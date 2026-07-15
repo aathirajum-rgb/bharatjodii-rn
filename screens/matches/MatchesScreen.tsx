@@ -56,6 +56,7 @@ import {
 } from '../../service/homeService'
 import {
   communicationBtnOnClick,
+  fetchContactDetails,
 } from '../../service/communicationService'
 import { fetchBulkLikeMatches } from '../../service/profileService'
 import { redirectToViewProfile } from '../../service/buttonService'
@@ -70,6 +71,7 @@ import { StorageKeys } from '../../constants/storage.keys'
 import Constants from 'expo-constants'
 import GamBanner from '../../components/gam-banner/GamBanner'
 import BulkLikeModal from '../../components/bulk-like/BulkLikeModal'
+import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
 import StickyBanner from '../../components/sticky-banner/StickyBanner'
 import AppRatingModal from '../../components/app-rating/AppRatingModal'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
@@ -840,6 +842,47 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   // ── WhatsApp "pay now" paywall modal (free/non-paid user tapped WhatsApp) ──
   const [whatsappPaywallProfile, setWhatsappPaywallProfile] = useState<MatchProfile | null>(null)
 
+  // ── Contact-reveal flow (Angular button.component.ts's two-step confirm →
+  // phoneviewed API → Contact Details sheet) — previously this port skipped
+  // straight to dialing on 'show_contact', no confirmation or details sheet. ──
+  const [contactConfirm, setContactConfirm] = useState<{ profile: MatchProfile; action: 'call' | 'whatsapp' } | null>(null)
+  const [contactDetails, setContactDetails] = useState<{
+    name: string; mobile?: string | undefined; whatsappNumber?: string | undefined
+    showCounter?: boolean | undefined; viewedCount?: string | undefined; remainingCount?: string | undefined
+  } | null>(null)
+  // Angular button.component.ts:551-579 — the CONFIRMATION popup's own quota
+  // footer line ("You have viewed contact numbers of #VAR# profiles. #VAR1#
+  // remaining till #VAR2#"), read purely from the local CONTACT_DETAIL cache
+  // (no API call) — #VAR#=phoneNumbersViewed, #VAR1#=phoneNumbersLeft,
+  // #VAR2#=expiryTextValue. Defaults to 0 until the first real reveal, same as
+  // Angular (nbcontacts's own response has no viewed-count field).
+  const [contactQuota, setContactQuota] = useState({ viewed: '0', left: '', expiry: '' })
+
+  // The other phoneviewed/pre-flight scenarios (communicationService.ts's
+  // showContactDetails + showCallOrWhatsApp's verify_id/female_free gates) —
+  // all mutually exclusive with each other and with contactDetails, so one slot works.
+  type PhoneInfoSheet =
+    | { kind: 'phone_protected' }
+    | { kind: 'under_validation'; message: string }
+    | { kind: 'phone_limit_exceeded'; body: string; cta: string }
+    | { kind: 'fup_limit'; header: string; body: string; cta: string; cta1: string }
+    | { kind: 'profile_validation'; title: string; content: string; cta: string; image?: string | undefined }
+    | { kind: 'phone_number_left' }
+    // Angular common-funtions.ts's check_Paid_NonVerifyIdUser() — paid male,
+    // not eKYC-verified. Content is server-driven (REGISTRATIONARRAYS.
+    // PROFILEVERIFYPAID.Shortlist), read at the point this is set (see
+    // handleContactConfirmYes) rather than passed through CommActionResult.
+    | { kind: 'verify_id'; title: string; content: string; ctaLabel: string }
+    // Angular communication.service.ts's femaleFreeContactFunc() — 4 reachable
+    // outcomes for a female free-3-contact user (the 5th, femaleFree-PhotoAdded,
+    // is only produced with isRedirect=true, not on this tap-to-call path).
+    | { kind: 'female_free_photo_add' }
+    | { kind: 'female_free_photo_pending' }
+    | { kind: 'female_free_photo_fail' }
+    | { kind: 'female_free_call_verification' }
+    | { kind: 'female_free_limit_over' }
+  const [phoneInfoSheet, setPhoneInfoSheet] = useState<PhoneInfoSheet | null>(null)
+
   // ── After-like CTA state (#22-24) — read once per mount, same pattern as gamParams ──
   const [ownEntryType,      setOwnEntryType]      = useState('')
   const [femaleFreeEligible, setFemaleFreeEligible] = useState(false)
@@ -965,6 +1008,11 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         const [extCount, , promo, bulkLikeResult] = await Promise.all([
           fetchExtendedMatchesCount(),
           fetchAndStorePPSetData().then(async (ppSetData) => {
+            // Populates CONTACT_DETAIL (Angular: common.ts's getContactDetails(),
+            // called on every Matches-page load) BEFORE reading it below — this
+            // was previously never called anywhere, so indNumbersLeft always
+            // read the '0' fallback.
+            await fetchContactDetails().catch(() => {})
             const [entryType, reg, femaleFreeRaw, horoAvailable, contactDetail, ekycStatus] = await Promise.all([
               getSessionValue('ENTRYTYPE'),
               getRegistrationArrays(),
@@ -985,9 +1033,14 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
               )
 
               // Remaining-contacts count (#23) — Angular: getIndNumbersLeft(). CONTACT_DETAIL
-              // isn't written anywhere in this port yet (no phone-view-details flow ported),
-              // so this reads '0' until that's built — wired correctly, dormant for now.
+              // is now populated above via fetchContactDetails() (nbcontacts) and updated
+              // again after each phoneviewed call (communicationService.ts's showContactDetails).
               setIndNumbersLeft(String(contactDetail?.IndNumbersLeft ?? '0'))
+              setContactQuota({
+                viewed: String(contactDetail?.phoneNumbersViewed ?? '0'),
+                left:   String(contactDetail?.phoneNumbersLeft ?? ''),
+                expiry: String(contactDetail?.expiryTextValue ?? ''),
+              })
 
               // BANNERSLOT 1011 — add-photo generic promo (#26)
               setAddPhotoPromoActive(!['P', 'Y'].includes(photoStatus))
@@ -1301,34 +1354,271 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     }
   }
 
-  async function handleCall(profile: MatchProfile) {
-    try {
-      const result = await communicationBtnOnClick('matches', 'call', { MATRIID: profile.profileId })
-      if (result.type === 'show_contact' && result.contact) {
-        Linking.openURL(`tel:${result.contact}`)
-      } else if (result.type === 'payment_promo') {
-        navigation.navigate('recharge')
-      }
-      // verify_id / female_free → future bottom sheet
-    } catch (e) {
-      if (__DEV__) console.error('[Matches] call error:', e)
+  // Angular button.component.ts's showContactDetails() always confirms first
+  // ("You can view #HISHER# number and call or WhatsApp #HIMHER#...") — this
+  // port previously skipped straight to communicationBtnOnClick and dialed
+  // whatever it returned, with no confirmation step at all.
+  function handleCall(profile: MatchProfile) {
+    setContactConfirm({ profile, action: 'call' })
+  }
+
+  function handleWhatsApp(profile: MatchProfile) {
+    setContactConfirm({ profile, action: 'whatsapp' })
+  }
+
+  function handleContactConfirmClose() {
+    setContactConfirm(null)
+  }
+
+  // Angular button.component.ts:551-583 — the confirmation popup's TostMsg is
+  // built from VIEWPHONECONFIRM (the question) + VIEWPHONEDETAIL (the quota
+  // footer) concatenated into ONE body, not two separate texts.
+  function getContactConfirmContent(): string {
+    const question = t('VIEWPROFILE.VIEWPHONECONFIRM')
+      .replace('#HISHER#', t(`PRONOUN.${oppGender}.hisher`))
+      .replace('#HIMHER#', t(`PRONOUN.${oppGender}.himher`))
+    const quota = t('VIEWPROFILE.VIEWPHONEDETAIL')
+      .replace('#VAR#', contactQuota.viewed)
+      .replace('#VAR1#', contactQuota.left)
+      .replace('#VAR2#', contactQuota.expiry)
+    return `${question}\n\n${quota}`
+  }
+
+  function handlePhoneInfoClose() {
+    setPhoneInfoSheet(null)
+  }
+
+  // Maps each of the 6 phoneviewed scenarios (besides success) onto the generic
+  // BottomSheet's flexible data shape — no bespoke component needed since these
+  // vary between "just a close-X and raw text" (under_validation) and "two CTAs
+  // with an OR separator" (fup_limit), both of which BottomSheetData already
+  // supports directly.
+  function getPhoneInfoSheetData(): {
+    image?: string | undefined; title?: string | undefined; content?: string | undefined
+    ctaLabel?: string | undefined; linkCtaLabel?: string | undefined; orCtaText?: string | undefined
+    secondaryCtaLabel?: string | undefined; showSecondaryCta?: boolean | undefined; sideBySideCtas?: boolean | undefined
+  } {
+    if (!phoneInfoSheet) return {}
+    switch (phoneInfoSheet.kind) {
+      case 'phone_protected':
+        // Angular en.json: GENERAL.PROTECT_NUMBER/_SUB/_NOTE — fixed strings, not
+        // server-driven. Title has a literal <br> in Angular; stripped to a space
+        // here since this sheet renders plain Text, not HTML.
+        return {
+          image:   CDN + 'protected-phoneno.svg',
+          title:   t('GENERAL.PROTECT_NUMBER').replace(/<br\s*\/?>/gi, ' '),
+          content: `${t('GENERAL.PROTECT_NUMBER_SUB')}\n\n${t('GENERAL.PROTECT_NUMBER_NOTE')}`,
+          ctaLabel: t('GENERAL.OK_CTA', 'OK'),
+        }
+      case 'under_validation':
+        // Angular: bare modal, just a close-X and the raw API message — no
+        // title, no CTA button at all.
+        return { content: phoneInfoSheet.message }
+      case 'phone_limit_exceeded':
+        return {
+          image:    CDN + 'reached-limit-phone-number-img.svg',
+          content:  phoneInfoSheet.body,
+          ctaLabel: phoneInfoSheet.cta,
+        }
+      case 'fup_limit':
+        return {
+          image:        CDN + 'maximum-limit-reached-img.svg',
+          title:        phoneInfoSheet.header,
+          content:      phoneInfoSheet.body,
+          ctaLabel:     phoneInfoSheet.cta,
+          orCtaText:    t('GENERAL.OR', 'OR'),
+          linkCtaLabel: phoneInfoSheet.cta1,
+        }
+      case 'profile_validation':
+        return {
+          image:    phoneInfoSheet.image,
+          title:    phoneInfoSheet.title,
+          content:  phoneInfoSheet.content,
+          ctaLabel: phoneInfoSheet.cta,
+        }
+      case 'phone_number_left':
+        // Angular's real behavior here is a whole renewal/upgrade-promo sub-flow
+        // (a second API call + a distinct screen) that doesn't exist in this
+        // port yet — this is an honest placeholder, not the real feature.
+        return {
+          title:    t('GENERAL.SORRY', 'Sorry'),
+          content:  'Full renewal verification isn’t available in this app yet — please try again from a different profile for now.',
+          ctaLabel: t('GENERAL.OK_CTA', 'OK'),
+        }
+      case 'verify_id':
+        return {
+          title:    phoneInfoSheet.title,
+          content:  phoneInfoSheet.content,
+          ctaLabel: phoneInfoSheet.ctaLabel,
+        }
+      // Angular botton-sheet.config.ts's UNDERVALIDSHEET/ADDPHOTOTEXT/
+      // VERIFIEDBTMSHEET/PHONENOLIMIT — English text confirmed via source, not
+      // exact i18n key lookups (these configs build the string inline rather
+      // than through a translation key), so used here as literal strings.
+      case 'female_free_photo_pending':
+        return {
+          title:    'Your photo is under validation!',
+          content:  'This may take up to 2 hours. You can view phone numbers after that',
+          ctaLabel: t('GENERAL.OK_CTA', 'OK'),
+        }
+      case 'female_free_photo_add':
+        return {
+          title:    `Add your photo to get 5 free contacts or get a paid membership to view ${t(`PRONOUN.${oppGender}.hisher`)} phone number`,
+          ctaLabel: 'Become a paid member',
+          secondaryCtaLabel: 'Add photo now',
+          showSecondaryCta:  true,
+        }
+      case 'female_free_photo_fail':
+        // No distinct Angular copy confirmed for the rejected-photo case —
+        // treated the same as "no photo" (re-prompt to add one), since a
+        // rejected photo isn't a usable one either.
+        return {
+          title:    `Add your photo to get 5 free contacts or get a paid membership to view ${t(`PRONOUN.${oppGender}.hisher`)} phone number`,
+          ctaLabel: 'Become a paid member',
+          secondaryCtaLabel: 'Add photo now',
+          showSecondaryCta:  true,
+        }
+      case 'female_free_call_verification':
+        return {
+          title:    `Contact us to get 5 more free contacts or get a paid membership to view ${t(`PRONOUN.${oppGender}.hisher`)} phone number`,
+          ctaLabel: 'Become a paid member',
+          secondaryCtaLabel: 'Call now',
+          showSecondaryCta:  true,
+        }
+      case 'female_free_limit_over':
+        return {
+          title:    'You have reached the maximum free phone number views limit!',
+          content:  'Become a paid member to view more phone numbers of matches',
+          ctaLabel: 'Become paid member',
+        }
     }
   }
 
-  async function handleWhatsApp(profile: MatchProfile) {
+  function handlePhoneInfoPrimaryPress() {
+    const kind = phoneInfoSheet?.kind
+    setPhoneInfoSheet(null)
+    // "Become a paid member" across the female-free variants, and verify_id's
+    // own CTA, both point at the same upgrade path already used elsewhere here.
+    if (kind === 'female_free_photo_add' || kind === 'female_free_photo_fail'
+      || kind === 'female_free_call_verification' || kind === 'female_free_limit_over') {
+      navigation.navigate('recharge')
+    }
+    // fup_limit's primary CTA is "Complete full verification" → Angular
+    // navigates to /fup-verify, which isn't built — closing is the honest
+    // behavior until that screen exists, rather than pretending to navigate.
+  }
+
+  function handlePhoneInfoSecondaryPress() {
+    const kind = phoneInfoSheet?.kind
+    setPhoneInfoSheet(null)
+    if (kind === 'female_free_photo_add' || kind === 'female_free_photo_fail') {
+      navigation.navigate('Gallery')
+    }
+    // "Call now" (female_free_call_verification) would dial app support in
+    // Angular — no confirmed support number source exists in this port yet,
+    // so this honestly just closes rather than pretending to place a call.
+  }
+
+  async function handleContactConfirmYes() {
+    if (!contactConfirm) return
+    const { profile, action } = contactConfirm
+    setContactConfirm(null)
     try {
-      const result = await communicationBtnOnClick('matches', 'whatsapp', { MATRIID: profile.profileId })
-      if (result.type === 'show_contact' && result.contact) {
-        const num = result.contact.replace(/\D/g, '')
-        if (num) Linking.openURL(`https://wa.me/${num}`)
+      const result = await communicationBtnOnClick('matches', action, { MATRIID: profile.profileId })
+      if (result.type === 'show_contact') {
+        // Angular's Contact Details popup shows Name/Mobile/WhatsApp/Call
+        // together regardless of which CTA was tapped — not one-or-the-other.
+        setContactDetails({
+          name:           profile.name,
+          mobile:         result.mobile,
+          whatsappNumber: result.whatsappNumber,
+          showCounter:    result.showCounter,
+          viewedCount:    result.viewedCount,
+          remainingCount: result.remainingCount,
+        })
+        // Keep the confirmation sheet's own quota footer fresh for next time,
+        // without waiting for a full screen reload.
+        if (result.viewedCount !== undefined || result.remainingCount !== undefined) {
+          setContactQuota(prev => ({
+            ...prev,
+            viewed: result.viewedCount ?? prev.viewed,
+            left:   result.remainingCount ?? prev.left,
+          }))
+        }
       } else if (result.type === 'payment_promo') {
-        // Confirmation modal first (Figma "Jodii Desktop" node 867:12515) — "Pay now"
-        // inside it is what actually navigates to recharge, not this tap.
-        setWhatsappPaywallProfile(profile)
+        if (action === 'whatsapp') {
+          // Confirmation modal first (Figma "Jodii Desktop" node 867:12515) — "Pay now"
+          // inside it is what actually navigates to recharge, not this tap.
+          setWhatsappPaywallProfile(profile)
+        } else {
+          navigation.navigate('recharge')
+        }
+      } else if (result.type === 'phone_protected') {
+        setPhoneInfoSheet({ kind: 'phone_protected' })
+      } else if (result.type === 'under_validation') {
+        setPhoneInfoSheet({ kind: 'under_validation', message: result.message })
+      } else if (result.type === 'phone_limit_exceeded') {
+        setPhoneInfoSheet({ kind: 'phone_limit_exceeded', body: result.body, cta: result.cta })
+      } else if (result.type === 'fup_limit') {
+        setPhoneInfoSheet({ kind: 'fup_limit', header: result.header, body: result.body, cta: result.cta, cta1: result.cta1 })
+      } else if (result.type === 'profile_validation') {
+        setPhoneInfoSheet({ kind: 'profile_validation', title: result.title, content: result.content, cta: result.cta, image: result.image })
+      } else if (result.type === 'phone_number_left') {
+        setPhoneInfoSheet({ kind: 'phone_number_left' })
+      } else if (result.type === 'verify_id') {
+        // Angular communication.service.ts's navigateToVerify() — content is
+        // server-driven from REGISTRATIONARRAYS.PROFILEVERIFYPAID.Shortlist
+        // (a cached registration payload). The support-number placeholder is
+        // `##CSNUM##` (double-hash, confirmed against 5+ call sites) and it
+        // only ever appears in CTA, not CONTENT — communication.service.ts:640-642:
+        //   if (data.CTA.includes('##CSNUM##')) data.CTA = data.CTA
+        //     .replace(/##CSNUM##/g, localStorage['VERIFIEDBYCALLNUM'] || '')
+        //     .replace('+91', '')
+        // (An earlier version of this code wrongly applied a replace to
+        // CONTENT instead of CTA, using a nonexistent cfg.CSNUM field instead
+        // of the real VERIFIEDBYCALLNUM session value.)
+        const arrays = await getRegistrationArrays()
+        const cfg = arrays?.PROFILEVERIFYPAID?.Shortlist ?? {}
+        let cta = String(cfg.CTA ?? 'OK')
+        if (cta.includes('##CSNUM##')) {
+          const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
+          cta = cta.replace(/##CSNUM##/g, callNum).replace('+91', '')
+        }
+        setPhoneInfoSheet({
+          kind:    'verify_id',
+          title:   String(cfg.TITLE ?? 'Verify your profile'),
+          content: String(cfg.CONTENT ?? 'Please complete ID verification to view phone numbers.'),
+          ctaLabel: cta,
+        })
+      } else if (result.type === 'female_free') {
+        const kindByAction: Record<string, PhoneInfoSheet['kind'] | undefined> = {
+          'femaleFree-PhotoAdd':     'female_free_photo_add',
+          'femaleFree-PhotoPending': 'female_free_photo_pending',
+          'femaleFree-PhotoFail':    'female_free_photo_fail',
+          'callVerification':        'female_free_call_verification',
+          'femaleFree-LimitOver':    'female_free_limit_over',
+        }
+        const kind = kindByAction[result.action]
+        if (kind) setPhoneInfoSheet({ kind } as PhoneInfoSheet)
+      } else if (result.type === 'error') {
+        showToast(result.message)
       }
     } catch (e) {
-      if (__DEV__) console.error('[Matches] whatsapp error:', e)
+      if (__DEV__) console.error('[Matches] contact-reveal error:', e)
     }
+  }
+
+  function handleContactDetailsClose() {
+    setContactDetails(null)
+  }
+
+  function handleContactDetailsCall() {
+    if (contactDetails?.mobile) Linking.openURL(`tel:${contactDetails.mobile}`)
+  }
+
+  function handleContactDetailsWhatsApp() {
+    const num = contactDetails?.whatsappNumber?.replace(/\D/g, '')
+    if (num) Linking.openURL(`https://wa.me/${num}`)
   }
 
   function handleWhatsappPaywallPayNow() {
@@ -1723,6 +2013,42 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           onClose={() => setWhatsappPaywallProfile(null)}
           onPayNow={handleWhatsappPaywallPayNow}
         />
+        {/* Angular button.component.ts's two-step contact reveal: confirm → phoneviewed
+            API → Contact Details sheet — see handleCall/handleWhatsApp above. */}
+        <BottomSheet
+          visible={!!contactConfirm}
+          type="viewPhoneConfirm"
+          data={{
+            content: getContactConfirmContent(),
+            ctaLabel: t('ACCOUNT.YES', 'Yes'),
+          }}
+          onClose={handleContactConfirmClose}
+          onPrimaryPress={handleContactConfirmYes}
+        />
+        <ContactDetailsSheet
+          visible={!!contactDetails}
+          name={contactDetails?.name ?? ''}
+          mobile={contactDetails?.mobile}
+          whatsappNumber={contactDetails?.whatsappNumber}
+          showCounter={contactDetails?.showCounter}
+          viewedCount={contactDetails?.viewedCount}
+          remainingCount={contactDetails?.remainingCount}
+          onClose={handleContactDetailsClose}
+          onCall={handleContactDetailsCall}
+          onWhatsApp={handleContactDetailsWhatsApp}
+        />
+        {/* The other 6 phoneviewed scenarios (protected number / under validation /
+            limit exceeded / FUP limit / profile validation / phone-number-left) —
+            see getPhoneInfoSheetData() for how each maps onto this generic sheet. */}
+        <BottomSheet
+          visible={!!phoneInfoSheet}
+          type="phonePrivacyInfo"
+          data={getPhoneInfoSheetData()}
+          onClose={handlePhoneInfoClose}
+          onPrimaryPress={handlePhoneInfoPrimaryPress}
+          onSecondaryPress={handlePhoneInfoSecondaryPress}
+          onLinkPress={handlePhoneInfoClose}
+        />
         <Toast request={toastRequest} />
       </>
     )
@@ -1873,6 +2199,42 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         oppGender={oppGender}
         onClose={() => setWhatsappPaywallProfile(null)}
         onPayNow={handleWhatsappPaywallPayNow}
+      />
+      {/* Angular button.component.ts's two-step contact reveal: confirm → phoneviewed
+          API → Contact Details sheet — see handleCall/handleWhatsApp above. */}
+      <BottomSheet
+        visible={!!contactConfirm}
+        type="viewPhoneConfirm"
+        data={{
+          content: getContactConfirmContent(),
+          ctaLabel: t('ACCOUNT.YES', 'Yes'),
+        }}
+        onClose={handleContactConfirmClose}
+        onPrimaryPress={handleContactConfirmYes}
+      />
+      <ContactDetailsSheet
+        visible={!!contactDetails}
+        name={contactDetails?.name ?? ''}
+        mobile={contactDetails?.mobile}
+        whatsappNumber={contactDetails?.whatsappNumber}
+        showCounter={contactDetails?.showCounter}
+        viewedCount={contactDetails?.viewedCount}
+        remainingCount={contactDetails?.remainingCount}
+        onClose={handleContactDetailsClose}
+        onCall={handleContactDetailsCall}
+        onWhatsApp={handleContactDetailsWhatsApp}
+      />
+      {/* The other 6 phoneviewed scenarios (protected number / under validation /
+          limit exceeded / FUP limit / profile validation / phone-number-left) —
+          see getPhoneInfoSheetData() for how each maps onto this generic sheet. */}
+      <BottomSheet
+        visible={!!phoneInfoSheet}
+        type="phonePrivacyInfo"
+        data={getPhoneInfoSheetData()}
+        onClose={handlePhoneInfoClose}
+        onPrimaryPress={handlePhoneInfoPrimaryPress}
+        onSecondaryPress={handlePhoneInfoSecondaryPress}
+        onLinkPress={handlePhoneInfoClose}
       />
       <Toast request={toastRequest} />
     </View>

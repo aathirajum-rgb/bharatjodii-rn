@@ -255,18 +255,26 @@ function showIndirectContact(ctx: AfterLikeCtx): boolean {
     && !isPhoneAlreadyViewedFree(ctx.phoneViewed)
 }
 
-function isCallNowState(ctx: AfterLikeCtx): boolean {
+// Angular: common-funtions.ts getButtonInfo():695-706 — this same boolean condition
+// (paid, OR a free user who's already viewed this profile's phone once free, OR
+// female-free-3-contact eligible) selects `buttonType = call`, whose label is
+// CONFIG.TEXT.viewPhoneNumber — NEVER "Call Now" (that string isn't assigned to
+// this button anywhere in Angular; the previous name/label here were both wrong).
+function isViewPhoneNumberState(ctx: AfterLikeCtx): boolean {
   return ctx.entryType === 'P' || isPhoneAlreadyViewedFree(ctx.phoneViewed) || ctx.femaleFreeEligible
 }
 
 export function getAfterLikeCtaLabel(ctx: AfterLikeCtx, t: (key: string) => string): string {
-  return isCallNowState(ctx) ? t('HOME.CALL_NOW') : t('GENERAL.PAY_NOW')
+  return isViewPhoneNumberState(ctx) ? t('VIEWPROFILE.VIEW_PHONE') : t('GENERAL.PAY_NOW')
 }
 
-// Angular: common-funtions.ts getButtonInfo() — iconType = callIconWhite (Call Now)
-// or paidMembership (Pay Now), rendered before the label via ion-icon slot="start".
+// Angular: common-funtions.ts getButtonInfo() — iconType = callIconWhite (View
+// phone number) or paidMembership (Pay Now), rendered before the label via
+// ion-icon slot="start". Same underlying action either way (buttonType='call',
+// routed through communicationBtnOnClick → showContactDetails) — only the label
+// changes with eligibility, confirmed against button.service.ts's clickOnCallBtn.
 export function getAfterLikeCtaIcon(ctx: AfterLikeCtx): string {
-  return isCallNowState(ctx)
+  return isViewPhoneNumberState(ctx)
     ? CDN + 'revamp/call-icon-white.svg'
     : CDN + 'get-paid-membership.svg'
 }

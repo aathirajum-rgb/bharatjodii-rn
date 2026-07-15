@@ -16,8 +16,10 @@ import {
 import { Colors } from '../../constants/colors'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 
-const PHOTO_W = 220
-const PHOTO_H = 260
+// Figma node 606:6239's photo frame (606:6240) is a 248×248 SQUARE, not the
+// 220×260 rectangle this previously guessed at.
+const PHOTO_W = 248
+const PHOTO_H = 248
 
 export default function MatchCardDesktop({
   profile, oppGender, ownEntryType, femaleFreeEligible, indNumbersLeft,
@@ -95,37 +97,46 @@ export default function MatchCardDesktop({
 
       {/* ── Info (right) ──────────────────────────────────────────────────── */}
       <View style={c.info}>
-        <View style={c.badgeRow}>
-          <View style={c.badges}>
-            {profile.isPaidMember && (
-              <ProfileBadge variant="paid" text={t('MENU.PAID_BADGE')} />
-            )}
-            {/* Angular: FUNC.getLogInGender() == 'F' — oppGender === 'M' means the viewer is female */}
-            {profile.isIdVerified && oppGender === 'M' && (
-              <ProfileBadge variant="verified" text={t('MATCHES.VERIFIED_ID')} />
-            )}
+        {/* Grouped into one block so `info`'s space-between only opens a gap
+            AFTER this (between it and the CTA row below) — badges/name/details
+            stay tightly stacked together, only the CTA gets pushed to the
+            card's bottom edge. */}
+        <View>
+          <View style={c.badgeRow}>
+            <View style={c.badges}>
+              {profile.isPaidMember && (
+                <ProfileBadge variant="paid" text={t('MENU.PAID_BADGE')} />
+              )}
+              {/* Angular: FUNC.getLogInGender() == 'F' — oppGender === 'M' means the viewer is female */}
+              {profile.isIdVerified && oppGender === 'M' && (
+                <ProfileBadge variant="verified" text={t('MATCHES.VERIFIED_ID')} />
+              )}
+            </View>
+            <View style={c.contactIcons}>
+              {/* Figma node 606:6276: the call icon sits inside its own white
+                  circular button (24×24, #006C48 border) — unlike WhatsApp,
+                  which is just its own icon graphic with no extra wrapper. */}
+              <Pressable style={c.callIconBtn} onPress={onCall} hitSlop={8}>
+                <CallIcon width={20} height={20} />
+              </Pressable>
+              <Pressable onPress={onWhatsApp} hitSlop={8}>
+                <WhatsAppIcon width={24} height={24} />
+              </Pressable>
+            </View>
           </View>
-          <View style={c.contactIcons}>
-            <Pressable onPress={onCall} hitSlop={8}>
-              <CallIcon width={22} height={22} />
-            </Pressable>
-            <Pressable onPress={onWhatsApp} hitSlop={8}>
-              <WhatsAppIcon width={24} height={24} />
-            </Pressable>
-          </View>
-        </View>
 
-        <Pressable onPress={onPress}>
-          <Text style={c.name} numberOfLines={1}>{profile.name}</Text>
-          <Text style={c.jodiId}>{t('MATCHES.JODI_ID').replace('#ID#', profile.profileId)}</Text>
-          <Text style={c.basicView} numberOfLines={2}>{buildBasicView(profile)}</Text>
-          <View style={c.viewProfileRow}>
-            <Text style={c.viewProfile}>{t('MATCHES.VIEW_PROFILE_CTA')}</Text>
-            {/* Angular: button-revamp.component.html's IsShowAnimation() branch — real
-                Jodii swaps the plain chevron for this animated GIF, not a static arrow. */}
-            <Image source={{ uri: RIGHT_ARROW_ANIMATION_URI }} style={c.viewProfileArrow} />
-          </View>
-        </Pressable>
+          <Pressable onPress={onPress}>
+            <Text style={c.name} numberOfLines={1}>{profile.name}</Text>
+            <Text style={c.jodiId}>{t('MATCHES.JODI_ID').replace('#ID#', profile.profileId)}</Text>
+            <Text style={c.basicView} numberOfLines={2}>{buildBasicView(profile)}</Text>
+            <View style={c.viewProfileRow}>
+              <Text style={c.viewProfile}>{t('MATCHES.VIEW_PROFILE_CTA')}</Text>
+              {/* Angular: button-revamp.component.html's IsShowAnimation() branch — real
+                  Jodii swaps the plain chevron for this animated GIF, not a static arrow. */}
+              <Image source={{ uri: RIGHT_ARROW_ANIMATION_URI }} style={c.viewProfileArrow} />
+            </View>
+          </Pressable>
+        </View>
 
         {showLikeCTA(profile.likedStatus) && (
           <View style={c.ctaRow}>
@@ -199,7 +210,8 @@ const c = StyleSheet.create({
   photoBox: {
     width:            PHOTO_W,
     height:           PHOTO_H,
-    borderRadius:     10,
+    // Figma node 606:6240: 8px radius (this used 10 — a plausible-looking guess).
+    borderRadius:     8,
     overflow:         'hidden',
     backgroundColor:  Colors.divider,
     flexShrink:       0,
@@ -249,88 +261,119 @@ const c = StyleSheet.create({
     textAlign:  'center',
     lineHeight: 16,
   },
-  info: { flex: 1, justifyContent: 'flex-start' },
+  // Confirmed via get_design_context on node 606:6239: the info column really
+  // is `height:248px, justify-between` in Figma's own generated code — the
+  // fixed-28px-gap version tried the turn before was a guess that happened to
+  // match ONE mock's incidental leftover space, not the actual design intent.
+  // Shorter real profiles will show a bigger gap above the CTA row than this
+  // mock does — that's the design as specified, not a bug.
+  info: { flex: 1, justifyContent: 'space-between' },
 
   badgeRow: {
     flexDirection:  'row',
     alignItems:     'center',
     justifyContent: 'space-between',
-    marginBottom:   8,
+    marginBottom:   12,
   },
   badges: {
     flexDirection: 'row',
     alignItems:    'center',
-    gap:           6,
+    gap:           8,
   },
   contactIcons: {
     flexDirection: 'row',
     alignItems:    'center',
-    gap:           12,
+    gap:           24,
+  },
+  callIconBtn: {
+    width:           24,
+    height:          24,
+    borderRadius:    12,
+    borderWidth:     1,
+    borderColor:     '#006C48',
+    backgroundColor: Colors.white,
+    alignItems:      'center',
+    justifyContent:  'center',
   },
 
   name: {
     fontFamily: 'Poppins-SemiBold',
     fontSize:   18,
-    color:      Colors.textDark,
+    color:      Colors.black,
   },
   jodiId: {
     fontFamily: 'Poppins-Regular',
-    fontSize:   13,
-    color:      Colors.textSecondary,
+    fontSize:   14,
+    color:      Colors.black,
     marginTop:  2,
   },
   basicView: {
     fontFamily: 'Poppins-Regular',
-    fontSize:   13,
-    color:      Colors.textDark,
+    fontSize:   14,
+    color:      Colors.black,
     lineHeight: 20,
-    marginTop:  8,
+    marginTop:  12,
   },
   viewProfileRow: {
     flexDirection: 'row',
     alignItems:    'center',
     gap:           2,
-    marginTop:     8,
+    marginTop:     12,
   },
   viewProfile: {
-    fontFamily: 'Poppins-Medium',
-    fontSize:   13,
+    fontFamily: 'Poppins-Regular',
+    fontSize:   14,
     color:      Colors.link,
   },
   viewProfileArrow: { width: 18, height: 15 },
 
+  // Figma node 606:6258's "Frame 1707482322": no marginTop needed — `info`'s
+  // own justify-between now positions this row at the card's bottom edge. The
+  // 16px gap between each button (160−144) is still correct.
   ctaRow: {
     flexDirection: 'row',
-    gap:           8,
-    marginTop:     16,
+    gap:           16,
   },
+  // Figma node 606:6258's "Frame 1707482322" CTA row: Don't-show 144 / View-later
+  // 144 / Like 194 out of a 514-wide row (144+16+144+16+194=514) — three buttons
+  // sharing the row proportionally, not two content-hugged buttons plus a third
+  // stretched to consume whatever's left (which is what `ctaLike: {flex:1}` did
+  // here before — on a wide desktop card that made Like enormous compared to its
+  // siblings, vs. Figma's fairly modest, similarly-sized three-up row).
+  //
+  // borderColor/text color '#545454' and gap:4 (not Colors.borderLight/6) —
+  // Figma's own generated code for both Tertiary CTAs: `border-[#545454]`,
+  // `text-[#545454]`, `gap-[4px]`, height 40, font Poppins-Regular (not Medium).
   ctaDontShow: {
+    flex:              144,
+    height:            40,
     flexDirection:     'row',
     alignItems:        'center',
     justifyContent:    'center',
-    gap:               6,
+    gap:               4,
     borderWidth:       1,
-    borderColor:       Colors.borderLight,
+    borderColor:       '#545454',
     borderRadius:      8,
-    paddingVertical:   10,
     paddingHorizontal: 14,
   },
-  ctaDontShowText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.textDark },
+  ctaDontShowText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#545454' },
   ctaViewLater: {
+    flex:              144,
+    height:            40,
     flexDirection:     'row',
     alignItems:        'center',
     justifyContent:    'center',
-    gap:               6,
+    gap:               4,
     borderWidth:       1,
-    borderColor:       Colors.borderLight,
+    borderColor:       '#545454',
     borderRadius:      8,
-    paddingVertical:   10,
     paddingHorizontal: 14,
   },
-  ctaViewLaterText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.textDark },
+  ctaViewLaterText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#545454' },
   ctaDisabled: { opacity: 0.4 },
   ctaLike: {
-    flex:              1,
+    flex:              194,
+    height:            40,
     flexDirection:     'row',
     alignItems:        'center',
     justifyContent:    'center',
@@ -338,10 +381,11 @@ const c = StyleSheet.create({
     // the mobile card's ctaLike (MatchesScreen.tsx) — was inconsistent with it here.
     backgroundColor:   Colors.primaryDark,
     borderRadius:      8,
-    paddingVertical:   10,
-    gap:               6,
+    paddingHorizontal: 14,
+    gap:               4,
   },
-  ctaLikeText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.white },
+  // Figma: "Like" text is Poppins-SemiBold (not Medium), 14px (not 13).
+  ctaLikeText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.white },
 
   afterLikeRow: {
     backgroundColor:   Colors.afterLikeBg,

@@ -5,12 +5,12 @@
 
 import { apiCall } from './apiClient'
 import { Endpoints } from './api.endpoints'
-import { getItem, getJson } from './storageService'
+import { getItem, getJson, setJson } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { getSessionValue } from './registrationService'
 import { navigate } from '../utils/navigationRef'
 import { ENavigation } from '../types/enums/navigation.enum'
-import { resolveFemaleFreeAction } from './femaleFreeService'
+import { resolveFemaleFreeAction, getFemaleContactStatus } from './femaleFreeService'
 import { redirectToIntermediatePage } from './paymentService'
 
 // ─── Result types ─────────────────────────────────────────────────────────────
@@ -18,7 +18,19 @@ import { redirectToIntermediatePage } from './paymentService'
 
 export type CommActionResult =
   | { type: 'api_success';       data: any; action: string }
-  | { type: 'show_contact';      contact: string; whatsapp: boolean }
+  // `contact`/`whatsapp` are the original fields (kept so the two call sites
+  // that haven't been migrated to the full Contact Details sheet yet —
+  // ViewProfileScreen.tsx — keep working unchanged). The rest are the fields
+  // the new sheet (MatchesScreen.tsx) needs: mobile/whatsappNumber together
+  // (Angular's popup shows both, regardless of which CTA was tapped), and the
+  // "Contacts viewed X/Y" counter (paid-entryType only — communication.service.ts
+  // fields PHNUMBERVIEWED/PHNUMBERLEFT via phoneviewed's response).
+  | {
+      type: 'show_contact'; contact: string; whatsapp: boolean
+      mobile?: string | undefined; whatsappNumber?: string | undefined
+      showCounter?: boolean | undefined
+      viewedCount?: string | undefined; remainingCount?: string | undefined
+    }
   | { type: 'payment_promo';     action: string; profile: any }
   | { type: 'verify_id';         fromPage: string; action: string }
   | { type: 'female_free';       action: string; profile: any }
@@ -26,6 +38,18 @@ export type CommActionResult =
   | { type: 'report_popup';      partnerId: string; profile: any }
   | { type: 'view_later_done' }
   | { type: 'skip_done' }
+  // ── phoneviewed's other ERRCODE branches (button.component.ts /
+  // communication.service.ts's afterHttpServiceResponse — all 8 confirmed
+  // scenarios for this endpoint). Most of these carry SERVER-DRIVEN text
+  // (data.RESPONSE.MSG / data.BODY / data.RESPONSE.HEADER etc.) — Angular
+  // renders whatever the API sent, not fixed app strings, so these fields are
+  // read straight off the response rather than hardcoded here. ──
+  | { type: 'phone_protected' } // ERRCODE:14 — fixed i18n text (GENERAL.PROTECT_NUMBER*)
+  | { type: 'under_validation'; message: string } // ERRCODE:10 — raw data.RESPONSE.MSG
+  | { type: 'phone_limit_exceeded'; body: string; cta: string } // ERRCODE:11
+  | { type: 'fup_limit'; header: string; body: string; cta: string; cta1: string } // ERRCODE:12
+  | { type: 'profile_validation'; title: string; content: string; cta: string; image?: string | undefined } // RESPONSECODE:1,ERRCODE:13
+  | { type: 'phone_number_left'; profile: any } // RESPONSECODE:3 — renewal/upgrade sub-flow, not yet built (see showContactDetails)
   | { type: 'error';             message: string }
 
 export type CommunicationAction =
@@ -85,11 +109,13 @@ async function showCallOrWhatsApp(
   action: string,
   oppProfile: any,
 ): Promise<CommActionResult> {
-  const [entryType, ekycStatus, femaleFreeData, ppSetRaw] = await Promise.all([
+  const [entryType, ekycStatus, femaleFreeData, ppSetRaw, gender, paidFlag] = await Promise.all([
     getSessionValue('ENTRYTYPE'),
     getItem('PI_EKYCSTATUS'),
     getSessionValue('FEMALEFREECONACT'),
     getJson<Record<string, any>>(SK.App.PP_SET_DATA),
+    getItem(SK.User.LOGIN_GENDER),
+    getItem(SK.Payment.PAY_P_FLAG),
   ])
 
   const photoStatus: string = (ppSetRaw as any)?.PI_PHOTOSTATUS ?? 'N'
@@ -101,13 +127,26 @@ async function showCallOrWhatsApp(
       if (femaleFreeAction) {
         return { type: 'female_free', action: femaleFreeAction, profile: oppProfile }
       }
+      // resolveFemaleFreeAction returns null once eKYC-verified — but that
+      // only means the photo/verification gates are clear, NOT that the free
+      // quota itself still has room (Angular's PHONENOLIMIT case).
+      const { canViewContact } = await getFemaleContactStatus()
+      if (!canViewContact) {
+        return { type: 'female_free', action: 'femaleFree-LimitOver', profile: oppProfile }
+      }
       // Eligible — show contact for free
-      return showContactDetails(oppProfile, action === 'whatsapp' || action === 'whatsappNudge')
+      return showContactDetails(oppProfile, action === 'whatsapp' || action === 'whatsappNudge', entryType ?? '')
     }
   }
 
-  // Non-ID verified user
-  if (ekycStatus !== '1') {
+  // Angular common-funtions.ts:362-364 check_Paid_NonVerifyIdUser() — this gate
+  // requires ALL THREE: entryType=='P' AND gender=='M' AND ekycStatus=='0' AND
+  // getPaidFlag()=='1' (session key PAYPFLAG — a SEPARATE feature-enablement
+  // flag from ENTRYTYPE, not redundant with it). Missing this last check was a
+  // confirmed real bug: it made the gate over-fire for a real paid male user
+  // whose PAYPFLAG wasn't '1', who should have gone straight to showContactDetails
+  // (Angular's own fallback for that exact combination — verified via source).
+  if (entryType === 'P' && gender === 'M' && ekycStatus !== '1' && paidFlag === '1') {
     return { type: 'verify_id', fromPage, action }
   }
 
@@ -117,31 +156,163 @@ async function showCallOrWhatsApp(
   }
 
   // Paid + verified → show contact
-  return showContactDetails(oppProfile, action === 'whatsapp' || action === 'whatsappNudge')
+  return showContactDetails(oppProfile, action === 'whatsapp' || action === 'whatsappNudge', entryType ?? '')
 }
 
 async function showContactDetails(
   oppProfile: any,
   isWhatsapp: boolean,
+  entryType: string,
 ): Promise<CommActionResult> {
   // Angular: getApiParams(profileId, 'phoneviewed') → ID&PARTNERID&LOGINGENDER&ENTRYTYPE
   const partnerId = String(oppProfile?.MATRIID ?? '')
   const params    = await getCommParams(partnerId, true)
   const result    = await apiCall(Endpoints.communication.phoneViewed, 'POST', params)
+  const errCode   = String(result?.ERRCODE ?? '')
+  const isSuccessCode = result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1
 
-  if (result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1) {
-    const det = result.RESPONSE?.PHONEDET?.[0] ?? {}
-    const cc  = det.PriMobileCountryCode ?? '+91'
-    const num = det.MOBILE ?? det.MobileNo ?? det.MOBILENUMBER ?? ''
-    const wa  = String(result.RESPONSE?.WHATSAPP ?? '').replace(/\D/g, '')
-    const contact = num ? `${cc}${num}` : wa
+  // Angular button.component.ts/communication.service.ts afterHttpServiceResponse()
+  // — ERRCODE is checked BEFORE assuming a RESPONSECODE:1 means real success;
+  // RESPONSECODE:1 + ERRCODE:13 is the profile-validation branch, not success.
+  // All 8 confirmed scenarios for this endpoint, checked in Angular's own order:
+
+  // ERRCODE:14 — profile has protected their phone number. Shown INSTEAD of the
+  // Contact Details sheet, not alongside it — fixed i18n text (not server-driven).
+  if (errCode === '14') {
+    return { type: 'phone_protected' }
+  }
+
+  // ERRCODE:10 — under photo validation. Angular renders data.RESPONSE.MSG
+  // directly as raw text (no title/CTA at all, just a close-X) — server-driven.
+  if (errCode === '10' && result?.RESPONSE?.MSG) {
+    return { type: 'under_validation', message: String(result.RESPONSE.MSG) }
+  }
+
+  // ERRCODE:11 — view-limit exceeded. Angular's lowerpopup reads content?.BODY /
+  // content?.CTA off the raw response itself (server-driven; the quoted defaults
+  // are Angular's own template placeholders, used here only if the field is absent).
+  if (errCode === '11') {
     return {
-      type:     'show_contact',
-      contact:  isWhatsapp ? (wa || contact) : contact,
-      whatsapp: isWhatsapp,
+      type: 'phone_limit_exceeded',
+      body: String(result?.BODY ?? result?.RESPONSE?.BODY ?? 'You have reached your limit to like matches for the day.'),
+      cta:  String(result?.CTA ?? result?.RESPONSE?.CTA ?? 'Okay'),
     }
   }
-  return { type: 'error', message: 'Could not fetch contact' }
+
+  // ERRCODE:12 — fair-usage-policy phone-view limit. Two CTAs ("complete
+  // verification" vs "continue with limited access") separated by an "OR" —
+  // Angular's own template placeholders used as fallbacks, server-driven otherwise.
+  // NOTE: Angular's primary CTA navigates to a `/fup-verify` re-verification flow
+  // that doesn't exist anywhere in this port yet — that's a separate, larger
+  // feature (its own screen), not just a bottom sheet; see MatchesScreen.tsx's
+  // handler for how this is surfaced until that's built.
+  if (errCode === '12') {
+    return {
+      type:   'fup_limit',
+      header: String(result?.HEADER ?? result?.RESPONSE?.HEADER ?? 'You have reached the maximum limit of phone numbers you can view with this account!'),
+      body:   String(result?.BODY ?? result?.RESPONSE?.BODY ?? 'Please complete the full verification to remove this limit or continue to view only 1 phone number per day.'),
+      cta:    String(result?.CTA ?? result?.RESPONSE?.CTA ?? 'Complete full verification'),
+      cta1:   String(result?.CTA1 ?? result?.RESPONSE?.CTA1 ?? 'Continue with limited access'),
+    }
+  }
+
+  // RESPONSECODE:1, ERRCODE:13 — profile validation rejected. Angular sources
+  // title/content/CTA/icon from a server-driven "PROBOTTOM" config that isn't
+  // fetched anywhere in this port yet (no confirmed data source) — falls back to
+  // a reasonable generic message until that config is wired up.
+  if (isSuccessCode && errCode === '13') {
+    return {
+      type:    'profile_validation',
+      title:   String(result?.RESPONSE?.PROBOTTOM?.TITLE ?? 'Profile under review'),
+      content: String(result?.RESPONSE?.PROBOTTOM?.CONTENT ?? 'This profile is currently under verification. Please try again later.'),
+      cta:     String(result?.RESPONSE?.PROBOTTOM?.CTA ?? 'Okay'),
+      image:   result?.RESPONSE?.PROBOTTOM?.IMG ?? undefined,
+    }
+  }
+
+  // RESPONSECODE:3 — phone-number-left/renewal sub-flow. Angular calls a SECOND
+  // API (nbcustomer) then branches into a renewal or upgrade-promo screen
+  // depending on entry type — a materially bigger feature than a bottom sheet,
+  // not built here; surfaced as its own result type so the caller can show
+  // something reasonable rather than silently failing.
+  if (String(result?.RESPONSECODE ?? '') === '3') {
+    return { type: 'phone_number_left', profile: oppProfile }
+  }
+
+  if (isSuccessCode) {
+    const det = result.RESPONSE?.PHONEDET?.[0] ?? {}
+    const cc  = det.PriMobileCountryCode ?? '+91'
+    // Angular button.component.ts:613-664 — real field is PriMobileNo, not
+    // MOBILE/MobileNo/MOBILENUMBER (kept as fallbacks in case an older/other
+    // server response shape is ever hit).
+    const num = det.PriMobileNo ?? det.MOBILE ?? det.MobileNo ?? det.MOBILENUMBER ?? ''
+    const wa  = String(result.RESPONSE?.WHATSAPP ?? '').replace(/\D/g, '')
+    const contact = num ? `${cc}${num}` : wa
+
+    // Angular communication.service.ts:604-615 — after a successful phoneviewed
+    // call, the LOCAL contact-quota cache gets updated with these fields (merged
+    // with whatever CONTACT_DETAIL already holds, e.g. expiryTextValue from the
+    // separate nbcontacts load — see fetchContactDetails below).
+    //
+    // Two field-name variants exist in Angular itself: communication.service.ts
+    // writes `phoneNumbersUsed`, but button.component.ts's own CONFIRMATION-step
+    // reader (viewContactNoConfirmPopUp(), the popup this port replicates) reads
+    // `phoneNumbersViewed` instead — write both so this port's own confirmation
+    // sheet (which reads phoneNumbersViewed, see MatchesScreen.tsx) gets real data.
+    const viewedCount    = String(result.RESPONSE?.PHNUMBERVIEWED ?? '')
+    const remainingCount = String(result.RESPONSE?.PHNUMBERLEFT ?? '')
+    const prevDetail = (await getJson<Record<string, any>>('CONTACT_DETAIL')) ?? {}
+    await setJson('CONTACT_DETAIL', {
+      ...prevDetail,
+      phoneNumbersUsed:   result.RESPONSE?.PHNUMBERVIEWED,
+      phoneNumbersViewed: result.RESPONSE?.PHNUMBERVIEWED,
+      phoneNumbersLeft:   result.RESPONSE?.PHNUMBERLEFT,
+      IndContactUsed:     result.RESPONSE?.INDPHNUMBERVIEWED,
+      IndNumbersLeft:     result.RESPONSE?.INDPHNUMBERLEFT,
+    })
+
+    return {
+      type:           'show_contact',
+      contact:        isWhatsapp ? (wa || contact) : contact,
+      whatsapp:       isWhatsapp,
+      mobile:         num ? `${cc}${num}` : undefined,
+      whatsappNumber: wa || undefined,
+      // Angular modalpopup.component.html:476-480 — counter row only for paid
+      // entryType ('P'); free users don't see it at all.
+      showCounter:    entryType === 'P',
+      viewedCount,
+      remainingCount,
+    }
+  }
+
+  // Scenario 8 — any other failure with a message: Angular just shows a toast
+  // (presentToast), not a modal at all.
+  const fallbackMsg = result?.RESPONSE?.MSG ?? result?.MSG
+  return { type: 'error', message: fallbackMsg ? String(fallbackMsg) : 'Could not fetch contact' }
+}
+
+// ─── Contact quota (nbcontacts) ────────────────────────────────────────────────
+// Angular common.ts:920-943 getContactDetails() — called on page load (Matches/
+// Menu/Activity/Explore/ViewProfile) to populate the CONTACT_DETAIL cache (raw
+// RESPONSE written as-is: IndNumbersLeft/phoneNumbersLeft/expiryTextValue/
+// totalProfileCountData) so getIndNumbersLeft()-style reads have real data
+// instead of the '0' fallback before any phoneviewed call has ever happened.
+export async function fetchContactDetails(): Promise<void> {
+  const [loginId, gender, entryType, femaleFreeData] = await Promise.all([
+    getItem(SK.Auth.USER_ID),
+    getItem(SK.User.LOGIN_GENDER),
+    getSessionValue('ENTRYTYPE'),
+    getSessionValue('FEMALEFREECONACT'),
+  ])
+  // AUTORENEWALFLAG has no confirmed session source in this port yet — Angular
+  // reads it off the user's active-plan state, which isn't tracked client-side
+  // here; '0' is a safe default (server treats missing/'0' as "not auto-renew").
+  const params = `ID=${loginId ?? ''}&MEMBERSHIPTYPE=${entryType ?? ''}&LOGINGENDER=${gender ?? 'M'}` +
+    `&AUTORENEWALFLAG=0&FREECONTACTS=${femaleFreeData?.FEMALEFREECONACT === '1' ? '1' : '0'}`
+  const result = await apiCall(Endpoints.payment.contacts, 'POST', params)
+  if (result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1) {
+    await setJson('CONTACT_DETAIL', result.RESPONSE ?? {})
+  }
 }
 
 // ─── Chat ─────────────────────────────────────────────────────────────────────
