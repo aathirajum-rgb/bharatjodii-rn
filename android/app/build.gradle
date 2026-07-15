@@ -187,6 +187,16 @@ android {
     }
 }
 
+// App does not use barcode/QR scanning — exclude Google ML Kit's barcode-scanning
+// stack (pulled in transitively by expo-camera) to drop its native libs (libbarhopper_v3.so,
+// several MB per ABI) from the packaged app.
+configurations.all {
+    exclude group: "com.google.mlkit", module: "barcode-scanning"
+    exclude group: "com.google.android.gms", module: "play-services-code-scanner"
+    exclude group: "com.google.android.gms", module: "play-services-mlkit-barcode-scanning"
+    exclude group: "androidx.camera", module: "camera-mlkit-vision"
+}
+
 dependencies {
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")

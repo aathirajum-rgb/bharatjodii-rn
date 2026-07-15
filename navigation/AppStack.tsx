@@ -60,6 +60,13 @@ import SearchScreen                       from '../screens/search/SearchScreen'
 import FaqScreen                          from '../screens/help-center/FaqScreen'
 import IgnoredProfilesScreen               from '../screens/ignored-profiles/IgnoredProfilesScreen'
 import SearchByIdScreen                    from '../screens/search-by-id/SearchByIdScreen'
+import EditProfileScreen                   from '../screens/edit-profile/EditProfileScreen'
+import ReligiousDetailsScreen               from '../screens/edit-profile/ReligiousDetailsScreen'
+import ProfessionalDetailsScreen            from '../screens/edit-profile/ProfessionalDetailsScreen'
+import BasicDetailsScreen                   from '../screens/edit-profile/BasicDetailsScreen'
+import LifestyleDetailsScreen               from '../screens/edit-profile/LifestyleDetailsScreen'
+import FamilyDetailsEditScreen               from '../screens/edit-profile/FamilyDetailsScreen'
+import PropertyDetailsEditScreen             from '../screens/edit-profile/PropertyDetailsScreen'
 import ExternalPageScreen                  from '../screens/external-page/ExternalPageScreen'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -110,6 +117,13 @@ export type AppStackParamList = {
   Faq: { type: 'PROFILE' | 'CONTACTMATCHES' | 'PAYMENT'; itemId?: number }
   IgnoredProfiles: undefined
   SearchById: undefined
+  EditProfile: undefined
+  EditProfileReligious: undefined
+  EditProfileProfessional: undefined
+  EditProfileBasic: undefined
+  EditProfileLifestyle: undefined
+  EditProfileFamily: undefined
+  EditProfileProperty: undefined
   ExternalPage: { url: string; title: string }
   // Angular: viewprofile.page.ts route params (:module/:id) — fromPage drives the
   // "from" context communicationBtnOnClick needs for its paywall/report-popup logic.
@@ -365,6 +379,13 @@ export default function AppStack() {
       <Stack.Screen name="Faq" component={FaqScreen} />
       <Stack.Screen name="IgnoredProfiles" component={IgnoredProfilesScreen} />
       <Stack.Screen name="SearchById" component={SearchByIdScreen} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+      <Stack.Screen name="EditProfileReligious" component={ReligiousDetailsScreen} />
+      <Stack.Screen name="EditProfileProfessional" component={ProfessionalDetailsScreen} />
+      <Stack.Screen name="EditProfileBasic" component={BasicDetailsScreen} />
+      <Stack.Screen name="EditProfileLifestyle" component={LifestyleDetailsScreen} />
+      <Stack.Screen name="EditProfileFamily" component={FamilyDetailsEditScreen} />
+      <Stack.Screen name="EditProfileProperty" component={PropertyDetailsEditScreen} />
       <Stack.Screen name="ExternalPage" component={ExternalPageScreen} />
       <Stack.Screen
         name="ComponentShowcase"

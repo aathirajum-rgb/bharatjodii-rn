@@ -12,3 +12,8 @@
 -keep class com.facebook.react.turbomodule.** { *; }
 
 # Add any project specific keep options here:
+
+# expo-camera's barcode-scanning code path is compiled in but its ML Kit dependencies
+# are excluded from packaging (see app/build.gradle) since this app never scans barcodes.
+# These classes are intentionally absent; the code paths referencing them are unreachable.
+-dontwarn com.google.mlkit.vision.**
