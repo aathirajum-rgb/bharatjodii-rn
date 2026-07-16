@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { LANG_LABELS } from '../../components/matches-header/MatchesHeader'
 import {
-  WhatsAppIcon, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
+  WhatsAppIcon, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon, PhotoSwiper,
   showLikeCTA, showAfterLikeCTA, disableDontShow, disableViewLater, HtmlText,
   buildBasicView, getBlurPhotoUri, ProfileBadge,
   getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showContactsLeftBanner, showFreeBadge,
@@ -263,6 +263,15 @@ export default function ViewProfileDesktopLayout({
   // promo to show — see rightCol below). Measuring it directly is the only way
   // to match it exactly in both cases instead of guessing at flex arithmetic.
   const [leftColWidth, setLeftColWidth] = useState<number | null>(null)
+  // Figma (93:4277's hero card): the photo fills the FULL height of the hero
+  // card, ending flush with the CTA row below it — it isn't a fixed 180px
+  // square. Since the card's own height is driven by heroContent's natural
+  // content height (name/badges/info/CTA — heroPhoto has no intrinsic height
+  // of its own once unpinned from HERO_PHOTO_SIZE), measuring heroContent and
+  // feeding that back into heroPhoto/PhotoSwiper is what keeps them level —
+  // a fixed square left empty space below the CTA row whenever that content
+  // was shorter than 180px.
+  const [heroContentHeight, setHeroContentHeight] = useState<number | null>(null)
 
   // Buffer around heroBottomY so the sticky bar's mount/unmount doesn't flip on
   // every scroll tick when scrollY hovers right at the boundary (common with
@@ -385,18 +394,26 @@ export default function ViewProfileDesktopLayout({
 
         {/* ── Hero card — photo (left) + name/badges/icons/CTA (right) ────────── */}
         <View style={s.heroCard} onLayout={e => setHeroBottomY(e.nativeEvent.layout.y + e.nativeEvent.layout.height)}>
-          <Pressable
-            style={s.heroPhoto}
-            onPress={() => profile.isPhotoAvailable && !profile.isPhotoProtect && onOpenPhotoViewer(0)}
-          >
+          <View style={[s.heroPhoto, heroContentHeight ? { height: heroContentHeight } : null]}>
             {profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0 ? (
-              <Image source={{ uri: profile.photos[0] }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              // Figma (282:1919/282:2030) — same dynamicBullets dot pagination
+              // the Matches screen's card photo already uses when a profile has
+              // more than one photo (dots-only here, no arrow overlay). Reusing
+              // PhotoSwiper directly instead of a static single <Image> so this
+              // hero photo gets the same swipe-through-photos + dot indicator
+              // behavior, not just its first photo.
+              <PhotoSwiper
+                images={profile.photos}
+                width={HERO_PHOTO_SIZE}
+                height={heroContentHeight ?? HERO_PHOTO_SIZE}
+                onPress={onOpenPhotoViewer}
+              />
             ) : (
               <CdnSvg uri={getBlurPhotoUri(oppGender)} width="100%" height="100%" />
             )}
-          </Pressable>
+          </View>
 
-          <View style={s.heroContent}>
+          <View style={s.heroContent} onLayout={e => setHeroContentHeight(e.nativeEvent.layout.height)}>
             <View style={s.heroTopRow}>
               <View style={s.badgeRow}>
                 {profile.isPaidMember && <ProfileBadge variant="paid" text={t('MENU.PAID_BADGE')} />}
