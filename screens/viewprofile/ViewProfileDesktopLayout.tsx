@@ -4,7 +4,7 @@
 // logic (same split MatchesDesktopLayout.tsx/MatchCardDesktop.tsx already use
 // for the Matches screen) and passes it down as props; this file only arranges
 // that data into the desktop two-column grid + sticky-on-scroll condensed bar.
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   FlatList, NativeScrollEvent, NativeSyntheticEvent,
@@ -39,6 +39,17 @@ const SIDEBAR_WIDTH = 260
 // SimilarProfileCardItem's `size` prop doc comment for why this can't be left
 // to default — mobile's own default reads the browser's full window width).
 const SIMILAR_CARD_SIZE = 180
+// Angular: <app-swiper>'s navigation-module arrows advance the "Other/Similar
+// profiles" row exactly one card at a time (see ViewProfileScreen.tsx's mobile
+// scrollSimilarBy) — desktop was left as a bare draggable FlatList with no
+// arrows, which felt like the mobile/native free-scroll instead of matching
+// this same click-to-advance behavior. Same gap value `similarListContent`
+// already uses below.
+const SIMILAR_CARD_GAP = 16
+// Must match `similarListContent`'s own paddingHorizontal below — only the
+// LEFT side matters here since that's the only padding visible at rest
+// (scrollX 0); the right-side padding is only seen once scrolled to the end.
+const SIMILAR_LIST_PADDING = 24
 
 export interface NeighborPreview {
   name: string
@@ -113,6 +124,118 @@ function DesktopSectionHeader({ title, first }: { title: string; first?: boolean
   return <Text style={[ds.sectionHeader, first && ds.sectionHeaderFirst]}>{title}</Text>
 }
 
+// Hoisted to module scope — these used to be defined INSIDE ViewProfileDesktopLayout's
+// function body, which gives them a brand-new function identity on every single render
+// of that component (e.g. every profile switch via Next/Prev). React then sees a
+// different component type than last render and fully unmounts+remounts the whole
+// subtree — including the Image/CdnSvg inside — instead of just updating props. That
+// unmount/remount was the actual cause of the flicker (the "View phone number" button
+// lives in CtaRow, the neighbor avatars live in NeighborButton — Call/WhatsApp sit
+// directly in the stable parent JSX and were never affected). Being module-level
+// functions now, their identity is stable across renders, so React only re-renders
+// their contents like any other component.
+
+// Shared by both the inline hero-card CTA and the condensed sticky bar's CTA —
+// same underlying showLikeCTA/showAfterLikeCTA gating & handlers the mobile
+// screen's renderCtaBlock() uses, just laid out as one compact row instead of
+// mobile's two-row stacked block.
+function CtaRow({
+  compact, sameGender, ownProfile, likedStatus, dontShowStatus, viewLaterStatus,
+  onDontShow, onViewLater, onLike, onCall, ctaCtx, t,
+}: {
+  compact?: boolean
+  sameGender: boolean
+  ownProfile: boolean
+  likedStatus: ViewProfileModel['likedStatus']
+  dontShowStatus: string
+  viewLaterStatus: string
+  onDontShow: () => void
+  onViewLater: () => void
+  onLike: () => void
+  onCall: () => void
+  ctaCtx: AfterLikeCtx
+  t: (key: string) => string
+}) {
+  if (sameGender || ownProfile) return null
+  if (showLikeCTA(likedStatus)) {
+    return (
+      <View style={ds.ctaRow}>
+        <Pressable
+          style={[ds.ctaDontShow, compact && ds.ctaCompact, disableDontShow(dontShowStatus) && ds.ctaDisabled]}
+          onPress={onDontShow}
+          disabled={disableDontShow(dontShowStatus)}
+        >
+          <CloseIcon width={16} height={16} />
+          <Text style={ds.ctaDontShowText}>{t('GENERAL.DONTSHOWCTA')}</Text>
+        </Pressable>
+        <Pressable
+          style={[ds.ctaViewLater, compact && ds.ctaCompact, disableViewLater(viewLaterStatus) && ds.ctaDisabled]}
+          onPress={onViewLater}
+          disabled={disableViewLater(viewLaterStatus)}
+        >
+          <ViewLaterIcon width={16} height={16} />
+          <Text style={ds.ctaViewLaterText}>{t('GENERAL.VIEWLATER')}</Text>
+        </Pressable>
+        <Pressable style={[ds.ctaLike, compact && ds.ctaCompact]} onPress={onLike}>
+          <LikeIcon width={16} height={17} />
+          <Text style={ds.ctaLikeText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
+        </Pressable>
+      </View>
+    )
+  }
+  if (showAfterLikeCTA(likedStatus)) {
+    return (
+      <View style={ds.afterLikeRow}>
+        <Text style={ds.afterLikeText} numberOfLines={1}>{getAfterLikeContentText(ctaCtx, t)}</Text>
+        <View style={ds.ctaSendInterestWrap}>
+          {showFreeBadge(ctaCtx) && (
+            <View style={ds.freeBadge} pointerEvents="none">
+              <Text style={ds.freeBadgeText}>{t('GENERAL.FREE')}</Text>
+            </View>
+          )}
+          <Pressable style={ds.ctaSendInterest} onPress={onCall}>
+            <CdnSvg uri={getAfterLikeCtaIcon(ctaCtx)} width={16} height={16} />
+            <Text style={ds.ctaSendInterestText}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
+          </Pressable>
+        </View>
+        {showContactsLeftBanner(ctaCtx) && !compact && (
+          <Text style={ds.contactsLeftText}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
+        )}
+      </View>
+    )
+  }
+  return null
+}
+
+function NeighborButton({
+  side, enabled, preview, onPress, t,
+}: {
+  side: 'prev' | 'next'
+  enabled: boolean
+  preview: NeighborPreview | undefined
+  onPress: () => void
+  t: (key: string) => string
+}) {
+  if (!enabled) return null
+  // Angular has no localized "Previous" string anywhere in locales/en.json for
+  // this desktop-only control (mobile's equivalent is a bare ‹/› chevron, no
+  // label) — "Next" reuses the existing GENERAL.NEXT key, "Previous" is plain
+  // English to match, same convention MatchesDesktopNav.tsx already uses for
+  // its own un-keyed "Upgrade" label.
+  const label = side === 'prev' ? 'Previous' : t('GENERAL.NEXT')
+  return (
+    <Pressable style={s.neighborBtn} onPress={onPress}>
+      {side === 'next' && !!preview?.photoUri && (
+        <Image source={{ uri: preview.photoUri }} style={s.neighborAvatar} contentFit="cover" />
+      )}
+      <Text style={s.neighborBtnText}>{label}</Text>
+      {side === 'prev' && !!preview?.photoUri && (
+        <Image source={{ uri: preview.photoUri }} style={s.neighborAvatar} contentFit="cover" />
+      )}
+    </Pressable>
+  )
+}
+
 export default function ViewProfileDesktopLayout({
   profile, oppGender, sameGender, ownProfile, loginGender, hasReligiousInfo,
   ownEntryType, femaleFreeEligible, indNumbersLeft, loginHoroAvail, horoscopeRequested,
@@ -132,11 +255,54 @@ export default function ViewProfileDesktopLayout({
   // "measure once, compare to live scroll position" approach ViewProfileScreen's
   // mobile floating-CTA (topCtaVisible) already uses.
   const [heroBottomY, setHeroBottomY] = useState<number | null>(null)
-  const [scrollY, setScrollY] = useState(0)
-  const showStickyBar = heroBottomY !== null && scrollY > heroBottomY
+  const [showStickyBar, setShowStickyBar] = useState(false)
+  // "Similar profiles" needs to end at the exact same right edge as "Basic
+  // details"/leftCol — but leftCol's rendered width isn't a fixed number: it's
+  // whatever's left over after the flex row divides space with rightCol (which
+  // itself only exists, and only reserves width, when there's a membership
+  // promo to show — see rightCol below). Measuring it directly is the only way
+  // to match it exactly in both cases instead of guessing at flex arithmetic.
+  const [leftColWidth, setLeftColWidth] = useState<number | null>(null)
+
+  // Buffer around heroBottomY so the sticky bar's mount/unmount doesn't flip on
+  // every scroll tick when scrollY hovers right at the boundary (common with
+  // wheel/trackpad scrolling) — without it, the bar (and the CTA/nav buttons
+  // inside it) visibly flickered in and out on small back-and-forth scroll.
+  const STICKY_BAR_HYSTERESIS = 30
 
   function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    setScrollY(e.nativeEvent.contentOffset.y)
+    if (heroBottomY === null) return
+    const y = e.nativeEvent.contentOffset.y
+    setShowStickyBar(prev => {
+      if (!prev && y > heroBottomY + STICKY_BAR_HYSTERESIS) return true
+      if (prev && y < heroBottomY - STICKY_BAR_HYSTERESIS) return false
+      return prev
+    })
+  }
+
+  // Arrow-button navigation for the Similar Profiles row — mirrors
+  // ViewProfileScreen.tsx's mobile scrollSimilarBy/onSimilarScroll exactly,
+  // advancing one card at a time instead of leaving it a free-drag list.
+  // Card size is derived from leftColWidth (this section is exactly that wide —
+  // see similarSection's style below) so the row divides into exactly 4 slots
+  // that fill the section flush to its right edge, with no leftover gap and no
+  // 5th card peeking — a fixed 180px (Figma's own size) left a gap here
+  // whenever leftColWidth didn't happen to divide evenly into 4×180+3×16.
+  const [similarIndex, setSimilarIndex] = useState(0)
+  const similarListRef = useRef<FlatList<SimilarProfileCard>>(null)
+  const similarCardSize = leftColWidth
+    ? Math.max(120, Math.floor((leftColWidth - SIMILAR_LIST_PADDING - SIMILAR_CARD_GAP * 3) / 4))
+    : SIMILAR_CARD_SIZE
+  const similarCardStride = similarCardSize + SIMILAR_CARD_GAP
+
+  function scrollSimilarBy(delta: number) {
+    const nextIndex = Math.max(0, Math.min(similarProfiles.length - 1, similarIndex + delta))
+    similarListRef.current?.scrollToOffset({ offset: nextIndex * similarCardStride, animated: true })
+    setSimilarIndex(nextIndex)
+  }
+
+  function onSimilarScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    setSimilarIndex(Math.round(e.nativeEvent.contentOffset.x / similarCardStride))
   }
 
   const ctaCtx: AfterLikeCtx = {
@@ -146,85 +312,6 @@ export default function ViewProfileDesktopLayout({
     femaleFreeEligible,
     indNumbersLeft,
     oppGender,
-  }
-
-  // Shared by both the inline hero-card CTA and the condensed sticky bar's CTA —
-  // same underlying showLikeCTA/showAfterLikeCTA gating & handlers the mobile
-  // screen's renderCtaBlock() uses, just laid out as one compact row instead of
-  // mobile's two-row stacked block.
-  function CtaRow({ compact }: { compact?: boolean }) {
-    if (sameGender || ownProfile) return null
-    if (showLikeCTA(profile.likedStatus)) {
-      return (
-        <View style={ds.ctaRow}>
-          <Pressable
-            style={[ds.ctaDontShow, compact && ds.ctaCompact, disableDontShow(profile.dontShowStatus) && ds.ctaDisabled]}
-            onPress={onDontShow}
-            disabled={disableDontShow(profile.dontShowStatus)}
-          >
-            <CloseIcon width={16} height={16} />
-            <Text style={ds.ctaDontShowText}>{t('GENERAL.DONTSHOWCTA')}</Text>
-          </Pressable>
-          <Pressable
-            style={[ds.ctaViewLater, compact && ds.ctaCompact, disableViewLater(profile.viewLaterStatus) && ds.ctaDisabled]}
-            onPress={onViewLater}
-            disabled={disableViewLater(profile.viewLaterStatus)}
-          >
-            <ViewLaterIcon width={16} height={16} />
-            <Text style={ds.ctaViewLaterText}>{t('GENERAL.VIEWLATER')}</Text>
-          </Pressable>
-          <Pressable style={[ds.ctaLike, compact && ds.ctaCompact]} onPress={onLike}>
-            <LikeIcon width={16} height={17} />
-            <Text style={ds.ctaLikeText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
-          </Pressable>
-        </View>
-      )
-    }
-    if (showAfterLikeCTA(profile.likedStatus)) {
-      return (
-        <View style={ds.afterLikeRow}>
-          <Text style={ds.afterLikeText} numberOfLines={1}>{getAfterLikeContentText(ctaCtx, t)}</Text>
-          <View style={ds.ctaSendInterestWrap}>
-            {showFreeBadge(ctaCtx) && (
-              <View style={ds.freeBadge} pointerEvents="none">
-                <Text style={ds.freeBadgeText}>{t('GENERAL.FREE')}</Text>
-              </View>
-            )}
-            <Pressable style={ds.ctaSendInterest} onPress={onCall}>
-              <CdnSvg uri={getAfterLikeCtaIcon(ctaCtx)} width={16} height={16} />
-              <Text style={ds.ctaSendInterestText}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
-            </Pressable>
-          </View>
-          {showContactsLeftBanner(ctaCtx) && !compact && (
-            <Text style={ds.contactsLeftText}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
-          )}
-        </View>
-      )
-    }
-    return null
-  }
-
-  function NeighborButton({
-    side, enabled, preview, onPress,
-  }: { side: 'prev' | 'next'; enabled: boolean; preview: NeighborPreview | undefined; onPress: () => void }) {
-    if (!enabled) return null
-    // Angular has no localized "Previous" string anywhere in locales/en.json for
-    // this desktop-only control (mobile's equivalent is a bare ‹/› chevron, no
-    // label) — "Next" reuses the existing GENERAL.NEXT key, "Previous" is plain
-    // English to match, same convention MatchesDesktopNav.tsx already uses for
-    // its own un-keyed "Upgrade" label.
-    const label = side === 'prev' ? 'Previous' : t('GENERAL.NEXT')
-    return (
-      <Pressable style={s.neighborBtn} onPress={onPress}>
-        {side === 'next' && !!preview?.photoUri && (
-          <Image source={{ uri: preview.photoUri }} style={s.neighborAvatar} contentFit="cover" />
-        )}
-        <Text style={s.neighborBtnText}>{label}</Text>
-        {side === 'prev' && !!preview?.photoUri && (
-          <Image source={{ uri: preview.photoUri }} style={s.neighborAvatar} contentFit="cover" />
-        )}
-      </Pressable>
-    )
   }
 
   return (
@@ -251,10 +338,23 @@ export default function ViewProfileDesktopLayout({
             )}
             <Text style={s.stickyName} numberOfLines={1}>{profile.name}</Text>
           </View>
-          <CtaRow compact />
+          <CtaRow
+            compact
+            sameGender={sameGender}
+            ownProfile={ownProfile}
+            likedStatus={profile.likedStatus}
+            dontShowStatus={profile.dontShowStatus}
+            viewLaterStatus={profile.viewLaterStatus}
+            onDontShow={onDontShow}
+            onViewLater={onViewLater}
+            onLike={onLike}
+            onCall={onCall}
+            ctaCtx={ctaCtx}
+            t={t}
+          />
           <View style={s.stickyNav}>
-            <NeighborButton side="prev" enabled={hasPrevProfile} preview={prevPreview} onPress={onGoToPrev} />
-            <NeighborButton side="next" enabled={hasNextProfile} preview={nextPreview} onPress={onGoToNext} />
+            <NeighborButton side="prev" enabled={hasPrevProfile} preview={prevPreview} onPress={onGoToPrev} t={t} />
+            <NeighborButton side="next" enabled={hasNextProfile} preview={nextPreview} onPress={onGoToNext} t={t} />
           </View>
         </View>
       )}
@@ -277,8 +377,8 @@ export default function ViewProfileDesktopLayout({
               </Text>
             </Pressable>
             <View style={s.paginationNav}>
-              <NeighborButton side="prev" enabled={hasPrevProfile} preview={prevPreview} onPress={onGoToPrev} />
-              <NeighborButton side="next" enabled={hasNextProfile} preview={nextPreview} onPress={onGoToNext} />
+              <NeighborButton side="prev" enabled={hasPrevProfile} preview={prevPreview} onPress={onGoToPrev} t={t} />
+              <NeighborButton side="next" enabled={hasNextProfile} preview={nextPreview} onPress={onGoToNext} t={t} />
             </View>
           </View>
         )}
@@ -346,14 +446,26 @@ export default function ViewProfileDesktopLayout({
                 <Text style={s.biodataCtaText}>{t('BIO_DATA.BIODATA_DOWNLOAD_FREE')}</Text>
               </Pressable>
             ) : (
-              <CtaRow />
+              <CtaRow
+                sameGender={sameGender}
+                ownProfile={ownProfile}
+                likedStatus={profile.likedStatus}
+                dontShowStatus={profile.dontShowStatus}
+                viewLaterStatus={profile.viewLaterStatus}
+                onDontShow={onDontShow}
+                onViewLater={onViewLater}
+                onLike={onLike}
+                onCall={onCall}
+                ctaCtx={ctaCtx}
+                t={t}
+              />
             )}
           </View>
         </View>
 
         {/* ── Two-column body ──────────────────────────────────────────────── */}
         <View style={s.twoColumn}>
-          <View style={s.leftCol}>
+          <View style={s.leftCol} onLayout={e => setLeftColWidth(e.nativeEvent.layout.width)}>
             <DesktopSectionHeader title={t('VIEWPROFILE.BASIC_DETAILS')} first />
             <View style={ds.rowsGroup}>
               <DesktopDetailRow icon={ICON.createdFor} label={t('VIEWPROFILE.CREATEDFOR')} value={profile.profileFor} />
@@ -510,18 +622,25 @@ export default function ViewProfileDesktopLayout({
             )}
           </View>
 
-          <View style={s.rightCol}>
-            {!sameGender && menuPromo?.MATCHESSLOT && (
-              // Figma node 290:2854 wraps this same "become a paid member" content
-              // in its OWN rounded-16 card (cream/gold gradient, soft shadow) — the
-              // mobile MembershipBanner component underneath is reused as-is for its
-              // content (server-driven TITLE/BENEFITS/CTA), just given the desktop
-              // card's outer chrome instead of mobile's flat full-bleed banner look.
+          {!sameGender && menuPromo?.MATCHESSLOT && (
+            // Only rendered — and only reserving its column width — when there's
+            // an actual promo to show. An always-present empty rightCol reserved
+            // 260px of dead space next to "Basic details" whenever there was no
+            // promo, which made leftCol stop well short of the page's right edge
+            // while the full-width "Similar profiles" section below it kept
+            // spanning the whole row, so the two no longer lined up.
+            //
+            // Figma node 290:2854 wraps this same "become a paid member" content
+            // in its OWN rounded-16 card (cream/gold gradient, soft shadow) — the
+            // mobile MembershipBanner component underneath is reused as-is for its
+            // content (server-driven TITLE/BENEFITS/CTA), just given the desktop
+            // card's outer chrome instead of mobile's flat full-bleed banner look.
+            <View style={s.rightCol}>
               <View style={s.sidebarCard}>
                 <MembershipBanner data={menuPromo.MATCHESSLOT} onPress={onMembershipBannerPress} />
               </View>
-            )}
-          </View>
+            </View>
+          )}
         </View>
 
         {/* ── Similar profiles ─────────────────────────────────────────────── */}
@@ -530,29 +649,49 @@ export default function ViewProfileDesktopLayout({
             colors={['#E6F5F0', 'rgba(230,245,240,0)']}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={s.similarSection}
+            style={[s.similarSection, leftColWidth ? { width: leftColWidth } : null]}
           >
             <View style={s.similarHeaderRow}>
               <Text style={s.similarHeader}>
                 {t('VIEWPROFILE.SIMILARPROFILES').replace('#NAME#', profile.name)}
               </Text>
             </View>
-            <FlatList
-              data={similarProfiles}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={item => item.matriId}
-              contentContainerStyle={s.similarListContent}
-              renderItem={({ item }) => (
-                <SimilarProfileCardItem
-                  card={item}
-                  oppGender={oppGender}
-                  t={t}
-                  onPress={() => onSimilarProfilePress(item)}
-                  size={SIMILAR_CARD_SIZE}
-                />
+            <View style={s.similarListViewport}>
+              <FlatList
+                ref={similarListRef}
+                data={similarProfiles}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                snapToInterval={similarCardStride}
+                decelerationRate="fast"
+                onScroll={onSimilarScroll}
+                scrollEventThrottle={32}
+                keyExtractor={item => item.matriId}
+                contentContainerStyle={s.similarListContent}
+                renderItem={({ item }) => (
+                  <SimilarProfileCardItem
+                    card={item}
+                    oppGender={oppGender}
+                    t={t}
+                    onPress={() => onSimilarProfilePress(item)}
+                    size={similarCardSize}
+                  />
+                )}
+              />
+              {/* Angular: <app-swiper>'s navigation-module arrows — same dark
+                  circular button look ViewProfileScreen.tsx's mobile version
+                  and the hero photo swiper's desktop arrows already use. */}
+              {similarIndex > 0 && (
+                <Pressable style={[s.similarArrowBtn, s.similarArrowLeft]} onPress={() => scrollSimilarBy(-1)} hitSlop={8}>
+                  <Text style={s.similarArrowText}>{'‹'}</Text>
+                </Pressable>
               )}
-            />
+              {similarIndex < similarProfiles.length - 1 && (
+                <Pressable style={[s.similarArrowBtn, s.similarArrowRight]} onPress={() => scrollSimilarBy(1)} hitSlop={8}>
+                  <Text style={s.similarArrowText}>{'›'}</Text>
+                </Pressable>
+              )}
+            </View>
           </LinearGradient>
         )}
       </ScrollView>
@@ -659,10 +798,31 @@ const s = StyleSheet.create({
     elevation: 3,
   },
 
-  similarSection: { marginTop: 32, paddingVertical: 24, borderRadius: 12 },
-  similarHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 24 },
+  // width:'100%' + overflow:'hidden' — expo-linear-gradient's web output doesn't
+  // reliably inherit the parent column's default stretch-to-full-width sizing,
+  // so without an explicit width the horizontal card row could push this section
+  // wider than the rest of the page content (spilling past where the "Basic
+  // details"/"Family details" card ends, all the way toward the raw browser
+  // edge) instead of closing at the same right edge as everything above it.
+  similarSection: { width: '100%', overflow: 'hidden', marginTop: 32, paddingVertical: 24, borderRadius: 12 },
+  similarHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SIMILAR_LIST_PADDING },
   similarHeader: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.black, marginBottom: 12 },
-  similarListContent: { paddingHorizontal: 24, gap: 16 },
+  similarListContent: { paddingHorizontal: SIMILAR_LIST_PADDING, gap: SIMILAR_CARD_GAP },
+  // No explicit width needed — this stretches to fill similarSection, which is
+  // itself already pinned to leftColWidth (see the inline style override on
+  // the LinearGradient above). overflow:'hidden' just clips the arrows/cards
+  // to that same boundary.
+  similarListViewport: { overflow: 'hidden' },
+  // Same dark circular button look ViewProfileScreen.tsx's mobile Similar
+  // Profiles arrows and the hero photo swiper's desktop arrows already use.
+  similarArrowBtn: {
+    position: 'absolute', top: '50%', marginTop: -16,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center',
+  },
+  similarArrowLeft:  { left: 8 },
+  similarArrowRight: { right: 8 },
+  similarArrowText: { color: Colors.white, fontSize: 20, lineHeight: 20 },
 })
 
 // ─── CTA + detail-row styles ───────────────────────────────────────────────────

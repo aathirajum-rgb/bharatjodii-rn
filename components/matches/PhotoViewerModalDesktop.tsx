@@ -14,6 +14,13 @@ const CARD_MAX_WIDTH  = 960
 const CARD_MAX_HEIGHT = 557
 const PHOTO_SIZE_MAX  = 404
 const THUMB_SIZE      = 40
+// Figma (141:37089, "Bottom sheet" frame): the chevron buttons sit INSIDE the
+// white card, not outside it — 44px circles offset a fixed 64px out from the
+// (centered) photo box's own edges, vertically centered with it. A previous
+// pass placed them at `left:-64`/`right:-64` relative to the CARD instead of
+// the photo, which pushed them out into the dark scrim past the card's edge.
+const CHEVRON_SIZE = 44
+const CHEVRON_GAP   = 64
 
 export interface PhotoViewerModalDesktopProps {
   visible:      boolean
@@ -35,6 +42,11 @@ export default function PhotoViewerModalDesktop({
   const cardWidth  = Math.min(CARD_MAX_WIDTH, width * 0.9)
   const cardHeight = Math.min(CARD_MAX_HEIGHT, height * 0.85)
   const photoSize  = Math.min(PHOTO_SIZE_MAX, cardWidth * 0.42, cardHeight * 0.7)
+  // The photo box is horizontally centered in the card, so the space on either
+  // side of it is (cardWidth - photoSize) / 2 — the chevron sits CHEVRON_GAP
+  // inside that margin, clamped so it can't overlap the photo on a narrow card.
+  const sideMargin   = (cardWidth - photoSize) / 2
+  const chevronInset = Math.max(8, sideMargin - CHEVRON_GAP - CHEVRON_SIZE)
 
   function goPrev() { setIndex(i => Math.max(0, i - 1)) }
   function goNext() { setIndex(i => Math.min(images.length - 1, i + 1)) }
@@ -52,17 +64,20 @@ export default function PhotoViewerModalDesktop({
 
           <View style={[s.photoBox, { width: photoSize, height: photoSize }]}>
             {!!images[index] && (
-              <Image source={{ uri: images[index] }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              // "cover" cropped portrait-oriented photos (taller than the
+              // square box) at the top/bottom to fill it — "contain" always
+              // shows the whole photo, matching Figma's full-view intent.
+              <Image source={{ uri: images[index] }} style={StyleSheet.absoluteFill} contentFit="contain" />
             )}
           </View>
 
           {hasPrev && (
-            <Pressable style={[s.chevronBtn, s.chevronLeft]} onPress={goPrev} hitSlop={8}>
+            <Pressable style={[s.chevronBtn, { left: chevronInset }]} onPress={goPrev} hitSlop={8}>
               <Text style={s.chevronText}>{'‹'}</Text>
             </Pressable>
           )}
           {hasNext && (
-            <Pressable style={[s.chevronBtn, s.chevronRight]} onPress={goNext} hitSlop={8}>
+            <Pressable style={[s.chevronBtn, { right: chevronInset }]} onPress={goNext} hitSlop={8}>
               <Text style={s.chevronText}>{'›'}</Text>
             </Pressable>
           )}
@@ -107,8 +122,6 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
-  chevronLeft:  { left: -64 },
-  chevronRight: { right: -64 },
   chevronText:  { color: Colors.white, fontSize: 26, lineHeight: 26 },
   thumbStrip: {
     flexDirection: 'row', gap: 16, marginTop: 27,

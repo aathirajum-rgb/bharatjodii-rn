@@ -270,6 +270,12 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 
   const [profile, setProfile] = useState<ViewProfileModel | null>(null)
   const [loading, setLoading] = useState(true)
+  // Prev/Next just swaps matriId, re-running the load effect below — without this,
+  // every chevron tap set `loading` true again, which tears down the ENTIRE screen
+  // (header/nav included, see the `if (loading) return ...` below) for a spinner
+  // flash, even though the neighbor's data is usually already prefetched. Only the
+  // very first load (arriving fresh from Matches) should show that full-screen state.
+  const isFirstLoadRef = useRef(true)
   const [loginGender, setLoginGender] = useState<'M' | 'F'>('F')
   const [ownEntryType, setOwnEntryType] = useState('')
   const [femaleFreeEligible, setFemaleFreeEligible] = useState(false)
@@ -322,7 +328,8 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     let cancelled = false
 
     async function load() {
-      setLoading(true)
+      if (isFirstLoadRef.current) setLoading(true)
+      isFirstLoadRef.current = false
       const [lg, entryType, femaleFreeRaw, contactDetail, horoAvail, userId] = await Promise.all([
         getItem(StorageKeys.User.LOGIN_GENDER),
         getSessionValue('ENTRYTYPE'),
@@ -381,9 +388,17 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         }
         // Feature 2 prefetch: warm the immediate prev/next neighbor(s) now so
         // tapping a chevron swaps instantly instead of showing a loading flash.
-        // Skipped in DR mode, which has no prev/next affordance at all.
+        // Goes two hops deep (not just ±1) so the Previous/Next buttons' OWN
+        // neighbor-preview avatar (which looks one profile further out than
+        // whichever profile is current) is already cached by the time the user
+        // actually lands there — with only ±1, landing on idx+1 needs idx+2's
+        // preview immediately for its "Next" button, which hadn't been fetched
+        // yet and popped in a moment later once the request finished, reading
+        // as a flicker. Skipped in DR mode, which has no prev/next affordance at all.
         const idx = profileIds.indexOf(matriId)
-        const neighborIds = isDrMode ? [] : [profileIds[idx - 1], profileIds[idx + 1]].filter(
+        const neighborIds = isDrMode ? [] : [
+          profileIds[idx - 2], profileIds[idx - 1], profileIds[idx + 1], profileIds[idx + 2],
+        ].filter(
           (id): id is string => !!id && !prefetchCache.current.has(id),
         )
         neighborIds.forEach(id => {
@@ -396,6 +411,12 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
             // for display instead of only caching the raw response.
             const preview = viewProfileAdapter.adapt(res)
             setNeighborPreviews(prev => ({ ...prev, [id]: { name: preview.name, photoUri: preview.photos[0] } }))
+            // Same photo URI backs both the small neighbor-button avatar AND the
+            // next hero card's main picture — without warming it here, tapping
+            // the chevron swapped `profile` instantly (data prefetched above) but
+            // the <Image> itself had never been fetched, so it went blank and
+            // popped in once the network request finished, which read as a flicker.
+            if (preview.photos[0]) Image.prefetch(preview.photos[0]).catch(() => {})
           }).catch(() => {})
         })
       }
