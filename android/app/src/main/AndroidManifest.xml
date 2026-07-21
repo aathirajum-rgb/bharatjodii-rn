@@ -27,6 +27,13 @@
     <meta-data android:name="expo.modules.updates.EXPO_UPDATES_LAUNCH_WAIT_MS" android:value="0"/>
     <meta-data android:name="expo.modules.updates.EXPO_UPDATE_URL" android:value="https://stgimg.jodii.app/jodii-ota-server/jodii-ota-server/manifest.php"/>
     <meta-data android:name="expo.modules.updates.UPDATES_CONFIGURATION_REQUEST_HEADERS_KEY" android:value="{&quot;expo-flavor&quot;:&quot;jodii&quot;,&quot;expo-channel-name&quot;:&quot;jodii-production&quot;}"/>
+    <!-- Required by com.razorpay:customui — the SDK crashes on init if this
+         meta-data is absent, even though the real per-transaction key is
+         still passed programmatically to Razorpay(activity, key) in
+         RazorpayWebView.kt. Value decrypted from a real PAYCONFIG.RAZORPAY.keyId
+         sample using encryptionService.ts's AES key — confirm this still
+         matches your live Razorpay Key ID; update if it doesn't. -->
+    <meta-data android:name="com.razorpay.ApiKey" android:value="rzp_test_CQAuakjeopRBqd"/>
     <activity android:name=".MainActivity" android:configChanges="keyboard|keyboardHidden|orientation|screenSize|screenLayout|uiMode|smallestScreenSize" android:launchMode="singleTask" android:windowSoftInputMode="adjustResize" android:theme="@style/Theme.App.SplashScreen" android:exported="true" android:screenOrientation="portrait">
       <intent-filter>
         <action android:name="android.intent.action.MAIN"/>
@@ -51,5 +58,6 @@
         <category android:name="android.intent.category.DEFAULT"/>
       </intent-filter>
     </activity>
+    <activity android:name=".RazorpayWebView" android:exported="false" android:theme="@style/Theme.AppCompat.Light.NoActionBar"/>
   </application>
 </manifest>

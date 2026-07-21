@@ -37,7 +37,13 @@ import PropertyDetailsScreen       from '../screens/onboarding/PropertyDetailsSc
 import StarRaasiScreen             from '../screens/onboarding/StarRaasiScreen'
 import DoshamScreen                from '../screens/onboarding/DoshamScreen'
 import PaymentSuccessScreen        from '../screens/payment/PaymentSuccessScreen'
+import PaymentOptionsScreen        from '../screens/payment/PaymentOptionsScreen'
+import CardPaymentScreen           from '../screens/payment/CardPaymentScreen'
+import UpiAddressScreen            from '../screens/payment/UpiAddressScreen'
+import NetBankingScreen            from '../screens/payment/NetBankingScreen'
+import MorePaymentOptionsScreen    from '../screens/payment/MorePaymentOptionsScreen'
 import RechargeScreen              from '../screens/payment/RechargeScreen'
+import type { SelectedPackage }    from '../service/paymentService'
 import PermissionDemoScreen        from '../screens/PermissionDemoScreen'
 import MatchesScreen               from '../screens/matches/MatchesScreen'
 import ViewProfileScreen           from '../screens/viewprofile/ViewProfileScreen'
@@ -124,6 +130,11 @@ export type AppStackParamList = {
   EditProfileLifestyle: undefined
   EditProfileFamily: undefined
   EditProfileProperty: undefined
+  'payment-options': { selectedPackage?: SelectedPackage } | undefined
+  'card-payment': { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
+  'upi-address':  { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
+  'net-banking':  { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
+  'more-payment-options': { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
   ExternalPage: { url: string; title: string }
   // Angular: viewprofile.page.ts route params (:module/:id) — fromPage drives the
   // "from" context communicationBtnOnClick needs for its paywall/report-popup logic.
@@ -333,12 +344,12 @@ const shell = StyleSheet.create({
 const Stack = createNativeStackNavigator<AppStackParamList>()
 
 export default function AppStack() {
-  const { isNewUser } = useAuth()
+  const { initialRoute } = useAuth()
 
   return (
     <Stack.Navigator
       screenOptions={{ headerShown: false }}
-      initialRouteName={isNewUser ? 'onboarding' : 'Matches'}
+      initialRouteName={initialRoute}
     >
       <Stack.Screen name="Matches"   component={MatchesScreen} />
       <Stack.Screen name="viewProfile" component={ViewProfileScreen} />
@@ -359,8 +370,13 @@ export default function AppStack() {
       <Stack.Screen
         name="recharge"
         component={RechargeScreen}
-        options={{ headerShown: true, title: 'Membership Plans', headerStyle: { backgroundColor: Colors.primary }, headerTintColor: Colors.white }}
+        options={{ headerShown: false }}
       />
+      <Stack.Screen name="payment-options" component={PaymentOptionsScreen} />
+      <Stack.Screen name="card-payment" component={CardPaymentScreen} />
+      <Stack.Screen name="upi-address" component={UpiAddressScreen} />
+      <Stack.Screen name="net-banking" component={NetBankingScreen} />
+      <Stack.Screen name="more-payment-options" component={MorePaymentOptionsScreen} />
       <Stack.Screen name="payment-success" component={PaymentSuccessScreen} />
       <Stack.Screen name="Activity" component={ActivityScreen} />
       <Stack.Screen name="Menu" component={MenuScreen} />

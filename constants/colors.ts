@@ -103,4 +103,7 @@ export const Colors = {
   addPhotoGradientEnd:     '#DCFFF0',   // add-photo banner gradient end
   addPhotoCtaBg:           '#1C644C',   // add-photo banner CTA fallback background
   membershipCardBg:        '#FFFBF0',   // membership/festival offer card background
+
+  // ── Payment options screen ───────────────────────────────────────────────────
+  discountGreen:  '#029664',   // "Special discount" amount text (PaymentOptionsScreen)
 }

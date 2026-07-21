@@ -60,7 +60,7 @@ import {
 } from '../../service/communicationService'
 import { fetchBulkLikeMatches } from '../../service/profileService'
 import { redirectToViewProfile } from '../../service/buttonService'
-import { getHeroBannerDetails } from '../../service/paymentService'
+import { getHeroBannerDetails, paymentTrack } from '../../service/paymentService'
 import { shouldShowRatingPopup, markRatingPopupShown } from '../../service/appRatingService'
 import { requestPushNotificationPermission } from '../../service/permissionService'
 import { fetchSurveyPopup, type SurveyPopupData } from '../../service/surveyService'
@@ -1822,7 +1822,9 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     switch (tab) {
       case 0: navigation.navigate('Home');     break
       case 2: navigation.navigate('Activity'); break
-      case 3: navigation.navigate('recharge'); break
+      // Angular: footer.component.ts — paymentTrack(31) fires right before
+      // routing a free member to the payment intermediate page.
+      case 3: paymentTrack('31'); navigation.navigate('recharge'); break
       case 4: navigation.navigate('Search');   break
     }
   }
