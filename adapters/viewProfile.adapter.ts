@@ -40,10 +40,19 @@ export class ViewProfileAdapter implements Adapter<ViewProfileModel> {
 
     const gender: 'M' | 'F' = personal['GENDER'] === 'F' ? 'F' : 'M'
 
-    const nriLocation = location['NRISTATE'] && location['NRICOUNTRY']
-      ? `${location['NRISTATE']}, ${location['NRICOUNTRY']}`
-      : ''
-    const cityState = [location['CITY'], location['STATE']].filter(Boolean).join(', ')
+    // Angular: viewprofile.page.html:607-652 — these are THREE separate, independently
+    // gated rows (NRI location, city/state, and a Hindi/etc-only "Hometown" row), not
+    // one collapsed string. NRI needs only ONE of NRICOUNTRY/NRISTATE present (not
+    // both), and is COUNTRY-first ("India, Chennai" order, not "Chennai, India").
+    // When NRI is showing, the city/state row's label switches from "Current location"
+    // to "Home location" (HOME_LOCATION) — same row, different heading underneath it.
+    const nriLocation = location['NRICOUNTRY'] || location['NRISTATE']
+      ? [location['NRICOUNTRY'], location['NRISTATE']].filter(Boolean).join(', ')
+      : undefined
+    const cityState = [location['CITY'], location['STATE']].filter(Boolean).join(', ') || undefined
+    const homeCityState = location['HOMECITY'] && location['HOMESTATE']
+      ? [location['HOMECITY'], location['HOMESTATE']].filter(Boolean).join(', ')
+      : undefined
 
     const photos: string[] = Array.isArray(photo['PHOTO'])
       ? photo['PHOTO'].map((p: any) => p?.IMAGE).filter(Boolean)
@@ -63,7 +72,10 @@ export class ViewProfileAdapter implements Adapter<ViewProfileModel> {
     // endpoints) — apply the same fallback hardening here rather than trusting
     // a single field name.
     const isIdVerified = personal['IDVERIFY'] == '1' || personal['IDVERIFYSTATUS'] == '1' || personal['IDVERIFIED'] == '1'
-    const income = professional['ANNUALINCOME'] ?? professional['MONTHLYINCOME'] ?? professional['INCOME']
+    // Angular: viewprofile.page.html:692 — ANNUALINCOME=='0' means "no income data",
+    // same "0" = "none" sentinel as elsewhere in this API, not a literal ₹0 income.
+    const incomeRaw = professional['ANNUALINCOME'] ?? professional['MONTHLYINCOME'] ?? professional['INCOME']
+    const income = incomeRaw != null && String(incomeRaw) !== '0' ? incomeRaw : undefined
 
     const model: ViewProfileModel = {
       // Confirmed live: this endpoint's PERSONALINFO uses MATRID (single I), not the
@@ -73,14 +85,22 @@ export class ViewProfileAdapter implements Adapter<ViewProfileModel> {
       profileId:        String(personal['MATRID'] ?? personal['MATRIID'] ?? personal['NBID'] ?? personal['ID'] ?? ''),
       name:             personal['NAME'] ?? '',
       age:              stripAgeUnit(personal['AGE']),
-      location:         nriLocation || cityState,
+      location:         nriLocation || cityState || '',
+      nriLocation,
+      cityStateLocation: cityState,
+      homeLocation:     homeCityState,
       height:           personal['HEIGHTCATEGORY'] ?? personal['HEIGHT'] ?? undefined,
       education:        professional['EDUCATION'] ?? undefined,
       occupation:       professional['OCCUPATION'] ?? undefined,
-      income:           income ?? undefined,
+      income,
       caste:            religious['CASTE'] ?? undefined,
       photos,
-      isPaidMember:     payment['ENTRYTYPE'] === 'P' || personal['MEMBERSHIP'] === '1',
+      // Angular's viewprofile.page.html inline check (`ENTRYTYPE === '1'`) is stale —
+      // confirmed live, this endpoint's PAYMENTINFO.ENTRYTYPE sends the same 'F'/'B'/
+      // paid-tier letter codes as every listing endpoint, never '0'/'1'. Matches the
+      // already-live-verified FUNC.IsPaidMember pattern homeService.ts uses for the
+      // exact same field on Matches/Home listing cards, not the dead template value.
+      isPaidMember:     !['B', 'F'].includes(String(payment['ENTRYTYPE'] ?? 'F')) || personal['MEMBERSHIP'] === '1',
       isIdVerified,
       isPhotoAvailable: photo['PHOTOAVAILABLE'] === 'Y',
       isPhotoProtect:   photo['PHOTOPROTECTED'] === 'Y',
@@ -96,6 +116,9 @@ export class ViewProfileAdapter implements Adapter<ViewProfileModel> {
       maritalStatus:    personal['MARITALSTATUS'] ?? undefined,
       noOfChildren:     personal['NOOFCHILDREN'] ?? undefined,
       motherTongue:     personal['MOTHERTONGUE'] ?? personal['MOTHERTONGUES'] ?? undefined,
+      // Angular: viewprofile.page.ts:214/401 — homePlaceDomain.includes(MOTHERTONGUES)
+      // gates the Hometown row on the raw numeric code, never the display text above.
+      motherTongueCode: personal['MOTHERTONGUES'] ?? undefined,
       physicalStatus:   personal['PHYSICALSTATUS'] ?? undefined,
       profileFor:       personal['PROFILEFOR'] ?? undefined,
 
@@ -124,7 +147,6 @@ export class ViewProfileAdapter implements Adapter<ViewProfileModel> {
       // profile fell into the "hasn't added horoscope" request-CTA branch
       // even when the opposite profile's horoscope really was available.
       horoscopeAvailable: horo['HOROSCOPEAVAILABLE'] === 'Y',
-      horoCompatibility:  horo['COMPATIBILITY'] ?? undefined,
       hasStarMatchInputs: !!(religious['RAASI'] && religious['STAR']),
 
       likedMsg: comm['LIKEDMSG'] ?? undefined,

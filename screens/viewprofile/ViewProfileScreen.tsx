@@ -75,7 +75,12 @@ export const ICON = {
   children:       CDN_SVG + 'revamp-child.svg',
   physicalStatus: CDN_SVG + 'physical-status.svg',
   motherTongue:   CDN_SVG + 'viewprofile/language-icon.svg',
+  // Angular uses a DIFFERENT icon per location row — location-icon.svg for the NRI
+  // row, hometown-vp.svg for the plain city/state row, hometown-icon.svg for the
+  // separate Hindi/etc-only "Hometown" row (viewprofile.page.html:610/622/642).
+  locationNRI:    CDN_SVG + 'viewprofile/location-icon.svg',
   location:       CDN_SVG + 'viewprofile/hometown-vp.svg',
+  hometown:       CDN_SVG + 'viewprofile/hometown-icon.svg',
   education:      CDN_SVG + 'viewprofile/education-icon.svg',
   occupation:     CDN_SVG + 'viewprofile/occupation-icon.svg',
   salary:         CDN_SVG + 'viewprofile/salary-icon.svg',
@@ -92,6 +97,10 @@ export const ICON = {
   vehicle:        CDN_SVG + 'viewprofile/vehicle-details-icon.svg',
   horoscope:      CDN_SVG + 'viewprofile/horoscope-icon.svg',
 }
+
+// Angular: viewprofile.page.ts:214 — mother-tongue codes for which the separate
+// "Hometown" row shows (Hindi and a few others; unrelated to NRI status).
+export const HOME_PLACE_DOMAIN = ['2', '14', '17', '41', '4', '51']
 
 // Angular: viewprofile.page.html's photo swiper is sized to scrWidth (viewport
 // width) with NO explicit height override — i.e. a flat, full-bleed SQUARE photo,
@@ -323,6 +332,8 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // Angular: loginHoroAvail mirrors localStorage.HOROSCOPEAVAILABLE — the LOGGED-IN
   // user's own horoscope-availability flag ('1'/'0'), not the viewed profile's.
   const [loginHoroAvail, setLoginHoroAvail] = useState('0')
+  // Angular: showAddHoro — see the load effect's comment for what this gates.
+  const [showAddHoro, setShowAddHoro] = useState(true)
   // Angular: the top CTA row is `position: sticky; bottom: 0` (viewprofile.page.scss
   // .sticky-btm) — it rides along pinned to the screen bottom for as long as the
   // detail sections keep scrolling past underneath it, and only stops once the
@@ -361,13 +372,14 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
       // the confirm sheet's quota footer (contactQuota) has real numbers
       // instead of whatever was last cached (or nothing, on a fresh session).
       await fetchContactDetails().catch(() => {})
-      const [lg, entryType, femaleFreeRaw, contactDetail, horoAvail, userId] = await Promise.all([
+      const [lg, entryType, femaleFreeRaw, contactDetail, horoAvail, userId, religionKey] = await Promise.all([
         getItem(StorageKeys.User.LOGIN_GENDER),
         getSessionValue('ENTRYTYPE'),
         getSessionValue('FEMALEFREECONACT'),
         getJson<Record<string, any>>('CONTACT_DETAIL'),
         getSessionValue('HOROSCOPEAVAILABLE'),
         getItem(StorageKeys.Auth.USER_ID),
+        getSessionValue('RELIGIONKEY'),
       ])
       if (cancelled) return
       setOwnUserId(userId ?? '')
@@ -383,6 +395,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         expiry: String(contactDetail?.expiryTextValue ?? ''),
       })
       setLoginHoroAvail(String(horoAvail ?? '0'))
+      // Angular: viewprofile.page.ts:2695-2699 — showAddHoro, a per-VIEWER (not
+      // per-profile) religion-based feature toggle that hides the entire Horoscope
+      // section regardless of data, for viewers whose own RELIGIONKEY is Muslim
+      // (codes '3'/'4'/'5' — horoscope matching isn't part of Muslim marriage customs).
+      setShowAddHoro(!['3', '4', '5'].includes(String(religionKey ?? '')))
 
       const cached = prefetchCache.current.get(matriId)
       const raw = cached ?? await getViewProfile(matriId)
@@ -951,6 +968,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // Angular: sameGender hides Call/WhatsApp/Like entirely.
   const sameGender = profile.gender === loginGender
   const hasReligiousInfo = !!(profile.caste || profile.raasi || profile.star || (profile.dosham && profile.dosham.length > 0))
+  const showHomeTownRow = !!profile.homeLocation && HOME_PLACE_DOMAIN.includes(profile.motherTongueCode ?? '')
 
   const ctaCtx: AfterLikeCtx = {
     entryType:   ownEntryType,
@@ -1071,6 +1089,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           femaleFreeEligible={femaleFreeEligible}
           indNumbersLeft={indNumbersLeft}
           loginHoroAvail={loginHoroAvail}
+          showAddHoro={showAddHoro}
           starMatch={starMatch}
           similarProfiles={similarProfiles}
           menuPromo={menuPromo}
@@ -1329,15 +1348,20 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               </View>
             )}
           </View>
-          <Text style={s.jodiId}>{t('EDITPROFILE.JODIIID')} : {profile.profileId}</Text>
+          <Text style={s.jodiId}>{t('VIEWPROFILE.ID')} : {profile.profileId}</Text>
 
           {/* !! coerces to a real boolean — the adapter's `?? undefined` doesn't
               catch a raw API value of "" (empty but present, not null/undefined),
               and `'' && <Text/>` evaluates to '' itself: a bare empty-string text
               node landing directly under this View, which is exactly what React
               Native Web's "Unexpected text node ... cannot be a child of a <View>"
-              warning is about. */}
-          {!!profile.likedMsg && <Text style={s.likedMsg}>{profile.likedMsg}</Text>}
+              warning is about. Angular: viewprofile.page.html:448-458 also requires
+              (!ownProfile || !sameGender) and LIKED ∈ {'0','5') — adapter's
+              toLikedStatus() already clamps any raw '5' down to '0', so checking
+              for '0' here covers both Angular states. */}
+          {!!profile.likedMsg && (!ownProfile || !sameGender) && profile.likedStatus === '0' && (
+            <Text style={s.likedMsg}>{profile.likedMsg}</Text>
+          )}
 
           {/* The top CTA is NOT rendered inline here — Angular's copy of it is
               `position: sticky; bottom: 0`, so it rides pinned to the screen bottom
@@ -1353,7 +1377,21 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           <DetailRow icon={ICON.children} label={t('VIEWPROFILE.NOOFCHILDREN')} value={profile.noOfChildren} />
           <DetailRow icon={ICON.physicalStatus} label={t('REG.PHYSICAL_STATUS')} value={profile.physicalStatus} />
           <DetailRow icon={ICON.motherTongue} label={t('VIEWPROFILE.MOTHERTONGUE')} value={profile.motherTongue} />
-          <DetailRow icon={ICON.location} label={t('VIEWPROFILE.CURRENTLOCATION')} value={profile.location} isLast />
+          {/* Angular: viewprofile.page.html:607-652 — up to three independent rows.
+              When the NRI row shows, the city/state row's label switches to
+              "Home location" instead of "Current location" (same field, different
+              heading). The separate "Hometown" row only shows for mother-tongue
+              codes in homePlaceDomain (e.g. Hindi) — unrelated to NRI status. */}
+          <DetailRow icon={ICON.locationNRI} label={t('VIEWPROFILE.CURRENTLOCATION')} value={profile.nriLocation} />
+          <DetailRow
+            icon={ICON.location}
+            label={profile.nriLocation ? t('VIEWPROFILE.HOME_LOCATION') : t('VIEWPROFILE.CURRENTLOCATION')}
+            value={profile.cityStateLocation}
+            isLast={!showHomeTownRow}
+          />
+          {showHomeTownRow && (
+            <DetailRow icon={ICON.hometown} label={t('REG.REG_TITLE_44')} value={profile.homeLocation} isLast />
+          )}
 
           {/* ── Professional details ─────────────────────────────────────────── */}
           {(profile.education || profile.occupation || profile.income) && (
@@ -1417,8 +1455,10 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               || loginHoroAvail=='0')` — i.e. if you've already added your OWN
               horoscope but this profile hasn't added theirs, the whole section
               is hidden (there's no "request" UI live in Angular to fall back
-              to for that combination — confirmed dead/commented-out code). */}
-          {profile.showHoroSection && !sameGender &&
+              to for that combination — confirmed dead/commented-out code).
+              showAddHoro additionally hides the whole section for Muslim viewers
+              (see the load effect's comment). */}
+          {showAddHoro && profile.showHoroSection && !sameGender &&
            ((profile.horoscopeAvailable && loginHoroAvail === '1') || loginHoroAvail === '0') ? (
             <>
               <SectionHeader title={t('VIEWPROFILE.HORO_DETAILS')} />

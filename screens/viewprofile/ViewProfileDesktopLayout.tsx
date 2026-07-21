@@ -23,7 +23,7 @@ import {
 } from '../../components/matches/matchesCard.shared'
 import MembershipBanner from '../../components/matches/MembershipBanner'
 import {
-  ICON, familyCountText, SimilarProfileCardItem,
+  ICON, familyCountText, SimilarProfileCardItem, HOME_PLACE_DOMAIN,
 } from './ViewProfileScreen'
 import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interface'
 import type { SimilarProfileCard, StarMatchResult } from '../../service/viewProfileService'
@@ -67,6 +67,7 @@ export interface ViewProfileDesktopLayoutProps {
   femaleFreeEligible:  boolean
   indNumbersLeft:      string
   loginHoroAvail:      string
+  showAddHoro:         boolean
   starMatch:           StarMatchResult | null
   similarProfiles:     SimilarProfileCard[]
   menuPromo:           any
@@ -237,7 +238,7 @@ function NeighborButton({
 
 export default function ViewProfileDesktopLayout({
   profile, oppGender, sameGender, ownProfile, loginGender, hasReligiousInfo,
-  ownEntryType, femaleFreeEligible, indNumbersLeft, loginHoroAvail, starMatch,
+  ownEntryType, femaleFreeEligible, indNumbersLeft, loginHoroAvail, showAddHoro, starMatch,
   similarProfiles, menuPromo,
   hasPrevProfile, hasNextProfile, profileIndex, totalProfiles, prevPreview, nextPreview,
   langCode, onBack, onGoToPrev, onGoToNext, onLanguagePress,
@@ -448,7 +449,12 @@ export default function ViewProfileDesktopLayout({
             </View>
 
             <Text style={s.name} numberOfLines={1}>{profile.name}</Text>
-            <Text style={s.jodiId}>{t('EDITPROFILE.JODIIID')} : {profile.profileId}</Text>
+            <Text style={s.jodiId}>{t('VIEWPROFILE.ID')} : {profile.profileId}</Text>
+            {/* Angular: viewprofile.page.html:448-458 — was missing entirely on
+                desktop; see ViewProfileScreen.tsx's matching row for the full gate. */}
+            {!!profile.likedMsg && (!ownProfile || !sameGender) && profile.likedStatus === '0' && (
+              <Text style={s.likedMsg}>{profile.likedMsg}</Text>
+            )}
             {/* Angular sends some parts (e.g. HEIGHTCATEGORY) as raw server HTML —
                 a `<span class="height-revamp-text-small">...</span>` around the
                 cm/ft range — a plain Text showed that literal markup on screen;
@@ -491,7 +497,17 @@ export default function ViewProfileDesktopLayout({
               <DesktopDetailRow icon={ICON.children} label={t('VIEWPROFILE.NOOFCHILDREN')} value={profile.noOfChildren} />
               <DesktopDetailRow icon={ICON.physicalStatus} label={t('REG.PHYSICAL_STATUS')} value={profile.physicalStatus} />
               <DesktopDetailRow icon={ICON.motherTongue} label={t('VIEWPROFILE.MOTHERTONGUE')} value={profile.motherTongue} />
-              <DesktopDetailRow icon={ICON.location} label={t('VIEWPROFILE.CURRENTLOCATION')} value={profile.location} />
+              {/* Angular: viewprofile.page.html:607-652 — see ViewProfileScreen.tsx's
+                  matching rows for the full NRI/city-state/Hometown gate explanation. */}
+              <DesktopDetailRow icon={ICON.locationNRI} label={t('VIEWPROFILE.CURRENTLOCATION')} value={profile.nriLocation} />
+              <DesktopDetailRow
+                icon={ICON.location}
+                label={profile.nriLocation ? t('VIEWPROFILE.HOME_LOCATION') : t('VIEWPROFILE.CURRENTLOCATION')}
+                value={profile.cityStateLocation}
+              />
+              {!!profile.homeLocation && HOME_PLACE_DOMAIN.includes(profile.motherTongueCode ?? '') && (
+                <DesktopDetailRow icon={ICON.hometown} label={t('REG.REG_TITLE_44')} value={profile.homeLocation} />
+              )}
             </View>
 
             {(profile.education || profile.occupation || profile.income) && (
@@ -542,7 +558,7 @@ export default function ViewProfileDesktopLayout({
                 whole section when you've already added your own horoscope but this
                 profile hasn't added theirs — see ViewProfileScreen.tsx's matching
                 comment for the full explanation. */}
-            {profile.showHoroSection && !sameGender &&
+            {showAddHoro && profile.showHoroSection && !sameGender &&
              ((profile.horoscopeAvailable && loginHoroAvail === '1') || loginHoroAvail === '0') && (
               <>
                 <DesktopSectionHeader title={t('VIEWPROFILE.HORO_DETAILS')} />
@@ -784,6 +800,7 @@ const s = StyleSheet.create({
 
   name: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black, marginTop: 12 },
   jodiId: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, marginTop: 4 },
+  likedMsg: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.likedStripText, marginTop: 6 },
   basicInfo: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary, marginTop: 6, lineHeight: 18 },
 
   biodataCta: {

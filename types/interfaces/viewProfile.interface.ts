@@ -13,9 +13,18 @@ export interface ViewProfileModel extends MatchProfile {
   gender:          'M' | 'F'
   maritalStatus?:  string
   noOfChildren?:   string
-  motherTongue?:   string
-  physicalStatus?: string
-  profileFor?:     string
+  motherTongue?:     string
+  motherTongueCode?: string   // raw PERSONALINFO.MOTHERTONGUES numeric code — Hometown row visibility depends on this, not the display text
+  physicalStatus?:   string
+  profileFor?:       string
+
+  // Location — Angular renders these as up to three independent rows (NRI /
+  // city-state / Hindi-etc-only Hometown), not one collapsed string. `location`
+  // (from MatchProfile) stays as the single-string fallback other shared
+  // components (buildBasicView, etc.) already expect.
+  nriLocation?:      string
+  cityStateLocation?: string
+  homeLocation?:      string
 
   // Religious
   religion?:  string
@@ -38,9 +47,9 @@ export interface ViewProfileModel extends MatchProfile {
   // Horoscope (display-only in this phase — no request/upload actions)
   showHoroSection:     boolean
   horoscopeAvailable:  boolean
-  horoCompatibility?:  string   // e.g. "85%" — only meaningful for paid users with raasi+star both set
 
-  // Star-match teaser (paid = real values from horoCompatibility above; free = static teaser)
+  // Star-match teaser — real ratio comes from a separate proactive API call
+  // (ViewProfileScreen.tsx's starMatch state), not from this model.
   hasStarMatchInputs: boolean   // both own + opposite RAASI & STAR present
 
   likedMsg?: string   // COMMINFO.LIKEDMSG — "Liked by you on ..." row text, when present
