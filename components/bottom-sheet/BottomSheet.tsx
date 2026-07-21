@@ -49,11 +49,18 @@ export type BottomSheetType =
   | 'addPhotoPrompt'
   | 'viewPhoneConfirm'
 
+// A single bulleted row for BottomSheetData.benefits (icon + text).
+export interface BottomSheetBenefit {
+  icon:  string
+  value: string
+}
+
 // Structured data the sheet renders. Maps to Angular's `componentData` object.
 export interface BottomSheetData {
   image?: string | undefined            // top illustration / icon URL
   title?: string | undefined            // bold heading
   content?: string | undefined          // body text
+  benefits?: BottomSheetBenefit[] | undefined // bulleted icon+text list (e.g. auto-renewal benefits)
   ctaLabel?: string | undefined         // primary button label
   secondaryCtaLabel?: string | undefined // secondary button label
   linkCtaLabel?: string | undefined      // link text below buttons
@@ -67,6 +74,13 @@ export interface BottomSheetProps {
   visible: boolean
   type?: BottomSheetType | undefined
   data?: BottomSheetData | undefined
+  // Escape hatch for sheets whose content doesn't fit the data-driven shape
+  // above (e.g. a scrollable list + sticky footer, like Angular's
+  // editPackPopUp "View other packages" sheet) — renders instead of the
+  // image/title/content/benefits/CTA block, keeping the same Modal/scrim/
+  // slide-animation/close-button shell.
+  children?: React.ReactNode | undefined
+  showClose?: boolean | undefined  // only used with `children`; `data.showClose` is used otherwise
   style?: StyleProp<ViewStyle> | undefined
   onClose?: (() => void) | undefined
   onPrimaryPress?: (() => void) | undefined
@@ -83,6 +97,8 @@ export default function BottomSheet({
   visible,
   type: _type,
   data,
+  children,
+  showClose: showCloseProp,
   style,
   onClose,
   onPrimaryPress,
@@ -144,7 +160,7 @@ export default function BottomSheet({
     }
   }, [visible, isDesktop, slideAnim, scaleAnim, scrimAnim])
 
-  const showClose    = data?.showClose ?? true
+  const showClose    = children ? (showCloseProp ?? true) : (data?.showClose ?? true)
   const hasImage     = !!data?.image
   const hasPrimary   = !!data?.ctaLabel
   const hasSecondary = (data?.showSecondaryCta ?? false) && !!data?.secondaryCtaLabel
@@ -174,74 +190,90 @@ export default function BottomSheet({
     <>
       {closeButton}
 
-      {/* Top image — CdnSvg so CDN-hosted SVG icons (e.g. the "add your photo"
-          alert icon) render correctly on native, not just web. Angular sets no
-          explicit size on this image (it's the source asset's natural size) —
-          64x64 here is a reasonable fixed stand-in. */}
-      {hasImage && (
-        <CdnSvg
-          uri={data!.image!}
-          width={64}
-          height={64}
-          style={styles.sheetImage}
-        />
-      )}
+      {children ? children : (
+        <>
+          {/* Top image — CdnSvg so CDN-hosted SVG icons (e.g. the "add your photo"
+              alert icon) render correctly on native, not just web. Angular sets no
+              explicit size on this image (it's the source asset's natural size) —
+              64x64 here is a reasonable fixed stand-in. */}
+          {hasImage && (
+            <CdnSvg
+              uri={data!.image!}
+              width={64}
+              height={64}
+              style={styles.sheetImage}
+            />
+          )}
 
-      {/* Title */}
-      {!!data?.title && <Text style={styles.title}>{data.title}</Text>}
+          {/* Title */}
+          {!!data?.title && <Text style={styles.title}>{data.title}</Text>}
 
-      {/* Content */}
-      {!!data?.content && <Text style={styles.content}>{data.content}</Text>}
+          {/* Content */}
+          {!!data?.content && <Text style={styles.content}>{data.content}</Text>}
 
-      {/* Side-by-side CTAs (e.g. Cancel | Block) */}
-      {sideBySide && (
-        <View style={styles.sideBySideRow}>
-          <ButtonRevamp
-            label={data!.secondaryCtaLabel!}
-            variant="ghost"
-            style={{ flex: 1 }}
-            onPress={onSecondaryPress}
-          />
-          <ButtonRevamp
-            label={data!.ctaLabel!}
-            variant="primary"
-            style={{ flex: 1 }}
-            onPress={onPrimaryPress}
-          />
-        </View>
-      )}
+          {/* Benefits list (e.g. auto-renewal incentives) — icon + text rows */}
+          {!!data?.benefits?.length && (
+            <View style={styles.benefitsList}>
+              {data.benefits.map((b, i) => (
+                <View key={i} style={styles.benefitRow}>
+                  <CdnSvg uri={b.icon} width={16} height={16} style={styles.benefitIcon} />
+                  <Text style={styles.benefitText}>{b.value}</Text>
+                </View>
+              ))}
+            </View>
+          )}
 
-      {/* Primary (stacked) — Angular: .primary-cta-jodii uses #B50033, a darker
-          red than the app's general Colors.primary (#C62828) used elsewhere */}
-      {hasPrimary && !sideBySide && (
-        <ButtonRevamp
-          label={data!.ctaLabel!}
-          variant="primary"
-          fullWidth
-          style={[styles.primaryBtn, { backgroundColor: Colors.primaryDark }]}
-          onPress={onPrimaryPress}
-        />
-      )}
+          {/* Side-by-side CTAs (e.g. Cancel | Block) */}
+          {sideBySide && (
+            <View style={styles.sideBySideRow}>
+              <ButtonRevamp
+                label={data!.secondaryCtaLabel!}
+                variant="ghost"
+                style={{ flex: 1 }}
+                onPress={onSecondaryPress}
+              />
+              <ButtonRevamp
+                label={data!.ctaLabel!}
+                variant="primary"
+                style={{ flex: 1 }}
+                onPress={onPrimaryPress}
+              />
+            </View>
+          )}
 
-      {/* Secondary (stacked) */}
-      {hasSecondary && !sideBySide && (
-        <ButtonRevamp
-          label={data!.secondaryCtaLabel!}
-          variant="secondary"
-          fullWidth
-          style={styles.secondaryBtn}
-          onPress={onSecondaryPress}
-        />
-      )}
+          {/* Primary (stacked) — Angular: .primary-cta-jodii uses #B50033, a darker
+              red than the app's general Colors.primary (#C62828) used elsewhere */}
+          {hasPrimary && !sideBySide && (
+            <ButtonRevamp
+              label={data!.ctaLabel!}
+              variant="primary"
+              fullWidth
+              style={[styles.primaryBtn, { backgroundColor: Colors.primaryDark }]}
+              onPress={onPrimaryPress}
+            />
+          )}
 
-      {/* OR separator */}
-      {hasOr && <Text style={styles.orText}>{data!.orCtaText}</Text>}
+          {/* Secondary (stacked) */}
+          {hasSecondary && !sideBySide && (
+            <ButtonRevamp
+              label={data!.secondaryCtaLabel!}
+              variant="secondary"
+              fullWidth
+              style={styles.secondaryBtn}
+              onPress={onSecondaryPress}
+            />
+          )}
 
-      {/* Link CTA */}
-      {hasLinkCta && (
-        <Pressable onPress={onLinkPress} style={styles.linkCtaBtn} hitSlop={6}>
-          <Text style={styles.linkCtaText}>{data!.linkCtaLabel}</Text>
-        </Pressable>
+          {/* OR separator */}
+          {hasOr && <Text style={styles.orText}>{data!.orCtaText}</Text>}
+
+          {/* Link CTA */}
+          {hasLinkCta && (
+            <Pressable onPress={onLinkPress} style={styles.linkCtaBtn} hitSlop={6}>
+              <Text style={styles.linkCtaText}>{data!.linkCtaLabel}</Text>
+            </Pressable>
+          )}
+        </>
       )}
     </>
   )
@@ -407,6 +439,26 @@ const styles = StyleSheet.create({
     textAlign:    'center',
     lineHeight:   20,
     marginBottom: 20,
+  },
+  benefitsList: {
+    width:        '100%',
+    marginBottom: 16,
+  },
+  benefitRow: {
+    flexDirection: 'row',
+    alignItems:    'flex-start',
+    marginBottom:  12,
+  },
+  benefitIcon: {
+    marginTop:   2,
+    marginRight: 10,
+  },
+  benefitText: {
+    flex:       1,
+    fontFamily: 'Poppins-Regular',
+    fontSize:   13,
+    color:      '#1f1e1b',
+    lineHeight: 18,
   },
   primaryBtn: {
     marginTop:    16,

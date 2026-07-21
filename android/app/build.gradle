@@ -224,4 +224,14 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // Razorpay Custom Integration SDK — enables per-UPI-app targeting
+    // (getAppsWhichSupportUpi + upi_app_package_name intent flow) and direct
+    // card submission, neither of which react-native-razorpay's Standard
+    // Checkout SDK (com.razorpay:checkout) supports. These two Razorpay
+    // artifacts ship overlapping classes and cannot coexist in one Android
+    // build (confirmed: duplicate class com.razorpay.AdvertisingIdUtil etc.)
+    // — react-native-razorpay's Android autolinking is disabled in
+    // react-native.config.js for exactly this reason; iOS still uses it.
+    implementation "com.razorpay:customui:3.9.22"
 }

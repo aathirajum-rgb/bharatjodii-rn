@@ -1,241 +1,410 @@
+// Angular: pages/recharge/recharge.page.html (PageType == '3' variant, close-icon
+// header i.e. paymentPageType == '1') + components/benefits-card/benefits-card.component.html
+// — the membership plan-selection list. Reached from the footer "Membership" tab
+// (free/non-paid users) and from Matches/Explore promo banners; paid users are
+// routed to a separate My Membership screen instead (not this one).
+//
+// "View other packages" (Angular: viewAllPacKPopUp(), recharge.page.ts:819-845)
+// opens a BottomsheetComponent (action 'editPackPopUp') listing the FULL,
+// unfiltered promotion.CONTENT — not just the 3-card INTERMEDIATEPACK subset —
+// using the same benefits-card row. Its own footer Pay button dismisses the
+// sheet and calls payNow() with whatever was selected inside it (independent
+// from the main page's selection) — see recharge.page.ts:837-843.
+//
+// The plan-swipe/EPR/old PageType=='2' variants are intentionally not built —
+// out of scope for this Figma.
+
 import { useEffect, useState } from 'react'
 import {
-  ActivityIndicator,
-  Alert,
-  FlatList,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+  ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
+import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import {
-  getCheckoutDetails,
-  getPaymentConfig,
-  getRechargePackages,
-  handlePaymentSuccess,
-  initRazorpayPayment,
-  recordPaymentFailure,
+  checkAvailOffer, getMembershipPlans, getPaymentConfig, paymentTrack,
+  type MembershipPlan, type MembershipPlansData, type SelectedPackage,
 } from '../../service/paymentService'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+const ICON_CLOSE    = CDN_SVG + 'close-light-black.svg'
+const ICON_WHATSAPP = CDN_SVG + 'revamp/whatsapp-revamp.svg'
+const ICON_LIKE     = CDN_SVG + 'bottom-nav/like.svg'
+const ICON_CALL     = CDN_SVG + 'revamp/call-blue.svg'
 
-interface Package {
-  PACKAGEID: string
-  PACKAGENAME: string
-  AMOUNT: string
-  VALIDITY: string
-  DESCRIPTION?: string
-  POPULAR?: string
-}
+// Angular: benefits-card.component.html hides the second benefits row
+// ("...additional matches who liked you") specifically for the weekly pack.
+const WEEKLY_PACK_PRODUCT_ID = '76'
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
+type Props = { navigation: any }
 
-export default function RechargeScreen() {
-  const [packages, setPackages]         = useState<Package[]>([])
-  const [selectedPkg, setSelectedPkg]   = useState<Package | null>(null)
-  const [payMethods, setPayMethods]     = useState<any[]>([])
-  const [selectedMethod, setMethod]     = useState<string>('')
-  const [loading, setLoading]           = useState(true)
-  const [paying, setPaying]             = useState(false)
+export default function RechargeScreen({ navigation }: Props) {
+  const insets = useSafeAreaInsets()
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  const [data, setData]           = useState<MembershipPlansData | null>(null)
+  const [selectedId, setSelected] = useState('')
+  const [loading, setLoading]     = useState(true)
+
+  // "View other packages" sheet — its own independent selection, seeded from
+  // the main page's current selection when opened (matches Angular: the
+  // popup's BottomsheetComponent keeps local state, separate from
+  // recharge.page.ts's selectedPackId until the sheet's own Pay is tapped).
+  const [showAllPlans, setShowAllPlans]   = useState(false)
+  const [sheetSelectedId, setSheetSelected] = useState('')
+
+  useEffect(() => { loadData() }, [])
 
   async function loadData() {
     setLoading(true)
     try {
-      const [pkgs, config] = await Promise.all([
-        getRechargePackages(),
-        getPaymentConfig('CHECKOUT'),
+      // Angular: recharge.page.ts constructor/ngOnInit — getPayConfig(1) and
+      // checkAvailOffer() fire alongside the plan-list fetch; paymentTrack('0')
+      // is the page-view analytics beacon. None of these three block or feed
+      // the plan list itself (matches Angular's own fire-and-forget usage),
+      // so they run alongside getMembershipPlans() rather than before it.
+      const [result] = await Promise.all([
+        getMembershipPlans(),
+        getPaymentConfig(),
+        checkAvailOffer(),
+        paymentTrack('0'),
       ])
-      setPackages(pkgs)
-      const methods: any[] = config.PAYMENTMETHODS ?? []
-      setPayMethods(methods)
-      if (methods.length > 0) setMethod(methods[0].PAYTYPE ?? '')
+      setData(result)
+      if (result) setSelected(result.defaultProductId)
     } catch {
-      Alert.alert('Error', 'Could not load payment options. Please try again.')
+      Alert.alert('Error', 'Could not load membership plans. Please try again.')
     } finally {
       setLoading(false)
     }
   }
 
-  async function handlePay() {
-    if (!selectedPkg) {
-      Alert.alert('Select a plan', 'Please choose a membership plan to continue.')
-      return
-    }
-    if (!selectedMethod) {
-      Alert.alert('Select payment method', 'Please choose a payment method.')
-      return
-    }
+  const selectedPlan      = data?.plans.find(p => p.productid === selectedId)
+  const sheetSelectedPlan = data?.allPlans.find(p => p.productid === sheetSelectedId)
 
-    setPaying(true)
-    try {
-      const config   = await getPaymentConfig('CHECKOUT')
-      const saltKey  = config.GPAY_SALT_KEY ?? ''
-      const checkout = await getCheckoutDetails(selectedPkg.PACKAGEID, selectedMethod)
-
-      if (!checkout) {
-        Alert.alert('Error', 'Could not initiate payment. Please try again.')
-        return
-      }
-
-      const result = await initRazorpayPayment(checkout, selectedMethod, saltKey)
-
-      if (result.success) {
-        await handlePaymentSuccess()
-      } else {
-        const errCode: number = result.response?.code ?? 0
-        // code 0 = user cancelled — no error shown
-        if (errCode !== 0) {
-          await recordPaymentFailure(null, selectedPkg)
-          Alert.alert('Payment Failed', result.response?.description ?? 'Payment could not be completed.')
-        }
-      }
-    } catch {
-      Alert.alert('Error', 'Something went wrong. Please try again.')
-    } finally {
-      setPaying(false)
-    }
+  // This screen can now be the app's initial route (free/unpaid users land
+  // here straight from login — see AuthContext's initialRoute), in which
+  // case there's no back-stack and goBack() silently no-ops. Angular's
+  // closeIntermediatePage() has an equivalent fallback rather than assuming
+  // a previous page always exists.
+  function handleClose() {
+    if (navigation.canGoBack()) navigation.goBack()
+    else navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
   }
 
-  if (loading) {
-    return (
-      <SafeAreaView style={styles.center}>
-        <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={styles.loadingText}>Loading plans…</Text>
-      </SafeAreaView>
-    )
+  function openAllPlans() {
+    setSheetSelected(selectedId)
+    setShowAllPlans(true)
   }
+
+  // Payment method selection + checkout happen on PaymentOptionsScreen —
+  // this screen (and the "View other packages" sheet) only hand off the
+  // chosen plan. Angular: payNow(data) — same target regardless of which of
+  // the two selection surfaces the plan came from.
+  function proceedWithPlan(plan?: MembershipPlan) {
+    if (!plan) return
+    const selectedPackage: SelectedPackage = {
+      PACKAGEID:      plan.productid,
+      value:          plan.value1[0],
+      value1:         plan.value1,
+      price:          plan.price,
+      paidamt:        plan.paidamt,
+      discountamount: plan.discountamount,
+      autopayflag:    plan.autopayflag,
+    }
+    setShowAllPlans(false)
+    navigation.navigate('payment-options', { selectedPackage })
+  }
+
+  // Angular: promotion.CTA3.replace('₹<367>', offerprice || price). Both
+  // fields already carry the ₹ symbol, so no re-formatting is needed.
+  function payLabelFor(plan?: MembershipPlan): string {
+    return data ? data.payCtaTemplate.replace('₹<367>', plan?.offerprice || plan?.price || '') : ''
+  }
+  const payLabel = payLabelFor(selectedPlan)
 
   return (
-    <SafeAreaView style={styles.container}>
-      <Text style={styles.heading}>Choose a Plan</Text>
+    <View style={[s.screen, { paddingTop: insets.top }]}>
+      <View style={s.header}>
+        <Text style={s.headerTitle} numberOfLines={1}>{data?.title ?? 'Membership plans'}</Text>
+        <Pressable onPress={handleClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
+          <CdnSvg uri={ICON_CLOSE} width={20} height={20} />
+        </Pressable>
+      </View>
 
-      {/* Package list */}
-      <FlatList
-        data={packages}
-        keyExtractor={item => item.PACKAGEID}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={<Text style={styles.emptyText}>No plans available.</Text>}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[styles.card, selectedPkg?.PACKAGEID === item.PACKAGEID && styles.cardSelected]}
-            onPress={() => setSelectedPkg(item)}
-            activeOpacity={0.8}
-          >
-            {item.POPULAR === '1' && (
-              <View style={styles.popularBadge}>
-                <Text style={styles.popularText}>POPULAR</Text>
+      {loading ? (
+        <ActivityIndicator color={Colors.primaryDark} style={{ marginTop: 40 }} />
+      ) : !data || data.plans.length === 0 ? (
+        <View style={s.emptyState}>
+          <Text style={s.emptyText}>No plans available.</Text>
+        </View>
+      ) : (
+        <>
+          <ScrollView contentContainerStyle={s.content}>
+            {data.plans.map(plan => (
+              <PlanCard
+                key={plan.productid}
+                plan={plan}
+                selected={selectedId === plan.productid}
+                onPress={() => setSelected(plan.productid)}
+              />
+            ))}
+
+            {!!data.viewAllText && (
+              <Pressable style={s.viewAllRow} onPress={openAllPlans}>
+                <Text style={s.viewAllText}>{data.viewAllText}</Text>
+              </Pressable>
+            )}
+
+            {!!data.offerBannerText && (
+              <View style={s.offerBanner}>
+                <Text style={s.offerBannerText}>{data.offerBannerText}</Text>
               </View>
             )}
-            <Text style={styles.pkgName}>{item.PACKAGENAME}</Text>
-            <Text style={styles.pkgPrice}>₹{item.AMOUNT}</Text>
-            <Text style={styles.pkgValidity}>{item.VALIDITY}</Text>
-            {item.DESCRIPTION ? <Text style={styles.pkgDesc}>{item.DESCRIPTION}</Text> : null}
-          </TouchableOpacity>
-        )}
-      />
+          </ScrollView>
 
-      {/* Payment method selector */}
-      {payMethods.length > 0 && (
-        <View style={styles.methodSection}>
-          <Text style={styles.sectionTitle}>Payment Method</Text>
-          <View style={styles.methodRow}>
-            {payMethods.map(m => (
-              <TouchableOpacity
-                key={m.PAYTYPE}
-                style={[styles.methodBtn, selectedMethod === m.PAYTYPE && styles.methodBtnSelected]}
-                onPress={() => setMethod(m.PAYTYPE)}
-              >
-                <Text style={[styles.methodText, selectedMethod === m.PAYTYPE && styles.methodTextSelected]}>
-                  {m.PAYTYPENAME ?? m.PAYTYPE}
-                </Text>
-              </TouchableOpacity>
-            ))}
+          <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
+            <ButtonRevamp
+              label={payLabel}
+              variant="primary"
+              size="large"
+              fullWidth
+              icon="forward-icon-white"
+              iconPosition="end"
+              style={{ backgroundColor: Colors.primaryDark }}
+              onPress={() => proceedWithPlan(selectedPlan)}
+            />
+            {!!data.helpline && (
+              <View style={s.needHelpRow}>
+                <Text style={s.needHelpText}>Need help? </Text>
+                <CdnSvg uri={ICON_CALL} width={16} height={16} />
+                <Text style={s.needHelpNumber}>{data.helpline}</Text>
+              </View>
+            )}
           </View>
-        </View>
+        </>
       )}
 
-      {/* Pay button */}
-      <TouchableOpacity
-        style={[styles.payBtn, (!selectedPkg || paying) && styles.payBtnDisabled]}
-        onPress={handlePay}
-        disabled={!selectedPkg || paying}
-        activeOpacity={0.85}
+      <BottomSheet
+        visible={showAllPlans}
+        onClose={() => setShowAllPlans(false)}
       >
-        {paying
-          ? <ActivityIndicator color="#fff" />
-          : <Text style={styles.payBtnText}>
-              {selectedPkg ? `Pay ₹${selectedPkg.AMOUNT}` : 'Select a Plan'}
-            </Text>
-        }
-      </TouchableOpacity>
-    </SafeAreaView>
+        <View style={s.sheetInner}>
+          <Text style={s.sheetTitle}>{data?.viewAllText ?? 'All packages'}</Text>
+          <ScrollView style={s.sheetList} contentContainerStyle={s.sheetListContent}>
+            {data?.allPlans.map(plan => (
+              <PlanCard
+                key={plan.productid}
+                plan={plan}
+                selected={sheetSelectedId === plan.productid}
+                onPress={() => setSheetSelected(plan.productid)}
+              />
+            ))}
+          </ScrollView>
+          <ButtonRevamp
+            label={payLabelFor(sheetSelectedPlan)}
+            variant="primary"
+            size="large"
+            fullWidth
+            icon="forward-icon-white"
+            iconPosition="end"
+            style={{ backgroundColor: Colors.primaryDark, marginTop: 16 }}
+            onPress={() => proceedWithPlan(sheetSelectedPlan)}
+          />
+          {!!data?.helpline && (
+            <View style={[s.needHelpRow, { marginTop: 8 }]}>
+              <Text style={s.needHelpText}>Need help? </Text>
+              <CdnSvg uri={ICON_CALL} width={16} height={16} />
+              <Text style={s.needHelpNumber}>{data.helpline}</Text>
+            </View>
+          )}
+        </View>
+      </BottomSheet>
+    </View>
   )
+}
+
+// ─── PlanCard ─────────────────────────────────────────────────────────────────
+// Angular: components/benefits-card/benefits-card.component.html
+
+function PlanCard({
+  plan, selected, onPress,
+}: { plan: MembershipPlan; selected: boolean; onPress: () => void }) {
+  const hasStrike  = !!plan.offerprice
+  const showSecondBenefit = plan.productid !== WEEKLY_PACK_PRODUCT_ID && !!plan.benefits[1]
+
+  return (
+    <View style={plan.splprodflag === '1' ? s.cardWrap : undefined}>
+      {plan.splprodflag === '1' && (
+        <LinearGradient
+          colors={['#00858C', '#004179', '#004179', '#00858C']}
+          locations={[0, 0.25, 0.75, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={s.onlyForYouTab}
+        >
+          <Text style={s.onlyForYouText}>Only for you</Text>
+        </LinearGradient>
+      )}
+
+      {plan.tag === '1' && (
+        <LinearGradient
+          colors={['#5564EC', '#7347CB', '#A822A3']}
+          locations={[0, 0.48, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={s.mostSoldBadge}
+        >
+          <Text style={s.mostSoldText}>Most Sold</Text>
+        </LinearGradient>
+      )}
+
+      <Pressable
+        style={[s.card, selected ? s.cardSelected : s.cardUnselected]}
+        onPress={onPress}
+        accessibilityRole="radio"
+        accessibilityState={{ checked: selected }}
+      >
+        <View style={s.cardTopRow}>
+          <View style={s.cardTopLeft}>
+            <View style={[s.radioCircle, selected && s.radioCircleSelected]}>
+              {selected && <View style={s.radioDot} />}
+            </View>
+            <View>
+              <Text style={s.durationText}>{plan.value1[1]}</Text>
+              <Text style={s.typeText}>{plan.value1[0]}</Text>
+            </View>
+          </View>
+
+          <View style={s.cardTopRight}>
+            {/* Angular: displayAmt() renders these pre-formatted amount strings
+                (already carrying their own ₹ symbol) as-is — no re-formatting. */}
+            <View style={s.priceRow}>
+              {hasStrike && <Text style={s.strikePrice}>{plan.price}</Text>}
+              <Text style={s.finalPrice}>{plan.paidamt}</Text>
+            </View>
+            {!!plan.discounttitle && <Text style={s.saveText}>{plan.discounttitle}</Text>}
+          </View>
+        </View>
+
+        <View style={s.divider} />
+
+        <View style={s.benefitRow}>
+          <CdnSvg uri={ICON_WHATSAPP} width={16} height={16} style={s.benefitIcon} />
+          <Text style={s.benefitText}>{renderBenefitText(plan.benefits[0]?.value)}</Text>
+        </View>
+        {showSecondBenefit && (
+          <View style={s.benefitRow}>
+            <CdnSvg uri={ICON_LIKE} width={16} height={16} style={s.benefitIcon} />
+            <Text style={s.benefitText}>{renderBenefitText(plan.benefits[1].value)}</Text>
+          </View>
+        )}
+      </Pressable>
+    </View>
+  )
+}
+
+// ─── renderBenefitText ────────────────────────────────────────────────────────
+// The API sends benefit copy as light HTML — e.g. `Call/WhatsApp <span
+// class="font-14-semibold">10</span> matches`. There's no HTML renderer in
+// this codebase, so this pulls out just the <span>...</span> wrapped segment
+// and renders it as bold nested Text (RN supports nesting Text for inline
+// styling); everything else renders as plain text, matching Angular's visual
+// result without needing a full HTML parser.
+
+function renderBenefitText(html?: string) {
+  if (!html) return null
+  const parts = html.split(/(<span[^>]*>.*?<\/span>)/g)
+  return parts.map((part, i) => {
+    const match = part.match(/<span[^>]*>(.*?)<\/span>/)
+    return match
+      ? <Text key={i} style={s.benefitBold}>{match[1]}</Text>
+      : part
+  })
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  container:    { flex: 1, backgroundColor: Colors.surface },
-  center:       { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  loadingText:  { color: Colors.textSecondary, fontSize: 14 },
-  heading:      { fontSize: 22, fontWeight: '700', color: Colors.textStrong, padding: 20, paddingBottom: 8 },
-  listContent:  { paddingHorizontal: 16, paddingBottom: 8 },
-  emptyText:    { textAlign: 'center', color: Colors.textPlaceholder, marginTop: 40 },
+const s = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: Colors.white },
+
+  header: {
+    height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 24,
+  },
+  headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, flex: 1 },
+
+  content: { padding: 24, paddingTop: 20, gap: 20 },
+
+  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  emptyText:  { fontSize: 14, color: Colors.textSecondary },
+
+  cardWrap: { marginTop: 20 },
+
+  onlyForYouTab: {
+    position: 'absolute', top: -20, left: 0, height: 40, borderTopLeftRadius: 12, borderTopRightRadius: 12,
+    paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center',
+  },
+  onlyForYouText: { fontFamily: 'Poppins-Medium', fontSize: 10, color: Colors.white },
+
+  mostSoldBadge: {
+    position: 'absolute', top: -11, left: 43, height: 20, borderRadius: 20,
+    paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', zIndex: 1,
+  },
+  mostSoldText: { fontFamily: 'Poppins-Medium', fontSize: 10, color: Colors.white },
 
   card: {
-    borderWidth: 1.5,
-    borderColor: '#e0e0e0',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
-    backgroundColor: Colors.surfaceAlt,
+    borderRadius: 16, padding: 12, backgroundColor: Colors.white,
+    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 4, elevation: 3,
   },
-  cardSelected: { borderColor: Colors.primary, backgroundColor: Colors.primarySurfaceAlt },
-  popularBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: Colors.primary,
-    borderRadius: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    marginBottom: 6,
-  },
-  popularText: { color: '#fff', fontSize: 10, fontWeight: '700' },
-  pkgName:     { fontSize: 16, fontWeight: '600', color: Colors.textStrong },
-  pkgPrice:    { fontSize: 22, fontWeight: '700', color: Colors.primary, marginTop: 4 },
-  pkgValidity: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
-  pkgDesc:     { fontSize: 12, color: Colors.textTertiary, marginTop: 4 },
+  cardSelected:   { borderWidth: 2, borderColor: Colors.primaryDark },
+  cardUnselected: { borderWidth: 1, borderColor: Colors.borderNeutral },
 
-  methodSection: { paddingHorizontal: 16, paddingVertical: 8 },
-  sectionTitle:  { fontSize: 14, fontWeight: '600', color: '#444', marginBottom: 8 },
-  methodRow:     { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  methodBtn: {
-    borderWidth: 1,
-    borderColor: Colors.borderLight,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    backgroundColor: Colors.surfaceInput,
-  },
-  methodBtnSelected: { borderColor: Colors.primary, backgroundColor: Colors.primarySurfaceAlt },
-  methodText:        { fontSize: 13, color: '#444' },
-  methodTextSelected:{ color: Colors.primary, fontWeight: '600' },
+  cardTopRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  cardTopLeft: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
 
-  payBtn: {
-    margin: 16,
-    // Angular: recharge.page.html Pay Now button uses primaryBg (#B50033 = Colors.primaryDark),
-    // not Colors.primary — same fix as ButtonRevamp's primary variant.
-    backgroundColor: Colors.primaryDark,
-    borderRadius: 12,
-    height: 52,
-    alignItems: 'center',
-    justifyContent: 'center',
+  radioCircle: {
+    width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: Colors.borderNeutral,
+    alignItems: 'center', justifyContent: 'center', marginTop: 2,
   },
-  payBtnDisabled: { backgroundColor: '#e0a0a0' },
-  payBtnText:     { color: '#fff', fontSize: 17, fontWeight: '700' },
+  radioCircleSelected: { borderColor: Colors.primaryDark },
+  radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: Colors.primaryDark },
+
+  durationText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
+  typeText:     { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#222222', marginTop: 2 },
+
+  cardTopRight: { alignItems: 'flex-end' },
+  priceRow:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  strikePrice:  { fontSize: 12, color: Colors.textPlaceholder, textDecorationLine: 'line-through' },
+  finalPrice:   { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black },
+  saveText:     { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#00A650', marginTop: 4 },
+
+  divider: { height: 1, backgroundColor: Colors.divider, marginVertical: 12 },
+
+  benefitRow:  { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
+  benefitIcon: { marginTop: 1, marginRight: 4 },
+  benefitText: { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black, lineHeight: 16 },
+  benefitBold: { fontFamily: 'Poppins-SemiBold', fontSize: 14 },
+
+  viewAllRow:  { alignItems: 'center', paddingVertical: 4 },
+  viewAllText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.textSecondary, textDecorationLine: 'underline' },
+
+  offerBanner: {
+    borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16,
+    backgroundColor: Colors.membershipCardBg, alignItems: 'center',
+  },
+  offerBannerText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#7A1739', textAlign: 'center', lineHeight: 16 },
+
+  footer: { paddingHorizontal: 24, paddingTop: 12, gap: 8 },
+
+  // "View other packages" sheet
+  sheetInner:       { maxHeight: '100%' },
+  sheetTitle:       { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, textAlign: 'center', marginBottom: 16 },
+  sheetList:        { maxHeight: 480 },
+  sheetListContent: { gap: 20, paddingBottom: 8 },
+
+  needHelpRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  needHelpText:   { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black },
+  needHelpNumber: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.link, marginLeft: 4 },
 })

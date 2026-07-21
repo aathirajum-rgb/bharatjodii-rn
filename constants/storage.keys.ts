@@ -72,6 +72,7 @@ export const StorageKeys = {
     RP: 'RP',
     STT: 'STT',
     FUPI: 'FUPI',
+    RECHARGE_HELPLINE: 'RECHARGEHELPLINE',
   },
 
   Promotions: {

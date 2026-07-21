@@ -63,6 +63,10 @@ module.exports = ({ config }) => ({
       NSPhotoLibraryUsageDescription: 'We need access to your photos to let you upload a profile picture.',
       NSCameraUsageDescription: 'We need camera access to take profile photos.',
       NSMicrophoneUsageDescription: 'We need microphone access for voice messages.',
+      // react-native-razorpay README (FAQ) — required for iOS to detect/launch
+      // Google Pay ('tez'), PhonePe, and Paytm during the UPI payment flow.
+      // Only takes effect in a standalone build (prebuild/EAS), not Metro/dev.
+      LSApplicationQueriesSchemes: ['tez', 'phonepe', 'paytmmp'],
     },
   },
   web: {

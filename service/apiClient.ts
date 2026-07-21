@@ -135,8 +135,16 @@ export async function apiCall(
 
     if (!res) return errorResponse(url)
 
+    // Some endpoints (confirmed: nbpromotion) send RESPONSECODE/ERRCODE as
+    // JSON numbers rather than strings, but every service in this codebase
+    // compares them as strings ('1', '0') — normalize once here instead of
+    // patching every call site. String(x) on an already-string value is a
+    // no-op, so this can't affect endpoints that already send strings.
+    if (res['RESPONSECODE'] !== undefined) res['RESPONSECODE'] = String(res['RESPONSECODE'])
+    if (res['ERRCODE']      !== undefined) res['ERRCODE']      = String(res['ERRCODE'])
+
     const errCode = res['ERRCODE']
-    if (errCode === 22 || errCode === 61 || errCode === 23) {
+    if (errCode === '22' || errCode === '61' || errCode === '23') {
       if (_retrying) return errorResponse(url) // prevent infinite retry
       const result = await handleErrCode(errCode, res['RTN'], url, () =>
         apiCall(url, method, params, true),

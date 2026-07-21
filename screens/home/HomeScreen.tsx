@@ -13,6 +13,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import HomeHeader, { type ToolbarItem } from '../../components/home-header/HomeHeader'
 import SwiperCard, { type SwiperItem } from '../../components/swiper-card/SwiperCard'
+import { paymentTrack } from '../../service/paymentService'
 import { Colors } from '../../constants/colors'
 // The rest of this screen's data is still mock (see MOCK_* below) — this section
 // is the one exception, now that the Matches screen it hands off to can actually
@@ -170,7 +171,9 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       case 1: navigation.navigate('Matches');  break
       case 2: navigation.navigate('Activity'); break
       case 4: navigation.navigate('Search');   break
-      case 3: navigation.navigate('recharge'); break
+      // Angular: footer.component.ts — paymentTrack(31) fires right before
+      // routing a free member to the payment intermediate page.
+      case 3: paymentTrack('31'); navigation.navigate('recharge'); break
     }
   }
 
