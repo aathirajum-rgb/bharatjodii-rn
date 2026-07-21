@@ -1,20 +1,30 @@
-// Desktop Matches sidebar (Figma "Jodii Desktop", node 225:2522).
-// The 14 preference rows (Age/Location/.../Profile created) have no live
-// per-field "current value" data source anywhere in the app — they keep the
-// Figma-mock display values, but are now real entry points into the same
+// Desktop Matches sidebar (Figma "Jodii Desktop", node 225:2522/1151:17450).
+// The 14 preference rows (Age/Location/.../Profile created) now show the
+// user's real saved search/PP selections (via useFilterDisplayValues, reading
+// the same filterService AsyncStorage SearchScreen.tsx writes to) instead of
+// a hardcoded "Any" placeholder — and are real entry points into the same
 // `onEditPreferences` action the "Edit preferences" link above already uses.
 // The two checkboxes reuse the SAME single-select quick-filter state as the
 // chips above (PHOTOAVAILABLE/HOROSCOPEAVAILABLE are the same keys) — there's
 // no separate multi-value facet system behind this sidebar.
 import { useTranslation } from 'react-i18next'
+import { useFocusEffect } from '@react-navigation/native'
+import { useCallback } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import FilterFieldRow from './FilterFieldRow'
 import CheckboxGroup from '../checkbox/CheckboxGroup'
+import { useFilterDisplayValues, type FilterFieldKey } from '../../hooks/useFilterDisplayValues'
 import { Colors } from '../../constants/colors'
 
+// Same field SET and ORDER as SearchScreen.tsx's own `rows` (the mobile "Edit
+// preferences" screen, itself matching Angular) — this previously dropped
+// EATINGHABITS entirely and placed RELIGION after MOTHERTONGUE instead of
+// right after LOCATION, which read as "Religion is missing" since it only
+// showed up far later in the scrollable list than every other version of
+// this screen puts it.
 const FIELD_KEYS = [
-  'AGE', 'LOCATION', 'CASTE', 'STAR', 'DOSHAM', 'OCCUPATION', 'MONTHLYINCOME',
-  'EDUCATION', 'HEIGHT', 'MOTHERTONGUE', 'RELIGION', 'MARITALSTATUS',
+  'AGE', 'LOCATION', 'RELIGION', 'CASTE', 'STAR', 'DOSHAM', 'OCCUPATION', 'MONTHLYINCOME',
+  'EDUCATION', 'HEIGHT', 'MOTHERTONGUE', 'MARITALSTATUS', 'EATINGHABITS',
   'PHYSICALSTATUS', 'PROFILECREATED',
 ] as const
 
@@ -30,6 +40,13 @@ export default function MatchesFilterSidebar({
 }) {
   const { t } = useTranslation()
   const editPreferences = onEditPreferences ?? noop
+  const [filterDisplay, reloadFilterDisplay] = useFilterDisplayValues()
+
+  // Refresh on every return to this screen — SearchScreen.tsx (navigated to via
+  // onEditPreferences) is where these values actually change, and this sidebar
+  // doesn't otherwise know when that happens (it only reads AsyncStorage once
+  // per mount, and Matches often stays mounted underneath rather than remounting).
+  useFocusEffect(useCallback(() => { reloadFilterDisplay() }, [reloadFilterDisplay]))
 
   return (
     <View style={s.container}>
@@ -54,7 +71,13 @@ export default function MatchesFilterSidebar({
           and never depends on how far the match list has scrolled. */}
       <ScrollView style={s.list} showsVerticalScrollIndicator={false}>
         {FIELD_KEYS.map(key => (
-          <FilterFieldRow key={key} label={t(`FILTER.${key}`)} value="Any" onPress={editPreferences} />
+          <FilterFieldRow
+            key={key}
+            label={t(`FILTER.${key}`)}
+            value={filterDisplay?.values[key as FilterFieldKey] ?? t('SEARCH.ANY')}
+            active={filterDisplay?.active[key as FilterFieldKey] ?? false}
+            onPress={editPreferences}
+          />
         ))}
 
         <CheckboxGroup

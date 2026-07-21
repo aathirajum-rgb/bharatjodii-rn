@@ -23,10 +23,10 @@ import {
 } from '../../components/matches/matchesCard.shared'
 import MembershipBanner from '../../components/matches/MembershipBanner'
 import {
-  ICON, withPronouns, familyCountText, SimilarProfileCardItem,
+  ICON, familyCountText, SimilarProfileCardItem,
 } from './ViewProfileScreen'
 import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interface'
-import type { SimilarProfileCard } from '../../service/viewProfileService'
+import type { SimilarProfileCard, StarMatchResult } from '../../service/viewProfileService'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 
@@ -67,7 +67,7 @@ export interface ViewProfileDesktopLayoutProps {
   femaleFreeEligible:  boolean
   indNumbersLeft:      string
   loginHoroAvail:      string
-  horoscopeRequested:  boolean
+  starMatch:           StarMatchResult | null
   similarProfiles:     SimilarProfileCard[]
   menuPromo:           any
 
@@ -95,7 +95,6 @@ export interface ViewProfileDesktopLayoutProps {
   onMembershipBannerPress:  () => void
 
   onAddHoroscope:      () => void
-  onRequestHoroscope:  () => void
   onViewHoroscope:     () => void
   onAddFamilyDetails:  () => void
   onAddPropertyDetails: () => void
@@ -238,13 +237,13 @@ function NeighborButton({
 
 export default function ViewProfileDesktopLayout({
   profile, oppGender, sameGender, ownProfile, loginGender, hasReligiousInfo,
-  ownEntryType, femaleFreeEligible, indNumbersLeft, loginHoroAvail, horoscopeRequested,
+  ownEntryType, femaleFreeEligible, indNumbersLeft, loginHoroAvail, starMatch,
   similarProfiles, menuPromo,
   hasPrevProfile, hasNextProfile, profileIndex, totalProfiles, prevPreview, nextPreview,
   langCode, onBack, onGoToPrev, onGoToNext, onLanguagePress,
   onLike, onDontShow, onViewLater, onCall, onWhatsApp,
   onOpenPhotoViewer, onSimilarProfilePress, onMembershipBannerPress,
-  onAddHoroscope, onRequestHoroscope, onViewHoroscope,
+  onAddHoroscope, onViewHoroscope,
   onAddFamilyDetails, onAddPropertyDetails, onDownloadBiodata, onViewStarMatchDetails, onReportProfile,
 }: ViewProfileDesktopLayoutProps) {
   const { t } = useTranslation()
@@ -521,20 +520,30 @@ export default function ViewProfileDesktopLayout({
                 </View>
                 {profile.hasStarMatchInputs && (
                   ownEntryType === 'P' ? (
-                    <Pressable onPress={onViewStarMatchDetails}>
-                      <Text style={ds.starMatchText}>
-                        {withPronouns(t('VIEWPROFILE.HOROCOMPATIBILITY'), oppGender, t).replace('#COMPARE#', profile.horoCompatibility ?? '')}
-                      </Text>
-                      <Text style={ds.starMatchTeaser}>{t('VIEWPROFILE.PAID_MEMBER_REPORT')}</Text>
-                    </Pressable>
+                    starMatch && (
+                      <Pressable onPress={onViewStarMatchDetails}>
+                        <Text style={ds.starMatchText}>
+                          {starMatch.displayText}{t('STARMATCHING.STAR_MATCHING_TXT')}
+                        </Text>
+                        <Text style={ds.starMatchTeaser}>{t('VIEWPROFILE.PAID_MEMBER_REPORT')}</Text>
+                      </Pressable>
+                    )
                   ) : (
-                    <Text style={ds.starMatchTeaser}>{t('VIEWPROFILE.FREE_MEMBER_REPORT')}</Text>
+                    <>
+                      <Text style={ds.starMatchText}>9/10{t('STARMATCHING.STAR_MATCHING_TXT')}</Text>
+                      <Text style={ds.starMatchTeaser}>{t('VIEWPROFILE.FREE_MEMBER_REPORT')}</Text>
+                    </>
                   )
                 )}
               </>
             )}
 
-            {profile.showHoroSection && !sameGender && (
+            {/* Angular's full visibility gate (viewprofile.page.html:821) hides this
+                whole section when you've already added your own horoscope but this
+                profile hasn't added theirs — see ViewProfileScreen.tsx's matching
+                comment for the full explanation. */}
+            {profile.showHoroSection && !sameGender &&
+             ((profile.horoscopeAvailable && loginHoroAvail === '1') || loginHoroAvail === '0') && (
               <>
                 <DesktopSectionHeader title={t('VIEWPROFILE.HORO_DETAILS')} />
                 <View style={ds.row}>
@@ -542,26 +551,13 @@ export default function ViewProfileDesktopLayout({
                   <View style={ds.rowLabelValue}>
                     <Text style={ds.label}>{t('VIEWPROFILE.HOROSCOPE')}</Text>
                     <View style={{ flex: 1 }}>
-                      {profile.horoscopeAvailable ? (
-                        loginHoroAvail === '1' ? (
-                          <Pressable onPress={onViewHoroscope}><Text style={ds.actionLink}>{t('GENERAL.ADD_HOROSCOPE')}</Text></Pressable>
-                        ) : (
-                          <>
-                            <Text style={ds.value}>{t('VIEWPROFILE.ADDYOURHORO').replace('#HIMHER#', t(`PRONOUN.${oppGender}.himhers`))}</Text>
-                            <Pressable onPress={onAddHoroscope}><Text style={ds.actionLink}>{t('GENERAL.ADD_HOROSCOPE')}</Text></Pressable>
-                          </>
-                        )
-                      ) : (
+                      {loginHoroAvail === '0' ? (
                         <>
-                          <Text style={ds.value}>{withPronouns(t('VIEWPROFILE.HOROSCOPE_REQ'), oppGender, t)}</Text>
-                          {horoscopeRequested ? (
-                            <Text style={ds.requestedText}>{withPronouns(t('VIEWPROFILE.HORO_REQUESTED'), oppGender, t)}</Text>
-                          ) : (
-                            <Pressable onPress={onRequestHoroscope}>
-                              <Text style={ds.actionLink}>{withPronouns(t('VIEWPROFILE.HOROSCOPE_SEND'), oppGender, t)}</Text>
-                            </Pressable>
-                          )}
+                          <Text style={ds.value}>{t('VIEWPROFILE.ADDYOURHORO').replace('#HIMHER#', t(`PRONOUN.${oppGender}.himhers`))}</Text>
+                          <Pressable onPress={onAddHoroscope}><Text style={ds.actionLink}>{t('GENERAL.ADD_HOROSCOPE')}</Text></Pressable>
                         </>
+                      ) : (
+                        <Pressable onPress={onViewHoroscope}><Text style={ds.actionLink}>{t('GENERAL.VIEW_HOROSCOPE')}</Text></Pressable>
                       )}
                     </View>
                   </View>
@@ -850,7 +846,6 @@ const ds = StyleSheet.create({
   label: { width: 170, fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
   value: { flex: 1, fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.black },
   actionLink: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.link, marginTop: 4 },
-  requestedText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.black, marginTop: 4 },
   addDetailPrompt: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
   addDetailPromptText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.link },
 

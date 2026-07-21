@@ -57,17 +57,15 @@ export default function ContactDetailsSheet({
           </Pressable>
         </View>
 
+        {/* Figma "Jodii Desktop" node 186:4576 — only the Name row is shown here;
+            the raw mobile digits are never printed as plain text anywhere on this
+            card (a previous pass here did show them, which doesn't match). The
+            number is only ever revealed by actually tapping the button below. */}
         <View style={s.infoBlock}>
           <View style={s.row}>
             <Text style={s.label}>{t('VIEWPROFILE.CONTACT_NAMEUSER')}</Text>
             <Text style={s.value}>{name}</Text>
           </View>
-          {!!mobile && (
-            <View style={s.row}>
-              <Text style={s.label}>{t('VIEWPROFILE.CONTACT_MOBILE')}</Text>
-              <Text style={s.value}>{mobile}</Text>
-            </View>
-          )}
         </View>
 
         {/* Figma: this WhatsApp button is white bg + #B50033 (brand red) border +
@@ -81,9 +79,14 @@ export default function ContactDetailsSheet({
           </Pressable>
         )}
 
+        {/* Figma node 186:4576 — labeled "View phone number" (not "Call"), same
+            copy the after-like CTA elsewhere in the app already uses for this
+            exact same reveal-and-call action (matchesCard.shared.tsx's
+            getAfterLikeCtaLabel). A previous pass here used a generic "Call"
+            label that didn't match. */}
         <Pressable style={[s.callBtn, { marginTop: whatsappNumber ? 12 : 16 }]} onPress={onCall}>
           <CallIcon width={24} height={24} />
-          <Text style={s.btnText}>{t('GENERAL.CALL', 'Call')}</Text>
+          <Text style={s.btnText}>{t('VIEWPROFILE.VIEW_PHONE')}</Text>
         </Pressable>
 
         {/* Figma: small icon + indigo (#29339B) text, NOT underlined — an

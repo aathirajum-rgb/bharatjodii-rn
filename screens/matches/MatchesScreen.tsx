@@ -60,6 +60,7 @@ import {
 } from '../../service/communicationService'
 import { fetchBulkLikeMatches } from '../../service/profileService'
 import { redirectToViewProfile } from '../../service/buttonService'
+import { setFilterEventType } from '../../service/filterService'
 import { getHeroBannerDetails } from '../../service/paymentService'
 import { shouldShowRatingPopup, markRatingPopupShown } from '../../service/appRatingService'
 import { requestPushNotificationPermission } from '../../service/permissionService'
@@ -1763,7 +1764,12 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   }
 
   async function applyQuickFilter(key: string) {
-    if (key === 'FILTER') { navigation.navigate('Search'); return }
+    // SearchScreen.tsx's header title/Reset-link/subheader all key off this
+    // SAME eventType flag (getFilterEventType()) — without setting it here,
+    // it stayed whatever it was last left at (defaulting to 'pp'), so tapping
+    // "Filter" from Matches showed the "Partner preferences" header instead of
+    // "Filters", even though this tap is the Filter-mode entry point, not PP.
+    if (key === 'FILTER') { await setFilterEventType('filter'); navigation.navigate('Search'); return }
     const next = selectedChip === key ? '' : key
     setSelectedChip(next)
     setLoading(true)

@@ -18,7 +18,7 @@ export default function StarMatchingScreen({ navigation, route }: { navigation: 
 
   const {
     partnerName, partnerPhoto, ownStar, ownRaasi, partnerStar, partnerRaasi,
-    percentage = 0, isNorth = false,
+    displayText = '', percentage = 0, isNorth = false,
   } = route?.params ?? {}
 
   // Angular: South India shows a 10-star row, active count = round(percentage/10).
@@ -56,9 +56,12 @@ export default function StarMatchingScreen({ navigation, route }: { navigation: 
           </View>
         </View>
 
+        {/* displayText is Angular's ready-to-render poruthamPercentage/poruthamPercentageNorth
+            string ("5.5/10" South, DHASA_PERCENTAGE North) — percentage is only the
+            plain 0-100 number backing the star-count/progress-bar visuals below it. */}
+        <Text style={s.percentText}>{displayText || `${percentage}%`}</Text>
         {isNorth ? (
           <View style={s.percentBlock}>
-            <Text style={s.percentText}>{percentage}%</Text>
             <View style={s.progressTrack}>
               <View style={[s.progressFill, { width: `${Math.max(0, Math.min(100, percentage))}%` }]} />
             </View>
@@ -81,7 +84,7 @@ export default function StarMatchingScreen({ navigation, route }: { navigation: 
           <View style={s.detailBlock}>
             <Text style={s.detailRow}>{t('VIEWPROFILE.RAASIIS')}: You — {ownRaasi ?? '—'} / {partnerName ?? '—'} — {partnerRaasi ?? '—'}</Text>
             <Text style={s.detailRow}>{t('VIEWPROFILE.STARIS')}: You — {ownStar ?? '—'} / {partnerName ?? '—'} — {partnerStar ?? '—'}</Text>
-            <Text style={s.detailRow}>{t('VIEWPROFILE.HOROCOMPATIBILITY').replace('#COMPARE#', `${percentage}%`)}</Text>
+            <Text style={s.detailRow}>{t('VIEWPROFILE.HOROCOMPATIBILITY').replace('#COMPARE#', displayText || `${percentage}%`)}</Text>
           </View>
         )}
       </ScrollView>

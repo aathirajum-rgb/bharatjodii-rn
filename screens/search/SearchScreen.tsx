@@ -13,8 +13,12 @@
 //    side-panel lists), reusing the existing SearchablePicker component.
 //  - MONTHLYINCOME is a flat multi-select bracket list — Angular's nested
 //    "custom range" sub-picker isn't ported.
-//  - PROFILECREATED/PHOTOAVAILABLE/HOROSCOPEAVAILABLE (Filter-mode-only) are
-//    simple on/off toggle rows, not Angular's dedicated bracket lists.
+//  - PROFILECREATED is a recency multi-select (Any Time/1 Week/1 month/3 Month —
+//    confirmed against a live screenshot) using PROFILECREATED_OPTIONS' local,
+//    fixed list; its day-count codes ('7'/'30'/'90') aren't confirmed against
+//    Angular's real API contract (see that constant's own comment).
+//    PHOTOAVAILABLE/HOROSCOPEAVAILABLE (both Filter-mode-only, alongside
+//    PROFILECREATED) are plain on/off checkboxes, matching Angular.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -28,7 +32,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
-import { CDN_REACT } from '../../constants/cdn'
+import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
 import { fetchSearchResults } from '../../service/homeService'
@@ -47,11 +51,40 @@ import {
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
 import MultiSelectPicker, { type MultiSelectOption } from '../../components/multi-select-picker/MultiSelectPicker'
+import { ICON } from '../viewprofile/ViewProfileScreen'
+import CheckboxGroup from '../../components/checkbox/CheckboxGroup'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
 const ICON_BACK  = CDN_REACT + '/menu_back_arrow.svg'
 const ICON_ARROW = CDN_REACT + '/menu_right_arrow.svg'
+
+// Angular's real Filters screen shows a distinct icon per row (confirmed
+// against a live screenshot: person/pin/caste/star/dosham/briefcase/cap icons
+// etc.) — this port previously rendered label+value+chevron only, no icon at
+// all. Reuses ViewProfile's own ICON map (same assets/images/svg/viewprofile/
+// CDN set Angular's detail rows already use) rather than a second copy of
+// these paths — every field below has a directly confirmed match EXCEPT
+// RELIGION, which has no other on-screen usage anywhere in this port to
+// confirm against; that one path is a best-guess following the exact same
+// `viewprofile/{field}-icon.svg` naming convention every other icon here uses.
+const FIELD_ICON: Record<FieldKey, string> = {
+  AGE:            ICON.age,
+  LOCATION:       ICON.location,
+  RELIGION:       CDN_SVG + 'viewprofile/religion-icon.svg',
+  CASTE:          ICON.caste,
+  STAR:           ICON.star,
+  DOSHAM:         ICON.dosham,
+  OCCUPATION:     ICON.occupation,
+  MONTHLYINCOME:  ICON.salary,
+  EDUCATION:      ICON.education,
+  HEIGHT:         ICON.height,
+  MOTHERTONGUE:   ICON.motherTongue,
+  MARITALSTATUS:  ICON.maritalStatus,
+  EATINGHABITS:   ICON.eating,
+  PHYSICALSTATUS: ICON.physicalStatus,
+  PROFILECREATED: ICON.createdFor,
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -65,8 +98,26 @@ type FieldKey =
 // Multi-select fields sharing one generic checkbox-list editor.
 const SIMPLE_MULTI_FIELDS = new Set<FieldKey>([
   'RELIGION', 'DOSHAM', 'OCCUPATION', 'MONTHLYINCOME', 'EDUCATION',
-  'MOTHERTONGUE', 'MARITALSTATUS', 'EATINGHABITS', 'PHYSICALSTATUS',
+  'MOTHERTONGUE', 'MARITALSTATUS', 'EATINGHABITS', 'PHYSICALSTATUS', 'PROFILECREATED',
 ])
+
+// Angular's real "Profile created" field is a recency multi-select (Any Time /
+// 1 Week ago / 1 month ago / 3 Month ago — confirmed against a live
+// screenshot), not the on/off toggle this port previously used. These 4
+// options are fixed/local (no server list exists for them, unlike every
+// other SIMPLE_MULTI_FIELDS entry), but the underlying day-count CODES sent
+// to the search API ('7'/'30'/'90') are an unconfirmed best guess — a
+// reasonable convention for day-based recency buckets, not verified against
+// Angular's actual API contract. If matches don't filter correctly by this
+// field, these codes are the first thing to check.
+function getProfileCreatedOptions(t: (key: string) => string): MultiSelectOption[] {
+  return [
+    { key: '0',  label: t('FILTER.PROFILECREATED_ANYTIME') },
+    { key: '7',  label: t('FILTER.PROFILECREATED_1WEEK') },
+    { key: '30', label: t('FILTER.PROFILECREATED_1MONTH') },
+    { key: '90', label: t('FILTER.PROFILECREATED_3MONTH') },
+  ]
+}
 
 const AGE_OPTIONS: PickerOption[] = Array.from({ length: 53 }, (_, i) => {
   const age = 18 + i
@@ -190,7 +241,7 @@ export default function SearchScreen({ navigation }: Props) {
       MARITALSTATUS:  labelsFor('MARITALSTATUS', selected.MARITALSTATUS ?? []),
       EATINGHABITS:   labelsFor('EATINGHABITS', selected.EATINGHABITS ?? []),
       PHYSICALSTATUS: labelsFor('PHYSICALSTATUS', selected.PHYSICALSTATUS ?? []),
-      PROFILECREATED: (selected.PROFILECREATED?.[0] && selected.PROFILECREATED[0] !== '0') ? t('GENERAL.YES') : t('SEARCH.ANY'),
+      PROFILECREATED: labelsFor('PROFILECREATED', selected.PROFILECREATED ?? []),
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }
   }, [selected, labelCache, isIslam])
@@ -209,6 +260,7 @@ export default function SearchScreen({ navigation }: Props) {
       case 'MARITALSTATUS':  opts = await ensureOptions('MARITALSTATUS', () => fetchMaritalStatusOptions(gender)); break
       case 'EATINGHABITS':   opts = await ensureOptions('EATINGHABITS', fetchEatingHabitOptions); break
       case 'PHYSICALSTATUS': opts = await ensureOptions('PHYSICALSTATUS', fetchPhysicalStatusOptions); break
+      case 'PROFILECREATED': opts = await ensureOptions('PROFILECREATED', async () => getProfileCreatedOptions(t)); break
       default: break
     }
     if (opts.length === 0) return
@@ -246,18 +298,17 @@ export default function SearchScreen({ navigation }: Props) {
     if (key === 'LOCATION') { openLocation(); return }
     if (key === 'STAR') { openStar(); return }
     if (key === 'CASTE') { openCaste(); return }
-    if (key === 'PROFILECREATED') {
-      const cur = selected.PROFILECREATED?.[0] === '1'
-      updateField('PROFILECREATED', cur ? ['0'] : ['1'])
-      return
-    }
     if (SIMPLE_MULTI_FIELDS.has(key)) { openSimpleMulti(key); return }
   }
 
   // ── Reset / Apply ─────────────────────────────────────────────────────────
 
   async function handleReset() {
-    await resetFilter('filter')
+    // Reset now shows in both modes (see header below) — resetFilter('pp')
+    // additionally clears the stored eventType flag itself, which 'filter'
+    // deliberately doesn't touch; passing the actual current mode instead of
+    // always hardcoding 'filter' matters now that this fires from PP mode too.
+    await resetFilter(eventType)
     const obj = { ...DEFAULT_FILTER }
     setSelected(obj)
     setPpCheckBox([])
@@ -308,16 +359,18 @@ export default function SearchScreen({ navigation }: Props) {
         <Text style={s.headerTitle}>
           {eventType === 'filter' ? t('FILTER.FILTER_HEADER') : t('FILTER.PP_HEADER')}
         </Text>
-        {eventType === 'filter' && (
-          <Pressable onPress={handleReset} hitSlop={8}>
-            <Text style={s.resetText}>{t('FILTER.RESET_HEADER')}</Text>
-          </Pressable>
-        )}
+        {/* Figma (node 15889:1907) shows Reset in BOTH Filter and Partner-
+            preferences mode — this previously only showed it in filter mode. */}
+        <Pressable onPress={handleReset} hitSlop={8}>
+          <Text style={s.resetText}>{t('FILTER.RESET_HEADER')}</Text>
+        </Pressable>
       </View>
 
       <ScrollView style={s.flex1} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
         {eventType !== 'filter' && (
-          <Text style={s.subHeader}>{t('FILTER.FILTER_SUB_HEADER')}</Text>
+          <View style={s.subHeader}>
+            <Text style={s.subHeaderText}>{t('FILTER.FILTER_SUB_HEADER')}</Text>
+          </View>
         )}
 
         <View style={s.card}>
@@ -328,19 +381,45 @@ export default function SearchScreen({ navigation }: Props) {
                 onPress={() => fieldRowPress(row.key)}
                 accessibilityRole="button"
               >
+                <CdnSvg uri={FIELD_ICON[row.key]} width={20} height={20} style={s.rowIcon} />
                 <View style={s.rowText}>
                   <Text style={s.rowLabel}>{row.label}</Text>
                   <Text style={s.rowValue} numberOfLines={1}>{(rowValue as any)[row.key]}</Text>
                 </View>
-                {row.key === 'PROFILECREATED' ? (
-                  <View style={[s.toggle, selected.PROFILECREATED?.[0] === '1' && s.toggleOn]} />
-                ) : (
-                  <CdnSvg uri={ICON_ARROW} width={16} height={16} />
-                )}
+                <CdnSvg uri={ICON_ARROW} width={16} height={16} />
               </Pressable>
               {i < arr.length - 1 && <View style={s.rowDivider} />}
             </View>
           ))}
+
+          {/* Filter-mode-only, same as PROFILECREATED above — this port
+              previously only had these two on the DESKTOP sidebar
+              (MatchesFilterSidebar.tsx's own CheckboxGroup, tied to the quick-
+              filter chip state); mobile's full Filters screen never showed
+              them at all, even though they're part of the same persisted
+              filterService selection (PHOTOAVAILABLE/HOROSCOPEAVAILABLE are
+              already in DEFAULT_FILTER and saved/sent the same way every
+              other field here is). */}
+          {eventType === 'filter' && (
+            <>
+              <View style={s.rowDivider} />
+              <CheckboxGroup
+                options={[
+                  {
+                    key:     'PHOTOAVAILABLE',
+                    value:   t('MATCHES.PP_ADDED_PHOTOS_CHECKBOX'),
+                    checked: selected.PHOTOAVAILABLE === '1',
+                  },
+                  {
+                    key:     'HOROSCOPEAVAILABLE',
+                    value:   t('MATCHES.PP_HOROSCOPE_CHECKBOX'),
+                    checked: selected.HOROSCOPEAVAILABLE === '1',
+                  },
+                ]}
+                onToggle={(key, checked) => updateField(key, checked ? '1' : '0')}
+              />
+            </>
+          )}
         </View>
       </ScrollView>
 
@@ -499,36 +578,51 @@ const s = StyleSheet.create({
     elevation:          4,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#333333', marginLeft: 6 },
-  resetText: { fontSize: 14, fontWeight: '600', color: Colors.primaryDark, paddingHorizontal: 12 },
+  // Figma (node 15889:1912/1913): title is Poppins-Medium/16/lineHeight24/black
+  // (was a plain system-font 500 weight, #333333); Reset is Poppins-Regular/14
+  // and Colors.link (#29339B, indigo) — was Colors.primaryDark, the app's dark
+  // RED brand color, a genuinely wrong color for this specific text.
+  headerTitle: { flex: 1, fontFamily: 'Poppins-Medium', fontSize: 16, lineHeight: 24, color: Colors.black, marginLeft: 6 },
+  resetText: { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 16, color: Colors.link, paddingHorizontal: 12 },
 
   scrollContent: { padding: 16, gap: 12 },
-  subHeader: { fontSize: 14, color: Colors.textSecondary, marginBottom: 4 },
+  // Figma (node 15889:2095): a rounded card (5%-opacity tint of the brand red,
+  // NOT a plain gray/secondary-colored line of text) — the container carries
+  // the background/padding/radius, subHeaderText carries the actual type.
+  subHeader: {
+    backgroundColor: 'rgba(181,0,51,0.05)',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 4,
+  },
+  subHeaderText: { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 20, color: Colors.black },
 
   card: { backgroundColor: Colors.white, borderRadius: 12, overflow: 'hidden' },
 
+  // Figma (node 15889:1927): paddingVertical 20 (was 14) — each row is ~80px
+  // tall there, ~56px here, which is why noticeably more rows fit on screen
+  // before scrolling than Angular's own reference (~8 rows per screen there).
   row: {
     flexDirection:     'row',
-    alignItems:        'center',
+    alignItems:        'flex-start',
     paddingHorizontal: 16,
-    paddingVertical:   14,
+    paddingVertical:   20,
     gap:               12,
   },
   rowPressed: { opacity: 0.6 },
-  rowText:  { flex: 1 },
-  rowLabel: { fontSize: 12, color: Colors.textSecondary, marginBottom: 2 },
-  rowValue: { fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
+  rowIcon:  { flexShrink: 0 },
+  // Figma: 8px gap between the label line and the value line below it (was a
+  // 2px marginBottom on the label alone).
+  rowText:  { flex: 1, gap: 8 },
+  // Figma: label is 14px Poppins-Regular/black (was 12px, gray) — value is
+  // 14px Poppins-Medium/black (was a plain 500-weight system font).
+  rowLabel: { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 16, color: Colors.black },
+  rowValue: { fontFamily: 'Poppins-Medium', fontSize: 14, lineHeight: 16, color: Colors.black },
   rowDivider: {
     height:           StyleSheet.hairlineWidth,
     backgroundColor:  'rgba(204,204,204,0.5)',
     marginHorizontal: 16,
   },
-
-  toggle: {
-    width: 40, height: 24, borderRadius: 12,
-    backgroundColor: Colors.borderSubtle,
-  },
-  toggleOn: { backgroundColor: Colors.primaryDark },
 
   footer: {
     paddingHorizontal: 16,

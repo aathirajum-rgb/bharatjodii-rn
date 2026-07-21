@@ -99,19 +99,11 @@ export async function getBioDataLink(matriId: string): Promise<string> {
   return `${Endpoints.profile.bioData}?${params}`
 }
 
-// ─── Horoscope request/view ─────────────────────────────────────────────────────
-// Angular: viewprofile.page.ts:1299-1316 (requestHoro) / :1518-1529 (viewHoro,
-// inside callNative('view_horoscope')).
-
-export async function requestHoroscope(partnerId: string): Promise<boolean> {
-  const [userId, gender] = await Promise.all([
-    getItem(SK.Auth.USER_ID),
-    getItem(SK.User.LOGIN_GENDER),
-  ])
-  const params = `ID=${userId ?? ''}&PARTNERID=${partnerId}&LOGINGENDER=${gender ?? 'M'}`
-  const result = await apiCall(Endpoints.communication.requestHoro, 'POST', params)
-  return result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1
-}
+// ─── Horoscope view ──────────────────────────────────────────────────────────────
+// Angular: viewprofile.page.ts:1518-1529 (viewHoro, inside callNative('view_horoscope')).
+// (Angular also has a requestHoro() — its only UI trigger is commented out of the
+// template, so it's unreachable dead code there; no React equivalent is kept here
+// either, see ViewProfileScreen.tsx's horoscope section-visibility gate.)
 
 // Angular opens the horoscope via a native-webview bridge event
 // (appNativeEvent({event_name:'view_horoscope', URL})) — RN has no such bridge;
@@ -125,45 +117,61 @@ export async function viewHoroscope(partnerId: string, profileVerified: boolean)
 }
 
 // ─── Star matching ("View details" full report) ────────────────────────────────
-// Angular: viewprofile.page.ts:1882-1915 (getStarMatch, paid users only — free
+// Angular: viewprofile.page.ts:1880-1913 (getStarMatch, paid users only — free
 // users see a static teaser instead, unchanged/already correct elsewhere on this
 // screen) and star-matching.component.ts (the report screen this feeds).
-
+//
+// Confirmed live (debug capture against a real profile pair): STAR/RAASI params
+// are the LOGGED-IN VIEWER's own numeric codes (Angular: ppSetData.PI_STAR/
+// PI_RAASI, e.g. "9"/"3") — NOT the viewed profile's star/raasi text. The server
+// looks up the viewed profile's side itself from VIEWEDID. Sending the viewed
+// profile's display text (e.g. "Vishakam") here, as an earlier version of this
+// function did, gets ERRMSG:"INVALID RAASI OR STAR" back (with RESPONSECODE/
+// ERRCODE still reading as success, so that failure mode is otherwise silent).
+//
+// This endpoint also uses the same REPONSE-typo envelope as view/profile/v1
+// (Angular checks `resultData['REPONSE']`, not 'RESPONSE') — reading the plain
+// 'RESPONSE' key here always came back empty regardless of whether the request
+// itself succeeded.
 export interface StarMatchResult {
-  percentage:  number
-  isNorth:     boolean   // North India → percentage bar; South India → 10-star row
-  ownStar?:    string    | undefined
-  ownRaasi?:   string    | undefined
+  displayText:   string    // Angular's poruthamPercentage/poruthamPercentageNorth — a ready-to-render string ("5.5/10" South, DHASA_PERCENTAGE North), not a number to reformat
+  percentage:    number    // SUMMARY.PORUTHAM_PERCENTAGE (e.g. "55%") parsed to a plain 0-100 number — for the detail screen's star-count/progress-bar visuals only, not the headline text
+  isNorth:       boolean
+  raw:           Record<string, any>   // full REPONSE — handed to StarMatchingScreen via navigation state, same as Angular's starMatchResponse
+  ownStar?:      string  | undefined
+  ownRaasi?:     string  | undefined
   partnerStar?:  string  | undefined
   partnerRaasi?: string  | undefined
 }
 
 export async function getStarMatch(
-  partnerId: string, star: string, raasi: string, motherTongue: string,
+  partnerId: string, ownStar: string, ownRaasi: string, motherTongue: string,
 ): Promise<StarMatchResult | null> {
   const userId = await getItem(SK.Auth.USER_ID)
-  const params = `ID=${userId ?? ''}&VIEWEDID=${partnerId}&STAR=${star}&RAASI=${raasi}&MOTHERTONGUE=${motherTongue}`
+  const params = `ID=${userId ?? ''}&VIEWEDID=${partnerId}&STAR=${ownStar}&RAASI=${ownRaasi}&MOTHERTONGUE=${motherTongue}`
   const result = await apiCall(Endpoints.profile.starMatch, 'POST', params)
   const ok = (result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1)
     && (result?.ERRCODE === '0' || result?.ERRCODE == 0)
-  if (!ok) return null
+  const res = result?.REPONSE
+  // Angular: viewprofile.page.ts:1893/1901 — presence of REPONSE means success
+  // (starAndraasiflag=true); an ERRMSG (e.g. invalid star/raasi) means failure
+  // (starAndraasiflag=false), even though RESPONSECODE/ERRCODE alone still say "ok".
+  if (!ok || !res) return null
 
-  // Exact field names haven't been debug-captured live yet (this call has never
-  // been wired before) — mirrors Angular's own state var names
-  // (poruthamPercentage/poruthamPercentageNorth/starMatchType) with a defensive
-  // fallback chain rather than committing to one guess.
-  const res = result?.RESPONSE ?? {}
-  const isNorth = String(res['DOMAIN'] ?? res['starMatchType'] ?? '').toLowerCase().includes('north')
-  const percentage = Number(
-    res['PORUTHAM_PERCENTAGE'] ?? res['PORUTHAMPERCENTAGE'] ?? res['PERCENTAGE'] ?? 0,
-  )
+  const isNorth = String(res['TYPE'] ?? '').toLowerCase().includes('north')
+  const displayText = isNorth
+    ? String(res['PREDICTION']?.['DHASA_PERCENTAGE'] ?? '')
+    : String(res['SUMMARY']?.['PORUTHAM_RATIO'] ?? '')
+  const percentage = Number(String(res['SUMMARY']?.['PORUTHAM_PERCENTAGE'] ?? '').replace('%', ''))
   return {
+    displayText,
     percentage: Number.isFinite(percentage) ? percentage : 0,
     isNorth,
-    ownStar:      res['OWNSTAR'] ?? undefined,
-    ownRaasi:     res['OWNRAASI'] ?? undefined,
-    partnerStar:  res['STAR'] ?? star ?? undefined,
-    partnerRaasi: res['RAASI'] ?? raasi ?? undefined,
+    raw: res,
+    ownStar:      res['USERPROFILE']?.['STAR']    ?? undefined,
+    ownRaasi:     res['USERPROFILE']?.['RAASI']   ?? undefined,
+    partnerStar:  res['PARTNERPROFILE']?.['STAR']  ?? undefined,
+    partnerRaasi: res['PARTNERPROFILE']?.['RAASI'] ?? undefined,
   }
 }
 

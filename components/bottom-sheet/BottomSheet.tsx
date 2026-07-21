@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 
 const SCREEN_H = Dimensions.get('window').height
 
@@ -89,22 +90,34 @@ export default function BottomSheet({
   onLinkPress,
 }: BottomSheetProps) {
   const insets = useSafeAreaInsets()
+  // Desktop/laptop web: Angular's real modal is a centered dialog, not a
+  // mobile bottom sheet sliding up off the bottom edge of a phone screen —
+  // that slide-up treatment only makes sense on a narrow mobile viewport.
+  // See WhatsAppPaywallModal (Figma "Jodii Desktop" node 867:16315) for the
+  // same centered-card convention already established for this exact kind
+  // of confirm-before-continuing dialog on desktop.
+  const isDesktop = useIsDesktopWeb()
 
-  // Keep Modal mounted until the slide-out animation finishes
+  // Keep Modal mounted until the close animation finishes
   const [modalVisible, setModalVisible] = useState(visible)
   const slideAnim   = useRef(new Animated.Value(SCREEN_H)).current
+  const scaleAnim   = useRef(new Animated.Value(0.92)).current
   const scrimAnim   = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
     if (visible) {
       setModalVisible(true)
       Animated.parallel([
-        Animated.spring(slideAnim, {
-          toValue:      0,
-          useNativeDriver: true,
-          tension:      55,
-          friction:     11,
-        }),
+        isDesktop
+          ? Animated.spring(scaleAnim, {
+              toValue: 1, useNativeDriver: true, tension: 60, friction: 9,
+            })
+          : Animated.spring(slideAnim, {
+              toValue:      0,
+              useNativeDriver: true,
+              tension:      55,
+              friction:     11,
+            }),
         Animated.timing(scrimAnim, {
           toValue:         1,
           duration:        200,
@@ -113,11 +126,13 @@ export default function BottomSheet({
       ]).start()
     } else {
       Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue:         SCREEN_H,
-          duration:        220,
-          useNativeDriver: true,
-        }),
+        isDesktop
+          ? Animated.timing(scaleAnim, { toValue: 0.92, duration: 160, useNativeDriver: true })
+          : Animated.timing(slideAnim, {
+              toValue:         SCREEN_H,
+              duration:        220,
+              useNativeDriver: true,
+            }),
         Animated.timing(scrimAnim, {
           toValue:         0,
           duration:        180,
@@ -127,7 +142,7 @@ export default function BottomSheet({
         if (finished) setModalVisible(false)
       })
     }
-  }, [visible, slideAnim, scrimAnim])
+  }, [visible, isDesktop, slideAnim, scaleAnim, scrimAnim])
 
   const showClose    = data?.showClose ?? true
   const hasImage     = !!data?.image
@@ -136,6 +151,100 @@ export default function BottomSheet({
   const sideBySide   = (data?.sideBySideCtas ?? false) && hasSecondary && hasPrimary
   const hasLinkCta   = !!data?.linkCtaLabel
   const hasOr        = !!data?.orCtaText && hasLinkCta
+
+  // Close button — Angular: mobile's bottomsheet-cross floats ABOVE the sheet
+  // (top:-48px, centered); desktop's sits INSIDE the card's own top-right
+  // corner instead (same convention WhatsAppPaywallModal already uses) — no
+  // drag handle exists anywhere in Angular's bottom-sheet component, so this
+  // port has none either.
+  // Desktop: a real in-flow row (not absolutely positioned) so it always
+  // reserves its own space above the title/content — an earlier version
+  // floated it absolutely over the top-right corner, which overlapped the
+  // body text whenever a sheet had no title/image to naturally push content
+  // down first (most of them — many BottomSheet uses are content-only).
+  const closeButton = showClose && (
+    <Pressable onPress={onClose} hitSlop={10} style={isDesktop ? styles.desktopCloseBtn : styles.closeBtn}>
+      <View style={isDesktop ? styles.desktopCloseCircle : styles.closeCircle}>
+        <Text style={styles.closeX}>✕</Text>
+      </View>
+    </Pressable>
+  )
+
+  const cardContent = (
+    <>
+      {closeButton}
+
+      {/* Top image — CdnSvg so CDN-hosted SVG icons (e.g. the "add your photo"
+          alert icon) render correctly on native, not just web. Angular sets no
+          explicit size on this image (it's the source asset's natural size) —
+          64x64 here is a reasonable fixed stand-in. */}
+      {hasImage && (
+        <CdnSvg
+          uri={data!.image!}
+          width={64}
+          height={64}
+          style={styles.sheetImage}
+        />
+      )}
+
+      {/* Title */}
+      {!!data?.title && <Text style={styles.title}>{data.title}</Text>}
+
+      {/* Content */}
+      {!!data?.content && <Text style={styles.content}>{data.content}</Text>}
+
+      {/* Side-by-side CTAs (e.g. Cancel | Block) */}
+      {sideBySide && (
+        <View style={styles.sideBySideRow}>
+          <ButtonRevamp
+            label={data!.secondaryCtaLabel!}
+            variant="ghost"
+            style={{ flex: 1 }}
+            onPress={onSecondaryPress}
+          />
+          <ButtonRevamp
+            label={data!.ctaLabel!}
+            variant="primary"
+            style={{ flex: 1 }}
+            onPress={onPrimaryPress}
+          />
+        </View>
+      )}
+
+      {/* Primary (stacked) — Angular: .primary-cta-jodii uses #B50033, a darker
+          red than the app's general Colors.primary (#C62828) used elsewhere */}
+      {hasPrimary && !sideBySide && (
+        <ButtonRevamp
+          label={data!.ctaLabel!}
+          variant="primary"
+          fullWidth
+          style={[styles.primaryBtn, { backgroundColor: Colors.primaryDark }]}
+          onPress={onPrimaryPress}
+        />
+      )}
+
+      {/* Secondary (stacked) */}
+      {hasSecondary && !sideBySide && (
+        <ButtonRevamp
+          label={data!.secondaryCtaLabel!}
+          variant="secondary"
+          fullWidth
+          style={styles.secondaryBtn}
+          onPress={onSecondaryPress}
+        />
+      )}
+
+      {/* OR separator */}
+      {hasOr && <Text style={styles.orText}>{data!.orCtaText}</Text>}
+
+      {/* Link CTA */}
+      {hasLinkCta && (
+        <Pressable onPress={onLinkPress} style={styles.linkCtaBtn} hitSlop={6}>
+          <Text style={styles.linkCtaText}>{data!.linkCtaLabel}</Text>
+        </Pressable>
+      )}
+    </>
+  )
 
   return (
     <Modal
@@ -157,99 +266,43 @@ export default function BottomSheet({
         pointerEvents="none"
       />
 
-      {/* Full-screen tap area to close */}
-      <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-
-      {/* Sheet — rendered after Pressable so it sits on top and captures its own touches */}
-      <Animated.View
-        style={[
-          styles.sheet,
-          { paddingBottom: insets.bottom + 20 },
-          { transform: [{ translateY: slideAnim }] },
-          style,
-        ]}
-      >
-        {/* Close button — Angular: bottomsheet-cross floats ABOVE the sheet
-            (top:-48px, centered), not inside it — no drag handle exists anywhere
-            in Angular's bottom-sheet component, so this port has none either. */}
-        {showClose && (
-          <Pressable style={styles.closeBtn} onPress={onClose} hitSlop={10}>
-            <View style={styles.closeCircle}>
-              <Text style={styles.closeX}>✕</Text>
-            </View>
+      {isDesktop ? (
+        // Tap-outside-to-close, tap-on-card-does-nothing — same nested-Pressable
+        // pattern WhatsAppPaywallModal already uses: the outer Pressable centers
+        // the card and closes on background taps; the inner no-op Pressable
+        // claims any tap landing on the card itself (including blank padding),
+        // so it never bubbles up to the outer one.
+        <Pressable style={styles.desktopOverlay} onPress={onClose}>
+          <Pressable onPress={() => {}}>
+            <Animated.View
+              style={[
+                styles.desktopCard,
+                { opacity: scrimAnim, transform: [{ scale: scaleAnim }] },
+                style,
+              ]}
+            >
+              {cardContent}
+            </Animated.View>
           </Pressable>
-        )}
+        </Pressable>
+      ) : (
+        <>
+          {/* Full-screen tap area to close */}
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 
-        {/* Top image — CdnSvg so CDN-hosted SVG icons (e.g. the "add your photo"
-            alert icon) render correctly on native, not just web. Angular sets no
-            explicit size on this image (it's the source asset's natural size) —
-            64x64 here is a reasonable fixed stand-in. */}
-        {hasImage && (
-          <CdnSvg
-            uri={data!.image!}
-            width={64}
-            height={64}
-            style={styles.sheetImage}
-          />
-        )}
-
-        {/* Title */}
-        {!!data?.title && <Text style={styles.title}>{data.title}</Text>}
-
-        {/* Content */}
-        {!!data?.content && <Text style={styles.content}>{data.content}</Text>}
-
-        {/* Side-by-side CTAs (e.g. Cancel | Block) */}
-        {sideBySide && (
-          <View style={styles.sideBySideRow}>
-            <ButtonRevamp
-              label={data!.secondaryCtaLabel!}
-              variant="ghost"
-              style={{ flex: 1 }}
-              onPress={onSecondaryPress}
-            />
-            <ButtonRevamp
-              label={data!.ctaLabel!}
-              variant="primary"
-              style={{ flex: 1 }}
-              onPress={onPrimaryPress}
-            />
-          </View>
-        )}
-
-        {/* Primary (stacked) — Angular: .primary-cta-jodii uses #B50033, a darker
-            red than the app's general Colors.primary (#C62828) used elsewhere */}
-        {hasPrimary && !sideBySide && (
-          <ButtonRevamp
-            label={data!.ctaLabel!}
-            variant="primary"
-            fullWidth
-            style={[styles.primaryBtn, { backgroundColor: Colors.primaryDark }]}
-            onPress={onPrimaryPress}
-          />
-        )}
-
-        {/* Secondary (stacked) */}
-        {hasSecondary && !sideBySide && (
-          <ButtonRevamp
-            label={data!.secondaryCtaLabel!}
-            variant="secondary"
-            fullWidth
-            style={styles.secondaryBtn}
-            onPress={onSecondaryPress}
-          />
-        )}
-
-        {/* OR separator */}
-        {hasOr && <Text style={styles.orText}>{data!.orCtaText}</Text>}
-
-        {/* Link CTA */}
-        {hasLinkCta && (
-          <Pressable onPress={onLinkPress} style={styles.linkCtaBtn} hitSlop={6}>
-            <Text style={styles.linkCtaText}>{data!.linkCtaLabel}</Text>
-          </Pressable>
-        )}
-      </Animated.View>
+          {/* Sheet — rendered after Pressable so it sits on top and captures its own touches */}
+          <Animated.View
+            style={[
+              styles.sheet,
+              { paddingBottom: insets.bottom + 20 },
+              { transform: [{ translateY: slideAnim }] },
+              style,
+            ]}
+          >
+            {cardContent}
+          </Animated.View>
+        </>
+      )}
     </Modal>
   )
 }
@@ -277,6 +330,43 @@ const styles = StyleSheet.create({
     shadowRadius:         16,
     shadowOffset:         { width: 0, height: -4 },
     elevation:            16,
+  },
+  // Desktop/laptop — centered dialog card, same convention WhatsAppPaywallModal
+  // (Figma "Jodii Desktop" node 867:16315) already uses for this exact kind of
+  // confirm-before-continuing popup, instead of a mobile slide-up bottom sheet.
+  desktopOverlay: {
+    flex:           1,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  desktopCard: {
+    width:            400,
+    maxWidth:         '90%',
+    maxHeight:        '85%',
+    backgroundColor:  Colors.white,
+    borderRadius:     16,
+    paddingHorizontal: 24,
+    paddingTop:        24,
+    paddingBottom:     24,
+    shadowColor:       Colors.shadow,
+    shadowOpacity:     0.15,
+    shadowRadius:      16,
+    shadowOffset:      { width: 0, height: 4 },
+    elevation:         16,
+  },
+  // In-flow (not absolute) — reserves its own row above whatever comes next,
+  // so it never overlaps title/content regardless of what a given sheet renders.
+  desktopCloseBtn: {
+    alignSelf:    'flex-end',
+    marginBottom: 8,
+  },
+  desktopCloseCircle: {
+    width:           28,
+    height:          28,
+    borderRadius:    14,
+    backgroundColor: Colors.surfaceInput,
+    alignItems:      'center',
+    justifyContent:  'center',
   },
   closeBtn: {
     position:  'absolute',

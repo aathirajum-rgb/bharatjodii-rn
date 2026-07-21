@@ -75,7 +75,14 @@ export default function BulkLikeModal({
   }
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose} statusBarTranslucent>
+    // `transparent` — every other Modal in this app passes it (BulkLikeModal was
+    // the sole exception); a non-transparent Modal is a known react-native-web
+    // pitfall where its content can render correctly but stop receiving pointer
+    // events entirely, which is exactly what made both the close X and Send
+    // buttons unresponsive on desktop web despite the cursor showing a pointer.
+    // `s.screen`'s own opaque white background already fills the full screen, so
+    // this doesn't change how it looks.
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <View style={s.screen}>
         <View style={s.header}>
           <Text style={s.title}>{t('MATCHES.BULK_LIKE_TITLE').replace(/<br\s*\/?>/gi, ' ')}</Text>

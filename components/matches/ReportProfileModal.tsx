@@ -92,7 +92,11 @@ export default function ReportProfileModal({
     .replace('#NAME#', partnerName ?? '')
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    // `transparent` — same fix as BulkLikeModal.tsx: this was the only other
+    // Modal in the app missing it, the same known react-native-web pitfall
+    // (content renders fine, pointer events silently stop reaching it).
+    // `m.screen`'s own opaque white background already covers the full screen.
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={m.screen}>
         <View style={m.header}>
           <Text style={m.headerTitle}>{t('MESSAGES.REPORT_PROFILE')}</Text>

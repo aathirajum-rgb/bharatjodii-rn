@@ -31,22 +31,24 @@ import MembershipBanner from '../../components/matches/MembershipBanner'
 import PhotoViewerModal from '../../components/matches/PhotoViewerModal'
 import PhotoViewerModalDesktop from '../../components/matches/PhotoViewerModalDesktop'
 import ReportProfileModal from '../../components/matches/ReportProfileModal'
+import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
+import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import ViewProfileDesktopLayout from './ViewProfileDesktopLayout'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import {
-  getViewProfile, markProfileViewed, getSimilarProfiles, requestHoroscope, viewHoroscope, getStarMatch,
+  getViewProfile, markProfileViewed, getSimilarProfiles, viewHoroscope, getStarMatch,
   getBioDataLink, getEnlargedPhotos,
   _debugLastViewProfileResult,
-  type SimilarProfileCard,
+  type SimilarProfileCard, type StarMatchResult,
 } from '../../service/viewProfileService'
 import { ENavigation } from '../../types/enums/navigation.enum'
 import { navigate as navigateGlobal } from '../../utils/navigationRef'
 import { viewProfileAdapter } from '../../adapters/viewProfile.adapter'
-import { communicationBtnOnClick } from '../../service/communicationService'
+import { communicationBtnOnClick, fetchContactDetails } from '../../service/communicationService'
 import { getHeroBannerDetails } from '../../service/paymentService'
 import { fetchMenuPromo } from '../../service/homeService'
 import { getItem, getJson } from '../../service/storageService'
-import { getSessionValue } from '../../service/registrationService'
+import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import { shouldShowCoachMark, markCoachMarkShown } from '../../service/coachMarkService'
 import { StorageKeys } from '../../constants/storage.keys'
@@ -110,31 +112,21 @@ const SIMILAR_CARD_GAP   = 16
 const SIMILAR_CARD_WIDTH = Math.round(SCREEN_WIDTH / 1.628)
 const SIMILAR_CARD_STRIDE = SIMILAR_CARD_WIDTH + SIMILAR_CARD_GAP
 
-// ─── Gendered placeholder substitution ─────────────────────────────────────────
-// Angular's real content carries BOTH single-# (#HESHE#/#HISHER#/#HIMHER#) and
-// double-# (##HE_SHE##/##HIS_HER##/##HIM_HER##, plus a lowercase ##he_she## quirk
-// on one specific string) token conventions across VIEWPROFILE.* strings — same
-// underlying pronoun slots, just spelled differently by string. Substituted via
-// the existing PRONOUN.{M|F}.* keys (established pattern from Matches).
-export function withPronouns(raw: string, oppGender: 'M' | 'F', t: (key: string) => string): string {
-  const heshe   = t(`PRONOUN.${oppGender}.heshe`)
-  const hisher  = t(`PRONOUN.${oppGender}.hisher`)
-  const himhers = t(`PRONOUN.${oppGender}.himhers`)
-  return raw
-    .replace(/##HE_SHE##/g, heshe).replace(/##HIS_HER##/g, hisher).replace(/##HIM_HER##/g, himhers)
-    .replace(/##he_she##/g, heshe.toLowerCase())
-    .replace(/#HESHE#/g, heshe).replace(/#HISHER#/g, hisher).replace(/#HIMHER#/g, himhers)
-}
-
 // Angular: none/1/many/"more than 5" text variants for brothers/sisters counts.
+// Angular: viewprofile.page.html:1014-1053 — BROTHERS/SISTERS are NOT a literal
+// headcount, they're a special code: 1-4 are literal counts, but 5 means "more
+// than 5" and 6 means "none" (zero is apparently never sent as a literal 0).
+// Treating 6 as "n > 5" (as an earlier version of this did) inverted the
+// "No Brothers"/"More than 5 brothers" labels for exactly those two codes.
 export function familyCountText(
   count: string | undefined,
   t: (key: string) => string,
   keys: { none: string; one: string; many: string; moreThan: string },
 ): string {
   const n = Number(count)
-  if (!count || Number.isNaN(n) || n <= 0) return t(keys.none)
-  if (n > 5) return t(keys.moreThan)
+  if (!count || Number.isNaN(n)) return ''
+  if (n === 6) return t(keys.none)
+  if (n === 5) return t(keys.moreThan)
   if (n === 1) return `1 ${t(keys.one)}`
   return `${n} ${t(keys.many)}`
 }
@@ -281,6 +273,38 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   const [femaleFreeEligible, setFemaleFreeEligible] = useState(false)
   const [indNumbersLeft, setIndNumbersLeft] = useState('0')
   const [whatsappPaywallOpen, setWhatsappPaywallOpen] = useState(false)
+  // ── Contact-reveal flow (Angular button.component.ts's two-step confirm →
+  // phoneviewed API → Contact Details sheet) — mirrors MatchesScreen.tsx's own
+  // fix for the exact same gap: this previously skipped straight to dialing on
+  // 'show_contact' with no confirmation step, and silently dropped every other
+  // phoneviewed branch (protected number, view limits, ID-verify gate,
+  // female-free flow) instead of surfacing anything for them. ──
+  const [contactConfirm, setContactConfirm] = useState<'call' | 'whatsapp' | null>(null)
+  const [contactDetails, setContactDetails] = useState<{
+    name: string; mobile?: string | undefined; whatsappNumber?: string | undefined
+    showCounter?: boolean | undefined; viewedCount?: string | undefined; remainingCount?: string | undefined
+  } | null>(null)
+  // Angular button.component.ts:551-579 — the CONFIRMATION popup's own quota
+  // footer line ("You have viewed contact numbers of #VAR# profiles. #VAR1#
+  // remaining till #VAR2#"), read purely from the local CONTACT_DETAIL cache.
+  const [contactQuota, setContactQuota] = useState({ viewed: '0', left: '', expiry: '' })
+  // The other phoneviewed/pre-flight scenarios (communicationService.ts's
+  // showContactDetails + showCallOrWhatsApp's verify_id/female_free gates) —
+  // all mutually exclusive with each other and with contactDetails, so one slot works.
+  type PhoneInfoSheet =
+    | { kind: 'phone_protected' }
+    | { kind: 'under_validation'; message: string }
+    | { kind: 'phone_limit_exceeded'; body: string; cta: string }
+    | { kind: 'fup_limit'; header: string; body: string; cta: string; cta1: string }
+    | { kind: 'profile_validation'; title: string; content: string; cta: string; image?: string | undefined }
+    | { kind: 'phone_number_left' }
+    | { kind: 'verify_id'; title: string; content: string; ctaLabel: string }
+    | { kind: 'female_free_photo_add' }
+    | { kind: 'female_free_photo_pending' }
+    | { kind: 'female_free_photo_fail' }
+    | { kind: 'female_free_call_verification' }
+    | { kind: 'female_free_limit_over' }
+  const [phoneInfoSheet, setPhoneInfoSheet] = useState<PhoneInfoSheet | null>(null)
   const [paymentStickyInfo, setPaymentStickyInfo] = useState<{ content: string; ctaLabel: string; deadlineMs: number } | null>(null)
   const [stickyDismissed, setStickyDismissed] = useState(false)
   // Angular: the header transforms once the photo scrolls out of view — plain
@@ -291,12 +315,14 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   const [showMenu, setShowMenu] = useState(false)
   const [similarProfiles, setSimilarProfiles] = useState<SimilarProfileCard[]>([])
   const [menuPromo, setMenuPromo] = useState<any>(null)
+  // Angular: getStarMatch() (viewprofile.page.ts:1880-1913) — called proactively
+  // once the profile loads (paid viewers only), not on click. null = not fetched
+  // yet OR the API call failed (Angular's starAndraasiflag=false) — either way the
+  // teaser row stays hidden, matching Angular exactly.
+  const [starMatch, setStarMatch] = useState<StarMatchResult | null>(null)
   // Angular: loginHoroAvail mirrors localStorage.HOROSCOPEAVAILABLE — the LOGGED-IN
   // user's own horoscope-availability flag ('1'/'0'), not the viewed profile's.
   const [loginHoroAvail, setLoginHoroAvail] = useState('0')
-  // Angular: vpdata.COMMINFO.ADDHOROSCOPE flipped locally on a successful
-  // requestHoro() call, never refetched (viewprofile.page.ts:1299-1316).
-  const [horoscopeRequested, setHoroscopeRequested] = useState(false)
   // Angular: the top CTA row is `position: sticky; bottom: 0` (viewprofile.page.scss
   // .sticky-btm) — it rides along pinned to the screen bottom for as long as the
   // detail sections keep scrolling past underneath it, and only stops once the
@@ -330,6 +356,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     async function load() {
       if (isFirstLoadRef.current) setLoading(true)
       isFirstLoadRef.current = false
+      // Angular: common.ts's getContactDetails(), called on every profile-view
+      // page load — populates CONTACT_DETAIL BEFORE it's read just below, so
+      // the confirm sheet's quota footer (contactQuota) has real numbers
+      // instead of whatever was last cached (or nothing, on a fresh session).
+      await fetchContactDetails().catch(() => {})
       const [lg, entryType, femaleFreeRaw, contactDetail, horoAvail, userId] = await Promise.all([
         getItem(StorageKeys.User.LOGIN_GENDER),
         getSessionValue('ENTRYTYPE'),
@@ -346,6 +377,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
       const femaleFree: any = femaleFreeRaw
       setFemaleFreeEligible(String(femaleFree?.FLAG) === '1' && gender === 'F' && String(femaleFree?.Left ?? '0') !== '0')
       setIndNumbersLeft(String(contactDetail?.IndNumbersLeft ?? '0'))
+      setContactQuota({
+        viewed: String(contactDetail?.phoneNumbersViewed ?? '0'),
+        left:   String(contactDetail?.phoneNumbersLeft ?? ''),
+        expiry: String(contactDetail?.expiryTextValue ?? ''),
+      })
       setLoginHoroAvail(String(horoAvail ?? '0'))
 
       const cached = prefetchCache.current.get(matriId)
@@ -356,6 +392,23 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         const adapted = viewProfileAdapter.adapt(raw)
         setProfile(adapted)
         setEnlargedPhotos(null)
+        // Angular: getStarMatch() (viewprofile.page.ts:1880-1913) — paid viewers
+        // only, fired once the profile's loaded so the inline teaser can show the
+        // real ratio immediately, not just on "View details" click. Needs the
+        // VIEWER's own star/raasi codes (ppSetData.PI_STAR/PI_RAASI), not the
+        // viewed profile's — see viewProfileService.ts's getStarMatch comment.
+        setStarMatch(null)
+        if (entryType === 'P' && adapted.hasStarMatchInputs) {
+          getJson<Record<string, any>>(StorageKeys.App.PP_SET_DATA).then(pp => {
+            if (cancelled) return
+            const ownStar  = pp?.['PI_STAR']
+            const ownRaasi = pp?.['PI_RAASI']
+            if (!ownStar || !ownRaasi) return
+            getStarMatch(matriId, String(ownStar), String(ownRaasi), String(pp?.['PI_MOTHERTONGUE'] ?? ''))
+              .then(result => { if (!cancelled) setStarMatch(result) })
+              .catch(() => {})
+          }).catch(() => {})
+        }
         // Angular: viewprofile.page.ts:761 — gated on PHOTOAVAILABLE=='Y', fired
         // once per page load, fire-and-forget (no loading UI, no .catch in
         // Angular either — matched here with a silent .catch for RN hygiene).
@@ -513,26 +566,248 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     } catch { /* ignore */ }
   }
 
-  async function handleCall() {
+  // Angular button.component.ts's showContactDetails() always confirms first
+  // ("You can view #HISHER# number and call or WhatsApp #HIMHER#...") — this
+  // previously skipped straight to communicationBtnOnClick and dialed whatever
+  // it returned, with no confirmation step at all (same fix as MatchesScreen.tsx).
+  function handleCall() {
     if (!profile) return
-    try {
-      const result = await communicationBtnOnClick(fromPage, 'call', { MATRIID: profile.profileId })
-      if (result.type === 'show_contact' && result.contact) Linking.openURL(`tel:${result.contact}`)
-      else if (result.type === 'payment_promo') navigation.navigate('recharge')
-    } catch { /* ignore */ }
+    setContactConfirm('call')
   }
 
-  async function handleWhatsApp() {
+  function handleWhatsApp() {
     if (!profile) return
+    setContactConfirm('whatsapp')
+  }
+
+  function handleContactConfirmClose() {
+    setContactConfirm(null)
+  }
+
+  // Angular button.component.ts:551-583 — the confirmation popup's TostMsg is
+  // built from VIEWPHONECONFIRM (the question) + VIEWPHONEDETAIL (the quota
+  // footer) concatenated into ONE body, not two separate texts.
+  function getContactConfirmContent(): string {
+    if (!profile) return ''
+    const question = t('VIEWPROFILE.VIEWPHONECONFIRM')
+      .replace('#HISHER#', t(`PRONOUN.${profile.gender}.hisher`))
+      .replace('#HIMHER#', t(`PRONOUN.${profile.gender}.himher`))
+    const quota = t('VIEWPROFILE.VIEWPHONEDETAIL')
+      .replace('#VAR#', contactQuota.viewed)
+      .replace('#VAR1#', contactQuota.left)
+      .replace('#VAR2#', contactQuota.expiry)
+    return `${question}\n\n${quota}`
+  }
+
+  async function handleContactConfirmYes() {
+    if (!profile || !contactConfirm) return
+    const action = contactConfirm
+    setContactConfirm(null)
     try {
-      const result = await communicationBtnOnClick(fromPage, 'whatsapp', { MATRIID: profile.profileId })
-      if (result.type === 'show_contact' && result.contact) {
-        const num = result.contact.replace(/\D/g, '')
-        if (num) Linking.openURL(`https://wa.me/${num}`)
+      const result = await communicationBtnOnClick(fromPage, action, { MATRIID: profile.profileId })
+      if (result.type === 'show_contact') {
+        // Angular's Contact Details popup shows Name/Mobile/WhatsApp/Call
+        // together regardless of which CTA was tapped — not one-or-the-other.
+        setContactDetails({
+          name:           profile.name,
+          mobile:         result.mobile,
+          whatsappNumber: result.whatsappNumber,
+          showCounter:    result.showCounter,
+          viewedCount:    result.viewedCount,
+          remainingCount: result.remainingCount,
+        })
+        if (result.viewedCount !== undefined || result.remainingCount !== undefined) {
+          setContactQuota(prev => ({
+            ...prev,
+            viewed: result.viewedCount ?? prev.viewed,
+            left:   result.remainingCount ?? prev.left,
+          }))
+        }
       } else if (result.type === 'payment_promo') {
-        setWhatsappPaywallOpen(true)
+        if (action === 'whatsapp') {
+          setWhatsappPaywallOpen(true)
+        } else {
+          navigation.navigate('recharge')
+        }
+      } else if (result.type === 'phone_protected') {
+        setPhoneInfoSheet({ kind: 'phone_protected' })
+      } else if (result.type === 'under_validation') {
+        setPhoneInfoSheet({ kind: 'under_validation', message: result.message })
+      } else if (result.type === 'phone_limit_exceeded') {
+        setPhoneInfoSheet({ kind: 'phone_limit_exceeded', body: result.body, cta: result.cta })
+      } else if (result.type === 'fup_limit') {
+        setPhoneInfoSheet({ kind: 'fup_limit', header: result.header, body: result.body, cta: result.cta, cta1: result.cta1 })
+      } else if (result.type === 'profile_validation') {
+        setPhoneInfoSheet({ kind: 'profile_validation', title: result.title, content: result.content, cta: result.cta, image: result.image })
+      } else if (result.type === 'phone_number_left') {
+        setPhoneInfoSheet({ kind: 'phone_number_left' })
+      } else if (result.type === 'verify_id') {
+        // Angular communication.service.ts's navigateToVerify() — content is
+        // server-driven from REGISTRATIONARRAYS.PROFILEVERIFYPAID.Shortlist, and
+        // the support-number placeholder `##CSNUM##` only ever appears in CTA.
+        const arrays = await getRegistrationArrays()
+        const cfg = arrays?.PROFILEVERIFYPAID?.Shortlist ?? {}
+        let cta = String(cfg.CTA ?? 'OK')
+        if (cta.includes('##CSNUM##')) {
+          const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
+          cta = cta.replace(/##CSNUM##/g, callNum).replace('+91', '')
+        }
+        setPhoneInfoSheet({
+          kind:     'verify_id',
+          title:    String(cfg.TITLE ?? 'Verify your profile'),
+          content:  String(cfg.CONTENT ?? 'Please complete ID verification to view phone numbers.'),
+          ctaLabel: cta,
+        })
+      } else if (result.type === 'female_free') {
+        const kindByAction: Record<string, PhoneInfoSheet['kind'] | undefined> = {
+          'femaleFree-PhotoAdd':     'female_free_photo_add',
+          'femaleFree-PhotoPending': 'female_free_photo_pending',
+          'femaleFree-PhotoFail':    'female_free_photo_fail',
+          'callVerification':        'female_free_call_verification',
+          'femaleFree-LimitOver':    'female_free_limit_over',
+        }
+        const kind = kindByAction[result.action]
+        if (kind) setPhoneInfoSheet({ kind } as PhoneInfoSheet)
       }
-    } catch { /* ignore */ }
+      // 'error' — silently drops, same as this screen's other action handlers
+      // (handleDontShow/handleViewLater) already do; no toast system here yet.
+    } catch (e) {
+      if (__DEV__) console.error('[ViewProfile] contact-reveal error:', e)
+    }
+  }
+
+  function handleContactDetailsClose() {
+    setContactDetails(null)
+  }
+
+  function handleContactDetailsCall() {
+    if (contactDetails?.mobile) Linking.openURL(`tel:${contactDetails.mobile}`)
+    setContactDetails(null)
+  }
+
+  function handleContactDetailsWhatsApp() {
+    if (contactDetails?.whatsappNumber) {
+      const num = contactDetails.whatsappNumber.replace(/\D/g, '')
+      if (num) Linking.openURL(`https://wa.me/${num}`)
+    }
+    setContactDetails(null)
+  }
+
+  function handlePhoneInfoClose() {
+    setPhoneInfoSheet(null)
+  }
+
+  // Maps each of the 6 phoneviewed scenarios (besides success) plus the
+  // female-free variants onto the generic BottomSheet's flexible data shape —
+  // mirrors MatchesScreen.tsx's getPhoneInfoSheetData() exactly.
+  function getPhoneInfoSheetData(): {
+    image?: string | undefined; title?: string | undefined; content?: string | undefined
+    ctaLabel?: string | undefined; linkCtaLabel?: string | undefined; orCtaText?: string | undefined
+    secondaryCtaLabel?: string | undefined; showSecondaryCta?: boolean | undefined; sideBySideCtas?: boolean | undefined
+  } {
+    if (!phoneInfoSheet) return {}
+    const gender = profile?.gender ?? 'F'
+    switch (phoneInfoSheet.kind) {
+      case 'phone_protected':
+        return {
+          image:   CDN_SVG + 'protected-phoneno.svg',
+          title:   t('GENERAL.PROTECT_NUMBER').replace(/<br\s*\/?>/gi, ' '),
+          content: `${t('GENERAL.PROTECT_NUMBER_SUB')}\n\n${t('GENERAL.PROTECT_NUMBER_NOTE')}`,
+          ctaLabel: t('GENERAL.OK_CTA', 'OK'),
+        }
+      case 'under_validation':
+        return { content: phoneInfoSheet.message }
+      case 'phone_limit_exceeded':
+        return {
+          image:    CDN_SVG + 'reached-limit-phone-number-img.svg',
+          content:  phoneInfoSheet.body,
+          ctaLabel: phoneInfoSheet.cta,
+        }
+      case 'fup_limit':
+        return {
+          image:        CDN_SVG + 'maximum-limit-reached-img.svg',
+          title:        phoneInfoSheet.header,
+          content:      phoneInfoSheet.body,
+          ctaLabel:     phoneInfoSheet.cta,
+          orCtaText:    t('GENERAL.OR', 'OR'),
+          linkCtaLabel: phoneInfoSheet.cta1,
+        }
+      case 'profile_validation':
+        return {
+          image:    phoneInfoSheet.image,
+          title:    phoneInfoSheet.title,
+          content:  phoneInfoSheet.content,
+          ctaLabel: phoneInfoSheet.cta,
+        }
+      case 'phone_number_left':
+        return {
+          title:    t('GENERAL.SORRY', 'Sorry'),
+          content:  'Full renewal verification isn’t available in this app yet — please try again from a different profile for now.',
+          ctaLabel: t('GENERAL.OK_CTA', 'OK'),
+        }
+      case 'verify_id':
+        return {
+          title:    phoneInfoSheet.title,
+          content:  phoneInfoSheet.content,
+          ctaLabel: phoneInfoSheet.ctaLabel,
+        }
+      case 'female_free_photo_pending':
+        return {
+          title:    'Your photo is under validation!',
+          content:  'This may take up to 2 hours. You can view phone numbers after that',
+          ctaLabel: t('GENERAL.OK_CTA', 'OK'),
+        }
+      case 'female_free_photo_add':
+        return {
+          title:    `Add your photo to get 5 free contacts or get a paid membership to view ${t(`PRONOUN.${gender}.hisher`)} phone number`,
+          ctaLabel: 'Become a paid member',
+          secondaryCtaLabel: 'Add photo now',
+          showSecondaryCta:  true,
+        }
+      case 'female_free_photo_fail':
+        return {
+          title:    `Add your photo to get 5 free contacts or get a paid membership to view ${t(`PRONOUN.${gender}.hisher`)} phone number`,
+          ctaLabel: 'Become a paid member',
+          secondaryCtaLabel: 'Add photo now',
+          showSecondaryCta:  true,
+        }
+      case 'female_free_call_verification':
+        return {
+          title:    `Contact us to get 5 more free contacts or get a paid membership to view ${t(`PRONOUN.${gender}.hisher`)} phone number`,
+          ctaLabel: 'Become a paid member',
+          secondaryCtaLabel: 'Call now',
+          showSecondaryCta:  true,
+        }
+      case 'female_free_limit_over':
+        return {
+          title:    'You have reached the maximum free phone number views limit!',
+          content:  'Become a paid member to view more phone numbers of matches',
+          ctaLabel: 'Become paid member',
+        }
+    }
+  }
+
+  function handlePhoneInfoPrimaryPress() {
+    const kind = phoneInfoSheet?.kind
+    setPhoneInfoSheet(null)
+    if (kind === 'female_free_photo_add' || kind === 'female_free_photo_fail'
+      || kind === 'female_free_call_verification' || kind === 'female_free_limit_over') {
+      navigation.navigate('recharge')
+    }
+    // fup_limit's primary CTA is "Complete full verification" → Angular
+    // navigates to /fup-verify, which isn't built — closing is the honest
+    // behavior until that screen exists, rather than pretending to navigate.
+  }
+
+  function handlePhoneInfoSecondaryPress() {
+    const kind = phoneInfoSheet?.kind
+    setPhoneInfoSheet(null)
+    if (kind === 'female_free_photo_add' || kind === 'female_free_photo_fail') {
+      navigation.navigate('Gallery')
+    }
+    // "Call now" (female_free_call_verification) would dial app support in
+    // Angular — no confirmed support number source exists in this port yet,
+    // so this honestly just closes rather than pretending to place a call.
   }
 
   function handleWhatsappPaywallPayNow() {
@@ -554,8 +829,10 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     navigation.navigate('recharge')
   }
 
-  // ── Horoscope actions — Angular: viewprofile.page.ts requestHoro()/callNative
-  // ('view_horoscope')/goToEdit('22') ─────────────────────────────────────────
+  // ── Horoscope actions — Angular: viewprofile.page.ts callNative('view_horoscope')/
+  // goToEdit('22'). (requestHoro() also exists in Angular but its only UI trigger is
+  // commented out of the template — dead code, never reachable — so it has no React
+  // equivalent here either; see the section-visibility gate below.) ────────────────
 
   function handleAddHoroscope() {
     // Angular: goToEdit(pageNo) → router.navigate(['editform-vp/'+pageNo]).
@@ -563,12 +840,6 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     // call biodataService.ts's goToEditScreen() already makes for this same
     // page — not a new gap introduced here.
     navigateGlobal(ENavigation.EDIT_FORM, { pageNo: 22, frm_page: 'viewprofile' })
-  }
-
-  async function handleRequestHoroscope() {
-    if (!profile) return
-    const ok = await requestHoroscope(profile.profileId)
-    if (ok) setHoroscopeRequested(true)
   }
 
   async function handleViewHoroscope() {
@@ -605,19 +876,21 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 
   // Angular: redirectiontoStarMatchReport() — paid-only; passes the already-fetched
   // result via router state to skip a redundant API call on the report screen.
-  async function handleViewStarMatchDetails() {
-    if (!profile) return
-    const result = await getStarMatch(profile.profileId, profile.star ?? '', profile.raasi ?? '', profile.motherTongue ?? '')
+  // starMatch is only non-null once the proactive fetch (profile-load effect)
+  // succeeds, which is also the only state that makes this row clickable at all.
+  function handleViewStarMatchDetails() {
+    if (!profile || !starMatch) return
     navigation.navigate('star-matching', {
       partnerId: profile.profileId,
       partnerName: profile.name,
       partnerPhoto: profile.photos[0],
-      ownRaasi: undefined,
-      ownStar: undefined,
-      partnerRaasi: result?.partnerRaasi ?? profile.raasi,
-      partnerStar: result?.partnerStar ?? profile.star,
-      percentage: result?.percentage ?? 0,
-      isNorth: result?.isNorth ?? false,
+      ownRaasi: starMatch.ownRaasi,
+      ownStar: starMatch.ownStar,
+      partnerRaasi: starMatch.partnerRaasi ?? profile.raasi,
+      partnerStar: starMatch.partnerStar ?? profile.star,
+      displayText: starMatch.displayText,
+      percentage: starMatch.percentage,
+      isNorth: starMatch.isNorth,
     })
   }
 
@@ -798,7 +1071,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           femaleFreeEligible={femaleFreeEligible}
           indNumbersLeft={indNumbersLeft}
           loginHoroAvail={loginHoroAvail}
-          horoscopeRequested={horoscopeRequested}
+          starMatch={starMatch}
           similarProfiles={similarProfiles}
           menuPromo={menuPromo}
           hasPrevProfile={hasPrevProfile}
@@ -821,7 +1094,6 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           onSimilarProfilePress={handleSimilarProfilePress}
           onMembershipBannerPress={handleMembershipBannerPress}
           onAddHoroscope={handleAddHoroscope}
-          onRequestHoroscope={handleRequestHoroscope}
           onViewHoroscope={handleViewHoroscope}
           onAddFamilyDetails={handleAddFamilyDetails}
           onAddPropertyDetails={handleAddPropertyDetails}
@@ -836,6 +1108,43 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           oppGender={oppGender}
           onClose={() => setWhatsappPaywallOpen(false)}
           onPayNow={handleWhatsappPaywallPayNow}
+        />
+
+        {/* Angular button.component.ts's two-step contact reveal: confirm → phoneviewed
+            API → Contact Details sheet — see handleCall/handleWhatsApp above. */}
+        <BottomSheet
+          visible={!!contactConfirm}
+          type="viewPhoneConfirm"
+          data={{
+            content: getContactConfirmContent(),
+            ctaLabel: t('ACCOUNT.YES', 'Yes'),
+          }}
+          onClose={handleContactConfirmClose}
+          onPrimaryPress={handleContactConfirmYes}
+        />
+        <ContactDetailsSheet
+          visible={!!contactDetails}
+          name={contactDetails?.name ?? ''}
+          mobile={contactDetails?.mobile}
+          whatsappNumber={contactDetails?.whatsappNumber}
+          showCounter={contactDetails?.showCounter}
+          viewedCount={contactDetails?.viewedCount}
+          remainingCount={contactDetails?.remainingCount}
+          onClose={handleContactDetailsClose}
+          onCall={handleContactDetailsCall}
+          onWhatsApp={handleContactDetailsWhatsApp}
+        />
+        {/* The other 6 phoneviewed scenarios (protected number / under validation /
+            limit exceeded / FUP limit / profile validation / phone-number-left) plus
+            the female-free variants — see getPhoneInfoSheetData() for the mapping. */}
+        <BottomSheet
+          visible={!!phoneInfoSheet}
+          type="phonePrivacyInfo"
+          data={getPhoneInfoSheetData()}
+          onClose={handlePhoneInfoClose}
+          onPrimaryPress={handlePhoneInfoPrimaryPress}
+          onSecondaryPress={handlePhoneInfoSecondaryPress}
+          onLinkPress={handlePhoneInfoClose}
         />
 
         <PhotoViewerModalDesktop
@@ -1071,20 +1380,29 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               <DetailRow icon={ICON.star} label={t('VIEWPROFILE.STARIS')} value={profile.star} />
               <DetailRow icon={ICON.dosham} label={t('VIEWPROFILE.DOSHAMIS')} value={profile.dosham?.join(', ')} isLast />
               {/* Star-match porutham teaser — paid VIEWERS (ownEntryType, not the
-                  viewed profile's own paid status — that was a pre-existing mix-up,
-                  fixed here) with both raasi+star see the real compatibility value
-                  plus a "View details" link into the full report; free viewers see
-                  a static teaser (Angular's own paywall-teaser trick). */}
+                  viewed profile's own paid status) with both raasi+star see the
+                  real ratio (proactively fetched above) plus a "View details" link
+                  into the full report; free viewers see a static fake-ratio teaser
+                  (Angular's own paywall-teaser trick — always "9/10", never a real
+                  API call). Angular: viewprofile.page.html:769-815 — the headline is
+                  the ratio/percentage text plus STARMATCHING.STAR_MATCHING_TXT, NOT
+                  VIEWPROFILE.HOROCOMPATIBILITY (that key is for a different screen —
+                  using it here was a mismatch from an earlier pass). For paid
+                  viewers, a null starMatch (still loading, or the API call failed —
+                  Angular's starAndraasiflag=false) hides the row entirely, same as Angular. */}
               {profile.hasStarMatchInputs && (
                 ownEntryType === 'P' ? (
-                  <Pressable onPress={handleViewStarMatchDetails}>
-                    <Text style={s.starMatchText}>
-                      {withPronouns(t('VIEWPROFILE.HOROCOMPATIBILITY'), oppGender, t).replace('#COMPARE#', profile.horoCompatibility ?? '')}
-                    </Text>
-                    <Text style={s.starMatchTeaser}>{t('VIEWPROFILE.PAID_MEMBER_REPORT')}</Text>
-                  </Pressable>
+                  starMatch && (
+                    <Pressable onPress={handleViewStarMatchDetails}>
+                      <Text style={s.starMatchText}>
+                        {starMatch.displayText}{t('STARMATCHING.STAR_MATCHING_TXT')}
+                      </Text>
+                      <Text style={s.starMatchTeaser}>{t('VIEWPROFILE.PAID_MEMBER_REPORT')}</Text>
+                    </Pressable>
+                  )
                 ) : (
                   <Pressable onPress={() => navigation.navigate('recharge')}>
+                    <Text style={s.starMatchText}>9/10{t('STARMATCHING.STAR_MATCHING_TXT')}</Text>
                     <Text style={s.starMatchTeaser}>{t('VIEWPROFILE.FREE_MEMBER_REPORT')}</Text>
                   </Pressable>
                 )
@@ -1093,8 +1411,15 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           )}
 
           {/* ── Horoscope details — Angular orders this right after Religious
-              details, before Life style (confirmed against real screenshots). */}
-          {profile.showHoroSection && !sameGender ? (
+              details, before Life style (confirmed against real screenshots).
+              Angular's full visibility gate (viewprofile.page.html:821) is
+              `SHOWHORO=='1' && ((HOROSCOPEAVAILABLE=='Y' && loginHoroAvail=='1')
+              || loginHoroAvail=='0')` — i.e. if you've already added your OWN
+              horoscope but this profile hasn't added theirs, the whole section
+              is hidden (there's no "request" UI live in Angular to fall back
+              to for that combination — confirmed dead/commented-out code). */}
+          {profile.showHoroSection && !sameGender &&
+           ((profile.horoscopeAvailable && loginHoroAvail === '1') || loginHoroAvail === '0') ? (
             <>
               <SectionHeader title={t('VIEWPROFILE.HORO_DETAILS')} />
               <View style={s.detailRow}>
@@ -1103,32 +1428,19 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                 </View>
                 <View style={s.detailTextCol}>
                   <Text style={s.detailLabel}>{t('VIEWPROFILE.HOROSCOPE')}</Text>
-                  {profile.horoscopeAvailable ? (
-                    loginHoroAvail === '1' ? (
-                      <Pressable onPress={handleViewHoroscope}>
+                  {loginHoroAvail === '0' ? (
+                    <>
+                      <Text style={s.detailValue}>
+                        {t('VIEWPROFILE.ADDYOURHORO').replace('#HIMHER#', t(`PRONOUN.${oppGender}.himhers`))}
+                      </Text>
+                      <Pressable onPress={handleAddHoroscope}>
                         <Text style={s.horoActionLink}>{t('GENERAL.ADD_HOROSCOPE')}</Text>
                       </Pressable>
-                    ) : (
-                      <>
-                        <Text style={s.detailValue}>
-                          {t('VIEWPROFILE.ADDYOURHORO').replace('#HIMHER#', t(`PRONOUN.${oppGender}.himhers`))}
-                        </Text>
-                        <Pressable onPress={handleAddHoroscope}>
-                          <Text style={s.horoActionLink}>{t('GENERAL.ADD_HOROSCOPE')}</Text>
-                        </Pressable>
-                      </>
-                    )
-                  ) : (
-                    <>
-                      <Text style={s.detailValue}>{withPronouns(t('VIEWPROFILE.HOROSCOPE_REQ'), oppGender, t)}</Text>
-                      {horoscopeRequested ? (
-                        <Text style={s.horoRequestedText}>{withPronouns(t('VIEWPROFILE.HORO_REQUESTED'), oppGender, t)}</Text>
-                      ) : (
-                        <Pressable onPress={handleRequestHoroscope}>
-                          <Text style={s.horoActionLink}>{withPronouns(t('VIEWPROFILE.HOROSCOPE_SEND'), oppGender, t)}</Text>
-                        </Pressable>
-                      )}
                     </>
+                  ) : (
+                    <Pressable onPress={handleViewHoroscope}>
+                      <Text style={s.horoActionLink}>{t('GENERAL.VIEW_HOROSCOPE')}</Text>
+                    </Pressable>
                   )}
                 </View>
               </View>
@@ -1311,6 +1623,38 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         oppGender={oppGender}
         onClose={() => setWhatsappPaywallOpen(false)}
         onPayNow={handleWhatsappPaywallPayNow}
+      />
+
+      <BottomSheet
+        visible={!!contactConfirm}
+        type="viewPhoneConfirm"
+        data={{
+          content: getContactConfirmContent(),
+          ctaLabel: t('ACCOUNT.YES', 'Yes'),
+        }}
+        onClose={handleContactConfirmClose}
+        onPrimaryPress={handleContactConfirmYes}
+      />
+      <ContactDetailsSheet
+        visible={!!contactDetails}
+        name={contactDetails?.name ?? ''}
+        mobile={contactDetails?.mobile}
+        whatsappNumber={contactDetails?.whatsappNumber}
+        showCounter={contactDetails?.showCounter}
+        viewedCount={contactDetails?.viewedCount}
+        remainingCount={contactDetails?.remainingCount}
+        onClose={handleContactDetailsClose}
+        onCall={handleContactDetailsCall}
+        onWhatsApp={handleContactDetailsWhatsApp}
+      />
+      <BottomSheet
+        visible={!!phoneInfoSheet}
+        type="phonePrivacyInfo"
+        data={getPhoneInfoSheetData()}
+        onClose={handlePhoneInfoClose}
+        onPrimaryPress={handlePhoneInfoPrimaryPress}
+        onSecondaryPress={handlePhoneInfoSecondaryPress}
+        onLinkPress={handlePhoneInfoClose}
       />
 
       <PhotoViewerModal
@@ -1521,7 +1865,6 @@ const s = StyleSheet.create({
   starMatchTeaser: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 13, color: Colors.link, marginTop: 8 },
 
   horoActionLink:    { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: Colors.link, marginTop: 8 },
-  horoRequestedText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 14, color: Colors.black, marginTop: 8 },
   // Feature 6 — own-profile "add missing section" prompts, replacing a section
   // that would otherwise render nothing when its data is empty.
   addDetailPrompt: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },

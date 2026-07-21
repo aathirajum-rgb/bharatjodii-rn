@@ -109,13 +109,21 @@ export class ViewProfileAdapter implements Adapter<ViewProfileModel> {
       smoking:      habits['SMOKING'] ?? undefined,
       eatingHabits: habits['EATINGHABITS'] ?? undefined,
 
-      brothers: family['BROTHERS'] ?? undefined,
-      sisters:  family['SISTERS'] ?? undefined,
+      // Angular: viewprofile.page.html:1001 hides the whole Family details section
+      // when `BROTHERS != '' || SISTERS != ''` is false — an empty string (not just
+      // null/undefined) means "no data", so `??` alone let it through as "defined".
+      brothers: family['BROTHERS'] || undefined,
+      sisters:  family['SISTERS'] || undefined,
       property: toPropertyList(family['NPROPERTY']),
       vehicle:  toPropertyList(family['NVECHILE']),
 
       showHoroSection:    horo['SHOWHORO'] === '1',
-      horoscopeAvailable: horo['HOROSCOPEAVAILABLE'] === '1',
+      // Angular: viewprofile.page.html:821 checks `HOROSCOPEAVAILABLE == 'Y'`
+      // (not '1' — that sentinel is 'Y'/'N', unlike the '1'/'0' SHOWHORO flag
+      // right above it). Comparing against '1' here always failed, so this
+      // profile fell into the "hasn't added horoscope" request-CTA branch
+      // even when the opposite profile's horoscope really was available.
+      horoscopeAvailable: horo['HOROSCOPEAVAILABLE'] === 'Y',
       horoCompatibility:  horo['COMPATIBILITY'] ?? undefined,
       hasStarMatchInputs: !!(religious['RAASI'] && religious['STAR']),
 

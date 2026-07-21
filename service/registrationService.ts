@@ -855,6 +855,12 @@ export async function storeWebURLData(data: Record<string, any>): Promise<void> 
     'PAYPROMO', 'PROFILEVERIFIED', 'DEFERREDIDUSER', 'LOGINTYPE', 'NRIWHATSAPP',
     'IPCOUNTRYCODE', 'AIVFLAG', 'SHORTLISTENABLE', 'SURVEYPOPUP',
     'GLASSBOXFLAG', 'UPIFLAG', 'RPAYFLAG', 'DRNEXT',
+    // Angular: config.ts's localvalueArr whitelist — HOROSCOPEAVAILABLE was missing
+    // from this list, so the logged-in viewer's own horoscope flag was silently
+    // dropped on every login. loginHoroAvail (ViewProfileScreen.tsx) always fell
+    // back to '0', so the horoscope section always rendered the "add your own
+    // horoscope" prompt regardless of the account's real state.
+    'HOROSCOPEAVAILABLE',
   ]
   SCALAR_KEYS.forEach(k => { if (data[k] !== undefined) session[k] = String(data[k]) })
 
