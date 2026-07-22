@@ -8,13 +8,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, Dimensions, FlatList, Linking,
+  ActivityIndicator, Dimensions, FlatList, Linking, Platform,
   NativeScrollEvent, NativeSyntheticEvent,
   Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { StatusBar } from 'expo-status-bar'
+import * as WebBrowser from 'expo-web-browser'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { LANG_LABELS } from '../../components/matches-header/MatchesHeader'
@@ -30,6 +31,7 @@ import StickyBanner from '../../components/sticky-banner/StickyBanner'
 import MembershipBanner from '../../components/matches/MembershipBanner'
 import PhotoViewerModal from '../../components/matches/PhotoViewerModal'
 import PhotoViewerModalDesktop from '../../components/matches/PhotoViewerModalDesktop'
+import HoroscopeSvgViewerModal from '../../components/matches/HoroscopeSvgViewerModal'
 import ReportProfileModal from '../../components/matches/ReportProfileModal'
 import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
@@ -329,6 +331,16 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // yet OR the API call failed (Angular's starAndraasiflag=false) — either way the
   // teaser row stays hidden, matching Angular exactly.
   const [starMatch, setStarMatch] = useState<StarMatchResult | null>(null)
+  // Angular's real native Android/iOS apps intercept the view_horoscope bridge
+  // event themselves and handle it in-app (confirmed by the team — this repo only
+  // has the WEB fallback, index.html's handleNativeEvent, which does
+  // window.open(url, '_blank') and is correctly mirrored below for Platform.OS
+  // === 'web' only). On native, HOROSCOPEURL is sometimes a plain image instead
+  // of a report page — shown in-app via PhotoViewerModal (raster) or
+  // HoroscopeSvgViewerModal (svg — expo-image can't decode those on native,
+  // same limitation CdnSvg.tsx already documents) rather than a browser.
+  const [horoscopeImageUrl, setHoroscopeImageUrl] = useState<string | null>(null)
+  const [horoscopeSvgUrl, setHoroscopeSvgUrl] = useState<string | null>(null)
   // Angular: loginHoroAvail mirrors localStorage.HOROSCOPEAVAILABLE — the LOGGED-IN
   // user's own horoscope-availability flag ('1'/'0'), not the viewed profile's.
   const [loginHoroAvail, setLoginHoroAvail] = useState('0')
@@ -868,7 +880,26 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
       return
     }
     const url = await viewHoroscope(profile.profileId, profile.isIdVerified)
-    if (url) Linking.openURL(url)
+    if (!url) return
+    if (Platform.OS === 'web') {
+      // Angular: index.html's handleNativeEvent('view_horoscope') does
+      // window.open(url, '_blank') — a new tab is correct here, unchanged.
+      Linking.openURL(url)
+      return
+    }
+    // Native (Android/iOS): stay in-app instead of handing off to the external
+    // OS browser. SVG needs its own viewer (react-native-svg-based, since
+    // expo-image can't decode remote SVGs on native); other raster images use
+    // the same in-app photo viewer the profile photos use; anything else (a
+    // report page/PDF, e.g. .html) opens in an in-app browser tab
+    // (SFSafariViewController/Chrome Custom Tabs), not Safari/Chrome itself.
+    if (/\.svg(\?|#|$)/i.test(url)) {
+      setHoroscopeSvgUrl(url)
+    } else if (/\.(png|jpe?g|gif|webp)(\?|#|$)/i.test(url)) {
+      setHoroscopeImageUrl(url)
+    } else {
+      await WebBrowser.openBrowserAsync(url)
+    }
   }
 
   // ── Feature 6 self-preview actions — Angular: clickAddMoreDetails('27'|'28')
@@ -895,19 +926,26 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // result via router state to skip a redundant API call on the report screen.
   // starMatch is only non-null once the proactive fetch (profile-load effect)
   // succeeds, which is also the only state that makes this row clickable at all.
-  function handleViewStarMatchDetails() {
+  // Angular's own-side avatar/name (star-matching.component.ts:83-85) comes from
+  // localStorage NAME/PHOTOURL — the LOGGED-IN viewer's own profile photo, not
+  // anything tied to this specific viewed profile.
+  async function handleViewStarMatchDetails() {
     if (!profile || !starMatch) return
+    const [ownName, ownPhoto] = await Promise.all([
+      getSessionValue('NAME'),
+      getSessionValue('PHOTOURL'),
+    ])
     navigation.navigate('star-matching', {
-      partnerId: profile.profileId,
+      // React Navigation's web linking serializes route params into the URL —
+      // a plain object param naively stringifies to the literal text
+      // "[object Object]" there (confirmed live), unlike native where params
+      // stay in memory. JSON-stringifying explicitly avoids that; the receiving
+      // screen JSON.parses it back.
+      data: JSON.stringify(starMatch.raw),
+      ownName: ownName || '',
+      ownPhoto: ownPhoto || undefined,
       partnerName: profile.name,
       partnerPhoto: profile.photos[0],
-      ownRaasi: starMatch.ownRaasi,
-      ownStar: starMatch.ownStar,
-      partnerRaasi: starMatch.partnerRaasi ?? profile.raasi,
-      partnerStar: starMatch.partnerStar ?? profile.star,
-      displayText: starMatch.displayText,
-      percentage: starMatch.percentage,
-      isNorth: starMatch.isNorth,
     })
   }
 
@@ -1711,6 +1749,19 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         partnerName={profile.name}
         onClose={() => setReportModalOpen(false)}
         onSubmitted={handleReportSubmitted}
+      />
+
+      <PhotoViewerModal
+        visible={!!horoscopeImageUrl}
+        images={horoscopeImageUrl ? [horoscopeImageUrl] : []}
+        initialIndex={0}
+        onClose={() => setHoroscopeImageUrl(null)}
+      />
+
+      <HoroscopeSvgViewerModal
+        visible={!!horoscopeSvgUrl}
+        uri={horoscopeSvgUrl}
+        onClose={() => setHoroscopeSvgUrl(null)}
       />
     </View>
   )

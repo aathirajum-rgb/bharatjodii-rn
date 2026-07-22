@@ -106,8 +106,11 @@ export async function getBioDataLink(matriId: string): Promise<string> {
 // either, see ViewProfileScreen.tsx's horoscope section-visibility gate.)
 
 // Angular opens the horoscope via a native-webview bridge event
-// (appNativeEvent({event_name:'view_horoscope', URL})) — RN has no such bridge;
-// Linking.openURL is the direct analog for opening an external document/image URL.
+// (appNativeEvent({event_name:'view_horoscope', URL})) — the real native Android/
+// iOS apps handle that event themselves in-app (not visible in the web-only
+// Angular repo); ViewProfileScreen.tsx's handleViewHoroscope() mirrors that:
+// web keeps Linking.openURL (new tab, matching index.html's own web fallback),
+// native opens in-app (in-app browser, or the photo viewer for an image URL).
 export async function viewHoroscope(partnerId: string, profileVerified: boolean): Promise<string | null> {
   const userId = await getItem(SK.Auth.USER_ID)
   const params = `ID=${userId ?? ''}&VIEWEDID=${partnerId}&PROFILEVERIFIED=${profileVerified ? '1' : '0'}`

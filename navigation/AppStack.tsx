@@ -141,10 +141,16 @@ export type AppStackParamList = {
   viewProfile: { matriId: string; fromPage: string; showRating?: boolean; profileIds?: string[] } | undefined
   // Angular: redirectiontoStarMatchReport() passes the already-fetched result via
   // router state to skip a redundant API call — same idea here via route params.
+  // `data` is the raw starmatch API REPONSE (COMPATIBILITY/SUMMARY/USERPROFILE/
+  // PARTNERPROFILE/TYPE/PREDICTION) as a JSON STRING, not the object itself —
+  // React Navigation's web linking naively stringifies an object param into the
+  // URL as literal "[object Object]" (confirmed live); StarMatchingScreen
+  // JSON.parses this back before deriving anything, same data Angular's own
+  // setStarMatchingDetails() works from.
   'star-matching': {
-    partnerId: string; partnerName?: string; partnerPhoto?: string
-    ownStar?: string; ownRaasi?: string; partnerStar?: string; partnerRaasi?: string
-    percentage: number; isNorth: boolean
+    data: string
+    ownName: string; ownPhoto?: string | undefined
+    partnerName?: string; partnerPhoto?: string
   } | undefined
 }
 

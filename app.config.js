@@ -87,6 +87,7 @@ module.exports = ({ config }) => ({
     'expo-image',
     'expo-splash-screen',
     'expo-video',
+    'expo-web-browser',
     ['expo-camera', { barcodeScannerEnabled: false }],
   ],
 });

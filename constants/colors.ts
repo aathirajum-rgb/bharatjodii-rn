@@ -106,4 +106,12 @@ export const Colors = {
 
   // ── Payment options screen ───────────────────────────────────────────────────
   discountGreen:  '#029664',   // "Special discount" amount text (PaymentOptionsScreen)
+
+  // ── Star match report (StarMatchingScreen) — exact hex from Angular's
+  // star-matching.component.css, not this app's general design tokens.
+  starMatchYes:      '#10b981',   // compatibility "YES" text / active star / progress fill
+  starMatchNo:       '#ef4444',   // compatibility "NO" text
+  starMatchCtaBg:    '#fcd34d',   // "View Detailed Report" button background
+  starMatchNoteBg:   '#fef6db',   // footnote background
+  starMatchNoteText: '#aa8606',   // footnote text
 }
