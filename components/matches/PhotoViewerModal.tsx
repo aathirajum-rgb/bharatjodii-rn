@@ -5,7 +5,7 @@
 // collapse naturally into one surface: tap the photo, get a full-screen modal
 // that both pinch-zooms the current photo AND pages between all of them —
 // covers both Angular behaviors as a single, more idiomatic component.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Modal, Pressable, StyleSheet, Text, View, FlatList, useWindowDimensions } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
@@ -33,11 +33,19 @@ const BACK_ICON_URI = CDN_REACT + '/arrowleft.svg'
 // below scale 1 during the gesture snaps back immediately too, same as at the
 // end). Ported here as closely as the RNGH/Reanimated equivalents allow.
 function ZoomablePhoto({
-  uri, width, height, onZoomChange, onNaturalSize,
+  uri, width, height, onZoomChange, onNaturalSize, scrollRef,
 }: {
   uri: string; width: number; height: number
   onZoomChange: (zoomed: boolean) => void
   onNaturalSize?: ((size: { width: number; height: number }) => void) | undefined
+  // Real native Android/iOS builds route ALL touch dispatch through RNGH once
+  // GestureHandlerRootView wraps the app (see App.tsx) — including the parent
+  // FlatList's own scroll responder. Without explicitly declaring this pinch as
+  // simultaneous with that FlatList, the FlatList claims two-finger touches
+  // first and the pinch recognizer never activates at all (only reproduces on
+  // a real device — a browser doesn't have this native responder to conflict
+  // with, which is why this bug wasn't visible until a real build was tested).
+  scrollRef: React.RefObject<any>
 }) {
   const scale = useSharedValue(1)
   const translateX = useSharedValue(0)
@@ -60,6 +68,7 @@ function ZoomablePhoto({
   }
 
   const pinch = Gesture.Pinch()
+    .simultaneousWithExternalGesture(scrollRef)
     .onStart(e => {
       startFocalX.value = e.focalX
       startFocalY.value = e.focalY
@@ -141,6 +150,9 @@ export default function PhotoViewerModal({ visible, images, initialIndex, onClos
   // a different aspect ratio (confirmed against a real Angular screenshot:
   // it never shows a visible placeholder-colored gap around the photo).
   const [naturalSizes, setNaturalSizes] = useState<Record<number, { width: number; height: number }>>({})
+  // Handed to each ZoomablePhoto's pinch gesture via simultaneousWithExternalGesture —
+  // see the comment on that prop for why this is required on real native builds.
+  const flatListRef = useRef<FlatList>(null)
 
   useEffect(() => {
     if (visible) { setIndex(initialIndex); setZoomed(false); setNaturalSizes({}) }
@@ -208,6 +220,7 @@ export default function PhotoViewerModal({ visible, images, initialIndex, onClos
 
         <View style={s.photoArea}>
           <FlatList
+            ref={flatListRef}
             data={images}
             horizontal
             scrollEnabled={!zoomed}
@@ -233,6 +246,7 @@ export default function PhotoViewerModal({ visible, images, initialIndex, onClos
                       height={fitted.height}
                       onZoomChange={setZoomed}
                       onNaturalSize={size => setNaturalSizes(prev => (prev[i] ? prev : { ...prev, [i]: size }))}
+                      scrollRef={flatListRef}
                     />
                   </View>
                 </View>
