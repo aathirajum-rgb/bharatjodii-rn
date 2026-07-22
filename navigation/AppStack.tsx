@@ -9,6 +9,7 @@ import { StorageKeys } from '../constants/storage.keys'
 import { OnboardingCtx, FooterState, FooterHandlers } from '../contexts/OnboardingContext'
 import { getItem } from '../service/storageService'
 import { useAuth } from '../contexts/AuthContext'
+import { useIsDesktopWeb } from '../hooks/useIsDesktopWeb'
 import ComponentShowcaseScreen    from '../screens/dev/ComponentShowcaseScreen'
 import HomeScreen                  from '../screens/home/HomeScreen'
 import GalleryScreen               from '../screens/GalleryScreen'
@@ -36,12 +37,18 @@ import FamilyDetailsScreen         from '../screens/onboarding/FamilyDetailsScre
 import PropertyDetailsScreen       from '../screens/onboarding/PropertyDetailsScreen'
 import StarRaasiScreen             from '../screens/onboarding/StarRaasiScreen'
 import DoshamScreen                from '../screens/onboarding/DoshamScreen'
+import PersonalReligiousDesktopStep    from '../screens/onboarding/PersonalReligiousDesktopStep'
+import EducationLocationDesktopStep    from '../screens/onboarding/EducationLocationDesktopStep'
+import PhotoUploadDesktopStep          from '../screens/onboarding/PhotoUploadDesktopStep'
+import OtherDetailsDesktopStep         from '../screens/onboarding/OtherDetailsDesktopStep'
 import PaymentSuccessScreen        from '../screens/payment/PaymentSuccessScreen'
 import PaymentOptionsScreen        from '../screens/payment/PaymentOptionsScreen'
 import CardPaymentScreen           from '../screens/payment/CardPaymentScreen'
 import UpiAddressScreen            from '../screens/payment/UpiAddressScreen'
 import NetBankingScreen            from '../screens/payment/NetBankingScreen'
 import MorePaymentOptionsScreen    from '../screens/payment/MorePaymentOptionsScreen'
+import NeftRtgsScreen               from '../screens/payment/NeftRtgsScreen'
+import PayAtStoreScreen             from '../screens/payment/PayAtStoreScreen'
 import RechargeScreen              from '../screens/payment/RechargeScreen'
 import type { SelectedPackage }    from '../service/paymentService'
 import PermissionDemoScreen        from '../screens/PermissionDemoScreen'
@@ -51,6 +58,7 @@ import StarMatchingScreen          from '../screens/star-matching/StarMatchingSc
 import ActivityScreen               from '../screens/activity/ActivityScreen'
 import LanguageSelectionScreen     from '../screens/LanguageSelectionScreen'
 import MenuScreen                  from '../screens/menu/MenuScreen'
+import BiodataScreen                from '../screens/menu/BiodataScreen'
 import DeleteProfileScreen             from '../screens/delete-profile/DeleteProfileScreen'
 import DeleteProfileMrgReasonScreen    from '../screens/delete-profile/DeleteProfileMrgReasonScreen'
 import DeleteProfileHideScreen         from '../screens/delete-profile/DeleteProfileHideScreen'
@@ -98,6 +106,7 @@ export type AppStackParamList = {
   LanguageSelection: undefined
   Activity:          undefined
   Menu:              undefined
+  Biodata:           undefined
   DeleteProfile:         undefined
   DeleteProfileMrgReason:    { reason: string; reasonName?: string }
   DeleteProfileHide:              { reasonName: string }
@@ -135,6 +144,8 @@ export type AppStackParamList = {
   'upi-address':  { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
   'net-banking':  { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
   'more-payment-options': { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
+  'neft-rtgs':  { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
+  'pay-at-store': { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
   ExternalPage: { url: string; title: string }
   // Angular: viewprofile.page.ts route params (:module/:id) — fromPage drives the
   // "from" context communicationBtnOnClick needs for its paywall/report-popup logic.
@@ -158,10 +169,28 @@ export type AppStackParamList = {
 // AppHeader and footer stay mounted across all onboarding screens.
 // Only the content area re-renders on pageNo change.
 
+// Desktop-web pageNo keys — a SEPARATE step sequence from mobile's numeric
+// pageNo switch below, since desktop combines multiple mobile fields into
+// one card per step (see PersonalReligiousDesktopStep.tsx's header comment).
+// Presentational-only split, same pattern as MatchesDesktopLayout.tsx /
+// ViewProfileDesktopLayout.tsx — this router still owns navigation, each
+// desktop step screen owns its own data/save logic directly (no shared
+// footer chrome, unlike the mobile OnboardingCtx footer below).
+const DESKTOP_PAGE_NOS = new Set([
+  'desktop-personal-religious', 'desktop-education-location',
+  'desktop-photo-upload', 'desktop-other-details',
+])
+
 function OnboardingRouter({ navigation, route }: { navigation: any; route: any }) {
   const pageNo = route.params?.pageNo ?? '1'
+  const isDesktop = useIsDesktopWeb()
   const insets = useSafeAreaInsets()
 
+  // Hooks below must run unconditionally on every render (React's rules of
+  // hooks) — isDesktop can flip mid-session on an actual browser resize, not
+  // just at mount, so an early return here before these hooks would throw
+  // "Rendered fewer hooks than expected" the moment a user resizes the
+  // window. The isDesktop branch below only affects what JSX is returned.
   const [footerState, setFooterStateRaw] = useState<FooterState>({
     nextDisabled: true,
     nextLoading:  false,
@@ -219,6 +248,20 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
+
+  if (isDesktop) {
+    const desktopPage = DESKTOP_PAGE_NOS.has(pageNo) ? pageNo : 'desktop-personal-religious'
+    if (desktopPage === 'desktop-other-details') {
+      return <OtherDetailsDesktopStep navigation={navigation} />
+    }
+    if (desktopPage === 'desktop-photo-upload') {
+      return <PhotoUploadDesktopStep navigation={navigation} />
+    }
+    if (desktopPage === 'desktop-education-location') {
+      return <EducationLocationDesktopStep navigation={navigation} />
+    }
+    return <PersonalReligiousDesktopStep navigation={navigation} />
+  }
 
   return (
     <OnboardingCtx.Provider value={{ setFooterState, handlers }}>
@@ -383,9 +426,12 @@ export default function AppStack() {
       <Stack.Screen name="upi-address" component={UpiAddressScreen} />
       <Stack.Screen name="net-banking" component={NetBankingScreen} />
       <Stack.Screen name="more-payment-options" component={MorePaymentOptionsScreen} />
+      <Stack.Screen name="neft-rtgs" component={NeftRtgsScreen} />
+      <Stack.Screen name="pay-at-store" component={PayAtStoreScreen} />
       <Stack.Screen name="payment-success" component={PaymentSuccessScreen} />
       <Stack.Screen name="Activity" component={ActivityScreen} />
       <Stack.Screen name="Menu" component={MenuScreen} />
+      <Stack.Screen name="Biodata" component={BiodataScreen} />
       <Stack.Screen name="DeleteProfile" component={DeleteProfileScreen} />
       <Stack.Screen name="DeleteProfileMrgReason" component={DeleteProfileMrgReasonScreen} />
       <Stack.Screen name="DeleteProfileHide" component={DeleteProfileHideScreen} />

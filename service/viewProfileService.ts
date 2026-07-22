@@ -5,7 +5,7 @@
 
 import { apiCall } from './apiClient'
 import { Endpoints } from './api.endpoints'
-import { getItem } from './storageService'
+import { getItem, setItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { getSession } from './registrationService'
 
@@ -93,10 +93,65 @@ export async function getBioDataLink(matriId: string): Promise<string> {
     getItem(SK.Auth.TOKEN),
     getItem(SK.Auth.REFRESH_TOKEN),
     getItem(SK.Auth.LANG),
-    getItem('THEMEID'),
+    getItem(SK.App.BIODATA_THEME_ID),
   ])
   const params = `MATRIID=${matriId}&LANG=${lang ?? 'en'}&ATN=${atn ?? ''}&RTN=${rtn ?? ''}&THEME=${themeId ?? '1'}`
   return `${Endpoints.profile.bioData}?${params}`
+}
+
+// ─── Biodata theming + QR ───────────────────────────────────────────────────────
+// Angular: download-biodata.component.ts getuserBioData() — the SAME viewprofile
+// endpoint as getViewProfile(), but with TYPE=BIODATA, additionally returns
+// BIODATATHEME (5 color/background variants used to skin the biodata preview:
+// {VALUE, BGCOLOR, TOP_IMG}) and a top-level QRCODE image URL (biodata-page.html:
+// `[src]="userBioData?.QRCODE"` — a server-rendered QR image, not client-drawn).
+// Kept as its own call rather than adding TYPE=BIODATA to getViewProfile() itself
+// — that function also prefetches OTHER people's profiles and neighbor profiles
+// for the prev/next swipe, none of which have any use for this data.
+//
+// BOTTOM_IMG (also present in BIODATATHEME) is deliberately NOT read here —
+// confirmed dead in Angular's own template (download-biodata.component.html:473
+// `<!-- <ion-img *ngIf="theme?.BOTTOM_IMG" ... -->`, commented out, never
+// rendered), so there's nothing to port.
+
+export interface BiodataTheme {
+  value:   string
+  bgColor: string
+  topImg:  string
+}
+
+export interface BiodataExtras {
+  themes:     BiodataTheme[]
+  qrCodeUrl?: string | undefined
+}
+
+function resolveThemeImageUrl(url: string): string {
+  return /^https?:\/\//.test(url) ? url : `https://${url}`
+}
+
+export async function getBiodataExtras(matriId: string): Promise<BiodataExtras> {
+  const userId = await getItem(SK.Auth.USER_ID)
+  const params = `ID=${userId ?? ''}&VIEWEDID=${matriId}&TYPE=BIODATA`
+  const result = await apiCall(Endpoints.profile.view, 'POST', params)
+  if (!(result?.RESPONSECODE == 1 && result?.ERRCODE == 0)) return { themes: [] }
+
+  const payload = result?.REPONSE
+  const list = payload?.BIODATATHEME
+  const themes: BiodataTheme[] = Array.isArray(list)
+    ? list
+      .map((theme: any) => ({
+        value:   String(theme?.VALUE ?? ''),
+        bgColor: theme?.BGCOLOR ? String(theme.BGCOLOR) : '#011443',
+        topImg:  resolveThemeImageUrl(String(theme?.TOP_IMG ?? '')),
+      }))
+      .filter((theme: BiodataTheme) => theme.value !== '')
+    : []
+
+  return { themes, qrCodeUrl: payload?.QRCODE || undefined }
+}
+
+export async function saveBiodataThemeId(themeValue: string): Promise<void> {
+  await setItem(SK.App.BIODATA_THEME_ID, themeValue)
 }
 
 // ─── Horoscope view ──────────────────────────────────────────────────────────────
