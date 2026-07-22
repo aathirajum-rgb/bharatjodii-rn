@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring, runOnJS,
+  useSharedValue, useAnimatedStyle, runOnJS,
 } from 'react-native-reanimated'
 import { useTranslation } from 'react-i18next'
 import { Colors } from '../../constants/colors'
@@ -21,9 +21,17 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 // Same back-icon asset ViewProfileScreen's own header uses.
 const BACK_ICON_URI = CDN_REACT + '/arrowleft.svg'
 
-const MIN_SCALE = 1
-const MAX_SCALE = 4
-
+// Angular: viewprofile.page.ts:2380-2488 (onPinchStartAndMoveHandler/onPinch/
+// onPinchEndHandler) — a Hammer.js pinch, NOT the "pinch, then stay zoomed and
+// pan around" gesture this component used to implement. Angular's real
+// behavior: zoom tracks your fingers live (scaled from the pinch focal point,
+// via CSS transformOrigin) and snaps back to scale 1 the INSTANT you release
+// (pinchend unconditionally calls resetPinchElement() — no spring, just an
+// immediate style removal) — it's a momentary preview, not a persistent
+// zoomed-and-pan mode. There's also no double-tap-to-zoom anywhere in
+// Angular's gesture code, and no upper scale clamp (only a lower one: pinching
+// below scale 1 during the gesture snaps back immediately too, same as at the
+// end). Ported here as closely as the RNGH/Reanimated equivalents allow.
 function ZoomablePhoto({
   uri, width, height, onZoomChange, onNaturalSize,
 }: {
@@ -32,56 +40,53 @@ function ZoomablePhoto({
   onNaturalSize?: ((size: { width: number; height: number }) => void) | undefined
 }) {
   const scale = useSharedValue(1)
-  const savedScale = useSharedValue(1)
   const translateX = useSharedValue(0)
   const translateY = useSharedValue(0)
-  const savedTranslateX = useSharedValue(0)
-  const savedTranslateY = useSharedValue(0)
+  // Angular: transformOrigin set to the pinch focal point as a %-of-element
+  // position (viewprofile.page.ts:2466-2481) — zoom expands from where your
+  // fingers are, not always from the image's center.
+  const originX = useSharedValue(50)
+  const originY = useSharedValue(50)
+  const startFocalX = useSharedValue(0)
+  const startFocalY = useSharedValue(0)
 
+  // Angular: resetPinchElement() — an immediate style removal, not an
+  // animated spring-back, so no withSpring here either.
   function reset() {
-    scale.value = withSpring(1)
-    savedScale.value = 1
-    translateX.value = withSpring(0)
-    translateY.value = withSpring(0)
-    savedTranslateX.value = 0
-    savedTranslateY.value = 0
+    scale.value = 1
+    translateX.value = 0
+    translateY.value = 0
     onZoomChange(false)
   }
 
   const pinch = Gesture.Pinch()
+    .onStart(e => {
+      startFocalX.value = e.focalX
+      startFocalY.value = e.focalY
+      originX.value = (e.focalX / width) * 100
+      originY.value = (e.focalY / height) * 100
+    })
     .onUpdate(e => {
-      scale.value = Math.max(MIN_SCALE, Math.min(MAX_SCALE, savedScale.value * e.scale))
-    })
-    .onEnd(() => {
-      savedScale.value = scale.value
-      if (scale.value <= 1) runOnJS(reset)()
-      else runOnJS(onZoomChange)(true)
-    })
-
-  const pan = Gesture.Pan()
-    .onUpdate(e => {
-      if (savedScale.value <= 1) return
-      translateX.value = savedTranslateX.value + e.translationX
-      translateY.value = savedTranslateY.value + e.translationY
-    })
-    .onEnd(() => {
-      savedTranslateX.value = translateX.value
-      savedTranslateY.value = translateY.value
-    })
-
-  const doubleTap = Gesture.Tap()
-    .numberOfTaps(2)
-    .onEnd(() => {
-      if (savedScale.value > 1) {
-        runOnJS(reset)()
-      } else {
-        scale.value = withSpring(2)
-        savedScale.value = 2
-        runOnJS(onZoomChange)(true)
+      // Angular: `if (ev.scale < 1) { resetPinchElement(); return; }` — can't
+      // pinch smaller than the original size; doing so just snaps back.
+      if (e.scale < 1) {
+        scale.value = 1
+        translateX.value = 0
+        translateY.value = 0
+        return
       }
+      scale.value = e.scale
+      // Angular: translate.x/y = startXTranslate + startX + ev.deltaX/deltaY —
+      // the pinch centroid's own movement doubles as a two-finger pan, since
+      // initScale/startX/startY are always 0 here (full reset after every
+      // previous gesture, so there's nothing saved to add them to).
+      translateX.value = e.focalX - startFocalX.value
+      translateY.value = e.focalY - startFocalY.value
+      runOnJS(onZoomChange)(true)
     })
-
-  const gesture = Gesture.Exclusive(doubleTap, Gesture.Simultaneous(pinch, pan))
+    .onEnd(() => {
+      runOnJS(reset)()
+    })
 
   const style = useAnimatedStyle(() => ({
     transform: [
@@ -89,10 +94,11 @@ function ZoomablePhoto({
       { translateY: translateY.value },
       { scale: scale.value },
     ],
+    transformOrigin: `${originX.value}% ${originY.value}%`,
   }))
 
   return (
-    <GestureDetector gesture={gesture}>
+    <GestureDetector gesture={pinch}>
       <Animated.View style={[{ width, height }, style]}>
         {/* The card this photo sits in is now sized to the photo's OWN aspect
             ratio (see onNaturalSize below), so contentFit is close to a no-op
