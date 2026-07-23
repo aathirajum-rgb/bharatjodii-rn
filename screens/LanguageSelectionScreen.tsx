@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -8,6 +8,12 @@ import ButtonRevamp from '../components/button-revamp/ButtonRevamp';
 import { Colors } from '../constants/colors';
 import i18n from '../i18n';
 import { getCurrentLanguage, submitLanguage } from '../service/languageService';
+import { useIsDesktopWeb } from '../hooks/useIsDesktopWeb';
+import LanguageSelectionDesktopLayout from './LanguageSelectionDesktopLayout';
+import { getItem } from '../service/storageService';
+import { StorageKeys } from '../constants/storage.keys';
+import { paymentTrack } from '../service/paymentService';
+import type { FooterTab } from '../components/app-footer/AppFooter';
 
 // Language order matches Figma design (en.json node-id 11851:6689)
 const LANGUAGES = [
@@ -33,6 +39,12 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
   const [submitting, setSubmitting] = useState(false);
   const insets = useSafeAreaInsets();
   const { t } = useTranslation();
+  const isDesktop = useIsDesktopWeb();
+  const [userName, setUserName] = useState('');
+
+  useEffect(() => {
+    getItem(StorageKeys.User.NAME).then(name => setUserName(name ?? ''));
+  }, []);
 
   const handleNext = async () => {
     if (!selected || submitting) return;
@@ -48,6 +60,31 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
       onSelect(selected);
     }
   };
+
+  function handleTabPress(tab: FooterTab) {
+    if (!navigation) return;
+    switch (tab) {
+      case 0: navigation.navigate('Home');     break
+      case 1: navigation.navigate('Matches');  break
+      case 2: navigation.navigate('Activity'); break
+      case 3: paymentTrack('31'); navigation.navigate('recharge'); break
+      case 4: navigation.navigate('Search');   break
+    }
+  }
+
+  if (isDesktop) {
+    return (
+      <LanguageSelectionDesktopLayout
+        navigation={navigation}
+        userName={userName}
+        selected={selected}
+        submitting={submitting}
+        onSelect={setSelected}
+        onNext={handleNext}
+        onTabPress={handleTabPress}
+      />
+    );
+  }
 
   return (
     <View style={styles.screen}>

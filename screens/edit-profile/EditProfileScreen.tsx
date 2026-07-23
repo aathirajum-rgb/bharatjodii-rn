@@ -42,6 +42,8 @@ import {
   fetchStates, fetchCities,
 } from '../../service/registrationService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import EditProfileDesktopScreen from './EditProfileDesktopScreen'
 
 const ICON_BACK  = CDN_REACT + '/menu_back_arrow.svg'
 const ICON_ARROW = CDN_REACT + '/menu_right_arrow.svg'
@@ -108,6 +110,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function EditProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+  const isDesktop = useIsDesktopWeb()
 
   const [loading, setLoading]   = useState(true)
   const [profile, setProfile]   = useState<EditProfileInfo | null>(null)
@@ -165,6 +168,10 @@ export default function EditProfileScreen({ navigation }: Props) {
 
   function openPreview() {
     navigation.navigate('viewProfile', { matriId: ownId, fromPage: 'menu' })
+  }
+
+  if (isDesktop) {
+    return <EditProfileDesktopScreen navigation={navigation} />
   }
 
   if (loading || !profile) {

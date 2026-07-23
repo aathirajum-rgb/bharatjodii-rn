@@ -142,8 +142,11 @@ function parseDosham(raw: any): { dosham?: string; doshamType?: string[] } {
 
 function splitProperties(raw: any): { properties: string[]; vehicles: string[] } {
   const VEHICLE_CODES = new Set(['5', '6', '7'])
+  // Confirmed via live capture: FAMILYPROPERTY comes back as an array of
+  // {VALUE: "<code>"} objects, not plain codes — String(item) on one of
+  // these produced the literal text "[object Object]" instead of the code.
   const all: string[] = Array.isArray(raw)
-    ? raw.map(String)
+    ? raw.map(item => (item && typeof item === 'object') ? String(item.VALUE ?? '') : String(item)).filter(Boolean)
     : typeof raw === 'string' ? raw.split('~').filter(Boolean) : []
   return {
     properties: all.filter(c => !VEHICLE_CODES.has(c)),

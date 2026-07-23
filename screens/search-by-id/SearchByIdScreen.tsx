@@ -18,7 +18,7 @@
 //    same end result as Angular's router.url.includes('/searchbyid') check,
 //    no special-casing needed on the ViewProfile side.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -28,6 +28,12 @@ import { searchProfileById } from '../../service/searchByIdService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import FloatingLabelInput from '../../components/input/FloatingLabelInput'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import SearchByIdDesktopLayout from './SearchByIdDesktopLayout'
+import { getItem } from '../../service/storageService'
+import { StorageKeys } from '../../constants/storage.keys'
+import { paymentTrack } from '../../service/paymentService'
+import type { FooterTab } from '../../components/app-footer/AppFooter'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
@@ -36,6 +42,12 @@ type Props = { navigation: any }
 export default function SearchByIdScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+  const isDesktop = useIsDesktopWeb()
+  const [userName, setUserName] = useState('')
+
+  useEffect(() => {
+    getItem(StorageKeys.User.NAME).then(name => setUserName(name ?? ''))
+  }, [])
 
   const [id, setId] = useState('')
   const [error, setError] = useState<string | undefined>(undefined)
@@ -62,6 +74,32 @@ export default function SearchByIdScreen({ navigation }: Props) {
     } finally {
       setLoading(false)
     }
+  }
+
+  function handleTabPress(tab: FooterTab) {
+    switch (tab) {
+      case 0: navigation.navigate('Home');     break
+      case 1: navigation.navigate('Matches');  break
+      case 2: navigation.navigate('Activity'); break
+      case 3: paymentTrack('31'); navigation.navigate('recharge'); break
+      case 4: navigation.navigate('Search');   break
+    }
+  }
+
+  if (isDesktop) {
+    return (
+      <SearchByIdDesktopLayout
+        navigation={navigation}
+        userName={userName}
+        id={id}
+        error={error}
+        loading={loading}
+        canSubmit={canSubmit}
+        onChangeId={handleChangeId}
+        onSubmit={handleSubmit}
+        onTabPress={handleTabPress}
+      />
+    )
   }
 
   return (
