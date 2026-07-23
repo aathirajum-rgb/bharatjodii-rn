@@ -57,6 +57,7 @@ import {
 import {
   communicationBtnOnClick,
   fetchContactDetails,
+  shouldSkipPhoneConfirm,
 } from '../../service/communicationService'
 import { fetchBulkLikeMatches } from '../../service/profileService'
 import { redirectToViewProfile } from '../../service/buttonService'
@@ -113,9 +114,10 @@ function buildMergedList(
 // Wrapped in memo() so unrelated MatchesScreen re-renders (popup timers, sticky
 // countdowns, etc.) don't force every visible card to re-render during scroll —
 // a card only re-renders when its own props actually change.
-const MatchCard = memo(function MatchCard({
+export const MatchCard = memo(function MatchCard({
   profile, oppGender, ownEntryType, femaleFreeEligible, indNumbersLeft,
   onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp,
+  showLikedBadge,
 }: {
   profile:    MatchProfile
   oppGender:  'M' | 'F'
@@ -128,6 +130,13 @@ const MatchCard = memo(function MatchCard({
   onViewLater:() => void
   onCall:     () => void
   onWhatsApp: () => void
+  // Angular's real gate is showLikedLbl (true for BOTH liked tabs on Activity,
+  // regardless of the viewer's own likedStatus toward that profile) — the
+  // COMTEXTDATE text itself already carries the correct direction/wording
+  // ("You liked X on..." vs "X liked you on..."). Matches' own listing never
+  // passes this, so its stricter likedStatus==='1' gate (this profile is one
+  // you've already liked) stays exactly as-is; only ActivityScreen opts in.
+  showLikedBadge?: boolean | undefined
 }) {
   const { t } = useTranslation()
   const { LinearGradient } = require('expo-linear-gradient')
@@ -251,12 +260,21 @@ const MatchCard = memo(function MatchCard({
       )}
 
       {/* ── Liked strip ────────────────────────────────────────────────────── */}
-      {/* Angular: .liked-profile — pink gradient strip below badges */}
-      {!!profile.likedDateText && profile.likedStatus === '1' && (
-        <View style={c.likedStrip}>
+      {/* Angular: .liked-profile { border-radius:50px; background: linear-gradient(
+          90deg, #FFEAF7 0%, #FFF 100%); padding: 4px 8px } (matches-card.component
+          .scss:175-179) — an actual pink→white GRADIENT, not the flat color this
+          previously used, and alignSelf:'flex-start' so it hugs its content like
+          Angular's flex div (was stretching full-width before). */}
+      {!!profile.likedDateText && (showLikedBadge || profile.likedStatus === '1') && (
+        <LinearGradient
+          colors={['#FFEAF7', '#FFFFFF']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={c.likedStrip}
+        >
           <CdnSvg uri={CDN + 'liked-new.svg'} width={20} height={20} />
           <Text style={c.likedText} numberOfLines={1}>{profile.likedDateText}</Text>
-        </View>
+        </LinearGradient>
       )}
 
       {/* ── Activity label row ────────────────────────────────────────────── */}
@@ -851,8 +869,9 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   // straight to dialing on 'show_contact', no confirmation or details sheet. ──
   const [contactConfirm, setContactConfirm] = useState<{ profile: MatchProfile; action: 'call' | 'whatsapp' } | null>(null)
   const [contactDetails, setContactDetails] = useState<{
-    name: string; mobile?: string | undefined; whatsappNumber?: string | undefined
-    showCounter?: boolean | undefined; viewedCount?: string | undefined; remainingCount?: string | undefined
+    name: string; mobile?: string | undefined; dialNumber?: string | undefined; whatsappNumber?: string | undefined
+    showCounter?: boolean | undefined; viewedCount?: string | undefined; totalCount?: string | undefined
+    idVerified?: boolean | undefined
   } | null>(null)
   // Angular button.component.ts:551-579 — the CONFIRMATION popup's own quota
   // footer line ("You have viewed contact numbers of #VAR# profiles. #VAR1#
@@ -1388,16 +1407,25 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     }
   }
 
-  // Angular button.component.ts's showContactDetails() always confirms first
-  // ("You can view #HISHER# number and call or WhatsApp #HIMHER#...") — this
-  // port previously skipped straight to communicationBtnOnClick and dialed
-  // whatever it returned, with no confirmation step at all.
+  // Angular button.component.ts's showContactDetails() (communication.service.ts:
+  // 253-271) — the confirm popup is only shown when NEITHER direct-reveal
+  // condition is met (already viewed this profile before, or mutual-like+paid+
+  // quota-left) — it's not unconditional. A previous version of this port
+  // always showed the confirm step regardless.
   function handleCall(profile: MatchProfile) {
-    setContactConfirm({ profile, action: 'call' })
+    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType)) {
+      handleContactConfirmYes({ profile, action: 'call' })
+    } else {
+      setContactConfirm({ profile, action: 'call' })
+    }
   }
 
   function handleWhatsApp(profile: MatchProfile) {
-    setContactConfirm({ profile, action: 'whatsapp' })
+    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType)) {
+      handleContactConfirmYes({ profile, action: 'whatsapp' })
+    } else {
+      setContactConfirm({ profile, action: 'whatsapp' })
+    }
   }
 
   function handleContactConfirmClose() {
@@ -1553,9 +1581,15 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     // so this honestly just closes rather than pretending to place a call.
   }
 
-  async function handleContactConfirmYes() {
-    if (!contactConfirm) return
-    const { profile, action } = contactConfirm
+  // Angular's confirm step, when shown, calls PhoneViewProfileFunc() on "Yes";
+  // the direct-reveal path (shouldSkipPhoneConfirm) calls the exact same
+  // function immediately instead — same underlying action either way, this
+  // just lets handleCall/handleWhatsApp invoke it without first round-
+  // tripping through contactConfirm state.
+  async function handleContactConfirmYes(override?: { profile: MatchProfile; action: 'call' | 'whatsapp' }) {
+    const pending = override ?? contactConfirm
+    if (!pending) return
+    const { profile, action } = pending
     setContactConfirm(null)
     try {
       const result = await communicationBtnOnClick('matches', action, { MATRIID: profile.profileId })
@@ -1565,10 +1599,12 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         setContactDetails({
           name:           profile.name,
           mobile:         result.mobile,
+          dialNumber:     result.dialNumber,
           whatsappNumber: result.whatsappNumber,
           showCounter:    result.showCounter,
           viewedCount:    result.viewedCount,
-          remainingCount: result.remainingCount,
+          totalCount:     result.totalCount,
+          idVerified:     profile.isIdVerified,
         })
         // Keep the confirmation sheet's own quota footer fresh for next time,
         // without waiting for a full screen reload.
@@ -1647,7 +1683,9 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   }
 
   function handleContactDetailsCall() {
-    if (contactDetails?.mobile) Linking.openURL(`tel:${contactDetails.mobile}`)
+    // Angular: callNative('dial_pad') dials data.phoneNo (country-code
+    // prefixed), not data.mobileNo (the bare on-screen display value).
+    if (contactDetails?.dialNumber) Linking.openURL(`tel:${contactDetails.dialNumber}`)
   }
 
   function handleContactDetailsWhatsApp() {
@@ -2073,7 +2111,8 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           whatsappNumber={contactDetails?.whatsappNumber}
           showCounter={contactDetails?.showCounter}
           viewedCount={contactDetails?.viewedCount}
-          remainingCount={contactDetails?.remainingCount}
+          totalCount={contactDetails?.totalCount}
+          showNotVerifiedNote={!contactDetails?.idVerified && loginGender === 'F'}
           onClose={handleContactDetailsClose}
           onCall={handleContactDetailsCall}
           onWhatsApp={handleContactDetailsWhatsApp}
@@ -2260,7 +2299,8 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         whatsappNumber={contactDetails?.whatsappNumber}
         showCounter={contactDetails?.showCounter}
         viewedCount={contactDetails?.viewedCount}
-        remainingCount={contactDetails?.remainingCount}
+        totalCount={contactDetails?.totalCount}
+        showNotVerifiedNote={!contactDetails?.idVerified && loginGender === 'F'}
         onClose={handleContactDetailsClose}
         onCall={handleContactDetailsCall}
         onWhatsApp={handleContactDetailsWhatsApp}
@@ -2425,20 +2465,25 @@ const c = StyleSheet.create({
   paidBadge:     { width: 80, height: 24 },
   verifiedBadge: { width: 100, height: 24 },
 
-  // Angular: .liked-profile — pink gradient strip with heart icon + date text
+  // Angular: .liked-profile { border-radius:50px; padding:4px 8px } +
+  // "ml-16 mr-24 mt-8" on the div itself (matches-card.component.scss:175-179,
+  // .html:135) — asymmetric margins (not a symmetric marginHorizontal:16), and
+  // alignSelf:'flex-start' so this hugs its content like Angular's flex div
+  // instead of stretching to the card's full width.
   likedStrip: {
     flexDirection:    'row',
     alignItems:       'center',
-    marginHorizontal: 16,
+    alignSelf:        'flex-start',
+    marginLeft:       16,
+    marginRight:      24,
     marginTop:        8,
     borderRadius:     50,
-    backgroundColor:  Colors.likedStripBg,
     paddingHorizontal: 8,
     paddingVertical:   4,
     gap:              4,
   },
   likedIcon: { width: 20, height: 20, flexShrink: 0 },
-  likedText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.likedStripText, flex: 1 },
+  likedText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.likedStripText },
 
   // Angular: d-flex align-center-item mt-12 pl-16 pr-16
   nameRow: {

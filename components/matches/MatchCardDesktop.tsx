@@ -2,8 +2,10 @@
 // photo-left/info-right layout. Same props as the mobile MatchCard
 // (screens/matches/MatchesScreen.tsx) so MatchesDesktopLayout can pass the
 // exact same profile/handlers with zero adaptation.
+import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import {
   WhatsAppIcon, WhatsAppUnlockButton, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
@@ -14,7 +16,10 @@ import {
   type AfterLikeCtx,
 } from './matchesCard.shared'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
+
+const CDN = CDN_SVG
 
 // Figma node 606:6239's photo frame (606:6240) is a 248×248 SQUARE, not the
 // 220×260 rectangle this previously guessed at.
@@ -24,6 +29,7 @@ const PHOTO_H = 248
 export default function MatchCardDesktop({
   profile, oppGender, ownEntryType, femaleFreeEligible, indNumbersLeft,
   onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp,
+  showLikedBadge, menu,
 }: {
   profile:            MatchProfile
   oppGender:          'M' | 'F'
@@ -36,6 +42,15 @@ export default function MatchCardDesktop({
   onViewLater: () => void
   onCall:      () => void
   onWhatsApp:  () => void
+  // See MatchCard (MatchesScreen.tsx) for why this exists — this card never
+  // had the liked-date strip at all (a separate gap from the mobile one).
+  showLikedBadge?: boolean | undefined
+  // Figma "Jodii Desktop — Registration" node 629:11046 ("Liked profiles"):
+  // the 3-dot menu sits INLINE in the icon row next to call/WhatsApp, not
+  // floating over the photo like the mobile card / this card's earlier
+  // placeholder desktop layout did. Only Activity's desktop layout passes
+  // this — Matches desktop has no per-card menu, so it's optional.
+  menu?: { open: boolean; onPress: () => void; content: ReactNode } | undefined
 }) {
   const { t } = useTranslation()
 
@@ -51,6 +66,8 @@ export default function MatchCardDesktop({
     indNumbersLeft,
     oppGender,
   }
+
+  const showLikedStrip = !!profile.likedDateText && (showLikedBadge || profile.likedStatus === '1')
 
   return (
     <View style={c.card}>
@@ -102,16 +119,32 @@ export default function MatchCardDesktop({
             stay tightly stacked together, only the CTA gets pushed to the
             card's bottom edge. */}
         <View>
+          {/* Figma node 629:11046 ("Liked profiles" desktop): when the liked-date
+              pill shows, IT pairs with the icon row on the card's top line, and
+              paid/verified badges drop to their own row underneath — not merged
+              into the same row as the icons like the plain Matches-tab layout. */}
           <View style={c.badgeRow}>
-            <View style={c.badges}>
-              {profile.isPaidMember && (
-                <ProfileBadge variant="paid" text={t('MENU.PAID_BADGE')} />
-              )}
-              {/* Angular: FUNC.getLogInGender() == 'F' — oppGender === 'M' means the viewer is female */}
-              {profile.isIdVerified && oppGender === 'M' && (
-                <ProfileBadge variant="verified" text={t('MATCHES.VERIFIED_ID')} />
-              )}
-            </View>
+            {showLikedStrip ? (
+              <LinearGradient
+                colors={['#FFF2CC', '#FFFFFF']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={c.likedStrip}
+              >
+                <CdnSvg uri={CDN + 'liked-new.svg'} width={16} height={16} />
+                <Text style={c.likedText} numberOfLines={1}>{profile.likedDateText}</Text>
+              </LinearGradient>
+            ) : (
+              <View style={c.badges}>
+                {profile.isPaidMember && (
+                  <ProfileBadge variant="paid" text={t('MENU.PAID_BADGE')} />
+                )}
+                {/* Angular: FUNC.getLogInGender() == 'F' — oppGender === 'M' means the viewer is female */}
+                {profile.isIdVerified && oppGender === 'M' && (
+                  <ProfileBadge variant="verified" text={t('MATCHES.VERIFIED_ID')} />
+                )}
+              </View>
+            )}
             <View style={c.contactIcons}>
               {/* Figma node 606:6276: the call icon sits inside its own white
                   circular button (24×24, #006C48 border) — unlike WhatsApp,
@@ -122,8 +155,32 @@ export default function MatchCardDesktop({
               <Pressable onPress={onWhatsApp} hitSlop={8}>
                 <WhatsAppIcon width={24} height={24} />
               </Pressable>
+              {/* Figma node 629:14637: a #fafafa circular button with 3 stacked
+                  dots, inline with call/WhatsApp — Activity's desktop layout is
+                  the only caller that passes this. */}
+              {menu && (
+                <View style={c.menuWrap}>
+                  <Pressable style={c.menuBtn} onPress={menu.onPress} hitSlop={8}>
+                    <View style={c.menuDot} />
+                    <View style={c.menuDot} />
+                    <View style={c.menuDot} />
+                  </Pressable>
+                  {menu.open && menu.content}
+                </View>
+              )}
             </View>
           </View>
+
+          {showLikedStrip && (profile.isPaidMember || (profile.isIdVerified && oppGender === 'M')) && (
+            <View style={[c.badges, c.badgesSecondRow]}>
+              {profile.isPaidMember && (
+                <ProfileBadge variant="paid" text={t('MENU.PAID_BADGE')} />
+              )}
+              {profile.isIdVerified && oppGender === 'M' && (
+                <ProfileBadge variant="verified" text={t('MATCHES.VERIFIED_ID')} />
+              )}
+            </View>
+          )}
 
           <Pressable onPress={onPress}>
             <Text style={c.name} numberOfLines={1}>{profile.name}</Text>
@@ -164,30 +221,38 @@ export default function MatchCardDesktop({
         )}
 
         {showAfterLikeCTA(profile.likedStatus) && (
-          // Angular: matches-cta-bg-color + getContentAfterLike() text + Call Now/Pay Now
-          // CTA + FREE badge + contacts-left line — same content mobile's MatchCard shows
-          // (MatchesScreen.tsx), previously hardcoded static text here instead.
-          <View style={c.afterLikeRow}>
+          // Figma node 629:12230 ("Frame 1707482133"): a full-width gradient bar
+          // (#FCEAF0 fading to transparent), "Talk to him directly" at left, a
+          // 240×40 primaryDark pill button at right — not the compact tinted box
+          // this used before. Same underlying copy/gating as mobile's MatchCard
+          // (getAfterLikeContentText/getAfterLikeCtaLabel/showFreeBadge), just
+          // restyled to match this real desktop design.
+          <LinearGradient
+            colors={['#FCEAF0', 'rgba(252,234,240,0.2)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={c.afterLikeRow}
+          >
             <View style={c.afterLikeTopRow}>
-              <Text style={c.afterLikeText}>{getAfterLikeContentText(ctaCtx, t)}</Text>
+              <Text style={c.afterLikeText} numberOfLines={1}>{getAfterLikeContentText(ctaCtx, t)}</Text>
               <View style={c.ctaSendInterestWrap}>
+                <Pressable style={c.ctaSendInterest} onPress={onCall}>
+                  <View style={c.ctaSendInterestIconBox}>
+                    <CdnSvg uri={getAfterLikeCtaIcon(ctaCtx)} width={20} height={20} />
+                  </View>
+                  <Text style={c.ctaSendInterestText}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
+                </Pressable>
                 {showFreeBadge(ctaCtx) && (
                   <View style={c.freeBadge} pointerEvents="none">
                     <Text style={c.freeBadgeText}>{t('GENERAL.FREE')}</Text>
                   </View>
                 )}
-                <Pressable style={c.ctaSendInterest} onPress={onCall}>
-                  <View style={c.ctaSendInterestIconBox}>
-                    <CdnSvg uri={getAfterLikeCtaIcon(ctaCtx)} width={16} height={16} />
-                  </View>
-                  <Text style={c.ctaSendInterestText}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
-                </Pressable>
               </View>
             </View>
             {showContactsLeftBanner(ctaCtx) && (
               <Text style={c.contactsLeftText}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
             )}
-          </View>
+          </LinearGradient>
         )}
       </View>
     </View>
@@ -280,6 +345,19 @@ const c = StyleSheet.create({
     alignItems:    'center',
     gap:           8,
   },
+  badgesSecondRow: { marginTop: 8 },
+  // Figma node 903:2986 (629:11046, "Liked profiles" desktop): gold/cream
+  // gradient (#FFF2CC→#FFF) + #4d3a00 text — a DIFFERENT palette from the
+  // mobile card's pink liked-strip (matches-card.component.scss's
+  // `.liked-profile`), confirmed intentional: this real desktop Figma frame
+  // is the source of truth for the desktop card specifically.
+  likedStrip: {
+    flexDirection: 'row', alignItems: 'center',
+    alignSelf: 'flex-start',
+    borderRadius: 50,
+    paddingHorizontal: 8, paddingVertical: 4, gap: 4,
+  },
+  likedText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#4D3A00' },
   contactIcons: {
     flexDirection: 'row',
     alignItems:    'center',
@@ -295,6 +373,14 @@ const c = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
   },
+  // Figma node 629:14637: #fafafa circular button, 3 stacked 3px dots.
+  menuWrap: { position: 'relative' },
+  menuBtn: {
+    width: 24, height: 24, borderRadius: 12,
+    backgroundColor: '#FAFAFA',
+    alignItems: 'center', justifyContent: 'center', gap: 1,
+  },
+  menuDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: Colors.black },
 
   name: {
     fontFamily: 'Poppins-SemiBold',
@@ -387,16 +473,20 @@ const c = StyleSheet.create({
   // Figma: "Like" text is Poppins-SemiBold (not Medium), 14px (not 13).
   ctaLikeText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.white },
 
+  // Figma node 629:12230 ("Frame 1707482133"): full-width 52px-tall gradient
+  // bar (#FCEAF0 fading toward transparent), rounded 8, pl-16/pr-4/py-4 — the
+  // right-side padding is intentionally thin since the CTA button itself
+  // fills most of the row's height.
   afterLikeRow: {
-    backgroundColor:   Colors.afterLikeBg,
     borderRadius:      8,
-    borderWidth:       1,
-    borderColor:       Colors.afterLikeBorder,
-    paddingHorizontal: 14,
-    paddingVertical:   10,
+    height:            52,
+    paddingLeft:       16,
+    paddingRight:      4,
+    paddingVertical:   4,
     marginTop:         16,
   },
   afterLikeTopRow: {
+    flex:           1,
     flexDirection:  'row',
     alignItems:     'center',
     justifyContent: 'space-between',
@@ -405,32 +495,37 @@ const c = StyleSheet.create({
   afterLikeText: {
     flex:       1,
     fontFamily: 'Poppins-Medium',
-    fontSize:   13,
+    fontSize:   14,
     color:      Colors.black,
   },
   ctaSendInterestWrap: { position: 'relative', flexShrink: 0 },
+  // Figma: bg #b50033 (Colors.primaryDark), 240×40, radius 8, px-24, gap-4.
   ctaSendInterest: {
     flexDirection:     'row',
     alignItems:        'center',
     justifyContent:    'center',
-    gap:               6,
-    // Angular: matches-card.component.html's after-like CTA also uses primaryBg (primaryDark)
+    gap:               4,
+    width:             240,
+    height:            40,
     backgroundColor:   Colors.primaryDark,
     borderRadius:      8,
-    paddingVertical:   8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
   },
   ctaSendInterestIconBox: {
-    width: 16, height: 16, flexShrink: 0,
+    width: 20, height: 20, flexShrink: 0,
     alignItems: 'center', justifyContent: 'center',
   },
-  ctaSendInterestText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.white },
+  ctaSendInterestText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.white },
+  // Figma node 629:12675 ("Trust Badge"): a small ribbon overlapping the CTA
+  // button's top-right corner — approximated here as a rounded pill (the
+  // exact folded-ribbon vector wasn't worth reproducing for a small badge);
+  // #544000 text color IS the exact value Figma's own generated code gives.
   freeBadge: {
     position: 'absolute', top: -10, right: 8, zIndex: 1,
-    backgroundColor: Colors.badgeNewBg, borderRadius: 10,
+    backgroundColor: '#FFF2CC', borderRadius: 10,
     paddingHorizontal: 8, paddingVertical: 2,
   },
-  freeBadgeText: { fontFamily: 'Poppins-SemiBold', fontSize: 10, color: Colors.badgeNewText },
+  freeBadgeText: { fontFamily: 'Poppins-Medium', fontSize: 10, color: '#544000' },
   contactsLeftText: {
     fontFamily: 'Poppins-Regular',
     fontSize:   11,

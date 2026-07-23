@@ -45,7 +45,7 @@ import {
   type SimilarProfileCard, type StarMatchResult, type BiodataTheme,
 } from '../../service/viewProfileService'
 import { viewProfileAdapter } from '../../adapters/viewProfile.adapter'
-import { communicationBtnOnClick, fetchContactDetails } from '../../service/communicationService'
+import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm } from '../../service/communicationService'
 import { getHeroBannerDetails } from '../../service/paymentService'
 import { fetchMenuPromo } from '../../service/homeService'
 import { getItem, getJson } from '../../service/storageService'
@@ -302,8 +302,8 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // female-free flow) instead of surfacing anything for them. ──
   const [contactConfirm, setContactConfirm] = useState<'call' | 'whatsapp' | null>(null)
   const [contactDetails, setContactDetails] = useState<{
-    name: string; mobile?: string | undefined; whatsappNumber?: string | undefined
-    showCounter?: boolean | undefined; viewedCount?: string | undefined; remainingCount?: string | undefined
+    name: string; mobile?: string | undefined; dialNumber?: string | undefined; whatsappNumber?: string | undefined
+    showCounter?: boolean | undefined; viewedCount?: string | undefined; totalCount?: string | undefined
   } | null>(null)
   // Angular button.component.ts:551-579 — the CONFIRMATION popup's own quota
   // footer line ("You have viewed contact numbers of #VAR# profiles. #VAR1#
@@ -660,14 +660,25 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // ("You can view #HISHER# number and call or WhatsApp #HIMHER#...") — this
   // previously skipped straight to communicationBtnOnClick and dialed whatever
   // it returned, with no confirmation step at all (same fix as MatchesScreen.tsx).
+  // Angular communication.service.ts's showContactDetails() (lines 253-271) —
+  // the confirm step is only shown when NEITHER direct-reveal condition is
+  // met (already viewed this profile before, or mutual-like+paid+quota-left).
   function handleCall() {
     if (!profile) return
-    setContactConfirm('call')
+    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType)) {
+      handleContactConfirmYes('call')
+    } else {
+      setContactConfirm('call')
+    }
   }
 
   function handleWhatsApp() {
     if (!profile) return
-    setContactConfirm('whatsapp')
+    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType)) {
+      handleContactConfirmYes('whatsapp')
+    } else {
+      setContactConfirm('whatsapp')
+    }
   }
 
   function handleContactConfirmClose() {
@@ -689,9 +700,9 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     return `${question}\n\n${quota}`
   }
 
-  async function handleContactConfirmYes() {
-    if (!profile || !contactConfirm) return
-    const action = contactConfirm
+  async function handleContactConfirmYes(override?: 'call' | 'whatsapp') {
+    const action = override ?? contactConfirm
+    if (!profile || !action) return
     setContactConfirm(null)
     try {
       const result = await communicationBtnOnClick(fromPage, action, { MATRIID: profile.profileId })
@@ -701,10 +712,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         setContactDetails({
           name:           profile.name,
           mobile:         result.mobile,
+          dialNumber:     result.dialNumber,
           whatsappNumber: result.whatsappNumber,
           showCounter:    result.showCounter,
           viewedCount:    result.viewedCount,
-          remainingCount: result.remainingCount,
+          totalCount:     result.totalCount,
         })
         if (result.viewedCount !== undefined || result.remainingCount !== undefined) {
           setContactQuota(prev => ({
@@ -771,7 +783,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   }
 
   function handleContactDetailsCall() {
-    if (contactDetails?.mobile) Linking.openURL(`tel:${contactDetails.mobile}`)
+    if (contactDetails?.dialNumber) Linking.openURL(`tel:${contactDetails.dialNumber}`)
     setContactDetails(null)
   }
 
@@ -1279,7 +1291,8 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           whatsappNumber={contactDetails?.whatsappNumber}
           showCounter={contactDetails?.showCounter}
           viewedCount={contactDetails?.viewedCount}
-          remainingCount={contactDetails?.remainingCount}
+          totalCount={contactDetails?.totalCount}
+          showNotVerifiedNote={!!profile && !profile.isIdVerified && loginGender === 'F'}
           onClose={handleContactDetailsClose}
           onCall={handleContactDetailsCall}
           onWhatsApp={handleContactDetailsWhatsApp}
@@ -1896,7 +1909,8 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         whatsappNumber={contactDetails?.whatsappNumber}
         showCounter={contactDetails?.showCounter}
         viewedCount={contactDetails?.viewedCount}
-        remainingCount={contactDetails?.remainingCount}
+        totalCount={contactDetails?.totalCount}
+        showNotVerifiedNote={!!profile && !profile.isIdVerified && loginGender === 'F'}
         onClose={handleContactDetailsClose}
         onCall={handleContactDetailsCall}
         onWhatsApp={handleContactDetailsWhatsApp}

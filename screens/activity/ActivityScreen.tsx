@@ -1,52 +1,57 @@
+// Liked Profile screen — Angular: activity.component.ts/.html (route `/activity`,
+// tabs `likedyou`/`likesent`). Figma "2026 - Design Enhancement" nodes 2036:2568
+// (paid) / 2036:2719 (unpaid), file NtASk18Qa7um4vjCvfMHEH.
+//
+// Reuses the EXACT same card component MatchesScreen.tsx uses (MatchCard) —
+// confirmed against Angular's own source that /matches and /activity both
+// render the same `app-matches-card` component, so this isn't just DRY
+// cleanup, it matches Angular's real architecture. MatchCard's existing
+// after-like CTA logic (matchesCard.shared.tsx's getAfterLikeContentText/
+// getAfterLikeCtaLabel) already produces the exact paid/unpaid copy in both
+// Figma frames ("Talk to him/her directly"+"View phone number" vs "To contact
+// via Call/WhatsApp"+"Pay Now") and the liked-strip already renders the
+// pink "You liked ... on DATE" pill — reusing it gives us that design for free,
+// we only need to feed it correctly-adapted data.
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator,
-  FlatList,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
+  ActivityIndicator, FlatList, Linking, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
+import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import Toast, { type ToastRequest } from '../../components/toast/Toast'
+import BottomSheet from '../../components/bottom-sheet/BottomSheet'
+import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
+import ReportProfileModal from '../../components/matches/ReportProfileModal'
+import ThreeDotMenu from '../../components/matches/ThreeDotMenu'
+import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
+import { MatchCard } from '../matches/MatchesScreen'
+import ActivityDesktopLayout from './ActivityDesktopLayout'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import { useContactGating } from '../../hooks/useContactGating'
+import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
+import { matchProfileAdapter } from '../../adapters/matches.adapter'
+import { fetchActivityListingPage } from '../../service/activityService'
+import { communicationBtnOnClick, shouldSkipPhoneConfirm } from '../../service/communicationService'
+import { redirectToViewProfile } from '../../service/buttonService'
 import { paymentTrack } from '../../service/paymentService'
-import MatchesCard from '../../components/matches-card/MatchesCard'
+import { fetchNotifCount } from '../../service/homeService'
+import { logEvent, logScreen } from '../../service/analyticsService'
+import { getItem, getJson, setJson } from '../../service/storageService'
+import { StorageKeys } from '../../constants/storage.keys'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import { StorageKeys } from '../../constants/storage.keys'
-import { callActivityApi } from '../../service/activityService'
-import { getItem } from '../../service/storageService'
+import i18n from '../../i18n'
+import type { MatchProfile } from '../../types/interfaces/matches.interface'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Props = { navigation: any; route?: any }
-
-type TabType = 'likedyou' | 'likesent'
-
-interface RawProfile {
-  MATRIID:         string
-  NAME?:           string
-  AGE?:            string
-  HEIGHTCATEGORY?: string
-  EDUCATION?:      string
-  OCCUPATION?:     string
-  CASTE?:          string
-  CITY?:           string
-  STATE?:          string
-  INCOME?:         string
-  THUMBIMG?:       string
-  PHOTO?:          { IMAGE: string }[]
-  PHOTOSTATUS?:    string | number
-  PHOTOPRIVACY?:   string | number
-  LIKED?:          string
-  PHONEVIEWED?:    string
-  STATUS?:         string | number
-  COMTEXTDATE?:    string
-}
+export type LikedTab = 'likedyou' | 'likesent'
 
 interface TabData {
-  profiles:    RawProfile[]
+  profiles:    MatchProfile[]
   total:       number
   hasMore:     boolean
   loadingMore: boolean
@@ -54,203 +59,477 @@ interface TabData {
   loaded:      boolean
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
 const LIMIT = 20
-const AVATAR_MALE   = CDN_SVG + 'avatar-male.svg'
-const AVATAR_FEMALE = CDN_SVG + 'avatar-female.svg'
-
-const INITIAL_TAB_DATA: TabData = {
-  profiles: [], total: 0, hasMore: true, loadingMore: false, start: 0, loaded: false,
-}
+const INITIAL_TAB_DATA: TabData = { profiles: [], total: 0, hasMore: true, loadingMore: false, start: 0, loaded: false }
+const CDN = CDN_SVG
 
 // ─── ActivityScreen ───────────────────────────────────────────────────────────
 
 export default function ActivityScreen({ navigation }: Props) {
+  const { t } = useTranslation()
   const insets = useSafeAreaInsets()
+  const isDesktop = useIsDesktopWeb()
+  const gating = useContactGating()
 
-  const [activeTab,     setActiveTab]     = useState<TabType>('likesent')
-  const [initialLoad,   setInitialLoad]   = useState(true)
-
-  const [tabData, setTabData] = useState<Record<TabType, TabData>>({
+  const [activeTab,   setActiveTab]   = useState<LikedTab>('likesent')
+  const [initialLoad, setInitialLoad] = useState(true)
+  const [tabData, setTabData] = useState<Record<LikedTab, TabData>>({
     likedyou: { ...INITIAL_TAB_DATA },
     likesent: { ...INITIAL_TAB_DATA },
   })
 
-  const userIdRef    = useRef('')
-  const avatarRef    = useRef(AVATAR_FEMALE)  // opposite gender avatar
+  const userIdRef = useRef('')
 
-  // ── Helpers ──────────────────────────────────────────────────────────────────
+  // ── Contact flow state (confirm → communicationBtnOnClick → result) ────────
+  // Angular button.component.ts's two-step contact reveal: confirm → phoneviewed
+  // API → Contact Details sheet, same as MatchesScreen.tsx.
+  const [contactConfirm, setContactConfirm] = useState<{ profile: MatchProfile; action: 'call' | 'whatsapp' } | null>(null)
+  const [contactDetails, setContactDetails] = useState<{
+    name: string; mobile?: string | undefined; dialNumber?: string | undefined; whatsappNumber?: string | undefined
+    showCounter?: boolean | undefined; viewedCount?: string | undefined; totalCount?: string | undefined
+    idVerified?: boolean | undefined
+  } | null>(null)
+  const [whatsappPaywallProfile, setWhatsappPaywallProfile] = useState<MatchProfile | null>(null)
+  const [reportTarget, setReportTarget] = useState<{ id: string; name: string } | null>(null)
+  // Angular: report-remove-profile.component's own visibility toggle — only
+  // one card's dropdown is open at a time.
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
+  // The ~10 other phoneviewed/pre-flight results (phone protected, FUP limit,
+  // ID-verify prompt, female-free variants, etc.) — see usePhoneInfoSheet.ts.
+  const phoneInfo = usePhoneInfoSheet()
 
-  function withFallback(raw: RawProfile[]): RawProfile[] {
-    const avatar = avatarRef.current
-    return raw.map(r => ({
-      ...r,
-      THUMBIMG: r.THUMBIMG || avatar,
-      PHOTO:    r.PHOTO?.length ? r.PHOTO : [{ IMAGE: r.THUMBIMG || avatar }],
+  // ── Unread "new" badge per tab — Angular: common.getNotificationCount(1) →
+  // notificationcount API's COMCOUNT array, persisted-viewed via localStorage
+  // VIEWEDACTIVITYLIST so the badge disappears once a tab's been opened. ──────
+  const [newCounts, setNewCounts] = useState<Record<LikedTab, number>>({ likedyou: 0, likesent: 0 })
+  const [viewedTabs, setViewedTabs] = useState<Record<string, boolean>>({})
+
+  function showToast(message: string) {
+    setToastRequest({ message, key: Date.now() })
+  }
+
+  // ── Data helpers ─────────────────────────────────────────────────────────────
+
+  function updateTab(tab: LikedTab, patch: Partial<TabData>) {
+    setTabData(prev => ({ ...prev, [tab]: { ...prev[tab], ...patch } }))
+  }
+
+  function patchProfile(tab: LikedTab, profileId: string, patch: Partial<MatchProfile>) {
+    setTabData(prev => ({
+      ...prev,
+      [tab]: {
+        ...prev[tab],
+        profiles: prev[tab].profiles.map(p => p.profileId === profileId ? { ...p, ...patch } : p),
+      },
     }))
   }
 
-  function updateTab(tab: TabType, patch: Partial<TabData>) {
-    setTabData(prev => ({ ...prev, [tab]: { ...prev[tab], ...patch } }))
+  function removeProfile(tab: LikedTab, profileId: string) {
+    setTabData(prev => ({
+      ...prev,
+      [tab]: {
+        ...prev[tab],
+        profiles: prev[tab].profiles.filter(p => p.profileId !== profileId),
+        total: Math.max(0, prev[tab].total - 1),
+      },
+    }))
   }
 
   // ── API ──────────────────────────────────────────────────────────────────────
 
-  async function loadTab(tab: TabType, start: number, isFirst: boolean) {
+  async function loadTab(tab: LikedTab, start: number, isFirst: boolean) {
     if (isFirst) updateTab(tab, { loaded: false })
     else         updateTab(tab, { loadingMore: true })
 
     try {
-      const res = await callActivityApi(tab, userIdRef.current, start, LIMIT)
+      const result = await fetchActivityListingPage(tab, userIdRef.current, start, LIMIT)
+      const adapted = result.items.map(matchProfileAdapter.adapt)
+      const hasMore = result.items.length >= LIMIT
 
-      if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0) {
-        const raw: RawProfile[] = res.RESPONSE ?? []
-        const total = isFirst ? parseInt(res.TOTAL ?? '0', 10) : undefined
-
-        const filled = withFallback(raw)
-        const hasMore = raw.length >= LIMIT
-
-        setTabData(prev => {
-          const existing = prev[tab]
-          return {
-            ...prev,
-            [tab]: {
-              profiles:    isFirst ? filled : [...existing.profiles, ...filled],
-              total:       total ?? existing.total,
-              hasMore,
-              loadingMore: false,
-              start:       start + LIMIT,
-              loaded:      true,
-            },
-          }
-        })
-      } else if (res?.ERRCODE == 1) {
-        updateTab(tab, { hasMore: false, loaded: true, loadingMore: false })
-      } else {
-        updateTab(tab, { loaded: true, loadingMore: false })
-      }
+      setTabData(prev => {
+        const existing = prev[tab]
+        return {
+          ...prev,
+          [tab]: {
+            profiles:    isFirst ? adapted : [...existing.profiles, ...adapted],
+            total:       isFirst ? result.totalCount : existing.total,
+            hasMore,
+            loadingMore: false,
+            start:       start + LIMIT,
+            loaded:      true,
+          },
+        }
+      })
     } catch {
       updateTab(tab, { loaded: true, loadingMore: false })
     }
   }
 
-  // ── Init — load both tabs in parallel ────────────────────────────────────────
+  // Angular: activity.component.ts's viewedActivitytList — a tab's unread badge
+  // is cleared the moment it's actually opened, persisted so it stays cleared
+  // across app restarts.
+  async function markTabViewed(tab: LikedTab) {
+    setViewedTabs(prev => {
+      if (prev[tab]) return prev
+      const next = { ...prev, [tab]: true }
+      setJson('VIEWEDACTIVITYLIST', next).catch(() => {})
+      return next
+    })
+  }
 
   useEffect(() => {
+    logScreen('Activity')
     Promise.all([
       getItem(StorageKeys.Auth.USER_ID),
       getItem(StorageKeys.User.LOGIN_GENDER),
-      getItem(StorageKeys.User.GENDER),
-    ]).then(async ([id, loginG, regG]) => {
+      getJson<Record<string, boolean>>('VIEWEDACTIVITYLIST'),
+      fetchNotifCount().catch(() => ({ newCount: 0, comCount: [] })),
+    ]).then(async ([id, loginG, viewed, notif]) => {
       userIdRef.current = id ?? ''
-      const female = loginG === 'F' || regG === '2'
-      avatarRef.current = female ? AVATAR_MALE : AVATAR_FEMALE
+      const initialTab: LikedTab = loginG === 'F' ? 'likedyou' : 'likesent'
+      setActiveTab(initialTab)
+      setViewedTabs(viewed ?? {})
 
-      const defaultTab: TabType = female ? 'likedyou' : 'likesent'
-      setActiveTab(defaultTab)
+      const likedYouEntry = notif.comCount.find(c => c.comtype === 'likedyou')
+      const likeSentEntry = notif.comCount.find(c => c.comtype === 'likesent' || c.comtype === 'likedbyme')
+      setNewCounts({
+        likedyou: Number(likedYouEntry?.newcount ?? 0),
+        likesent: Number(likeSentEntry?.newcount ?? 0),
+      })
 
-      // Load both tabs concurrently; default tab shown first
       await Promise.all([
         loadTab('likedyou', 0, true),
         loadTab('likesent', 0, true),
       ])
       setInitialLoad(false)
+      markTabViewed(initialTab)
     })
   }, [])
 
-  // ── Tab switch ───────────────────────────────────────────────────────────────
+  // Angular: changeLanguage() (activity.component.ts:1442-1459) — tears down and
+  // re-fetches so server-rendered/translated content refreshes in the new
+  // language. Skips the initial mount (already covered above).
+  const mountedLangRef = useRef(i18n.language)
+  useEffect(() => {
+    if (i18n.language === mountedLangRef.current) return
+    mountedLangRef.current = i18n.language
+    loadTab('likedyou', 0, true)
+    loadTab('likesent', 0, true)
+  }, [i18n.language])
 
-  function switchTab(tab: TabType) {
+  function switchTab(tab: LikedTab) {
     if (tab === activeTab) return
     setActiveTab(tab)
-    // Reload if never loaded (shouldn't happen since we preload both)
+    logEvent({ category: 'activity', action: 'tab_click', label: tab })
+    markTabViewed(tab)
     if (!tabData[tab].loaded) loadTab(tab, 0, true)
   }
 
-  // ── Pagination ────────────────────────────────────────────────────────────────
-
   const handleEndReached = useCallback(() => {
     const d = tabData[activeTab]
-    if (!d.loadingMore && d.hasMore && d.loaded) {
-      loadTab(activeTab, d.start, false)
-    }
+    if (!d.loadingMore && d.hasMore && d.loaded) loadTab(activeTab, d.start, false)
   }, [tabData, activeTab])
+
+  // ── Card action handlers ──────────────────────────────────────────────────────
+  // Angular: matches-card.component.ts's clickOn*() → communication.service.ts's
+  // communicationBtnOnClick() — same dispatcher MatchesScreen.tsx uses, 'activity'
+  // as fromPage (Angular's own variant string for this exact screen).
+
+  function handlePress(profile: MatchProfile) {
+    const ids = tabData[activeTab].profiles.map(p => p.profileId)
+    redirectToViewProfile('', profile.profileId, 'activity', ids)
+  }
+
+  async function handleLike(profile: MatchProfile) {
+    patchProfile(activeTab, profile.profileId, { likedStatus: '1' })
+    try {
+      const result = await communicationBtnOnClick('activity', 'like', { MATRIID: profile.profileId })
+      if (result.type === 'error') {
+        patchProfile(activeTab, profile.profileId, { likedStatus: '0' })
+        showToast(result.message)
+      } else if (result.type === 'api_success' && result.message) {
+        showToast(result.message)
+      }
+    } catch { /* keep optimistic state — matches MatchesScreen's own silent-catch convention */ }
+  }
+
+  async function handleDontShow(profile: MatchProfile) {
+    removeProfile(activeTab, profile.profileId)
+    try {
+      await communicationBtnOnClick('activity', 'dontshow', { MATRIID: profile.profileId })
+      showToast(t('VIEWPROFILE.SKIP_PROFILE'))
+    } catch { /* card already removed client-side, matches Angular's optimistic behavior */ }
+  }
+
+  async function handleViewLater(profile: MatchProfile) {
+    removeProfile(activeTab, profile.profileId)
+    try {
+      await communicationBtnOnClick('activity', 'viewlater', { MATRIID: profile.profileId })
+      showToast(t('GENERAL.PROFILE_LATER'))
+    } catch { /* same as above */ }
+  }
+
+  // Angular button.component.ts's showContactDetails() (communication.service.ts:
+  // 253-271) — the confirm step is only shown when NEITHER direct-reveal
+  // condition is met (already viewed this profile before, or mutual-like+paid+
+  // quota-left) — not unconditionally. Rendered via the same generic
+  // BottomSheet(type="viewPhoneConfirm") MatchesScreen.tsx uses.
+  function confirmThenContact(profile: MatchProfile, action: 'call' | 'whatsapp') {
+    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, gating.indNumbersLeft, gating.ownEntryType)) {
+      handleContactConfirmYes({ profile, action })
+    } else {
+      setContactConfirm({ profile, action })
+    }
+  }
+
+  function getContactConfirmContent(): string {
+    if (!contactConfirm) return ''
+    const question = t('VIEWPROFILE.VIEWPHONECONFIRM')
+      .replace('#HISHER#', t(`PRONOUN.${gating.oppGender}.hisher`))
+      .replace('#HIMHER#', t(`PRONOUN.${gating.oppGender}.himher`))
+    const quota = t('VIEWPROFILE.VIEWPHONEDETAIL')
+      .replace('#VAR#', gating.contactQuota.viewed)
+      .replace('#VAR1#', gating.contactQuota.left)
+      .replace('#VAR2#', gating.contactQuota.expiry)
+    return `${question}\n\n${quota}`
+  }
+
+  function handleContactConfirmClose() {
+    setContactConfirm(null)
+  }
+
+  async function handleContactConfirmYes(override?: { profile: MatchProfile; action: 'call' | 'whatsapp' }) {
+    const pending = override ?? contactConfirm
+    if (!pending) return
+    const { profile, action } = pending
+    setContactConfirm(null)
+    try {
+      const result = await communicationBtnOnClick('activity', action, { MATRIID: profile.profileId })
+      if (result.type === 'show_contact') {
+        setContactDetails({
+          name: profile.name, mobile: result.mobile, dialNumber: result.dialNumber, whatsappNumber: result.whatsappNumber,
+          showCounter: result.showCounter, viewedCount: result.viewedCount, totalCount: result.totalCount,
+          idVerified: profile.isIdVerified,
+        })
+      } else if (result.type === 'payment_promo') {
+        // Angular: same {type:'payment_promo'} MatchesScreen.tsx handles — WhatsApp
+        // gets a confirm modal first ("Pay now" inside it navigates), Call goes
+        // straight to recharge.
+        if (action === 'whatsapp') setWhatsappPaywallProfile(profile)
+        else navigation.navigate('recharge')
+      } else if (result.type === 'error') {
+        showToast(result.message)
+      } else {
+        await phoneInfo.handleResult(result)
+      }
+    } catch { /* silent — matches MatchesScreen's own convention */ }
+  }
+
+  function handleContactDetailsClose() { setContactDetails(null) }
+  function handleContactDetailsCall() {
+    if (contactDetails?.dialNumber) Linking.openURL(`tel:${contactDetails.dialNumber}`)
+  }
+  function handleContactDetailsWhatsApp() {
+    const num = contactDetails?.whatsappNumber?.replace(/\D/g, '')
+    if (num) Linking.openURL(`https://wa.me/${num}`)
+  }
+
+  // Angular matches-card.component.ts:262-270 clickOnReportProfile() →
+  // communicationBtnOnClick('reportprofile') fires a SILENT report/profile/v1
+  // hit first; the reasons-picker only opens on that call's success
+  // (communication.service.ts:139-141, 485-488) — not a direct open.
+  async function handleReportPress(profile: MatchProfile) {
+    setOpenMenuId(null)
+    try {
+      const result = await communicationBtnOnClick('activity', 'reportprofile', { MATRIID: profile.profileId })
+      if (result.type === 'report_popup') {
+        setReportTarget({ id: profile.profileId, name: profile.name })
+      } else if (result.type === 'error') {
+        showToast(result.message)
+      }
+    } catch { /* silent — matches this service's own convention elsewhere */ }
+  }
+
+  // Angular: IsShowRemoveProfile — only true on the "Liked by you" tab, you
+  // can't remove a profile from "Who liked you". Same dontshow action as the
+  // swipe-style Don't Show CTA, just triggered from the 3-dot menu instead.
+  function handleRemovePress(profile: MatchProfile) {
+    setOpenMenuId(null)
+    handleDontShow(profile)
+  }
+
+  function handleMenuPress(profile: MatchProfile) {
+    setOpenMenuId(prev => prev === profile.profileId ? null : profile.profileId)
+  }
+
+  // ── Footer nav ────────────────────────────────────────────────────────────────
+
+  function handleTabPress(tab: FooterTab) {
+    switch (tab) {
+      case 0: navigation.navigate('Home');     break
+      case 1: navigation.navigate('Matches');  break
+      case 3: paymentTrack('31'); navigation.navigate('recharge'); break
+      case 4: navigation.navigate('Search');   break
+      // case 2 is this screen — do nothing
+    }
+  }
 
   // ── Computed ──────────────────────────────────────────────────────────────────
 
-  const current = tabData[activeTab]
-  const avatar  = avatarRef.current
+  const current  = tabData[activeTab]
+  const isPaid   = !['B', 'F'].includes(gating.ownEntryType)
 
-  // Tab chip labels with count
-  function tabLabel(tab: TabType): string {
+  function tabLabel(tab: LikedTab): string {
     const count = tabData[tab].total
-    const base  = tab === 'likedyou' ? 'Profiles who liked you' : 'Profiles you liked'
+    const base  = tab === 'likedyou' ? t('LIKE_LIST.LIKEDYOU_TITLE') : t('LIKE_LIST.LIKESENT_TITLE')
     return count > 0 ? `${base} (${count})` : base
   }
 
-  // Upsell banner text per tab
-  function bannerTitle(): string {
-    const n = current.total
-    if (activeTab === 'likedyou') {
-      return n === 1 ? '1 match has liked you!' : `${n} matches have liked you!`
-    }
-    return n === 1 ? 'You have liked 1 match!' : `You have liked ${n} matches!`
+  // Angular: app-chip's countShow — newcount!=0 && tab not yet opened this session/install.
+  function tabUnreadCount(tab: LikedTab): number {
+    return viewedTabs[tab] ? 0 : newCounts[tab]
   }
 
-  // ── Render helpers ────────────────────────────────────────────────────────────
+  function bannerTitle(): string {
+    const key = activeTab === 'likedyou' ? 'LIKE_LIST.LIKEDYOU' : 'LIKE_LIST.LIKESENT'
+    return t(key).replace('#COUNT#', String(current.total))
+  }
 
-  function renderItem({ item }: { item: RawProfile }) {
-    const isDeleted = item.STATUS == 1 || item.STATUS === '1'
+  // ── Desktop ────────────────────────────────────────────────────────────────────
 
-    const card = (
-      <MatchesCard
-        profileId={item.MATRIID}
-        name={item.NAME}
-        age={item.AGE}
-        height={item.HEIGHTCATEGORY}
-        education={item.EDUCATION}
-        occupation={item.OCCUPATION}
-        caste={item.CASTE}
-        city={item.CITY}
-        state={item.STATE}
-        profileImageArr={isDeleted ? undefined : item.PHOTO}
-        defaultImg={item.THUMBIMG || avatar}
-        isPhotoAvailable={!isDeleted && (item.PHOTOSTATUS == 1 || item.PHOTOSTATUS === '1')}
-        isPhotoProtect={!isDeleted && (item.PHOTOPRIVACY == 1 || item.PHOTOPRIVACY === '1')}
-        showReqPhotoElement={!isDeleted}
-        isActivityLabel={isDeleted}
-        LabelText={isDeleted ? 'This profile has been deleted' : undefined}
-        likedStatus={(item.LIKED ?? '0') as '0' | '1' | '2' | '3'}
-        phoneViewed={item.PHONEVIEWED}
-        showLikedLbl={!isDeleted}
-        variant={activeTab}
-        onViewProfile={isDeleted ? undefined : () => {}}
-      />
+  if (isDesktop) {
+    return (
+      <ActivityDesktopLayout
+        activeTab={activeTab}
+        tabLabel={tabLabel}
+        tabUnreadCount={tabUnreadCount}
+        current={current}
+        initialLoad={initialLoad}
+        isPaid={isPaid}
+        bannerTitle={bannerTitle()}
+        gating={gating}
+        langCode={i18n.language}
+        onSwitchTab={switchTab}
+        onLoadMore={handleEndReached}
+        onPress={handlePress}
+        onLike={handleLike}
+        onDontShow={handleDontShow}
+        onViewLater={handleViewLater}
+        onCall={p => confirmThenContact(p, 'call')}
+        onWhatsApp={p => confirmThenContact(p, 'whatsapp')}
+        onMenuPress={handleMenuPress}
+        openMenuId={openMenuId}
+        onRemovePress={handleRemovePress}
+        onReportPress={handleReportPress}
+        onGetPaidMembership={() => navigation.navigate('recharge')}
+        onLanguagePress={() => navigation.navigate('LanguageSelection')}
+        onTabPress={handleTabPress}
+      >
+        <BottomSheet
+          visible={!!contactConfirm}
+          type="viewPhoneConfirm"
+          data={{ content: getContactConfirmContent(), ctaLabel: t('ACCOUNT.YES', 'Yes') }}
+          onClose={handleContactConfirmClose}
+          onPrimaryPress={handleContactConfirmYes}
+        />
+        {contactDetails && (
+          <ContactDetailsSheet
+            visible
+            name={contactDetails.name}
+            mobile={contactDetails.mobile}
+            whatsappNumber={contactDetails.whatsappNumber}
+            showCounter={contactDetails.showCounter}
+            viewedCount={contactDetails.viewedCount}
+            totalCount={contactDetails.totalCount}
+            showNotVerifiedNote={!contactDetails.idVerified && gating.loginGender === 'F'}
+            onClose={handleContactDetailsClose}
+            onCall={handleContactDetailsCall}
+            onWhatsApp={handleContactDetailsWhatsApp}
+          />
+        )}
+        <WhatsAppPaywallModal
+          visible={!!whatsappPaywallProfile}
+          profile={whatsappPaywallProfile}
+          oppGender={gating.oppGender}
+          onClose={() => setWhatsappPaywallProfile(null)}
+          onPayNow={() => { setWhatsappPaywallProfile(null); navigation.navigate('recharge') }}
+        />
+        {reportTarget && (
+          <ReportProfileModal
+            visible
+            partnerId={reportTarget.id}
+            partnerName={reportTarget.name}
+            onClose={() => setReportTarget(null)}
+            onSubmitted={() => setReportTarget(null)}
+          />
+        )}
+        <BottomSheet
+          visible={!!phoneInfo.sheet}
+          type="phonePrivacyInfo"
+          data={phoneInfo.getData(t)}
+          onClose={phoneInfo.close}
+          onPrimaryPress={() => phoneInfo.primaryPress(navigation)}
+          onSecondaryPress={() => phoneInfo.secondaryPress(navigation)}
+          onLinkPress={phoneInfo.close}
+        />
+        <Toast request={toastRequest} />
+      </ActivityDesktopLayout>
     )
+  }
 
-    if (isDeleted) {
-      return (
-        <View pointerEvents="none" style={styles.deletedWrap}>
-          {card}
-        </View>
-      )
-    }
+  // ── Render helpers (mobile) ────────────────────────────────────────────────────
 
-    return card
+  function renderItem({ item }: { item: MatchProfile }) {
+    return (
+      <View style={styles.cardWrap}>
+        <MatchCard
+          profile={item}
+          oppGender={gating.oppGender}
+          ownEntryType={gating.ownEntryType}
+          femaleFreeEligible={gating.femaleFreeEligible}
+          indNumbersLeft={gating.indNumbersLeft}
+          onPress={() => handlePress(item)}
+          onLike={() => handleLike(item)}
+          onDontShow={() => handleDontShow(item)}
+          onViewLater={() => handleViewLater(item)}
+          onCall={() => confirmThenContact(item, 'call')}
+          onWhatsApp={() => confirmThenContact(item, 'whatsapp')}
+          showLikedBadge
+        />
+        {/* Figma: circular dark 3-dot menu, top-right of the photo — Angular's
+            IsShowThreeDots (Report always, Remove only on "Liked by you"). Not
+            part of MatchCard itself (plain Matches list never shows this), so
+            it's overlaid here rather than added to the shared component. */}
+        <Pressable style={styles.menuBtn} onPress={() => handleMenuPress(item)} hitSlop={8}>
+          <View style={styles.menuDot} />
+          <View style={styles.menuDot} />
+          <View style={styles.menuDot} />
+        </Pressable>
+        {openMenuId === item.profileId && (
+          <ThreeDotMenu
+            showRemove={activeTab === 'likesent'}
+            showReport
+            onRemove={() => handleRemovePress(item)}
+            onReport={() => handleReportPress(item)}
+          />
+        )}
+      </View>
+    )
   }
 
   function renderListHeader() {
-    if (current.total === 0) return null
+    // Angular: female-free-user upsell banner — Figma shows this for ANY unpaid
+    // viewer though (the mock's own "You liked her..." caption implies a male
+    // viewer and still shows it), so gating this on ownEntryType rather than
+    // Angular's narrower EntryType=='F' condition.
+    if (isPaid || current.total === 0) return null
     return (
       <View style={styles.banner}>
         <Text style={styles.bannerTitle}>{bannerTitle()}</Text>
-        <Text style={styles.bannerSub}>Become a paid member to contact them directly</Text>
-        <Pressable
-          style={styles.bannerBtn}
-          onPress={() => navigation.navigate('recharge')}
-        >
-          <Text style={styles.bannerBtnLabel}>Get paid membership</Text>
+        <Text style={styles.bannerSub}>{t('VERIFY_ID_DOC.BECOMEPAIDMEMBER')}</Text>
+        <Pressable style={styles.bannerBtn} onPress={() => navigation.navigate('recharge')}>
+          <Text style={styles.bannerBtnLabel}>{t('VERIFY_ID_DOC.BECOME_PAID')}</Text>
         </Pressable>
       </View>
     )
@@ -267,31 +546,17 @@ export default function ActivityScreen({ navigation }: Props) {
 
   function renderEmpty() {
     if (!current.loaded) return null
+    const isLikeSent = activeTab === 'likesent'
     return (
       <View style={styles.emptyState}>
-        <Text style={styles.emptyIcon}>💌</Text>
-        <Text style={styles.emptyTitle}>No profiles yet</Text>
+        <Text style={styles.emptyTitle}>
+          {t(isLikeSent ? 'LIKE_LIST.NOPROFILE_CONT' : 'LIKE_LIST.NOPROFILE_CONT_1')}
+        </Text>
         <Text style={styles.emptySubtitle}>
-          {activeTab === 'likedyou'
-            ? 'Profiles that like you will appear here'
-            : 'Profiles you like will appear here'}
+          {t(isLikeSent ? 'LIKE_LIST.NOPROFILE_CONT_SUB' : 'LIKE_LIST.NOPROFILE_CONT_1_SUB')}
         </Text>
       </View>
     )
-  }
-
-  // ── Footer nav ────────────────────────────────────────────────────────────────
-
-  function handleTabPress(tab: FooterTab) {
-    switch (tab) {
-      case 0: navigation.navigate('Home');     break
-      case 1: navigation.navigate('Matches');  break
-      // Angular: footer.component.ts — paymentTrack(31) fires right before
-      // routing a free member to the payment intermediate page.
-      case 3: paymentTrack('31'); navigation.navigate('recharge'); break
-      case 4: navigation.navigate('Search');   break
-      // case 2 is this screen — do nothing
-    }
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
@@ -301,27 +566,31 @@ export default function ActivityScreen({ navigation }: Props) {
 
       {/* ── Header ── */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Liked profiles</Text>
+        <Text style={styles.headerTitle}>{t('GENERAL.ICON_3')}</Text>
+        <Pressable style={styles.langPill} onPress={() => navigation.navigate('LanguageSelection')} hitSlop={8}>
+          <CdnSvg uri={CDN + 'revamp/lang-change-img.svg'} width={22} height={22} />
+          <Text style={styles.langText}>English</Text>
+        </Pressable>
       </View>
 
       {/* ── Tab chips ── */}
       <View style={styles.tabBarWrap}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabScroll}
-        >
-          {(['likedyou', 'likesent'] as TabType[]).map(tab => {
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
+          {(['likedyou', 'likesent'] as LikedTab[]).map(tab => {
             const isActive = activeTab === tab
+            const unread = tabUnreadCount(tab)
             return (
               <Pressable
                 key={tab}
                 style={[styles.chip, isActive && styles.chipActive]}
                 onPress={() => switchTab(tab)}
               >
-                <Text style={[styles.chipLabel, isActive && styles.chipLabelActive]}>
-                  {tabLabel(tab)}
-                </Text>
+                <Text style={[styles.chipLabel, isActive && styles.chipLabelActive]}>{tabLabel(tab)}</Text>
+                {unread > 0 && (
+                  <View style={styles.unreadBadge}>
+                    <Text style={styles.unreadBadgeText}>{unread}</Text>
+                  </View>
+                )}
               </Pressable>
             )
           })}
@@ -337,7 +606,7 @@ export default function ActivityScreen({ navigation }: Props) {
         ) : (
           <FlatList
             data={current.profiles}
-            keyExtractor={item => item.MATRIID}
+            keyExtractor={item => item.profileId}
             renderItem={renderItem}
             ListHeaderComponent={renderListHeader}
             ListEmptyComponent={renderEmpty}
@@ -346,12 +615,65 @@ export default function ActivityScreen({ navigation }: Props) {
             onEndReachedThreshold={0.4}
             contentContainerStyle={styles.listContent}
             showsVerticalScrollIndicator={false}
+            initialNumToRender={4}
+            maxToRenderPerBatch={4}
+            windowSize={7}
+            removeClippedSubviews
           />
         )}
       </View>
 
-      {/* ── Footer — always visible, same as Home/Matches ── */}
+      {/* ── Footer ── */}
       <AppFooter activeTab={2} onTabPress={handleTabPress} />
+
+      <BottomSheet
+        visible={!!contactConfirm}
+        type="viewPhoneConfirm"
+        data={{ content: getContactConfirmContent(), ctaLabel: t('ACCOUNT.YES', 'Yes') }}
+        onClose={handleContactConfirmClose}
+        onPrimaryPress={handleContactConfirmYes}
+      />
+      {contactDetails && (
+        <ContactDetailsSheet
+          visible
+          name={contactDetails.name}
+          mobile={contactDetails.mobile}
+          whatsappNumber={contactDetails.whatsappNumber}
+          showCounter={contactDetails.showCounter}
+          viewedCount={contactDetails.viewedCount}
+          totalCount={contactDetails.totalCount}
+          showNotVerifiedNote={!contactDetails.idVerified && gating.loginGender === 'F'}
+          onClose={handleContactDetailsClose}
+          onCall={handleContactDetailsCall}
+          onWhatsApp={handleContactDetailsWhatsApp}
+        />
+      )}
+      <WhatsAppPaywallModal
+        visible={!!whatsappPaywallProfile}
+        profile={whatsappPaywallProfile}
+        oppGender={gating.oppGender}
+        onClose={() => setWhatsappPaywallProfile(null)}
+        onPayNow={() => { setWhatsappPaywallProfile(null); navigation.navigate('recharge') }}
+      />
+      {reportTarget && (
+        <ReportProfileModal
+          visible
+          partnerId={reportTarget.id}
+          partnerName={reportTarget.name}
+          onClose={() => setReportTarget(null)}
+          onSubmitted={() => { setReportTarget(null); showToast(t('GENERAL.REPORT_SUBMITTED', 'Report submitted')) }}
+        />
+      )}
+      <BottomSheet
+        visible={!!phoneInfo.sheet}
+        type="phonePrivacyInfo"
+        data={phoneInfo.getData(t)}
+        onClose={phoneInfo.close}
+        onPrimaryPress={() => phoneInfo.primaryPress(navigation)}
+        onSecondaryPress={() => phoneInfo.secondaryPress(navigation)}
+        onLinkPress={phoneInfo.close}
+      />
+      <Toast request={toastRequest} bottomOffset={56 + 16} />
     </View>
   )
 }
@@ -359,141 +681,72 @@ export default function ActivityScreen({ navigation }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: Colors.background },
+  flex1:  { flex: 1 },
 
-  screen: {
-    flex:            1,
-    backgroundColor: Colors.background,
-  },
-  flex1: {
-    flex: 1,
-  },
-
-  // ── Header ────────────────────────────────────────────────────────────────────
+  // ── Header ──────────────────────────────────────────────────────────────────
   header: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    paddingHorizontal: 20,
-    paddingVertical:   14,
-    backgroundColor:   Colors.surface,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 20, paddingVertical: 14,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.divider,
   },
-  headerTitle: {
-    fontSize:   20,
-    fontWeight: '700',
-    color:      Colors.textDark,   // #333333
+  headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.textDark },
+  langPill: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    borderWidth: 1, borderColor: Colors.borderNeutral, borderRadius: 8,
+    paddingHorizontal: 8, paddingVertical: 4,
   },
+  langText: { fontFamily: 'Poppins-Medium', fontSize: 12, color: Colors.textDark },
 
-  // ── Tab bar ────────────────────────────────────────────────────────────────────
-  // Angular: activity-top-tabs (fixed z-index) → plain sticky in RN via list header
-  tabBarWrap: {
-    backgroundColor:   Colors.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.divider,
-  },
-  tabScroll: {
-    paddingHorizontal: 16,
-    paddingVertical:   10,
-    gap:               8,
-  },
-
-  // Angular: activity-slider-bg = #f1f5f9 (inactive), selected + brand pink (active)
+  // ── Tab bar — Figma: unselected border #b0b0b0, selected bg/border chip tokens ──
+  tabBarWrap: { backgroundColor: Colors.surface },
+  tabScroll: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  // Figma: unselected chip border is #b0b0b0 (Colors.inputBorder), not the
+  // #8a8a8a used by the language pill above.
   chip: {
-    paddingHorizontal: 16,
-    paddingVertical:   8,
-    borderRadius:      20,
-    backgroundColor:   '#f1f5f9',
-    borderWidth:       1,
-    borderColor:       'transparent',
+    flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderColor: Colors.inputBorder,
   },
-  chipActive: {
-    backgroundColor: Colors.primarySurface,           // #fff0f0
-    borderColor:     Colors.chipBorderActive,          // rgba(181,0,51,0.40)
+  chipActive: { backgroundColor: Colors.chipSurfaceSelected, borderColor: Colors.chipBorderActive },
+  chipLabel: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textDark },
+  chipLabelActive: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textDark },
+  // Angular: app-chip's countShow badge — small red circle, white count text.
+  unreadBadge: {
+    minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
+    backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
   },
-  chipLabel: {
-    fontSize:   13,
-    fontWeight: '500',
-    color:      Colors.textMedium,
-  },
-  chipLabelActive: {
-    color:      Colors.primaryDark,    // #B50033
-    fontWeight: '700',
-  },
+  unreadBadgeText: { fontFamily: 'Poppins-SemiBold', fontSize: 11, color: Colors.white },
 
-  // ── Upsell banner ──────────────────────────────────────────────────────────────
-  // Angular: .matches-liked-you-block { padding: 16px; background: rgba(181,0,51,0.05) }
-  banner: {
-    backgroundColor: 'rgba(181, 0, 51, 0.05)',
-    padding:         16,
-    gap:             6,
-    marginBottom:    12,
+  // ── Card + 3-dot menu overlay ──────────────────────────────────────────────────
+  cardWrap: { position: 'relative' },
+  menuBtn: {
+    position: 'absolute', top: 16, right: 16,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: 'rgba(84,84,84,0.85)',
+    alignItems: 'center', justifyContent: 'center', gap: 2,
   },
-  bannerTitle: {
-    fontSize:   16,
-    fontWeight: '700',
-    color:      Colors.textPrimary,
-    lineHeight: 22,
-  },
-  bannerSub: {
-    fontSize:   14,
-    color:      Colors.textMedium,
-    lineHeight: 20,
-    marginBottom: 8,
-  },
+  menuDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.white },
+
+  // ── Unpaid upsell banner — Figma: bg rgba(181,0,51,0.05) ─────────────────────
+  banner: { backgroundColor: 'rgba(181, 0, 51, 0.05)', padding: 16, gap: 6 },
+  bannerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.textPrimary, lineHeight: 22 },
+  bannerSub: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textMedium, lineHeight: 20, marginBottom: 8 },
   bannerBtn: {
-    alignSelf:        'flex-start',
-    borderWidth:      1.5,
-    borderColor:      Colors.primary,
-    borderRadius:     6,
-    paddingHorizontal:14,
-    paddingVertical:  8,
+    alignSelf: 'flex-start', borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 6,
+    paddingHorizontal: 14, paddingVertical: 8,
   },
-  bannerBtnLabel: {
-    fontSize:   14,
-    fontWeight: '600',
-    color:      Colors.primary,
-  },
+  bannerBtnLabel: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.primary },
 
   // ── List ──────────────────────────────────────────────────────────────────────
-  listContent: {
-    paddingTop: 12,
-    flexGrow:   1,
-  },
-
-  // ── Deleted profile card wrapper ───────────────────────────────────────────────
-  deletedWrap: {
-    opacity: 0.65,
-  },
-
-  // ── States ────────────────────────────────────────────────────────────────────
-  loadingWrap: {
-    flex:           1,
-    alignItems:     'center',
-    justifyContent: 'center',
-  },
-  footerLoader: {
-    paddingVertical: 20,
-    alignItems:      'center',
-  },
+  listContent: { flexGrow: 1 },
+  footerLoader: { paddingVertical: 20, alignItems: 'center' },
+  loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyState: {
-    flex:              1,
-    alignItems:        'center',
-    justifyContent:    'center',
-    paddingHorizontal: 32,
-    paddingTop:        80,
-    gap:               12,
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 32, paddingTop: 80, gap: 12,
   },
-  emptyIcon: {
-    fontSize: 56,
-  },
-  emptyTitle: {
-    fontSize:   20,
-    fontWeight: '700',
-    color:      Colors.textPrimary,
-    textAlign:  'center',
-  },
-  emptySubtitle: {
-    fontSize:   14,
-    color:      Colors.textSecondary,
-    textAlign:  'center',
-    lineHeight: 20,
-  },
+  emptyTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.textPrimary, textAlign: 'center' },
+  emptySubtitle: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
 })

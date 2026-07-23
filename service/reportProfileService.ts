@@ -49,13 +49,24 @@ export async function fetchReportReasons(partnerId: string): Promise<ReportReaso
   }
 }
 
+// Angular: report-profile.component.ts:289-296 — on success, response.MESSAGE
+// (TITLE/CONTENT/CTA) is handed straight to the shared BottomSheetComponent
+// as componentData for action='reportProfile' — the success sheet's text is
+// API-driven, not a static i18n string.
+export interface ReportSubmitResult {
+  ok:      boolean
+  title?:  string | undefined
+  content?: string | undefined
+  cta?:    string | undefined
+}
+
 // Angular: report-profile.component.ts:258-270 — multipart POST to
 // 'reportoppositeprofile', which resolves (httpservice.service.ts:155) to the
 // exact same image-CDN PHP endpoint already wired here as Endpoints.media.reportProfile.
 export async function submitReport(
   partnerId: string,
   opts: { key: string; title: string; comments?: string | undefined; photoUri?: string | undefined },
-): Promise<boolean> {
+): Promise<ReportSubmitResult> {
   const userId = await getItem(SK.Auth.USER_ID)
   const formData = new FormData()
   formData.append('ID', userId ?? '')
@@ -71,5 +82,13 @@ export async function submitReport(
     } as any)
   }
   const result = await uploadFile(Endpoints.media.reportProfile, formData)
-  return result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1
+  const ok = result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1
+  if (!ok) return { ok: false }
+  const msg = result?.MESSAGE ?? {}
+  return {
+    ok: true,
+    title: msg?.TITLE ? String(msg.TITLE) : undefined,
+    content: msg?.CONTENT ? String(msg.CONTENT) : undefined,
+    cta: msg?.CTA ? String(msg.CTA) : undefined,
+  }
 }

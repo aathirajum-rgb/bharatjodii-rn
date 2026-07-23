@@ -1,15 +1,10 @@
 // "Contact Details" bottom sheet — Angular button.component.ts:613-664 /
 // modalpopup.component.html:402-485 (action `viewProfileContactNo`), shown after
 // the user confirms (ContactConfirmSheet) and the phoneviewed API call resolves.
-// Shows Name/Mobile, a WhatsApp button (only if a WhatsApp number came back),
-// a Call button (always), "Share this number with your family", and a
-// "Contacts viewed X/Y" counter — paid entryType only (Angular gates this row
-// on FUNC.getEnteryType()=='P'), matching `showCounter` from communicationService.ts.
-//
-// Exact colors/spacing confirmed against Figma "Jodii - Master File English"
-// node 3765:4837/3765:4904 — a couple of earlier guesses here (green WhatsApp
-// button, floating-above close X, underlined share link) turned out wrong;
-// see inline comments below for what changed.
+// Verified directly against modalpopup.component.html:402-485 — several
+// details here previously came from a different, wrong Figma reference
+// ("Jodii - Master File English" / a "Jodii Desktop" node) that doesn't match
+// this actual popup; see inline comments below for what changed.
 import { Modal, Pressable, Share, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
@@ -25,14 +20,18 @@ export interface ContactDetailsSheetProps {
   whatsappNumber?: string | undefined
   showCounter?:    boolean | undefined
   viewedCount?:    string | undefined
-  remainingCount?: string | undefined
+  totalCount?:     string | undefined
+  // Angular: *ngIf="data.idverified == '0' && LOGINGENDER == 'F'"
+  // (modalpopup.component.html:417) — shown only to female viewers looking at
+  // a not-yet-ID-verified profile.
+  showNotVerifiedNote?: boolean | undefined
   onClose:         () => void
   onCall:          () => void
   onWhatsApp:      () => void
 }
 
 export default function ContactDetailsSheet({
-  visible, name, mobile, whatsappNumber, showCounter, viewedCount, remainingCount,
+  visible, name, mobile, whatsappNumber, showCounter, viewedCount, totalCount, showNotVerifiedNote,
   onClose, onCall, onWhatsApp,
 }: ContactDetailsSheetProps) {
   const { t } = useTranslation()
@@ -47,9 +46,6 @@ export default function ContactDetailsSheet({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={s.scrim} onPress={onClose} />
       <View style={[s.sheet, { paddingBottom: insets.bottom + 24 }]}>
-        {/* Figma: close X sits INSIDE the card's top-right corner, same row as
-            the title — not floating above the sheet (an earlier guess based on
-            an Angular SCSS class name that turned out not to match). */}
         <View style={s.headerRow}>
           <Text style={s.title}>{t('VIEWPROFILE.CONTACT_DETAILS')}</Text>
           <Pressable onPress={onClose} hitSlop={10}>
@@ -57,21 +53,33 @@ export default function ContactDetailsSheet({
           </Pressable>
         </View>
 
-        {/* Figma "Jodii Desktop" node 186:4576 — only the Name row is shown here;
-            the raw mobile digits are never printed as plain text anywhere on this
-            card (a previous pass here did show them, which doesn't match). The
-            number is only ever revealed by actually tapping the button below. */}
+        {showNotVerifiedNote && (
+          <Text style={s.notVerifiedNote}>{t('VIEWPROFILE.VERIFIED_NOTE')}</Text>
+        )}
+
+        {/* modalpopup.component.html:422-435 — Name AND Mobile are both plain
+            text rows here; the raw digits are NOT hidden on this popup (a
+            previous pass here deliberately omitted the Mobile row entirely,
+            based on a different/wrong Figma reference — confirmed wrong
+            against both the real Angular markup and a live screenshot). */}
         <View style={s.infoBlock}>
           <View style={s.row}>
             <Text style={s.label}>{t('VIEWPROFILE.CONTACT_NAMEUSER')}</Text>
             <Text style={s.value}>{name}</Text>
           </View>
+          {!!mobile && (
+            <View style={s.row}>
+              <Text style={s.label}>{t('VIEWPROFILE.CONTACT_MOBILE')}</Text>
+              <Text style={s.value}>{mobile}</Text>
+            </View>
+          )}
         </View>
 
-        {/* Figma: this WhatsApp button is white bg + #B50033 (brand red) border +
-            BLACK text — not green, and not a grey/muted outline either (both
-            were earlier guesses). Shown only when a WhatsApp number actually
-            came back in the phoneviewed response (Angular: *ngIf="loadWhatsapp()"). */}
+        {/* modalpopup.component.html:442-447 — app-button-revamp textColor:
+            'greyColor' + border:'greyBorder' + background:'whiteBg'. Both map
+            to the SAME --ion-color-grey-color (#545454, theme/variables.scss:179)
+            — white bg + grey border + grey text, NOT a brand-red border/black
+            text (a previous guess here). */}
         {!!whatsappNumber && (
           <Pressable style={s.waBtn} onPress={onWhatsApp}>
             <WhatsAppIcon width={24} height={24} />
@@ -79,18 +87,14 @@ export default function ContactDetailsSheet({
           </Pressable>
         )}
 
-        {/* Figma node 186:4576 — labeled "View phone number" (not "Call"), same
-            copy the after-like CTA elsewhere in the app already uses for this
-            exact same reveal-and-call action (matchesCard.shared.tsx's
-            getAfterLikeCtaLabel). A previous pass here used a generic "Call"
-            label that didn't match. */}
+        {/* modalpopup.component.html:455-458 — labeled "Call" (generalContent.
+            CALL_CTA / GENERAL.CALL_CTA), not "View phone number" — that's the
+            BEFORE-reveal button elsewhere; this popup IS the revealed state. */}
         <Pressable style={[s.callBtn, { marginTop: whatsappNumber ? 12 : 16 }]} onPress={onCall}>
           <CallIcon width={24} height={24} />
-          <Text style={s.btnText}>{t('VIEWPROFILE.VIEW_PHONE')}</Text>
+          <Text style={s.btnText}>{t('GENERAL.CALL_CTA')}</Text>
         </Pressable>
 
-        {/* Figma: small icon + indigo (#29339B) text, NOT underlined — an
-            earlier version guessed at an underlined link with no icon. */}
         <Pressable onPress={handleShare} style={s.shareRow} hitSlop={6}>
           <CdnSvg uri={CDN_SVG + 'share-img-contact-details-popup.svg'} width={10} height={12} />
           <Text style={s.shareLinkText}>{t('VIEWPROFILE.CONTACT_DETAIL_SHARE')}</Text>
@@ -103,10 +107,15 @@ export default function ContactDetailsSheet({
               width="100%" height={1}
               style={s.divider}
             />
+            {/* Angular: viewContactNoPopUp() (communication.service.ts:604-609) —
+                "Contacts viewed X/Y" = (TOTALPHNUMBER - PHNUMBERLEFT) / TOTALPHNUMBER.
+                A previous pass here paired viewedCount with the REMAINING count
+                instead of the TOTAL quota — a different, wrong pair (that's what
+                produced a nonsensical "50/0" when the quota was exhausted). */}
             <Text style={s.counter}>
               {t('VIEWPROFILE.VIEWPHONEDETAIL_1')
                 .replace('#VAR#', viewedCount ?? '0')
-                .replace('#VAR1#', remainingCount ?? '0')}
+                .replace('#VAR1#', totalCount ?? '0')}
             </Text>
           </>
         )}
@@ -144,17 +153,23 @@ const s = StyleSheet.create({
     lineHeight: 28,
     color:      '#1f1e1b',
   },
-  infoBlock: { gap: 4 },
+  // Angular: VERIFIED_NOTE row (modalpopup.component.html:417) — body2-regular-14,
+  // color-1f1e1b, mt-8 relative to the title above it.
+  notVerifiedNote: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#1f1e1b', marginTop: 8 },
+  infoBlock: { gap: 4, marginTop: 24 },
   row: { flexDirection: 'row' },
   label: { fontFamily: 'Poppins-Regular',  fontSize: 14, lineHeight: 25, color: '#1f1e1b' },
   // Figma: value is SemiBold (not Medium) with a slight letter-spacing.
   value: { fontFamily: 'Poppins-SemiBold', fontSize: 14, lineHeight: 25, letterSpacing: 0.14, color: '#1f1e1b' },
+  // Angular: --ion-color-grey-color: #545454 (theme/variables.scss:179) — used
+  // for BOTH the border and text on this button (not a brand-red border/black
+  // text, a previous guess here).
   waBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 4, height: 44, borderRadius: 8, marginTop: 16, paddingHorizontal: 24,
-    backgroundColor: Colors.white, borderWidth: 1, borderColor: '#B50033',
+    backgroundColor: Colors.white, borderWidth: 1, borderColor: '#545454',
   },
-  waBtnText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.black },
+  waBtnText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: '#545454' },
   callBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 4, height: 44, borderRadius: 8, paddingHorizontal: 24,

@@ -99,7 +99,12 @@ function toProfile(p: Record<string, any>): SwiperItem {
     viewLaterStatus:     p['VIEWLATER'],
     isNewLabel:          p['ISNEWLABEL']  === '1',
     labelContent:        p['LABELCONTENT'],
-    likedViewedDateText: p['LIKEDVIEWEDDATETEXT'] ?? p['VIEWEDDATETEXT'] ?? p['LIKEDDATETEXT'],
+    // COMTEXTDATE — Angular's activity.component.html binds this straight to
+    // matches-card's LabelText for BOTH liked tabs. Missing from this fallback
+    // chain was the actual root cause of the "liked you on DATE" strip never
+    // showing for Activity-sourced profiles at all (the other 3 field names
+    // are never sent by the likedyou/likedbyme endpoints).
+    likedViewedDateText: p['LIKEDVIEWEDDATETEXT'] ?? p['VIEWEDDATETEXT'] ?? p['LIKEDDATETEXT'] ?? p['COMTEXTDATE'],
     // Angular: FUNC.IsPaidMember — paid if ENTRYTYPE not 'B'/'F'. MEMBERSHIPTYPE is a
     // confirmed alternate name for the same value (registrationService.ts:768 maps it
     // to ENTRYTYPE the same way) — some listing shapes send that one instead.
@@ -118,7 +123,10 @@ function toProfile(p: Record<string, any>): SwiperItem {
   }
 }
 
-function toListingResult(res: Record<string, any>): ListingResult {
+// Exported so other listing screens (e.g. ActivityScreen's liked-profile tabs)
+// can parse their own RESPONSE/TOTAL envelope through the same SwiperItem
+// mapping instead of hand-rolling a second raw->UI adapter.
+export function toListingResult(res: Record<string, any>): ListingResult {
   // Angular matches API: profiles in res['RESPONSE'] (array), count in res['TOTAL']
   // Other listing APIs may use res['LIST'] / res['TOTALCOUNT'] — keep fallbacks
   const raw = res['RESPONSE'] ?? res['LIST'] ?? res['LISTDATA'] ?? []

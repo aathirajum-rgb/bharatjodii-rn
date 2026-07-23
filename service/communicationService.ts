@@ -29,9 +29,23 @@ export type CommActionResult =
   // fields PHNUMBERVIEWED/PHNUMBERLEFT via phoneviewed's response).
   | {
       type: 'show_contact'; contact: string; whatsapp: boolean
-      mobile?: string | undefined; whatsappNumber?: string | undefined
+      // mobile = bare number, for ON-SCREEN display only. dialNumber = the
+      // SAME number with country code prefixed — the one actually dialed/
+      // opened in WhatsApp (Angular: mobileNo vs phoneNo, modalpopup.
+      // component.ts:436-441 — conflating these leaks the country code into
+      // the display text, a previous bug here).
+      mobile?: string | undefined; dialNumber?: string | undefined
+      whatsappNumber?: string | undefined
       showCounter?: boolean | undefined
-      viewedCount?: string | undefined; remainingCount?: string | undefined
+      // viewedCount = TOTALPHNUMBER - PHNUMBERLEFT (shared by both counters below).
+      // remainingCount = PHNUMBERLEFT — feeds the CONFIRM step's own "Y remaining"
+      // quota footer (see contactQuota in MatchesScreen.tsx/ViewProfileScreen.tsx).
+      // totalCount = TOTALPHNUMBER — feeds THIS popup's own "Contacts viewed X/Y"
+      // counter (ContactDetailsSheet.tsx) — a different pairing than remainingCount,
+      // easy to conflate since both come off the same response.
+      viewedCount?: string | undefined
+      remainingCount?: string | undefined
+      totalCount?: string | undefined
     }
   | { type: 'payment_promo';     action: string; profile: any }
   | { type: 'verify_id';         fromPage: string; action: string }
@@ -59,6 +73,25 @@ export type CommunicationAction =
   | 'call' | 'whatsapp' | 'whatsappNudge'
   | 'jodimessages' | 'paynow' | 'viewlater'
   | 'reportprofile'
+
+// Angular: communication.service.ts's showContactDetails() (lines 253-271) —
+// the REAL entry point for "View phone number"/Call, decides whether to skip
+// the confirm popup and reveal contact details directly, or show the confirm
+// step first. A previous version of this port always showed the confirm step
+// unconditionally — this is the missing decision. Two of Angular's three
+// direct-reveal conditions are implemented (both use data already available
+// on MatchProfile/ContactGating); the third (PHONEPROTECTED != '0') isn't —
+// it needs a field this port doesn't otherwise track anywhere, and its exact
+// real-world trigger rate couldn't be confirmed against live data.
+export function shouldSkipPhoneConfirm(
+  phoneViewed: string, likedStatus: string, indNumbersLeft: string, entryType: string,
+): boolean {
+  // Already viewed this specific profile's number before — no need to ask again.
+  if (['1', '3'].includes(phoneViewed)) return true
+  // Mutual-like/shortlisted, paid, with quota left.
+  if ((['2', '3'].includes(likedStatus) || phoneViewed === '2') && Number(indNumbersLeft) > 0 && entryType === 'P') return true
+  return false
+}
 
 // ─── Main entry ───────────────────────────────────────────────────────────────
 
@@ -96,8 +129,20 @@ export async function communicationBtnOnClick(
       await redirectToIntermediatePage(fromPage)
       return { type: 'api_success', data: null, action: 'paynow' }
 
-    case 'reportprofile':
+    case 'reportprofile': {
+      // Angular matches-card.component.ts:262-270 clickOnReportProfile() →
+      // communicationBtnOnClick fires a SILENT `communication/report/profile/v1`
+      // hit BEFORE opening the reasons picker (communication.service.ts:139-141,
+      // 485-488 reportProfilePopUp() only runs on that call's success) — a
+      // previous version of this port skipped straight to the picker with no
+      // API call at all.
+      const params = await getCommParams(partnerId, false)
+      const result = await apiCall(Endpoints.communication.reportProfile, 'POST', params)
+      const ok = (result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1)
+        && (result?.ERRCODE === '0' || result?.ERRCODE == 0)
+      if (!ok) return { type: 'error', message: String(result?.MSG ?? result?.RESPONSE?.MSG ?? 'Unable to report this profile right now.') }
       return { type: 'report_popup', partnerId, profile: oppProfile }
+    }
 
     default:
       return { type: 'error', message: `Unknown action: ${action}` }
@@ -248,8 +293,17 @@ async function showContactDetails(
     // MOBILE/MobileNo/MOBILENUMBER (kept as fallbacks in case an older/other
     // server response shape is ever hit).
     const num = det.PriMobileNo ?? det.MOBILE ?? det.MobileNo ?? det.MOBILENUMBER ?? ''
-    const wa  = String(result.RESPONSE?.WHATSAPP ?? '').replace(/\D/g, '')
-    const contact = num ? `${cc}${num}` : wa
+    const dialNumber = num ? `${cc}${num}` : undefined
+    // Angular's WhatsApp button dials the SAME phone number as Call
+    // (modalpopup.component.ts:439-458 — callNative('whatsapp') sends
+    // `data.phoneNo`, identical to what callNative('dial_pad') sends).
+    // RESPONSE.WHATSAPP is NOT a phone number at all — it's an optional
+    // prefill-message object ({BODY, LINK, BOTTOMCONTENT}) used only to open
+    // WhatsApp with pre-filled text when present. A previous version of this
+    // code treated that object as if it WERE the WhatsApp number (stripping
+    // non-digits from it), which produced an empty string and made the
+    // WhatsApp button silently never show.
+    const contact = dialNumber ?? ''
 
     // Angular communication.service.ts:604-615 — after a successful phoneviewed
     // call, the LOCAL contact-quota cache gets updated with these fields (merged
@@ -261,8 +315,23 @@ async function showContactDetails(
     // reader (viewContactNoConfirmPopUp(), the popup this port replicates) reads
     // `phoneNumbersViewed` instead — write both so this port's own confirmation
     // sheet (which reads phoneNumbersViewed, see MatchesScreen.tsx) gets real data.
-    const viewedCount    = String(result.RESPONSE?.PHNUMBERVIEWED ?? '')
+    //
+    // Two DIFFERENT counters exist in Angular, easy to conflate since both come
+    // off this same response:
+    //  - Confirm-step footer (next profile's confirm dialog): "viewed X, Y
+    //    REMAINING" — (viewedCount, remainingCount=PHNUMBERLEFT).
+    //  - THIS Contact Details popup's own counter: "Contacts viewed X/Y" —
+    //    (viewedCount, totalCount=TOTALPHNUMBER), not remaining. Angular:
+    //    viewContactNoPopUp() (communication.service.ts:604-606).
+    // `viewedCount` itself is shared by both and is a COMPUTED value
+    // (TOTALPHNUMBER - PHNUMBERLEFT) — a previous version of this code read
+    // the raw PHNUMBERVIEWED field for it instead, which is actually a
+    // this-profile-only viewed FLAG ('0'/'1'), not a running total.
+    const totalPhNumber  = Number(result.RESPONSE?.TOTALPHNUMBER ?? 0)
+    const phNumberLeft   = Number(result.RESPONSE?.PHNUMBERLEFT ?? 0)
+    const viewedCount    = String(totalPhNumber - phNumberLeft)
     const remainingCount = String(result.RESPONSE?.PHNUMBERLEFT ?? '')
+    const totalCount     = String(totalPhNumber)
     const prevDetail = (await getJson<Record<string, any>>('CONTACT_DETAIL')) ?? {}
     await setJson('CONTACT_DETAIL', {
       ...prevDetail,
@@ -275,15 +344,28 @@ async function showContactDetails(
 
     return {
       type:           'show_contact',
-      contact:        isWhatsapp ? (wa || contact) : contact,
+      contact,
       whatsapp:       isWhatsapp,
-      mobile:         num ? `${cc}${num}` : undefined,
-      whatsappNumber: wa || undefined,
+      // Angular keeps mobile display and dial values as two DIFFERENT values
+      // (modalpopup.component.ts:436-441) — `mobileNo` (bare, e.g.
+      // "6494048462") is what's shown on screen ([innerHTML]="data?.mobileNo"),
+      // `phoneNo` (country-code prefixed, e.g. "+91 6494048462") is what's
+      // actually dialed for BOTH Call and WhatsApp (callNative('dial_pad')
+      // and callNative('whatsapp') both send data.phoneNo) — WhatsApp does
+      // NOT use a separate number. A previous version of this code baked the
+      // country code into the one `mobile` field (leaking it into the
+      // display) AND tried to source a distinct WhatsApp number from
+      // RESPONSE.WHATSAPP (actually a prefill-message object, not a number),
+      // which made the WhatsApp button silently never show.
+      mobile:         num || undefined,
+      dialNumber,
+      whatsappNumber: dialNumber,
       // Angular modalpopup.component.html:476-480 — counter row only for paid
       // entryType ('P'); free users don't see it at all.
       showCounter:    entryType === 'P',
       viewedCount,
       remainingCount,
+      totalCount,
     }
   }
 

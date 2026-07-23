@@ -22,9 +22,9 @@ export interface ViewProfileModel extends MatchProfile {
   // city-state / Hindi-etc-only Hometown), not one collapsed string. `location`
   // (from MatchProfile) stays as the single-string fallback other shared
   // components (buildBasicView, etc.) already expect.
-  nriLocation?:      string | undefined
-  cityStateLocation?: string | undefined
-  homeLocation?:      string | undefined
+  nriLocation?:      string
+  cityStateLocation?: string
+  homeLocation?:      string
 
   // Religious
   religion?:  string
