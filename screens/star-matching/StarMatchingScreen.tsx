@@ -1,7 +1,7 @@
 // Star-matching "View details" full report — Angular: star-matching.component.ts/
 // .html/.css. Reached from ViewProfileScreen's "View details" link (paid viewers
 // only; free viewers get the existing recharge-redirect teaser instead, unchanged).
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Image as RNImage, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
@@ -9,15 +9,35 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
+import { getItem } from '../../service/storageService'
+import { StorageKeys as SK } from '../../constants/storage.keys'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import i18n from '../../i18n'
+import StarMatchingDesktopLayout from './StarMatchingDesktopLayout'
 
 const BACK_ICON_URI = CDN_REACT + '/arrowleft.svg'
 const TICK_GREEN_URI = CDN_SVG + 'tick-green.svg'
 const CROSS_RED_URI = CDN_SVG + 'cross-red.svg'
 const ACTIVE_STAR_URI = CDN_SVG + 'active-star.svg'
 const INACTIVE_STAR_URI = CDN_SVG + 'unactive-star.svg'
+const MALE_AVATAR_URI = CDN_SVG + 'male_avatar_new.svg'
+const FEMALE_AVATAR_URI = CDN_SVG + 'female_avatar_new.svg'
+// Angular never forces a fixed aspect ratio on this box — no height is set in
+// its CSS at all (.start-matching-photo-block div), so the box just takes
+// whatever shape the real photo naturally is (typically portrait, taller than
+// wide). A guessed *wide* ratio (1.4) was the previous bug here: it squashed
+// the box short, which is also why 10 compatibility rows + the button fit on
+// one screen with no scrolling — Angular needs to scroll past ~6 rows because
+// its taller photo boxes push everything else down further. Used only until
+// the real photo's onLoad reports its actual width/height.
+const DEFAULT_PHOTO_RATIO = 0.8
+// The silhouette fallback icon's own canvas is roughly this shape — not
+// measured from a real photo, so this stays fixed rather than dynamic.
+const AVATAR_ICON_RATIO = 0.85
 
 // Angular: star-matching.component.ts's RESPONSE.COMPATIBILITY item shape.
-interface CompatibilityItem {
+// Exported so StarMatchingDesktopLayout can share the same shape.
+export interface CompatibilityItem {
   KEY: string
   VALUE: string   // 'YES' | 'NO'
   COLOR: string   // 'GREEN' | 'RED'
@@ -32,6 +52,19 @@ export default function StarMatchingScreen({ navigation, route }: { navigation: 
   // the back button then returns to the summary view instead of leaving the screen
   // (reDirectoPage()), and only actually navigates back on a second back-press.
   const [showDetail, setShowDetail] = useState(false)
+  // Angular: common.getAvatarImg() — own slot falls back to a silhouette
+  // matching the logged-in user's OWN gender; the partner slot falls back to
+  // the OPPOSITE gender's silhouette, not a blank box.
+  const [loginGender, setLoginGender] = useState<string | null>(null)
+  useEffect(() => { getItem(SK.User.LOGIN_GENDER).then(setLoginGender) }, [])
+  const ownAvatarFallback = loginGender === 'F' ? FEMALE_AVATAR_URI : MALE_AVATAR_URI
+  const partnerAvatarFallback = loginGender === 'F' ? MALE_AVATAR_URI : FEMALE_AVATAR_URI
+  // Angular: (error)="onImgErrorHandler($event, isOppositeProfile)" — falls
+  // back to the silhouette on a load FAILURE too, not just a missing URL.
+  const [ownPhotoFailed, setOwnPhotoFailed] = useState(false)
+  const [partnerPhotoFailed, setPartnerPhotoFailed] = useState(false)
+  const [ownRatio, setOwnRatio] = useState(DEFAULT_PHOTO_RATIO)
+  const [partnerRatio, setPartnerRatio] = useState(DEFAULT_PHOTO_RATIO)
 
   const { data: dataJson, ownName, ownPhoto, partnerName, partnerPhoto } = route?.params ?? {}
   // See ViewProfileScreen.tsx's handleViewStarMatchDetails — JSON-stringified
@@ -60,6 +93,36 @@ export default function StarMatchingScreen({ navigation, route }: { navigation: 
     else navigation.goBack()
   }
 
+  // Desktop/laptop web gets the Figma "Jodii Desktop" single-card layout (see
+  // StarMatchingDesktopLayout.tsx); native iOS/Android and narrow mobile-web
+  // keep the mobile JSX below untouched — same isDesktop early-return split
+  // ViewProfileDesktopLayout.tsx already uses.
+  const isDesktop = useIsDesktopWeb()
+  if (isDesktop) {
+    return (
+      <StarMatchingDesktopLayout
+        ownName={ownName}
+        ownPhoto={ownPhoto}
+        partnerName={partnerName}
+        partnerPhoto={partnerPhoto}
+        loginGender={loginGender}
+        userProfile={userProfile}
+        partnerProfile={partnerProfile}
+        isNorth={isNorth}
+        compatibility={compatibility}
+        summary={summary}
+        prediction={prediction}
+        activeStars={activeStars}
+        progressPct={progressPct}
+        langCode={i18n.language}
+        showDetail={showDetail}
+        onBack={handleBack}
+        onLanguagePress={() => navigation.navigate('LanguageSelection')}
+        onViewDetailedReport={() => setShowDetail(true)}
+      />
+    )
+  }
+
   return (
     <SafeAreaView style={s.screen} edges={['top', 'bottom']}>
       <View style={s.header}>
@@ -69,97 +132,123 @@ export default function StarMatchingScreen({ navigation, route }: { navigation: 
         <Text style={s.headerTitle}>{t('STARMATCHING.HEADER')}</Text>
       </View>
 
-      <ScrollView contentContainerStyle={s.content}>
+      <ScrollView contentContainerStyle={s.content} style={s.scroll}>
         {!showDetail ? (
           <>
-            {/* ── Two profile cards ──────────────────────────────────────────── */}
-            <View style={s.profilesRow}>
-              <View style={s.profileCol}>
-                {ownPhoto ? (
-                  <Image source={{ uri: ownPhoto }} style={s.avatar} contentFit="cover" />
-                ) : (
-                  <View style={s.avatar} />
-                )}
-                <Text style={s.profileName} numberOfLines={1}>{ownName ?? '—'}</Text>
-                <Text style={s.profileMeta}>{t('STARMATCHING.RAASI')} {userProfile?.RAASI ?? '—'}</Text>
-                <Text style={s.profileMeta}>{t('STARMATCHING.STAR')} {userProfile?.STAR ?? '—'}</Text>
+            {/* Angular: first white-background ion-row (photos + ratio/stars/
+                progress + "Star matching X" line) — pt-24 pb-24. */}
+            <View style={s.card}>
+              {/* ── Two profile cards ──────────────────────────────────────── */}
+              <View style={s.profilesRow}>
+                <View style={s.profileCol}>
+                  {ownPhoto && !ownPhotoFailed ? (
+                    <Image
+                      source={{ uri: ownPhoto }}
+                      style={[s.avatar, { aspectRatio: ownRatio }]}
+                      contentFit="cover"
+                      onLoad={e => setOwnRatio(e.source.width / e.source.height)}
+                      onError={() => setOwnPhotoFailed(true)}
+                    />
+                  ) : (
+                    // expo-image can't decode remote SVGs on native (see
+                    // CdnSvg.tsx) — the fallback silhouette is an .svg, so it
+                    // goes through plain RNImage, same as the tick/cross/star
+                    // icons elsewhere on this screen.
+                    <RNImage source={{ uri: ownAvatarFallback }} style={[s.avatar, { aspectRatio: AVATAR_ICON_RATIO }]} />
+                  )}
+                  <Text style={s.profileName} numberOfLines={1}>{ownName ?? '—'}</Text>
+                  <Text style={s.profileMeta}>{t('STARMATCHING.RAASI')} {userProfile?.RAASI ?? '—'}</Text>
+                  <Text style={s.profileMeta}>{t('STARMATCHING.STAR')} {userProfile?.STAR ?? '—'}</Text>
+                </View>
+                <View style={s.profileCol}>
+                  {partnerPhoto && !partnerPhotoFailed ? (
+                    <Image
+                      source={{ uri: partnerPhoto }}
+                      style={[s.avatar, { aspectRatio: partnerRatio }]}
+                      contentFit="cover"
+                      onLoad={e => setPartnerRatio(e.source.width / e.source.height)}
+                      onError={() => setPartnerPhotoFailed(true)}
+                    />
+                  ) : (
+                    <RNImage source={{ uri: partnerAvatarFallback }} style={[s.avatar, { aspectRatio: AVATAR_ICON_RATIO }]} />
+                  )}
+                  <Text style={s.profileName} numberOfLines={1}>{partnerProfile?.NAME ?? partnerName ?? '—'}</Text>
+                  <Text style={s.profileMeta}>{t('STARMATCHING.RAASI')} {partnerProfile?.RAASI ?? '—'}</Text>
+                  <Text style={s.profileMeta}>{t('STARMATCHING.STAR')} {partnerProfile?.STAR ?? '—'}</Text>
+                </View>
               </View>
-              <View style={s.profileCol}>
-                {partnerPhoto ? (
-                  <Image source={{ uri: partnerPhoto }} style={s.avatar} contentFit="cover" />
-                ) : (
-                  <View style={s.avatar} />
-                )}
-                <Text style={s.profileName} numberOfLines={1}>{partnerProfile?.NAME ?? partnerName ?? '—'}</Text>
-                <Text style={s.profileMeta}>{t('STARMATCHING.RAASI')} {partnerProfile?.RAASI ?? '—'}</Text>
-                <Text style={s.profileMeta}>{t('STARMATCHING.STAR')} {partnerProfile?.STAR ?? '—'}</Text>
-              </View>
+
+              {/* ── Ratio/percentage + stars or progress bar ────────────────── */}
+              {isNorth ? (
+                <>
+                  <Text style={s.ratioText}>{prediction?.TOTAL ?? `${progressPct}%`}</Text>
+                  <View style={s.progressTrack}>
+                    <View style={[s.progressFill, { width: `${progressPct}%` }]} />
+                  </View>
+                  <Text style={s.starMatchingLine}>
+                    {t('STARMATCHING.STAR_MATCHING')} <Text style={s.starMatchingValue}>{prediction?.STAR_MATCHING}</Text>
+                  </Text>
+                </>
+              ) : (
+                <>
+                  <Text style={s.ratioText}>{summary?.PORUTHAM_RATIO}</Text>
+                  <View style={s.starsRow}>
+                    {Array.from({ length: 10 }, (_, i) => (
+                      <RNImage
+                        key={i}
+                        source={{ uri: i < activeStars ? ACTIVE_STAR_URI : INACTIVE_STAR_URI }}
+                        style={s.starIcon}
+                      />
+                    ))}
+                  </View>
+                  <Text style={s.starMatchingLine}>
+                    {t('STARMATCHING.STAR_MATCHING')} <Text style={s.starMatchingValue}>{summary?.STAR_MATCHING}</Text>
+                  </Text>
+                </>
+              )}
             </View>
 
-            {/* ── Ratio/percentage + stars or progress bar ──────────────────── */}
-            {isNorth ? (
-              <>
-                <Text style={s.ratioText}>{prediction?.TOTAL ?? `${progressPct}%`}</Text>
-                <View style={s.progressTrack}>
-                  <View style={[s.progressFill, { width: `${progressPct}%` }]} />
-                </View>
-                <Text style={s.starMatchingLine}>
-                  {t('STARMATCHING.STAR_MATCHING')} <Text style={s.starMatchingValue}>{prediction?.STAR_MATCHING}</Text>
-                </Text>
-              </>
-            ) : (
-              <>
-                <Text style={s.ratioText}>{summary?.PORUTHAM_RATIO}</Text>
-                <View style={s.starsRow}>
-                  {Array.from({ length: 10 }, (_, i) => (
+            {/* Angular: second white-background ion-row, mt-8 — the 8px gray
+                page background shows through as a gap between the two cards. */}
+            <View style={[s.card, s.cardGap]}>
+              {/* ── Compatibility list (summary rows only) ───────────────────── */}
+              <Text style={s.sectionHeader}>{t('STARMATCHING.STAR_COMPATIBILITY')}</Text>
+              {compatibility.map((item, i) => (
+                <View key={i} style={s.compatRow}>
+                  <Text style={s.compatKey}>{i + 1}. {item.KEY}</Text>
+                  <View style={s.compatValueCol}>
                     <RNImage
-                      key={i}
-                      source={{ uri: i < activeStars ? ACTIVE_STAR_URI : INACTIVE_STAR_URI }}
-                      style={s.starIcon}
+                      source={{ uri: item.COLOR === 'RED' ? CROSS_RED_URI : TICK_GREEN_URI }}
+                      style={s.compatIcon}
                     />
-                  ))}
+                    <Text style={item.COLOR === 'RED' ? s.compatNo : s.compatYes}>{item.VALUE}</Text>
+                  </View>
                 </View>
-                <Text style={s.starMatchingLine}>
-                  {t('STARMATCHING.STAR_MATCHING')} <Text style={s.starMatchingValue}>{summary?.STAR_MATCHING}</Text>
+              ))}
+
+              {/* Angular: the "View Detailed Report" toggle only exists for South
+                  India — the North India branch has no equivalent button. */}
+              {!isNorth && (
+                <Pressable style={s.detailBtn} onPress={() => setShowDetail(true)}>
+                  <Text style={s.detailBtnText}>{t('STARMATCHING.REPORT_CTA')}</Text>
+                </Pressable>
+              )}
+
+              <View style={s.noteBox}>
+                <Text style={s.noteText}>
+                  <Text style={s.noteLabel}>{t('STARMATCHING.NOTE')}</Text>
+                  {t('STARMATCHING.NOTE_SUB')}
                 </Text>
-              </>
-            )}
-
-            {/* ── Compatibility list (summary rows only) ─────────────────────── */}
-            <Text style={s.sectionHeader}>{t('STARMATCHING.STAR_COMPATIBILITY')}</Text>
-            {compatibility.map((item, i) => (
-              <View key={i} style={s.compatRow}>
-                <Text style={s.compatKey}>{i + 1}. {item.KEY}</Text>
-                <View style={s.compatValueCol}>
-                  <RNImage
-                    source={{ uri: item.COLOR === 'RED' ? CROSS_RED_URI : TICK_GREEN_URI }}
-                    style={s.compatIcon}
-                  />
-                  <Text style={item.COLOR === 'RED' ? s.compatNo : s.compatYes}>{item.VALUE}</Text>
-                </View>
               </View>
-            ))}
-
-            {/* Angular: the "View Detailed Report" toggle only exists for South
-                India — the North India branch has no equivalent button. */}
-            {!isNorth && (
-              <Pressable style={s.detailBtn} onPress={() => setShowDetail(true)}>
-                <Text style={s.detailBtnText}>{t('STARMATCHING.REPORT_CTA')}</Text>
-              </Pressable>
-            )}
-
-            <View style={s.noteBox}>
-              <Text style={s.noteText}>
-                <Text style={s.noteLabel}>{t('STARMATCHING.NOTE')}</Text>
-                {t('STARMATCHING.NOTE_SUB')}
-              </Text>
             </View>
           </>
         ) : (
-          /* ── Detail view — full breakdown per porutham item, no header photos/
-              ratio/note — matches Angular's moreDetailTemplate exactly. ────────── */
+          /* ── Detail view — Angular's moreDetailTemplate: each porutham item is
+              its OWN white-background ion-row, mt-8 gap between them (same
+              stacked-card look as the summary view above), not a single list
+              with divider lines. ─────────────────────────────────────────────── */
           compatibility.map((item, i) => (
-            <View key={i} style={s.detailItem}>
+            <View key={i} style={[s.card, i > 0 && s.cardGap]}>
               <View style={s.detailItemHeader}>
                 <Text style={s.detailKey}>{i + 1}. {item.KEY}</Text>
                 <RNImage
@@ -180,21 +269,38 @@ export default function StarMatchingScreen({ navigation, route }: { navigation: 
 }
 
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.background },
+  // Angular: ion-content { --background: #dddddd } — the gray page the two
+  // white cards below sit on top of.
+  screen: { flex: 1, backgroundColor: Colors.starMatchPageBg },
+  // Angular: ion-toolbar row — "pt-16 pb-16", not 12.
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingVertical: 12,
+    paddingHorizontal: 16, paddingVertical: 16,
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
     backgroundColor: Colors.surface,
   },
   backBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   headerTitle: { fontFamily: 'Poppins-Medium', fontSize: 16, color: Colors.textDark },
 
-  content: { padding: 24 },
+  scroll: { backgroundColor: Colors.starMatchPageBg },
+  content: { paddingBottom: 24 },
+  // Angular: each ion-row.white-background — full-bleed white band, own
+  // 24px horizontal/vertical padding (--ion-cust-padding: 24px).
+  card: { backgroundColor: Colors.surface, padding: 24 },
+  // Angular: mt-8 between the two stacked white rows — the gray page
+  // background shows through as an 8px gap, not a border or shadow.
+  cardGap: { marginTop: 8 },
 
-  profilesRow: { flexDirection: 'row', gap: 16 },
-  profileCol: { flex: 1 },
-  avatar: { width: '100%', aspectRatio: 1.4, borderRadius: 4, backgroundColor: Colors.divider, marginBottom: 8 },
+  // Angular: ion-col size="5" / offset="2" size="5" on a 12-col grid —
+  // 5:2:5 ratio, so each photo is 5/12 (41.67%) wide with a 2/12 (16.67%)
+  // gap between them (space-between across two 41.67% columns leaves
+  // exactly that gap, no explicit gap value needed).
+  profilesRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  profileCol: { width: '41.67%' },
+  // aspectRatio is applied inline per-instance (real photo's own ratio once
+  // known, or the fixed silhouette-icon ratio) — see DEFAULT_PHOTO_RATIO/
+  // AVATAR_ICON_RATIO above.
+  avatar: { width: '100%', borderRadius: 4, backgroundColor: Colors.divider, marginBottom: 8 },
   profileName: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.textDark },
   profileMeta: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
 
@@ -209,7 +315,10 @@ const s = StyleSheet.create({
   starMatchingLine: { fontFamily: 'Poppins-Medium', fontSize: 12, color: '#334155', textAlign: 'center', marginTop: 12 },
   starMatchingValue: { color: Colors.starMatchYes },
 
-  sectionHeader: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.black, marginTop: 24 },
+  // Angular: no margin class on this ion-col — its only top spacing is the
+  // card's own pt-24 padding, already applied by `card` above. An extra
+  // marginTop here would double that gap.
+  sectionHeader: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.black },
   compatRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16,
   },
@@ -225,13 +334,18 @@ const s = StyleSheet.create({
   },
   detailBtnText: { fontFamily: 'Poppins-Medium', fontSize: 12, color: Colors.textDark },
 
-  noteBox: { backgroundColor: Colors.starMatchNoteBg, borderRadius: 4, padding: 12, marginTop: 24, marginBottom: 24 },
+  // Angular: .star-match-report { padding: 10px 12px 10px 12px } — asymmetric,
+  // not a uniform 12.
+  noteBox: { backgroundColor: Colors.starMatchNoteBg, borderRadius: 4, paddingVertical: 10, paddingHorizontal: 12, marginTop: 24 },
   noteText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.starMatchNoteText, lineHeight: 16 },
   noteLabel: { fontFamily: 'Poppins-Medium' },
 
-  detailItem: { paddingTop: 24, paddingBottom: 24, borderTopWidth: 1, borderTopColor: Colors.divider },
-  detailItemHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  detailKey: { fontFamily: 'Poppins-Medium', fontSize: 16, color: Colors.textDark, flex: 1 },
+  // Angular's moreDetailTemplate lays "{{i+1}}. KEY [icon] VALUE" out as one
+  // inline-flowing label (d-flex, no space-between) — not a key-stretches/
+  // value-pinned-right table row, so detailKey must NOT flex:1 here (that's
+  // only correct for the summary view's compatRow above).
+  detailItemHeader: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
+  detailKey: { fontFamily: 'Poppins-Medium', fontSize: 16, color: Colors.textDark },
   detailBody: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textDark, lineHeight: 16, marginTop: 12 },
   detailResult: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textDark, lineHeight: 18, marginTop: 12 },
 })

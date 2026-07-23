@@ -114,4 +114,5 @@ export const Colors = {
   starMatchCtaBg:    '#fcd34d',   // "View Detailed Report" button background
   starMatchNoteBg:   '#fef6db',   // footnote background
   starMatchNoteText: '#aa8606',   // footnote text
+  starMatchPageBg:   '#dddddd',   // ion-content --background — gray page behind the white cards
 }
