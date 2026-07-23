@@ -8,14 +8,15 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, Dimensions, FlatList, Linking, Platform,
-  NativeScrollEvent, NativeSyntheticEvent,
-  Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Dimensions, FlatList, Linking, Platform, Alert, NativeSyntheticEvent,
+  NativeScrollEvent, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { StatusBar } from 'expo-status-bar'
 import * as WebBrowser from 'expo-web-browser'
+import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import { runOnJS } from 'react-native-reanimated'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { LANG_LABELS } from '../../components/matches-header/MatchesHeader'
@@ -39,12 +40,10 @@ import ViewProfileDesktopLayout from './ViewProfileDesktopLayout'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import {
   getViewProfile, markProfileViewed, getSimilarProfiles, viewHoroscope, getStarMatch,
-  getBioDataLink, getEnlargedPhotos,
+  getBioDataLink, getEnlargedPhotos, getBiodataExtras, saveBiodataThemeId,
   _debugLastViewProfileResult,
-  type SimilarProfileCard, type StarMatchResult,
+  type SimilarProfileCard, type StarMatchResult, type BiodataTheme,
 } from '../../service/viewProfileService'
-import { ENavigation } from '../../types/enums/navigation.enum'
-import { navigate as navigateGlobal } from '../../utils/navigationRef'
 import { viewProfileAdapter } from '../../adapters/viewProfile.adapter'
 import { communicationBtnOnClick, fetchContactDetails } from '../../service/communicationService'
 import { getHeroBannerDetails } from '../../service/paymentService'
@@ -109,6 +108,17 @@ export const HOME_PLACE_DOMAIN = ['2', '14', '17', '41', '4', '51']
 // not the rounded/cropped rectangle Matches cards use.
 const SCREEN_WIDTH = Dimensions.get('window').width
 const PHOTO_HEIGHT = SCREEN_WIDTH
+const SCREEN_HEIGHT = Dimensions.get('window').height
+
+// Feature 6 biodata theming — Angular: download-biodata.component.html:74-75's
+// negative-margin-top-*-biodata classes. Each template's photo/details card
+// overlaps UP into the themed top image by a different amount — themes 1&2
+// pull up 8vh, 3 pulls up 13vh, 4 pulls up 18vh, 5 pulls up only 2vh.
+const BIODATA_THEME_OVERLAP_VH: Record<string, number> = { '1': 8, '2': 8, '3': 13, '4': 18, '5': 2 }
+function biodataThemeOverlapMargin(themeValue: string): number {
+  const vh = BIODATA_THEME_OVERLAP_VH[themeValue] ?? 0
+  return -Math.round(SCREEN_HEIGHT * (vh / 100))
+}
 
 // Angular: "Other profiles like X" is <app-swiper> — Swiper.js with its navigation
 // module (arrow buttons) + per-card snapping, not a freely-scrolling list. One
@@ -372,6 +382,12 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   const [showCoachMark, setShowCoachMark] = useState(false)
   // Feature 5: report-profile reasons-picker modal.
   const [reportModalOpen, setReportModalOpen] = useState(false)
+  // Feature 6 biodata theming — 5 swipeable color/background templates, own-profile only.
+  const [themes, setThemes] = useState<BiodataTheme[]>([])
+  const [themeIndex, setThemeIndex] = useState(0)
+  // Angular: download-biodata.component.html:451-463 — a server-rendered QR
+  // image (userBioData.QRCODE), NOT client-drawn like the payment QR feature.
+  const [biodataQrUrl, setBiodataQrUrl] = useState<string | undefined>(undefined)
 
   useEffect(() => {
     let cancelled = false
@@ -534,6 +550,51 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     shouldShowCoachMark().then(should => { if (!cancelled && should) setShowCoachMark(true) })
     return () => { cancelled = true }
   }, [profile, loginGender, hasPrevProfile, hasNextProfile])
+
+  // Feature 6 biodata theming — Angular: download-biodata.component.ts's 5
+  // swipeable color/background templates + QR code. Only meaningful in
+  // ownProfile mode; fetched once that's known, separately from the main
+  // profile load (see getBiodataExtras' comment for why it isn't folded in).
+  useEffect(() => {
+    if (!ownProfile || !matriId) return
+    let cancelled = false
+    Promise.all([getBiodataExtras(matriId), getItem(StorageKeys.App.BIODATA_THEME_ID)])
+      .then(([extras, savedId]) => {
+        if (cancelled) return
+        setBiodataQrUrl(extras.qrCodeUrl)
+        if (extras.themes.length === 0) return
+        setThemes(extras.themes)
+        const savedIdx = extras.themes.findIndex(theme => theme.value === savedId)
+        setThemeIndex(savedIdx >= 0 ? savedIdx : 0)
+      })
+    return () => { cancelled = true }
+  }, [ownProfile, matriId])
+
+  function cycleTheme(direction: 1 | -1) {
+    if (themes.length === 0) return
+    const nextIndex = (themeIndex + direction + themes.length) % themes.length
+    setThemeIndex(nextIndex)
+    saveBiodataThemeId(themes[nextIndex]!.value).catch(() => {})
+  }
+
+  // Angular: .vpcontent{{viewedid}} gesture (onMove) — a horizontal swipe over
+  // the themed top area cycles templates; deltaX>0 (drag right) goes to the
+  // PREVIOUS template, deltaX<0 (drag left) goes NEXT — same direction Angular
+  // uses. activeOffsetX/failOffsetY (matching matchesCard.shared.tsx's
+  // PhotoSwiper gesture) claim the touch only once horizontal movement clearly
+  // dominates, so this can't fight the vertical ScrollView below it.
+  // .enabled(...) is critical here, not cosmetic: this same GestureDetector wraps
+  // the photo area on OTHER people's profiles too (to avoid duplicating that
+  // whole JSX block), where PhotoSwiper's own internal pan gesture already owns
+  // that surface — disabled fully steps aside instead of contending with it.
+  const themeSwipeGesture = Gesture.Pan()
+    .enabled(ownProfile && themes.length > 1)
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-10, 10])
+    .onEnd(e => {
+      if (e.translationX > 40) runOnJS(cycleTheme)(-1)
+      else if (e.translationX < -40) runOnJS(cycleTheme)(1)
+    })
 
   function dismissCoachMark() {
     setShowCoachMark(false)
@@ -864,11 +925,13 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // equivalent here either; see the section-visibility gate below.) ────────────────
 
   function handleAddHoroscope() {
-    // Angular: goToEdit(pageNo) → router.navigate(['editform-vp/'+pageNo]).
-    // Reuses the exact same (currently unregistered, pre-existing) navigation
-    // call biodataService.ts's goToEditScreen() already makes for this same
-    // page — not a new gap introduced here.
-    navigateGlobal(ENavigation.EDIT_FORM, { pageNo: 22, frm_page: 'viewprofile' })
+    // Angular: goToEdit(pageNo) → router.navigate(['editform-vp/'+pageNo]) opens a
+    // horoscope-generation form. No RN screen builds that yet (confirmed — no
+    // enable/generate flow exists anywhere in this port), so this used to
+    // navigate to the dead 'editform' route (never registered in AppStack.tsx),
+    // which threw a navigation warning on every tap. Graceful stand-in until
+    // that screen is built.
+    Alert.alert('Add Horoscope', 'This feature is coming soon.')
   }
 
   async function handleViewHoroscope() {
@@ -903,15 +966,45 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   }
 
   // ── Feature 6 self-preview actions — Angular: clickAddMoreDetails('27'|'28')
-  // (viewprofile.page.ts:2502-2523), same EDIT_FORM pageNo mapping biodataService.ts's
-  // PI_BROTHERS/PI_SISTERS(28) and PI_PROPERTY(21) fields already use ─────────────
+  // (viewprofile.page.ts:2502-2523) ───────────────────────────────────────────
 
   function handleAddFamilyDetails() {
-    navigateGlobal(ENavigation.EDIT_FORM, { pageNo: 28, frm_page: 'viewprofile' })
+    // Was navigateGlobal(ENavigation.EDIT_FORM, ...) — 'editform' has no matching
+    // Stack.Screen (confirmed), so this threw a navigation warning on every tap.
+    // EditProfileFamily is the real registered screen covering brothers/sisters.
+    navigation.navigate('EditProfileFamily')
   }
 
   function handleAddPropertyDetails() {
-    navigateGlobal(ENavigation.EDIT_FORM, { pageNo: 21, frm_page: 'viewprofile' })
+    // Same dead-route fix as handleAddFamilyDetails — EditProfileProperty is the
+    // real registered screen covering property/vehicle.
+    navigation.navigate('EditProfileProperty')
+  }
+
+  // Angular: download-biodata.component.ts redirectToMissingPage() — a single
+  // top-of-screen "some details are missing" banner that redirects to whichever
+  // field is missing, in this priority order. Angular's own cascade also checks
+  // photo/physical-status/gothram/horoscope, but none of those have a real edit
+  // destination in this port yet (confirmed — see handleAddHoroscope above), so
+  // they're left out here rather than pointing the banner at a dead route.
+  function getFirstMissingScreen(p: ViewProfileModel): string | null {
+    if (!p.income)      return 'EditProfileProfessional'
+    if (!p.eatingHabits) return 'EditProfileLifestyle'
+    if (!p.drinking)     return 'EditProfileLifestyle'
+    if (!p.smoking)      return 'EditProfileLifestyle'
+    if (!p.raasi)        return 'EditProfileReligious'
+    if (!p.dosham?.length) return 'EditProfileReligious'
+    if (!p.star)         return 'EditProfileReligious'
+    if (!p.brothers)     return 'EditProfileFamily'
+    if (!p.sisters)      return 'EditProfileFamily'
+    if (!p.property.length && !p.vehicle.length) return 'EditProfileProperty'
+    return null
+  }
+
+  function handleMissingDetailsPress() {
+    if (!profile) return
+    const screen = getFirstMissingScreen(profile)
+    if (screen) navigation.navigate(screen)
   }
 
   // Angular: a plain `<a [href]="getBioDataLink()" download>` — Linking.openURL
@@ -1282,6 +1375,20 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         )}
       </View>
 
+      {/* Angular: download-biodata.component.html:26-50 — a single top-of-screen
+          "some details are missing" banner, distinct from the per-section inline
+          "Add X Details" prompts below. Figma (15156-14105): plain row, message
+          left, "Add now" + chevron link right. */}
+      {ownProfile && !!profile && !!getFirstMissingScreen(profile) && (
+        <Pressable style={s.missingBanner} onPress={handleMissingDetailsPress}>
+          <Text style={s.missingBannerText}>{t('BIO_DATA.MISSING_DETAILS_TXT')}</Text>
+          <View style={s.missingBannerCta}>
+            <Text style={s.missingBannerCtaText}>{t('BIO_DATA.ADD_NOW_TXT')}</Text>
+            <CdnSvg uri={CDN_REACT + '/menu_right_arrow.svg'} width={16} height={16} />
+          </View>
+        </Pressable>
+      )}
+
       <ScrollView
         style={s.scrollView}
         onLayout={e => setViewportHeight(e.nativeEvent.layout.height)}
@@ -1300,29 +1407,60 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
             positioning ancestor that reproduces that (viewprofile.page.html:1495-1512,
             .scss:512,523). */}
         <View style={s.photoWrap}>
-          <View style={s.photoBox}>
-            {profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0 ? (
-              <PhotoSwiper
-                images={profile.photos}
-                width={SCREEN_WIDTH}
-                height={PHOTO_HEIGHT}
-                onPress={i => { setPhotoViewerIndex(i); setPhotoViewerOpen(true) }}
-              />
-            ) : (
-              <View>
-                <CdnSvg uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} />
-                {!sameGender && (
-                  <View style={s.photoOverlay}>
-                    <View style={s.overlayCard}>
-                      <Text style={s.overlayText}>
-                        {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
-                      </Text>
-                      <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={handleWhatsApp} />
+          <GestureDetector gesture={themeSwipeGesture}>
+            <View
+              style={[
+                s.photoBox,
+                ownProfile && themes.length > 0 && { backgroundColor: themes[themeIndex]!.bgColor },
+              ]}
+            >
+              {/* Feature 6 biodata theming — TOP_IMG sits behind the photo as a
+                  decorative background, matching Angular's ion-img.TOP_IMG layered
+                  under the profile photo/details block. */}
+              {ownProfile && themes.length > 0 && (
+                <Image
+                  source={{ uri: themes[themeIndex]!.topImg }}
+                  style={StyleSheet.absoluteFill}
+                  contentFit="cover"
+                  pointerEvents="none"
+                />
+              )}
+              {ownProfile ? (
+                // Angular's biodata page shows ONE static photo (getPhotoUrl()), never
+                // a swipeable gallery — and PhotoSwiper's own horizontal pan would
+                // fight the theme-swipe gesture on this exact surface (same conflict
+                // class documented below for prev/next-profile navigation).
+                profile.isPhotoAvailable && profile.photos.length > 0 ? (
+                  <Image
+                    source={{ uri: profile.photos[0] }}
+                    style={{ width: SCREEN_WIDTH, height: PHOTO_HEIGHT }}
+                    contentFit="cover"
+                  />
+                ) : (
+                  <CdnSvg uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} />
+                )
+              ) : profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0 ? (
+                <PhotoSwiper
+                  images={profile.photos}
+                  width={SCREEN_WIDTH}
+                  height={PHOTO_HEIGHT}
+                  onPress={i => { setPhotoViewerIndex(i); setPhotoViewerOpen(true) }}
+                />
+              ) : (
+                <View>
+                  <CdnSvg uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} />
+                  {!sameGender && (
+                    <View style={s.photoOverlay}>
+                      <View style={s.overlayCard}>
+                        <Text style={s.overlayText}>
+                          {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
+                        </Text>
+                        <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={handleWhatsApp} />
+                      </View>
                     </View>
-                  </View>
-                )}
-              </View>
-            )}
+                  )}
+                </View>
+              )}
             {/* Figma (363:10859): top+bottom dark gradient over the photo — improves
                 legibility of the badges/dots overlaid on it, absent from the older
                 plain-photo version this screen started with. */}
@@ -1346,7 +1484,21 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                 </View>
               </Pressable>
             )}
-          </View>
+            </View>
+          </GestureDetector>
+          {/* Feature 6 biodata theming — Angular's biodata-back-arrow-img/
+              biodata-next-arrow-img, a tap alternative to the swipe gesture above.
+              Only shown once themes have actually loaded (own-profile only). */}
+          {ownProfile && themes.length > 1 && (
+            <>
+              <Pressable style={[s.profileArrowBtn, s.profileArrowLeft]} onPress={() => cycleTheme(-1)} hitSlop={8}>
+                <Text style={s.profileArrowText}>{'‹'}</Text>
+              </Pressable>
+              <Pressable style={[s.profileArrowBtn, s.profileArrowRight]} onPress={() => cycleTheme(1)} hitSlop={8}>
+                <Text style={s.profileArrowText}>{'›'}</Text>
+              </Pressable>
+            </>
+          )}
           {hasPrevProfile && (
             <Pressable style={[s.profileArrowBtn, s.profileArrowLeft]} onPress={goToPrev} hitSlop={8}>
               <Text style={s.profileArrowText}>{'‹'}</Text>
@@ -1360,7 +1512,20 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         </View>
 
         {/* ── Info card ──────────────────────────────────────────────────────── */}
-        <View style={s.infoCard}>
+        <View
+          style={[
+            s.infoCard,
+            // Feature 6 biodata theming — Figma (15156-14157, "Rectangle 15753"):
+            // a rounded white card floating with an 8px side margin, overlapping
+            // up into the themed top image by the per-template amount above.
+            // Angular's regular (non-biodata) view has neither — see infoCard's
+            // own comment — so this only applies in ownProfile/biodata mode.
+            ownProfile && themes.length > 0 && {
+              marginTop: biodataThemeOverlapMargin(themes[themeIndex]!.value),
+              marginHorizontal: 8, borderRadius: 16,
+            },
+          ]}
+        >
           <View style={s.badgeRow}>
             {profile.isPaidMember && <ProfileBadge variant="paid" text={t('MENU.PAID_BADGE')} />}
             {profile.isIdVerified && loginGender === 'F' && (
@@ -1605,6 +1770,17 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
             </>
           )}
 
+          {/* Feature 6 biodata QR — Angular: download-biodata.component.html:451-463.
+              A server-rendered QR image (not client-drawn, unlike the payment QR
+              feature), letting someone scan it to view this profile publicly. */}
+          {ownProfile && !!biodataQrUrl && (
+            <View style={s.biodataQrSection}>
+              <Image source={{ uri: biodataQrUrl }} style={s.biodataQrImage} contentFit="contain" />
+              <Text style={s.biodataQrCaption}>
+                {t('BIO_DATA.QR_CODE_TXT').replace('#HISHER#', t(`PRONOUN.${loginGender}.hisher`))}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Second CTA — Angular repeats this exact block right after Property
@@ -1961,6 +2137,12 @@ const s = StyleSheet.create({
   addDetailPrompt: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
   addDetailPromptText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 14, color: Colors.link },
 
+  biodataQrSection: { alignItems: 'center', paddingTop: 24, gap: 16 },
+  biodataQrImage: { width: 160, height: 160 },
+  biodataQrCaption: {
+    fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 12, color: '#1a1818', textAlign: 'center',
+  },
+
   // Angular: app-swiper.component.html:2 — `ion-row class="pt-32 ... pb-24"` — header
   // text aligned with the rest of the padded content, but the card row itself bleeds
   // to the screen edges.
@@ -2014,6 +2196,17 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingHorizontal: 16, paddingBottom: 10,
   },
+  missingBanner: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    backgroundColor: Colors.selectionBg, paddingHorizontal: 16, paddingVertical: 12,
+  },
+  missingBannerText: {
+    flex: 1, marginRight: 12, fontFamily: 'Poppins-Regular', fontSize: 12,
+    color: '#1e1e1e', letterSpacing: 0.24,
+  },
+  missingBannerCta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  missingBannerCtaText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.link },
+
   headerBackBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   headerSpacer: { flex: 1 },
   // Angular: `.vp-profile-name` (global.scss:22188-22192) — font16 (~16px),

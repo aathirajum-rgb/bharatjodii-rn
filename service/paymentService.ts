@@ -37,6 +37,10 @@ export interface IPaymentConfig {
   // app doesn't integrate — using it here was a bug: that field doesn't
   // exist at the top level at all, so this was always empty in practice.)
   RAZORPAY_KEY_ID?: string
+  // Angular: payment.service.ts callNativeForPayment() — hasResponse.QRCODEFLAG,
+  // gates whether the "Request a family/friend to pay" QR+WhatsApp block
+  // shows at all ('1' = show, anything else = hide).
+  QRCODEFLAG?: string
 }
 
 // Angular: payment-mode.page.html *ngFor over PAYMENTMETHODS — RECOMMEND ('1'/'0')
@@ -242,6 +246,131 @@ export async function getNetBankingList(): Promise<NetBankingItem[]> {
     return result.RESPONSE?.list ?? []
   }
   return []
+}
+
+// ─── NEFT/RTGS/Pay at Bank ────────────────────────────────────────────────────
+// Angular: pages/recharge/payusing/payusing.page.ts loadBanks() — a static
+// bank-transfer instructions screen (no Razorpay/checkout call at all): pick
+// a bank, see its account details, optionally open the branch locator link
+// or dial the toll-free number to report the transfer.
+
+export interface PayAtBankItem {
+  Bank:          string
+  AccNo:         string
+  AccName:       string
+  IFSCNo:        string
+  BranchUrl?:    string | undefined
+  ImagePathOn?:  string | undefined
+  ImagePathOff?: string | undefined
+}
+
+export interface PayAtBankData {
+  banks:      PayAtBankItem[]
+  tollFreeNo: string
+}
+
+export async function getPayAtBankList(): Promise<PayAtBankData> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const result = await apiCall(Endpoints.payment.payAtBankList, 'POST', `ID=${userId}`)
+  if (result?.RESPONSECODE === '1' && result?.ERRCODE === '0') {
+    return { banks: result.RESPONSE?.list ?? [], tollFreeNo: result.RESPONSE?.tollFreeNo ?? '' }
+  }
+  return { banks: [], tollFreeNo: '' }
+}
+
+// ─── Pay at our stores (branch locator) ───────────────────────────────────────
+// Angular: pages/recharge/branch-locator/branch-locator.page.ts — state →
+// city → store drill-down, no Razorpay/checkout involved. Field names
+// (STATEID/STATE, CITYID/CITY, Title/Address/Phone/OfficeTime) confirmed
+// from branch-locator.page.spec.ts mock responses. Angular's ERRCODE-only
+// check (no RESPONSECODE) is intentional here — mirrored, not a mistake.
+
+export interface PaymentStateItem {
+  STATEID: string | number
+  STATE:   string
+}
+
+export interface PaymentCityItem {
+  CITYID: string | number
+  CITY:   string
+}
+
+export interface PaymentStoreItem {
+  Title:       string
+  Address:     string
+  Phone?:      { value: string }[] | undefined
+  OfficeTime?: string | undefined
+}
+
+export async function getPaymentStateList(): Promise<PaymentStateItem[]> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const result = await apiCall(Endpoints.payment.stateList, 'POST', `ID=${userId}`)
+  return result?.ERRCODE === '0' ? (result.RESPONSE ?? []) : []
+}
+
+export async function getPaymentCityList(stateId: string): Promise<PaymentCityItem[]> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const result = await apiCall(Endpoints.payment.cityList, 'POST', `ID=${userId}&stateId=${stateId}`)
+  return result?.ERRCODE === '0' ? (result.RESPONSE ?? []) : []
+}
+
+export async function getPaymentStoreList(stateId: string, cityId: string): Promise<PaymentStoreItem[]> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const result = await apiCall(
+    Endpoints.payment.storeList, 'POST', `ID=${userId}&stateId=${stateId}&cityId=${cityId}`,
+  )
+  return result?.ERRCODE === '0' ? (result.RESPONSE ?? []) : []
+}
+
+// ─── QR payment link (Request a family/friend to pay) ─────────────────────────
+// Angular: payment.service.ts getQRCode() + more-payment-option.page.ts
+// enableQR() — QRIMGCONTENT is the raw data the client renders as a QR code
+// on-screen; QRIMG is a SEPARATE server-hosted image URL used only for the
+// WhatsApp share attachment (confirmed — Angular's WHATSAPPIMG native-bridge
+// field reads from this, not from a client-rendered snapshot of the QR).
+
+export interface QRPaymentData {
+  qrValue?:     string
+  qrImg?:       string
+  qrOrderId?:   string
+  upiOrderId?:  string
+  whatsappMsg?: string
+}
+
+export async function getQRPaymentData(packId: string): Promise<QRPaymentData> {
+  const [userId, appVersion, userIp] = await Promise.all([
+    getItem(SK.Auth.USER_ID),
+    getItem('APPVERSION'),
+    getItem('USERIP'),
+  ])
+  const params = `ID=${userId ?? ''}&PRODUCTID=${packId}&APPVERSION=${appVersion ?? ''}&IPADDRESS=${userIp ?? ''}`
+  const result = await apiCall(Endpoints.payment.checkoutQR, 'POST', params)
+  if (result?.ERRCODE !== '0') return {}
+
+  const r = result.RESPONSE ?? {}
+  return {
+    qrValue:     r.QRIMGCONTENT,
+    qrImg:       r.QRIMG,
+    qrOrderId:   r.QRORDERID,
+    upiOrderId:  r.UPIORDERID,
+    whatsappMsg: r.WHATSAPPMSG,
+  }
+}
+
+// Angular: payment.service.ts delayQR() — 2 minutes after the QR is shown,
+// check both the QR-flow order and the original UPI order once; if either
+// came back successful, treat the whole checkout as paid.
+export async function checkQrPaymentOutcome(
+  qrOrderId?: string, upiOrderId?: string,
+): Promise<'success' | 'failure' | null> {
+  const [qrResult, upiResult] = await Promise.all([
+    checkPaymentStatus({ razorpay_order_id: qrOrderId ?? '', upi_order_id: '' }),
+    checkPaymentStatus({ razorpay_order_id: upiOrderId ?? '', upi_order_id: '' }),
+  ])
+  const qrStatus  = String(qrResult?.MSG ?? '').toLowerCase()
+  const upiStatus = String(upiResult?.MSG ?? '').toLowerCase()
+  const status = upiStatus === 'success' ? upiStatus : qrStatus
+  return status === 'success' || status === 'failure' ? (status as 'success' | 'failure') : null
 }
 
 // ─── Hero banner ──────────────────────────────────────────────────────────────

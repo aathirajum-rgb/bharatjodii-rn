@@ -120,6 +120,7 @@ export const StorageKeys = {
     ID_UPLOAD_NUM: 'IDUPLOADNUM',
     RELIGION_KEY: 'RELIGIONKEY',
     CUSTOMER_CARE: 'CUSTOMER-CARE',
+    BIODATA_THEME_ID: 'THEMEID',
     TEST: 'TEST',
   },
 

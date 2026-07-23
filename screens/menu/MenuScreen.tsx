@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Alert,
   Animated,
   Dimensions,
   Modal,
@@ -33,7 +32,7 @@ const SCREEN_H = Dimensions.get('window').height
 const PRIVACY_POLICY_URL   = 'https://www.jodii.com/privacy-policy.html'
 const TERMS_CONDITIONS_URL = 'https://www.jodii.com/terms.html'
 
-const ICON = {
+export const ICON = {
   back:          R + 'menu_back_arrow.svg',
   avatar:        R + 'menu_avatar.svg',
   verified:      R + 'menu_verified.svg',
@@ -57,6 +56,21 @@ const ICON = {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Props = { navigation: any }
+
+// ─── Logout side effects ─────────────────────────────────────────────────────
+// Extracted so other entry points (e.g. HomeSidebar's desktop logout row) can
+// fire the exact same sequence without duplicating it — only the confirm-sheet
+// UI around it (LogoutSheet, also exported below) differs per caller.
+
+export async function performLogout(): Promise<void> {
+  // 1. Emit socket Logout event and disconnect
+  disconnectSocket()
+  // 2. Fire analytics events (matches Angular's pushfirebaseEvents + triggerAppNativeEvent)
+  logEvent({ category: 'ManageAccount', action: 'Logout', label: 'Submitted' })
+  dispatchNativeEvent({ event_name: 'logout' })
+  // 3. Clear session storage and flip navigation to AuthStack
+  await clearSession()
+}
 
 // ─── MenuRow ──────────────────────────────────────────────────────────────────
 
@@ -90,7 +104,7 @@ function MenuRow({ icon, iconSize = 24, title, onPress, showDivider }: RowProps)
 // ─── LogoutSheet ──────────────────────────────────────────────────────────────
 // Ported from the old SettingsScreen — same confirm-before-logout bottom sheet.
 
-function LogoutSheet({ visible, onYes, onNo }: { visible: boolean; onYes: () => void; onNo: () => void }) {
+export function LogoutSheet({ visible, onYes, onNo }: { visible: boolean; onYes: () => void; onNo: () => void }) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const [modalVisible, setModalVisible] = useState(visible)
@@ -192,8 +206,11 @@ export default function MenuScreen({ navigation }: Props) {
 
   const isPaid = entryType !== '' && !['B', 'F'].includes(entryType)
 
-  function stub(label: string) {
-    Alert.alert(label, 'Coming soon')
+  // Angular: menu.page.ts redirectToBioData() → /download-biodata — a
+  // dedicated screen (BiodataScreen.tsx), not ViewProfileScreen's own-profile
+  // mode.
+  function handleDownloadBiodata() {
+    navigation.navigate('Biodata')
   }
 
   const handleLogout = useCallback(() => {
@@ -202,13 +219,7 @@ export default function MenuScreen({ navigation }: Props) {
 
   const handleConfirmLogout = useCallback(async () => {
     setLogoutSheetVisible(false)
-    // 1. Emit socket Logout event and disconnect
-    disconnectSocket()
-    // 2. Fire analytics events (matches Angular's pushfirebaseEvents + triggerAppNativeEvent)
-    logEvent({ category: 'ManageAccount', action: 'Logout', label: 'Submitted' })
-    dispatchNativeEvent({ event_name: 'logout' })
-    // 3. Clear session storage and flip navigation to AuthStack
-    await clearSession()
+    await performLogout()
   }, [])
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -299,7 +310,7 @@ export default function MenuScreen({ navigation }: Props) {
           <MenuRow
             icon={ICON.biodata}
             title={t('MENU.DOWNLOAD_BIODATA')}
-            onPress={() => stub('Download Biodata')}
+            onPress={handleDownloadBiodata}
           />
         </View>
 

@@ -25,6 +25,8 @@ import { CDN_SVG } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import RechargeDesktopLayout from './RechargeDesktopLayout'
 import {
   checkAvailOffer, getMembershipPlans, getPaymentConfig, paymentTrack,
   type MembershipPlan, type MembershipPlansData, type SelectedPackage,
@@ -43,6 +45,7 @@ type Props = { navigation: any }
 
 export default function RechargeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
+  const isDesktop = useIsDesktopWeb()
 
   const [data, setData]           = useState<MembershipPlansData | null>(null)
   const [selectedId, setSelected] = useState('')
@@ -123,6 +126,30 @@ export default function RechargeScreen({ navigation }: Props) {
     return data ? data.payCtaTemplate.replace('₹<367>', plan?.offerprice || plan?.price || '') : ''
   }
   const payLabel = payLabelFor(selectedPlan)
+
+  // ── Desktop web layout (Figma "Jodii Desktop - Registration", 1047-10280) ──
+  // Wide browser window only — mobile/native/narrow-web keep the JSX below,
+  // untouched, sharing all the same state/handlers defined above.
+  if (isDesktop) {
+    return (
+      <RechargeDesktopLayout
+        data={data}
+        loading={loading}
+        selectedId={selectedId}
+        onSelect={setSelected}
+        onClose={handleClose}
+        onViewAllPlans={openAllPlans}
+        showAllPlans={showAllPlans}
+        onCloseAllPlans={() => setShowAllPlans(false)}
+        sheetSelectedId={sheetSelectedId}
+        onSheetSelect={setSheetSelected}
+        payLabel={payLabel}
+        onPay={() => proceedWithPlan(selectedPlan)}
+        sheetPayLabel={payLabelFor(sheetSelectedPlan)}
+        onSheetPay={() => proceedWithPlan(sheetSelectedPlan)}
+      />
+    )
+  }
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
@@ -228,7 +255,7 @@ export default function RechargeScreen({ navigation }: Props) {
 // ─── PlanCard ─────────────────────────────────────────────────────────────────
 // Angular: components/benefits-card/benefits-card.component.html
 
-function PlanCard({
+export function PlanCard({
   plan, selected, onPress,
 }: { plan: MembershipPlan; selected: boolean; onPress: () => void }) {
   const hasStrike  = !!plan.offerprice
@@ -313,7 +340,7 @@ function PlanCard({
 // styling); everything else renders as plain text, matching Angular's visual
 // result without needing a full HTML parser.
 
-function renderBenefitText(html?: string) {
+export function renderBenefitText(html?: string) {
   if (!html) return null
   const parts = html.split(/(<span[^>]*>.*?<\/span>)/g)
   return parts.map((part, i) => {
