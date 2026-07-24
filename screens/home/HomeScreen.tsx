@@ -489,7 +489,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       case 4: navigation.navigate('Search');   break
       // Angular: footer.component.ts — paymentTrack(31) fires right before
       // routing a free member to the payment intermediate page.
-      case 3: paymentTrack('31'); navigation.navigate('recharge'); break
+      case 3: paymentTrack('31'); navigation.navigate('recharge', { fromTab: true }); break
     }
   }
 

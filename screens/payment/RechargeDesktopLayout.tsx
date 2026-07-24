@@ -76,12 +76,6 @@ export default function RechargeDesktopLayout({
                 />
               ))}
 
-              {!!data.viewAllText && (
-                <Pressable style={s.viewAllRow} onPress={onViewAllPlans}>
-                  <Text style={s.viewAllText}>{data.viewAllText}</Text>
-                </Pressable>
-              )}
-
               {!!data.offerBannerText && (
                 <View style={s.offerBanner}>
                   <Text style={s.offerBannerText}>{data.offerBannerText}</Text>
@@ -90,6 +84,11 @@ export default function RechargeDesktopLayout({
             </ScrollView>
 
             <View style={s.footer}>
+              {!!data.viewAllText && (
+                <Pressable style={s.viewAllRow} onPress={onViewAllPlans}>
+                  <Text style={s.viewAllText}>{data.viewAllText}</Text>
+                </Pressable>
+              )}
               <ButtonRevamp
                 label={payLabel}
                 variant="primary"

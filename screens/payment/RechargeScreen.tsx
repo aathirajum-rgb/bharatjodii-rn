@@ -21,10 +21,11 @@ import {
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG } from '../../constants/cdn'
+import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
+import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import RechargeDesktopLayout from './RechargeDesktopLayout'
 import {
@@ -32,7 +33,7 @@ import {
   type MembershipPlan, type MembershipPlansData, type SelectedPackage,
 } from '../../service/paymentService'
 
-const ICON_CLOSE    = CDN_SVG + 'close-light-black.svg'
+const ICON_BACK     = CDN_REACT + '/menu_back_arrow.svg'
 const ICON_WHATSAPP = CDN_SVG + 'revamp/whatsapp-revamp.svg'
 const ICON_LIKE     = CDN_SVG + 'bottom-nav/like.svg'
 const ICON_CALL     = CDN_SVG + 'revamp/call-blue.svg'
@@ -41,11 +42,28 @@ const ICON_CALL     = CDN_SVG + 'revamp/call-blue.svg'
 // ("...additional matches who liked you") specifically for the weekly pack.
 const WEEKLY_PACK_PRODUCT_ID = '76'
 
-type Props = { navigation: any }
+type Props = { navigation: any; route: any }
 
-export default function RechargeScreen({ navigation }: Props) {
+export default function RechargeScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
   const isDesktop = useIsDesktopWeb()
+
+  // Reached two different ways: tapping the footer "Membership" tab (shows
+  // as tab content — no back arrow, bottom tab bar visible), or from a
+  // promo banner/paywall elsewhere in the app (full-screen push — back
+  // arrow, no tab bar). The caller distinguishes these via this param —
+  // see handleTabPress() in every screen with an AppFooter.
+  const fromTab = !!route?.params?.fromTab
+
+  function handleTabPress(tab: FooterTab) {
+    switch (tab) {
+      case 0: navigation.navigate('Home');     break
+      case 1: navigation.navigate('Matches');  break
+      case 2: navigation.navigate('Activity'); break
+      case 4: navigation.navigate('Search');   break
+      // case 3 (Membership) — already here, no-op.
+    }
+  }
 
   const [data, setData]           = useState<MembershipPlansData | null>(null)
   const [selectedId, setSelected] = useState('')
@@ -154,10 +172,16 @@ export default function RechargeScreen({ navigation }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Text style={s.headerTitle} numberOfLines={1}>{data?.title ?? 'Membership plans'}</Text>
-        <Pressable onPress={handleClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
-          <CdnSvg uri={ICON_CLOSE} width={20} height={20} />
-        </Pressable>
+        {fromTab ? (
+          <Text style={s.headerTitle} numberOfLines={1}>{data?.title ?? 'Membership plans'}</Text>
+        ) : (
+          <>
+            <Pressable onPress={handleClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back">
+              <CdnSvg uri={ICON_BACK} width={24} height={24} />
+            </Pressable>
+            <Text style={[s.headerTitle, s.headerTitleWithBack]} numberOfLines={1}>{data?.title ?? 'Membership plans'}</Text>
+          </>
+        )}
       </View>
 
       {loading ? (
@@ -178,12 +202,6 @@ export default function RechargeScreen({ navigation }: Props) {
               />
             ))}
 
-            {!!data.viewAllText && (
-              <Pressable style={s.viewAllRow} onPress={openAllPlans}>
-                <Text style={s.viewAllText}>{data.viewAllText}</Text>
-              </Pressable>
-            )}
-
             {!!data.offerBannerText && (
               <View style={s.offerBanner}>
                 <Text style={s.offerBannerText}>{data.offerBannerText}</Text>
@@ -191,7 +209,14 @@ export default function RechargeScreen({ navigation }: Props) {
             )}
           </ScrollView>
 
-          <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
+          {/* "View other packages" + Pay + Need help are all sticky here —
+              only the plan list above scrolls. */}
+          <View style={[s.footer, { paddingBottom: fromTab ? 12 : insets.bottom + 12 }]}>
+            {!!data.viewAllText && (
+              <Pressable style={s.viewAllRow} onPress={openAllPlans}>
+                <Text style={s.viewAllText}>{data.viewAllText}</Text>
+              </Pressable>
+            )}
             <ButtonRevamp
               label={payLabel}
               variant="primary"
@@ -210,6 +235,10 @@ export default function RechargeScreen({ navigation }: Props) {
               </View>
             )}
           </View>
+
+          {fromTab && (
+            <AppFooter activeTab={3} upgradeTag="₹300 OFF" onTabPress={handleTabPress} />
+          )}
         </>
       )}
 
@@ -361,6 +390,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
   },
   headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, flex: 1 },
+  headerTitleWithBack: { marginLeft: 16 },
 
   content: { padding: 24, paddingTop: 20, gap: 20 },
 

@@ -1868,7 +1868,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
       case 2: navigation.navigate('Activity'); break
       // Angular: footer.component.ts — paymentTrack(31) fires right before
       // routing a free member to the payment intermediate page.
-      case 3: paymentTrack('31'); navigation.navigate('recharge'); break
+      case 3: paymentTrack('31'); navigation.navigate('recharge', { fromTab: true }); break
       case 4: navigation.navigate('Search');   break
     }
   }

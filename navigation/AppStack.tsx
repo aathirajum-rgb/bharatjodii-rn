@@ -100,7 +100,7 @@ export type AppStackParamList = {
   onboarding:        { pageNo: string; standalone?: boolean } | undefined
   Permissions:       undefined
   Gallery:           undefined
-  recharge:          { from?: string; paymentId?: string; type?: string } | undefined
+  recharge:          { from?: string; paymentId?: string; type?: string; fromTab?: boolean } | undefined
   renewal:           { from?: string; paymentId?: string; type?: string } | undefined
   'payment-success': undefined
   'payment-failed': {

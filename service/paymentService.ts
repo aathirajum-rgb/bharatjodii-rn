@@ -584,7 +584,12 @@ export interface MembershipPlansData {
   defaultProductId: string
   payCtaTemplate:   string  // e.g. "Pay ₹<367>" — the literal substring '₹<367>' gets replaced with the amount
   helpline:         string
-  offerBannerText?: string | undefined // unconfirmed field name — see AGENTS note below
+  // Angular: recharge.page.html:151 — promotion.AADIPROMO.NOTE, shown only
+  // when promotion.PROMOTYPE == '20' (the seasonal "Aadi offer" campaign).
+  // AADIPROMO is a campaign-named field on the backend, not a generic key —
+  // a future campaign may introduce a differently-named sibling object
+  // rather than reusing this one.
+  offerBannerText?: string | undefined
 }
 
 // Strips a leading currency symbol/commas/whitespace and returns a plain
@@ -663,10 +668,7 @@ export async function getMembershipPlans(): Promise<MembershipPlansData | null> 
     defaultProductId: promotion.DEFAULTPRODUCTID ?? plans[0]?.productid ?? '',
     payCtaTemplate:   promotion.CTA3 ?? 'Pay ₹<367>',
     helpline:         promotion.NUMBER ?? '',
-    // Not confirmed against Angular source (no matching field found) — left
-    // undefined until the real API field name is identified; the screen
-    // hides this banner whenever it's absent.
-    offerBannerText:  promotion.OFFERBANNERTEXT,
+    offerBannerText:  promotion.PROMOTYPE === '20' ? promotion.AADIPROMO?.NOTE : undefined,
   }
 }
 
