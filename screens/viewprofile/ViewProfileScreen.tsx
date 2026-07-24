@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator, Dimensions, FlatList, Linking, Platform, Alert, NativeSyntheticEvent,
-  NativeScrollEvent, Pressable, ScrollView, StyleSheet, Text, View,
+  NativeScrollEvent, Pressable, ScrollView, StyleSheet, Text, View, Image as RNImage,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -23,7 +23,7 @@ import { LANG_LABELS } from '../../components/matches-header/MatchesHeader'
 import {
   WhatsAppIcon, WhatsAppUnlockButton, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   showLikeCTA, showAfterLikeCTA, disableDontShow, disableViewLater, HtmlText,
-  getBlurPhotoUri, NEWLY_JOINED_STAR_URI, ProfileBadge, PhotoSwiper,
+  getBlurPhotoUri, getAvatarFallbackUri, NEWLY_JOINED_STAR_URI, ProfileBadge, PhotoSwiper,
   getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showContactsLeftBanner, showFreeBadge,
   type AfterLikeCtx,
 } from '../../components/matches/matchesCard.shared'
@@ -290,6 +290,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // very first load (arriving fresh from Matches) should show that full-screen state.
   const isFirstLoadRef = useRef(true)
   const [loginGender, setLoginGender] = useState<'M' | 'F'>('F')
+  // Angular: onImgErrorHandler() — the own-profile hero photo (biodata theming
+  // view) is a single static <Image>, not PhotoSwiper, so it needs its own
+  // load-failure flag rather than PhotoSwiper's internal per-index tracking.
+  const [heroPhotoFailed, setHeroPhotoFailed] = useState(false)
+  useEffect(() => { setHeroPhotoFailed(false) }, [profile?.profileId])
   const [ownEntryType, setOwnEntryType] = useState('')
   const [femaleFreeEligible, setFemaleFreeEligible] = useState(false)
   const [indNumbersLeft, setIndNumbersLeft] = useState('0')
@@ -1443,20 +1448,28 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                 // a swipeable gallery — and PhotoSwiper's own horizontal pan would
                 // fight the theme-swipe gesture on this exact surface (same conflict
                 // class documented below for prev/next-profile navigation).
-                profile.isPhotoAvailable && profile.photos.length > 0 ? (
+                profile.isPhotoAvailable && profile.photos.length > 0 && !heroPhotoFailed ? (
                   <Image
                     source={{ uri: profile.photos[0] }}
                     style={{ width: SCREEN_WIDTH, height: PHOTO_HEIGHT }}
                     contentFit="cover"
+                    onError={() => setHeroPhotoFailed(true)}
+                  />
+                ) : profile.isPhotoAvailable && profile.photos.length > 0 && heroPhotoFailed ? (
+                  <RNImage
+                    source={{ uri: getAvatarFallbackUri(oppGender) }}
+                    style={{ width: SCREEN_WIDTH, height: PHOTO_HEIGHT }}
                   />
                 ) : (
                   <CdnSvg uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} />
                 )
               ) : profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0 ? (
                 <PhotoSwiper
+                  key={profile.profileId}
                   images={profile.photos}
                   width={SCREEN_WIDTH}
                   height={PHOTO_HEIGHT}
+                  oppGender={oppGender}
                   onPress={i => { setPhotoViewerIndex(i); setPhotoViewerOpen(true) }}
                 />
               ) : (

@@ -81,6 +81,7 @@ export default function MatchCardDesktop({
             images={profile.photos}
             width={PHOTO_W}
             height={PHOTO_H}
+            oppGender={oppGender}
             onPress={onPress}
             showArrows
           />

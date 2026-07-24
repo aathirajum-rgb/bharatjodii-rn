@@ -403,9 +403,11 @@ export default function ViewProfileDesktopLayout({
               // hero photo gets the same swipe-through-photos + dot indicator
               // behavior, not just its first photo.
               <PhotoSwiper
+                key={profile.profileId}
                 images={profile.photos}
                 width={HERO_PHOTO_SIZE}
                 height={heroContentHeight ?? HERO_PHOTO_SIZE}
+                oppGender={oppGender}
                 onPress={onOpenPhotoViewer}
               />
             ) : (

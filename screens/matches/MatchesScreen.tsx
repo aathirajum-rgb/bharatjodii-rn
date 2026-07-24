@@ -174,6 +174,7 @@ export const MatchCard = memo(function MatchCard({
             images={profile.photos}
             width={SW - 32}
             height={PHOTO_H}
+            oppGender={oppGender}
             onPress={onPress}
           />
         ) : isHiddenPhoto ? (

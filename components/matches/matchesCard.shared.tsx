@@ -10,7 +10,7 @@
 
 import { useRef, useState } from 'react'
 import {
-  Pressable, StyleSheet, Text, View,
+  Image as RNImage, Pressable, StyleSheet, Text, View,
 } from 'react-native'
 import { Image } from 'expo-image'
 import Carousel, { type ICarouselInstance } from 'react-native-reanimated-carousel'
@@ -27,6 +27,24 @@ import type { MatchProfile } from '../../types/interfaces/matches.interface'
 
 export function getBlurPhotoUri(oppGender: 'M' | 'F'): string {
   return CDN_SVG + (oppGender === 'F' ? 'revamp/profile-photo-blur.svg' : 'profile-blur-male.svg')
+}
+
+export const MALE_AVATAR_URI   = CDN_SVG + 'male_avatar_new.svg'
+export const FEMALE_AVATAR_URI = CDN_SVG + 'female_avatar_new.svg'
+
+// Angular: core/functions/common-funtions.ts's onImgErrorHandler() sets
+// event.target.src = getAvatarImg(getOppGenderType()) on every profile photo
+// <img>/<ion-img> (error)/(ionError) — a CLIENT-SIDE fallback for a load
+// FAILURE (broken CDN link, S3 AccessDenied XML, 404, ...), distinct from
+// getBlurPhotoUri above (that's for "no real photo at all"/photo-protected).
+// getOppGenderType() is the opposite of the LOGGED-IN user's own gender —
+// since these screens only ever list opposite-gender profiles, the `oppGender`
+// prop already threaded through every caller here IS that same value. Same
+// pattern already established in StarMatchingScreen.tsx for its own/partner
+// photos; this brings PhotoSwiper (Matches/Activity cards + ViewProfile) up
+// to the same behavior — it previously had NO error fallback at all.
+export function getAvatarFallbackUri(oppGender: 'M' | 'F'): string {
+  return oppGender === 'F' ? FEMALE_AVATAR_URI : MALE_AVATAR_URI
 }
 
 export const NEWLY_JOINED_STAR_URI = CDN_SVG + 'revamp/newly-joined-star.svg'
@@ -381,6 +399,9 @@ export interface PhotoSwiperProps {
   images:       string[]
   width:        number
   height:       number
+  // Angular: onImgErrorHandler() — which gender silhouette to fall back to if
+  // a given slide's photo URL fails to load (see getAvatarFallbackUri above).
+  oppGender:    'M' | 'F'
   // Receives the currently-active photo index — callers that don't need it
   // (existing Matches cards) can keep declaring a zero-arg handler; TS allows
   // passing a function with fewer params where more are provided.
@@ -407,9 +428,12 @@ function configureSwiperPanGesture(pan: PanGesture): void {
   pan.activeOffsetX([-10, 10]).failOffsetY([-10, 10])
 }
 
-export function PhotoSwiper({ images, width, height, onPress, showArrows }: PhotoSwiperProps) {
+export function PhotoSwiper({ images, width, height, oppGender, onPress, showArrows }: PhotoSwiperProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const carouselRef = useRef<ICarouselInstance>(null)
+  // Per-slide load-failure tracking — one bad URL in a multi-photo gallery
+  // shouldn't force every OTHER slide over to the fallback avatar too.
+  const [failedIndices, setFailedIndices] = useState<Record<number, boolean>>({})
 
   return (
     // overflow:'hidden' here too, not just on the parent photoBox — on Android, the
@@ -426,14 +450,19 @@ export function PhotoSwiper({ images, width, height, onPress, showArrows }: Phot
         onSnapToItem={setActiveIndex}
         renderItem={({ item, index }) => (
           <Pressable style={{ width, height }} onPress={() => onPress?.(index)}>
-            <Image
-              source={{ uri: item }}
-              style={swiperStyles.image}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-              recyclingKey={item}
-              transition={150}
-            />
+            {failedIndices[index] ? (
+              <RNImage source={{ uri: getAvatarFallbackUri(oppGender) }} style={swiperStyles.image} />
+            ) : (
+              <Image
+                source={{ uri: item }}
+                style={swiperStyles.image}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                recyclingKey={item}
+                transition={150}
+                onError={() => setFailedIndices(prev => ({ ...prev, [index]: true }))}
+              />
+            )}
           </Pressable>
         )}
       />
