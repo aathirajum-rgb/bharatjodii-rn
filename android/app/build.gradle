@@ -234,4 +234,11 @@ dependencies {
     // — react-native-razorpay's Android autolinking is disabled in
     // react-native.config.js for exactly this reason; iOS still uses it.
     implementation "com.razorpay:customui:3.9.22"
+
+    // PayU Custom Integration — silent per-account substitute for the
+    // Razorpay UPI flow (PAYCONFIG.PAYSOURCE == '2'), matching the old
+    // native Android app's behavior. See PayUBridgeModule/PayUWebView.
+    implementation("in.payu:upisdk:1.7.2") {
+        exclude group: "org.json", module: "json"
+    }
 }

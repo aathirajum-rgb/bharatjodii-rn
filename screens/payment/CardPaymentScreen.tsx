@@ -10,9 +10,9 @@
 // to react-native-razorpay's own secure card-entry UI, where this form's
 // fields are only for UX/validation parity with Angular, not transmitted.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
-  Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View,
+  Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
@@ -20,9 +20,11 @@ import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import FloatingLabelInput, { validateName } from '../../components/input/FloatingLabelInput'
+import LinkCTA from '../../components/link-cta/LinkCTA'
 import {
-  getCheckoutDetails, getFinalAmount, getPaymentConfig, handlePaymentSuccess, initRazorpayNative,
-  initRazorpayPayment, recordPaymentFailure, stringifyPaymentResponse, toPaise, type SelectedPackage,
+  getCheckoutDetails, getFinalAmount, getPaymentConfig, getRechargeHelpline, getRetryRemainingMs,
+  handlePaymentSuccess, initRazorpayNative, initRazorpayPayment, recordPaymentFailure,
+  stringifyPaymentResponse, toPaise, verifyPaymentSuccess, type SelectedPackage,
 } from '../../service/paymentService'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
@@ -81,6 +83,9 @@ export default function CardPaymentScreen({ navigation, route }: Props) {
   const [cvv, setCvv]           = useState('')
   const [touched, setTouched]   = useState(false)
   const [paying, setPaying]     = useState(false)
+  const [helpline, setHelpline] = useState('')
+
+  useEffect(() => { getRechargeHelpline().then(setHelpline) }, [])
 
   const nameError   = touched ? validateName(name) : undefined
   const cardError   = touched ? validateCardNumber(cardNumber) : undefined
@@ -99,6 +104,13 @@ export default function CardPaymentScreen({ navigation, route }: Props) {
   async function handlePay() {
     setTouched(true)
     if (!isValid || !selectedPackage) return
+
+    const remainingMs = await getRetryRemainingMs()
+    if (remainingMs > 0) {
+      const mins = Math.ceil(remainingMs / 60000)
+      Alert.alert('Please wait', `You can retry payment in about ${mins} minute${mins === 1 ? '' : 's'}.`)
+      return
+    }
 
     setPaying(true)
     try {
@@ -137,12 +149,29 @@ export default function CardPaymentScreen({ navigation, route }: Props) {
       }
 
       if (result.success) {
-        await handlePaymentSuccess()
+        const verified = await verifyPaymentSuccess(result.response, checkout.orderId)
+        if (verified) {
+          await handlePaymentSuccess()
+        } else {
+          await recordPaymentFailure(null, selectedPackage, {
+            status: 'pending', retryRoute: 'card-payment', retryParams: route.params,
+          })
+          navigation.navigate('payment-failed', {
+            selectedPackage, amountLabel, status: 'pending', orderId: checkout.orderId,
+            retryRoute: 'card-payment', retryParams: route.params,
+          })
+        }
       } else {
         const errCode: number = result.response?.code ?? 0
         if (errCode !== 0) {
-          await recordPaymentFailure(null, selectedPackage)
-          Alert.alert('Payment Failed', stringifyPaymentResponse(result.response))
+          const reason = stringifyPaymentResponse(result.response)
+          await recordPaymentFailure(null, selectedPackage, {
+            status: 'failure', reason, retryRoute: 'card-payment', retryParams: route.params,
+          })
+          navigation.navigate('payment-failed', {
+            selectedPackage, amountLabel, status: 'failure', reason,
+            retryRoute: 'card-payment', retryParams: route.params,
+          })
         }
       }
     } catch (error: any) {
@@ -218,6 +247,15 @@ export default function CardPaymentScreen({ navigation, route }: Props) {
         {Platform.OS !== 'android' && (
           <Text style={s.confirmNote}>You'll confirm your card details securely on the next screen</Text>
         )}
+
+        {!!helpline && (
+          <LinkCTA
+            text="Need help in making payment?"
+            contact={helpline}
+            onPress={() => Linking.openURL(`tel:${helpline}`)}
+            style={s.helpLink}
+          />
+        )}
       </ScrollView>
 
       <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
@@ -257,6 +295,7 @@ const s = StyleSheet.create({
     fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textTertiary,
     textAlign: 'center', marginTop: 16,
   },
+  helpLink: { marginTop: 24 },
 
   footer: { paddingHorizontal: 16, paddingTop: 12 },
 })

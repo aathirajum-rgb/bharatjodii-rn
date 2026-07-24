@@ -63,6 +63,7 @@ export enum ENavigation {
   MY_MEMBERSHIP          = 'my-membership',
   PAYMENT                = 'payment',
   PAYMENT_SUCCESS        = 'payment-success',
+  PAYMENT_FAILED         = 'payment-failed',
   ADD_PHOTO_INTERMEDIATE = 'addphoto-intermediate',
   ADD_PHOTO_PUBLISH      = 'addphoto-publish',
   PHOTO_REJECTION        = 'photo-rejection',

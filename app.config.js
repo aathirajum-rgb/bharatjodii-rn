@@ -84,6 +84,8 @@ module.exports = ({ config }) => ({
   },
   plugins: [
     './plugins/withAndroidFlavors',
+    './plugins/withRazorpayAndroidBridge',
+    './plugins/withPayUAndroidBridge',
     'expo-image',
     'expo-splash-screen',
     'expo-video',

@@ -22,8 +22,9 @@ import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import LinkCTA from '../../components/link-cta/LinkCTA'
 import {
   findUpiPackageName, formatAmount, getAutoRenewalBenefits, getCheckoutDetails, getFinalAmount,
-  getPaymentConfig, getRechargeHelpline, getUpiAppList, handlePaymentSuccess, initRazorpayNative,
-  initRazorpayPayment, parseAmount, recordPaymentFailure, stringifyPaymentResponse, toPaise,
+  getPaymentConfig, getRechargeHelpline, getRetryRemainingMs, getUpiAppList, handlePaymentSuccess,
+  initPayUNative, initRazorpayNative, initRazorpayPayment, parseAmount, recordPaymentFailure,
+  stringifyPaymentResponse, toPaise, verifyPayUPaymentSuccess, verifyPaymentSuccess,
   type AutoRenewalSheetData, type PaymentMethodItem, type SelectedPackage, type UpiAppInfo,
 } from '../../service/paymentService'
 
@@ -133,7 +134,10 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
   }
 
   const recommended = methods.filter(m => m.RECOMMEND === '1')
-  const otherModes   = methods.filter(m => m.RECOMMEND !== '1')
+  // On web (PWA), the "Other payment modes" section (netbanking/NEFT/pay-at-
+  // store/doorstep, reached via the OTHERMODES row) isn't shown at all —
+  // those flows depend on native bridges/screens this build doesn't have.
+  const otherModes = Platform.OS === 'web' ? [] : methods.filter(m => m.RECOMMEND !== '1')
 
   const value1 = selectedPackage.value1
   const planName     = value1?.[0] ?? selectedPackage.value
@@ -179,12 +183,23 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
       // more-payment-option page (Net Banking/NEFT-RTGS/Pay at stores),
       // it does NOT show those rows inline on this screen.
       case 'OTHERMODES': navigation.navigate('more-payment-options', params); break
+      // Angular: payment-mode.page.ts:700-702 — free-doorstep-collection,
+      // a scheduling request (no charge here), separate from OTHERMODES.
+      case 'DOORSTEP':   navigation.navigate('doorstep-collection', params); break
       default:           Alert.alert(item.NAME, 'This payment mode is coming soon.')
     }
   }
 
   async function handlePay() {
     if (!selectedKey) { Alert.alert('Select payment method', 'Please choose a payment method.'); return }
+
+    const remainingMs = await getRetryRemainingMs()
+    if (remainingMs > 0) {
+      const mins = Math.ceil(remainingMs / 60000)
+      Alert.alert('Please wait', `You can retry payment in about ${mins} minute${mins === 1 ? '' : 's'}.`)
+      return
+    }
+
     setPaying(true)
     try {
       const config = await getPaymentConfig()
@@ -196,8 +211,38 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
       // which native UPI app to target, further down.
       const checkout = await getCheckoutDetails(selectedPackage!.PACKAGEID, toRazorpayMethod(selectedKey), renewOnExpiry)
 
+      // PAYSOURCE=='2' silently routes this account's whole UPI flow through
+      // PayU instead of Razorpay — see initPayUNative(). Only applies to the
+      // UPI-native-bridge branch below; card/netbanking (and iOS, which has
+      // no PayU bridge) keep using Razorpay regardless.
+      const usePayU = Platform.OS === 'android' && AUTOPAY_CAPABLE_KEYS.has(selectedKey) && config.PAYSOURCE === '2'
+
       let result: { success: boolean; response: any }
-      if (Platform.OS === 'android' && AUTOPAY_CAPABLE_KEYS.has(selectedKey)) {
+      if (usePayU) {
+        const upiAppPackageName = findUpiPackageName(installedApps, selectedKey)
+        result = await initPayUNative({
+          merchantKey: config.PAYU_MERCHANT_KEY ?? '',
+          txnId:       checkout.txnid ?? '',
+          productInfo: checkout.productinfo ?? '',
+          firstName:   checkout.firstname ?? '',
+          email:       checkout.email || 'jodii@matrimony.com',
+          amount:      checkout.amount ?? '',
+          phone:       checkout.MOBILENO ?? '',
+          surl:        checkout.surl ?? '',
+          furl:        checkout.furl ?? '',
+          hash:        checkout.hash ?? '',
+          bankcode:    checkout.bankcode ?? '',
+          upiAppPackageName,
+          si: checkout.si === 1 && checkout.si_details ? {
+            billingAmount:    checkout.si_details.billingAmount,
+            billingCurrency:  checkout.si_details.billingCurrency,
+            billingCycle:     checkout.si_details.billingCycle,
+            billingInterval:  checkout.si_details.billingInterval,
+            paymentStartDate: checkout.si_details.paymentStartDate,
+            paymentEndDate:   checkout.si_details.paymentEndDate,
+          } : undefined,
+        })
+      } else if (Platform.OS === 'android' && AUTOPAY_CAPABLE_KEYS.has(selectedKey)) {
         // Native bridge: target the specific detected GPay/PhonePe/Paytm app
         // directly via its package name, instead of Razorpay's own generic
         // UPI-app picker (which is all react-native-razorpay's Standard
@@ -229,12 +274,31 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
       }
 
       if (result.success) {
-        await handlePaymentSuccess()
+        const verified = usePayU
+          ? await verifyPayUPaymentSuccess(result.response?.payuResult, result.response?.txnId)
+          : await verifyPaymentSuccess(result.response, checkout.orderId)
+        if (verified) {
+          await handlePaymentSuccess()
+        } else {
+          await recordPaymentFailure(null, selectedPackage, {
+            status: 'pending', retryRoute: 'payment-options', retryParams: route.params,
+          })
+          navigation.navigate('payment-failed', {
+            selectedPackage, amountLabel: formatAmount(finalTotalNum), status: 'pending', orderId: checkout.orderId,
+            retryRoute: 'payment-options', retryParams: route.params,
+          })
+        }
       } else {
         const errCode: number = result.response?.code ?? 0
         if (errCode !== 0) {
-          await recordPaymentFailure(null, selectedPackage)
-          Alert.alert('Payment Failed', stringifyPaymentResponse(result.response))
+          const reason = stringifyPaymentResponse(result.response)
+          await recordPaymentFailure(null, selectedPackage, {
+            status: 'failure', reason, retryRoute: 'payment-options', retryParams: route.params,
+          })
+          navigation.navigate('payment-failed', {
+            selectedPackage, amountLabel: formatAmount(finalTotalNum), status: 'failure', reason,
+            retryRoute: 'payment-options', retryParams: route.params,
+          })
         }
       }
     } catch (error: any) {

@@ -8,9 +8,9 @@
 // GPay/PhonePe on PaymentOptionsScreen — not just the manual VPA field this
 // screen used to be limited to.
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import {
-  ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
@@ -18,10 +18,12 @@ import { CDN, CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import FloatingLabelInput from '../../components/input/FloatingLabelInput'
+import LinkCTA from '../../components/link-cta/LinkCTA'
 import {
-  getCheckoutDetails, getFinalAmount, getPaymentConfig, getUpiAppList, handlePaymentSuccess,
-  initRazorpayNative, initUPIPayment, recordPaymentFailure, stringifyPaymentResponse, toPaise,
-  type SelectedPackage, type UpiAppInfo,
+  getCheckoutDetails, getFinalAmount, getPaymentConfig, getRechargeHelpline, getRetryRemainingMs,
+  getUpiAppList, handlePaymentSuccess, initPayUNative, initRazorpayNative, initUPIPayment,
+  recordPaymentFailure, stringifyPaymentResponse, toPaise, verifyPayUPaymentSuccess,
+  verifyPaymentSuccess, type SelectedPackage, type UpiAppInfo,
 } from '../../service/paymentService'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
@@ -54,6 +56,9 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
   const [vpa, setVpa]       = useState('')
   const [touched, setTouched] = useState(false)
   const [paying, setPaying]   = useState(false)
+  const [helpline, setHelpline] = useState('')
+
+  useEffect(() => { getRechargeHelpline().then(setHelpline) }, [])
 
   // Detected installed UPI apps (Android only) — GPay/Paytm/PhonePe shown
   // directly, everything else (CRED, iMobile, PayZapp, etc.) tucked under an
@@ -63,7 +68,7 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
   // method is active at a time.
   const [topApps, setTopApps]       = useState<UpiAppInfo[]>([])
   const [otherApps, setOtherApps]   = useState<UpiAppInfo[]>([])
-  const [showOthers, setShowOthers] = useState(false)
+  const [showOthers, setShowOthers] = useState(true)
   const [selectedApp, setSelectedApp] = useState<UpiAppInfo | null>(null)
   const [loadingApps, setLoadingApps] = useState(Platform.OS === 'android')
 
@@ -102,15 +107,70 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
     setTouched(true)
     if (!canPay || !selectedPackage) return
 
+    const remainingMs = await getRetryRemainingMs()
+    if (remainingMs > 0) {
+      const mins = Math.ceil(remainingMs / 60000)
+      Alert.alert('Please wait', `You can retry payment in about ${mins} minute${mins === 1 ? '' : 's'}.`)
+      return
+    }
+
     setPaying(true)
     try {
       const config  = await getPaymentConfig()
       const saltKey = config.RAZORPAY_KEY_ID ?? ''
 
-      const checkout = await getCheckoutDetails(selectedPackage.PACKAGEID, 'UPI')
+      // Lowercase 'upi', matching PaymentOptionsScreen's toRazorpayMethod() —
+      // checked against real Razorpay order/payment history via the Razorpay
+      // MCP, which showed every recent UPI payment succeeding with no
+      // errors, meaning this screen's "could not initiate payment" failures
+      // were happening in our own nbpaymentcheckout call, before Razorpay
+      // was ever reached.
+      //
+      // renewOnExpiry is deliberately NOT forced true here (unlike an
+      // earlier version of this fix) — doing so made the backend create a
+      // recurring/customer-linked order even when this flow isn't set up
+      // for one, which surfaces as Razorpay rejecting the submit with
+      // {"code":5,"description":"The id provided does not exist"} (the
+      // known failure mode when a recurring order's customer_id doesn't
+      // resolve — see the comment on the customerId field below).
+      const checkout = await getCheckoutDetails(selectedPackage.PACKAGEID, 'upi')
+
+      // PAYSOURCE=='2' silently routes this account's whole UPI flow through
+      // PayU instead of Razorpay — see initPayUNative(). No iOS PayU bridge
+      // exists (the old app's PayU integration was Android-only), so iOS
+      // keeps using Razorpay's Standard Checkout regardless of PAYSOURCE.
+      // Also requires a detected app: the old Android app's PayU integration
+      // never supported manual VPA entry (startUpiPayment there has no vpa
+      // field at all) — a manual VPA on a PayU account falls through to the
+      // Razorpay branch below instead of submitting an incomplete PayU
+      // payload with no UPI target.
+      const usePayU = Platform.OS === 'android' && config.PAYSOURCE === '2' && !!selectedApp
 
       let result: { success: boolean; response: any }
-      if (Platform.OS === 'android') {
+      if (usePayU) {
+        result = await initPayUNative({
+          merchantKey: config.PAYU_MERCHANT_KEY ?? '',
+          txnId:       checkout.txnid ?? '',
+          productInfo: checkout.productinfo ?? '',
+          firstName:   checkout.firstname ?? '',
+          email:       checkout.email || 'jodii@matrimony.com',
+          amount:      checkout.amount ?? '',
+          phone:       checkout.MOBILENO ?? '',
+          surl:        checkout.surl ?? '',
+          furl:        checkout.furl ?? '',
+          hash:        checkout.hash ?? '',
+          bankcode:    checkout.bankcode ?? '',
+          upiAppPackageName: selectedApp?.packageName,
+          si: checkout.si === 1 && checkout.si_details ? {
+            billingAmount:    checkout.si_details.billingAmount,
+            billingCurrency:  checkout.si_details.billingCurrency,
+            billingCycle:     checkout.si_details.billingCycle,
+            billingInterval:  checkout.si_details.billingInterval,
+            paymentStartDate: checkout.si_details.paymentStartDate,
+            paymentEndDate:   checkout.si_details.paymentEndDate,
+          } : undefined,
+        })
+      } else if (Platform.OS === 'android') {
         result = await initRazorpayNative({
           // Confirmed via a real captured checkout response — it's a FLAT
           // object (getCheckoutDetails() previously returned .RESPONSE, a
@@ -141,12 +201,31 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
       }
 
       if (result.success) {
-        await handlePaymentSuccess()
+        const verified = usePayU
+          ? await verifyPayUPaymentSuccess(result.response?.payuResult, result.response?.txnId)
+          : await verifyPaymentSuccess(result.response, checkout.orderId)
+        if (verified) {
+          await handlePaymentSuccess()
+        } else {
+          await recordPaymentFailure(null, selectedPackage, {
+            status: 'pending', retryRoute: 'upi-address', retryParams: route.params,
+          })
+          navigation.navigate('payment-failed', {
+            selectedPackage, amountLabel, status: 'pending', orderId: checkout.orderId,
+            retryRoute: 'upi-address', retryParams: route.params,
+          })
+        }
       } else {
         const errCode: number = result.response?.code ?? 0
         if (errCode !== 0) {
-          await recordPaymentFailure(null, selectedPackage)
-          Alert.alert('Payment Failed', stringifyPaymentResponse(result.response))
+          const reason = stringifyPaymentResponse(result.response)
+          await recordPaymentFailure(null, selectedPackage, {
+            status: 'failure', reason, retryRoute: 'upi-address', retryParams: route.params,
+          })
+          navigation.navigate('payment-failed', {
+            selectedPackage, amountLabel, status: 'failure', reason,
+            retryRoute: 'upi-address', retryParams: route.params,
+          })
         }
       }
     } catch (error: any) {
@@ -165,7 +244,7 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
         <Text style={s.headerTitle} numberOfLines={1}>Pay using UPI apps</Text>
       </View>
 
-      <ScrollView contentContainerStyle={s.content}>
+      <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 24 }]}>
         <Text style={s.subtitle}>Enter existing UPI address</Text>
 
         <FloatingLabelInput
@@ -183,31 +262,48 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
           variant="primary"
           size="medium"
           disabled={!isValid}
+          loading={paying && !selectedApp}
           onPress={handlePay}
-          style={s.submitBtn}
+          style={[s.submitBtn, s.squareBtn]}
         />
 
         {loadingApps && <ActivityIndicator color={Colors.primaryDark} style={{ marginTop: 24 }} />}
 
         {!loadingApps && (topApps.length > 0 || otherApps.length > 0) && (
           <View style={s.appCard}>
-            {topApps.map((app, idx) => (
-              <Pressable
-                key={app.packageName}
-                style={[s.appRow, idx === topApps.length - 1 && otherApps.length === 0 && s.appRowLast]}
-                onPress={() => selectApp(app)}
-                accessibilityRole="radio"
-                accessibilityState={{ checked: selectedApp?.packageName === app.packageName }}
-              >
-                <View style={s.appRowLeft}>
-                  <CdnSvg uri={iconForApp(app.packageName)} width={24} height={24} />
-                  <Text style={s.appLabel}>{app.appName}</Text>
-                </View>
-                <View style={[s.radioCircle, selectedApp?.packageName === app.packageName && s.radioCircleSelected]}>
-                  {selectedApp?.packageName === app.packageName && <View style={s.radioDot} />}
-                </View>
-              </Pressable>
-            ))}
+            {topApps.map((app, idx) => {
+              const isSelected = selectedApp?.packageName === app.packageName
+              return (
+                <Fragment key={app.packageName}>
+                  <Pressable
+                    style={[s.appRow, idx === topApps.length - 1 && otherApps.length === 0 && !isSelected && s.appRowLast]}
+                    onPress={() => selectApp(app)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: isSelected }}
+                  >
+                    <View style={s.appRowLeft}>
+                      <CdnSvg uri={iconForApp(app.packageName)} width={24} height={24} />
+                      <Text style={s.appLabel}>{app.appName}</Text>
+                    </View>
+                    <View style={[s.radioCircle, isSelected && s.radioCircleSelected]}>
+                      {isSelected && <View style={s.radioDot} />}
+                    </View>
+                  </Pressable>
+                  {isSelected && (
+                    <View style={s.inlinePayBlock}>
+                      <ButtonRevamp
+                        label={amountLabel ? `Proceed to pay ${amountLabel}` : 'Proceed to pay'}
+                        variant="primary"
+                        fullWidth
+                        loading={paying}
+                        style={s.payBtn}
+                        onPress={handlePay}
+                      />
+                    </View>
+                  )}
+                </Fragment>
+              )
+            })}
 
             {otherApps.length > 0 && (
               <>
@@ -221,41 +317,53 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
                   </View>
                   <CdnSvg uri={ICON_CHEVRON} width={16} height={16} />
                 </Pressable>
-                {showOthers && otherApps.map((app, idx) => (
-                  <Pressable
-                    key={app.packageName}
-                    style={[s.appRow, idx === otherApps.length - 1 && s.appRowLast]}
-                    onPress={() => selectApp(app)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ checked: selectedApp?.packageName === app.packageName }}
-                  >
-                    <View style={s.appRowLeft}>
-                      <CdnSvg uri={iconForApp(app.packageName)} width={24} height={24} />
-                      <Text style={s.appLabel}>{app.appName}</Text>
-                    </View>
-                    <View style={[s.radioCircle, selectedApp?.packageName === app.packageName && s.radioCircleSelected]}>
-                      {selectedApp?.packageName === app.packageName && <View style={s.radioDot} />}
-                    </View>
-                  </Pressable>
-                ))}
+                {showOthers && otherApps.map((app, idx) => {
+                  const isSelected = selectedApp?.packageName === app.packageName
+                  return (
+                    <Fragment key={app.packageName}>
+                      <Pressable
+                        style={[s.appRow, idx === otherApps.length - 1 && !isSelected && s.appRowLast]}
+                        onPress={() => selectApp(app)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ checked: isSelected }}
+                      >
+                        <View style={s.appRowLeft}>
+                          <CdnSvg uri={iconForApp(app.packageName)} width={24} height={24} />
+                          <Text style={s.appLabel}>{app.appName}</Text>
+                        </View>
+                        <View style={[s.radioCircle, isSelected && s.radioCircleSelected]}>
+                          {isSelected && <View style={s.radioDot} />}
+                        </View>
+                      </Pressable>
+                      {isSelected && (
+                        <View style={s.inlinePayBlock}>
+                          <ButtonRevamp
+                            label={amountLabel ? `Proceed to pay ${amountLabel}` : 'Proceed to pay'}
+                            variant="primary"
+                            fullWidth
+                            loading={paying}
+                            style={s.payBtn}
+                            onPress={handlePay}
+                          />
+                        </View>
+                      )}
+                    </Fragment>
+                  )
+                })}
               </>
             )}
           </View>
         )}
-      </ScrollView>
 
-      <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
-        <ButtonRevamp
-          label={amountLabel ? `Pay ${amountLabel}` : 'Pay'}
-          variant="primary"
-          size="large"
-          fullWidth
-          loading={paying}
-          disabled={touched && !canPay}
-          style={{ backgroundColor: Colors.primaryDark }}
-          onPress={handlePay}
-        />
-      </View>
+        {!!helpline && (
+          <LinkCTA
+            text="Need help in making payment?"
+            contact={helpline}
+            onPress={() => Linking.openURL(`tel:${helpline}`)}
+            style={s.helpLink}
+          />
+        )}
+      </ScrollView>
     </View>
   )
 }
@@ -275,6 +383,8 @@ const s = StyleSheet.create({
   field:    { marginBottom: 8 },
   note:     { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textTertiary },
   submitBtn: { alignSelf: 'flex-start', marginTop: 12 },
+  squareBtn: { borderRadius: 4 },
+  helpLink:  { marginTop: 24 },
 
   appCard: {
     marginTop: 24, backgroundColor: Colors.white, borderRadius: 16, paddingHorizontal: 16,
@@ -295,5 +405,6 @@ const s = StyleSheet.create({
   radioCircleSelected: { borderColor: Colors.primaryDark },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primaryDark },
 
-  footer: { paddingHorizontal: 16, paddingTop: 12 },
+  inlinePayBlock: { paddingVertical: 12, paddingBottom: 16 },
+  payBtn: { backgroundColor: Colors.primaryDark },
 })

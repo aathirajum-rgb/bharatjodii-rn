@@ -26,21 +26,39 @@ import { logAppsFlyer } from './analyticsService'
 const RazorpayBridge = Platform.OS === 'android' ? NativeModules.RazorpayBridge : null
 const razorpayBridgeEmitter = RazorpayBridge ? new NativeEventEmitter(RazorpayBridge) : null
 
+// ─── Native PayU bridge (Android only) ─────────────────────────────────────────
+// See android/app/src/main/java/jodii/app/PayUBridgeModule.kt + PayUWebView.kt.
+// PayU is a silent, account-wide substitute for the Razorpay UPI flow — the
+// old native Android app picked Razorpay vs PayU per-account via
+// PAYCONFIG.PAYSOURCE ('1' = Razorpay, '2' = PayU), with no user-visible
+// difference. A prior comment in this file claimed PAYCONFIG.GOOGLEPAY never
+// exists in practice — confirmed with the team that PAYSOURCE=='2' is live
+// for real accounts today, so that assumption was wrong; verify the exact
+// GOOGLEPAY.Key field name against a real PAYSOURCE=='2' account response
+// before relying on this in production.
+const PayUBridge = Platform.OS === 'android' ? NativeModules.PayUBridge : null
+const payUBridgeEmitter = PayUBridge ? new NativeEventEmitter(PayUBridge) : null
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface IPaymentConfig {
   PAYCONFIG?: any
   PAYMENTMETHODS?: PaymentMethodItem[]
   // Angular: payment.service.ts — decrypt(PAYCONFIG.RAZORPAY.keyId). This is
-  // the actual Razorpay SDK key. (PAYCONFIG.GOOGLEPAY.saltkey is a *different*
-  // gateway's key — used only on the PAYSOURCE=='2' PayU path, which this
-  // app doesn't integrate — using it here was a bug: that field doesn't
-  // exist at the top level at all, so this was always empty in practice.)
+  // the actual Razorpay SDK key.
   RAZORPAY_KEY_ID?: string
   // Angular: payment.service.ts callNativeForPayment() — hasResponse.QRCODEFLAG,
   // gates whether the "Request a family/friend to pay" QR+WhatsApp block
   // shows at all ('1' = show, anything else = hide).
   QRCODEFLAG?: string
+  // Angular: payment.service.ts callNativeForUPIPayment() — decides Razorpay
+  // ('1') vs PayU ('2') for the ENTIRE UPI flow, account-wide. See
+  // initPayUNative() below.
+  PAYSOURCE?: string
+  // Angular: PAYCONFIG.GOOGLEPAY.Key — PayU's merchant key (analogous to
+  // Razorpay's Key ID; not decrypted, passed to the SDK as-is per the old
+  // Android app). Only present/meaningful when PAYSOURCE == '2'.
+  PAYU_MERCHANT_KEY?: string
 }
 
 // Angular: payment-mode.page.html *ngFor over PAYMENTMETHODS — RECOMMEND ('1'/'0')
@@ -149,6 +167,74 @@ export async function redirectToIntermediatePage(
   navigate(destination, { from: fromPage, paymentId, type })
 }
 
+// ─── UPI Autopay renewal (RenewalScreen) ──────────────────────────────────────
+// Angular: payment.service.ts redirectToIntermediatePage()/openRenew() — when
+// PAYRENEWALFLAG+RENEWALENABLEKEY are both '1', any Pay/Upgrade tap app-wide
+// redirects here instead of the normal recharge flow. The old app auto-fired
+// the actual nbupiautopay charge ~3s after showing this screen (Cancel was
+// the only opt-out) — this port requires an explicit "Renew Now" tap instead,
+// a deliberate UX change, not a parity gap.
+
+export interface RenewalBannerData {
+  title:         string
+  planName:      string  // Angular CONTENT
+  planDuration:  string  // Angular CONTENT1
+  paymentLabel:  string  // Angular CONTENT2, e.g. "Paying with"
+  paymentMethod: string  // Angular CONTENT3, e.g. "PhonePe"
+  benefitsTitle: string
+  benefits:      AutoRenewalBenefit[]
+  paymentId?:    string | undefined
+}
+
+export async function getRenewalBanner(): Promise<RenewalBannerData | null> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const ipCountryCode = (await getSessionValue('IPCOUNTRYCODE')) ?? 'IN'
+  const result = await apiCall(
+    Endpoints.payment.payBanner, 'POST', `ID=${userId}&TYPE=RENEWAL&COUNTRYCODE=${ipCountryCode}`,
+  )
+  if (result?.ERRCODE !== '0' || !result?.RESPONSE) return null
+
+  const r = result.RESPONSE
+
+  // Angular: redirectToIntermediatePage() persists these for later screens
+  // (e.g. congratulations) to read without refetching.
+  await setJson('PAYMENTBENEFIT', { MONTHS: r.MONTHS, CONTACTCOUNT: r.CONTACTCOUNT, PAYMENTID: r.PAYMENTID })
+
+  return {
+    title:         r.TITLE ?? 'Renewing membership',
+    planName:      r.CONTENT ?? '',
+    planDuration:  r.CONTENT1 ?? '',
+    paymentLabel:  r.CONTENT2 ?? '',
+    paymentMethod: r.CONTENT3 ?? '',
+    benefitsTitle: r.BENEFITSTITLE ?? 'Benefits',
+    benefits: Array.isArray(r.BENEFITS)
+      ? r.BENEFITS.map((b: any) => ({ icon: RENEWAL_TICK, value: String(b?.value ?? b) }))
+      : [],
+    paymentId: r.PAYMENTID,
+  }
+}
+
+export interface RenewalChargeResult {
+  outcome:  'success' | 'pending' | 'failure'
+  message?: string | undefined
+}
+
+// Angular: lowerpopup.component.ts reNewProcessing() + payment.service.ts
+// openRenew()'s onDidDismiss() handler — ERRCODE/RESPONSECODE combination
+// distinguishes success ('1'/'0'), pending ('1'/'5'), and failure (anything
+// else with ERRCODE=='1'). Only ID is sent — the server already knows which
+// mandate/plan to charge for this member.
+export async function submitUpiAutopayRenewal(): Promise<RenewalChargeResult> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const result = await apiCall(Endpoints.payment.upiAutoPay, 'POST', `ID=${userId}`)
+
+  if (result?.ERRCODE === '1' && result?.RESPONSECODE === '0') return { outcome: 'success' }
+  if (result?.ERRCODE === '1' && result?.RESPONSECODE === '5') {
+    return { outcome: 'pending', message: result?.RESPONSE?.MSG }
+  }
+  return { outcome: 'failure', message: result?.RESPONSE?.MSG }
+}
+
 export async function redirectToMembershipPage(fromPage = '', replaceStack = false): Promise<void> {
   const entryType = String((await getSessionValue('ENTRYTYPE')) ?? '')
   const target    = entryType === 'P' ? ENavigation.MY_MEMBERSHIP : ENavigation.RECHARGE
@@ -160,12 +246,20 @@ export async function redirectToMembershipPage(fromPage = '', replaceStack = fal
 // ─── Payment config (PAYCONFIG) ────────────────────────────────────────────────
 // POST nbpaybanner → decrypt Google Pay salt → return filtered payment methods.
 
+// Bumped whenever a field is added that a previously-cached PAYCONFIG object
+// wouldn't have — without this, getPaymentConfig() would keep returning an
+// indefinitely-cached pre-update object (this cache has no TTL and is never
+// cleared elsewhere) missing PAYSOURCE/PAYU_MERCHANT_KEY forever on any
+// device that already cached a config before those fields existed, silently
+// defeating the PayU routing in initPayUNative() for upgraded installs.
+const PAYCONFIG_CACHE_VERSION = 2
+
 // Angular: payment.service.ts callNativeForPayment() — real param is TYPE=PAYCONFIG
 // (confirmed against a live network capture); 'CHECKOUT' was never a valid value
 // for this endpoint — that's a different call (see checkAvailOffer below).
 export async function getPaymentConfig(mode = 'PAYCONFIG'): Promise<IPaymentConfig> {
-  const cached = await getJson<IPaymentConfig>(PAYMENT_CACHE_KEYS.PAYCONFIG)
-  if (cached) return cached
+  const cached = await getJson<IPaymentConfig & { _cacheVersion?: number }>(PAYMENT_CACHE_KEYS.PAYCONFIG)
+  if (cached && cached._cacheVersion === PAYCONFIG_CACHE_VERSION) return cached
 
   const [userId, appVersion, motherTongue] = await Promise.all([
     getItem(SK.Auth.USER_ID),
@@ -193,6 +287,16 @@ export async function getPaymentConfig(mode = 'PAYCONFIG'): Promise<IPaymentConf
     payConfig.RAZORPAY_KEY_ID = decrypt(payConfig.RAZORPAY.keyId)
   }
 
+  // PAYSOURCE=='2' silently routes the whole UPI flow through PayU instead of
+  // Razorpay for this account — see initPayUNative(). GOOGLEPAY.Key is PayU's
+  // merchant key, passed through as-is (matching the old Android app).
+  if (payConfig?.PAYSOURCE != null) {
+    payConfig.PAYSOURCE = String(payConfig.PAYSOURCE)
+  }
+  if (payConfig?.GOOGLEPAY?.Key) {
+    payConfig.PAYU_MERCHANT_KEY = payConfig.GOOGLEPAY.Key
+  }
+
   // Angular: callNativeForPayment() — PAYMENTMETHODS.filter(item => item.FLAG != 0)
   // The real API sends RECOMMEND/AUTOPAY/RAZORFLAG as JSON numbers (e.g. 1),
   // not strings — coerce to string here so every `=== '1'` comparison
@@ -210,6 +314,7 @@ export async function getPaymentConfig(mode = 'PAYCONFIG'): Promise<IPaymentConf
       }))
   }
 
+  payConfig._cacheVersion = PAYCONFIG_CACHE_VERSION
   await setJson(PAYMENT_CACHE_KEYS.PAYCONFIG, payConfig)
   return payConfig
 }
@@ -320,6 +425,21 @@ export async function getPaymentStoreList(stateId: string, cityId: string): Prom
     Endpoints.payment.storeList, 'POST', `ID=${userId}&stateId=${stateId}&cityId=${cityId}`,
   )
   return result?.ERRCODE === '0' ? (result.RESPONSE ?? []) : []
+}
+
+// ─── Free doorstep cash collection ─────────────────────────────────────────────
+// Angular: free-doorstep-collection.page.ts postData() — a plain scheduling
+// request, not a gateway checkout: no amount is charged here, a
+// representative collects cash in person later. addressLine2 is always sent
+// empty — Angular's own form never actually renders that field (dead input).
+// np=1 is a literal, unexplained constant in the real request (matched
+// as-is; no other value was ever seen used for it).
+
+export async function submitDoorstepCollection(packageId: string, addressLine1: string): Promise<boolean> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const params = `np=1&addressLine1=${encodeURIComponent(addressLine1)}&addressLine2=&productId=${packageId}&ID=${userId}`
+  const result = await apiCall(Endpoints.payment.doorstepCollection, 'POST', params)
+  return result?.RESPONSECODE === '1' && result?.ERRCODE === '0'
 }
 
 // ─── QR payment link (Request a family/friend to pay) ─────────────────────────
@@ -826,6 +946,95 @@ export function initRazorpayNative(rawOptions: NativeCheckoutOptions): Promise<{
   })
 }
 
+// ─── Native PayU bridge (Android only, UPI substitute) ────────────────────────
+// Silent per-account substitute for the Razorpay UPI flow — see PAYSOURCE on
+// IPaymentConfig. All fields here come from the backend's own order-creation
+// response (getCheckoutDetails()), matching the old native Android app's
+// GetOrderIdParser contract — nothing PayU-specific is configured natively.
+
+export interface PayUStandingInstruction {
+  billingAmount:    string
+  billingCurrency:  string
+  billingCycle:     string  // 'yearly' | 'monthly' | 'weekly' | 'daily' | 'adhoc' | anything else -> 'once'
+  billingInterval:  number
+  paymentStartDate: string
+  paymentEndDate:   string
+}
+
+export interface PayUCheckoutOptions {
+  merchantKey:        string
+  txnId:              string
+  productInfo:        string
+  firstName:          string
+  email:              string
+  amount:              string
+  phone:              string
+  surl:               string
+  furl:               string
+  hash:               string
+  bankcode:           string
+  upiAppPackageName?: string | undefined
+  si?:                PayUStandingInstruction | undefined
+}
+
+// Raw pass-through to PayUBridge.openCheckout(). Resolution comes back async
+// via native events (PayUPaymentSuccess/Failure/BackPressed) — see
+// PayUWebView.kt. The success payload carries the raw PayU response JSON
+// string + txnId; see verifyPayUPaymentSuccess() for turning that into a
+// verified server-side outcome.
+export function initPayUNative(options: PayUCheckoutOptions): Promise<{ success: boolean; response: any }> {
+  if (!PayUBridge || !payUBridgeEmitter) {
+    return Promise.resolve({ success: false, response: { description: 'Native PayU bridge unavailable' } })
+  }
+
+  return new Promise(resolve => {
+    let settled = false
+    let wentBackground = false
+
+    const settle = (result: { success: boolean; response: any }) => {
+      if (settled) return
+      settled = true
+      successSub.remove()
+      failureSub.remove()
+      backSub.remove()
+      appStateSub.remove()
+      resolve(result)
+    }
+
+    const successSub = payUBridgeEmitter.addListener('PayUPaymentSuccess', data => settle({ success: true, response: data }))
+    const failureSub = payUBridgeEmitter.addListener('PayUPaymentFailure', data => settle({
+      success: false,
+      response: {
+        code:        Number(data?.errorCode) || 1,
+        description: data?.errorMessage || 'Payment could not be completed.',
+      },
+    }))
+    const backSub = payUBridgeEmitter.addListener('PayUBackPressed', () => settle({ success: false, response: { code: 0, description: 'Payment cancelled' } }))
+
+    // Same rationale as initRazorpayNative()'s AppState fallback — the user
+    // may be bounced to a UPI app and never hand control back.
+    const appStateSub = AppState.addEventListener('change', nextState => {
+      if (nextState === 'background' || nextState === 'inactive') {
+        wentBackground = true
+      } else if (nextState === 'active' && wentBackground) {
+        setTimeout(() => settle({ success: false, response: { code: 0, description: 'Payment cancelled' } }), 5000)
+      }
+    })
+
+    const { si, ...rest } = options
+    PayUBridge.openCheckout(si ? {
+      ...rest,
+      si:                true,
+      siBillingAmount:   si.billingAmount,
+      siBillingCurrency: si.billingCurrency,
+      siBillingCycle:    si.billingCycle,
+      siBillingInterval: si.billingInterval,
+      siPaymentStartDate: si.paymentStartDate,
+      siPaymentEndDate:   si.paymentEndDate,
+    } : rest)
+  })
+}
+
 // ─── Payment status ───────────────────────────────────────────────────────────
 
 export async function checkPaymentStatus(param: Record<string, any>): Promise<any> {
@@ -836,6 +1045,63 @@ export async function checkPaymentStatus(param: Record<string, any>): Promise<an
   return apiCall(Endpoints.payment.pendingPayment, 'POST', paramStr)
 }
 
+// Angular: payment.service.ts onPaymentSuccess() — a Razorpay SDK "success"
+// callback is a client-side claim, not proof; Angular posted the
+// order/payment/signature triple to nbpaymentprocess for server-side
+// signature verification before treating a purchase as real. This app's
+// native bridge (Android) and react-native-razorpay (iOS) success events
+// were never followed by that check — verified purely client-side. The two
+// success shapes differ (Android: paymentId/orderId/signature from
+// RazorpayWebView.kt; iOS: razorpay_payment_id/razorpay_order_id/
+// razorpay_signature from react-native-razorpay), normalized here to the
+// same params Angular's working call used.
+export async function verifyPaymentSuccess(response: any, orderId?: string): Promise<boolean> {
+  const paymentId       = response?.razorpay_payment_id ?? response?.paymentId
+  const signature       = response?.razorpay_signature ?? response?.signature
+  const razorpayOrderId = response?.razorpay_order_id ?? response?.orderId ?? orderId
+
+  if (!paymentId || !signature || !razorpayOrderId) return false
+
+  const result = await checkPaymentStatus({
+    razorpay_order_id:   razorpayOrderId,
+    razorpay_payment_id: paymentId,
+    razorpay_signature:  signature,
+  })
+  return String(result?.MSG ?? '').toLowerCase() === 'success'
+}
+
+// Android: UPIWebviewActivity.java verifyPayUOrder() — PayU has no
+// order/payment/signature triple like Razorpay; instead the raw PayU
+// response JSON (returned by PayUWebView.kt's success event) is unpacked and
+// its individual fields posted to the same nbpaymentprocess endpoint,
+// keyed by txnId as both upi_order_id and razorpay_order_id (matching the
+// old app's own field reuse, not a typo here).
+export async function verifyPayUPaymentSuccess(payuResultJson: string | undefined, txnId: string | undefined): Promise<boolean> {
+  if (!payuResultJson || !txnId) return false
+
+  let result: any
+  try {
+    result = JSON.parse(payuResultJson)?.result
+  } catch {
+    return false
+  }
+  if (!result) return false
+
+  const response = await checkPaymentStatus({
+    upi_order_id:      txnId,
+    razorpay_order_id: txnId,
+    txnid:             result.txnid ?? '',
+    hash:              result.hash ?? '',
+    mihpayid:          result.mihpayid ?? '',
+    status:            result.status ?? '',
+    email:             result.email ?? '',
+    firstname:         result.firstname ?? '',
+    productinfo:       result.productinfo ?? '',
+    amount:            result.amount ?? '',
+  })
+  return String(response?.MSG ?? '').toLowerCase() === 'success'
+}
+
 // ─── Payment failure / success state ─────────────────────────────────────────
 
 export async function handlePaymentSuccess(): Promise<void> {
@@ -844,11 +1110,46 @@ export async function handlePaymentSuccess(): Promise<void> {
   navigate(ENavigation.PAYMENT_SUCCESS)
 }
 
-export async function recordPaymentFailure(_packagesData: any, selectedData: any): Promise<void> {
+// Angular: payment-mode.page.ts isPayRetryWindowElapsed() — a 1-hour cooldown
+// before the user is allowed to re-attempt payment after a failure, to avoid
+// hammering the gateway/getting flagged for repeated fraud-looking attempts.
+const RETRY_WINDOW_MS = 60 * 60 * 1000
+
+export interface PaymentFailureContext {
+  packageId?:    string | undefined
+  status:        'failure' | 'pending'
+  reason?:       string | undefined
+  retryRoute?:   string | undefined
+  retryParams?:  any
+  retryDeadline: number
+}
+
+export async function recordPaymentFailure(
+  _packagesData: any,
+  selectedData: any,
+  extra?: {
+    reason?:      string | undefined
+    status?:      'failure' | 'pending' | undefined
+    retryRoute?:  string | undefined
+    retryParams?: any
+  },
+): Promise<void> {
   const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
   await apiCall(Endpoints.payment.paymentFailed, 'POST', `ID=${userId}&PACKAGEID=${selectedData?.PACKAGEID}`)
-  await setItem(PAYMENT_CACHE_KEYS.PAYMENT_FAILED_STICKY, '1')
-  await setItem(PAYMENT_CACHE_KEYS.PAYMENT_FAILED_PKG_ID, selectedData?.PACKAGEID ?? '')
+  const retryDeadline = Date.now() + RETRY_WINDOW_MS
+  await Promise.all([
+    setItem(PAYMENT_CACHE_KEYS.PAYMENT_FAILED_STICKY, '1'),
+    setItem(PAYMENT_CACHE_KEYS.PAYMENT_FAILED_PKG_ID, selectedData?.PACKAGEID ?? ''),
+    setItem(PAYMENT_CACHE_KEYS.PAYMENTFAILURE_STICKY, String(retryDeadline)),
+    setPaymentFailedContext({
+      packageId:    selectedData?.PACKAGEID,
+      status:       extra?.status ?? 'failure',
+      reason:       extra?.reason,
+      retryRoute:   extra?.retryRoute,
+      retryParams:  extra?.retryParams,
+      retryDeadline,
+    }),
+  ])
 }
 
 export async function clearPaymentFailedState(): Promise<void> {
@@ -860,15 +1161,24 @@ export async function clearPaymentFailedState(): Promise<void> {
     removeItem(PAYMENT_CACHE_KEYS.PAYMENTFAILURE_STICKY),
     removeItem(PAYMENT_CACHE_KEYS.PAYMENT_FAILED_PKG_ID),
     removeItem(PAYMENT_CACHE_KEYS.PAYMENT_FAILED_STICKY),
+    removeItem('PAYMENT_FAILED_CONTEXT'),
   ])
 }
 
-export async function setPaymentFailedContext(data: Record<string, any>): Promise<void> {
+export async function setPaymentFailedContext(data: PaymentFailureContext): Promise<void> {
   await setJson('PAYMENT_FAILED_CONTEXT', data)
 }
 
-export async function getPaymentFailedContext(): Promise<any> {
-  return getJson('PAYMENT_FAILED_CONTEXT')
+export async function getPaymentFailedContext(): Promise<PaymentFailureContext | null> {
+  return getJson<PaymentFailureContext>('PAYMENT_FAILED_CONTEXT')
+}
+
+// Milliseconds left in the retry cooldown — 0 once elapsed or if there's no
+// recorded failure at all.
+export async function getRetryRemainingMs(): Promise<number> {
+  const context = await getPaymentFailedContext()
+  if (!context?.retryDeadline) return 0
+  return Math.max(0, context.retryDeadline - Date.now())
 }
 
 // ─── Paywall update ───────────────────────────────────────────────────────────

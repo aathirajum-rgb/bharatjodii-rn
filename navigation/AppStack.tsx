@@ -42,6 +42,9 @@ import EducationLocationDesktopStep    from '../screens/onboarding/EducationLoca
 import PhotoUploadDesktopStep          from '../screens/onboarding/PhotoUploadDesktopStep'
 import OtherDetailsDesktopStep         from '../screens/onboarding/OtherDetailsDesktopStep'
 import PaymentSuccessScreen        from '../screens/payment/PaymentSuccessScreen'
+import PaymentFailedScreen         from '../screens/payment/PaymentFailedScreen'
+import DoorstepCollectionScreen    from '../screens/payment/DoorstepCollectionScreen'
+import RenewalScreen               from '../screens/payment/RenewalScreen'
 import PaymentOptionsScreen        from '../screens/payment/PaymentOptionsScreen'
 import CardPaymentScreen           from '../screens/payment/CardPaymentScreen'
 import UpiAddressScreen            from '../screens/payment/UpiAddressScreen'
@@ -98,7 +101,17 @@ export type AppStackParamList = {
   Permissions:       undefined
   Gallery:           undefined
   recharge:          { from?: string; paymentId?: string; type?: string } | undefined
+  renewal:           { from?: string; paymentId?: string; type?: string } | undefined
   'payment-success': undefined
+  'payment-failed': {
+    selectedPackage?: SelectedPackage
+    amountLabel?:     string
+    status:           'failure' | 'pending'
+    reason?:          string
+    orderId?:         string
+    retryRoute:       string
+    retryParams?:     any
+  }
   ComponentShowcase: undefined
   // Angular: languageChangeService.languageChange() opens the language screen as a
   // modal ON TOP of the current page (Matches, onboarding, etc.) — never a full-screen
@@ -146,6 +159,7 @@ export type AppStackParamList = {
   'more-payment-options': { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
   'neft-rtgs':  { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
   'pay-at-store': { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
+  'doorstep-collection': { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
   ExternalPage: { url: string; title: string }
   // Angular: viewprofile.page.ts route params (:module/:id) — fromPage drives the
   // "from" context communicationBtnOnClick needs for its paywall/report-popup logic.
@@ -429,6 +443,9 @@ export default function AppStack() {
       <Stack.Screen name="neft-rtgs" component={NeftRtgsScreen} />
       <Stack.Screen name="pay-at-store" component={PayAtStoreScreen} />
       <Stack.Screen name="payment-success" component={PaymentSuccessScreen} />
+      <Stack.Screen name="payment-failed" component={PaymentFailedScreen} />
+      <Stack.Screen name="doorstep-collection" component={DoorstepCollectionScreen} />
+      <Stack.Screen name="renewal" component={RenewalScreen} />
       <Stack.Screen name="Activity" component={ActivityScreen} />
       <Stack.Screen name="Menu" component={MenuScreen} />
       <Stack.Screen name="Biodata" component={BiodataScreen} />

@@ -6,16 +6,18 @@
 
 import { useEffect, useState } from 'react'
 import {
-  ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import LinkCTA from '../../components/link-cta/LinkCTA'
 import {
-  getCheckoutDetails, getFinalAmount, getNetBankingList, getPaymentConfig, handlePaymentSuccess,
-  initRazorpayNative, initRazorpayPayment, recordPaymentFailure, stringifyPaymentResponse, toPaise,
+  getCheckoutDetails, getFinalAmount, getNetBankingList, getPaymentConfig, getRechargeHelpline,
+  getRetryRemainingMs, handlePaymentSuccess, initRazorpayNative, initRazorpayPayment,
+  recordPaymentFailure, stringifyPaymentResponse, toPaise, verifyPaymentSuccess,
   type NetBankingItem, type SelectedPackage,
 } from '../../service/paymentService'
 
@@ -35,8 +37,12 @@ export default function NetBankingScreen({ navigation, route }: Props) {
   const [showOthers, setShowOthers] = useState(false)
   const [loading, setLoading]     = useState(true)
   const [paying, setPaying]       = useState(false)
+  const [helpline, setHelpline]   = useState('')
 
-  useEffect(() => { loadBanks() }, [])
+  useEffect(() => {
+    loadBanks()
+    getRechargeHelpline().then(setHelpline)
+  }, [])
 
   async function loadBanks() {
     setLoading(true)
@@ -59,6 +65,14 @@ export default function NetBankingScreen({ navigation, route }: Props) {
 
   async function handlePay() {
     if (!selectedKey || !selectedPackage) return
+
+    const remainingMs = await getRetryRemainingMs()
+    if (remainingMs > 0) {
+      const mins = Math.ceil(remainingMs / 60000)
+      Alert.alert('Please wait', `You can retry payment in about ${mins} minute${mins === 1 ? '' : 's'}.`)
+      return
+    }
+
     setPaying(true)
     try {
       const config  = await getPaymentConfig()
@@ -94,12 +108,29 @@ export default function NetBankingScreen({ navigation, route }: Props) {
       }
 
       if (result.success) {
-        await handlePaymentSuccess()
+        const verified = await verifyPaymentSuccess(result.response, checkout.orderId)
+        if (verified) {
+          await handlePaymentSuccess()
+        } else {
+          await recordPaymentFailure(null, selectedPackage, {
+            status: 'pending', retryRoute: 'net-banking', retryParams: route.params,
+          })
+          navigation.navigate('payment-failed', {
+            selectedPackage, amountLabel, status: 'pending', orderId: checkout.orderId,
+            retryRoute: 'net-banking', retryParams: route.params,
+          })
+        }
       } else {
         const errCode: number = result.response?.code ?? 0
         if (errCode !== 0) {
-          await recordPaymentFailure(null, selectedPackage)
-          Alert.alert('Payment Failed', stringifyPaymentResponse(result.response))
+          const reason = stringifyPaymentResponse(result.response)
+          await recordPaymentFailure(null, selectedPackage, {
+            status: 'failure', reason, retryRoute: 'net-banking', retryParams: route.params,
+          })
+          navigation.navigate('payment-failed', {
+            selectedPackage, amountLabel, status: 'failure', reason,
+            retryRoute: 'net-banking', retryParams: route.params,
+          })
         }
       }
     } catch (error: any) {
@@ -172,6 +203,15 @@ export default function NetBankingScreen({ navigation, route }: Props) {
               )}
             </>
           )}
+
+          {!!helpline && (
+            <LinkCTA
+              text="Need help in making payment?"
+              contact={helpline}
+              onPress={() => Linking.openURL(`tel:${helpline}`)}
+              style={s.helpLink}
+            />
+          )}
         </ScrollView>
       )}
 
@@ -215,6 +255,7 @@ const s = StyleSheet.create({
   otherToggle: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: Colors.divider },
   otherToggleText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.link },
   otherList: { marginTop: 8 },
+  helpLink:  { marginTop: 8 },
 
   otherRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
