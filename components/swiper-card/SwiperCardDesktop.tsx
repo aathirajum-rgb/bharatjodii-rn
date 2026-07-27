@@ -7,13 +7,12 @@
 // with mobile's MatchesCard — solved there with a dedicated MatchCardDesktop;
 // this is that same fix for Home's simpler swiper sections (small square
 // photo + name + age/education, no like/call/whatsapp actions).
+import { useEffect, useState } from 'react'
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG } from '../../constants/cdn'
 import type { SwiperItem } from './SwiperCard'
-
-const AVATAR_FB = CDN_SVG + 'default-profile.svg'
+import { getOppGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
 
 export interface SwiperCardDesktopProps {
   swiperHeader?: string | undefined
@@ -33,6 +32,15 @@ export default function SwiperCardDesktop({
   swiperHeader, newCount, items, cardWidth = DEFAULT_CARD_W, cardHeight = DEFAULT_CARD_H,
   showSeeAll = true, onCardPress, onSeeAllPress,
 }: SwiperCardDesktopProps) {
+  // Angular: getAvatarImage(profile) → getAvatarImg(getOppGenderType()) — a
+  // card's photo placeholder is the opposite gender's silhouette.
+  const [avatarFallback, setAvatarFallback] = useState(FEMALE_AVATAR_URL)
+  useEffect(() => {
+    let cancelled = false
+    getOppGenderAvatarUrl().then(url => { if (!cancelled) setAvatarFallback(url) })
+    return () => { cancelled = true }
+  }, [])
+
   if (!items || items.length === 0) return null
 
   return (
@@ -69,7 +77,7 @@ export default function SwiperCardDesktop({
                   <Image source={{ uri: item.profileImg }} style={s.photoImg} resizeMode="cover" />
                 ) : (
                   <View style={s.photoFallback}>
-                    <CdnSvg uri={AVATAR_FB} width={cardWidth * 0.4} height={cardWidth * 0.4} />
+                    <CdnSvg uri={avatarFallback} width={cardWidth * 0.4} height={cardWidth * 0.4} />
                   </View>
                 )}
                 {item.isNewlyJoined && (

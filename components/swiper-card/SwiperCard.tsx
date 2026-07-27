@@ -1,5 +1,4 @@
 import {
-  Dimensions,
   FlatList,
   Pressable,
   StyleSheet,
@@ -7,7 +6,7 @@ import {
   View,
 } from 'react-native'
 import { Colors } from '../../constants/colors'
-import ProfileCard, { type CardSection, type CardVariant } from '../profile-card/ProfileCard'
+import ProfileCard, { PHOTO_HEIGHT, type CardSection, type CardVariant } from '../profile-card/ProfileCard'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -72,7 +71,12 @@ export interface SwiperCardProps {
   items: SwiperItem[]
 
   // ── Layout ────────────────────────────────────────────────────────────────
-  cardWidth?: number | undefined   // explicit width per card; default is ~55% of screen
+  // Explicit width override — normally omit this and let the card size itself
+  // from cardSection instead (see PHOTO_HEIGHT import below); Angular's cards
+  // are square per section (card-htN CSS classes pair identical min-width/
+  // min-height), so a flat one-size-fits-all default here would misshape
+  // every section except the one it happens to match by coincidence.
+  cardWidth?: number | undefined
 
   // ── Callbacks ─────────────────────────────────────────────────────────────
   onCardPress?:     ((item: SwiperItem, index: number) => void) | undefined
@@ -83,10 +87,8 @@ export interface SwiperCardProps {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SCREEN_W   = Dimensions.get('window').width
 const CARD_GAP   = 12
 const CARD_PAD   = 16   // horizontal padding on the FlatList
-const DEFAULT_CARD_W = Math.round(SCREEN_W * 0.55)
 
 // ─── SwiperCard ───────────────────────────────────────────────────────────────
 // Horizontal scrollable section of ProfileCards.
@@ -100,12 +102,16 @@ export default function SwiperCard({
   cardVariant = 1,
   cardSection = 'matches',
   items,
-  cardWidth = DEFAULT_CARD_W,
+  cardWidth,
   onCardPress,
   onLikePress,
   onViewMorePress,
   onSeeAllPress,
 }: SwiperCardProps) {
+  // Angular: card-htN classes set min-width === min-height per section — reuse
+  // ProfileCard's own per-section ratio table as the default card width unless
+  // a caller has a genuine reason to override it.
+  const resolvedCardWidth = cardWidth ?? PHOTO_HEIGHT[cardSection]
 
   if (!items || items.length === 0) return null
 
@@ -141,10 +147,10 @@ export default function SwiperCard({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={[styles.listContent, { gap: CARD_GAP }]}
         // Snap to each card for a clean swipe feel
-        snapToInterval={cardWidth + CARD_GAP}
+        snapToInterval={resolvedCardWidth + CARD_GAP}
         decelerationRate="fast"
         renderItem={({ item, index }) => (
-          <View style={{ width: cardWidth }}>
+          <View style={{ width: resolvedCardWidth }}>
             <ProfileCard
               variant={cardVariant}
               section={cardSection}
@@ -179,7 +185,7 @@ export default function SwiperCard({
           showSeeAll && onSeeAllPress ? (
             // "See All" ghost card at the end of the list
             <Pressable
-              style={[styles.seeAllCard, { width: cardWidth * 0.7 }]}
+              style={[styles.seeAllCard, { width: resolvedCardWidth * 0.7, height: resolvedCardWidth * 1.3 }]}
               onPress={onSeeAllPress}
             >
               <Text style={styles.seeAllCardText}>See All</Text>
@@ -258,8 +264,7 @@ const styles = StyleSheet.create({
     alignItems:        'center',
     justifyContent:    'center',
     gap:               8,
-    // Match height of a standard matches card photo
-    height:            Math.round(SCREEN_W * 0.55 * 1.3),
+    // height set inline at the call site (proportional to resolvedCardWidth)
   },
   seeAllCardText: {
     fontSize:   16,

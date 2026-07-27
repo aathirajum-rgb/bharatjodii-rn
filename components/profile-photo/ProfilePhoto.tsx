@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -14,7 +14,8 @@ import { BlurView } from 'expo-blur'
 import * as ImagePicker from 'expo-image-picker'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG, CDN_IMG } from '../../constants/cdn'
+import { CDN_SVG } from '../../constants/cdn'
+import { getOppGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,7 +72,6 @@ export interface ProfilePhotoProps {
 // ─── CDN constants ────────────────────────────────────────────────────────────
 
 const CDN = CDN_SVG + 'revamp/'
-const DEFAULT_AVATAR = CDN_IMG + 'default-profile.jpg'
 
 const ICONS = {
   newlyJoinedBg:  CDN + 'newly-joined.svg',
@@ -137,7 +137,7 @@ function PhotoRequestOverlay({ type, onPress }: PhotoRequestProps) {
 
 export default function ProfilePhoto({
   profileImage,
-  defaultImage = DEFAULT_AVATAR,
+  defaultImage,
   height,
   isPhotoAvailable  = true,
   isPhotoProtect    = false,
@@ -165,9 +165,22 @@ export default function ProfilePhoto({
 }: ProfilePhotoProps) {
   const [imgError, setImgError] = useState(false)
   const [uploading, setUploading] = useState(false)
+  // Angular: getAvatarImage(profile) → getAvatarImg(getOppGenderType()) — a
+  // profile card's placeholder (no photo) is the OPPOSITE gender's silhouette.
+  // Read once per mount rather than threading login gender through every
+  // ProfileCard prop chain; callers that need a specific per-item avatar
+  // (e.g. the logged-in user's own photo) still override via `defaultImage`.
+  const [oppGenderAvatar, setOppGenderAvatar] = useState(FEMALE_AVATAR_URL)
+
+  useEffect(() => {
+    let cancelled = false
+    getOppGenderAvatarUrl().then(url => { if (!cancelled) setOppGenderAvatar(url) })
+    return () => { cancelled = true }
+  }, [])
 
   const r = RADIUS[variant]
-  const imgSrc = (imgError || !profileImage) ? defaultImage : profileImage
+  const resolvedDefault = defaultImage ?? oppGenderAvatar
+  const imgSrc = (imgError || !profileImage) ? resolvedDefault : profileImage
 
   // Determine what state the photo block is in
   const showBlur        = isPhotoProtect && isPhotoAvailable

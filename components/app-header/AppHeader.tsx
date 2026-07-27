@@ -1,16 +1,19 @@
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import CdnSvg from '../cdn-svg/CdnSvg'
-import MenuIcon from '../../assets/icons/MenuIcon'
-import NotificationIcon from '../../assets/icons/NotificationIcon'
-import SearchIcon from '../../assets/icons/SearchIcon'
+import Badge from '../badge/Badge'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
+import { getOwnGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
 import i18n from '../../i18n'
 
-// Maps i18n language codes to their short display labels shown in the header button
+// Angular: header.component.ts's langLableName = getSelectedKeyValue(langArrayList,
+// language) — the FULL language name, not an abbreviation (confirmed against a
+// live screenshot showing "English", not "Eng").
 const LANG_LABEL: Record<string, string> = {
-  en: 'Eng', tm: 'Tamil', tl: 'Telugu', ml: 'Malay', kn: 'Kanna',
+  en: 'English', tm: 'Tamil', tl: 'Telugu', ml: 'Malayalam', kn: 'Kannada',
   hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
 }
 
@@ -31,7 +34,9 @@ export interface AppHeaderProps {
   // ── header1 (home page) ──────────────────────────────────────────────────
   userImg?:           string  | undefined
   userName?:          string  | undefined
-  completionPct?:     number  | undefined   // e.g. 70  → shows "70%" red badge on avatar
+  // Accepted for backwards compatibility but not rendered — Angular's own
+  // completion-percentage ring is commented out/disabled in its real template.
+  completionPct?:     number  | undefined
   hasPaidBatch?:      boolean | undefined
   homeToolBar?:       ToolbarItem[] | undefined
 
@@ -67,6 +72,8 @@ const ICONS = {
   fwdLink:   CDN + 'revamp/forward-icon-link.svg',
   arrowLeft: CDN_REACT + '/arrowleft.svg',
   close:     CDN + 'revamp/close-icon.svg',
+  // Angular: header.component.html's hamburger — assets/images/svg/revamp/menu-home.svg
+  menuHome:  CDN + 'revamp/menu-home.svg',
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -85,7 +92,6 @@ export default function AppHeader({
   type,
   userImg,
   userName,
-  completionPct,
   hasPaidBatch = false,
   homeToolBar,
   title,
@@ -100,8 +106,20 @@ export default function AppHeader({
   onLanguagePress,
   style,
 }: AppHeaderProps) {
+  const { t } = useTranslation()
+
   // Resolve language label — use explicit prop, else auto-detect from i18n
   const resolvedLangLabel = languageLabel ?? LANG_LABEL[i18n.language] ?? 'Eng'
+
+  // Angular: header.component.ts's common.getAvatarImg() (called with no args,
+  // i.e. isOppositeProfile=false) — the logged-in user's OWN avatar placeholder
+  // uses their OWN gender, unlike a profile card's opposite-gender placeholder.
+  const [ownAvatarFallback, setOwnAvatarFallback] = useState(FEMALE_AVATAR_URL)
+  useEffect(() => {
+    let cancelled = false
+    getOwnGenderAvatarUrl().then(url => { if (!cancelled) setOwnAvatarFallback(url) })
+    return () => { cancelled = true }
+  }, [])
 
   // ── header1: home screen header (Figma node 15859:14389 top area) ───────────
   // Row 1 (app bar): hamburger | [flex] | language selector | toolbar icons
@@ -113,12 +131,13 @@ export default function AppHeader({
 
         {/* ── Row 1: App bar ── */}
         <View style={styles.h1AppBar}>
-          {/* Hamburger / menu */}
+          {/* Hamburger / menu — Angular: reDirectPage('/menu'), its own
+              dedicated column, not part of the homeToolBar loop below. */}
           <Pressable
             style={styles.h1IconBtn}
             onPress={() => onToolbarItemPress?.('menu')}
           >
-            <MenuIcon size={18} color={Colors.textPrimary} />
+            <CdnSvg uri={ICONS.menuHome} width={18} height={18} />
           </Pressable>
 
           <View style={styles.flex1} />
@@ -130,19 +149,16 @@ export default function AppHeader({
             <CdnSvg uri={ICONS.chevDown} width={24} height={24} />
           </Pressable>
 
-          {/* Notification + chat icon buttons */}
+          {/* Angular: home.config.ts's homeToolBar — discover-matches (search)
+              then notification, in that order; each icon rendered from its own
+              toolImg URL (no local vector-icon special-casing). */}
           {homeToolBar?.filter(t => t.toolType !== 'menu').map(item => (
             <Pressable
               key={item.toolType}
               style={styles.h1IconBtn}
               onPress={() => onToolbarItemPress?.(item.toolType)}
             >
-              {item.toolType === 'notification'
-                ? <NotificationIcon size={18} color={Colors.textPrimary} />
-                : item.toolType === 'chat'
-                ? <SearchIcon size={18} color={Colors.textPrimary} />
-                : <CdnSvg uri={item.toolImg} width={19} height={19} />
-              }
+              <CdnSvg uri={item.toolImg} width={19} height={19} />
               {!!(item.showNotification && item.notifyCount && item.notifyCount !== '0') && (
                 <BadgeCount count={item.notifyCount!} />
               )}
@@ -152,18 +168,18 @@ export default function AppHeader({
 
         {/* ── Row 2: User profile bar ── */}
         <View style={styles.h1UserBar}>
+          {/* Angular: header.component.html's completion-percentage ring is
+              commented-out/disabled in the real template (confirmed against a
+              live screenshot — plain avatar, no badge) — not rendered here
+              either, `completionPct` is kept in the prop interface only in
+              case a future revamp re-enables it. */}
           <Pressable style={styles.h1AvatarWrap} onPress={onAvatarPress}>
             <CdnSvg
-              uri={userImg ?? CDN + 'revamp/default-avatar.svg'}
+              uri={userImg ?? ownAvatarFallback}
               width={48}
               height={48}
               style={styles.h1AvatarRadius}
             />
-            {completionPct !== undefined && (
-              <View style={styles.completionBadge}>
-                <Text style={styles.completionText}>{completionPct}%</Text>
-              </View>
-            )}
           </Pressable>
 
           <Pressable style={styles.h1NameBlock} onPress={onEditProfilePress}>
@@ -172,6 +188,18 @@ export default function AppHeader({
               <Text style={styles.h1EditLabel}>Edit profile</Text>
               <CdnSvg uri={ICONS.fwdLink} width={12} height={12} />
             </View>
+            {/* Angular: paidBatch = entryType=='P' && payRenewalFlag=='0' &&
+                !check_Paid_Verified_Nophoto() — shown as a green pill under
+                the name/edit-profile row. Was accepted as a prop here but
+                never actually rendered. */}
+            {hasPaidBatch && (
+              <Badge
+                variant="paid"
+                text={t('MENU.PAID_BADGE')}
+                imageUrl={CDN + 'revamp/paid-tag-revamp.svg'}
+                style={styles.h1PaidBadge}
+              />
+            )}
           </Pressable>
         </View>
 
@@ -305,6 +333,9 @@ const styles = StyleSheet.create({
     width:     12,
     height:    12,
     tintColor: Colors.primary,
+  },
+  h1PaidBadge: {
+    marginTop: 6,
   },
 
   // Language selector pill

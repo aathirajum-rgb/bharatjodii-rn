@@ -87,6 +87,10 @@ export const StorageKeys = {
     RENEWAL_ENABLE_KEY: 'RENEWALENABLEKEY',
     SF_PROMOTION: 'S&FPROMOTION',
     CR_FLAG: 'CRFLAG',
+    // Angular: explore.component.ts's local dismissal of the Home "assist" banner
+    // (persisted once the user taps its CTA/close) — ASSISTEDPROMO=='1' means don't
+    // show it again this session even if PPSET's ASSISTEDFLAG is still '1'.
+    ASSISTED_PROMO: 'ASSISTEDPROMO',
   },
 
   Faq: {

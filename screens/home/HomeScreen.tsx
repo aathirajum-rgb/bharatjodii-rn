@@ -1,28 +1,65 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Dimensions,
   FlatList,
   Image,
+  ImageBackground,
+  Linking,
+  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native'
+import Constants from 'expo-constants'
+import { LinearGradient } from 'expo-linear-gradient'
+import { useFocusEffect } from '@react-navigation/native'
+import { useTranslation } from 'react-i18next'
+import { useVideoPlayer, VideoView } from 'expo-video'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import AppHeader, { type ToolbarItem } from '../../components/app-header/AppHeader'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
-import HomeHeader, { type ToolbarItem } from '../../components/home-header/HomeHeader'
 import SwiperCard, { type SwiperItem } from '../../components/swiper-card/SwiperCard'
-import { paymentTrack } from '../../service/paymentService'
+import Loader from '../../components/loader/Loader'
+import StickyBanner from '../../components/sticky-banner/StickyBanner'
+import { paymentTrack, getHeroBannerDetails, getMenuPromo, redirectToIntermediatePage } from '../../service/paymentService'
+import { communicationBtnOnClick } from '../../service/communicationService'
+import { redirectToViewProfile } from '../../service/buttonService'
+import { getItem, setItem } from '../../service/storageService'
+import { getRegistrationArrays } from '../../service/registrationService'
+import { logScreen } from '../../service/analyticsService'
+import { socketConnection, emitNotificationDetails, onNotificationList } from '../../service/socketService'
+import { StorageKeys } from '../../constants/storage.keys'
+import { EnvConfig } from '../../constants/env'
 import { Colors } from '../../constants/colors'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import HomeDesktopLayout from './HomeDesktopLayout'
+import HeroBanner, { type HeroBannerContent } from './HeroBanner'
+import AssistBanner, { type AssistBannerContent } from './AssistBanner'
+import ForceUpdateCard from './ForceUpdateCard'
+import {
+  filterCompleteProfileCards,
+  computeSelfHelpVideosVisible,
+  computeDefaultLikedTab,
+  computeHasPaidBadge,
+  computeShowHeroBanner,
+  computeHeroBannerVariant,
+  computeShowAssistBanner,
+  computeForceUpdateInfo,
+  isPaidVerifiedNoPhotoMale,
+  isNonIdVerifiedPaidMale,
+  type LikedTab,
+  type HeroBannerVariant,
+  type ForceUpdateInfo,
+} from './homeGating'
 import {
   fetchExploreCategories, fetchHomeSession, fetchAndStorePPSetData, fetchMatches,
   fetchViewedYou, fetchDailyRec, fetchNewlyJoined, fetchViewedByMe,
   fetchLikedByMe, fetchLikedYou, fetchSuccessStories, fetchFaqVideos,
-  fetchCustomerCare, fetchPayBanner,
-  type ExploreCategory, type HelpVideo,
+  fetchCustomerCare, fetchNotifCount, fetchExploreCounts, refreshSession,
+  mapCompleteProfileCards, fetchProfileValidationBanner,
+  type ExploreCategory, type HelpVideo, type CompleteProfileCard, type ComCountEntry,
 } from '../../service/homeService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -30,19 +67,25 @@ import {
 const CDN = 'https://imgs.jodii.app/assets/images/svg/'
 const { width: SW } = Dimensions.get('window')
 
-const BIG_CARD_W = SW - 32   // full-width card for Today's matches
-const CAT_W      = (SW - 48 - 8) / 2
-const CAT_H      = CAT_W * 0.72
-
 // ─── Toolbar ──────────────────────────────────────────────────────────────────
+// Angular: core/config/home.config.ts's homeToolBar — discover-matches (search
+// icon) then notification, in that order. 'menu'/'messager-list' entries exist
+// in that same config but are commented out (dead) there too — there is no
+// chat icon on Home's header at all in the real app.
 
-const TOOLBAR: ToolbarItem[] = [
-  { toolType: 'notification', toolImg: CDN + 'revamp/notification.svg', showNotification: false },
-  { toolType: 'chat',         toolImg: CDN + 'revamp/chat.svg' },
-  { toolType: 'menu',         toolImg: CDN + 'revamp/menu-alt.svg' },
-]
+function buildToolbar(comCount: ComCountEntry[]): ToolbarItem[] {
+  const notifyTotal = comCount.reduce((sum, c) => sum + Number(c.newcount ?? 0), 0)
+  return [
+    { toolType: 'discover-matches', toolImg: CDN + 'bottom-nav/search-deactive.svg' },
+    { toolType: 'notification', toolImg: CDN + 'revamp/home-notification.svg', showNotification: notifyTotal > 0, notifyCount: String(notifyTotal) },
+  ]
+}
 
-// ─── Mock Data ────────────────────────────────────────────────────────────────
+function comCountFor(comCount: ComCountEntry[], type: string): number {
+  return Number(comCount.find(c => c.comtype === type)?.newcount ?? 0)
+}
+
+// ─── Mock Data (shown briefly on first paint / kept if a fetch comes back empty) ──
 
 const MOCK_ALL_MATCHES: SwiperItem[] = [
   { profileId: 'am1', name: 'Meenakshi',  age: '26 Yrs', education: "Bachelor's Degree", isNewlyJoined: false, likedStatus: '0' },
@@ -91,7 +134,6 @@ const MOCK_STORIES: SwiperItem[] = [
   { profileId: 's3', name: 'Srikanth & Ramya',  location: 'Chennai',    date: 'Posted on 28th Oct 2025' },
 ]
 
-// ExploreCategory type imported from homeService — same shape, real fetch backs it now.
 const MOCK_CATEGORIES: ExploreCategory[] = [
   { id: 'c1', label: 'Diploma and below',    count: 33,  imageUrl: '' },
   { id: 'c2', label: 'Graduate and above',   count: 55,  imageUrl: '' },
@@ -105,94 +147,35 @@ const MOCK_VIDEOS: HelpVideo[] = [
   { id: 'v2', title: 'Tips to get more profile views',                 thumbUrl: '', videoUrl: '' },
 ]
 
-// ─── Offer Banner ─────────────────────────────────────────────────────────────
-
-export interface OfferBannerProps {
-  onPlayNow?:     () => void
-  // Angular: paymentService's payment/banner-style endpoint (fetchPayBanner in
-  // homeService.ts) — defaults match this card's original static copy so
-  // callers that haven't wired it up yet render exactly as before.
-  bannerText?:    string
-  saveAmount?:    string
-  timeRemaining?: string
-}
-
-export function OfferBanner({
-  onPlayNow, bannerText = 'Special Offer!', saveAmount = '150', timeRemaining = '29h : 48m : 14s',
-}: OfferBannerProps) {
-  return (
-    <View style={ob.wrap}>
-      <View style={ob.left}>
-        <Text style={ob.label}>{bannerText}</Text>
-        <Text style={ob.saveLine}>{'Save upto '}<Text style={ob.amount}>₹{saveAmount}</Text></Text>
-        <View style={ob.countdown}>
-          <Text style={ob.cdText}>{'Offer ends in '}<Text style={ob.cdBold}>{timeRemaining}</Text></Text>
-        </View>
-        <Pressable style={ob.btn} onPress={onPlayNow}>
-          <Text style={ob.btnText}>Play Now</Text>
-        </Pressable>
-      </View>
-      <View style={ob.right}>
-        <CdnSvg uri={CDN + 'revamp/gift-box.svg'} width={90} height={90} />
-      </View>
-    </View>
-  )
-}
-const ob = StyleSheet.create({
-  wrap:      { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#EBF0FF' },
-  left:      { flex: 1, gap: 4 },
-  label:     { fontFamily: 'Poppins-Medium',    fontSize: 13, color: Colors.textPrimary },
-  saveLine:  { fontFamily: 'Poppins-Regular',   fontSize: 13, color: Colors.textPrimary },
-  amount:    { fontFamily: 'Poppins-Bold',      fontSize: 22, color: '#29339B' },
-  countdown: { borderLeftWidth: 2, borderLeftColor: '#29339B', backgroundColor: 'rgba(41,51,155,0.06)', borderRadius: 4, paddingVertical: 4, paddingHorizontal: 8, alignSelf: 'flex-start', marginTop: 2 },
-  cdText:    { fontFamily: 'Poppins-Regular',   fontSize: 11, color: Colors.textSecondary },
-  cdBold:    { fontFamily: 'Poppins-Bold',      color: Colors.textPrimary },
-  btn:       { backgroundColor: '#29339B', borderRadius: 20, paddingVertical: 6, paddingHorizontal: 24, alignSelf: 'flex-start', marginTop: 8 },
-  btnText:   { fontFamily: 'Poppins-SemiBold',  fontSize: 13, color: Colors.white },
-  right:     { width: 110, height: 90, alignItems: 'center', justifyContent: 'center', marginLeft: 8 },
-  gift:      { width: 90, height: 90 },
-})
-
 // ─── Complete Your Profile ────────────────────────────────────────────────────
-// Extracted so HomeDesktopLayout.tsx can render the exact same card — only the
-// surrounding layout (mobile full-bleed vs. desktop's right-column card) differs.
+// Generic renderer over homeGating's filterCompleteProfileCards() output — one
+// row per PPSET-derived card type, replacing the old hardcoded horoscope+star-
+// only widget. Extracted so HomeDesktopLayout.tsx can render the exact same list.
 
-export interface CompleteProfileCardProps {
-  onAddHoroscope: () => void
-  onAddStarRaasi: () => void
-  // Angular: explore.component.ts's getPPSETData() drops the HOROSCOPE card from
-  // completeCard once localStorage.HOROSCOPEAVAILABLE is set — same idea for
-  // star/raasi (HomeSession's starAvailable, from fetchHomeSession()). Default
-  // true so existing callers that haven't been updated yet keep both rows.
-  showHoroscope?: boolean
-  showStarRaasi?: boolean
+export interface CompleteProfileSectionProps {
+  cards:       CompleteProfileCard[]
+  onCardPress: (card: CompleteProfileCard) => void
 }
 
-export function CompleteProfileCard({
-  onAddHoroscope, onAddStarRaasi, showHoroscope = true, showStarRaasi = true,
-}: CompleteProfileCardProps) {
-  if (!showHoroscope && !showStarRaasi) return null
+export function CompleteProfileSection({ cards, onCardPress }: CompleteProfileSectionProps) {
+  if (cards.length === 0) return null
   return (
     <View style={s.cpCard}>
-      {showHoroscope && (
-        <Pressable style={s.cpRow} onPress={onAddHoroscope}>
-          <View style={s.cpIcon}>
-            <CdnSvg uri={CDN + 'revamp/horoscope-icon.svg'} width={24} height={24} />
-          </View>
-          <Text style={s.cpText}>Add horoscope details</Text>
-          <Text style={s.cpAdd}>Add {'>'}</Text>
-        </Pressable>
-      )}
-      {showHoroscope && showStarRaasi && <View style={s.cpDivider} />}
-      {showStarRaasi && (
-        <Pressable style={s.cpRow} onPress={onAddStarRaasi}>
-          <View style={s.cpIcon}>
-            <CdnSvg uri={CDN + 'revamp/star-icon.svg'} width={24} height={24} />
-          </View>
-          <Text style={s.cpText}>Add star/raasi details</Text>
-          <Text style={s.cpAdd}>Add {'>'}</Text>
-        </Pressable>
-      )}
+      {cards.map((card, idx) => (
+        <View key={card.type}>
+          <Pressable style={s.cpRow} onPress={() => onCardPress(card)}>
+            {/* Angular: card?.THUMBIMG — a per-card image URL from the server,
+                not a client-guessed icon; plain Image (not CdnSvg) since the
+                format isn't guaranteed to be SVG. */}
+            <View style={s.cpIcon}>
+              {!!card.imageUrl && <Image source={{ uri: card.imageUrl }} style={s.cpIconImg} resizeMode="contain" />}
+            </View>
+            <Text style={s.cpText}>{card.label}</Text>
+            <Text style={s.cpAdd}>{card.ctaLabel} {'>'}</Text>
+          </Pressable>
+          {idx < cards.length - 1 && <View style={s.cpDivider} />}
+        </View>
+      ))}
     </View>
   )
 }
@@ -200,28 +183,29 @@ export function CompleteProfileCard({
 // ─── Liked Profiles (tab toggle + card list) ──────────────────────────────────
 
 export interface LikedProfilesSectionProps {
-  likedTab:     'me' | 'them'
-  onTabChange:  (tab: 'me' | 'them') => void
+  likedTab:     LikedTab
+  onTabChange:  (tab: LikedTab) => void
   likedByMe:    SwiperItem[]
   likedMe:      SwiperItem[]
   likedByCount: number
   likedMeCount: number
   onCardPress:  (item: SwiperItem) => void
+  onLikePress:  (item: SwiperItem) => void
 }
 
 export function LikedProfilesSection({
-  likedTab, onTabChange, likedByMe, likedMe, likedByCount, likedMeCount, onCardPress,
+  likedTab, onTabChange, likedByMe, likedMe, likedByCount, likedMeCount, onCardPress, onLikePress,
 }: LikedProfilesSectionProps) {
-  const items = likedTab === 'me' ? likedByMe : likedMe
+  const items = likedTab === 'likedbyme' ? likedByMe : likedMe
   return (
     <>
       <Text style={s.sectionTitle}>{'Liked profiles (' + (likedByCount + likedMeCount) + ')'}</Text>
       <View style={s.tabRow}>
-        <Pressable style={[s.tabPill, likedTab === 'me'   && s.tabPillActive]} onPress={() => onTabChange('me')}>
-          <Text style={[s.tabPillText, likedTab === 'me'   && s.tabPillTextActive]}>{'Liked by you (' + likedByCount + ')'}</Text>
+        <Pressable style={[s.tabPill, likedTab === 'likedyou'  && s.tabPillActive]} onPress={() => onTabChange('likedyou')}>
+          <Text style={[s.tabPillText, likedTab === 'likedyou'  && s.tabPillTextActive]}>{'Liked you (' + likedMeCount + ')'}</Text>
         </Pressable>
-        <Pressable style={[s.tabPill, likedTab === 'them' && s.tabPillActive]} onPress={() => onTabChange('them')}>
-          <Text style={[s.tabPillText, likedTab === 'them' && s.tabPillTextActive]}>{'Liked you (' + likedMeCount + ')'}</Text>
+        <Pressable style={[s.tabPill, likedTab === 'likedbyme' && s.tabPillActive]} onPress={() => onTabChange('likedbyme')}>
+          <Text style={[s.tabPillText, likedTab === 'likedbyme' && s.tabPillTextActive]}>{'Liked by you (' + likedByCount + ')'}</Text>
         </Pressable>
       </View>
       <SwiperCard
@@ -230,50 +214,54 @@ export function LikedProfilesSection({
         items={items}
         showSeeAll={false}
         onCardPress={onCardPress}
+        onLikePress={onLikePress}
       />
     </>
   )
 }
 
 // ─── Explore Categories ────────────────────────────────────────────────────────
+// Angular: explore-card.component.html's ACTIVE template (the big-image-tile
+// version with a separate count line and a "Discover all categories" CTA below
+// the grid is entirely commented out in the real source) is a compact row —
+// small icon + title (count baked into the server's TITLE string already,
+// not a separate element) + inline forward chevron, on a light gradient card.
+// No "see all"/"discover all" button exists in the live template at all.
 
 export interface ExploreCategoriesSectionProps {
   categories: ExploreCategory[]
   tileWidth:  number
-  tileHeight: number
   onCategoryPress: (cat: ExploreCategory) => void
-  onDiscoverPress: () => void
 }
 
 export function ExploreCategoriesSection({
-  categories, tileWidth, tileHeight, onCategoryPress, onDiscoverPress,
+  categories, tileWidth, onCategoryPress,
 }: ExploreCategoriesSectionProps) {
   return (
     <>
       <Text style={s.sectionTitle}>Explore matches based on</Text>
       <View style={s.catGrid}>
-        {categories.map((cat, idx) => (
-          <Pressable
-            key={cat.id}
-            style={[s.catTile, { width: tileWidth }]}
-            onPress={() => onCategoryPress(cat)}
-          >
-            <View style={[s.catImgBox, { width: tileWidth, height: tileHeight }]}>
-              {cat.imageUrl
-                ? <Image source={{ uri: cat.imageUrl }} style={s.catImg} resizeMode="cover" />
-                : <View style={[s.catImg, { backgroundColor: ['#EDE7F6','#E3F2FD','#FCE4EC','#E8F5E9'][idx % 4] }]} />
-              }
-            </View>
-            <View style={s.catInfo}>
-              <Text style={s.catLabel} numberOfLines={2}>{cat.label}</Text>
-              <Text style={s.catCount}>{cat.count}</Text>
-            </View>
+        {categories.map(cat => (
+          <Pressable key={cat.id} onPress={() => onCategoryPress(cat)} style={{ width: tileWidth }}>
+            {/* Angular: backgroundStyle() — server's BGCOLOUR, else this exact
+                default diagonal gradient. */}
+            <LinearGradient
+              colors={['#DCF0FF', '#FFFFFF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={s.catTile}
+            >
+              <View style={s.catIconWrap}>
+                {!!cat.imageUrl && <Image source={{ uri: cat.imageUrl }} style={s.catIconImg} resizeMode="contain" />}
+              </View>
+              <Text style={s.catLabel} numberOfLines={2}>
+                {cat.label}{'  '}
+                <Text style={s.catChevron}>{'›'}</Text>
+              </Text>
+            </LinearGradient>
           </Pressable>
         ))}
       </View>
-      <Pressable style={s.discoverBtn} onPress={onDiscoverPress}>
-        <Text style={s.discoverText}>Discover all categories {'>'}</Text>
-      </Pressable>
     </>
   )
 }
@@ -281,20 +269,27 @@ export function ExploreCategoriesSection({
 // ─── Success Stories ───────────────────────────────────────────────────────────
 
 export function SuccessStoriesSection({
-  stories, cardWidth, onCardPress,
-}: { stories: SwiperItem[]; cardWidth: number; onCardPress: (item: SwiperItem) => void }) {
+  stories, onCardPress,
+}: { stories: SwiperItem[]; onCardPress: (item: SwiperItem) => void }) {
   return (
     <>
+      {/* Angular: HOME.HAPPILY_MARRIED_HEAD = "Got married <br>through Jodii",
+          HOME.HAPPILY_MARRIED_CONTENT = "Thousands have met their life
+          partner <br>through Jodii" — not "Made with Love in Jodii", and the
+          subtitle line was missing entirely. */}
       <View style={s.storyHeader}>
-        <Text style={s.storyTitle}>Made with</Text>
-        <Text style={s.storyTitleBold}>Love in Jodii</Text>
+        <Text style={s.storyTitle}>Got married</Text>
+        <Text style={s.storyTitleBold}>through Jodii</Text>
+        <Text style={s.storySubtitle}>Thousands have met their life partner{'\n'}through Jodii</Text>
       </View>
+      {/* No cardWidth override — Angular: card-ht4 is 91.111vmin square, not
+          the previous guessed 68% width. Let SwiperCard's per-section default
+          (ProfileCard's PHOTO_HEIGHT['successstory']) apply. */}
       <SwiperCard
         cardVariant={4}
         cardSection="successstory"
         items={stories}
         showSeeAll={false}
-        cardWidth={cardWidth}
         onCardPress={onCardPress}
       />
     </>
@@ -302,6 +297,11 @@ export function SuccessStoriesSection({
 }
 
 // ─── Self-help Videos ───────────────────────────────────────────────────────────
+// Angular: complete-profile.component.html's self-video swiper slide — the
+// caption (QUS) is overlaid in white text at the bottom of the background
+// image itself (FAQ-banners-position, a bottom scrim), not a separate text
+// row below the card; and the play button is the real CDN icon, not a
+// CSS-drawn triangle.
 
 export function SelfHelpVideosSection({
   videos, cardWidth, cardHeight, onVideoPress,
@@ -317,17 +317,19 @@ export function SelfHelpVideosSection({
         contentContainerStyle={s.hList}
         ItemSeparatorComponent={() => <View style={{ width: 12 }} />}
         renderItem={({ item, index }) => (
-          <Pressable style={[s.videoCard, { width: cardWidth }]} onPress={() => onVideoPress(item)}>
-            <View style={[s.videoThumb, { height: cardHeight }]}>
-              {item.thumbUrl
-                ? <Image source={{ uri: item.thumbUrl }} style={s.videoThumbImg} resizeMode="cover" />
-                : <View style={[s.videoThumbImg, { backgroundColor: ['#D6E8F6','#F6D6E0'][index % 2] }]} />
-              }
-              <View style={s.playBtn}>
-                <View style={s.playIcon} />
-              </View>
+          <Pressable style={[s.videoCard, { width: cardWidth, height: cardHeight }]} onPress={() => onVideoPress(item)}>
+            {item.thumbUrl
+              ? <Image source={{ uri: item.thumbUrl }} style={s.videoThumbImg} resizeMode="cover" />
+              : <View style={[s.videoThumbImg, { backgroundColor: ['#D6E8F6','#F6D6E0'][index % 2] }]} />
+            }
+            <View style={s.playBtn}>
+              <CdnSvg uri={`${CDN}play-pause-message-white.svg`} width={28} height={28} />
             </View>
-            <Text style={s.videoTitle} numberOfLines={2}>{item.title}</Text>
+            {!!item.title && (
+              <View style={s.videoCaptionScrim}>
+                <Text style={s.videoTitle} numberOfLines={2}>{item.title}</Text>
+              </View>
+            )}
           </Pressable>
         )}
       />
@@ -335,26 +337,42 @@ export function SelfHelpVideosSection({
   )
 }
 
+// Inline video player for the self-help video modal — same expo-video pattern
+// already used by screens/help-center/FaqScreen.tsx's FaqVideoPlayer.
+export function SelfHelpVideoPlayer({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, p => { p.play() })
+  return <VideoView player={player} style={s.videoModalPlayer} nativeControls />
+}
+
 // ─── Help / Support ─────────────────────────────────────────────────────────────
 
+// Angular: explore.component.ts's getHelbBannerData() → this whole section is
+// actually the shared <app-home-banner> component with action='helpBanner',
+// content read from the FAQ_DETAILS.BANNER translation object (a static
+// title/body/CTA/image/gradient-background, not the customer-care API) —
+// title+body+a single "Call us #CALL#" LINK (chevron, no button styling),
+// with a decorative image on the right. There is no WhatsApp button at all
+// in Angular's real Home help section.
 export function HelpSection({
-  onCallPress, onWhatsAppPress, phone = '+91 9876543210',
-}: { onCallPress: () => void; onWhatsAppPress: () => void; phone?: string }) {
+  onCallPress, phone = '+91 9876543210',
+}: { onCallPress: () => void; phone?: string }) {
   return (
-    <>
-      <Text style={s.helpTitle}>Do you need help?</Text>
-      <Text style={s.helpSub}>Feel free to connect with us everyday{'\n'}from 8 AM to 9 PM</Text>
-      <View style={s.helpActions}>
-        <Pressable style={s.callBtn} onPress={onCallPress}>
-          <CdnSvg uri={CDN + 'revamp/call-icon.svg'} width={22} height={22} />
-          <Text style={s.callBtnText}>{'Call us ' + phone}</Text>
-        </Pressable>
-        <Pressable style={s.waBtn} onPress={onWhatsAppPress}>
-          <CdnSvg uri={CDN + 'revamp/whatsapp-icon.svg'} width={22} height={22} />
-          <Text style={s.waBtnText}>WhatsApp</Text>
+    <LinearGradient
+      colors={['#FFEEE7', '#F5F5F5']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={s.helpWrap}
+    >
+      <View style={s.helpTextCol}>
+        <Text style={s.helpTitle}>Do you need help?</Text>
+        <Text style={s.helpSub}>Feel free to connect with us everyday from 8 AM to 9 PM</Text>
+        <Pressable style={s.helpCta} onPress={onCallPress}>
+          <Text style={s.helpCtaText}>{'Call us ' + phone}</Text>
+          <Text style={s.helpCtaChevron}>{'›'}</Text>
         </Pressable>
       </View>
-    </>
+      <Image source={{ uri: `${CDN}call-24-7.svg` }} style={s.helpImage} resizeMode="contain" />
+    </LinearGradient>
   )
 }
 
@@ -362,23 +380,61 @@ export function HelpSection({
 
 export default function HomeScreen({ navigation }: { navigation: any }) {
   const isDesktop = useIsDesktopWeb()
-  const [likedTab, setLikedTab] = useState<'me' | 'them'>('me')
+  const { t, i18n } = useTranslation()
+  const [contentLoaded, setContentLoaded] = useState(false)
+
+  const [likedTab, setLikedTab] = useState<LikedTab>('likedbyme')
   const [categories, setCategories] = useState<ExploreCategory[]>(MOCK_CATEGORIES)
 
-  // ── Session / profile-completion (Angular: explore.component.ts's
-  // getPPSETData() → PPsetData.PROFILECOMPLETENESS drives the header's
-  // progress ring; HOROSCOPEAVAILABLE/starAvailable drive completeCard's
-  // filter) ──
+  // ── Session / profile-completion / gating inputs ──────────────────────────
   const [userName, setUserName]           = useState('')
+  const [userImg, setUserImg]             = useState<string | undefined>(undefined)
   const [completionPct, setCompletionPct] = useState(0)
-  const [horoAvailable, setHoroAvailable] = useState(false)
-  const [starAvailable, setStarAvailable] = useState(false)
+  const [entryType, setEntryType]         = useState('')
+  const [gender, setGender]               = useState<'M' | 'F'>('F')
+  const [ekycStatus, setEkycStatus]       = useState('')
+  const [payRenewalFlag, setPayRenewalFlag] = useState('0')
+  const [lang, setLang]                   = useState('en')
+  const [ppSetData, setPpSetData]         = useState<Record<string, any>>({})
+  const [comCount, setComCount]           = useState<ComCountEntry[]>([])
+  const [completeCards, setCompleteCards] = useState<CompleteProfileCard[]>([])
+  const [upgradeTag, setUpgradeTag] = useState('')
+  const [showMembershipDot, setShowMembershipDot] = useState(false)
 
-  // ── Listing sections — each holds the small preview `items` SwiperCard
-  // shows plus the real `total` for the "(N)" section-header count. Mock
-  // data stays as the initial value (shown briefly on first paint / kept on
-  // fetch failure) — same graceful-fallback pattern this file's categories
-  // fetch already used. ──
+  // ── Hero banner / assist banner (mutually exclusive top slot) ─────────────
+  const [heroBannerVariant, setHeroBannerVariant]   = useState<HeroBannerVariant>(null)
+  const [heroBannerContent, setHeroBannerContent]   = useState<HeroBannerContent | null>(null)
+  const [assistContent, setAssistContent]           = useState<AssistBannerContent | null>(null)
+  const [assistDismissed, setAssistDismissed]       = useState(false)
+  const [paymentFailedDismissed, setPaymentFailedDismissed] = useState(false)
+
+  // ── Sticky banner (pinned above footer) — Angular's Home screen renders this
+  // as a THIRD, separate slot from the hero banner above (§16 in the source
+  // analysis: the generic sticky explicitly excludes PAYMENTFAILED_STICKY, which
+  // stays in the hero-banner slot handled above). Covers force-update (highest
+  // priority, same as MatchesScreen.tsx's judgment call) and the profile-
+  // validation-rejected banner (PISTATUS in [5,13]).
+  const [forceUpdateInfo, setForceUpdateInfo]           = useState<ForceUpdateInfo | null>(null)
+  const [profileValidationBanner, setProfileValidationBanner] = useState<{ show: boolean; message: string; ctaLabel: string } | null>(null)
+  const [stickyDismissed, setStickyDismissed]           = useState(false)
+  // Angular: logScrollEnd() hides the sticky banner once the user has scrolled
+  // past the header while actively scrolling down (shows again scrolling up or
+  // near the top) — RN has no overlaid/translucent header to recolor the way
+  // Angular's does, so only the sticky-banner-hide half of that behavior applies.
+  const [hideStickyOnScroll, setHideStickyOnScroll] = useState(false)
+  const scrollYRef = useRef(0)
+
+  // Self-help video playback — Angular has no modal for this either (its
+  // FAQ videos use a dedicated VideoFaqPopupComponent); mirrors the inline
+  // expo-video player pattern already used by screens/help-center/FaqScreen.tsx.
+  const [videoModalUrl, setVideoModalUrl] = useState<string | null>(null)
+
+  // ── Per-section skeleton-loader flags (Angular: mContLoaded/nmContLoaded —
+  // the only two Home sections that show a dashboard-skeleton while loading) ──
+  const [allMatchesLoaded, setAllMatchesLoaded]   = useState(false)
+  const [newlyJoinedLoaded, setNewlyJoinedLoaded] = useState(false)
+
+  // ── Listing sections ───────────────────────────────────────────────────────
   const [allMatches, setAllMatches]           = useState(MOCK_ALL_MATCHES)
   const [allMatchesTotal, setAllMatchesTotal] = useState(MOCK_ALL_MATCHES.length)
   const [viewedMe, setViewedMe]               = useState(MOCK_VIEWED_ME)
@@ -396,91 +452,325 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [stories, setStories]                 = useState<SwiperItem[]>(MOCK_STORIES)
   const [videos, setVideos]                   = useState<HelpVideo[]>(MOCK_VIDEOS)
   const [customerCare, setCustomerCare]       = useState({ phone: '+91 9876543210', whatsapp: '' })
-  const [banner, setBanner] = useState({ bannerText: 'Special Offer!', saveAmount: '150', timeRemaining: '29h : 48m : 14s' })
 
-  const upgradeTag = '₹200 OFF'
+  // Angular: ngOnInit()/ionViewDidEnter() — loadHome() is the RN equivalent of
+  // BOTH combined. Called on every focus (useFocusEffect below); `includePopups`
+  // gates the truly one-time-per-mount bits (screen-view analytics, the
+  // once-per-install first-land ping) so they don't refire every time the user
+  // tabs back to Home.
+  const loadHome = useCallback(async (ctrl: { cancelled: boolean }, includePopups: boolean) => {
+    // Angular's RN port convention (MatchesScreen.tsx's loadMatches() step 1):
+    // every screen that fires listing API calls must refreshSession() first to
+    // guarantee a valid/upgraded ATN — this was missing here, and its absence
+    // is why every single Home listing call was failing with ERRCODE 23
+    // ("Token expired") uniformly, all at once, regardless of endpoint.
+    await refreshSession()
+    if (ctrl.cancelled) return
 
-  useEffect(() => {
-    let cancelled = false
+    if (includePopups) {
+      logScreen('Home')
+      // Angular: calltrackApi() — paymentTrack('115') fires once per install,
+      // guarded by FIRSTLAND_HOME in storage (no existing precedent for a
+      // "forever" one-time flag elsewhere in this repo — modeled on the
+      // SURVEYPOPUP/PN_LAST_SHOWN_DATE consume-once shapes in MatchesScreen.tsx).
+      getItem('FIRSTLAND_HOME').then(fired => {
+        if (ctrl.cancelled || fired === '1') return
+        setItem('FIRSTLAND_HOME', '1')
+        paymentTrack('115')
+      })
+    }
+
+    getItem(StorageKeys.User.PHOTO_URL).then(photo => { if (!ctrl.cancelled && photo) setUserImg(photo) })
 
     fetchExploreCategories().then(result => {
-      if (!cancelled && result.length > 0) setCategories(result)
+      if (!ctrl.cancelled && result.length > 0) setCategories(result)
     })
 
-    Promise.all([fetchHomeSession(), fetchAndStorePPSetData()]).then(([session, ppSetData]) => {
-      if (cancelled) return
+    Promise.all([fetchHomeSession(), fetchAndStorePPSetData()]).then(async ([session, data]) => {
+      if (ctrl.cancelled) return
       if (session.userName) setUserName(session.userName)
-      setHoroAvailable(session.horoAvailable)
-      setStarAvailable(session.starAvailable)
-      const completeness = Number(ppSetData?.['PROFILECOMPLETENESS'])
+      setEntryType(session.membershipType)
+      setLang(session.lang)
+      setPpSetData(data)
+      const completeness = Number(data?.['PROFILECOMPLETENESS'])
       if (!Number.isNaN(completeness)) setCompletionPct(completeness)
+
+      const [g, ekyc, paid, renewal, discoverCounts] = await Promise.all([
+        getItem(StorageKeys.User.LOGIN_GENDER),
+        getItem('EKYCSTATUS'),
+        getItem(StorageKeys.Payment.PAY_P_FLAG),
+        getItem(StorageKeys.Payment.PAY_RENEWAL_FLAG),
+        fetchExploreCounts(data?.['DISCOVERKEY']),
+      ])
+      if (ctrl.cancelled) return
+      const resolvedGender: 'M' | 'F' = g === 'M' ? 'M' : 'F'
+      setGender(resolvedGender)
+      setEkycStatus(ekyc ?? '')
+      setPayRenewalFlag(renewal ?? '0')
+
+      // Complete-Your-Profile cards — server list of incomplete cards, minus
+      // whatever's already done locally (horoscope/photo — see homeGating.ts).
+      const photoStatus = data?.['PI_PHOTOSTATUS'] ?? 'N'
+      const photoApproved = photoStatus === 'Y'
+      const rawCards = mapCompleteProfileCards(data)
+      setCompleteCards(filterCompleteProfileCards(rawCards, session.horoAvailable, photoApproved))
+
+      // Merge live counts into the Explore/Discover grid (best-effort — see
+      // fetchExploreCounts' NEEDS LIVE VERIFICATION note).
+      if (Object.keys(discoverCounts).length > 0) {
+        setCategories(prev => prev.map(cat => (
+          discoverCounts[cat.id] !== undefined ? { ...cat, count: discoverCounts[cat.id] } : cat
+        )))
+      }
+
+      // ── Hero banner precedence chain (Angular: explore.component.ts's
+      // getPPSETData() chain, same order MatchesScreen.tsx's applyHeroBanner
+      // if/else-if already uses for its own 3-way subset) ──────────────────
+      const entryTypeVal = session.membershipType
+      const isPvnpMale = isPaidVerifiedNoPhotoMale(entryTypeVal, ekyc ?? '', resolvedGender, photoStatus)
+      const isNivpMale = isNonIdVerifiedPaidMale(entryTypeVal, resolvedGender, ekyc ?? '', paid ?? '')
+      const showHero = computeShowHeroBanner({
+        entryType: entryTypeVal, payRenewalFlag: renewal ?? '0', gender: resolvedGender,
+        isNonIdVerifiedPaidMale: isNivpMale, isPaidVerifiedNoPhotoMale: isPvnpMale,
+      })
+      const flagOk = String(data?.['PROFILEPUBLISHEDFLAG']) === '0'
+      const typeOk = ['1', '2'].includes(String(data?.['PROFILEPUBLISHEDTYPE']))
+      const isFreeFemalePhotoPromo = flagOk && typeOk && entryTypeVal === 'F'
+
+      // Angular: PAYMENTFAILTYPE=='1' gates the payment-failed variant; content
+      // comes from getHeroBannerDetails(true, 1) — same call MatchesScreen.tsx's
+      // own payment-failed sticky uses (bannerType 1 = payment-failed content).
+      let paymentFailedContent: HeroBannerContent | null = null
+      if (!paymentFailedDismissed && (await getItem('PAYMENTFAILTYPE')) === '1') {
+        const failedBanner = await getHeroBannerDetails(true, 1)
+        const text = failedBanner?.['PAYMENTFAILEDCONTENT']
+        const cta  = failedBanner?.['PAYMENTFAILEDCTA']
+        if (text && cta) {
+          const startMs = Date.parse(failedBanner?.['OFFSTTIME'] ?? '')
+          const endMs   = Date.parse(failedBanner?.['OFFEDTIME'] ?? '')
+          const deadlineMs = !Number.isNaN(startMs) && !Number.isNaN(endMs)
+            ? Date.now() + Math.max(0, endMs - startMs)
+            : Date.now() + 10 * 60 * 1000
+          paymentFailedContent = { title: '', body: String(text), ctaLabel: String(cta), countdownDeadlineMs: deadlineMs }
+        }
+      }
+
+      const variant = computeHeroBannerVariant({
+        paymentFailedActive:       !!paymentFailedContent,
+        showHeroBanner:            showHero,
+        isFreeFemalePhotoPromo,
+        isNonIdVerifiedPaidMale:   isNivpMale,
+        isPaidVerifiedNoPhotoMale: isPvnpMale,
+      })
+      if (ctrl.cancelled) return
+      setHeroBannerVariant(variant)
+
+      if (variant === 'payment_failed' && paymentFailedContent) {
+        setHeroBannerContent(paymentFailedContent)
+      } else if (variant === 'photo_promo_free_female' || variant === 'non_id_verify_male' || variant === 'paid_verified_no_photo') {
+        const reg = await getRegistrationArrays()
+        if (ctrl.cancelled) return
+        const bannerKey = variant === 'photo_promo_free_female' ? 'PHOTOPUBLISHED'
+                         : variant === 'non_id_verify_male'      ? 'PROFILEVERIFYPAID'
+                         : 'PHOTOPUBLISHPAID'
+        const raw = reg?.[bannerKey]?.['Banner'] ?? {}
+        setHeroBannerContent({
+          title:      raw['TITLE'] || 'Profile not active yet!',
+          body:       raw['BODY']  || 'Upload your photo to activate profile and let matches see you',
+          ctaLabel:   raw['CTA']   || 'Add photo now',
+          ctaBgColor: raw['CTABGCOLOR']?.startsWith?.('#') ? raw['CTABGCOLOR'] : undefined,
+          ctaColor:   raw['CTACOLOR']?.startsWith?.('#')   ? raw['CTACOLOR']   : undefined,
+        })
+      } else if (variant === 'default') {
+        const details = await getHeroBannerDetails(false)
+        if (ctrl.cancelled) return
+        setHeroBannerContent({
+          title:    details?.['TITLE'] || 'Upgrade your membership',
+          body:     details?.['BODY']  || '',
+          ctaLabel: details?.['CTA']   || 'Upgrade now',
+        })
+      } else {
+        setHeroBannerContent(null)
+      }
+
+      // Angular: footer.component.ts's paymentService.getMenuPromo(0) — fetched
+      // once, feeds both the assist banner (ASSISTEDPROMO) and the footer's
+      // membership upgrade tag (MENUDISCOUNT) below. Cached by getMenuPromo
+      // itself, so this doesn't duplicate the assist-banner-specific fetch.
+      const menuPromo = await getMenuPromo('MENU')
+      if (ctrl.cancelled) return
+
+      // ── Assist ("breather") banner — Angular: takes precedence over the hero
+      // banner slot entirely when ASSISTEDFLAG is set and not locally dismissed.
+      if (computeShowAssistBanner(data?.['ASSISTEDFLAG'], assistDismissed)) {
+        const assisted = menuPromo?.['ASSISTEDPROMO']
+        if (assisted) {
+          setAssistContent({
+            title:    assisted['TITLE'] ?? '',
+            body:     assisted['BODY']  ?? '',
+            ctaLabel: assisted['CTA']   ?? 'Know more',
+          })
+        }
+      }
+
+      // ── Footer membership upgrade tag — Angular: footer.component.ts —
+      // membershipExpiry = ppSetData.NUMBEROFPAYMENTS > 0; upgradeTag =
+      // MENUDISCOUNT, cleared to '' for zero-value tags or paid members.
+      const membershipExpiry = Number(data?.['NUMBEROFPAYMENTS'] ?? 0) > 0
+      let tag = String(menuPromo?.['MENUDISCOUNT'] ?? '')
+      if (['0', '0 OFF', '₹0 OFF'].includes(tag) || entryTypeVal === 'P') tag = ''
+      setUpgradeTag(tag)
+      // Angular's exact showRedDot trigger lives outside footer.component.ts
+      // (a separate common.ts flag set elsewhere) and isn't traced here —
+      // approximated as "would show the tag at all" rather than guessed further.
+      setShowMembershipDot(membershipExpiry && entryTypeVal === 'F' && !!tag)
+
+      // ── Sticky banner — force-update (Angular/MatchesScreen.tsx line 1115's
+      // exact comparison, copied verbatim for parity) takes priority; else the
+      // profile-validation-rejected banner when PISTATUS is 5 (rejected) or 13
+      // (under review).
+      const psUpdateFlag = await getItem('PLAYSTOREUPDATE')
+      const appVersion = Constants.expoConfig?.version ?? '1.0.0'
+      const forceUpdate = computeForceUpdateInfo(data?.['APPFORCEUPDATE'], psUpdateFlag, appVersion)
+      if (ctrl.cancelled) return
+      setForceUpdateInfo(forceUpdate)
+
+      if (!forceUpdate && ['5', '13'].includes(String(data?.['PISTATUS']))) {
+        const validationBanner = await fetchProfileValidationBanner()
+        if (!ctrl.cancelled && validationBanner?.show) setProfileValidationBanner(validationBanner)
+      }
     })
 
     fetchMatches(0, 10).then(result => {
-      if (!cancelled && result.items.length > 0) {
+      if (ctrl.cancelled) return
+      if (result.items.length > 0) {
         setAllMatches(result.items)
         setAllMatchesTotal(result.totalCount)
       }
+      setAllMatchesLoaded(true)
     })
     fetchViewedYou().then(result => {
-      if (!cancelled && result.items.length > 0) {
+      if (!ctrl.cancelled && result.items.length > 0) {
         setViewedMe(result.items)
         setViewedMeTotal(result.totalCount)
       }
     })
     fetchDailyRec().then(result => {
-      if (!cancelled && result.items.length > 0) {
-        setTodayMatches(result.items)
+      if (!ctrl.cancelled && result.items.length > 0) {
+        setTodayMatches(result.items.slice(0, 4))
         setTodayTotal(result.totalCount)
       }
     })
     fetchNewlyJoined().then(result => {
-      if (!cancelled && result.items.length > 0) {
-        setNewlyJoined(result.items)
+      if (ctrl.cancelled) return
+      if (result.items.length > 0) {
+        setNewlyJoined(result.items.slice(0, 4))
         setNewlyJoinedTotal(result.totalCount)
       }
+      setNewlyJoinedLoaded(true)
     })
     fetchViewedByMe().then(result => {
-      if (!cancelled && result.items.length > 0) {
-        setProfilesViewed(result.items)
+      if (!ctrl.cancelled && result.items.length > 0) {
+        setProfilesViewed(result.items.slice(0, 5))
         setProfilesViewedTotal(result.totalCount)
       }
     })
-    fetchLikedByMe().then(result => {
-      if (!cancelled && result.items.length > 0) {
-        setLikedByMe(result.items)
-        setLikedByMeTotal(result.totalCount)
+    // Fetched together (rather than two independent .then()s) so the default-tab
+    // decision (Angular's "singlelikedlist" behavior) sees both real totals at
+    // once — computing it off either promise alone would race against whichever
+    // of the two resolves first.
+    Promise.all([fetchLikedByMe(), fetchLikedYou(), getItem(StorageKeys.User.LOGIN_GENDER)]).then(
+      ([likedByMeResult, likedYouResult, g]) => {
+        if (ctrl.cancelled) return
+        if (likedByMeResult.items.length > 0) {
+          setLikedByMe(likedByMeResult.items)
+          setLikedByMeTotal(likedByMeResult.totalCount)
+        }
+        if (likedYouResult.items.length > 0) {
+          setLikedMe(likedYouResult.items)
+          setLikedMeTotal(likedYouResult.totalCount)
+        }
+        setLikedTab(computeDefaultLikedTab(g === 'M' ? 'M' : 'F', likedYouResult.totalCount, likedByMeResult.totalCount))
       }
-    })
-    fetchLikedYou().then(result => {
-      if (!cancelled && result.items.length > 0) {
-        setLikedMe(result.items)
-        setLikedMeTotal(result.totalCount)
-      }
-    })
+    )
     fetchSuccessStories().then(result => {
-      if (!cancelled && result.length > 0) setStories(result)
+      if (!ctrl.cancelled && result.length > 1) setStories(result.slice(0, 5))
     })
     fetchFaqVideos().then(result => {
-      if (!cancelled && result.length > 0) setVideos(result)
+      if (!ctrl.cancelled && result.length > 0) setVideos(result)
     })
     fetchCustomerCare().then(result => {
-      if (!cancelled && (result.phone || result.whatsapp)) setCustomerCare(result)
+      if (!ctrl.cancelled && (result.phone || result.whatsapp)) setCustomerCare(result)
     })
-    fetchPayBanner().then(result => {
-      if (!cancelled && result.show) {
-        setBanner({
-          bannerText:    result.bannerText,
-          saveAmount:    result.saveAmount,
-          timeRemaining: result.timeRemaining,
-        })
-      }
+    fetchNotifCount().then(result => {
+      if (!ctrl.cancelled) setComCount(result.comCount)
     })
 
-    return () => { cancelled = true }
+    // Header/footer-critical data is ready once session+PPSET has resolved —
+    // Angular: contentLoaded gates the ENTIRE page (no header/footer) until
+    // this point; individual list sections keep their own mock-then-real /
+    // skeleton-loader treatment after that.
+    Promise.all([fetchHomeSession(), fetchAndStorePPSetData()]).finally(() => {
+      if (!ctrl.cancelled) setContentLoaded(true)
+    })
+  }, [assistDismissed, paymentFailedDismissed])
+
+  // Angular: ionViewDidEnter() — re-runs every time Home regains focus (tab
+  // switch, back-navigation), not just on first mount. `isFirstFocusRef` mirrors
+  // ngOnInit-vs-ionViewDidEnter: the first focus gets includePopups=true (fires
+  // once-per-mount analytics/tracking), every later focus gets false.
+  const isFirstFocusRef = useRef(true)
+  useFocusEffect(
+    useCallback(() => {
+      const ctrl = { cancelled: false }
+      const includePopups = isFirstFocusRef.current
+      isFirstFocusRef.current = false
+      loadHome(ctrl, includePopups)
+      return () => { ctrl.cancelled = true }
+    }, [loadHome])
+  )
+
+  // Angular: changeLanguage() (explore.component.ts) — switching language tears
+  // down and rebuilds the whole page so every server-rendered string re-fetches
+  // in the new language. Same mountedLangRef pattern as MatchesScreen.tsx:1282-1294
+  // — skips the initial mount (already covered by the focus effect above) and
+  // only reloads on a REAL change.
+  const mountedLangRef = useRef(i18n.language)
+  useEffect(() => {
+    if (i18n.language === mountedLangRef.current) return
+    mountedLangRef.current = i18n.language
+    const ctrl = { cancelled: false }
+    loadHome(ctrl, false)
+    return () => { ctrl.cancelled = true }
+  }, [i18n.language, loadHome])
+
+  // ── Live notification counts via socket (Angular: socketService.getNotificationLogin()
+  // subscription in ngAfterViewInit) — connects once, requests counts, and updates
+  // comCount live rather than only on load/focus. Nothing else in this app has
+  // wired this socket up yet, so this is the first real consumer.
+  useEffect(() => {
+    let cancelled = false
+    socketConnection(EnvConfig.notify).then(() => {
+      if (cancelled) return
+      emitNotificationDetails()
+    })
+    const unsubscribe = onNotificationList((data: any) => {
+      if (cancelled || !data) return
+      const list = data?.['COMCOUNT'] ?? data?.['RESPONSE']?.['COMCOUNT']
+      if (Array.isArray(list)) setComCount(list)
+    })
+    return () => { cancelled = true; unsubscribe() }
   }, [])
 
-  const likesCount = likedMeTotal
+  const hasPaidBadge = computeHasPaidBadge(
+    entryType, payRenewalFlag,
+    isPaidVerifiedNoPhotoMale(entryType, ekycStatus, gender, ppSetData?.['PI_PHOTOSTATUS'] ?? 'N'),
+  )
+
+  const toolbar = buildToolbar(comCount)
+  const selfHelpVisible = computeSelfHelpVideosVisible(lang)
+
+  // ── Navigation / action handlers ───────────────────────────────────────────
 
   function handleTabPress(tab: FooterTab) {
     switch (tab) {
@@ -494,26 +784,173 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   }
 
   function handleToolbarPress(toolType: string) {
-    if (toolType === 'notification') navigation.navigate('notification')
-    if (toolType === 'chat')         navigation.navigate('Messages')
-    if (toolType === 'menu')         navigation.navigate('Menu')
+    // Angular: header.component.ts's reDirectPage() — discover-matches icon
+    // goes to /search; notification icon goes to /notification (no dedicated
+    // notification route exists in this app yet — Activity is the closest
+    // existing equivalent, same underlying activity counts).
+    if (toolType === 'discover-matches') navigation.navigate('Search')
+    if (toolType === 'notification')     navigation.navigate('Activity')
+    if (toolType === 'menu')             navigation.navigate('Menu')
   }
 
-  function goToProfile(item: SwiperItem) {
-    if (item.profileId) navigation.navigate('viewprofile', { id: item.profileId })
+  // Angular: onclickPayNowCTA(type) — dispatches per the variant currently shown.
+  function handleHeroBannerPress() {
+    switch (heroBannerVariant) {
+      case 'payment_failed':
+        navigation.navigate('recharge', { fromTab: false })
+        break
+      case 'photo_promo_free_female':
+      case 'paid_verified_no_photo':
+        navigation.navigate('Gallery')
+        break
+      case 'non_id_verify_male':
+        /* TODO: no verify-id screen registered yet */
+        break
+      default:
+        paymentTrack('98')
+        redirectToIntermediatePage('home')
+    }
+  }
+
+  // Angular: onHomeBannerClose('paymentFailedPromotion') — session-scoped dismiss,
+  // only meaningful for the payment-failed variant (the other variants aren't
+  // closable in Angular either).
+  function handleHeroBannerDismiss() {
+    if (heroBannerVariant === 'payment_failed') {
+      setPaymentFailedDismissed(true)
+      setHeroBannerVariant(null)
+      setHeroBannerContent(null)
+    }
+  }
+
+  // Angular: assist-banner CTA — paymentTrack('105') + dismiss + payment intermediate page.
+  function handleAssistPress() {
+    paymentTrack('105')
+    setAssistDismissed(true)
+    setAssistContent(null)
+    redirectToIntermediatePage('home')
+  }
+
+  function handleAssistDismiss() {
+    setAssistDismissed(true)
+    setAssistContent(null)
+    setItem(StorageKeys.Promotions.ASSISTED_PROMO, '1')
+  }
+
+  // ── Sticky banner (force-update / profile-validation) ─────────────────────
+  const activeSticky: 'forceUpdate' | 'profileValidation' | null =
+    stickyDismissed ? null : forceUpdateInfo ? 'forceUpdate' : profileValidationBanner ? 'profileValidation' : null
+
+  function handleStickyPress() {
+    if (activeSticky === 'forceUpdate') {
+      const url = String(Constants.expoConfig?.extra?.['playStoreUrl'] ?? 'https://play.google.com/store/apps/details?id=jodii.app')
+      Linking.openURL(url)
+    } else if (activeSticky === 'profileValidation') {
+      // Angular: opens a PCS bottom sheet to fix the flagged profile fields —
+      // closest existing equivalent screen is EditProfile.
+      navigation.navigate('EditProfile')
+    }
+  }
+
+  function handleStickyClose() {
+    if (activeSticky === 'forceUpdate') {
+      setItem('PLAYSTOREUPDATE', '2')   // Angular: "show again next login"
+    }
+    setStickyDismissed(true)
+  }
+
+  // Angular: logScrollEnd(ev) — hides the sticky banner while actively
+  // scrolling down past a small threshold; shows it again scrolling up or near
+  // the top. Simplified from Angular's header-height-relative thresholds (no
+  // overlaid header here to measure against) to a flat 40px scroll delta.
+  function handleScroll(e: any) {
+    const y = e.nativeEvent.contentOffset.y
+    const delta = y - scrollYRef.current
+    if (Math.abs(delta) < 10) return
+    scrollYRef.current = y
+    if (y > 40 && delta > 0) setHideStickyOnScroll(true)
+    else if (delta < 0 || y < 40) setHideStickyOnScroll(false)
+  }
+
+  // Angular: clickOnViewProfile() → matriIdDBset() (prev/next swipe chain) →
+  // navigate to <type>/viewprofile/<id>. redirectToViewProfile is the same
+  // helper MatchesScreen.tsx uses, so ViewProfileScreen's swipe-through works
+  // identically regardless of which screen navigated into it.
+  function goToProfile(item: SwiperItem, sectionItems: SwiperItem[], fromPage: string) {
+    if (!item.profileId) return
+    const ids = sectionItems.map(i => i.profileId).filter((id): id is string => !!id)
+    redirectToViewProfile('', item.profileId, fromPage, ids)
+  }
+
+  // Angular: clickOnLike() → communicationBtnOnClick('home', action, oppProfile)
+  // → optimistic flip of LIKED in the local array (emitLikeDislikeProfiles()).
+  function makeLikeHandler(setList: (updater: (prev: SwiperItem[]) => SwiperItem[]) => void) {
+    return async (item: SwiperItem) => {
+      if (!item.profileId) return
+      const alreadyLiked = ['1', '2', '3'].includes(item.likedStatus ?? '0')
+      const action = alreadyLiked ? 'dislike' : 'like'
+      const result = await communicationBtnOnClick('home', action, { MATRIID: item.profileId })
+      if (result.type === 'api_success') {
+        setList(prev => prev.map(p => (
+          p.profileId === item.profileId ? { ...p, likedStatus: action === 'like' ? '1' : '0' } : p
+        )))
+      }
+    }
+  }
+
+  // setX setters are referentially stable across renders, so these don't need
+  // useCallback — makeLikeHandler(setX) itself is already a fresh closure per
+  // render either way, wrapping it would just add indirection with no benefit.
+  const likeAllMatches   = makeLikeHandler(setAllMatches)
+  const likeViewedMe     = makeLikeHandler(setViewedMe)
+  const likeTodayMatches = makeLikeHandler(setTodayMatches)
+  const likeNewlyJoined  = makeLikeHandler(setNewlyJoined)
+  const likeProfilesViewed = makeLikeHandler(setProfilesViewed)
+  const likeLikedByMe    = makeLikeHandler(setLikedByMe)
+  const likeLikedMe      = makeLikeHandler(setLikedMe)
+
+  // Angular: redirectToPCS(cardDetails) — each card type navigates to its own
+  // edit screen. HOROSCOPE and IDVERIFY have no registered route in this app
+  // yet (no dedicated screen exists) — left as TODO no-ops rather than guessing.
+  function handleCompleteProfileCard(card: CompleteProfileCard) {
+    switch (card.type) {
+      case 'PHOTO':       navigation.navigate('Gallery'); break
+      case 'STAR_RAASI':  navigation.navigate('onboarding', { pageNo: '29', standalone: true }); break
+      case 'PROPERTY':
+      case 'VEHICLE':     navigation.navigate('onboarding', { pageNo: '28', standalone: true }); break
+      case 'FAMILY':      navigation.navigate('onboarding', { pageNo: '27', standalone: true }); break
+      case 'DIET':        navigation.navigate('onboarding', { pageNo: '38', standalone: true }); break
+      case 'HOMETOWN':    navigation.navigate('onboarding', { pageNo: '44', standalone: true }); break
+      case 'HOROSCOPE':   /* TODO: no horoscope edit screen registered yet */ break
+      case 'IDVERIFY':    /* TODO: no verify-id screen registered yet */ break
+    }
+  }
+
+  // Angular: getHelbBannerData()'s CTA click → callNative('dial_pad') — dials
+  // customer care directly. No WhatsApp option exists in Home's help section.
+  function handleCallPress() {
+    if (customerCare.phone) Linking.openURL(`tel:${customerCare.phone}`)
   }
 
   // ── Desktop web layout (Figma "Jodii Desktop - Registration", 161:10324) ───
-  // Wide browser window only — mobile/native/narrow-web keep the JSX below,
-  // untouched, sharing all the same state/handlers defined above.
   if (isDesktop) {
     return (
       <HomeDesktopLayout
         navigation={navigation}
         userName={userName}
         completionPct={completionPct}
-        banner={banner}
-        onPlayNow={() => navigation.navigate('recharge')}
+        heroBannerVariant={heroBannerVariant}
+        heroBannerContent={heroBannerContent}
+        onHeroBannerPress={handleHeroBannerPress}
+        onHeroBannerDismiss={handleHeroBannerDismiss}
+        assistContent={assistDismissed ? null : assistContent}
+        onAssistPress={handleAssistPress}
+        onAssistDismiss={handleAssistDismiss}
+        activeSticky={activeSticky}
+        stickyText={activeSticky === 'forceUpdate' ? t('APP_UPDATE.NOTE') : profileValidationBanner?.message ?? ''}
+        stickyCtaLabel={activeSticky === 'forceUpdate' ? t('APP_UPDATE.CTA') : profileValidationBanner?.ctaLabel ?? ''}
+        onStickyPress={handleStickyPress}
+        onStickyClose={handleStickyClose}
         allMatches={allMatches}
         allMatchesTotal={allMatchesTotal}
         viewedMe={viewedMe}
@@ -524,8 +961,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         newlyJoinedTotal={newlyJoinedTotal}
         profilesViewed={profilesViewed}
         profilesViewedTotal={profilesViewedTotal}
-        showHoroscope={!horoAvailable}
-        showStarRaasi={!starAvailable}
+        completeCards={completeCards}
+        onCompleteProfileCardPress={handleCompleteProfileCard}
         likedTab={likedTab}
         onLikedTabChange={setLikedTab}
         likedByMe={likedByMe}
@@ -535,196 +972,295 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         categories={categories}
         stories={stories}
         videos={videos}
+        selfHelpVisible={selfHelpVisible}
         customerCare={customerCare}
-        onCardPress={goToProfile}
+        onCardPress={item => goToProfile(item, allMatches, 'home')}
         onTabPress={handleTabPress}
       />
     )
   }
 
+  if (!contentLoaded) {
+    return <Loader variant="spinner" fullPage />
+  }
+
   return (
     <View style={s.screen}>
 
-      {/* ── Header — separate component, SafeAreaView edges={['top']} inside ── */}
-      <HomeHeader
+      <AppHeader
+        type="header1"
+        userImg={userImg}
         userName={userName}
         completionPct={completionPct}
-        homeToolBar={TOOLBAR}
-        languageLabel="English"
-        onAvatarPress={() => navigation.navigate('viewprofile', { self: true })}
-        onEditProfilePress={() => navigation.navigate('onboarding', { pageNo: '2' })}
+        hasPaidBatch={hasPaidBadge}
+        homeToolBar={toolbar}
+        // Angular: avatar tap opens "my profile" (self view-profile). No
+        // self-view route/flow exists anywhere in this app yet (confirmed —
+        // not just here) and viewProfile requires a real matriId, so this
+        // routes to EditProfile instead of passing an empty one that could
+        // break ViewProfileScreen — TODO once a self-view route exists.
+        onAvatarPress={() => navigation.navigate('EditProfile')}
+        onEditProfilePress={() => navigation.navigate('onboarding', { pageNo: '2', standalone: true })}
         onToolbarItemPress={handleToolbarPress}
-        onLanguagePress={() => {}}
+        onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />
 
-      {/* ── Scrollable body ─────────────────────────────────────────────────── */}
-      <ScrollView style={s.scroll} showsVerticalScrollIndicator={false} bounces overScrollMode="never">
+      <ScrollView
+        style={s.scroll}
+        showsVerticalScrollIndicator={false}
+        bounces
+        overScrollMode="never"
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+      >
 
-        {/* Offer Banner */}
-        <OfferBanner
-          onPlayNow={() => navigation.navigate('recharge')}
-          bannerText={banner.bannerText}
-          saveAmount={banner.saveAmount}
-          timeRemaining={banner.timeRemaining}
-        />
+        {/* ════════════ HERO BANNER / ASSIST BANNER (mutually exclusive) ════════════
+            Angular: <app-home-banner *ngIf="heroBannerData && !assistFlag && ..."/>
+            vs. <app-breather *ngIf="assistFlag && assistBannerData"/> — assist wins. */}
+        {!assistDismissed && assistContent ? (
+          <AssistBanner content={assistContent} onPress={handleAssistPress} onDismiss={handleAssistDismiss} />
+        ) : heroBannerVariant && heroBannerContent ? (
+          <HeroBanner
+            content={heroBannerContent}
+            onPress={handleHeroBannerPress}
+            onDismiss={heroBannerVariant === 'payment_failed' ? handleHeroBannerDismiss : undefined}
+          />
+        ) : null}
 
         {/* ════════════ ALL MATCHES ════════════ */}
         <View style={s.section}>
-          <SwiperCard
-            swiperHeader={`All matches (${allMatchesTotal})`}
-            cardVariant={1}
-            cardSection="newmatches"
-            items={allMatches}
-            showSeeAll
-            onCardPress={(item) => goToProfile(item)}
-            onSeeAllPress={() => navigation.navigate('Matches')}
-          />
+          {!allMatchesLoaded ? (
+            <Loader variant="skeleton-dashboard" />
+          ) : allMatches.length > 1 ? (
+            <SwiperCard
+              swiperHeader={`All matches (${allMatchesTotal})`}
+              cardVariant={1}
+              // Angular: core/enums/home.enum.ts — allMatches maps to the
+              // section string 'matches', NOT 'newmatches' (that's Newly
+              // Joined's section below). ProfileCard.tsx's basicDetail()
+              // specifically omits the education suffix for section==='matches'
+              // — this was wired to the wrong section, so All Matches always
+              // showed "age, education" instead of Angular's age-only line.
+              cardSection="matches"
+              items={allMatches}
+              showSeeAll
+              onCardPress={item => goToProfile(item, allMatches, 'home_matches')}
+              onLikePress={likeAllMatches}
+              onSeeAllPress={() => navigation.navigate('Matches')}
+            />
+          ) : null}
         </View>
 
         <View style={s.divider} />
 
-        {/* ════════════ PROFILES WHO VIEWED ME ════════════ */}
-        <View style={s.section}>
-          <SwiperCard
-            swiperHeader={`Profiles who viewed me (${viewedMeTotal})`}
-            cardVariant={3}
-            cardSection="viewedyou"
-            items={viewedMe}
-            showSeeAll
-            onCardPress={(item) => goToProfile(item)}
-            onSeeAllPress={() => {}}
-          />
-        </View>
-
-        <View style={s.divider} />
-
-        {/* ════════════ COMPLETE YOUR PROFILE ════════════ */}
-        {(!horoAvailable || !starAvailable) && (
+        {/* ════════════ PROFILES WHO VIEWED ME ════════════
+            Angular: profilesWhoviewedYouSection.blockbgColor = 'dot-img-bg' —
+            a decorative background SVG plus a light pink-to-white gradient,
+            not the plain white every other (non-special-cased) section uses. */}
+        {viewedMeTotal > 3 && (
           <>
-            <View style={s.section}>
-              <Text style={s.sectionTitle}>Complete your profile</Text>
-              <CompleteProfileCard
-                onAddHoroscope={() => navigation.navigate('onboarding', { pageNo: '16' })}
-                onAddStarRaasi={() => navigation.navigate('onboarding', { pageNo: '27' })}
-                showHoroscope={!horoAvailable}
-                showStarRaasi={!starAvailable}
+            <LinearGradient colors={['#FFF1FF', '#FFFFFF']} style={s.section}>
+              <Image
+                source={{ uri: `${CDN}revamp/who-viewed-bg-color.svg` }}
+                style={StyleSheet.absoluteFill}
+                resizeMode="cover"
               />
-            </View>
-
+              <SwiperCard
+                swiperHeader={`Who viewed your profile (${viewedMeTotal})`}
+                newCount={comCountFor(comCount, 'viewedyou')}
+                cardVariant={3}
+                cardSection="viewedyou"
+                items={viewedMe}
+                showSeeAll
+                onCardPress={item => goToProfile(item, viewedMe, 'home_viewedyou')}
+                onLikePress={likeViewedMe}
+                onSeeAllPress={() => navigation.navigate('Activity')}
+              />
+            </LinearGradient>
             <View style={s.divider} />
           </>
         )}
 
-        {/* ════════════ TODAY'S MATCHES ════════════ */}
-        <View style={s.section}>
-          <SwiperCard
-            swiperHeader={`Today's matches for you (${todayTotal})`}
-            cardVariant={1}
-            cardSection="dailyrecommendations"
-            items={todayMatches}
-            cardWidth={BIG_CARD_W}
-            showSeeAll
-            onCardPress={(item) => goToProfile(item)}
-            onSeeAllPress={() => navigation.navigate('Matches')}
-          />
-        </View>
+        {/* ════════════ COMPLETE YOUR PROFILE ════════════ */}
+        {completeCards.length > 0 && (
+          <>
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Complete your profile</Text>
+              <CompleteProfileSection cards={completeCards} onCardPress={handleCompleteProfileCard} />
+            </View>
+            <View style={s.divider} />
+          </>
+        )}
 
-        <View style={s.divider} />
+        {/* ════════════ TODAY'S MATCHES (Daily Recommendation) ════════════
+            Angular: *ngIf="swiperDRContents?.length > 0" — unlike All Matches/
+            Newly Joined (>1), this section's threshold is just >0. Missing
+            this gate left a stray empty section + divider gap when there's no
+            daily-rec data. */}
+        {todayMatches.length > 0 && (
+          <>
+            <View style={s.section}>
+              <SwiperCard
+                // Angular: DAILYRECOMMENDATIONS.DAILY_RECOMMENDATIONS — "Daily recommendations", not "Today's matches for you".
+                swiperHeader={`Daily recommendations (${todayTotal})`}
+                cardVariant={1}
+                cardSection="dailyrecommendations"
+                items={todayMatches}
+                showSeeAll
+                onCardPress={item => goToProfile(item, todayMatches, 'home_dailyrec')}
+                onLikePress={likeTodayMatches}
+                onSeeAllPress={() => navigation.navigate('Matches')}
+              />
+            </View>
+            <View style={s.divider} />
+          </>
+        )}
 
-        {/* ════════════ NEWLY JOINED ════════════ */}
-        <View style={s.section}>
-          <SwiperCard
-            swiperHeader={`Newly joined (${newlyJoinedTotal})`}
-            cardVariant={1}
-            cardSection="newmatches"
-            items={newlyJoined}
-            showSeeAll
-            onCardPress={(item) => goToProfile(item)}
-            onSeeAllPress={() => {}}
-          />
-        </View>
+        {/* ════════════ NEWLY JOINED ════════════
+            Angular: newlyJoinedSection.blockbgColor = 'pink-bg-block' —
+            linear-gradient(#FCEBFF → #FFFFFF), not the plain white every
+            other section here uses. */}
+        <LinearGradient colors={['#FCEBFF', '#FFFFFF']} style={s.section}>
+          {!newlyJoinedLoaded ? (
+            <Loader variant="skeleton-dashboard" />
+          ) : newlyJoined.length > 1 ? (
+            <SwiperCard
+              swiperHeader={`Newly joined (${newlyJoinedTotal})`}
+              cardVariant={1}
+              cardSection="newmatches"
+              items={newlyJoined}
+              showSeeAll
+              onCardPress={item => goToProfile(item, newlyJoined, 'home_newmatches')}
+              onLikePress={likeNewlyJoined}
+              onSeeAllPress={() => navigation.navigate('Matches')}
+            />
+          ) : null}
+        </LinearGradient>
 
         <View style={s.divider} />
 
         {/* ════════════ PROFILES YOU VIEWED ════════════ */}
-        <View style={s.section}>
-          <SwiperCard
-            swiperHeader={`Profiles you viewed (${profilesViewedTotal})`}
-            cardVariant={3}
-            cardSection="viewedbyme"
-            items={profilesViewed}
-            showSeeAll
-            onCardPress={(item) => goToProfile(item)}
-            onSeeAllPress={() => {}}
-          />
-        </View>
+        {profilesViewed.length > 0 && (
+          <>
+            <View style={s.section}>
+              <SwiperCard
+                swiperHeader={`Profiles you viewed (${profilesViewedTotal})`}
+                newCount={comCountFor(comCount, 'viewedbyme')}
+                cardVariant={3}
+                cardSection="viewedbyme"
+                items={profilesViewed}
+                showSeeAll
+                onCardPress={item => goToProfile(item, profilesViewed, 'home_viewedbyme')}
+                onLikePress={likeProfilesViewed}
+                onSeeAllPress={() => navigation.navigate('Activity')}
+              />
+            </View>
+            <View style={s.divider} />
+          </>
+        )}
 
-        <View style={s.divider} />
-
-        {/* ════════════ LIKED PROFILES ════════════ */}
-        <View style={s.section}>
-          <LikedProfilesSection
-            likedTab={likedTab}
-            onTabChange={setLikedTab}
-            likedByMe={likedByMe}
-            likedMe={likedMe}
-            likedByCount={likedByMeTotal}
-            likedMeCount={likedMeTotal}
-            onCardPress={goToProfile}
-          />
-        </View>
-
-        <View style={s.divider} />
+        {/* ════════════ LIKED PROFILES ════════════
+            Angular: enums.likedprofile.blockbgColor = 'liked-profile-bg' — a
+            cover-fit background SVG, not plain white. */}
+        {(likedByMeTotal > 0 || likedMeTotal > 0) && (
+          <>
+            <ImageBackground source={{ uri: `${CDN}liked-profiles-bg.svg` }} style={s.section} resizeMode="cover">
+              <LikedProfilesSection
+                likedTab={likedTab}
+                onTabChange={setLikedTab}
+                likedByMe={likedByMe}
+                likedMe={likedMe}
+                likedByCount={likedByMeTotal}
+                likedMeCount={likedMeTotal}
+                onCardPress={item => goToProfile(item, likedTab === 'likedbyme' ? likedByMe : likedMe, 'home_liked')}
+                onLikePress={likedTab === 'likedbyme' ? likeLikedByMe : likeLikedMe}
+              />
+            </ImageBackground>
+            <View style={s.divider} />
+          </>
+        )}
 
         {/* ════════════ EXPLORE CATEGORIES ════════════ */}
-        <View style={s.section}>
-          <ExploreCategoriesSection
-            categories={categories}
-            tileWidth={CAT_W}
-            tileHeight={CAT_H}
-            onCategoryPress={cat => navigation.navigate('Matches', { exploreType: cat.id, exploreLabel: cat.label })}
-            onDiscoverPress={() => {}}
-          />
-        </View>
-
-        <View style={s.divider} />
+        {categories.length > 0 && (
+          <>
+            <View style={s.section}>
+              <ExploreCategoriesSection
+                categories={categories}
+                tileWidth={(SW - 32 - 8) / 2}
+                onCategoryPress={cat => navigation.navigate('Matches', { exploreType: cat.id, exploreLabel: cat.label })}
+              />
+            </View>
+            <View style={s.divider} />
+          </>
+        )}
 
         {/* ════════════ SUCCESS STORIES ════════════ */}
-        <View style={s.section}>
-          <SuccessStoriesSection
-            stories={stories}
-            cardWidth={Math.round(SW * 0.68)}
-            onCardPress={() => {}}
-          />
-        </View>
+        {stories.length > 1 && (
+          <>
+            <View style={s.section}>
+              <SuccessStoriesSection
+                stories={stories}
+                // Success stories are married couples, not viewable member
+                // profiles — no per-story detail route exists anywhere in this
+                // app (confirmed: SuccessStoriesScreen is a flat list with its
+                // own in-screen photo viewer, not a routable id). Tapping a
+                // preview card on Home opens that same list screen.
+                onCardPress={() => navigation.navigate('SuccessStories')}
+              />
+            </View>
+            <View style={s.divider} />
+          </>
+        )}
 
-        <View style={s.divider} />
-
-        {/* ════════════ SELF-HELP VIDEOS ════════════ */}
-        <View style={s.section}>
-          <SelfHelpVideosSection
-            videos={videos}
-            cardWidth={SW * 0.58}
-            cardHeight={SW * 0.33}
-            onVideoPress={() => {}}
-          />
-        </View>
-
-        <View style={s.divider} />
+        {/* ════════════ SELF-HELP VIDEOS (non-English UI only) ════════════ */}
+        {selfHelpVisible && videos.length > 0 && (
+          <>
+            <View style={s.section}>
+              <SelfHelpVideosSection
+                videos={videos}
+                cardWidth={SW * 0.58}
+                cardHeight={SW * 0.33}
+                onVideoPress={item => item.videoUrl && setVideoModalUrl(item.videoUrl)}
+              />
+            </View>
+            <View style={s.divider} />
+          </>
+        )}
 
         {/* ════════════ HELP SECTION ════════════ */}
         <View style={s.section}>
-          <HelpSection onCallPress={() => {}} onWhatsAppPress={() => {}} phone={customerCare.phone} />
+          <HelpSection onCallPress={handleCallPress} phone={customerCare.phone} />
         </View>
 
         <View style={{ height: 16 }} />
       </ScrollView>
 
-      {/* ── Footer ─────────────────────────────────────────────────────────── */}
+      {activeSticky === 'forceUpdate' && !hideStickyOnScroll && (
+        <ForceUpdateCard onPress={handleStickyPress} onClose={handleStickyClose} />
+      )}
+      {activeSticky === 'profileValidation' && !hideStickyOnScroll && (
+        <StickyBanner
+          text={profileValidationBanner!.message}
+          ctaLabel={profileValidationBanner!.ctaLabel}
+          onPress={handleStickyPress}
+          onClose={handleStickyClose}
+        />
+      )}
+
+      <Modal visible={!!videoModalUrl} animationType="slide" onRequestClose={() => setVideoModalUrl(null)}>
+        <View style={s.videoModal}>
+          <Pressable style={s.videoModalClose} onPress={() => setVideoModalUrl(null)}>
+            <Text style={s.videoModalCloseText}>✕</Text>
+          </Pressable>
+          {!!videoModalUrl && <SelfHelpVideoPlayer uri={videoModalUrl} />}
+        </View>
+      </Modal>
+
       <AppFooter
         activeTab={0}
-        likesCount={likesCount}
-        upgradeTag={upgradeTag}
+        likesCount={likedMeTotal}
+        upgradeTag={upgradeTag || undefined}
+        showMembershipDot={showMembershipDot}
         onTabPress={handleTabPress}
       />
 
@@ -760,36 +1296,44 @@ const s = StyleSheet.create({
   tabPillTextActive:  { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: Colors.textPrimary },
 
   // Explore categories
+  // Angular: .discover-new-bg — 12px radius, 1px #E6E6E6 border, compact
+  // icon+text row (not a big image tile), default background a light diagonal
+  // gradient (applied via LinearGradient at the call site, not here).
   catGrid:      { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8 },
-  catTile:      { width: CAT_W, borderRadius: 10, overflow: 'hidden', backgroundColor: Colors.white, borderWidth: 1, borderColor: Colors.divider },
-  catImgBox:    { width: CAT_W, height: CAT_H },
-  catImg:       { width: '100%', height: '100%' },
-  catInfo:      { paddingHorizontal: 10, paddingVertical: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  catLabel:     { fontFamily: 'Poppins-Medium', fontSize: 11, color: Colors.textPrimary, flex: 1 },
-  catCount:     { fontFamily: 'Poppins-Regular', fontSize: 11, color: Colors.textSecondary },
-  discoverBtn:  { marginHorizontal: 16, marginTop: 12, backgroundColor: Colors.primary, borderRadius: 8, height: 44, alignItems: 'center', justifyContent: 'center' },
-  discoverText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.white },
+  catTile:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#E6E6E6', paddingVertical: 8, paddingHorizontal: 8, minHeight: 64 },
+  catIconWrap:  { width: 32, height: 32, marginRight: 8, alignItems: 'center', justifyContent: 'center' },
+  catIconImg:   { width: 28, height: 28 },
+  catLabel:     { flex: 1, fontFamily: 'Poppins-Medium', fontSize: 12, color: Colors.textPrimary, lineHeight: 16 },
+  catChevron:   { color: '#29339B', fontFamily: 'Poppins-SemiBold' },
 
   // Success stories header
   storyHeader:    { paddingHorizontal: 16, marginBottom: 12 },
   storyTitle:     { fontFamily: 'Poppins-Regular', fontSize: 18, color: Colors.textPrimary },
   storyTitleBold: { fontFamily: 'Poppins-Bold',    fontSize: 22, color: Colors.primary },
+  storySubtitle:  { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textPrimary, marginTop: 8, lineHeight: 20 },
 
   // Self-help videos
-  videoCard:     { width: SW * 0.58, borderRadius: 10, overflow: 'hidden', backgroundColor: Colors.white, shadowColor: Colors.shadow, shadowOpacity: 0.08, shadowRadius: 6, elevation: 2 },
-  videoThumb:    { width: '100%', height: SW * 0.33, position: 'relative' },
-  videoThumbImg: { width: '100%', height: '100%' },
-  playBtn:       { position: 'absolute', top: '50%', left: '50%', width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(0,0,0,0.5)', transform: [{ translateX: -20 }, { translateY: -20 }], alignItems: 'center', justifyContent: 'center' },
-  playIcon:      { width: 0, height: 0, borderTopWidth: 9, borderBottomWidth: 9, borderLeftWidth: 16, borderTopColor: 'transparent', borderBottomColor: 'transparent', borderLeftColor: Colors.white, marginLeft: 3 },
-  videoTitle:    { fontFamily: 'Poppins-Regular', fontSize: 11, color: Colors.textPrimary, padding: 10 },
+  videoCard:     { borderRadius: 10, overflow: 'hidden', position: 'relative', backgroundColor: Colors.white },
+  videoThumbImg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+  playBtn:       { position: 'absolute', top: '50%', left: '50%', width: 40, height: 40, marginLeft: -20, marginTop: -20, alignItems: 'center', justifyContent: 'center' },
+  videoCaptionScrim: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 10, paddingTop: 24, backgroundColor: 'rgba(0,0,0,0.45)' },
+  videoTitle:    { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.white, lineHeight: 16 },
 
   // Help section
-  helpTitle:   { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.textPrimary, paddingHorizontal: 16, marginBottom: 6 },
-  helpSub:     { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary, paddingHorizontal: 16, marginBottom: 16, lineHeight: 20 },
-  helpActions: { flexDirection: 'row', paddingHorizontal: 16, gap: 12, flexWrap: 'wrap' },
-  callBtn:     { flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: Colors.divider, borderRadius: 24, paddingHorizontal: 16, paddingVertical: 10 },
-  callBtnText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.textPrimary },
-  waBtn:       { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#25D366', borderRadius: 24, paddingHorizontal: 16, paddingVertical: 10 },
-  waBtnText:   { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.white },
-  helpIconImg: { width: 22, height: 22 },
+  // Angular: FAQ_DETAILS.BANNER — title/body/link-CTA on a gradient card with
+  // a decorative image, not two call/whatsapp buttons.
+  helpWrap:      { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, borderRadius: 12, padding: 16, gap: 12 },
+  helpTextCol:   { flex: 1 },
+  helpTitle:     { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.textPrimary, marginBottom: 6 },
+  helpSub:       { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary, marginBottom: 10, lineHeight: 20 },
+  helpCta:       { flexDirection: 'row', alignItems: 'center' },
+  helpCtaText:   { fontFamily: 'Poppins-Medium', fontSize: 13, color: '#29339B' },
+  helpCtaChevron: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#29339B', marginLeft: 4 },
+  helpImage:     { width: 80, height: 80 },
+
+  // Self-help video modal
+  videoModal:      { flex: 1, backgroundColor: '#000' },
+  videoModalClose: { position: 'absolute', top: 48, right: 16, zIndex: 1, padding: 8 },
+  videoModalCloseText: { fontSize: 22, color: Colors.white },
+  videoModalPlayer: { flex: 1 },
 })

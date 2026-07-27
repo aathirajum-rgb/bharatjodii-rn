@@ -3,6 +3,7 @@ import { getItem, setItem, setJson } from './storageService'
 import { getSession, parseAndStoreWebViewURL } from './registrationService'
 import { Endpoints } from './api.endpoints'
 import { StorageKeys } from '../constants/storage.keys'
+import i18n from '../i18n'
 import type { SwiperItem } from '../components/swiper-card/SwiperCard'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -13,13 +14,6 @@ export interface HomeSession {
   membershipType: string
   horoAvailable: boolean
   starAvailable: boolean
-}
-
-export interface BannerData {
-  show: boolean
-  saveAmount: string
-  timeRemaining: string
-  bannerText: string
 }
 
 export interface ExploreCategory {
@@ -279,18 +273,6 @@ export async function fetchNotifCount(): Promise<NotifCountResult> {
   return { newCount: 0, comCount: [] }
 }
 
-// ─── Payment banner ───────────────────────────────────────────────────────────
-
-export async function fetchPayBanner(): Promise<BannerData> {
-  const res = await apiCall(Endpoints.payment.payBanner, 'POST', '')
-  return {
-    show:          res['ERRCODE'] === '1' && (res['SHOWBANNER'] === '1' || !!res['SAVEAMOUNT']),
-    saveAmount:    res['SAVEAMOUNT']    ?? '',
-    timeRemaining: res['TIMEREMAINING'] ?? res['OFFERTIME'] ?? '',
-    bannerText:    res['BANNERTEXT']    ?? res['OFFERTEXT'] ?? 'Special Offer!',
-  }
-}
-
 // ─── Menu promo (MATCHESSLOT membership banner) ───────────────────────────────
 // Angular: paymentService.getMenuPromo(0) → payment/nbmenu/v1
 // Returns MATCHESSLOT (festival/membership offer), MANYJOBSPROMO, ASSISTEDPROMO, etc.
@@ -328,6 +310,56 @@ export async function fetchAndStorePPSetData(): Promise<Record<string, any>> {
     return data
   }
   return {}
+}
+
+// ─── Complete Your Profile (PCS) cards ────────────────────────────────────────
+// Angular: getPPSETData()'s PCS array — each entry with FLAG===1 is an incomplete
+// profile-completion card. This is a pure mapper over fetchAndStorePPSetData()'s
+// output; the "already completed" filter (HOROSCOPE/PHOTO removal) is gating
+// logic and lives in screens/home/homeGating.ts's filterCompleteProfileCards().
+
+export interface CompleteProfileCard {
+  type:     'HOROSCOPE' | 'STAR_RAASI' | 'PROPERTY' | 'VEHICLE' | 'FAMILY' | 'IDVERIFY' | 'DIET' | 'HOMETOWN' | 'PHOTO'
+  // Angular: complete-profile.component.html reads card?.CONTENT and card?.THUMBIMG
+  // directly from each server-returned PCS entry — NOT a client-side label/icon
+  // lookup per type (a previous version of this port hardcoded English strings
+  // and guessed CDN icon paths here instead, which breaks for every other
+  // language and would show non-existent icons).
+  label:    string
+  imageUrl: string
+  // Angular: complete-profile.component.ts's getCTAText(card) — 'Add' for every
+  // card except PHOTO/HOROSCOPE, which use their own translation keys (all three
+  // happen to read "Add" in English, but can differ in other languages).
+  ctaLabel: string
+}
+
+const CTA_KEY: Partial<Record<CompleteProfileCard['type'], string>> = {
+  PHOTO:     'PROFILES.ADDYOURPHOTO',
+  HOROSCOPE: 'PROFILES.ADDYOURHORO',
+}
+
+// Angular: getPPSETData()'s PCS array. Field names for TYPE/CONTENT/THUMBIMG and
+// whether FLAG is numeric or string are unverified against a live payload —
+// mapped defensively with fallbacks.
+export function mapCompleteProfileCards(ppSetData: Record<string, any>): CompleteProfileCard[] {
+  const raw = ppSetData?.['PCS']
+  if (!Array.isArray(raw)) return []
+  const cards: CompleteProfileCard[] = []
+  const validTypes: CompleteProfileCard['type'][] =
+    ['PHOTO', 'HOROSCOPE', 'STAR_RAASI', 'PROPERTY', 'VEHICLE', 'FAMILY', 'IDVERIFY', 'DIET', 'HOMETOWN']
+  for (const entry of raw) {
+    const flag = entry?.['FLAG']
+    if (flag !== 1 && flag !== '1') continue
+    const type = String(entry?.['TYPE'] ?? entry?.['NAME'] ?? entry?.['CODE'] ?? '') as CompleteProfileCard['type']
+    if (!validTypes.includes(type)) continue
+    cards.push({
+      type,
+      label:    String(entry?.['CONTENT'] ?? ''),
+      imageUrl: String(entry?.['THUMBIMG'] ?? ''),
+      ctaLabel: i18n.t(CTA_KEY[type] ?? 'HOME.ADD'),
+    })
+  }
+  return cards
 }
 
 // ─── Daily recommendations ────────────────────────────────────────────────────
@@ -508,87 +540,209 @@ export async function fetchSearchResults(searchParams: string): Promise<ListingR
 }
 
 // ─── Profiles who viewed me ───────────────────────────────────────────────────
+// Angular: ID,START=0,LIMIT=20,BANNERFLAG=0,MYHOME=1,LASTLOGIN — confirmed live
+// against a real staging account; the previous PAGENO=1&TYPE=1 shape returned
+// ERRCODE 23 ("ATN and RTN Expire!", a red herring — the real cause is the
+// server rejecting the unrecognized param shape) even with a fully valid token.
 
 export async function fetchViewedYou(): Promise<ListingResult> {
-  const res = await apiCall(Endpoints.listing.viewedYou, 'POST', 'PAGENO=1&TYPE=1')
+  const [userId, session] = await Promise.all([getItem(StorageKeys.Auth.USER_ID), getSession()])
+  const params = `ID=${userId ?? ''}&START=0&LIMIT=20&BANNERFLAG=0&MYHOME=1&LASTLOGIN=${session['LASTLOGIN'] ?? ''}`
+  const res = await apiCall(Endpoints.listing.viewedYou, 'POST', params)
   return toListingResult(res)
 }
 
 // ─── Today's / Daily recommendations ─────────────────────────────────────────
+// Angular: ID,START=0,LIMIT=15,LIKED=1,VIEWED=1,REPORTED=1,BLOCKED=1,REMOVED=1,
+// SKIPED=1,MYHOME=1 — same shape fetchDailyRecommendations() below already uses;
+// this wrapper just returns the ListingResult (with totalCount) shape Home needs.
 
 export async function fetchDailyRec(): Promise<ListingResult> {
-  const res = await apiCall(Endpoints.listing.dailyRecommendations, 'POST', 'PAGENO=1')
+  const userId = await getItem(StorageKeys.Auth.USER_ID)
+  const params = `ID=${userId ?? ''}&START=0&LIMIT=15&LIKED=1&VIEWED=1&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&MYHOME=1`
+  const res = await apiCall(Endpoints.listing.dailyRecommendations, 'POST', params)
   return toListingResult(res)
 }
 
 // ─── Newly joined ─────────────────────────────────────────────────────────────
+// Angular: same listing/matches/v1 endpoint as All Matches, with NEWMATCHES=1 —
+// ID,START=0,LIMIT=30,LIKED=1,VIEWED=1,REPORTED=1,BLOCKED=1,REMOVED=1,SKIPED=1,
+// BANNERFLAG=0,LOGINCOUNT,NEWMATCHES=1,MYHOME=1.
 
 export async function fetchNewlyJoined(): Promise<ListingResult> {
-  const res = await apiCall(Endpoints.listing.matches, 'POST', 'PAGENO=1&ISNEWLYJOINED=1')
+  const [userId, session] = await Promise.all([getItem(StorageKeys.Auth.USER_ID), getSession()])
+  const loginCount = session['LOGINCOUNT'] ?? '0'
+  const parts = [
+    `ID=${userId ?? ''}`, 'START=0', 'LIMIT=30', 'LIKED=1', 'VIEWED=1',
+    'REPORTED=1', 'BLOCKED=1', 'REMOVED=1', 'SKIPED=1', 'BANNERFLAG=0',
+    `LOGINCOUNT=${loginCount}`, 'NEWMATCHES=1', 'MYHOME=1',
+  ]
+  const res = await apiCall(Endpoints.listing.matches, 'POST', parts.join('&'))
   return toListingResult(res)
 }
 
 // ─── Profiles you viewed ──────────────────────────────────────────────────────
+// Angular: ID,START=0,LIMIT=10,BANNERFLAG=0,SKIPED=1,MYHOME=1.
 
 export async function fetchViewedByMe(): Promise<ListingResult> {
-  const res = await apiCall(Endpoints.listing.viewedByMe, 'POST', 'PAGENO=1&TYPE=1')
+  const userId = await getItem(StorageKeys.Auth.USER_ID)
+  const params = `ID=${userId ?? ''}&START=0&LIMIT=10&BANNERFLAG=0&SKIPED=1&MYHOME=1`
+  const res = await apiCall(Endpoints.listing.viewedByMe, 'POST', params)
   return toListingResult(res)
 }
 
 // ─── Liked by me ──────────────────────────────────────────────────────────────
+// Angular: ID,START=0,LIMIT=10,BANNERFLAG=0,SKIPED=1.
 
 export async function fetchLikedByMe(): Promise<ListingResult> {
-  const res = await apiCall(Endpoints.listing.likedByMe, 'POST', 'PAGENO=1&TYPE=1')
+  const userId = await getItem(StorageKeys.Auth.USER_ID)
+  const params = `ID=${userId ?? ''}&START=0&LIMIT=10&BANNERFLAG=0&SKIPED=1`
+  const res = await apiCall(Endpoints.listing.likedByMe, 'POST', params)
   return toListingResult(res)
 }
 
 // ─── Liked you ────────────────────────────────────────────────────────────────
+// Angular: ID,START=0,LIMIT=10,BANNERFLAG=0,SKIPED=1.
 
 export async function fetchLikedYou(): Promise<ListingResult> {
-  const res = await apiCall(Endpoints.listing.likedYou, 'POST', 'PAGENO=1&TYPE=1')
+  const userId = await getItem(StorageKeys.Auth.USER_ID)
+  const params = `ID=${userId ?? ''}&START=0&LIMIT=10&BANNERFLAG=0&SKIPED=1`
+  const res = await apiCall(Endpoints.listing.likedYou, 'POST', params)
   return toListingResult(res)
 }
 
 // ─── Explore categories ───────────────────────────────────────────────────────
+// NEEDS LIVE VERIFICATION: unlike the other listing functions in this file,
+// there's no confirmed Angular contract for "list all discover categories with
+// labels/images" as a single API call — Angular's Discover grid tiles come from
+// PPSET's DISCOVERKEY-derived static config, with fetchExploreCounts (above)
+// separately supplying live counts per category. This PAGENO=1 call against
+// listing/explore/v1 (the same endpoint fetchExplore() uses with a required
+// FILTERTYPE) is unconfirmed and likely needs the same param-shape fix applied
+// above if it turns out to be hitting the wrong contract — flagged rather than
+// guessed further without a documented shape to base a fix on.
 
 export async function fetchExploreCategories(): Promise<ExploreCategory[]> {
   const res = await apiCall(Endpoints.listing.explore, 'POST', 'PAGENO=1')
   const raw = res['LIST'] ?? res['LISTDATA'] ?? []
   if (!Array.isArray(raw)) return []
   return raw.map((item: Record<string, any>, idx: number) => ({
-    id:       item['ID']       ?? item['TYPE']   ?? String(idx),
-    label:    item['LABEL']    ?? item['TITLE']   ?? '',
+    // Angular: explore-card.component.html's ACTIVE (non-commented) template
+    // reads exploreData.TITLE (count already baked in server-side, no separate
+    // count element) and exploreData.ICON (a small icon, not a full tile image).
+    id:       item['ID']       ?? item['FILTER']  ?? item['TYPE'] ?? String(idx),
+    label:    item['TITLE']    ?? item['LABEL']   ?? '',
     count:    Number(item['COUNT'] ?? 0),
-    imageUrl: item['IMAGEURL'] ?? item['IMGURL']  ?? '',
+    imageUrl: item['ICON']     ?? item['IMAGEURL'] ?? item['IMGURL'] ?? '',
   }))
+}
+
+// ─── Explore / Discover tile counts ───────────────────────────────────────────
+// Angular: getExploreMatchesCount() → listing/explorecount/v1 — ID,TYPES=<pipe~
+// joined discover keys>,START=0,LIMIT=1,LISTTYPE=COUNT,LIKED=1,VIEWED=0,
+// REPORTED=1,BLOCKED=1,REMOVED=1,SKIPED=1,BANNERFLAG=0. `discoverKey` here is
+// PPSET's DISCOVERKEY value itself (already the pipe-joined key string per
+// Angular's common.discoverType()), passed straight through as TYPES.
+// Response shape is still unconfirmed against a live payload — mapper below
+// tries both an object-keyed-by-category and a flat-list shape, falling back
+// to an empty map (tiles render without a count) if neither matches.
+
+export async function fetchExploreCounts(discoverKey?: string): Promise<Record<string, number>> {
+  const userId = await getItem(StorageKeys.Auth.USER_ID)
+  const parts = [
+    `ID=${userId ?? ''}`,
+    `TYPES=${discoverKey ?? ''}`,
+    'START=0', 'LIMIT=1', 'LISTTYPE=COUNT',
+    'LIKED=1', 'VIEWED=0', 'REPORTED=1', 'BLOCKED=1', 'REMOVED=1', 'SKIPED=1', 'BANNERFLAG=0',
+  ]
+  const res = await apiCall(Endpoints.listing.exploreCount, 'POST', parts.join('&'))
+  if (String(res?.RESPONSECODE) !== '1' || String(res?.ERRCODE) !== '0') return {}
+
+  const counts: Record<string, number> = {}
+  const respObj = res['RESPONSE']
+  if (respObj && !Array.isArray(respObj) && typeof respObj === 'object') {
+    for (const [key, value] of Object.entries(respObj)) {
+      const count = Array.isArray(value) ? Number((value[0] as any)?.['COUNT'] ?? 0) : Number((value as any)?.['COUNT'] ?? value ?? 0)
+      if (!Number.isNaN(count)) counts[key] = count
+    }
+    return counts
+  }
+  const rawList = res['LIST'] ?? res['LISTDATA'] ?? (Array.isArray(respObj) ? respObj : [])
+  if (Array.isArray(rawList)) {
+    for (const item of rawList) {
+      const key = String(item?.['KEY'] ?? item?.['TYPE'] ?? '')
+      if (key) counts[key] = Number(item?.['COUNT'] ?? 0)
+    }
+  }
+  return counts
+}
+
+// ─── Profile-validation-rejected sticky banner ────────────────────────────────
+// Angular: common.getProfileValidationData() → registrationform/v1?type=PROFILEVALID,
+// shown as a sticky above the footer (PISTATUS in [5,13] — profile rejected/under
+// review). No existing caller to copy the shape from; lowercase `type=` matches
+// every other caller of this endpoint in registrationService.ts (getRegistrationArrays
+// uses `type=all`).
+// NEEDS LIVE VERIFICATION: response field names (PROSTICKY/PROBOTTOM per the
+// Angular analysis) — mapped defensively below with fallbacks.
+
+export async function fetchProfileValidationBanner(): Promise<{ show: boolean; message: string; ctaLabel: string } | null> {
+  const userId = await getItem(StorageKeys.Auth.USER_ID)
+  const res = await apiCall(Endpoints.registration.initialFetch, 'POST', `type=PROFILEVALID&ID=${userId ?? ''}`)
+  if (String(res?.ERRCODE) !== '0') return null
+  const data = res['RESPONSE'] ?? res['PROSTICKY'] ?? res
+  const message = data?.['MESSAGE'] ?? data?.['CONTENT'] ?? data?.['STICKYCONTENT'] ?? ''
+  if (!message) return null
+  return {
+    show:     true,
+    message:  String(message),
+    ctaLabel: String(data?.['CTA'] ?? data?.['CTALABEL'] ?? 'Know more'),
+  }
 }
 
 // ─── Success Stories ──────────────────────────────────────────────────────────
+// Angular: ID,TYPE=5.
 
 export async function fetchSuccessStories(): Promise<SwiperItem[]> {
-  const res = await apiCall(Endpoints.registration.successStory, 'POST', 'PAGENO=1')
-  const raw = res['LIST'] ?? res['LISTDATA'] ?? []
+  const userId = await getItem(StorageKeys.Auth.USER_ID)
+  const res = await apiCall(Endpoints.registration.successStory, 'POST', `ID=${userId ?? ''}&TYPE=5`)
+  // Angular: response nests the array at RESPONSE.SUCCESSSTORY, not top-level.
+  const raw = res['RESPONSE']?.['SUCCESSSTORY'] ?? res['LIST'] ?? res['LISTDATA'] ?? []
   if (!Array.isArray(raw)) return []
-  return raw.map((p: Record<string, any>) => ({
-    profileId:  p['NBID']     ?? p['ID'],
-    name:       p['NAME'],
-    location:   p['LOCATION'] ?? p['CITY'],
-    profileImg: p['THUMBIMG'],
-    date:       p['POSTEDDATE'] ? `Posted on ${p['POSTEDDATE']}` : (p['DATE'] ?? ''),
-  }))
+  return raw.map((p: Record<string, any>) => {
+    // Angular: app-swiper.component.ts's getSuccessStoryName() — "${GroomName}
+    // & ${BrideName}", not a single NAME field.
+    const groom = p['GroomName'] ?? p['GROOMNAME']
+    const bride = p['BrideName'] ?? p['BRIDENAME']
+    return {
+      profileId:  p['NBID']     ?? p['ID'],
+      name:       (groom || bride) ? `${groom ?? ''} & ${bride ?? ''}` : p['NAME'],
+      // Angular: profile-card.component.html type==='4' binds [location]="cardContent.DISTRICT".
+      location:   p['DISTRICT'] ?? p['LOCATION'] ?? p['CITY'],
+      profileImg: p['THUMBIMG'],
+      // Angular binds [date]="cardContent?.TimePosted" directly — no "Posted
+      // on" prefix added client-side (the server string already includes it).
+      date:       p['TimePosted'] ?? p['POSTEDDATE'] ?? p['DATE'] ?? '',
+    }
+  })
 }
 
 // ─── FAQ / Self-help videos (non-English only) ────────────────────────────────
+// Angular: ID,TYPE=MYHOME (not a bare TYPE=1 — that was the wrong shape).
 
 export async function fetchFaqVideos(): Promise<HelpVideo[]> {
-  const res = await apiCall(Endpoints.communication.faqVideo, 'POST', 'TYPE=1')
-  const raw = res['LIST'] ?? res['LISTDATA'] ?? []
+  const userId = await getItem(StorageKeys.Auth.USER_ID)
+  const res = await apiCall(Endpoints.communication.faqVideo, 'POST', `ID=${userId ?? ''}&TYPE=MYHOME`)
+  const raw = res['LIST'] ?? res['LISTDATA'] ?? res['RESPONSE'] ?? []
   if (!Array.isArray(raw)) return []
+  // Angular: complete-profile.component.html's self-video swiper slide binds
+  // completeCard.QUS (caption), completeCard.BGIMG (background image), and
+  // completeCard.VIDEO (playback source) — not TITLE/THUMBURL/VIDEOURL.
   return raw.map((item: Record<string, any>, idx: number) => ({
     id:       item['VIDEOID']  ?? item['ID']       ?? String(idx),
-    title:    item['TITLE']    ?? item['NAME']      ?? '',
-    thumbUrl: item['THUMBURL'] ?? item['IMAGEURL']  ?? '',
-    videoUrl: item['VIDEOURL'] ?? item['URL']       ?? '',
+    title:    item['QUS']      ?? item['TITLE']    ?? item['NAME']     ?? '',
+    thumbUrl: item['BGIMG']    ?? item['THUMBURL'] ?? item['IMAGEURL'] ?? '',
+    videoUrl: item['VIDEO']    ?? item['VIDEOURL'] ?? item['URL']      ?? '',
   }))
 }
 
@@ -605,9 +759,16 @@ export async function fetchCustomerCare(): Promise<{ phone: string; whatsapp: st
       if (phone || whatsapp) return { phone, whatsapp }
     } catch { /* fall through to API */ }
   }
-  const res = await apiCall(Endpoints.payment.nbMenu, 'POST', '')
+  // Same shape confirmed working for getMenuPromo() in paymentService.ts —
+  // the previous empty-string params here was almost certainly hitting the
+  // same "unrecognized shape" rejection as the other functions fixed above.
+  const userId = await getItem(StorageKeys.Auth.USER_ID)
+  const res = await apiCall(Endpoints.payment.nbMenu, 'POST', `ID=${userId ?? ''}&TYPE=MENU`)
+  // Fields may be top-level or nested under RESPONSE depending on this
+  // endpoint's actual envelope (unconfirmed) — check both.
+  const data = res['RESPONSE'] ?? res
   return {
-    phone:    res['CSMOBILE']  ?? res['PHONE']    ?? '',
-    whatsapp: res['WAMOBILE']  ?? res['WHATSAPP'] ?? res['CSMOBILE'] ?? '',
+    phone:    data['CSMOBILE']  ?? data['PHONE']    ?? '',
+    whatsapp: data['WAMOBILE']  ?? data['WHATSAPP'] ?? data['CSMOBILE'] ?? '',
   }
 }

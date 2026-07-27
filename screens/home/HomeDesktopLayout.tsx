@@ -18,7 +18,8 @@
 // override it. Same problem MatchesDesktopLayout.tsx solved with a dedicated
 // MatchCardDesktop; SwiperCardDesktop is that fix for Home's simpler cards.
 import { useEffect, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import MatchesDesktopNav from '../../components/matches-header/MatchesDesktopNav'
 import HomeSidebar from '../../components/home-sidebar/HomeSidebar'
 import SwiperCardDesktop from '../../components/swiper-card/SwiperCardDesktop'
@@ -26,10 +27,15 @@ import type { SwiperItem } from '../../components/swiper-card/SwiperCard'
 import { Colors } from '../../constants/colors'
 import { StorageKeys } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
-import type { ExploreCategory } from '../../service/homeService'
+import type { ExploreCategory, CompleteProfileCard } from '../../service/homeService'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import type { LikedTab, HeroBannerVariant } from './homeGating'
+import HeroBanner, { type HeroBannerContent } from './HeroBanner'
+import AssistBanner, { type AssistBannerContent } from './AssistBanner'
+import StickyBanner from '../../components/sticky-banner/StickyBanner'
+import ForceUpdateCard from './ForceUpdateCard'
 import {
-  OfferBanner, CompleteProfileCard, ExploreCategoriesSection,
+  CompleteProfileSection, ExploreCategoriesSection,
   SelfHelpVideosSection, HelpSection, type HelpVideo,
 } from './HomeScreen'
 
@@ -38,7 +44,6 @@ const MAIN_WIDTH   = 700
 // (32px total) + gap:8 — both have to come out of MAIN_WIDTH before halving,
 // or two tiles overflow the row and flexWrap pushes the second down a line.
 const CAT_TILE_W   = (MAIN_WIDTH - 32 - 8) / 2
-const CAT_TILE_H   = CAT_TILE_W * 0.6
 const VIDEO_CARD_W = 320
 const VIDEO_CARD_H = 180
 const SMALL_CARD_W = 160
@@ -50,8 +55,18 @@ export interface HomeDesktopLayoutProps {
   navigation:      any
   userName:        string
   completionPct:   number
-  banner:          { bannerText: string; saveAmount: string; timeRemaining: string }
-  onPlayNow:       () => void
+  heroBannerVariant: HeroBannerVariant
+  heroBannerContent: HeroBannerContent | null
+  onHeroBannerPress: () => void
+  onHeroBannerDismiss: () => void
+  assistContent:     AssistBannerContent | null
+  onAssistPress:      () => void
+  onAssistDismiss:    () => void
+  activeSticky:       'forceUpdate' | 'profileValidation' | null
+  stickyText:         string
+  stickyCtaLabel:     string
+  onStickyPress:      () => void
+  onStickyClose:      () => void
   allMatches:      SwiperItem[]
   allMatchesTotal: number
   viewedMe:        SwiperItem[]
@@ -62,10 +77,10 @@ export interface HomeDesktopLayoutProps {
   newlyJoinedTotal: number
   profilesViewed:  SwiperItem[]
   profilesViewedTotal: number
-  showHoroscope:   boolean
-  showStarRaasi:   boolean
-  likedTab:        'me' | 'them'
-  onLikedTabChange:(tab: 'me' | 'them') => void
+  completeCards:   CompleteProfileCard[]
+  onCompleteProfileCardPress: (card: CompleteProfileCard) => void
+  likedTab:        LikedTab
+  onLikedTabChange:(tab: LikedTab) => void
   likedByMe:       SwiperItem[]
   likedByMeTotal:  number
   likedMe:         SwiperItem[]
@@ -73,18 +88,22 @@ export interface HomeDesktopLayoutProps {
   categories:      ExploreCategory[]
   stories:         SwiperItem[]
   videos:          HelpVideo[]
+  selfHelpVisible: boolean
   customerCare:    { phone: string; whatsapp: string }
   onCardPress:     (item: SwiperItem) => void
   onTabPress:      (tab: FooterTab) => void
 }
 
 export default function HomeDesktopLayout({
-  navigation, userName, onPlayNow, banner,
+  navigation, userName,
+  heroBannerVariant, heroBannerContent, onHeroBannerPress, onHeroBannerDismiss,
+  assistContent, onAssistPress, onAssistDismiss,
+  activeSticky, stickyText, stickyCtaLabel, onStickyPress, onStickyClose,
   allMatches, allMatchesTotal, viewedMe, viewedMeTotal,
   todayMatches, todayTotal, newlyJoined, newlyJoinedTotal,
-  profilesViewed, profilesViewedTotal, showHoroscope, showStarRaasi,
+  profilesViewed, profilesViewedTotal, completeCards, onCompleteProfileCardPress,
   likedTab, onLikedTabChange, likedByMe, likedByMeTotal, likedMe, likedMeTotal,
-  categories, stories, videos, customerCare, onCardPress, onTabPress,
+  categories, stories, videos, selfHelpVisible, customerCare, onCardPress, onTabPress,
 }: HomeDesktopLayoutProps) {
   const [userId, setUserId] = useState('')
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined)
@@ -99,7 +118,7 @@ export default function HomeDesktopLayout({
     })
   }, [])
 
-  const likedItems = likedTab === 'me' ? likedByMe : likedMe
+  const likedItems = likedTab === 'likedbyme' ? likedByMe : likedMe
 
   return (
     <View style={s.screen}>
@@ -114,14 +133,19 @@ export default function HomeDesktopLayout({
         />
 
         <ScrollView style={s.main} showsVerticalScrollIndicator={false} contentContainerStyle={s.mainContent}>
-          <View style={s.card}>
-            <OfferBanner
-              onPlayNow={onPlayNow}
-              bannerText={banner.bannerText}
-              saveAmount={banner.saveAmount}
-              timeRemaining={banner.timeRemaining}
-            />
-          </View>
+          {(assistContent || (heroBannerVariant && heroBannerContent)) && (
+            <View style={s.card}>
+              {assistContent ? (
+                <AssistBanner content={assistContent} onPress={onAssistPress} onDismiss={onAssistDismiss} />
+              ) : (
+                <HeroBanner
+                  content={heroBannerContent!}
+                  onPress={onHeroBannerPress}
+                  onDismiss={heroBannerVariant === 'payment_failed' ? onHeroBannerDismiss : undefined}
+                />
+              )}
+            </View>
+          )}
 
           <View style={s.section}>
             <SwiperCardDesktop
@@ -134,32 +158,33 @@ export default function HomeDesktopLayout({
             />
           </View>
 
-          <View style={s.section}>
+          {/* Angular: profilesWhoviewedYouSection.blockbgColor = 'dot-img-bg' */}
+          <LinearGradient colors={['#FFF1FF', '#FFFFFF']} style={s.section}>
+            <Image
+              source={{ uri: 'https://imgs.jodii.app/assets/images/svg/revamp/who-viewed-bg-color.svg' }}
+              style={StyleSheet.absoluteFill}
+              resizeMode="cover"
+            />
             <SwiperCardDesktop
-              swiperHeader={`Profiles who viewed me (${viewedMeTotal})`}
+              swiperHeader={`Who viewed your profile (${viewedMeTotal})`}
               items={viewedMe}
               cardWidth={SMALL_CARD_W}
               cardHeight={SMALL_CARD_H}
               onCardPress={onCardPress}
               onSeeAllPress={() => {}}
             />
-          </View>
+          </LinearGradient>
 
-          {(showHoroscope || showStarRaasi) && (
+          {completeCards.length > 0 && (
             <View style={s.section}>
               <Text style={s.sectionTitle}>Complete your profile</Text>
-              <CompleteProfileCard
-                onAddHoroscope={() => navigation.navigate('onboarding', { pageNo: '16' })}
-                onAddStarRaasi={() => navigation.navigate('onboarding', { pageNo: '27' })}
-                showHoroscope={showHoroscope}
-                showStarRaasi={showStarRaasi}
-              />
+              <CompleteProfileSection cards={completeCards} onCardPress={onCompleteProfileCardPress} />
             </View>
           )}
 
           <View style={s.section}>
             <SwiperCardDesktop
-              swiperHeader={`Today's matches for you (${todayTotal})`}
+              swiperHeader={`Daily recommendations (${todayTotal})`}
               items={todayMatches}
               cardWidth={SMALL_CARD_W}
               cardHeight={SMALL_CARD_H}
@@ -168,7 +193,8 @@ export default function HomeDesktopLayout({
             />
           </View>
 
-          <View style={s.section}>
+          {/* Angular: newlyJoinedSection.blockbgColor = 'pink-bg-block' */}
+          <LinearGradient colors={['#FCEBFF', '#FFFFFF']} style={s.section}>
             <SwiperCardDesktop
               swiperHeader={`Newly joined (${newlyJoinedTotal})`}
               items={newlyJoined}
@@ -177,7 +203,7 @@ export default function HomeDesktopLayout({
               onCardPress={onCardPress}
               onSeeAllPress={() => {}}
             />
-          </View>
+          </LinearGradient>
 
           <View style={s.section}>
             <SwiperCardDesktop
@@ -190,14 +216,19 @@ export default function HomeDesktopLayout({
             />
           </View>
 
-          <View style={s.section}>
+          {/* Angular: enums.likedprofile.blockbgColor = 'liked-profile-bg' */}
+          <ImageBackground
+            source={{ uri: 'https://imgs.jodii.app/assets/images/svg/liked-profiles-bg.svg' }}
+            style={s.section}
+            resizeMode="cover"
+          >
             <Text style={s.sectionTitle}>{`Liked profiles (${likedByMeTotal + likedMeTotal})`}</Text>
             <View style={s.tabRow}>
-              <Pressable style={[s.tabPill, likedTab === 'me'   && s.tabPillActive]} onPress={() => onLikedTabChange('me')}>
-                <Text style={[s.tabPillText, likedTab === 'me'   && s.tabPillTextActive]}>{`Liked by you (${likedByMeTotal})`}</Text>
+              <Pressable style={[s.tabPill, likedTab === 'likedyou'  && s.tabPillActive]} onPress={() => onLikedTabChange('likedyou')}>
+                <Text style={[s.tabPillText, likedTab === 'likedyou'  && s.tabPillTextActive]}>{`Liked you (${likedMeTotal})`}</Text>
               </Pressable>
-              <Pressable style={[s.tabPill, likedTab === 'them' && s.tabPillActive]} onPress={() => onLikedTabChange('them')}>
-                <Text style={[s.tabPillText, likedTab === 'them' && s.tabPillTextActive]}>{`Liked you (${likedMeTotal})`}</Text>
+              <Pressable style={[s.tabPill, likedTab === 'likedbyme' && s.tabPillActive]} onPress={() => onLikedTabChange('likedbyme')}>
+                <Text style={[s.tabPillText, likedTab === 'likedbyme' && s.tabPillTextActive]}>{`Liked by you (${likedByMeTotal})`}</Text>
               </Pressable>
             </View>
             <SwiperCardDesktop
@@ -207,38 +238,56 @@ export default function HomeDesktopLayout({
               showSeeAll={false}
               onCardPress={onCardPress}
             />
-          </View>
+          </ImageBackground>
 
           <View style={s.section}>
             <ExploreCategoriesSection
               categories={categories}
               tileWidth={CAT_TILE_W}
-              tileHeight={CAT_TILE_H}
               onCategoryPress={cat => navigation.navigate('Matches', { exploreType: cat.id, exploreLabel: cat.label })}
-              onDiscoverPress={() => {}}
             />
           </View>
 
           <View style={s.section}>
-            <Text style={s.storyTitle}>Made with <Text style={s.storyTitleBold}>Love in Jodii</Text></Text>
+            <Text style={s.storyTitle}>Got married <Text style={s.storyTitleBold}>through Jodii</Text></Text>
+            <Text style={s.storySubtitle}>Thousands have met their life partner through Jodii</Text>
             <SwiperCardDesktop
               items={stories}
               cardWidth={STORY_CARD_W}
               cardHeight={STORY_CARD_H}
               showSeeAll={false}
-              onCardPress={() => {}}
+              // Same as mobile — no per-story detail route exists, only the list screen.
+              onCardPress={() => navigation.navigate('SuccessStories')}
             />
           </View>
 
-          <View style={s.section}>
-            <SelfHelpVideosSection videos={videos} cardWidth={VIDEO_CARD_W} cardHeight={VIDEO_CARD_H} onVideoPress={() => {}} />
-          </View>
+          {selfHelpVisible && videos.length > 0 && (
+            <View style={s.section}>
+              <SelfHelpVideosSection videos={videos} cardWidth={VIDEO_CARD_W} cardHeight={VIDEO_CARD_H} onVideoPress={() => {}} />
+            </View>
+          )}
 
           <View style={s.section}>
-            <HelpSection onCallPress={() => {}} onWhatsAppPress={() => {}} phone={customerCare.phone} />
+            <HelpSection onCallPress={() => {}} phone={customerCare.phone} />
           </View>
         </ScrollView>
       </View>
+
+      {activeSticky === 'forceUpdate' && (
+        <View style={s.stickyWrap}>
+          <ForceUpdateCard onPress={onStickyPress} onClose={onStickyClose} />
+        </View>
+      )}
+      {activeSticky === 'profileValidation' && (
+        <View style={s.stickyWrap}>
+          <StickyBanner
+            text={stickyText}
+            ctaLabel={stickyCtaLabel}
+            onPress={onStickyPress}
+            onClose={onStickyClose}
+          />
+        </View>
+      )}
     </View>
   )
 }
@@ -250,6 +299,10 @@ const s = StyleSheet.create({
   },
   main: { flex: 1 },
   mainContent: { alignItems: 'center', paddingBottom: 40, gap: 24 },
+
+  // No persistent bottom footer bar on desktop (unlike mobile) — pin the
+  // sticky banner to the bottom of the viewport instead.
+  stickyWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
 
   card: { width: MAIN_WIDTH, borderRadius: 12, overflow: 'hidden' },
   section: { width: MAIN_WIDTH },
@@ -265,4 +318,5 @@ const s = StyleSheet.create({
 
   storyTitle: { fontFamily: 'Poppins-Regular', fontSize: 18, color: Colors.textPrimary, marginBottom: 12 },
   storyTitleBold: { fontFamily: 'Poppins-Bold', fontSize: 18, color: Colors.primary },
+  storySubtitle:  { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textPrimary, marginTop: 6 },
 })

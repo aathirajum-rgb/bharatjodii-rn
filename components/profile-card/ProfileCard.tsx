@@ -81,11 +81,18 @@ export interface ProfileCardProps {
 
 const SCREEN_W  = Dimensions.get('window').width
 const IMG_CDN   = CDN_SVG
-const AVATAR_FB = IMG_CDN + 'default-profile.svg'
 
 // Derived from Angular SCSS vmin values.
 // On portrait phones vmin ≈ vw = 1% of screen width.
-const PHOTO_HEIGHT: Record<CardSection, number> = {
+//
+// Confirmed against profile-card.component.scss's card-htN classes: every one
+// pairs min-width with an IDENTICAL min-height value (e.g. card-ht2's 55.558vmin
+// for both) — Angular's cards are square per section, not a fixed card width
+// with a per-section photo height. SwiperCard.tsx reuses this same table as its
+// default card WIDTH per section for exactly that reason — a flat default width
+// was previously used for every section except where a call site manually (and
+// in two cases, incorrectly) overrode it.
+export const PHOTO_HEIGHT: Record<CardSection, number> = {
   newmatches:           SCREEN_W * 0.7778,
   dailyrecommendations: SCREEN_W * 0.8067,  // Angular: 80.667vmin (wider than ht1)
   matches:              SCREEN_W * 0.5556,
@@ -170,7 +177,9 @@ export default function ProfileCard({
   // Shared photo-state props forwarded to ProfilePhoto on every variant
   const photoProps = {
     profileImage:       profileImg,
-    defaultImage:       avatarImg ?? AVATAR_FB,
+    // No per-item override → ProfilePhoto falls back to the opposite-gender
+    // avatar itself (Angular: getAvatarImage()/getOppGenderType()).
+    defaultImage:       avatarImg,
     isPhotoAvailable,
     isPhotoProtect,
     isAddPhotoRequest,
@@ -218,7 +227,9 @@ export default function ProfileCard({
           {isDR && (
             <View style={styles.cardBottom}>
               <Pressable style={styles.primaryBtn} onPress={onPress}>
-                <Text style={styles.primaryBtnText}>View Details</Text>
+                {/* Angular: CTATXT.VIEWDETAILS translation key actually reads
+                    "View profile" in English, not "View Details". */}
+                <Text style={styles.primaryBtnText}>View profile</Text>
               </Pressable>
             </View>
           )}
@@ -259,25 +270,32 @@ export default function ProfileCard({
     // ── 3 · Who Viewed / Viewed By Me ────────────────────────────────────────
     // Photo with viewed-icon + date overlay at bottom; name + details + link below.
     case 3: {
+      // Angular: profile-card.component.html's type==='3' has two MUTUALLY
+      // EXCLUSIVE overlay blocks (*ngIf="newTextLable!='1'" vs `==='1'`), not
+      // one block with just the text swapped — a "new" view gets a distinctly
+      // colored pink eye-icon + pink text, not the default white viewed-icon.
+      const isNew = isNewLabel === true
       return (
         <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]} onPress={onPress}>
           <ProfilePhoto {...photoProps} height={photoH} variant="viewedyou">
-            <View style={styles.viewedOverlay}>
+            <View style={[styles.viewedOverlay, isNew && styles.viewedOverlayNew]}>
               <CdnSvg
-                uri={IMG_CDN + 'viewed-icon-white.svg'}
+                uri={isNew ? IMG_CDN + 'revamp/eye-pink.svg' : IMG_CDN + 'viewed-icon-white.svg'}
                 width={14}
                 height={14}
                 style={styles.viewedIcon}
               />
-              <Text style={styles.viewedText} numberOfLines={1}>{labelText()}</Text>
+              <Text style={[styles.viewedText, isNew && styles.viewedTextNew]} numberOfLines={1}>{labelText()}</Text>
             </View>
           </ProfilePhoto>
 
           <View style={styles.cardInfo}>
             {!!name         && <Text style={styles.nameText}   numberOfLines={1}>{name}</Text>}
             {!!fullDetail() && <Text style={styles.detailText} numberOfLines={1}>{fullDetail()}</Text>}
+            {/* Angular: ENUMS.EButtonText.viewProfiles → 'MATCHES.VIEW_PROFILE'
+                → "View full profile" (locales/en.json:642), not "View Profile". */}
             <Pressable onPress={onPress} style={styles.linkBtn}>
-              <Text style={styles.linkBtnText}>View Profile →</Text>
+              <Text style={styles.linkBtnText}>View full profile →</Text>
             </Pressable>
           </View>
         </Pressable>
@@ -529,6 +547,14 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 11,
     color: Colors.white,
+  },
+  // Angular: profile-card.component.scss's .newly-viewed — solid light-pink
+  // background (#FCEAF0), not the default dark gradient overlay.
+  viewedOverlayNew: {
+    backgroundColor: '#FCEAF0',
+  },
+  viewedTextNew: {
+    color: '#DE2A68',
   },
 
   // ── See-All card (type 5) ──────────────────────────────────────────────────
