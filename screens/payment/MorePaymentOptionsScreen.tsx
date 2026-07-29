@@ -13,6 +13,8 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import QRCode from 'react-native-qrcode-svg'
+import { File, Paths } from 'expo-file-system'
+import RNShare, { Social } from 'react-native-share'
 import { Colors } from '../../constants/colors'
 import { CDN, CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
@@ -80,8 +82,36 @@ export default function MorePaymentOptionsScreen({ navigation, route }: Props) {
     }, QR_OUTCOME_DELAY_MS)
   }
 
-  function shareQrOnWhatsApp() {
-    if (qrData?.whatsappMsg) Share.share({ message: qrData.whatsappMsg }).catch(() => {})
+  // Angular: more-payment-option.page.ts shareQR() → native bridge event
+  // "OpenwhatsappWithContent" → Constants.openWhatsappWithIntent() —
+  // downloads QRIMG (a separate server-hosted QR PNG, not a snapshot of the
+  // on-screen qrValue) to a local file, then fires an ACTION_SEND intent
+  // pinned to com.whatsapp with the image attached (EXTRA_STREAM) alongside
+  // the text (EXTRA_TEXT). Not sent to a fixed contact — the old intent's
+  // mobileNo param is unused, WhatsApp shows its own chat picker.
+  async function shareQrOnWhatsApp() {
+    if (!qrData?.whatsappMsg) return
+
+    let imageUri: string | undefined
+    if (qrData.qrImg) {
+      try {
+        imageUri = (await File.downloadFileAsync(qrData.qrImg, Paths.cache)).uri
+      } catch {
+        imageUri = undefined
+      }
+    }
+
+    try {
+      await RNShare.shareSingle({
+        social:  Social.Whatsapp,
+        message: qrData.whatsappMsg,
+        ...(imageUri ? { url: imageUri, type: 'image/png' } : {}),
+      })
+    } catch {
+      // WhatsApp not installed, user cancelled, or the share failed — fall
+      // back to a plain text share so the link still gets through.
+      Share.share({ message: qrData.whatsappMsg }).catch(() => {})
+    }
   }
 
   function handleBack() {

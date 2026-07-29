@@ -49,6 +49,7 @@ import PaymentOptionsScreen        from '../screens/payment/PaymentOptionsScreen
 import CardPaymentScreen           from '../screens/payment/CardPaymentScreen'
 import UpiAddressScreen            from '../screens/payment/UpiAddressScreen'
 import NetBankingScreen            from '../screens/payment/NetBankingScreen'
+import HostedCheckoutWebViewScreen from '../screens/payment/HostedCheckoutWebViewScreen'
 import MorePaymentOptionsScreen    from '../screens/payment/MorePaymentOptionsScreen'
 import NeftRtgsScreen               from '../screens/payment/NeftRtgsScreen'
 import PayAtStoreScreen             from '../screens/payment/PayAtStoreScreen'
@@ -152,10 +153,20 @@ export type AppStackParamList = {
   EditProfileLifestyle: undefined
   EditProfileFamily: undefined
   EditProfileProperty: undefined
-  'payment-options': { selectedPackage?: SelectedPackage } | undefined
+  'payment-options': { selectedPackage?: SelectedPackage; amountLabel?: string; preselectedMethod?: string } | undefined
   'card-payment': { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
   'upi-address':  { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
   'net-banking':  { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
+  'hosted-checkout': {
+    selectedPackage: SelectedPackage
+    amountLabel?:    string
+    method:          'netbanking' | 'card' | 'upi'
+    bank?:           string
+    card?:           { number: string; expiryMonth: string; expiryYear: string; cvv: string }
+    amount:          number
+    retryRoute:      string
+    retryParams?:    any
+  }
   'more-payment-options': { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
   'neft-rtgs':  { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
   'pay-at-store': { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
@@ -439,6 +450,7 @@ export default function AppStack() {
       <Stack.Screen name="card-payment" component={CardPaymentScreen} />
       <Stack.Screen name="upi-address" component={UpiAddressScreen} />
       <Stack.Screen name="net-banking" component={NetBankingScreen} />
+      <Stack.Screen name="hosted-checkout" component={HostedCheckoutWebViewScreen} />
       <Stack.Screen name="more-payment-options" component={MorePaymentOptionsScreen} />
       <Stack.Screen name="neft-rtgs" component={NeftRtgsScreen} />
       <Stack.Screen name="pay-at-store" component={PayAtStoreScreen} />

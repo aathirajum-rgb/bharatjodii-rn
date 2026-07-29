@@ -1,27 +1,30 @@
 // Angular: pages/recharge/netbanking/netbanking.page.html + .ts — reached by
-// tapping "Net Banking" on payment-mode (PaymentOptionsScreen). Shows the
-// first few banks as a "popular" grid, the rest as a collapsible "other
-// banks" radio list (netbanking.page.html:43-95) — Angular has no explicit
-// "popular" flag on the data, this split is purely by render position.
+// tapping "Net Banking" on payment-mode (PaymentOptionsScreen).
+//
+// Figma: Jodii - Master File English, node 3650:10435 ("Net banking" header +
+// popular-bank grid + always-visible "All banks" list, no collapse toggle) +
+// node 2792:9267 (the NEFT/RTGS screen, sharing the same bank-selector grid —
+// its HDFC card shows the confirmed selected-state treatment: border
+// rgba(181,0,51,0.4) + background rgba(249,230,235,0.2), reused here for both
+// the popular grid AND the "All banks" list row).
 
 import { useEffect, useState } from 'react'
 import {
-  ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
-import LinkCTA from '../../components/link-cta/LinkCTA'
+import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
 import {
-  getCheckoutDetails, getFinalAmount, getNetBankingList, getPaymentConfig, getRechargeHelpline,
-  getRetryRemainingMs, handlePaymentSuccess, initRazorpayNative, initRazorpayPayment,
-  recordPaymentFailure, stringifyPaymentResponse, toPaise, verifyPaymentSuccess,
+  getFinalAmount, getNetBankingList, getRetryRemainingMs,
   type NetBankingItem, type SelectedPackage,
 } from '../../service/paymentService'
 
-const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
+const ICON_BACK    = CDN_REACT + '/menu_back_arrow.svg'
+const ICON_CHEVRON = CDN_REACT + '/menu_right_arrow.svg'
 
 const POPULAR_COUNT = 4
 
@@ -34,14 +37,12 @@ export default function NetBankingScreen({ navigation, route }: Props) {
 
   const [banks, setBanks]         = useState<NetBankingItem[]>([])
   const [selectedKey, setSelected] = useState('')
-  const [showOthers, setShowOthers] = useState(false)
   const [loading, setLoading]     = useState(true)
   const [paying, setPaying]       = useState(false)
-  const [helpline, setHelpline]   = useState('')
+  const [restrictedMinutes, setRestrictedMinutes] = useState<number | null>(null)
 
   useEffect(() => {
     loadBanks()
-    getRechargeHelpline().then(setHelpline)
   }, [])
 
   async function loadBanks() {
@@ -63,78 +64,32 @@ export default function NetBankingScreen({ navigation, route }: Props) {
     else navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
   }
 
+  // Netbanking is a hosted-webview flow, not a native-SDK order submission —
+  // see HostedCheckoutWebViewScreen.tsx. Real device trace confirmed
+  // nbpaymentcheckout returns raw HTML + a JS-bridge callback for this
+  // method (matching the old native Android app's PaymentWebviewActivity
+  // design exactly), not a Razorpay order — so the checkout call, native
+  // submission, and verification all happen on that screen instead.
   async function handlePay() {
     if (!selectedKey || !selectedPackage) return
 
-    const remainingMs = await getRetryRemainingMs()
-    if (remainingMs > 0) {
-      const mins = Math.ceil(remainingMs / 60000)
-      Alert.alert('Please wait', `You can retry payment in about ${mins} minute${mins === 1 ? '' : 's'}.`)
-      return
-    }
-
     setPaying(true)
     try {
-      const config  = await getPaymentConfig()
-      const saltKey = config.RAZORPAY_KEY_ID ?? ''
-
-      const checkout = await getCheckoutDetails(selectedPackage.PACKAGEID, 'NETBANKING')
-
-      let result: { success: boolean; response: any }
-      if (Platform.OS === 'android') {
-        result = await initRazorpayNative({
-          // Confirmed via a real captured checkout response — it's a FLAT
-          // object (getCheckoutDetails() previously returned .RESPONSE, a
-          // plain status string, discarding these fields entirely): amount,
-          // orderId, customerId, MOBILENO, recurring are top-level, no email.
-          amount:      checkout.amount ?? toPaise(getFinalAmount(selectedPackage)),
-          orderId:     checkout.orderId ?? '',
-          customerId:  checkout.customerId,
-          // The checkout response marks recurring:"1" whenever it created a
-          // customer-linked order (autopay) — Razorpay needs customer_id
-          // included in the submit payload for those orders, or it rejects
-          // the order_id as invalid ("the id provided does not exist").
-          recurring:   checkout.recurring === '1',
-          contact:     checkout.MOBILENO ?? '',
-          method:      'netbanking',
-          razorpayKey: saltKey,
-          bank:        selectedKey,
-        })
-      } else {
-        result = await initRazorpayPayment(
-          { ...checkout, amount: checkout.amount ?? toPaise(getFinalAmount(selectedPackage)), BANK: selectedKey },
-          'NETBANKING', saltKey,
-        )
+      const remainingMs = await getRetryRemainingMs()
+      if (remainingMs > 0) {
+        setRestrictedMinutes(Math.ceil(remainingMs / 60000))
+        return
       }
 
-      if (result.success) {
-        const verified = await verifyPaymentSuccess(result.response, checkout.orderId)
-        if (verified) {
-          await handlePaymentSuccess()
-        } else {
-          await recordPaymentFailure(null, selectedPackage, {
-            status: 'pending', retryRoute: 'net-banking', retryParams: route.params,
-          })
-          navigation.navigate('payment-failed', {
-            selectedPackage, amountLabel, status: 'pending', orderId: checkout.orderId,
-            retryRoute: 'net-banking', retryParams: route.params,
-          })
-        }
-      } else {
-        const errCode: number = result.response?.code ?? 0
-        if (errCode !== 0) {
-          const reason = stringifyPaymentResponse(result.response)
-          await recordPaymentFailure(null, selectedPackage, {
-            status: 'failure', reason, retryRoute: 'net-banking', retryParams: route.params,
-          })
-          navigation.navigate('payment-failed', {
-            selectedPackage, amountLabel, status: 'failure', reason,
-            retryRoute: 'net-banking', retryParams: route.params,
-          })
-        }
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Something went wrong. Please try again.')
+      navigation.navigate('hosted-checkout', {
+        selectedPackage,
+        amountLabel,
+        method:   'netbanking',
+        bank:     selectedKey,
+        amount:   getFinalAmount(selectedPackage),
+        retryRoute:  'net-banking',
+        retryParams: route.params,
+      })
     } finally {
       setPaying(false)
     }
@@ -146,7 +101,7 @@ export default function NetBankingScreen({ navigation, route }: Props) {
         <Pressable onPress={handleBack} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
-        <Text style={s.headerTitle} numberOfLines={1}>Pay using Net Banking</Text>
+        <Text style={s.headerTitle} numberOfLines={1}>Net banking</Text>
       </View>
 
       {loading ? (
@@ -160,16 +115,20 @@ export default function NetBankingScreen({ navigation, route }: Props) {
                 {popularBanks.map(bank => (
                   <Pressable
                     key={bank.key}
-                    style={[s.popularItem, selectedKey === bank.key && s.popularItemSelected]}
+                    style={s.popularItem}
                     onPress={() => setSelected(bank.key)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selectedKey === bank.key }}
                   >
-                    {!!(bank.ImagePathOn || bank.ImagePathOff) && (
-                      <CdnSvg
-                        uri={(selectedKey === bank.key ? bank.ImagePathOn : bank.ImagePathOff) ?? bank.ImagePathOff ?? bank.ImagePathOn ?? ''}
-                        width={40}
-                        height={40}
-                      />
-                    )}
+                    <View style={[s.popularIconBox, selectedKey === bank.key && s.selectedTint]}>
+                      {!!(bank.ImagePathOn || bank.ImagePathOff) && (
+                        <CdnSvg
+                          uri={bank.ImagePathOn ?? bank.ImagePathOff ?? ''}
+                          width={24}
+                          height={24}
+                        />
+                      )}
+                    </View>
                     <Text style={s.popularLabel} numberOfLines={1}>{bank.bankName}</Text>
                   </Pressable>
                 ))}
@@ -179,38 +138,23 @@ export default function NetBankingScreen({ navigation, route }: Props) {
 
           {otherBanks.length > 0 && (
             <>
-              <Pressable style={s.otherToggle} onPress={() => setShowOthers(v => !v)}>
-                <Text style={s.otherToggleText}>Select from other banks</Text>
-              </Pressable>
-              {showOthers && (
-                <View style={s.otherList}>
-                  <Text style={s.sectionLabel}>Select bank</Text>
-                  {otherBanks.map(bank => (
-                    <Pressable
-                      key={bank.key}
-                      style={s.otherRow}
-                      onPress={() => setSelected(bank.key)}
-                      accessibilityRole="radio"
-                      accessibilityState={{ checked: selectedKey === bank.key }}
-                    >
-                      <Text style={s.otherLabel}>{bank.bankName}</Text>
-                      <View style={[s.radioCircle, selectedKey === bank.key && s.radioCircleSelected]}>
-                        {selectedKey === bank.key && <View style={s.radioDot} />}
-                      </View>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
+              <View style={s.divider} />
+              <Text style={s.sectionLabel}>All banks</Text>
+              <View style={s.otherList}>
+                {otherBanks.map(bank => (
+                  <Pressable
+                    key={bank.key}
+                    style={[s.otherRow, selectedKey === bank.key && s.selectedTint]}
+                    onPress={() => setSelected(bank.key)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ checked: selectedKey === bank.key }}
+                  >
+                    <Text style={s.otherLabel} numberOfLines={1}>{bank.bankName}</Text>
+                    <CdnSvg uri={ICON_CHEVRON} width={20} height={20} />
+                  </Pressable>
+                ))}
+              </View>
             </>
-          )}
-
-          {!!helpline && (
-            <LinkCTA
-              text="Need help in making payment?"
-              contact={helpline}
-              onPress={() => Linking.openURL(`tel:${helpline}`)}
-              style={s.helpLink}
-            />
           )}
         </ScrollView>
       )}
@@ -227,6 +171,12 @@ export default function NetBankingScreen({ navigation, route }: Props) {
           onPress={handlePay}
         />
       </View>
+
+      <PaymentRestrictedSheet
+        visible={restrictedMinutes != null}
+        remainingMinutes={restrictedMinutes ?? 0}
+        onClose={() => setRestrictedMinutes(null)}
+      />
     </View>
   )
 }
@@ -239,36 +189,37 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white,
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
-  headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, marginLeft: 16, flex: 1 },
+  headerTitle: { fontFamily: 'Poppins-Medium', fontSize: 16, color: Colors.black, marginLeft: 16, flex: 1 },
 
   content: { padding: 16, gap: 16 },
-  sectionLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black, marginBottom: 8 },
+  sectionLabel: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.black, marginBottom: 8 },
 
-  popularGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  popularItem: {
-    width: 80, alignItems: 'center', gap: 6, padding: 8, borderRadius: 8,
-    borderWidth: 1, borderColor: Colors.borderSubtle,
+  popularGrid: { flexDirection: 'row', gap: 20, flexWrap: 'wrap' },
+  popularItem: { width: 58, alignItems: 'center', gap: 6 },
+  popularIconBox: {
+    width: 58, height: 58, borderRadius: 8, borderWidth: 1, borderColor: '#E6E6E6',
+    backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center',
   },
-  popularItemSelected: { borderColor: Colors.primaryDark, backgroundColor: Colors.selectionBg },
-  popularLabel: { fontFamily: 'Poppins-Regular', fontSize: 11, color: Colors.black, textAlign: 'center' },
+  popularLabel: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black, textAlign: 'center' },
 
-  otherToggle: { paddingVertical: 12, borderTopWidth: 1, borderTopColor: Colors.divider },
-  otherToggleText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.link },
-  otherList: { marginTop: 8 },
-  helpLink:  { marginTop: 8 },
+  divider: { height: 1, backgroundColor: Colors.divider, marginBottom: 4 },
+  otherList: { gap: 0 },
 
   otherRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    minHeight: 52, borderBottomWidth: 1, borderBottomColor: Colors.divider,
+    height: 40, paddingHorizontal: 8,
   },
-  otherLabel: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
+  otherLabel: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black, flexShrink: 1 },
 
-  radioCircle: {
-    width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.borderNeutral,
-    alignItems: 'center', justifyContent: 'center',
+  // Figma (NEFT/RTGS screen's selected HDFC card, node 2792:9267): the one
+  // confirmed selected-state treatment, reused for both the popular grid and
+  // an "All banks" row.
+  selectedTint: {
+    borderRadius:    8,
+    borderWidth:     1,
+    borderColor:     'rgba(181, 0, 51, 0.40)',
+    backgroundColor: 'rgba(249, 230, 235, 0.20)',
   },
-  radioCircleSelected: { borderColor: Colors.primaryDark },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primaryDark },
 
   footer: { paddingHorizontal: 16, paddingTop: 12 },
 })

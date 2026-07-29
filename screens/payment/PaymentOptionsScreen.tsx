@@ -20,6 +20,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import LinkCTA from '../../components/link-cta/LinkCTA'
+import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
 import {
   findUpiPackageName, formatAmount, getAutoRenewalBenefits, getCheckoutDetails, getFinalAmount,
   getPaymentConfig, getRechargeHelpline, getRetryRemainingMs, getUpiAppList, handlePaymentSuccess,
@@ -81,6 +82,7 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
   // reused both to filter the visible list and to target the right app at pay time.
   const [installedApps, setInstalledApps] = useState<UpiAppInfo[]>([])
   const [helpline, setHelpline] = useState('')
+  const [restrictedMinutes, setRestrictedMinutes] = useState<number | null>(null)
 
   useEffect(() => {
     if (!selectedPackage) { setLoading(false); return }
@@ -114,7 +116,13 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
       list = list.filter(m => Number(m.PAGE_ID) !== 2)
 
       setMethods(list)
-      const firstRecommended = list.find(m => m.RECOMMEND === '1')
+      // A failed payment retried from PaymentFailedScreen arrives with the
+      // method the user picked there already chosen — falls back to the
+      // first recommended row otherwise (unchanged default behavior).
+      const preselected = route.params?.preselectedMethod
+        ? list.find(m => m.KEY === route.params.preselectedMethod)
+        : undefined
+      const firstRecommended = preselected ?? list.find(m => m.RECOMMEND === '1')
       if (firstRecommended) setSelectedKey(firstRecommended.KEY)
     } finally {
       setLoading(false)
@@ -195,8 +203,7 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
 
     const remainingMs = await getRetryRemainingMs()
     if (remainingMs > 0) {
-      const mins = Math.ceil(remainingMs / 60000)
-      Alert.alert('Please wait', `You can retry payment in about ${mins} minute${mins === 1 ? '' : 's'}.`)
+      setRestrictedMinutes(Math.ceil(remainingMs / 60000))
       return
     }
 
@@ -302,6 +309,7 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
         }
       }
     } catch (error: any) {
+      console.error('DBG_PAYMENT_ERROR payment-options', error?.message, error)
       Alert.alert('Error', error?.message || 'Something went wrong. Please try again.')
     } finally {
       setPaying(false)
@@ -427,6 +435,12 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
         }}
         onClose={() => setShowRetentionSheet(false)}
         onPrimaryPress={() => { setRenewOnExpiry(true); setShowRetentionSheet(false) }}
+      />
+
+      <PaymentRestrictedSheet
+        visible={restrictedMinutes != null}
+        remainingMinutes={restrictedMinutes ?? 0}
+        onClose={() => setRestrictedMinutes(null)}
       />
     </View>
   )

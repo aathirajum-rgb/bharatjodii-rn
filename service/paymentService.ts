@@ -103,6 +103,7 @@ export interface SelectedPackage {
 export interface AutoRenewalBenefit {
   icon:  string
   value: string
+  info?: boolean  // Figma: trailing (i) marker on the "carry forward" row
 }
 
 export interface AutoRenewalSheetData {
@@ -117,7 +118,7 @@ const AUTO_RENEWAL_BENEFITS_FALLBACK: AutoRenewalSheetData = {
   title: 'Auto-Renewal Benefits:',
   benefits: [
     { icon: RENEWAL_TICK, value: 'Extra 10% off on renewal' },
-    { icon: RENEWAL_TICK, value: 'Carry forward of unused contacts' },
+    { icon: RENEWAL_TICK, value: 'Carry forward of unused contacts*', info: true },
     { icon: RENEWAL_TICK, value: 'Renew at the current price - even if prices go up' },
     { icon: RENEWAL_TICK, value: 'Get full refund even after renewal, if no paid benefits used' },
   ],
@@ -348,7 +349,9 @@ export async function getNetBankingList(): Promise<NetBankingItem[]> {
   const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
   const result = await apiCall(Endpoints.payment.netBankingList, 'POST', `ID=${userId}`)
   if (result?.RESPONSECODE === '1' && result?.ERRCODE === '0') {
-    return result.RESPONSE?.list ?? []
+    const list = result.RESPONSE?.list ?? []
+    console.error('DBG_NETBANKING_LIST', JSON.stringify(list))
+    return list
   }
   return []
 }
@@ -679,6 +682,11 @@ export async function getMembershipPlans(): Promise<MembershipPlansData | null> 
 // never existed in the real API and silently failed on every method: GPay,
 // PhonePe, manual UPI, card, netbanking all route through this one call).
 
+// IMPORTANT: only valid for methods the backend actually treats as a real
+// order-creation call — confirmed working for 'upi' (app-targeted intent
+// flow) via a live device trace. Netbanking, card, and manually-typed UPI
+// VPA are NOT valid here — see getHostedCheckoutRequest() below, which
+// those three route through instead.
 export async function getCheckoutDetails(
   packageId: string,
   method: string,
@@ -705,10 +713,92 @@ export async function getCheckoutDetails(
   // field read off "checkout" downstream (orderId, amount, MOBILENO) was
   // silently undefined.
   if (result?.RESPONSECODE === '1') return result
+  console.error('DBG_CHECKOUT_RAW', method, JSON.stringify(result))
   const reason = typeof result?.RESPONSE === 'string'
     ? result.RESPONSE
     : (result?.RESPONSE?.MSG ?? result?.RESPONSE?.ERRMESSAGE ?? result?.RESULT?.ERRMESSAGE)
   throw new Error(reason || 'Could not initiate payment. Please try again.')
+}
+
+// ─── Hosted checkout (WebView) — Netbanking / Card / manual-VPA UPI ──────────
+// Angular: netbanking.page.ts GoToPayment() / pay-using-credit-debit.page.ts /
+// upi-payment.page.ts manual-VPA path — nbpaymentcheckout is NOT a JSON
+// order-creation API for these three methods. It's a hosted-webview
+// endpoint: POST this exact form body, render whatever HTML comes back in a
+// WebView (a bank/card hosted page), and wait for that page's own JS to call
+// back into a bridge shaped {"event_name":"payment_status","status":...,
+// "message":...} — see HostedCheckoutWebViewScreen.tsx. Confirmed via a live
+// device trace: calling this with method=netbanking through the JSON-order
+// path (getCheckoutDetails) returns exactly this HTML/bridge-callback shape
+// instead of an order, matching the old native Android app's
+// PaymentWebviewActivity design exactly (not a bug to "fix" with different
+// params — it's the intended contract for these methods).
+
+export interface HostedCheckoutRequest {
+  uri:  string
+  body: string
+}
+
+export interface HostedCheckoutCard {
+  number:      string
+  expiryMonth: string
+  expiryYear:  string
+  cvv:         string
+}
+
+export async function getHostedCheckoutRequest(
+  packageId: string,
+  amount: number,
+  method: 'netbanking' | 'card' | 'upi',
+  bank?: string,
+  card?: HostedCheckoutCard,
+): Promise<HostedCheckoutRequest | null> {
+  const [userId, userName, appType, lang, atn, rtn] = await Promise.all([
+    getItem(SK.Auth.USER_ID),
+    getItem(SK.User.NAME),
+    getItem(SK.Auth.APP_TYPE),
+    getItem(SK.Auth.LANG),
+    getItem(SK.Auth.TOKEN),
+    getItem(SK.Auth.REFRESH_TOKEN),
+  ])
+  if (!userId) return null
+
+  const name = userName ?? ''
+  const fields: Record<string, string> = {
+    name,
+    amount: String(amount),
+    method,
+    // Angular sends this for every method sharing this code path, not just
+    // card — replicated as-is rather than "cleaned up" for netbanking.
+    cardHolderName: name,
+    // Angular: netbanking.page.ts GoToPayment() — the exact fallback string
+    // used when a real browser user agent isn't available (RN has none).
+    userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130.0.4430.93',
+    APPTYPE:   appType ?? '115',
+    productId: packageId,
+    ID:        userId,
+    LANG:      lang ?? 'en',
+    ATN:       atn ?? '',
+    RTN:       rtn ?? '',
+  }
+  if (bank) fields.bank = bank
+  // Angular: pay-using-credit-debit.page.ts loadPaymentView() — these four
+  // are sent as plain form fields to the SAME hosted-webview endpoint (not
+  // through any Razorpay SDK); the backend's card code path 500s without
+  // them (confirmed live — a Node stack trace surfaced when they were
+  // missing).
+  if (card) {
+    fields.cardNumber       = card.number
+    fields.cardExpiryMonth  = card.expiryMonth
+    fields.cardExpiryYear   = card.expiryYear
+    fields.cardCvv          = card.cvv
+  }
+
+  const body = Object.entries(fields)
+    .map(([k, v]) => `${k}=${encodeURIComponent(v)}`)
+    .join('&')
+
+  return { uri: Endpoints.payment.checkout, body }
 }
 
 // ─── Analytics tracking ───────────────────────────────────────────────────────
@@ -1169,6 +1259,80 @@ export async function clearPaymentFailedState(): Promise<void> {
 
 export async function setPaymentFailedContext(data: PaymentFailureContext): Promise<void> {
   await setJson('PAYMENT_FAILED_CONTEXT', data)
+}
+
+// ─── Payment failed detail (rich retry sheet) ──────────────────────────────
+// Angular: payment-failed.page.ts nbpaymentfaileddet() — PAGETYPE is entirely
+// server-decided (confirmed: the client only ever sends ID/ORDERID/TYPE/
+// APPVERSION, never a renewal/autopay signal); the client just renders
+// whichever PAGETYPE comes back. '0' = plain payment-method radio-picker +
+// single Retry button; '4'/'5' = auto-renewal promo variant (discount/timer/
+// bonus-contacts breakdown) — '1'/'2' aren't ported yet, callers should treat
+// any unrecognized PAGETYPE as '0'.
+export interface PaymentFailedDetail {
+  pageType:               string
+  title?:                 string | undefined   // PAYFAILEDTITLE — real dynamic promo copy, not a fixed string
+  content?:               string | undefined   // PAYFAILEDCONTENT
+  packageName?:           string | undefined
+  packageDuration?:       string | undefined
+  packageCost?:           string | undefined   // bare number, no ₹ — Angular prepends it at render time
+  totalAmt?:              string | undefined
+  paidAmt?:               string | undefined
+  discountAmt?:           string | undefined
+  discountTitle?:         string | undefined
+  extraDiscountTitle?:    string | undefined
+  profileCount?:          string | undefined
+  extraContact?:          string | undefined
+  timerEndMs?:            number | undefined
+  paymentMethods:         PaymentMethodItem[]
+  otherPaymentModesLabel?: string | undefined
+}
+
+function resolveTimerEnd(offEndTime?: string | number): number | undefined {
+  if (offEndTime == null || offEndTime === '') return undefined
+  const asNum = Number(offEndTime)
+  // Angular's looksLikeDate()/toMs() sniff — small numbers are seconds-from-
+  // now, large ones (>10-digit) are already an absolute epoch in ms.
+  if (!isNaN(asNum) && asNum > 0) return asNum > 10_000_000_000 ? asNum : Date.now() + asNum * 1000
+  const parsed = Date.parse(String(offEndTime))
+  return isNaN(parsed) ? undefined : parsed
+}
+
+// The API's *TITLE/*CONTENT fields are meant for Angular's [innerHTML] — RN
+// has no innerHTML, so strip tags rather than let literal markup show up.
+function stripHtml(value?: string): string | undefined {
+  if (!value) return value
+  return value.replace(/<[^>]+>/g, '').trim()
+}
+
+export async function getPaymentFailedDetail(orderId: string): Promise<PaymentFailedDetail | null> {
+  const [userId, appVersion] = await Promise.all([
+    getItem(SK.Auth.USER_ID),
+    getItem('APPVERSION'),
+  ])
+  const params = `ID=${userId ?? ''}&ORDERID=${orderId}&TYPE=POPUP&APPVERSION=${appVersion ?? ''}`
+  const result = await apiCall(Endpoints.payment.failedDetails, 'POST', params)
+  if (result?.ERRCODE !== '0' || !result?.RESPONSE) return null
+
+  const r = result.RESPONSE
+  return {
+    pageType:           String(r.PAGETYPE ?? '0'),
+    title:              stripHtml(r.PAYFAILEDTITLE),
+    content:            stripHtml(r.PAYFAILEDCONTENT),
+    packageName:        r.PACKAGENAME,
+    packageDuration:    r.PACKAGEDURATION,
+    packageCost:        r.PACKAGECOST,
+    totalAmt:           r.TOTALAMT,
+    paidAmt:            r.PAIDAMT,
+    discountAmt:        r.DISCOUNTAMT,
+    discountTitle:      r.DISCOUNTTITLE,
+    extraDiscountTitle: r.EXTRADISCOUNTTITLE,
+    profileCount:       r.PROFILECOUNT,
+    extraContact:       r.EXTRACONTACT,
+    timerEndMs:         resolveTimerEnd(r.OFFEDTIME),
+    paymentMethods:     Array.isArray(r.PAYMENTMETHODS) ? r.PAYMENTMETHODS : [],
+    otherPaymentModesLabel: r.OTHERPAYMENTMODES,
+  }
 }
 
 export async function getPaymentFailedContext(): Promise<PaymentFailureContext | null> {

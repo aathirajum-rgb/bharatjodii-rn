@@ -19,6 +19,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import FloatingLabelInput from '../../components/input/FloatingLabelInput'
 import LinkCTA from '../../components/link-cta/LinkCTA'
+import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
 import {
   getCheckoutDetails, getFinalAmount, getPaymentConfig, getRechargeHelpline, getRetryRemainingMs,
   getUpiAppList, handlePaymentSuccess, initPayUNative, initRazorpayNative, initUPIPayment,
@@ -57,6 +58,7 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
   const [touched, setTouched] = useState(false)
   const [paying, setPaying]   = useState(false)
   const [helpline, setHelpline] = useState('')
+  const [restrictedMinutes, setRestrictedMinutes] = useState<number | null>(null)
 
   useEffect(() => { getRechargeHelpline().then(setHelpline) }, [])
 
@@ -109,8 +111,7 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
 
     const remainingMs = await getRetryRemainingMs()
     if (remainingMs > 0) {
-      const mins = Math.ceil(remainingMs / 60000)
-      Alert.alert('Please wait', `You can retry payment in about ${mins} minute${mins === 1 ? '' : 's'}.`)
+      setRestrictedMinutes(Math.ceil(remainingMs / 60000))
       return
     }
 
@@ -229,6 +230,7 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
         }
       }
     } catch (error: any) {
+      console.error('DBG_PAYMENT_ERROR upi', error?.message, error)
       Alert.alert('Error', error?.message || 'Something went wrong. Please try again.')
     } finally {
       setPaying(false)
@@ -364,6 +366,12 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
           />
         )}
       </ScrollView>
+
+      <PaymentRestrictedSheet
+        visible={restrictedMinutes != null}
+        remainingMinutes={restrictedMinutes ?? 0}
+        onClose={() => setRestrictedMinutes(null)}
+      />
     </View>
   )
 }

@@ -1,18 +1,16 @@
 // Angular: pages/recharge/pay-using-credit-debit/pay-using-credit-debit.page.html + .ts
 // — reached by tapping "Debit/Credit cards" on payment-mode (PaymentOptionsScreen).
 //
-// Architecture note: Angular's form submits raw card fields (number/expiry/cvv)
-// through a native bridge straight to the payment gateway — that's how the old
-// hybrid WebView app worked. On Android this form now does the same thing via
-// RazorpayBridge (Razorpay's Custom Integration SDK, com.razorpay:customui),
-// which accepts a raw card payload directly — see RazorpayWebView.kt. iOS has
-// no Razorpay native bridge yet (out of scope for now), so it still falls back
-// to react-native-razorpay's own secure card-entry UI, where this form's
-// fields are only for UX/validation parity with Angular, not transmitted.
+// Card is a hosted-webview flow, not a native-SDK order submission — see
+// HostedCheckoutWebViewScreen.tsx. Same nbpaymentcheckout endpoint and bridge
+// callback as Netbanking (matching the old native Android app's
+// PaymentWebviewActivity design), so the checkout call, form submission, and
+// verification all happen on that screen instead — this screen only collects
+// the raw card fields and hands them off.
 
 import { useEffect, useState } from 'react'
 import {
-  Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View,
+  Linking, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
@@ -21,10 +19,9 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import FloatingLabelInput, { validateName } from '../../components/input/FloatingLabelInput'
 import LinkCTA from '../../components/link-cta/LinkCTA'
+import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
 import {
-  getCheckoutDetails, getFinalAmount, getPaymentConfig, getRechargeHelpline, getRetryRemainingMs,
-  handlePaymentSuccess, initRazorpayNative, initRazorpayPayment, recordPaymentFailure,
-  stringifyPaymentResponse, toPaise, verifyPaymentSuccess, type SelectedPackage,
+  getFinalAmount, getRechargeHelpline, getRetryRemainingMs, type SelectedPackage,
 } from '../../service/paymentService'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
@@ -84,6 +81,7 @@ export default function CardPaymentScreen({ navigation, route }: Props) {
   const [touched, setTouched]   = useState(false)
   const [paying, setPaying]     = useState(false)
   const [helpline, setHelpline] = useState('')
+  const [restrictedMinutes, setRestrictedMinutes] = useState<number | null>(null)
 
   useEffect(() => { getRechargeHelpline().then(setHelpline) }, [])
 
@@ -105,77 +103,29 @@ export default function CardPaymentScreen({ navigation, route }: Props) {
     setTouched(true)
     if (!isValid || !selectedPackage) return
 
-    const remainingMs = await getRetryRemainingMs()
-    if (remainingMs > 0) {
-      const mins = Math.ceil(remainingMs / 60000)
-      Alert.alert('Please wait', `You can retry payment in about ${mins} minute${mins === 1 ? '' : 's'}.`)
-      return
-    }
-
     setPaying(true)
     try {
-      const config  = await getPaymentConfig()
-      const saltKey = config.RAZORPAY_KEY_ID ?? ''
+      const remainingMs = await getRetryRemainingMs()
+      if (remainingMs > 0) {
+        setRestrictedMinutes(Math.ceil(remainingMs / 60000))
+        return
+      }
 
-      const checkout = await getCheckoutDetails(selectedPackage.PACKAGEID, 'CARD')
-
-      let result: { success: boolean; response: any }
-      if (Platform.OS === 'android') {
-        const [expiryMonthStr, expiryYearStr] = expiry.split('/')
-        result = await initRazorpayNative({
-          // Confirmed via a real captured checkout response — it's a FLAT
-          // object (getCheckoutDetails() previously returned .RESPONSE, a
-          // plain status string, discarding these fields entirely): amount,
-          // orderId, customerId, MOBILENO, recurring are top-level, no email.
-          amount:      checkout.amount ?? toPaise(getFinalAmount(selectedPackage)),
-          orderId:     checkout.orderId ?? '',
-          customerId:  checkout.customerId,
-          // The checkout response marks recurring:"1" whenever it created a
-          // customer-linked order (autopay) — Razorpay needs customer_id
-          // included in the submit payload for those orders, or it rejects
-          // the order_id as invalid ("the id provided does not exist").
-          recurring:   checkout.recurring === '1',
-          contact:     checkout.MOBILENO ?? '',
-          method:      'card',
-          razorpayKey: saltKey,
-          name,
-          cardNumber:  cardNumber.replace(/\D/g, ''),
-          expiryMonth: Number(expiryMonthStr),
-          expiryYear:  2000 + Number(expiryYearStr),
+      const [expiryMonthStr, expiryYearStr] = expiry.split('/')
+      navigation.navigate('hosted-checkout', {
+        selectedPackage,
+        amountLabel,
+        method: 'card',
+        card: {
+          number:      cardNumber.replace(/\D/g, ''),
+          expiryMonth: expiryMonthStr,
+          expiryYear:  String(2000 + Number(expiryYearStr)),
           cvv,
-        })
-      } else {
-        result = await initRazorpayPayment({ ...checkout, amount: checkout.amount ?? toPaise(getFinalAmount(selectedPackage)) }, 'CARD', saltKey)
-      }
-
-      if (result.success) {
-        const verified = await verifyPaymentSuccess(result.response, checkout.orderId)
-        if (verified) {
-          await handlePaymentSuccess()
-        } else {
-          await recordPaymentFailure(null, selectedPackage, {
-            status: 'pending', retryRoute: 'card-payment', retryParams: route.params,
-          })
-          navigation.navigate('payment-failed', {
-            selectedPackage, amountLabel, status: 'pending', orderId: checkout.orderId,
-            retryRoute: 'card-payment', retryParams: route.params,
-          })
-        }
-      } else {
-        const errCode: number = result.response?.code ?? 0
-        if (errCode !== 0) {
-          const reason = stringifyPaymentResponse(result.response)
-          await recordPaymentFailure(null, selectedPackage, {
-            status: 'failure', reason, retryRoute: 'card-payment', retryParams: route.params,
-          })
-          navigation.navigate('payment-failed', {
-            selectedPackage, amountLabel, status: 'failure', reason,
-            retryRoute: 'card-payment', retryParams: route.params,
-          })
-        }
-      }
-    } catch (error: any) {
-      Alert.alert('Error', error?.message || 'Something went wrong. Please try again.')
+        },
+        amount:      getFinalAmount(selectedPackage),
+        retryRoute:  'card-payment',
+        retryParams: route.params,
+      })
     } finally {
       setPaying(false)
     }
@@ -239,15 +189,6 @@ export default function CardPaymentScreen({ navigation, route }: Props) {
           />
         </View>
 
-        {/* Android submits these fields directly via RazorpayBridge (no second
-            entry screen). iOS still falls back to react-native-razorpay's own
-            secure card-entry screen, which can't accept a raw card number
-            from the app — telling the user up front avoids the confusing
-            experience of being asked for the same card twice unexplained. */}
-        {Platform.OS !== 'android' && (
-          <Text style={s.confirmNote}>You'll confirm your card details securely on the next screen</Text>
-        )}
-
         {!!helpline && (
           <LinkCTA
             text="Need help in making payment?"
@@ -270,6 +211,12 @@ export default function CardPaymentScreen({ navigation, route }: Props) {
           onPress={handlePay}
         />
       </View>
+
+      <PaymentRestrictedSheet
+        visible={restrictedMinutes != null}
+        remainingMinutes={restrictedMinutes ?? 0}
+        onClose={() => setRestrictedMinutes(null)}
+      />
     </View>
   )
 }
@@ -291,10 +238,6 @@ const s = StyleSheet.create({
   row:      { flexDirection: 'row', gap: 12 },
   rowField: { flex: 1 },
 
-  confirmNote: {
-    fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textTertiary,
-    textAlign: 'center', marginTop: 16,
-  },
   helpLink: { marginTop: 24 },
 
   footer: { paddingHorizontal: 16, paddingTop: 12 },

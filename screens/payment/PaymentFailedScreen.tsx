@@ -3,23 +3,39 @@
 // pending order to resolve, and gates retry behind a 1-hour cooldown
 // (payment-mode.page.ts isPayRetryWindowElapsed()) so the user can't hammer
 // the gateway with repeated attempts right after a failure.
+//
+// Once resolved to 'failure', renders as a bottom sheet (per Angular's own
+// modal presentation of this same component) whose content is driven by
+// PAGETYPE from nbpaymentfaileddet — entirely server-decided, never chosen
+// client-side (confirmed against the Angular source). PAGETYPE '4'/'5' get
+// the rich auto-renewal promo variant; anything else (including a failed
+// detail fetch) falls back to the plain payment-method radio-picker.
 
 import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
-import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import BottomSheet from '../../components/bottom-sheet/BottomSheet'
+import PlainRetryFailureSheet from '../../components/payment/PlainRetryFailureSheet'
+import AutoRenewalFailureSheet from '../../components/payment/AutoRenewalFailureSheet'
+import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
 import {
-  checkPaymentStatus, getPaymentFailedContext, handlePaymentSuccess,
-  type SelectedPackage,
+  checkPaymentStatus, getPaymentConfig, getPaymentFailedContext, getPaymentFailedDetail,
+  handlePaymentSuccess, type PaymentFailedDetail, type PaymentMethodItem, type SelectedPackage,
 } from '../../service/paymentService'
 
 // Angular: payment-failed.page.ts delayQR()-style polling — a handful of
 // spaced checks rather than one immediate call, since the backend itself is
 // usually still waiting on the gateway's own async webhook right after a
 // pending result.
-const POLL_ATTEMPTS  = 5
-const POLL_DELAY_MS  = 4000
+const POLL_ATTEMPTS = 5
+const POLL_DELAY_MS = 4000
+
+// Angular: payment-mode.page.html gates the auto-renewal checkbox on these
+// three recurring-capable methods — the same set is "inline-selectable"
+// here (retry lands back on retryRoute with the method preselected) rather
+// than routed to a separate screen.
+const AUTOPAY_CAPABLE_KEYS = new Set(['PAY_GPAY', 'PAY_PHONEPE', 'PAY_PAYTM'])
 
 type Status = 'failure' | 'pending'
 
@@ -53,6 +69,10 @@ export default function PaymentFailedScreen({ navigation, route }: Props) {
   const [polling, setPolling]               = useState(status === 'pending')
   const [retryDeadline, setRetryDeadline]   = useState<number | null>(null)
   const [remainingMs, setRemainingMs]       = useState(0)
+  const [loadingDetail, setLoadingDetail]   = useState(true)
+  const [detail, setDetail]                 = useState<PaymentFailedDetail | null>(null)
+  const [fallbackMethods, setFallbackMethods] = useState<PaymentMethodItem[]>([])
+  const [restrictedMinutes, setRestrictedMinutes] = useState<number | null>(null)
   const cancelledRef = useRef(false)
 
   useEffect(() => {
@@ -101,13 +121,55 @@ export default function PaymentFailedScreen({ navigation, route }: Props) {
     return () => clearInterval(id)
   }, [retryDeadline])
 
-  function handleRetry() {
-    if (remainingMs > 0) return
-    navigation.replace(retryRoute, retryParams ?? { selectedPackage, amountLabel })
+  // ── Failure-detail + fallback payment-method list ───────────────────────
+  useEffect(() => {
+    if (polling) return
+    Promise.all([
+      getPaymentFailedDetail(orderId ?? ''),
+      getPaymentConfig(),
+    ]).then(([failedDetail, config]) => {
+      if (cancelledRef.current) return
+      setDetail(failedDetail)
+      setFallbackMethods((config.PAYMENTMETHODS ?? []).filter(m => Number(m.PAGE_ID) !== 2))
+      setLoadingDetail(false)
+    })
+  }, [polling, orderId])
+
+  const canRetry = remainingMs <= 0
+
+  function handleClose() {
+    navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
   }
 
-  function handleGoBack() {
-    navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
+  // Angular: onClickPaymentModes()/payNow() — GPay/PhonePe/Paytm are always
+  // inline-selectable back on retryRoute (the same screen that showed them
+  // the first time); everything else routes to its own dedicated screen.
+  function handleMethodSelect(item: PaymentMethodItem) {
+    if (!canRetry) {
+      setRestrictedMinutes(Math.ceil(remainingMs / 60000))
+      return
+    }
+    if (AUTOPAY_CAPABLE_KEYS.has(item.KEY)) {
+      navigation.replace(retryRoute, { ...(retryParams ?? { selectedPackage, amountLabel }), preselectedMethod: item.KEY })
+      return
+    }
+    const params = { selectedPackage, amountLabel }
+    switch (item.KEY) {
+      case 'UPIPAY':     navigation.replace('upi-address', params); break
+      case 'DEBITCARD':  navigation.replace('card-payment', params); break
+      case 'NETBANKING': navigation.replace('net-banking', params); break
+      case 'OTHERMODES': navigation.replace('more-payment-options', params); break
+      case 'DOORSTEP':   navigation.replace('doorstep-collection', params); break
+      default:           navigation.replace(retryRoute, retryParams ?? params)
+    }
+  }
+
+  function handleOtherPaymentModes() {
+    if (!canRetry) {
+      setRestrictedMinutes(Math.ceil(remainingMs / 60000))
+      return
+    }
+    navigation.replace('more-payment-options', { selectedPackage, amountLabel })
   }
 
   if (polling) {
@@ -120,38 +182,47 @@ export default function PaymentFailedScreen({ navigation, route }: Props) {
     )
   }
 
-  const canRetry = remainingMs <= 0
+  const richVariant = !!detail && (detail.pageType === '4' || detail.pageType === '5') && detail.paymentMethods.length > 0
+  const methods = detail?.paymentMethods.length ? detail.paymentMethods : fallbackMethods
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
-      <Text style={s.icon}>⚠️</Text>
-      <Text style={s.title}>
-        {resolvedStatus === 'pending' ? 'Payment still pending' : 'Payment Failed'}
-      </Text>
-      <Text style={s.subtitle}>
-        {reason || "We couldn't complete your payment. If any amount was deducted, it will be refunded automatically."}
-      </Text>
-
-      {!canRetry && (
-        <Text style={s.cooldown}>You can retry in {formatCountdown(remainingMs)}</Text>
+    <BottomSheet visible onClose={handleClose}>
+      {loadingDetail ? (
+        <View style={s.sheetLoading}>
+          <ActivityIndicator color={Colors.primaryDark} size="large" />
+        </View>
+      ) : (
+        <>
+          {!canRetry && (
+            <Text style={s.cooldown}>You can retry in {formatCountdown(remainingMs)}</Text>
+          )}
+          {richVariant ? (
+            <AutoRenewalFailureSheet
+              detail={detail!}
+              onSelectMethod={handleMethodSelect}
+              onOtherPaymentModes={handleOtherPaymentModes}
+            />
+          ) : (
+            <PlainRetryFailureSheet
+              methods={methods}
+              amountLabel={amountLabel ?? (detail?.totalAmt ? `₹${detail.totalAmt}` : '')}
+              otherPaymentModesLabel={detail?.otherPaymentModesLabel}
+              onRetry={handleMethodSelect}
+              onOtherPaymentModes={handleOtherPaymentModes}
+            />
+          )}
+          {!!reason && resolvedStatus === 'failure' && !richVariant && (
+            <Text style={s.reason}>{reason}</Text>
+          )}
+        </>
       )}
 
-      <ButtonRevamp
-        label={amountLabel ? `Retry ${amountLabel}` : 'Retry Payment'}
-        variant="primary"
-        size="large"
-        fullWidth
-        disabled={!canRetry}
-        onPress={handleRetry}
-        style={s.retryBtn}
+      <PaymentRestrictedSheet
+        visible={restrictedMinutes != null}
+        remainingMinutes={restrictedMinutes ?? 0}
+        onClose={() => setRestrictedMinutes(null)}
       />
-      <ButtonRevamp
-        label="Back to Matches"
-        variant="link"
-        size="medium"
-        onPress={handleGoBack}
-      />
-    </View>
+    </BottomSheet>
   )
 }
 
@@ -160,9 +231,16 @@ const s = StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.white, padding: 32, gap: 12,
   },
-  icon:     { fontSize: 56, marginBottom: 4 },
   title:    { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.black, textAlign: 'center' },
   subtitle: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
-  cooldown: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.primaryDark, marginTop: 4 },
-  retryBtn: { marginTop: 20 },
+
+  sheetLoading: { paddingVertical: 40, alignItems: 'center' },
+  cooldown: {
+    fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.primaryDark,
+    textAlign: 'center', marginBottom: 12,
+  },
+  reason: {
+    fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textTertiary,
+    textAlign: 'center', marginTop: 8,
+  },
 })

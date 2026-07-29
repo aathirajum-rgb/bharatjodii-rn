@@ -13,6 +13,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
 import {
   getRenewalBanner, getRetryRemainingMs, handlePaymentSuccess, recordPaymentFailure,
   submitUpiAutopayRenewal, type RenewalBannerData,
@@ -29,6 +30,7 @@ export default function RenewalScreen({ navigation, route }: Props) {
   const [loading, setLoading]       = useState(true)
   const [renewing, setRenewing]     = useState(false)
   const [remainingMs, setRemainingMs] = useState(0)
+  const [restrictedMinutes, setRestrictedMinutes] = useState<number | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -53,8 +55,7 @@ export default function RenewalScreen({ navigation, route }: Props) {
 
   async function handleRenewNow() {
     if (remainingMs > 0) {
-      const mins = Math.ceil(remainingMs / 60000)
-      Alert.alert('Please wait', `You can try again in about ${mins} minute${mins === 1 ? '' : 's'}.`)
+      setRestrictedMinutes(Math.ceil(remainingMs / 60000))
       return
     }
 
@@ -131,6 +132,12 @@ export default function RenewalScreen({ navigation, route }: Props) {
         />
         <ButtonRevamp label="Maybe Later" variant="link" size="medium" onPress={handleMaybeLater} />
       </View>
+
+      <PaymentRestrictedSheet
+        visible={restrictedMinutes != null}
+        remainingMinutes={restrictedMinutes ?? 0}
+        onClose={() => setRestrictedMinutes(null)}
+      />
     </View>
   )
 }

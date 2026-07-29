@@ -1,37 +1,28 @@
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native'
+// Angular: pages/recharge/congratulations/congratulations.page.ts — reached
+// via handlePaymentSuccess() after any successful payment (all methods
+// funnel through the same static benefits-summary content, no amount/order
+// id/date is ever shown here). Angular's full page has a "View matches" CTA
+// after a 2s Lottie splash, but this Figma variant (node 3604:749) is a
+// non-dismissable auto-close sheet with no button at all — same treatment
+// as OTPSuccessSheet.
+
+import { useState } from 'react'
+import { View } from 'react-native'
+import PaymentSuccessSheet from '../../components/payment/PaymentSuccessSheet'
 import { navigate } from '../../utils/navigationRef'
 import { ENavigation } from '../../types/enums/navigation.enum'
-import { Colors } from '../../constants/colors'
 
 export default function PaymentSuccessScreen() {
-  return (
-    <View style={styles.container}>
-      <Text style={styles.icon}>✅</Text>
-      <Text style={styles.title}>Payment Successful!</Text>
-      <Text style={styles.subtitle}>Your membership is now active.</Text>
+  const [visible, setVisible] = useState(true)
 
-      <TouchableOpacity
-        style={styles.btn}
-        onPress={() => navigate(ENavigation.MATCHES)}
-        activeOpacity={0.85}
-      >
-        <Text style={styles.btnText}>View Matches</Text>
-      </TouchableOpacity>
+  function handleDismiss() {
+    setVisible(false)
+    navigate(ENavigation.MATCHES)
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <PaymentSuccessSheet visible={visible} onDismiss={handleDismiss} />
     </View>
   )
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surface, padding: 32, gap: 16 },
-  icon:      { fontSize: 64 },
-  title:     { fontSize: 24, fontWeight: '700', color: Colors.textStrong, textAlign: 'center' },
-  subtitle:  { fontSize: 16, color: Colors.textSecondary, textAlign: 'center' },
-  btn: {
-    marginTop: 16,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 40,
-    paddingVertical: 14,
-    borderRadius: 12,
-  },
-  btnText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-})

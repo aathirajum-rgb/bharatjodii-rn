@@ -53,6 +53,7 @@ export type BottomSheetType =
 export interface BottomSheetBenefit {
   icon:  string
   value: string
+  info?: boolean  // Figma: trailing (i) marker, e.g. auto-renewal's "carry forward" row
 }
 
 // Structured data the sheet renders. Maps to Angular's `componentData` object.
@@ -211,13 +212,21 @@ export default function BottomSheet({
           {/* Content */}
           {!!data?.content && <Text style={styles.content}>{data.content}</Text>}
 
-          {/* Benefits list (e.g. auto-renewal incentives) — icon + text rows */}
+          {/* Benefits list (e.g. auto-renewal incentives) — icon + text rows,
+              divided by hairlines (Figma: a Line between each row, none after
+              the last) */}
           {!!data?.benefits?.length && (
             <View style={styles.benefitsList}>
               {data.benefits.map((b, i) => (
-                <View key={i} style={styles.benefitRow}>
-                  <CdnSvg uri={b.icon} width={16} height={16} style={styles.benefitIcon} />
-                  <Text style={styles.benefitText}>{b.value}</Text>
+                <View key={i}>
+                  {i > 0 && <View style={styles.benefitDivider} />}
+                  <View style={styles.benefitRow}>
+                    <CdnSvg uri={b.icon} width={20} height={20} style={styles.benefitIcon} />
+                    <Text style={styles.benefitText}>
+                      {b.value}
+                      {b.info && <Text style={styles.benefitInfo}>{'  ⓘ'}</Text>}
+                    </Text>
+                  </View>
                 </View>
               ))}
             </View>
@@ -446,19 +455,26 @@ const styles = StyleSheet.create({
   },
   benefitRow: {
     flexDirection: 'row',
-    alignItems:    'flex-start',
-    marginBottom:  12,
+    alignItems:    'center',
+    paddingVertical: 8,
+  },
+  benefitDivider: {
+    height:          1,
+    backgroundColor: Colors.divider,
   },
   benefitIcon: {
-    marginTop:   2,
-    marginRight: 10,
+    marginRight: 8,
   },
   benefitText: {
     flex:       1,
     fontFamily: 'Poppins-Regular',
-    fontSize:   13,
+    fontSize:   14,
     color:      '#1f1e1b',
-    lineHeight: 18,
+    lineHeight: 20,
+  },
+  benefitInfo: {
+    fontSize: 12,
+    color:    Colors.textTertiary,
   },
   primaryBtn: {
     marginTop:    16,
