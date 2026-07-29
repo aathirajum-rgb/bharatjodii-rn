@@ -105,7 +105,7 @@ export default function CreatedByScreen({ navigation }: Props) {
         />
 
         {/* Title — i18n: REGISTRATION.CREATEDBY */}
-        <Text style={[os.title, { marginBottom: 24 }]}>
+        <Text style={os.title}>
           {t('REGISTRATION.CREATEDBY', 'Creating profile for')}
         </Text>
 
@@ -161,14 +161,14 @@ const styles = StyleSheet.create({
     gap:           16,
   },
 
-  // Pill chip — 40px height, fully-rounded (Figma: borderRadius 50px)
+  // Pill chip — 40px height, fully-rounded (Figma: borderRadius 50px, border #8a8a8a)
   chip: {
     flexDirection:   'row',
     alignItems:      'center',
     height:          40,
     borderRadius:    50,
     borderWidth:     1,
-    borderColor:     Colors.inputBorder,
+    borderColor:     Colors.borderNeutral,
     backgroundColor: Colors.surface,
     paddingLeft:     8,
     paddingRight:    16,

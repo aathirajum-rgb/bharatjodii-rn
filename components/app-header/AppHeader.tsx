@@ -235,11 +235,13 @@ export default function AppHeader({
 
         <View style={styles.flex1} />
 
-        <Pressable style={styles.langBtn} onPress={onLanguagePress}>
-          <CdnSvg uri={ICONS.lang} width={24} height={24} />
-          <Text style={styles.langText}>{resolvedLangLabel}</Text>
-          <CdnSvg uri={ICONS.chevDown} width={24} height={24} />
-        </Pressable>
+        {onLanguagePress && (
+          <Pressable style={styles.langBtn} onPress={onLanguagePress}>
+            <CdnSvg uri={ICONS.lang} width={24} height={24} />
+            <Text style={styles.langText}>{resolvedLangLabel}</Text>
+            <CdnSvg uri={ICONS.chevDown} width={24} height={24} />
+          </Pressable>
+        )}
       </View>
     </SafeAreaView>
   )

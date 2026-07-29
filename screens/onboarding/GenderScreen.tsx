@@ -173,30 +173,31 @@ const styles = StyleSheet.create({
     gap: 32,
   },
 
-  // Gender card — Figma: 1px #b0b0b0 border, 16px radius, 12px horizontal padding, no vertical padding
+  // Gender card — Angular .gender-selection: 1px #8A8A8A border, 16px radius, 12px horizontal padding
   card: {
     flexDirection:     'row',
     alignItems:        'center',
     gap:               16,
     borderWidth:       1,
-    borderColor:       Colors.inputBorder,
+    borderColor:       Colors.borderNeutral,
     borderRadius:      16,
     paddingHorizontal: 12,
     backgroundColor:   Colors.surface,
     overflow:          'hidden',
   },
+  // Angular .gender-selection.item-radio-checked: 2px solid #B50033 border, no bg change
   cardSelected: {
-    borderColor:     Colors.chipBorderActive,
-    backgroundColor: Colors.radioCheckedBg,
+    borderWidth: 2,
+    borderColor: Colors.primaryDark,
   },
 
-  // Avatar — Figma: 80×80, fills full card height (no vertical card padding)
+  // Avatar — Angular .img-icon: min 4.5rem (72px)
   avatar: {
-    width:  80,
-    height: 80,
+    width:  72,
+    height: 72,
   },
 
-  // Label — 14px Medium, stretches between avatar and radio
+  // Label — Angular body1-medium-14: 14px Medium
   cardLabel: {
     flex:       1,
     fontSize:   14,
@@ -207,11 +208,11 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
   },
 
-  // Radio — Figma: 24×24, 2px #8a8a8a border
+  // Radio — Angular ion-radio::part(container): 20×20, 2px border
   radio: {
-    width:           24,
-    height:          24,
-    borderRadius:    12,
+    width:           20,
+    height:          20,
+    borderRadius:    10,
     borderWidth:     2,
     borderColor:     Colors.borderNeutral,
     alignItems:      'center',

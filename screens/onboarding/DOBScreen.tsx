@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
@@ -312,15 +313,21 @@ export default function DOBScreen({ navigation }: Props) {
           })}
         </View>
 
-        {/* Age badge — "Your son is 28 years old" */}
+        {/* Age badge — "Your son is 28 years old" (Angular .height-block: fading gradient fill) */}
         {isAllSelected && calculatedAge !== null && calculatedAge > 0 && (
-          <View style={styles.ageBadge}>
+          <LinearGradient
+            colors={['rgba(181,0,51,0)', '#ffffff']}
+            locations={[0, 0.6]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.ageBadge}
+          >
             <Text style={styles.ageBadgeText}>
               {ageSubject ? `Your ${ageSubject} is ` : 'You are '}
               <Text style={styles.ageBadgeYears}>{calculatedAge} years</Text>
               {' old'}
             </Text>
-          </View>
+          </LinearGradient>
         )}
 
         {/* OR divider + "Please enter age" — hidden once all 3 date fields are filled */}
@@ -501,14 +508,16 @@ const styles = StyleSheet.create({
   },
   // ── Age badge ────────────────────────────────────────────────────────────────
 
+  // Angular .height-block: border-radius left-corners-only (8px 0 0 8px);
+  // fill is a fading gradient (rendered via LinearGradient at the call site).
   ageBadge: {
     marginTop:        12,
     paddingHorizontal: 8,
     paddingVertical:   4,
     borderWidth:       1,
     borderColor:       'rgba(181,0,51,0.1)',
-    borderRadius:      8,
-    backgroundColor:   'rgba(181,0,51,0.03)',
+    borderTopLeftRadius:    8,
+    borderBottomLeftRadius: 8,
     alignSelf:         'flex-start',
   },
   ageBadgeText: {

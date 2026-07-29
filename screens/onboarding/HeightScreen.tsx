@@ -210,7 +210,7 @@ export default function HeightScreen({ navigation }: Props) {
           contentFit="contain"
         />
 
-        <Text style={[os.title, { marginBottom: 24 }]}>{title}</Text>
+        <Text style={os.title}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -366,8 +366,7 @@ const styles = StyleSheet.create({
     gap:               6,
     marginHorizontal:  -24,
     paddingHorizontal: 24,
-    paddingVertical:   12,
-    minHeight:         60,
+    paddingVertical:   8,
   },
   rowBorder: {
     borderBottomWidth: 1,
@@ -383,7 +382,6 @@ const styles = StyleSheet.create({
     fontSize:   14,
     fontWeight: '400',
     color:      Colors.textPrimary,
-    lineHeight: 18,
   },
   rowLabelSelected: {
     fontWeight: '500',
@@ -393,7 +391,6 @@ const styles = StyleSheet.create({
     fontSize:   14,
     fontWeight: '400',
     color:      'rgba(0,0,0,0.6)',
-    lineHeight: 18,
     marginTop:  2,
   },
   rowSubtitleSelected: {

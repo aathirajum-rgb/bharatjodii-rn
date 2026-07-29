@@ -151,9 +151,11 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
 
   const borderColor = hasError ? Colors.inputError : focused ? Colors.inputFocus : Colors.inputBorder
 
-  // Title from i18n — Angular stores it with <br /> tag, strip to \n
+  // Title from i18n — Angular stores it with <br /> tag (padded with stray spaces,
+  // e.g. "Enter your <br /> mobile number"), so strip surrounding whitespace too —
+  // otherwise the second line renders with a leading-space indent.
   const title = t('LOGIN_PAGE.ENT_UR_MOBILE', 'Enter your\nmobile number')
-    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/\s*<br\s*\/?>\s*/gi, '\n')
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -313,12 +315,11 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
 
-  // Title — "Enter your\nmobile number" (Figma: Poppins Bold 28px)
+  // Title — "Enter your\nmobile number" (Figma + Angular heading1-semibold-22: Poppins SemiBold 22px)
   title: {
-    fontSize:     28,
-    fontWeight:   '700',
+    fontSize:     22,
+    fontWeight:   '600',
     color:        Colors.textPrimary,
-    lineHeight:   36,
     marginBottom: 32,
   },
 

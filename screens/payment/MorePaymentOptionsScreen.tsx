@@ -14,7 +14,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import QRCode from 'react-native-qrcode-svg'
 import { File, Paths } from 'expo-file-system'
-import RNShare, { Social } from 'react-native-share'
 import { Colors } from '../../constants/colors'
 import { CDN, CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
@@ -101,17 +100,25 @@ export default function MorePaymentOptionsScreen({ navigation, route }: Props) {
       }
     }
 
-    try {
-      await RNShare.shareSingle({
-        social:  Social.Whatsapp,
-        message: qrData.whatsappMsg,
-        ...(imageUri ? { url: imageUri, type: 'image/png' } : {}),
-      })
-    } catch {
-      // WhatsApp not installed, user cancelled, or the share failed — fall
-      // back to a plain text share so the link still gets through.
-      Share.share({ message: qrData.whatsappMsg }).catch(() => {})
+    // react-native-share has no web implementation — its module throws
+    // ("NativeRNShare... getEnforcing") the moment it's imported, so it's
+    // loaded lazily here rather than statically at the top of the file
+    // (this whole QR section is Android-only anyway, see loadQrSection()).
+    if (Platform.OS === 'android') {
+      try {
+        const { default: RNShare, Social } = await import('react-native-share')
+        await RNShare.shareSingle({
+          social:  Social.Whatsapp,
+          message: qrData.whatsappMsg,
+          ...(imageUri ? { url: imageUri, type: 'image/png' } : {}),
+        })
+        return
+      } catch {
+        // WhatsApp not installed, user cancelled, or the share failed — fall
+        // through to a plain text share so the link still gets through.
+      }
     }
+    Share.share({ message: qrData.whatsappMsg }).catch(() => {})
   }
 
   function handleBack() {

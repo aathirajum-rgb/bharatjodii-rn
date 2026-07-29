@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppHeader from '../components/app-header/AppHeader';
 import ButtonRevamp from '../components/button-revamp/ButtonRevamp';
 import { Colors } from '../constants/colors';
+import { LANG_FONTS, loadLangFonts } from '../constants/fonts';
 import i18n from '../i18n';
 import { getCurrentLanguage, submitLanguage } from '../service/languageService';
 import { useIsDesktopWeb } from '../hooks/useIsDesktopWeb';
@@ -41,9 +42,17 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
   const { t } = useTranslation();
   const isDesktop = useIsDesktopWeb();
   const [userName, setUserName] = useState('');
+  const [scriptFontsReady, setScriptFontsReady] = useState(false);
 
   useEffect(() => {
     getItem(StorageKeys.User.NAME).then(name => setUserName(name ?? ''));
+  }, []);
+
+  // This screen shows every language's native name at once (unlike the rest of
+  // the app, which only ever needs the current language's font), so every
+  // Noto Sans script font must be preloaded here.
+  useEffect(() => {
+    Promise.all(LANGUAGES.map(lang => loadLangFonts(lang.id))).then(() => setScriptFontsReady(true));
   }, []);
 
   const handleNext = async () => {
@@ -90,12 +99,17 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
     <View style={styles.screen}>
       <StatusBar style="dark" />
 
-      <AppHeader
-        type="registration"
-        showBackBtn={navigation?.canGoBack() ?? false}
-        closeIcon={presentedAsModal}
-        onBackPress={() => navigation?.goBack()}
-      />
+      {/* First-run onboarding has nothing to go back to and no reason to show
+          the (redundant) change-language header — only render it for the
+          mid-app modal switch, where the close icon is the only way to dismiss. */}
+      {presentedAsModal && (
+        <AppHeader
+          type="registration"
+          showBackBtn={navigation?.canGoBack() ?? false}
+          closeIcon
+          onBackPress={() => navigation?.goBack()}
+        />
+      )}
 
       {/* Scrollable area: title + 2-col language grid */}
       <ScrollView
@@ -120,7 +134,15 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
                 accessibilityLabel={`${lang.native} ${lang.english}`}
               >
                 <View style={styles.cardText}>
-                  <Text style={styles.nativeName} numberOfLines={1}>{lang.native}</Text>
+                  <Text
+                    style={[
+                      styles.nativeName,
+                      scriptFontsReady && { fontFamily: LANG_FONTS[lang.id]?.semiBold },
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {lang.native}
+                  </Text>
                   <Text style={styles.englishName} numberOfLines={1}>{lang.english}</Text>
                 </View>
                 <View style={[styles.radio, isSelected && styles.radioSelected]}>
@@ -172,10 +194,11 @@ const styles = StyleSheet.create({
   // Scrollable content
   scrollContent: {
     paddingHorizontal: GRID_H_PAD,
-    paddingTop:        12,
+    paddingTop:        20,
   },
   title: {
-    fontSize:     22,
+    fontFamily:   LANG_FONTS.en.semiBold,
+    fontSize:     20,
     fontWeight:   '600',
     color:        Colors.textPrimary,
     marginBottom: 24,
@@ -215,8 +238,9 @@ const styles = StyleSheet.create({
     color:      Colors.textPrimary,
   },
   englishName: {
-    fontSize: 12,
-    color:    Colors.textSecondary,
+    fontFamily: LANG_FONTS.en.regular,
+    fontSize:   12,
+    color:      Colors.textSecondary,
   },
 
   // Radio indicator (Figma: 24×24, Radio Button node 824:2040)
@@ -225,7 +249,7 @@ const styles = StyleSheet.create({
     height:          24,
     borderRadius:    12,
     borderWidth:     2,
-    borderColor:     Colors.inputBorder,
+    borderColor:     Colors.borderNeutral,
     alignItems:      'center',
     justifyContent:  'center',
     flexShrink:      0,

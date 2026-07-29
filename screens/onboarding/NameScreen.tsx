@@ -192,18 +192,19 @@ const styles = StyleSheet.create({
     borderColor: Colors.inputError,
   },
 
-  // Floating label chip — sits on top of the top border (Figma: top:-8, left:12, white bg, 12px Regular)
+  // Floating label chip — Angular .floating: top:-8, left:16, white bg
   labelWrap: {
     position:        'absolute',
     top:             -8,
-    left:            12,
+    left:            16,
     backgroundColor: Colors.surface,
     paddingHorizontal: 4,
   },
+  // Angular body3-regular-12 black-color: 12px Regular, black (not gray)
   labelText: {
     fontSize:   12,
     fontWeight: '400',
-    color:      Colors.textSecondary,
+    color:      Colors.textPrimary,
   },
 
 })
