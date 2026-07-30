@@ -776,6 +776,44 @@ export async function fetchStates(): Promise<Array<{ key: string; label: string 
   return items.sort((a, b) => a.label.localeCompare(b.label))
 }
 
+// Country list for NRI flow — Angular caches this as COUNTRYLIST inside the shared
+// type=all bootstrap response (same call getRegistrationArrays() already makes/caches).
+export async function fetchCountries(): Promise<Array<{ key: string; label: string }>> {
+  const arrays = await getRegistrationArrays()
+
+  const raw = arrays?.COUNTRYLIST
+  let items: Array<{ key: string; label: string }> = []
+
+  if (Array.isArray(raw) && raw.length > 0) {
+    items = raw
+      .map((c: any) => ({ key: String(c.COUNTRYID ?? c.key ?? ''), label: String(c.COUNTRY ?? c.value ?? '') }))
+      .filter(o => o.key !== '')
+  }
+
+  return items.sort((a, b) => a.label.localeCompare(b.label))
+}
+
+// State list for a given (non-Indian) country — NRI flow.
+// Angular checkIsNRIUser() branch: type=state&country=<COUNTRYID> (vs the domestic
+// fetchStates() fallback below, which hardcodes country=98 for India).
+export async function fetchNriStates(countryId: string): Promise<Array<{ key: string; label: string }>> {
+  const lang     = (await getItem(SK.Auth.LANG)) ?? 'en'
+  const paramStr = `type=state&country=${countryId}&state=&LANG=${lang}`
+  const res      = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
+
+  const rawArr = res?.RESPONSE?.STATEOBJ
+  const rawObj = res?.RESPONSE?.STATE?.[0]
+  let items: Array<{ key: string; label: string }> = []
+
+  if (Array.isArray(rawArr) && rawArr.length > 0) {
+    items = rawArr.map((s: any) => ({ key: String(s.STATEID ?? ''), label: String(s.STATE ?? '') })).filter(o => o.key !== '')
+  } else if (rawObj && typeof rawObj === 'object') {
+    items = Object.entries(rawObj).map(([key, value]) => ({ key, label: String(value) }))
+  }
+
+  return items.sort((a, b) => a.label.localeCompare(b.label))
+}
+
 // City list for a state: type=city&country=&state=<STATEID>
 // API returns CITYOBJ array [{key, value}] OR CITY[0] plain object {cityId: cityName}
 export async function fetchCities(stateId: string): Promise<Array<{ key: string; label: string }>> {
@@ -1051,6 +1089,97 @@ export async function submitHoroscopeDetails(
     'POST',
     `ID=${userId}&STAR=${star}&RAASI=${raasi}&DOSHAM=${dosham}`,
   )
+}
+
+// ─── Horoscope generation (pages 29/30/31) ────────────────────────────────────
+// Angular: HOROSTATE is never independently fetched — it reuses the same Indian
+// state list as fetchStates()/NATIVESTATE, defaulting to NATIVESTATE || STATE.
+// So there's no fetchHoroStates(); callers should use fetchStates() directly.
+
+export type HoroCity = {
+  key:       string  // Angular stores the array INDEX as the value, not an id
+  label:     string
+  latitude:  string
+  longitude: string
+  timezone:  string
+}
+
+// City list for a horoscope birth-state: ID=<userId>&STATEID=<HOROSTATE>.
+// Angular caches the raw response (with LATITUDE/LONGITUDE/TIMEZONE) in
+// REGISTRATIONARRAYS.HOROCITY so generateHoroscope() can look coordinates back
+// up by index later — mirrored here the same way.
+export async function fetchHoroCities(stateId: string): Promise<HoroCity[]> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const res    = await apiCall(Endpoints.registration.getHoroCity, 'POST', `ID=${userId}&STATEID=${stateId}`)
+
+  const raw = res?.RESPONSE
+  if (!Array.isArray(raw)) return []
+
+  const items: HoroCity[] = raw.map((c: any, i: number) => ({
+    key:       String(i),
+    label:     String(c.DISTRICT ?? ''),
+    latitude:  String(c.LATITUDE ?? ''),
+    longitude: String(c.LONGITUDE ?? ''),
+    timezone:  String(c.TIMEZONE ?? ''),
+  }))
+
+  const cached = await getItem('REGISTRATIONARRAYS')
+  const arrays: Record<string, any> = cached ? JSON.parse(cached) : {}
+  arrays.HOROCITY = items
+  await setItem('REGISTRATIONARRAYS', JSON.stringify(arrays))
+
+  return items
+}
+
+export type GenerateHoroscopeParams = {
+  date:     string  // day of month, e.g. "8" or "08"
+  month:    string  // 1-12
+  year:     string
+  hour:     string  // 1-12 (12-hour)
+  minute:   string  // 0-59
+  meridian: 'AM' | 'PM'
+  stateId:  string  // HOROSTATE
+  cityKey:  string  // HOROCITY — array index into fetchHoroCities()'s result
+}
+
+// Angular generateHoroscope(): builds ID/DATE/MONTH/YEAR/HOUR/MINUTE/SECOND/MERDIAN
+// (yes, "MERDIAN" — misspelled param name the backend actually expects, preserved
+// verbatim) + STATEID/CITY/LATITUDE/LONGITUDE/ZONE, then calls generatehoro the
+// first time or updatehoroinfo on subsequent edits (decided by the session-level
+// HOROSCOPEAVAILABLE flag, not the per-registration HOROSCOPEAVAIL reg value).
+export async function generateHoroscope(params: GenerateHoroscopeParams): Promise<boolean> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const arrays = await getRegistrationArrays()
+  const cities: HoroCity[] = arrays?.HOROCITY ?? []
+  const city   = cities[Number(params.cityKey)]
+
+  const dd = params.date.padStart(2, '0')
+  const mm = params.month.padStart(2, '0')
+
+  const paramStr =
+    `ID=${userId}&DATE=${dd}&MONTH=${mm}&YEAR=${params.year}` +
+    `&HOUR=${params.hour}&MINUTE=${params.minute}&SECOND=00&MERDIAN=${params.meridian}` +
+    `&STATEID=${params.stateId}&CITY=${params.cityKey}` +
+    `&LATITUDE=${city?.latitude ?? ''}&LONGITUDE=${city?.longitude ?? ''}&ZONE=${city?.timezone ?? ''}`
+
+  const horoscopeAvailable = await getItem(SK.Profile.HOROSCOPE_AVAILABLE)
+  const endpoint = horoscopeAvailable === '1'
+    ? Endpoints.registration.updateHoroInfo
+    : Endpoints.registration.generateHoro
+
+  const res = await apiCall(endpoint, 'POST', paramStr)
+  const ok  = res?.RESPONSECODE == 1
+
+  if (ok) {
+    // Angular toRailwayTime(): 12-hour + meridian → zero-padded 24-hour "HH:MM"
+    let hour24 = Number(params.hour) % 12
+    if (params.meridian === 'PM') hour24 += 12
+    await setRegValue('TIMEOFBIRTH', `${String(hour24).padStart(2, '0')}:${params.minute.padStart(2, '0')}`)
+    await setRegValue('HOROSCOPEAVAIL', '1')
+    await setItem(SK.Profile.HOROSCOPE_AVAILABLE, '1')
+  }
+
+  return ok
 }
 
 // ─── Registration update ──────────────────────────────────────────────────────

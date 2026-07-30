@@ -105,15 +105,18 @@ export default function ReligionScreen({ navigation }: Props) {
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
-        <Text style={[os.title, { marginBottom: 24 }]}>{title}</Text>
+        <Text style={os.title}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
         ) : (
           <View style={styles.fieldWrapper}>
-            <View style={styles.fieldLabelBadge}>
-              <Text style={styles.fieldLabelText}>Religion</Text>
-            </View>
+            {/* Angular only shows this label once a value is selected */}
+            {!!selected && (
+              <View style={styles.fieldLabelBadge}>
+                <Text style={styles.fieldLabelText}>Religion</Text>
+              </View>
+            )}
             <Pressable
               style={styles.selectField}
               onPress={() => setPanelVisible(true)}
@@ -165,11 +168,11 @@ const styles = StyleSheet.create({
     backgroundColor:   Colors.surface,
     paddingHorizontal: 4,
   },
+  // Angular .floating body3-regular-12 black-color: black, not gray
   fieldLabelText: {
     fontSize:   12,
     fontWeight: '400',
-    color:      Colors.textSecondary,
-    lineHeight: 16,
+    color:      Colors.textPrimary,
   },
 
   selectField: {
@@ -183,15 +186,15 @@ const styles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
+  // Angular's placeholder/value span is always black-color; only weight toggles
   selectFieldText: {
     flex:       1,
     fontSize:   14,
     fontWeight: '400',
-    color:      Colors.scrimSubtle,
+    color:      Colors.textPrimary,
   },
   selectFieldTextActive: {
     fontWeight: '500',
-    color:      Colors.textPrimary,
   },
   selectFieldArrow: {
     fontSize:   22,

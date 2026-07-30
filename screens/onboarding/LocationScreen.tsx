@@ -17,6 +17,8 @@ import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
   callPartialRegistrationAPI,
   fetchCities,
+  fetchCountries,
+  fetchNriStates,
   fetchStates,
   getNextPageAfterLocation,
   getRegValues,
@@ -45,7 +47,7 @@ const LOCATION_TITLES: Record<string, string> = {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Option = { key: string; label: string }
-type PanelKind = 'state' | 'city'
+type PanelKind = 'country' | 'state' | 'city'
 
 type Props = {
   navigation: any
@@ -63,10 +65,12 @@ export default function LocationScreen({ navigation }: Props) {
   const [countryCode,    setCountryCode]    = useState('91')
 
   // Location selections
+  const [selectedCountry, setSelectedCountry] = useState<Option | null>(null)  // NRI flow only
   const [selectedState,  setSelectedState]  = useState<Option | null>(null)
   const [selectedCity,   setSelectedCity]   = useState<Option | null>(null)
 
   // List data
+  const [countries,      setCountries]      = useState<Option[]>([])  // NRI flow only
   const [states,         setStates]         = useState<Option[]>([])
   const [cities,         setCities]         = useState<Option[]>([])
 
@@ -88,11 +92,39 @@ export default function LocationScreen({ navigation }: Props) {
       getItem(SK.User.COUNTRY_CODE),
       getRegValues(),
     ]).then(async ([cb, cc, ccode, rv]) => {
-      const { STATE: savedState, CITY: savedCity } = rv as Record<string, string>
+      const { COUNTRY: savedCountry, STATE: savedState, CITY: savedCity } = rv as Record<string, string>
       if (cb)    setCreatedBy(cb)
       if (cc)    setCustomerCare(cc)
       if (ccode) setCountryCode(ccode)
 
+      // Angular checkIsNRIUser(): country/state (no city) for non-Indian users
+      if (ccode && ccode !== '91') {
+        setLoadingStates(true)
+        try {
+          const countryList = await fetchCountries()
+          setCountries(countryList)
+
+          if (savedCountry && countryList.length > 0) {
+            const foundCountry = countryList.find(c => c.key === savedCountry)
+            if (foundCountry) {
+              setSelectedCountry(foundCountry)
+              const stateList = await fetchNriStates(savedCountry)
+              setStates(stateList)
+              if (savedState) {
+                const foundState = stateList.find(s => s.key === savedState)
+                if (foundState) setSelectedState(foundState)
+              }
+            }
+          }
+        } catch {
+          // user can retry by reopening the pickers
+        } finally {
+          setLoadingStates(false)
+        }
+        return
+      }
+
+      // Domestic (Indian) flow — Country fixed to India, State + District
       const stateList = await loadStates()
 
       // Restore prior selection
@@ -139,20 +171,39 @@ export default function LocationScreen({ navigation }: Props) {
     setPanelVisible(true)
   }
 
+  // NRI flow: choosing a country loads that country's states; no city field.
+  async function onCountrySelect(opt: Option) {
+    setSelectedCountry(opt)
+    setSelectedState(null)
+    setStates([])
+
+    setLoadingStates(true)
+    try {
+      const stateList = await fetchNriStates(opt.key)
+      setStates(stateList)
+    } catch {
+      setStates([])
+    } finally {
+      setLoadingStates(false)
+    }
+  }
+
   async function onStateSelect(opt: Option) {
     setSelectedState(opt)
-    setSelectedCity(null)
-    setCities([])
 
-    // Immediately start loading cities for the newly chosen state
-    setLoadingCities(true)
-    try {
-      const cityList = await fetchCities(opt.key)
-      setCities(cityList)
-    } catch {
+    // Domestic flow only — NRI has no city/district field
+    if (isIndianFlow) {
+      setSelectedCity(null)
       setCities([])
-    } finally {
-      setLoadingCities(false)
+      setLoadingCities(true)
+      try {
+        const cityList = await fetchCities(opt.key)
+        setCities(cityList)
+      } catch {
+        setCities([])
+      } finally {
+        setLoadingCities(false)
+      }
     }
   }
 
@@ -165,15 +216,24 @@ export default function LocationScreen({ navigation }: Props) {
   const title = LOCATION_TITLES[createdBy] ?? `Select where they live`
   const isIndianFlow = countryCode === '91'
   const countryLabel = isIndianFlow ? 'India' : 'Other'
-  const canSubmit    = !!selectedState && !!selectedCity && !submitting
+  // Angular isLocationValid(): NRI only requires Country+State (city is hidden for NRI on this step)
+  const canSubmit = isIndianFlow
+    ? !!selectedState && !!selectedCity && !submitting
+    : !!selectedCountry && !!selectedState && !submitting
 
   // ─── Submit ────────────────────────────────────────────────────────────────
 
   async function handleNext() {
-    if (!canSubmit || !selectedState || !selectedCity) return
+    if (!canSubmit || !selectedState) return
     setSubmitting(true)
     try {
-      await setRegValues({ STATE: selectedState.key, CITY: selectedCity.key, COUNTRY: INDIA_COUNTRY })
+      if (isIndianFlow) {
+        if (!selectedCity) return
+        await setRegValues({ STATE: selectedState.key, CITY: selectedCity.key, COUNTRY: INDIA_COUNTRY })
+      } else {
+        if (!selectedCountry) return
+        await setRegValues({ COUNTRY: selectedCountry.key, STATE: selectedState.key, CITY: '' })
+      }
       const nextPage = await getNextPageAfterLocation()
       navigation.push('onboarding', { pageNo: nextPage })
       callPartialRegistrationAPI()
@@ -204,38 +264,66 @@ export default function LocationScreen({ navigation }: Props) {
         ) : (
           <View style={styles.fieldsContainer}>
 
-            {/* Country field — fixed "India" for Indian flow, not interactive */}
-            <FloatField
-              label="Country"
-              value={countryLabel}
-              placeholder="Country"
-              onPress={() => {}}
-              hasValue
-              disabled
-            />
+            {isIndianFlow ? (
+              <>
+                {/* Country field — fixed "India" for Indian flow, not interactive */}
+                <FloatField
+                  label="Country"
+                  value={countryLabel}
+                  placeholder="Country"
+                  onPress={() => {}}
+                  hasValue
+                  disabled
+                />
 
-            {/* State field */}
-            <FloatField
-              label="State"
-              value={selectedState?.label ?? ''}
-              placeholder="Select state"
-              onPress={() => openPanel('state')}
-              hasValue={!!selectedState}
-            />
+                {/* State field */}
+                <FloatField
+                  label="State"
+                  value={selectedState?.label ?? ''}
+                  placeholder="Select state"
+                  onPress={() => openPanel('state')}
+                  hasValue={!!selectedState}
+                />
 
-            {/* District / City field */}
-            <FloatField
-              label="District"
-              value={selectedCity?.label ?? ''}
-              placeholder={loadingCities ? 'Loading cities…' : 'Select district'}
-              onPress={() => {
-                if (!selectedState || loadingCities) return
-                openPanel('city')
-              }}
-              hasValue={!!selectedCity}
-              disabled={!selectedState || loadingCities}
-              loading={loadingCities}
-            />
+                {/* District / City field */}
+                <FloatField
+                  label="District"
+                  value={selectedCity?.label ?? ''}
+                  placeholder={loadingCities ? 'Loading cities…' : 'Select district'}
+                  onPress={() => {
+                    if (!selectedState || loadingCities) return
+                    openPanel('city')
+                  }}
+                  hasValue={!!selectedCity}
+                  disabled={!selectedState || loadingCities}
+                  loading={loadingCities}
+                />
+              </>
+            ) : (
+              <>
+                {/* NRI flow (Angular checkIsNRIUser()): real Country picker + State,
+                    no District/City field on this step. */}
+                <FloatField
+                  label="Country"
+                  value={selectedCountry?.label ?? ''}
+                  placeholder="Select country"
+                  onPress={() => openPanel('country')}
+                  hasValue={!!selectedCountry}
+                />
+
+                <FloatField
+                  label="State"
+                  value={selectedState?.label ?? ''}
+                  placeholder="Select state"
+                  onPress={() => {
+                    if (!selectedCountry) return
+                    openPanel('state')
+                  }}
+                  hasValue={!!selectedState}
+                  disabled={!selectedCountry}
+                />
+              </>
+            )}
 
           </View>
         )}
@@ -243,14 +331,18 @@ export default function LocationScreen({ navigation }: Props) {
 
       {/* Sticky footer handled globally via useOnboardingFooter */}
 
-      {/* Shared picker for State + District */}
+      {/* Shared picker for Country + State + District */}
       <SearchablePicker
         visible={panelVisible}
-        title={panelKind === 'state' ? 'Select state' : 'Select district'}
-        placeholder={panelKind === 'state' ? 'Search state…' : 'Search district…'}
-        options={panelKind === 'state' ? states : cities}
-        selectedKey={panelKind === 'state' ? selectedState?.key ?? null : selectedCity?.key ?? null}
-        onSelect={panelKind === 'state' ? onStateSelect : onCitySelect}
+        title={panelKind === 'country' ? 'Select country' : panelKind === 'state' ? 'Select state' : 'Select district'}
+        placeholder={panelKind === 'country' ? 'Search country…' : panelKind === 'state' ? 'Search state…' : 'Search district…'}
+        options={panelKind === 'country' ? countries : panelKind === 'state' ? states : cities}
+        selectedKey={
+          panelKind === 'country' ? selectedCountry?.key ?? null :
+          panelKind === 'state'   ? selectedState?.key ?? null :
+          selectedCity?.key ?? null
+        }
+        onSelect={panelKind === 'country' ? onCountrySelect : panelKind === 'state' ? onStateSelect : onCitySelect}
         onClose={() => setPanelVisible(false)}
       />
     </View>
@@ -318,8 +410,9 @@ function FloatField({ label, value, placeholder, onPress, hasValue, disabled, lo
 const styles = StyleSheet.create({
   loader: { marginTop: 48 },
 
+  // 32px between every field, including title-to-first-field (matches Figma exactly)
   fieldsContainer: {
-    gap: 24,
+    gap: 32,
   },
 
   divider: {
@@ -349,10 +442,10 @@ const styles = StyleSheet.create({
 
 // FloatField styles (separate object so the sub-component can reference them cleanly)
 const floatStyles = StyleSheet.create({
-  // Outer wrapper — marginTop: 8 gives room for the label that overflows upward
+  // Outer wrapper — the fieldsContainer gap already provides room for the
+  // label that overflows upward, so no extra marginTop is needed here.
   wrapper: {
-    position:  'relative',
-    marginTop: 8,
+    position: 'relative',
   },
 
   field: {
@@ -366,11 +459,10 @@ const floatStyles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
-  fieldActive:   { borderColor: Colors.inputBorder },
-  fieldDisabled: {
-    backgroundColor: Colors.surfaceInput,
-    borderColor:     '#d8d8d8',
-  },
+  fieldActive: { borderColor: Colors.inputBorder },
+  // Figma renders the fixed/non-interactive Country field identically to an
+  // active field — same border, solid black text, no graying-out.
+  fieldDisabled: {},
 
   value: {
     flex:       1,
@@ -382,7 +474,7 @@ const floatStyles = StyleSheet.create({
     fontWeight: '400',
     color:      Colors.textPrimary,
   },
-  disabledText: { color: Colors.textSecondary },
+  disabledText: {},
 
   arrow: {
     fontSize:   22,

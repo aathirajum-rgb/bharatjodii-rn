@@ -35,6 +35,9 @@ import CustomGalleryScreen         from '../screens/onboarding/CustomGalleryScre
 import ManagePhotosScreen          from '../screens/onboarding/ManagePhotosScreen'
 import FamilyDetailsScreen         from '../screens/onboarding/FamilyDetailsScreen'
 import PropertyDetailsScreen       from '../screens/onboarding/PropertyDetailsScreen'
+import GenerateHoroscopeScreen     from '../screens/onboarding/GenerateHoroscopeScreen'
+import HoroscopeBirthDetailsScreen from '../screens/onboarding/HoroscopeBirthDetailsScreen'
+import HoroscopeTimeScreen         from '../screens/onboarding/HoroscopeTimeScreen'
 import StarRaasiScreen             from '../screens/onboarding/StarRaasiScreen'
 import DoshamScreen                from '../screens/onboarding/DoshamScreen'
 import PersonalReligiousDesktopStep    from '../screens/onboarding/PersonalReligiousDesktopStep'
@@ -264,11 +267,14 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
       case '20': return <AddPhotoScreen         navigation={navigation} route={route} />
       case '22': return <CustomGalleryScreen    navigation={navigation} route={route} />
       case '21': return <ManagePhotosScreen     navigation={navigation} route={route} />
-      case '27': return <FamilyDetailsScreen    navigation={navigation} route={route} />
-      case '28': return <PropertyDetailsScreen  navigation={navigation} route={route} />
-      case '29': return <StarRaasiScreen        navigation={navigation} route={route} />
-      case '32': return <DoshamScreen           navigation={navigation} route={route} />
-      default:   return <HomeScreen             navigation={navigation} />
+      case '27': return <FamilyDetailsScreen         navigation={navigation} route={route} />
+      case '28': return <PropertyDetailsScreen       navigation={navigation} route={route} />
+      case '29': return <GenerateHoroscopeScreen     navigation={navigation} route={route} />
+      case '30': return <HoroscopeBirthDetailsScreen navigation={navigation} route={route} />
+      case '31': return <HoroscopeTimeScreen         navigation={navigation} route={route} />
+      case '33': return <StarRaasiScreen             navigation={navigation} route={route} />
+      case '32': return <DoshamScreen                navigation={navigation} route={route} />
+      default:   return <HomeScreen                  navigation={navigation} />
     }
   }
 

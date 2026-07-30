@@ -215,7 +215,7 @@ export default function CasteScreen({ navigation }: Props) {
           contentFit="contain"
         />
 
-        <Text style={[os.title, { marginBottom: 24 }]}>{title}</Text>
+        <Text style={os.title}>{title}</Text>
 
         {fetchingCaste ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -336,16 +336,17 @@ const styles = StyleSheet.create({
     flexDirection:     'row',
     alignItems:        'center',
   },
+  // Angular .floating body3-regular-12 black-color: black, not gray
   fieldLabelText: {
     fontSize:   12,
     fontWeight: '400',
-    color:      Colors.textSecondary,
-    lineHeight: 16,
+    color:      Colors.textPrimary,
   },
+  // Figma: "(Optional)" suffix is a distinct lighter gray, not Colors.textSecondary
   fieldLabelOptional: {
     fontSize:   12,
     fontWeight: '400',
-    color:      Colors.textSecondary,
+    color:      'rgba(0,0,0,0.4)',
   },
 
   selectField: {
@@ -359,15 +360,15 @@ const styles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
+  // Angular's placeholder/value span is always black-color; only weight toggles
   selectFieldText: {
     flex:       1,
     fontSize:   14,
     fontWeight: '400',
-    color:      Colors.scrimSubtle,
+    color:      Colors.textPrimary,
   },
   selectFieldTextActive: {
     fontWeight: '500',
-    color:      Colors.textPrimary,
   },
   selectFieldArrow: {
     fontSize:   22,

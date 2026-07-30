@@ -146,7 +146,7 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
           contentFit="contain"
         />
 
-        <Text style={[os.title, { marginBottom: 24 }]}>{title}</Text>
+        <Text style={os.title}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />

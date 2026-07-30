@@ -143,7 +143,7 @@ export default function HomeTownLocationScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
-        <Text style={[os.title, { marginBottom: 32 }]}>{title}</Text>
+        <Text style={os.title}>{title}</Text>
 
         {loadingStates ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -241,14 +241,15 @@ function FloatField({ label, value, placeholder, onPress, hasValue, disabled, lo
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  loader:         { marginTop: 32 },
-  fieldsContainer: { gap: 24 },
+  loader: { marginTop: 32 },
+  // 32px between every field, including title-to-first-field (matches Figma exactly)
+  fieldsContainer: { gap: 32 },
 })
 
 const floatStyles = StyleSheet.create({
+  // fieldsContainer's gap already provides the label's overflow room — no extra marginTop needed
   wrapper: {
-    position:  'relative',
-    marginTop: 8,
+    position: 'relative',
   },
   field: {
     flexDirection:   'row',
@@ -261,21 +262,20 @@ const floatStyles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
-  fieldDisabled: {
-    backgroundColor: Colors.surfaceInput,
-    borderColor:     '#d8d8d8',
-  },
+  // Figma renders the disabled District field identically to an active field —
+  // same border, no graying-out.
+  fieldDisabled: {},
   value: {
     flex:       1,
     fontSize:   14,
     fontWeight: '500',
     color:      Colors.textPrimary,
   },
+  // Angular's placeholder/value span is always black-color; only weight toggles
   placeholder: {
     fontWeight: '400',
-    color:      Colors.scrimSubtle,
   },
-  disabledText: { color: Colors.textSecondary },
+  disabledText: {},
   arrow: {
     fontSize:   22,
     color:      Colors.textPrimary,

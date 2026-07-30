@@ -149,11 +149,11 @@ export default function DoshamScreen({ navigation }: Props) {
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
-        <Text style={[os.title, { marginBottom: 24 }]}>
+        <Text style={os.title}>
           {title}
         </Text>
 
-        {/* ── Step 1: Yes / No ── */}
+        {/* ── Step 1: Yes / No — standard pill-chip pattern (Figma: h40, radius50, left indicator) ── */}
         {hasDosham !== true && (
           <View style={styles.yesNoRow}>
             <Pressable
@@ -165,9 +165,14 @@ export default function DoshamScreen({ navigation }: Props) {
               {submitting && hasDosham === false ? (
                 <ActivityIndicator color={Colors.primary} />
               ) : (
-                <Text style={[styles.yesNoBtnText, hasDosham === false && styles.yesNoBtnTextActive]}>
-                  No
-                </Text>
+                <>
+                  <View style={[styles.yesNoIcon, hasDosham === false && styles.yesNoIconActive]}>
+                    {hasDosham === false && <Text style={styles.yesNoCheckmark}>✓</Text>}
+                  </View>
+                  <Text style={[styles.yesNoBtnText, hasDosham === false && styles.yesNoBtnTextActive]}>
+                    No
+                  </Text>
+                </>
               )}
             </Pressable>
 
@@ -177,6 +182,9 @@ export default function DoshamScreen({ navigation }: Props) {
               disabled={submitting}
               accessibilityRole="button"
             >
+              <View style={[styles.yesNoIcon, hasDosham === true && styles.yesNoIconActive]}>
+                {hasDosham === true && <Text style={styles.yesNoCheckmark}>✓</Text>}
+              </View>
               <Text style={[styles.yesNoBtnText, hasDosham === true && styles.yesNoBtnTextActive]}>
                 Yes
               </Text>
@@ -235,68 +243,88 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
 
-  // ── Yes / No ──
+  // ── Yes / No — standard pill-chip pattern (Figma: h40, radius50, border #8a8a8a) ──
   yesNoRow: {
     flexDirection: 'row',
+    flexWrap:      'wrap',
     gap:           16,
   },
   yesNoBtn: {
-    flex:            1,
-    paddingVertical: 18,
-    borderRadius:    12,
-    borderWidth:     1.5,
-    borderColor:     Colors.borderSoft,
-    backgroundColor: Colors.surface,
+    flexDirection:   'row',
     alignItems:      'center',
-    justifyContent:  'center',
+    height:          40,
+    borderRadius:    50,
+    borderWidth:     1,
+    borderColor:     Colors.borderNeutral,
+    backgroundColor: Colors.surface,
+    paddingLeft:     8,
+    paddingRight:    16,
+    gap:             8,
   },
   yesNoBtnActive: {
     borderColor:     Colors.chipBorderActive,
     backgroundColor: Colors.radioCheckedBg,
   },
+  // Figma keeps the label black in both states — only the indicator turns red
   yesNoBtnText: {
-    fontSize:   16,
-    fontWeight: '500',
+    fontSize:   14,
+    fontWeight: '400',
     color:      Colors.textPrimary,
   },
   yesNoBtnTextActive: {
-    color: Colors.primaryDark,
+    fontWeight: '500',
+  },
+  yesNoIcon: {
+    width:          20,
+    height:         20,
+    borderRadius:   10,
+    borderWidth:    1.5,
+    borderColor:    Colors.borderNeutral,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  yesNoIconActive: {
+    borderColor:     Colors.primaryDark,
+    backgroundColor: Colors.primaryDark,
+  },
+  yesNoCheckmark: {
+    color:      Colors.surface,
+    fontSize:   11,
+    fontWeight: '700',
   },
 
-  // ── Dosham type checkboxes ──
-  checkList: { gap: 12 },
+  // ── Dosham type checkboxes — flat full-width rows (Figma: no card border/radius,
+  // divider #e6e6e6, full-bleed #FFF1F5 when checked) ──
+  checkList: { gap: 0 },
 
   checkRow: {
     flexDirection:     'row',
     alignItems:        'center',
     justifyContent:    'space-between',
-    paddingHorizontal: 16,
+    marginHorizontal:  -24,
+    paddingHorizontal: 24,
     paddingVertical:   14,
-    borderRadius:      12,
-    borderWidth:       1,
-    borderColor:       Colors.borderSoft,
-    backgroundColor:   Colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.borderSubtle,
   },
   checkRowActive: {
-    borderColor:     Colors.chipBorderActive,
-    backgroundColor: Colors.radioCheckedBg,
+    backgroundColor: Colors.selectionBg,
   },
   checkLabel: {
     flex:        1,
-    fontSize:    15,
+    fontSize:    14,
     fontWeight:  '400',
     color:       Colors.textPrimary,
-    lineHeight:  20,
     marginRight: 12,
   },
+  // Figma keeps the label black when checked — only the weight changes
   checkLabelActive: {
     fontWeight: '500',
-    color:      Colors.primaryDark,
   },
   checkbox: {
-    width:          22,
-    height:         22,
-    borderRadius:   6,
+    width:          20,
+    height:         20,
+    borderRadius:   4,
     borderWidth:    1.5,
     borderColor:    Colors.borderNeutral,
     alignItems:     'center',

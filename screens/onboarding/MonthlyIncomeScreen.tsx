@@ -168,7 +168,7 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
           contentFit="contain"
         />
 
-        <Text style={[os.title, { marginBottom: 24 }]}>{title}</Text>
+        <Text style={os.title}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -178,7 +178,7 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
             {isNRI && currencyType && (
               <View style={styles.currencyWrapper}>
                 <Pressable
-                  style={styles.currencyField}
+                  style={[styles.currencyField, currencyDropdownOpen && styles.currencyFieldOpen]}
                   onPress={() => setCurrencyDropdownOpen(v => !v)}
                   accessibilityRole="button"
                   accessibilityLabel="Select currency"
@@ -275,7 +275,10 @@ const styles = StyleSheet.create({
 
   // ─── Currency picker ───────────────────────────────────────────────────────
   currencyWrapper: {
-    marginBottom: 8,
+    // Figma: 24px gap between the currency field and the income list below it
+    // (the domestic/no-currency-field path gets its title-to-list gap from
+    // os.title.marginBottom alone, so this must not add to that case)
+    marginBottom: 24,
     zIndex:       10,
   },
 
@@ -290,6 +293,14 @@ const styles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
+  // Figma renders the field + expanded dropdown as one seamless bordered box —
+  // hide this field's bottom border/radius so it merges with the dropdown below
+  // (same technique as DOBScreen's fieldOpen).
+  currencyFieldOpen: {
+    borderBottomLeftRadius:  0,
+    borderBottomRightRadius: 0,
+    borderBottomColor:       Colors.surface,
+  },
 
   currencyLabelBadge: {
     position:        'absolute',
@@ -302,7 +313,6 @@ const styles = StyleSheet.create({
     fontSize:   12,
     fontWeight: '400',
     color:      Colors.textPrimary,
-    lineHeight: 16,
   },
 
   currencyFieldValue: {
@@ -318,13 +328,15 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 
+  // No top border/radius or top margin — merges seamlessly with currencyFieldOpen above
   currencyDropdown: {
-    borderWidth:     1,
-    borderColor:     Colors.inputBorder,
-    borderRadius:    8,
-    backgroundColor: Colors.surface,
-    marginTop:       4,
-    overflow:        'hidden',
+    borderWidth:              1,
+    borderTopWidth:           0,
+    borderColor:              Colors.inputBorder,
+    borderBottomLeftRadius:   8,
+    borderBottomRightRadius:  8,
+    backgroundColor:          Colors.surface,
+    overflow:                 'hidden',
   },
 
   currencyOption: {
@@ -349,9 +361,10 @@ const styles = StyleSheet.create({
   },
 
   // ─── Income list ──────────────────────────────────────────────────────────
-  list: {
-    marginTop: 8,
-  },
+  // No marginTop: the domestic path (no currency field) gets its title-to-list
+  // gap from os.title.marginBottom alone; the NRI path's field-to-list gap
+  // comes from currencyWrapper.marginBottom instead.
+  list: {},
 
   listItem: {
     flexDirection:     'row',
@@ -375,7 +388,6 @@ const styles = StyleSheet.create({
     fontSize:   14,
     fontWeight: '400',
     color:      Colors.textPrimary,
-    lineHeight: 20,
   },
   listItemTextSelected: {
     fontWeight: '500',

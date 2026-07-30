@@ -910,18 +910,20 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const likeLikedMe      = makeLikeHandler(setLikedMe)
 
   // Angular: redirectToPCS(cardDetails) — each card type navigates to its own
-  // edit screen. HOROSCOPE and IDVERIFY have no registered route in this app
-  // yet (no dedicated screen exists) — left as TODO no-ops rather than guessing.
+  // edit screen. IDVERIFY has no registered route in this app yet (no dedicated
+  // screen exists) — left as a TODO no-op rather than guessing.
+  // StarRaasiScreen moved from page '29' to '33' when the horoscope generation
+  // flow (pages 29/30/31) was added — '29' is now GenerateHoroscopeScreen.
   function handleCompleteProfileCard(card: CompleteProfileCard) {
     switch (card.type) {
       case 'PHOTO':       navigation.navigate('Gallery'); break
-      case 'STAR_RAASI':  navigation.navigate('onboarding', { pageNo: '29', standalone: true }); break
+      case 'STAR_RAASI':  navigation.navigate('onboarding', { pageNo: '33', standalone: true }); break
       case 'PROPERTY':
       case 'VEHICLE':     navigation.navigate('onboarding', { pageNo: '28', standalone: true }); break
       case 'FAMILY':      navigation.navigate('onboarding', { pageNo: '27', standalone: true }); break
       case 'DIET':        navigation.navigate('onboarding', { pageNo: '38', standalone: true }); break
       case 'HOMETOWN':    navigation.navigate('onboarding', { pageNo: '44', standalone: true }); break
-      case 'HOROSCOPE':   /* TODO: no horoscope edit screen registered yet */ break
+      case 'HOROSCOPE':   navigation.navigate('onboarding', { pageNo: '29', standalone: true }); break
       case 'IDVERIFY':    /* TODO: no verify-id screen registered yet */ break
     }
   }

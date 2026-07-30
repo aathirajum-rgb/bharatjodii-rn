@@ -121,25 +121,33 @@ export default function GothraScreen({ navigation }: Props) {
           contentFit="contain"
         />
 
-        <Text style={[os.title, { marginBottom: 24 }]}>{title}</Text>
+        <Text style={os.title}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
         ) : (
-          <Pressable
-            style={styles.selectField}
-            onPress={() => setPanelVisible(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Select gothram"
-          >
-            <Text
-              style={[styles.selectFieldText, !!selected && styles.selectFieldTextActive]}
-              numberOfLines={1}
+          <View style={styles.fieldWrapper}>
+            {/* Matches Religion/Caste: label only shows once a value is selected */}
+            {!!selected && (
+              <View style={styles.fieldLabelBadge}>
+                <Text style={styles.fieldLabelText}>Gothram</Text>
+              </View>
+            )}
+            <Pressable
+              style={styles.selectField}
+              onPress={() => setPanelVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Select gothram"
             >
-              {selected ? selected.label : 'Select Gothram'}
-            </Text>
-            <Text style={styles.selectFieldArrow}>›</Text>
-          </Pressable>
+              <Text
+                style={[styles.selectFieldText, !!selected && styles.selectFieldTextActive]}
+                numberOfLines={1}
+              >
+                {selected ? selected.label : 'Select Gothram'}
+              </Text>
+              <Text style={styles.selectFieldArrow}>›</Text>
+            </Pressable>
+          </View>
         )}
       </ScrollView>
 
@@ -172,6 +180,24 @@ export default function GothraScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   loader: { marginTop: 48 },
+
+  fieldWrapper: {
+    position:  'relative',
+    marginTop: 8,
+  },
+  fieldLabelBadge: {
+    position:          'absolute',
+    top:               -8,
+    left:              12,
+    zIndex:            1,
+    backgroundColor:   Colors.surface,
+    paddingHorizontal: 4,
+  },
+  fieldLabelText: {
+    fontSize:   12,
+    fontWeight: '400',
+    color:      Colors.textPrimary,
+  },
 
   selectField: {
     flexDirection:   'row',

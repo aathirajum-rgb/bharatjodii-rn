@@ -39,4 +39,6 @@ export interface IRegistrationValues {
   INCOMECURRENCY: string
   GOTHRA: string
   HOMETOWN: boolean
+  TIMEOFBIRTH?: string
+  HOROSCOPEAVAIL?: string
 }

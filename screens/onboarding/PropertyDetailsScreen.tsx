@@ -174,20 +174,22 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  // Figma: 22px SemiBold (matches the standard onboarding title font, but this
+  // screen's own subtitle sits right below it with only a 12px gap, not the
+  // usual 32px, so this can't just reuse the shared os.title style)
   title: {
-    fontSize:     24,
-    fontWeight:   '700',
+    fontSize:     22,
+    fontWeight:   '600',
     color:        Colors.textPrimary,
-    lineHeight:   30,
-    marginBottom: 8,
+    marginBottom: 12,
   },
 
+  // Figma: black, not gray — 32px gap down to the property list
   subtitle: {
     fontSize:     14,
     fontWeight:   '400',
-    color:        Colors.textSecondary,
-    lineHeight:   20,
-    marginBottom: 28,
+    color:        Colors.textPrimary,
+    marginBottom: 32,
   },
 
   loader: { marginTop: 48 },
@@ -196,14 +198,15 @@ const styles = StyleSheet.create({
   list: {
     marginHorizontal: -24,
     borderTopWidth:    StyleSheet.hairlineWidth,
-    borderTopColor:    Colors.border,
+    borderTopColor:    Colors.borderSubtle,
   },
 
   row: {
     flexDirection:     'row',
     alignItems:        'center',
+    gap:               6,
+    height:            44,
     paddingHorizontal: 24,
-    paddingVertical:   16,
     backgroundColor:   Colors.surface,
   },
   rowSelected: {
@@ -211,25 +214,23 @@ const styles = StyleSheet.create({
   },
   rowDivider: {
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.border,
+    borderBottomColor: Colors.borderSubtle,
   },
 
   rowLabel: {
     flex:       1,
-    fontSize:   15,
+    fontSize:   14,
     fontWeight: '400',
     color:      Colors.textPrimary,
-    lineHeight: 22,
-    marginRight: 12,
   },
   rowLabelSelected: {
-    fontWeight: '700',
+    fontWeight: '500',
   },
 
   checkbox: {
-    width:           24,
-    height:          24,
-    borderRadius:    6,
+    width:           20,
+    height:          20,
+    borderRadius:    4,
     borderWidth:     1.5,
     borderColor:     Colors.borderNeutral,
     backgroundColor: Colors.surface,
