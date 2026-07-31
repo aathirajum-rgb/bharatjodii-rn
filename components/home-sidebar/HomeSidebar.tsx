@@ -1,30 +1,36 @@
 // Desktop Home left sidebar (Figma "Jodii Desktop - Registration", node
-// 161:10324) — profile summary card + the SAME menu list as mobile's
-// MenuScreen.tsx (same rows, same order, same icons, same nav targets/i18n
-// keys), just laid out as a compact sidebar instead of a full-screen scroll
-// of cards. Per explicit instruction, this does NOT follow Figma's own
-// (different/curated) row set — it mirrors MenuScreen.tsx exactly.
+// 1034:6600, "Sidebar") — user profile summary card + account menu, matching
+// the Figma design's own row set exactly (confirmed against the live "Jodii
+// Desktop" and "Jodii Desktop - Scroll view" frames — the card has exactly
+// 7 rows below the Edit profile/Edit preferences pair, with no Logout row).
 //
-// Logout reuses MenuScreen.tsx's own exported LogoutSheet + performLogout —
-// same confirm-before-logout bottom sheet and side effects, not a re-implementation.
-import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
+// Icons load from the CDN (imgs.jodii.app), the same way the Angular app's
+// own menu.page.html loads its account-menu icons, instead of bundling local
+// Figma-exported files via require() — the desktop-home/ folder of ~80
+// locally require()'d assets from the original build of this screen was
+// never committed to git and got wiped from disk, breaking every screen
+// that referenced it. CDN URLs can't disappear from under us the same way.
 import { Image } from 'expo-image'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
+import { CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
-import { paymentTrack } from '../../service/paymentService'
-import { ICON, LogoutSheet, performLogout } from '../../screens/menu/MenuScreen'
+import { ICON as MENU_ICON } from '../../screens/menu/MenuScreen'
 
-// Angular: external-page.page.ts's hardcoded urlObjs = {1: privacy, 2: terms}.
-const PRIVACY_POLICY_URL   = 'https://www.jodii.com/privacy-policy.html'
-const TERMS_CONDITIONS_URL = 'https://www.jodii.com/terms.html'
+const ICON = {
+  editProfile:     `${CDN_SVG}menu/edit-profile.svg`,
+  editPreferences: `${CDN_SVG}filter-icon.svg`,
+  settings:        `${CDN_SVG}menu/setting.svg`,
+  searchProfile:   `${CDN_SVG}search-profile-id-img.svg`,
+  viewLater:       `${CDN_SVG}profiles-view-later.svg`,
+  ignoredProfiles: `${CDN_SVG}profiles-you-marked-img.svg`,
+  successStories:  `${CDN_SVG}jodii-wedding-stories-img.svg`,
+  customerSupport: `${CDN_SVG}menu/customer-support-new.svg`,
+}
 
-// Matches the row a given sidebar destination screen should highlight
-// (Figma's pink active-row state on Search-by-ID / Edit-profile screens).
 export type SidebarItem =
-  | 'editProfile' | 'searchById' | 'biodata' | 'successStories' | 'ignoredProfiles'
-  | 'customerSupport' | 'language' | 'deleteProfile' | 'privacyPolicy' | 'terms'
+  | 'editProfile' | 'editPreferences' | 'settings' | 'searchById'
+  | 'viewLater' | 'ignoredProfiles' | 'successStories' | 'customerSupport'
 
 export interface HomeSidebarProps {
   navigation:  any
@@ -34,27 +40,27 @@ export interface HomeSidebarProps {
   activeItem?: SidebarItem | undefined
 }
 
-function SidebarRow({ icon, iconSize = 20, title, active = false, onPress }: { icon: string; iconSize?: number; title: string; active?: boolean; onPress: () => void }) {
+function SidebarRow({
+  iconUri, iconSize = 28, title, active = false, onPress,
+}: {
+  iconUri:    string
+  iconSize?:  number
+  title:      string
+  active?:    boolean
+  onPress:    () => void
+}) {
   return (
     <Pressable style={({ pressed }) => [s.row, active && s.rowActive, pressed && s.rowPressed]} onPress={onPress} accessibilityRole="button">
       <View style={s.rowIconWrap}>
-        <CdnSvg uri={icon} width={iconSize} height={iconSize} />
+        <CdnSvg uri={iconUri} width={iconSize} height={iconSize} />
       </View>
       <Text style={[s.rowTitle, active && s.rowTitleActive]} numberOfLines={1}>{title}</Text>
-      <CdnSvg uri={ICON.arrow} width={14} height={14} />
+      <Text style={s.rowChevron}>{'›'}</Text>
     </Pressable>
   )
 }
 
 export default function HomeSidebar({ navigation, userName, userId, photoUrl, activeItem }: HomeSidebarProps) {
-  const { t } = useTranslation()
-  const [logoutSheetVisible, setLogoutSheetVisible] = useState(false)
-
-  async function handleConfirmLogout() {
-    setLogoutSheetVisible(false)
-    await performLogout()
-  }
-
   return (
     <View style={s.container}>
       {/* ── Profile summary ── */}
@@ -62,107 +68,68 @@ export default function HomeSidebar({ navigation, userName, userId, photoUrl, ac
         {photoUrl ? (
           <Image source={{ uri: photoUrl }} style={s.avatar} contentFit="cover" />
         ) : (
-          <CdnSvg uri={ICON.avatar} width={80} height={80} />
+          <CdnSvg uri={MENU_ICON.avatar} width={100} height={100} />
         )}
       </View>
       <Text style={s.name} numberOfLines={1}>{userName}</Text>
-      <Text style={s.id}>{t('MENU.ID')} {userId}</Text>
+      <Text style={s.id}>ID {userId}</Text>
 
-      {/* ── Membership promo (Figma: "Flat ₹300 OFF on Jodii membership") ── */}
-      <View style={s.promoCard}>
-        <View>
-          <Text style={s.promoTitle}>{t('MENU.FLAT_OFF', 'Flat ₹300 OFF')}</Text>
-          <Text style={s.promoSubtitle}>{t('MENU.ON_MEMBERSHIP', 'on Jodii membership')}</Text>
-        </View>
-        <Pressable
-          style={s.promoBtn}
-          onPress={() => { paymentTrack('31'); navigation.navigate('recharge') }}
-        >
-          <Text style={s.promoBtnText}>{t('MENU.PAY_NOW', 'Pay now')}</Text>
-        </Pressable>
-      </View>
-
-      {/* ── Card 2: Edit Profile + Search by ID ── */}
+      {/* ── Card: Edit profile / Edit preferences, then a divider, then the
+          rest of the account menu — Figma renders this as ONE card with a
+          single internal divider, not separate boxed groups. ── */}
       <View style={s.card}>
-        <SidebarRow icon={ICON.edit} title={t('MENU.EDIT_PROFILE')} active={activeItem === 'editProfile'} onPress={() => navigation.navigate('EditProfile')} />
-        <View style={s.rowDivider} />
-        <SidebarRow icon={ICON.searchId} title={t('MENU.SEARCH_BY_ID')} active={activeItem === 'searchById'} onPress={() => navigation.navigate('SearchById')} />
-      </View>
+        <SidebarRow iconUri={ICON.editProfile} title="Edit profile" active={activeItem === 'editProfile'} onPress={() => navigation.navigate('EditProfile')} />
+        <SidebarRow iconUri={ICON.editPreferences} iconSize={24} title="Edit preferences" active={activeItem === 'editPreferences'} onPress={() => navigation.navigate('Search')} />
 
-      {/* ── Card 3: Download Biodata ── */}
-      <View style={s.card}>
-        <SidebarRow icon={ICON.biodata} title={t('MENU.DOWNLOAD_BIODATA')} active={activeItem === 'biodata'} onPress={() => navigation.navigate('Biodata')} />
-      </View>
+        <View style={s.divider} />
 
-      {/* ── Card 4: Main menu ── */}
-      <View style={s.card}>
-        <SidebarRow icon={ICON.wedding} title={t('MENU.SUCCESS_STORIES')} active={activeItem === 'successStories'} onPress={() => navigation.navigate('SuccessStories')} />
-        <View style={s.rowDivider} />
-        <SidebarRow icon={ICON.dontShow} title={t('MENU.IGNORED_PROFILES')} active={activeItem === 'ignoredProfiles'} onPress={() => navigation.navigate('IgnoredProfiles')} />
-        <View style={s.rowDivider} />
-        <SidebarRow icon={ICON.support} title={t('MENU.CUSTOMER_SUPPORT')} active={activeItem === 'customerSupport'} onPress={() => navigation.navigate('HelpCenter')} />
+        <SidebarRow iconUri={ICON.settings} iconSize={24} title="Settings" active={activeItem === 'settings'} onPress={() => { /* TODO: no dedicated Settings screen registered yet */ }} />
+        <SidebarRow iconUri={ICON.searchProfile} title="Search profile by ID" active={activeItem === 'searchById'} onPress={() => navigation.navigate('SearchById')} />
+        <SidebarRow iconUri={ICON.viewLater} title="Profile marked as view later" active={activeItem === 'viewLater'} onPress={() => { /* TODO: no dedicated view-later list screen registered yet */ }} />
+        <SidebarRow iconUri={ICON.ignoredProfiles} title="Ignored profiles" active={activeItem === 'ignoredProfiles'} onPress={() => navigation.navigate('IgnoredProfiles')} />
+        <SidebarRow iconUri={ICON.successStories} title="Jodii success stories" active={activeItem === 'successStories'} onPress={() => navigation.navigate('SuccessStories')} />
+        <SidebarRow iconUri={ICON.customerSupport} title="Contact Customer support" active={activeItem === 'customerSupport'} onPress={() => navigation.navigate('HelpCenter')} />
       </View>
-
-      {/* ── Card 5: Settings (merged from the old SettingsScreen) ── */}
-      <View style={s.card}>
-        <SidebarRow icon={ICON.language} title={t('MENU.TTTLE_6')} active={activeItem === 'language'} onPress={() => navigation.navigate('LanguageSelection')} />
-        <View style={s.rowDivider} />
-        <SidebarRow icon={ICON.deleteAccount} title={t('ACCOUNT.DEL_PRO')} active={activeItem === 'deleteProfile'} onPress={() => navigation.navigate('DeleteProfile')} />
-        <View style={s.rowDivider} />
-        <SidebarRow
-          icon={ICON.privacy} iconSize={16} title={t('ACCOUNT.PRIVACY_POLICY')} active={activeItem === 'privacyPolicy'}
-          onPress={() => navigation.navigate('ExternalPage', { url: PRIVACY_POLICY_URL, title: t('ACCOUNT.PRIVACY_POLICY') })}
-        />
-        <View style={s.rowDivider} />
-        <SidebarRow
-          icon={ICON.terms} iconSize={16} title={t('ACCOUNT.TERMS_CONDITIONS')} active={activeItem === 'terms'}
-          onPress={() => navigation.navigate('ExternalPage', { url: TERMS_CONDITIONS_URL, title: t('ACCOUNT.TERMS_CONDITIONS') })}
-        />
-        <View style={s.rowDivider} />
-        <SidebarRow icon={ICON.logout} title={t('ACCOUNT.LOGOUT')} onPress={() => setLogoutSheetVisible(true)} />
-      </View>
-
-      <LogoutSheet
-        visible={logoutSheetVisible}
-        onYes={handleConfirmLogout}
-        onNo={() => setLogoutSheetVisible(false)}
-      />
     </View>
   )
 }
 
+// Sized up from Figma's literal 254px card (per explicit feedback that it
+// read as too small next to the wider main content column) — scaled by
+// ~1.25x across the board (width, avatar, type, row height) rather than
+// just widening the outer container, so it reads as a deliberately bigger
+// card and not a stretched one.
 const s = StyleSheet.create({
-  container: { width: 254 },
+  container: { width: 320 },
 
   avatarWrap: {
-    width: 80, height: 80, borderRadius: 40, overflow: 'hidden', alignSelf: 'center',
+    width: 100, height: 100, borderRadius: 50, overflow: 'hidden', alignSelf: 'center',
     backgroundColor: Colors.surfaceInput,
   },
-  avatar: { width: 80, height: 80 },
+  avatar: { width: 100, height: 100 },
 
-  name: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: Colors.textDark, textAlign: 'center', marginTop: 12 },
-  id:   { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textSecondary, textAlign: 'center', marginTop: 2, marginBottom: 20 },
-
-  promoCard: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: '#EAF7EE', borderRadius: 10, padding: 12, marginBottom: 16,
-  },
-  promoTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: Colors.textDark },
-  promoSubtitle: { fontFamily: 'Poppins-Regular', fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
-  promoBtn: { backgroundColor: Colors.discountGreen, borderRadius: 6, paddingHorizontal: 12, paddingVertical: 7 },
-  promoBtnText: { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: Colors.white },
+  name: { fontFamily: 'Poppins-SemiBold', fontSize: 18, lineHeight: 22, color: Colors.black, textAlign: 'center', marginTop: 14 },
+  id:   { fontFamily: 'Poppins-Regular', fontSize: 16, lineHeight: 22, color: '#545454', textAlign: 'center', marginTop: 4, marginBottom: 24 },
 
   card: {
-    backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.borderSubtle,
-    marginBottom: 16, overflow: 'hidden',
+    backgroundColor: Colors.white,
+    borderWidth:     1,
+    borderColor:     Colors.borderSubtle,
+    borderRadius:    18,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
   },
   row: {
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 12, gap: 10,
+    flexDirection:  'row',
+    alignItems:     'center',
+    height:         48,
+    gap:            10,
   },
   rowPressed: { backgroundColor: Colors.surfaceInput },
-  rowActive: { backgroundColor: Colors.selectionBg },
-  rowIconWrap: { width: 20, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  rowTitle: { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textDark },
-  rowTitleActive: { fontFamily: 'Poppins-Medium', color: Colors.primary },
-  rowDivider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.borderSubtle, marginHorizontal: 12 },
+  rowActive:  { backgroundColor: Colors.selectionBg },
+  rowIconWrap: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  rowTitle:   { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 18, color: Colors.black },
+  rowTitleActive: { fontFamily: 'Poppins-Medium', color: Colors.primaryDark },
+  rowChevron: { fontSize: 18, fontFamily: 'Poppins-Regular', color: '#8a8a8a' },
+  divider: { height: 1, backgroundColor: Colors.borderSubtle, marginVertical: 6 },
 })
