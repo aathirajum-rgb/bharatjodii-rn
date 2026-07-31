@@ -6,10 +6,15 @@ import {
   Text,
   View,
 } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import ProfilePhoto, { type PhotoVariant } from '../profile-photo/ProfilePhoto'
+
+// Angular: core/config/button.config.ts's SEE_ALL — textColor: 'linkColor'
+// (--ion-color-link-color: #29339B), not the brand red.
+const SEE_ALL_LINK_COLOR = '#29339B'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -319,24 +324,31 @@ export default function ProfileCard({
 
     // ── 5 · See All / View More ───────────────────────────────────────────────
     // 3 stacked avatar thumbnails + "See All" link. No profile photo.
+    // Angular: profile-card.component.html — all 3 avatars are the SAME size;
+    // the middle one (viewMoreList[1]) is `position: absolute` inside a
+    // centered flex row, so it overlaps the seam between the other two rather
+    // than being rendered larger.
     case 5: {
       const avatars = viewMoreList.slice(0, 3)
       return (
-        <Pressable style={({ pressed }) => [styles.card, styles.seeAllCard, pressed && { opacity: 0.85 }]} onPress={onViewMorePress}>
-          <View style={styles.avatarRow}>
-            {avatars.map((item, i) => (
-              <View key={i} style={[styles.avatarWrap, i === 1 && styles.avatarMiddleWrap]}>
-                <Image
-                  source={{ uri: item.THUMBIMG }}
-                  style={styles.avatarImg}
-                  resizeMode="cover"
-                />
-              </View>
-            ))}
-          </View>
-          <Pressable onPress={onViewMorePress} style={[styles.linkBtn, styles.linkBtnCenter]}>
-            <Text style={styles.linkBtnText}>{viewMoreContent} →</Text>
-          </Pressable>
+        <Pressable style={({ pressed }) => [styles.card, styles.seeAllCardOuter, pressed && { opacity: 0.85 }]} onPress={onViewMorePress}>
+          <LinearGradient colors={['#FFF1FF', '#FFFFFF']} style={styles.seeAllCard}>
+            <View style={styles.avatarRow}>
+              {avatars.map((item, i) => (
+                <View key={i} style={[styles.avatarWrap, i === 1 && styles.avatarWrapAbsolute]}>
+                  <Image
+                    source={{ uri: item.THUMBIMG }}
+                    style={styles.avatarImg}
+                    resizeMode="cover"
+                  />
+                </View>
+              ))}
+            </View>
+            <Pressable onPress={onViewMorePress} style={[styles.linkBtn, styles.linkBtnCenter, styles.linkBtnRow]}>
+              <Text style={styles.linkBtnText}>{viewMoreContent}</Text>
+              <CdnSvg uri={`${IMG_CDN}revamp/forward-icon-link.svg`} width={12} height={12} />
+            </Pressable>
+          </LinearGradient>
         </Pressable>
       )
     }
@@ -510,9 +522,14 @@ const styles = StyleSheet.create({
   linkBtnCenter: {
     alignSelf: 'center',
   },
+  linkBtnRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           4,
+  },
   linkBtnText: {
     fontSize: 13,
-    color: Colors.primary,
+    color: SEE_ALL_LINK_COLOR,
     fontWeight: '600',
   },
 
@@ -558,13 +575,21 @@ const styles = StyleSheet.create({
   },
 
   // ── See-All card (type 5) ──────────────────────────────────────────────────
-  // Angular: background linear-gradient(#FFF1FF → #FFFFFF)
+  // The wrapping View at the SwiperCard call site sets an explicit height,
+  // but a plain Pressable doesn't auto-stretch to fill its parent's main-axis
+  // size — without flex:1 here it just content-sizes, leaving the reserved
+  // height as a dead gap below the visible card.
+  seeAllCardOuter: {
+    flex: 1,
+  },
+  // Angular: linear-gradient(to bottom, #FFF1FF, #FFFFFF) — real gradient now
+  // via LinearGradient at the call site, not a flat approximation.
   seeAllCard: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 32,
     paddingHorizontal: 16,
-    backgroundColor: '#FFF1FF',   // top of Angular gradient; white baseline shows below
   },
   avatarRow: {
     flexDirection: 'row',
@@ -572,12 +597,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 16,
   },
+  // Angular: .avatar-position — all 3 avatars the same size; only the middle
+  // one is absolutely positioned to overlap the seam between the other two.
   avatarWrap: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    borderWidth: 2,
-    borderColor: Colors.surface,
+    borderWidth: 3,
+    borderColor: Colors.white,
     overflow: 'hidden',
     marginHorizontal: -8,
     shadowColor: Colors.shadow,
@@ -586,10 +613,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
-  avatarMiddleWrap: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  // RN's `position: absolute` (unlike web CSS) anchors to the parent's
+  // origin rather than the element's own static flow position, so the
+  // horizontal centering has to be done explicitly.
+  avatarWrapAbsolute: {
+    position: 'absolute',
+    left: '50%',
+    marginLeft: -28,   // half of avatarWrap's width, to center it
     zIndex: 1,
   },
   avatarImg: {

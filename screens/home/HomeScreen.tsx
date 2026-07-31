@@ -85,6 +85,12 @@ function comCountFor(comCount: ComCountEntry[], type: string): number {
   return Number(comCount.find(c => c.comtype === type)?.newcount ?? 0)
 }
 
+// Angular: cardMoreItemsData = cardMoreItems.splice(cap, 3) — the 3 items just
+// beyond the visible slice, previewed as thumbnails on the "view more" card.
+function moreItemsFrom(list: SwiperItem[], cap: number): { THUMBIMG: string }[] {
+  return list.slice(cap, cap + 3).map(i => ({ THUMBIMG: i.profileImg ?? '' }))
+}
+
 // ─── Mock Data (shown briefly on first paint / kept if a fetch comes back empty) ──
 
 const MOCK_ALL_MATCHES: SwiperItem[] = [
@@ -135,10 +141,10 @@ const MOCK_STORIES: SwiperItem[] = [
 ]
 
 const MOCK_CATEGORIES: ExploreCategory[] = [
-  { id: 'c1', label: 'Diploma and below',    count: 33,  imageUrl: '' },
-  { id: 'c2', label: 'Graduate and above',   count: 55,  imageUrl: '' },
-  { id: 'c3', label: 'Same community',       count: 99,  imageUrl: '' },
-  { id: 'c4', label: 'Own business',         count: 40,  imageUrl: '' },
+  { id: 'c1', label: 'Diploma and below',    count: 33,  imageUrl: '', bgColor: '#DCF0FF' },
+  { id: 'c2', label: 'Graduate and above',   count: 55,  imageUrl: '', bgColor: '#E6DCFF' },
+  { id: 'c3', label: 'Same community',       count: 99,  imageUrl: '', bgColor: '#FFF6DC' },
+  { id: 'c4', label: 'Own business',         count: 40,  imageUrl: '', bgColor: '#DCFFE6' },
 ]
 
 export type { HelpVideo }
@@ -196,16 +202,20 @@ export interface LikedProfilesSectionProps {
 export function LikedProfilesSection({
   likedTab, onTabChange, likedByMe, likedMe, likedByCount, likedMeCount, onCardPress, onLikePress,
 }: LikedProfilesSectionProps) {
+  const { t } = useTranslation()
   const items = likedTab === 'likedbyme' ? likedByMe : likedMe
   return (
     <>
+      {/* No confirmed i18n key for this combined "Liked profiles (N)" header —
+          left in English pending source verification; the tab labels below
+          are confirmed against LIKE_LIST.LIKEDYOU_HOME/LIKESENT_HOME. */}
       <Text style={s.sectionTitle}>{'Liked profiles (' + (likedByCount + likedMeCount) + ')'}</Text>
       <View style={s.tabRow}>
         <Pressable style={[s.tabPill, likedTab === 'likedyou'  && s.tabPillActive]} onPress={() => onTabChange('likedyou')}>
-          <Text style={[s.tabPillText, likedTab === 'likedyou'  && s.tabPillTextActive]}>{'Liked you (' + likedMeCount + ')'}</Text>
+          <Text style={[s.tabPillText, likedTab === 'likedyou'  && s.tabPillTextActive]}>{`${t('LIKE_LIST.LIKEDYOU_HOME')} (${likedMeCount})`}</Text>
         </Pressable>
         <Pressable style={[s.tabPill, likedTab === 'likedbyme' && s.tabPillActive]} onPress={() => onTabChange('likedbyme')}>
-          <Text style={[s.tabPillText, likedTab === 'likedbyme' && s.tabPillTextActive]}>{'Liked by you (' + likedByCount + ')'}</Text>
+          <Text style={[s.tabPillText, likedTab === 'likedbyme' && s.tabPillTextActive]}>{`${t('LIKE_LIST.LIKESENT_HOME')} (${likedByCount})`}</Text>
         </Pressable>
       </View>
       <SwiperCard
@@ -228,6 +238,18 @@ export function LikedProfilesSection({
 // not a separate element) + inline forward chevron, on a light gradient card.
 // No "see all"/"discover all" button exists in the live template at all.
 
+// Angular: explore-card.component.ts's backgroundStyle() passes exploreData.BGCOLOUR
+// straight through as a CSS `background` value (solid color or gradient string) —
+// RN's LinearGradient needs a plain color array instead of CSS syntax, so pull the
+// hex stops out of whatever the server sent. Falls back to the same default
+// two-stop gradient Angular itself falls back to when BGCOLOUR is missing.
+const DEFAULT_CAT_GRADIENT: [string, string] = ['#DCF0FF', '#FFFFFF']
+function parseGradientColors(bgColor: string | undefined): [string, string, ...string[]] {
+  const hexColors = bgColor?.match(/#[0-9a-fA-F]{3,8}/g)
+  if (!hexColors || hexColors.length === 0) return DEFAULT_CAT_GRADIENT
+  return hexColors.length === 1 ? [hexColors[0]!, hexColors[0]!] : [hexColors[0]!, hexColors[1]!, ...hexColors.slice(2)]
+}
+
 export interface ExploreCategoriesSectionProps {
   categories: ExploreCategory[]
   tileWidth:  number
@@ -237,16 +259,20 @@ export interface ExploreCategoriesSectionProps {
 export function ExploreCategoriesSection({
   categories, tileWidth, onCategoryPress,
 }: ExploreCategoriesSectionProps) {
+  const { t } = useTranslation()
   return (
     <>
-      <Text style={s.sectionTitle}>Explore matches based on</Text>
+      {/* Angular: home.enum.ts's sectionTitle.exploreMatches = 'HOME.EXPLORE_MATCHES_TXT'
+          ("Discover matches") — HOME.EXPLORE_MATCHES ("Explore matches based on")
+          is a different, unused key. */}
+      <Text style={s.sectionTitle}>{t('HOME.EXPLORE_MATCHES_TXT')}</Text>
       <View style={s.catGrid}>
         {categories.map(cat => (
           <Pressable key={cat.id} onPress={() => onCategoryPress(cat)} style={{ width: tileWidth }}>
-            {/* Angular: backgroundStyle() — server's BGCOLOUR, else this exact
-                default diagonal gradient. */}
+            {/* Angular: backgroundStyle() — server's BGCOLOUR per category,
+                else this exact default diagonal gradient. */}
             <LinearGradient
-              colors={['#DCF0FF', '#FFFFFF']}
+              colors={parseGradientColors(cat.bgColor)}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 1 }}
               style={s.catTile}
@@ -271,16 +297,15 @@ export function ExploreCategoriesSection({
 export function SuccessStoriesSection({
   stories, onCardPress,
 }: { stories: SwiperItem[]; onCardPress: (item: SwiperItem) => void }) {
+  const { t } = useTranslation()
+  const [headLine1, headLine2] = t('HOME.HAPPILY_MARRIED_HEAD').split('<br>').map(p => p.trim())
+  const subtitle = t('HOME.HAPPILY_MARRIED_CONTENT').replace(/<br\s*\/?>/gi, '\n')
   return (
     <>
-      {/* Angular: HOME.HAPPILY_MARRIED_HEAD = "Got married <br>through Jodii",
-          HOME.HAPPILY_MARRIED_CONTENT = "Thousands have met their life
-          partner <br>through Jodii" — not "Made with Love in Jodii", and the
-          subtitle line was missing entirely. */}
       <View style={s.storyHeader}>
-        <Text style={s.storyTitle}>Got married</Text>
-        <Text style={s.storyTitleBold}>through Jodii</Text>
-        <Text style={s.storySubtitle}>Thousands have met their life partner{'\n'}through Jodii</Text>
+        <Text style={s.storyTitle}>{headLine1}</Text>
+        <Text style={s.storyTitleBold}>{headLine2}</Text>
+        <Text style={s.storySubtitle}>{subtitle}</Text>
       </View>
       {/* No cardWidth override — Angular: card-ht4 is 91.111vmin square, not
           the previous guessed 68% width. Let SwiperCard's per-section default
@@ -306,9 +331,10 @@ export function SuccessStoriesSection({
 export function SelfHelpVideosSection({
   videos, cardWidth, cardHeight, onVideoPress,
 }: { videos: HelpVideo[]; cardWidth: number; cardHeight: number; onVideoPress: (item: HelpVideo) => void }) {
+  const { t } = useTranslation()
   return (
     <>
-      <Text style={s.sectionTitle}>Self-help videos</Text>
+      <Text style={s.sectionTitle}>{t('HOME.SELF_VIDEO_HEADER')}</Text>
       <FlatList
         data={videos}
         keyExtractor={i => i.id}
@@ -356,18 +382,24 @@ export function SelfHelpVideoPlayer({ uri }: { uri: string }) {
 export function HelpSection({
   onCallPress, phone = '+91 9876543210',
 }: { onCallPress: () => void; phone?: string }) {
+  const { t } = useTranslation()
+  // Measured directly off the live Angular app's inline style on #helpBanner
+  // (matches FAQ_DETAILS.BANNER.BANNERBG exactly): linear-gradient(335deg,
+  // #FFEEE7 5.54%, #F5F5F5 93.82%) — peach starts near the bottom-right,
+  // grey ends near the top-left. 335deg converted to start/end fractions via
+  // the standard CSS-angle-to-corner-points formula (x=0.5+sin(θ)·0.5 etc.).
   return (
     <LinearGradient
       colors={['#FFEEE7', '#F5F5F5']}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+      start={{ x: 0.71, y: 0.95 }}
+      end={{ x: 0.29, y: 0.05 }}
       style={s.helpWrap}
     >
       <View style={s.helpTextCol}>
-        <Text style={s.helpTitle}>Do you need help?</Text>
-        <Text style={s.helpSub}>Feel free to connect with us everyday from 8 AM to 9 PM</Text>
+        <Text style={s.helpTitle}>{t('FAQ_DETAILS.BANNER.TITLE')}</Text>
+        <Text style={s.helpSub}>{t('FAQ_DETAILS.BANNER.BODY')}</Text>
         <Pressable style={s.helpCta} onPress={onCallPress}>
-          <Text style={s.helpCtaText}>{'Call us ' + phone}</Text>
+          <Text style={s.helpCtaText}>{t('FAQ_DETAILS.BANNER.CTA').replace('#CALL#', phone).trim()}</Text>
           <Text style={s.helpCtaChevron}>{'›'}</Text>
         </Pressable>
       </View>
@@ -631,7 +663,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       // (under review).
       const psUpdateFlag = await getItem('PLAYSTOREUPDATE')
       const appVersion = Constants.expoConfig?.version ?? '1.0.0'
-      const forceUpdate = computeForceUpdateInfo(data?.['APPFORCEUPDATE'], psUpdateFlag, appVersion)
+      const forceUpdate = computeForceUpdateInfo(data?.['APPFORCEUPDATE'], psUpdateFlag, appVersion, isFreeFemalePhotoPromo)
       if (ctrl.cancelled) return
       setForceUpdateInfo(forceUpdate)
 
@@ -657,21 +689,23 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     })
     fetchDailyRec().then(result => {
       if (!ctrl.cancelled && result.items.length > 0) {
-        setTodayMatches(result.items.slice(0, 4))
+        // Full array kept in state (not sliced here) — display and the
+        // "view more" card's thumbnail preview each slice it separately below.
+        setTodayMatches(result.items)
         setTodayTotal(result.totalCount)
       }
     })
     fetchNewlyJoined().then(result => {
       if (ctrl.cancelled) return
       if (result.items.length > 0) {
-        setNewlyJoined(result.items.slice(0, 4))
+        setNewlyJoined(result.items)
         setNewlyJoinedTotal(result.totalCount)
       }
       setNewlyJoinedLoaded(true)
     })
     fetchViewedByMe().then(result => {
       if (!ctrl.cancelled && result.items.length > 0) {
-        setProfilesViewed(result.items.slice(0, 5))
+        setProfilesViewed(result.items)
         setProfilesViewedTotal(result.totalCount)
       }
     })
@@ -694,7 +728,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       }
     )
     fetchSuccessStories().then(result => {
-      if (!ctrl.cancelled && result.length > 1) setStories(result.slice(0, 5))
+      if (!ctrl.cancelled && result.length > 1) setStories(result)
     })
     fetchFaqVideos().then(result => {
       if (!ctrl.cancelled && result.length > 0) setVideos(result)
@@ -1035,7 +1069,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <Loader variant="skeleton-dashboard" />
           ) : allMatches.length > 1 ? (
             <SwiperCard
-              swiperHeader={`All matches (${allMatchesTotal})`}
+              swiperHeader={`${t('HOME.ALLMATCH_HEADER')} (${allMatchesTotal})`}
               cardVariant={1}
               // Angular: core/enums/home.enum.ts — allMatches maps to the
               // section string 'matches', NOT 'newmatches' (that's Newly
@@ -1044,7 +1078,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               // — this was wired to the wrong section, so All Matches always
               // showed "age, education" instead of Angular's age-only line.
               cardSection="matches"
-              items={allMatches}
+              items={allMatches.slice(0, 5)}
+              moreItems={moreItemsFrom(allMatches, 5)}
               showSeeAll
               onCardPress={item => goToProfile(item, allMatches, 'home_matches')}
               onLikePress={likeAllMatches}
@@ -1068,11 +1103,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 resizeMode="cover"
               />
               <SwiperCard
-                swiperHeader={`Who viewed your profile (${viewedMeTotal})`}
+                swiperHeader={`${t('HOME.WHO_VIEWED_YOU_HEADER')} (${viewedMeTotal})`}
                 newCount={comCountFor(comCount, 'viewedyou')}
                 cardVariant={3}
                 cardSection="viewedyou"
-                items={viewedMe}
+                items={viewedMe.slice(0, 5)}
+                moreItems={moreItemsFrom(viewedMe, 5)}
                 showSeeAll
                 onCardPress={item => goToProfile(item, viewedMe, 'home_viewedyou')}
                 onLikePress={likeViewedMe}
@@ -1087,7 +1123,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         {completeCards.length > 0 && (
           <>
             <View style={s.section}>
-              <Text style={s.sectionTitle}>Complete your profile</Text>
+              <Text style={s.sectionTitle}>{t('HOME.COMPLETE_PROFILE_HEADER')}</Text>
               <CompleteProfileSection cards={completeCards} onCardPress={handleCompleteProfileCard} />
             </View>
             <View style={s.divider} />
@@ -1103,11 +1139,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           <>
             <View style={s.section}>
               <SwiperCard
-                // Angular: DAILYRECOMMENDATIONS.DAILY_RECOMMENDATIONS — "Daily recommendations", not "Today's matches for you".
-                swiperHeader={`Daily recommendations (${todayTotal})`}
+                swiperHeader={`${t('DAILYRECOMMENDATIONS.DAILY_RECOMMENDATIONS')} (${todayTotal})`}
                 cardVariant={1}
                 cardSection="dailyrecommendations"
-                items={todayMatches}
+                items={todayMatches.slice(0, 4)}
+                moreItems={moreItemsFrom(todayMatches, 4)}
                 showSeeAll
                 onCardPress={item => goToProfile(item, todayMatches, 'home_dailyrec')}
                 onLikePress={likeTodayMatches}
@@ -1127,10 +1163,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <Loader variant="skeleton-dashboard" />
           ) : newlyJoined.length > 1 ? (
             <SwiperCard
-              swiperHeader={`Newly joined (${newlyJoinedTotal})`}
+              swiperHeader={`${t('HOME.NEWLY_JOINED_HEADER')} (${newlyJoinedTotal})`}
               cardVariant={1}
               cardSection="newmatches"
-              items={newlyJoined}
+              items={newlyJoined.slice(0, 4)}
+              moreItems={moreItemsFrom(newlyJoined, 4)}
               showSeeAll
               onCardPress={item => goToProfile(item, newlyJoined, 'home_newmatches')}
               onLikePress={likeNewlyJoined}
@@ -1146,11 +1183,16 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           <>
             <View style={s.section}>
               <SwiperCard
-                swiperHeader={`Profiles you viewed (${profilesViewedTotal})`}
+                // No dedicated HOME.* key found for this section's header —
+                // LIKE_LIST.VIEWEDBYME_TITLE ("Viewed by me") is the closest
+                // confirmed match (same 'viewedbyme' sectionType from Angular's
+                // home.enum.ts) and is translated for every locale we ship.
+                swiperHeader={`${t('LIKE_LIST.VIEWEDBYME_TITLE')} (${profilesViewedTotal})`}
                 newCount={comCountFor(comCount, 'viewedbyme')}
                 cardVariant={3}
                 cardSection="viewedbyme"
-                items={profilesViewed}
+                items={profilesViewed.slice(0, 5)}
+                moreItems={moreItemsFrom(profilesViewed, 5)}
                 showSeeAll
                 onCardPress={item => goToProfile(item, profilesViewed, 'home_viewedbyme')}
                 onLikePress={likeProfilesViewed}

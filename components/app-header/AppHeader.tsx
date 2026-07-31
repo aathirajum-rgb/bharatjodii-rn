@@ -127,6 +127,11 @@ export default function AppHeader({
   // Background: light periwinkle blue #EBF0FF
   if (type === 'header1') {
     return (
+      // Angular: explore.component.ts's logScrollEnd()/setHeaderColor() only
+      // switch HEADERBG to the blue paidBgColor gradient once the user
+      // scrolls back up past a hero banner, or on init when a hero banner is
+      // active — for the common case (no hero banner, no scroll yet) the
+      // header renders plain white, confirmed against a live screenshot.
       <SafeAreaView edges={['top']} style={[styles.h1Bg, style]}>
 
         {/* ── Row 1: App bar ── */}
@@ -252,17 +257,19 @@ export default function AppHeader({
 const styles = StyleSheet.create({
 
   // ── header1 — Figma light-blue header ──────────────────────────────────────
+  // Measured off the live Angular app (#headerIonGrid computed padding):
+  // 16px top, 24px horizontal, 12px bottom — not 16px/14px.
   h1Bg: {
-    backgroundColor:   '#EBF0FF',
-    paddingHorizontal: 16,
-    paddingBottom:     14,
+    backgroundColor:   Colors.white,
+    paddingHorizontal: 24,
+    paddingBottom:     12,
   },
 
   // Row 1: hamburger | language | icons
   h1AppBar: {
     flexDirection:  'row',
     alignItems:     'center',
-    paddingTop:     10,
+    paddingTop:     16,
     gap:            8,
   },
 
@@ -341,16 +348,19 @@ const styles = StyleSheet.create({
   },
 
   // Language selector pill
+  // Measured off the live Angular app (.lang-selection computed style):
+  // 8px radius, transparent fill, solid black 1px border, ~37px tall —
+  // same visual language as the icon buttons, not a grey-bordered pill.
   h1LangBtn: {
     flexDirection:     'row',
     alignItems:        'center',
     gap:               4,
     borderWidth:       1,
-    borderColor:       'rgba(138,138,138,0.6)',
+    borderColor:       '#000000',
     borderRadius:      8,
     paddingVertical:   4,
     paddingHorizontal: 8,
-    height:            32,
+    height:            36,
   },
   h1LangIcon: {
     width:  20,
@@ -367,13 +377,16 @@ const styles = StyleSheet.create({
   },
 
   // Icon buttons — blue bordered squares
+  // Measured directly off the live Angular app (.home-header-icon computed
+  // style): 36×36, 8px radius, transparent fill, solid black 1px border —
+  // not the light-blue filled pill this previously guessed at.
   h1IconBtn: {
-    width:           32,
-    height:          32,
-    borderRadius:    10,
-    backgroundColor: '#D5E5FF',
-    borderWidth:     0.8,
-    borderColor:     '#81A0DD',
+    width:           36,
+    height:          36,
+    borderRadius:    8,
+    backgroundColor: 'transparent',
+    borderWidth:     1,
+    borderColor:     '#000000',
     alignItems:      'center',
     justifyContent:  'center',
     position:        'relative',

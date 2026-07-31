@@ -1,13 +1,13 @@
 import type { IEnvConfig } from './types'
 
 const dev: IEnvConfig = {
-  env:        'dev',
+   env:        'dev',
   production: false,
   release:    '138',
-  api:        'https://dev1oapi.jodii.app/',
-  payment:    'https://dev1oapi.jodii.app/',
-  paymentNg:  'https://devng.jodii.app/',
-  notify:     'https://devmc.jodii.app',
+  api:        'https://stgoapi.jodii.app/',
+  payment:    'https://stgoapi.jodii.app/',
+  paymentNg:  'https://stgng.jodii.app/',
+  notify:     'https://stgmc.jodii.app/',
   image:      'https://stgimg.jodii.app/',
 }
 

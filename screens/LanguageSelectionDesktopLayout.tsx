@@ -42,8 +42,10 @@ export default function LanguageSelectionDesktopLayout({
 }: LanguageSelectionDesktopLayoutProps) {
   const { t } = useTranslation()
 
+  // No sidebar row maps to "change language" in the Figma-matched sidebar
+  // (that's the top nav's language selector instead) — no activeItem to highlight.
   return (
-    <DesktopPageShell navigation={navigation} userName={userName} activeItem="language" onTabPress={onTabPress}>
+    <DesktopPageShell navigation={navigation} userName={userName} onTabPress={onTabPress}>
       <View style={s.main}>
         <Text style={s.pageTitle}>{t('MENU.TTTLE_6')}</Text>
 

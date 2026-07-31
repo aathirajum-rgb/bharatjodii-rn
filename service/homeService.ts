@@ -21,6 +21,11 @@ export interface ExploreCategory {
   label: string
   count: number
   imageUrl: string
+  // Angular: explore-card.component.ts's backgroundStyle() — a per-category
+  // CSS background (solid or gradient) string from the server, e.g.
+  // "linear-gradient(113deg, #DCF0FF 1.75%, #FFF 26.84%), #FFF". Falls back
+  // to that same default gradient when the server omits it.
+  bgColor?: string | undefined
 }
 
 export interface HelpVideo {
@@ -634,6 +639,7 @@ export async function fetchExploreCategories(): Promise<ExploreCategory[]> {
     label:    item['TITLE']    ?? item['LABEL']   ?? '',
     count:    Number(item['COUNT'] ?? 0),
     imageUrl: item['ICON']     ?? item['IMAGEURL'] ?? item['IMGURL'] ?? '',
+    bgColor:  item['BGCOLOUR'] ?? item['BGCOLOR']  ?? undefined,
   }))
 }
 

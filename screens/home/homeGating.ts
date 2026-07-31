@@ -131,11 +131,16 @@ export interface ForceUpdateInfo { minVersion: string }
 
 // Angular/MatchesScreen.tsx line 1115 — same naive string/number `<` comparison,
 // copied verbatim (bug-compatible with the source, not "fixed") for parity.
+// Angular: explore.component.ts's SHOWFLAG calc also requires `!showPhotoPromotion`
+// — the force-update sticky is suppressed while the free-female add-photo hero
+// banner is showing, so the two prompts never stack.
 export function computeForceUpdateInfo(
   appForceUpdate: { APPVERSION?: string } | undefined,
   psUpdateFlag: string | null,
   appVersion: string,
+  suppressForPhotoPromo: boolean,
 ): ForceUpdateInfo | null {
+  if (suppressForPhotoPromo) return null
   if (appForceUpdate?.APPVERSION && psUpdateFlag !== '1' && appVersion < appForceUpdate.APPVERSION) {
     return { minVersion: appForceUpdate.APPVERSION }
   }

@@ -1,12 +1,60 @@
+import { useState } from 'react'
 import {
   FlatList,
   Pressable,
   StyleSheet,
   Text,
   View,
+  type NativeSyntheticEvent,
+  type NativeScrollEvent,
 } from 'react-native'
+import { useTranslation } from 'react-i18next'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import ProfileCard, { PHOTO_HEIGHT, type CardSection, type CardVariant } from '../profile-card/ProfileCard'
+
+// Angular: core/config/button.config.ts's SEE_ALL — textColor: 'linkColor'
+// (--ion-color-link-color: #29339B), iconType: 'forward-icon-link' — a plain
+// text+chevron in the brand red was wrong on both counts.
+const SEE_ALL_LINK_COLOR = '#29339B'
+const FWD_ICON = `${CDN_SVG}revamp/forward-icon-link.svg`
+
+// ─── Pagination dots ────────────────────────────────────────────────────────────
+// Angular: home.config.ts's per-section swiper `pagination: { dynamicBullets:
+// true, dynamicMainBullets: 5 }` (Swiper.js) — up to 5 dots visible at once in a
+// window centered on the active slide, active dot enlarged into a pill, dots
+// nearer the edge of the window shrunk. Tracked continuously via FlatList's
+// onScroll (see handleScroll below) rather than only on scroll-settle, since
+// react-native-web doesn't reliably fire onMomentumScrollEnd for mouse-drag/
+// trackpad scrolling.
+function PaginationDots({ total, activeIndex }: { total: number; activeIndex: number }) {
+  if (total <= 1) return null
+  const maxVisible = 5
+  const half = Math.floor(maxVisible / 2)
+  let start = Math.max(0, Math.min(activeIndex - half, total - maxVisible))
+  start = Math.max(0, start)
+  const end = Math.min(total, start + maxVisible)
+  const indices = Array.from({ length: end - start }, (_, i) => start + i)
+
+  return (
+    <View style={styles.dotsRow}>
+      {indices.map(i => {
+        const distance = Math.abs(i - activeIndex)
+        return (
+          <View
+            key={i}
+            style={[
+              styles.dot,
+              i === activeIndex && styles.dotActive,
+              i !== activeIndex && distance >= 2 && styles.dotSmall,
+            ]}
+          />
+        )
+      })}
+    </View>
+  )
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -78,6 +126,11 @@ export interface SwiperCardProps {
   // every section except the one it happens to match by coincidence.
   cardWidth?: number | undefined
 
+  // Angular: cardMoreItemsData — the 3 items just beyond the visible slice
+  // (e.g. items #6-8 when 5 are shown), previewed as overlapping THUMBIMG
+  // thumbnails on the ghost "view more" card at the end of the list.
+  moreItems?: { THUMBIMG: string }[] | undefined
+
   // ── Callbacks ─────────────────────────────────────────────────────────────
   onCardPress?:     ((item: SwiperItem, index: number) => void) | undefined
   onLikePress?:     ((item: SwiperItem, index: number) => void) | undefined
@@ -103,21 +156,55 @@ export default function SwiperCard({
   cardSection = 'matches',
   items,
   cardWidth,
+  moreItems,
   onCardPress,
   onLikePress,
   onViewMorePress,
   onSeeAllPress,
 }: SwiperCardProps) {
+  const { t } = useTranslation()
   // Angular: card-htN classes set min-width === min-height per section — reuse
   // ProfileCard's own per-section ratio table as the default card width unless
   // a caller has a genuine reason to override it.
   const resolvedCardWidth = cardWidth ?? PHOTO_HEIGHT[cardSection]
+
+  // ProfileCard's case-1 renders a plain square (photo height === width) for
+  // every section EXCEPT Daily Recommendations, which adds an extra "View
+  // profile" button block below the photo (cardBottom + primaryBtn: ~24px
+  // block padding + ~26px button padding + ~20px text line height). Case-3
+  // (viewedyou/viewedbyme — cardVariant 3) always adds its own cardInfo block
+  // (name + detail + "View full profile" link: ~20px block padding + ~26px
+  // name line + ~18px detail line + ~26px link ≈ 85px), regardless of which
+  // of those two sections it is — both share the identical case-3 markup.
+  // The ghost "see all" card needs to match whichever height the real
+  // sibling cards actually render at, or the row grows to fit the taller
+  // item and leaves a gap below the shorter one.
+  const realCardHeight =
+    cardSection === 'dailyrecommendations' ? resolvedCardWidth + 70 :
+    cardVariant === 3                      ? resolvedCardWidth + 85 :
+    resolvedCardWidth
+
+  // Active-slide index for the pagination dots. Angular updates on the
+  // swiper's `transitionEnd` — RN's onMomentumScrollEnd is the native
+  // equivalent, but react-native-web never dispatches it for mouse-drag/
+  // trackpad scrolling, which would leave the dots permanently stuck at 0 on
+  // web. onScroll fires reliably on every platform, so track continuously
+  // from it instead (throttled via scrollEventThrottle below).
+  const [activeIndex, setActiveIndex] = useState(0)
+  function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
+    const x = e.nativeEvent.contentOffset.x
+    const idx = Math.round(x / (resolvedCardWidth + CARD_GAP))
+    setActiveIndex(Math.max(0, Math.min(idx, items.length - 1)))
+  }
 
   if (!items || items.length === 0) return null
 
   return (
     <View style={styles.container}>
       {/* ── Section header ── */}
+      {/* Angular: app-swiper.component.html — the "See all" CTA is a separate
+          element BELOW the card list (right-aligned, sharing a row with the
+          pagination dots), not inline with the header title. */}
       {(!!swiperHeader || newCount !== undefined) && (
         <View style={styles.header}>
           <View style={styles.headerLeft}>
@@ -130,12 +217,6 @@ export default function SwiperCard({
               </View>
             )}
           </View>
-
-          {showSeeAll && !!onSeeAllPress && (
-            <Pressable onPress={onSeeAllPress} style={styles.seeAllBtn}>
-              <Text style={styles.seeAllText}>See All →</Text>
-            </Pressable>
-          )}
         </View>
       )}
 
@@ -149,6 +230,8 @@ export default function SwiperCard({
         // Snap to each card for a clean swipe feel
         snapToInterval={resolvedCardWidth + CARD_GAP}
         decelerationRate="fast"
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
         renderItem={({ item, index }) => (
           <View style={{ width: resolvedCardWidth }}>
             <ProfileCard
@@ -183,17 +266,40 @@ export default function SwiperCard({
         )}
         ListFooterComponent={
           showSeeAll && onSeeAllPress ? (
-            // "See All" ghost card at the end of the list
-            <Pressable
-              style={[styles.seeAllCard, { width: resolvedCardWidth * 0.7, height: resolvedCardWidth * 1.3 }]}
-              onPress={onSeeAllPress}
-            >
-              <Text style={styles.seeAllCardText}>See All</Text>
-              <Text style={styles.seeAllArrow}>→</Text>
-            </Pressable>
+            // "See All" ghost card at the end of the list — Angular's own
+            // in-carousel "view more" slide (app-profile-card type='5'),
+            // previewing the next few hidden profiles' real thumbnails.
+            // Angular: .see-all-card { width: 94%; height: 100% } — nearly full
+            // width (small inset just to reveal the drop shadow) and EXACTLY
+            // the same height as the sibling profile cards in this section
+            // (a fixed 1.3x-width multiplier here previously made the ghost
+            // card taller/shorter than the real cards, inflating the row
+            // height and leaving a gap below the shorter item).
+            <View style={{ width: resolvedCardWidth * 0.94, height: realCardHeight }}>
+              <ProfileCard
+                variant={5}
+                section={cardSection}
+                viewMoreList={moreItems ?? []}
+                viewMoreContent={t('HOME.SEE_ALL_CTA')}
+                onViewMorePress={onSeeAllPress}
+              />
+            </View>
           ) : null
         }
       />
+
+      {/* ── Dots + "See all" row, below the card list ── */}
+      {(items.length > 1 || (showSeeAll && !!onSeeAllPress)) && (
+        <View style={styles.bottomRow}>
+          <PaginationDots total={items.length} activeIndex={activeIndex} />
+          {showSeeAll && !!onSeeAllPress && (
+            <Pressable onPress={onSeeAllPress} style={styles.seeAllBtn}>
+              <Text style={styles.seeAllText}>{t('HOME.SEE_ALL_CTA')}</Text>
+              <CdnSvg uri={FWD_ICON} width={12} height={12} />
+            </Pressable>
+          )}
+        </View>
+      )}
     </View>
   )
 }
@@ -241,11 +347,14 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
   seeAllBtn: {
-    paddingLeft: 12,
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           4,
+    paddingLeft:   12,
   },
   seeAllText: {
     fontSize:   13,
-    color:      Colors.primary,
+    color:      SEE_ALL_LINK_COLOR,
     fontWeight: '600',
   },
 
@@ -254,26 +363,38 @@ const styles = StyleSheet.create({
     paddingHorizontal: CARD_PAD,
   },
 
-  // ── "See All" ghost card at list end ──────────────────────────────────────
-  seeAllCard: {
-    borderRadius:      16,
-    borderWidth:       1,
-    borderColor:       Colors.border,
-    borderStyle:       'dashed',
-    backgroundColor:   Colors.surfaceAlt,
+  // ── Bottom row: pagination dots (left) + "See all" link (right) ──────────
+  // Angular: swiper box has class="explore-pagination pb-16" (16px bottom
+  // padding) before the dots/CTA row starts — the dots themselves are
+  // absolutely offset -25px past that via Swiper.js's own pagination CSS
+  // (no clean RN equivalent), but the resulting card-to-row gap is that 16px.
+  bottomRow: {
+    flexDirection:     'row',
     alignItems:        'center',
-    justifyContent:    'center',
-    gap:               8,
-    // height set inline at the call site (proportional to resolvedCardWidth)
+    justifyContent:    'space-between',
+    paddingHorizontal: CARD_PAD,
+    marginTop:         16,
   },
-  seeAllCardText: {
-    fontSize:   16,
-    fontWeight: '600',
-    color:      Colors.primary,
+  dotsRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           4,
   },
-  seeAllArrow: {
-    fontSize:   22,
-    color:      Colors.primary,
-    fontWeight: '700',
+  dot: {
+    width:           6,
+    height:          6,
+    borderRadius:    3,
+    backgroundColor: Colors.border,
+  },
+  dotActive: {
+    width:           16,
+    height:          6,
+    borderRadius:    3,
+    backgroundColor: Colors.primary,
+  },
+  dotSmall: {
+    width:        4,
+    height:       4,
+    borderRadius: 2,
   },
 })
