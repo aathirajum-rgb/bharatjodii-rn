@@ -222,7 +222,15 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
       // PayU instead of Razorpay — see initPayUNative(). Only applies to the
       // UPI-native-bridge branch below; card/netbanking (and iOS, which has
       // no PayU bridge) keep using Razorpay regardless.
-      const usePayU = Platform.OS === 'android' && AUTOPAY_CAPABLE_KEYS.has(selectedKey) && config.PAYSOURCE === '2'
+      //
+      // Angular: payment.service.ts:371-373 — an autopay-mandate registration
+      // (renewOnExpiry checked) forces this specific transaction back to
+      // Razorpay when PayU's own GOOGLEPAY.AUTOPAYFLAG isn't '1', even on a
+      // PAYSOURCE=='2' account — PayU can't handle that account's autopay
+      // setup, so only the one-time-charge path may still use it.
+      const payUBlockedForAutopay = renewOnExpiry && config.PAYU_AUTOPAY_FLAG !== '1'
+      const usePayU = Platform.OS === 'android' && AUTOPAY_CAPABLE_KEYS.has(selectedKey) &&
+        config.PAYSOURCE === '2' && !payUBlockedForAutopay
 
       let result: { success: boolean; response: any }
       if (usePayU) {
@@ -233,7 +241,11 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
           productInfo: checkout.productinfo ?? '',
           firstName:   checkout.firstname ?? '',
           email:       checkout.email || 'jodii@matrimony.com',
-          amount:      checkout.amount ?? '',
+          // PayUBridgeModule.kt reads this via getString() (unlike Razorpay's
+          // bridge, which uses getInt()) — the backend sends amount as a raw
+          // JSON number, which crashes ReadableMap.getString() if not
+          // stringified first (confirmed via a real device crash trace).
+          amount:      String(checkout.amount ?? ''),
           phone:       checkout.MOBILENO ?? '',
           surl:        checkout.surl ?? '',
           furl:        checkout.furl ?? '',

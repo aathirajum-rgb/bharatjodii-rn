@@ -63,6 +63,7 @@ import MatchesScreen               from '../screens/matches/MatchesScreen'
 import ViewProfileScreen           from '../screens/viewprofile/ViewProfileScreen'
 import StarMatchingScreen          from '../screens/star-matching/StarMatchingScreen'
 import ActivityScreen               from '../screens/activity/ActivityScreen'
+import MessagerListScreen           from '../screens/messagerList/MessagerListScreen'
 import LanguageSelectionScreen     from '../screens/LanguageSelectionScreen'
 import MenuScreen                  from '../screens/menu/MenuScreen'
 import BiodataScreen                from '../screens/menu/BiodataScreen'
@@ -122,6 +123,7 @@ export type AppStackParamList = {
   // push. AuthStack's own LanguageSelection route (pre-login, full-screen) is separate.
   LanguageSelection: undefined
   Activity:          undefined
+  MessagerList:      undefined
   Menu:              undefined
   Biodata:           undefined
   DeleteProfile:         undefined
@@ -465,6 +467,7 @@ export default function AppStack() {
       <Stack.Screen name="doorstep-collection" component={DoorstepCollectionScreen} />
       <Stack.Screen name="renewal" component={RenewalScreen} />
       <Stack.Screen name="Activity" component={ActivityScreen} />
+      <Stack.Screen name="MessagerList" component={MessagerListScreen} />
       <Stack.Screen name="Menu" component={MenuScreen} />
       <Stack.Screen name="Biodata" component={BiodataScreen} />
       <Stack.Screen name="DeleteProfile" component={DeleteProfileScreen} />

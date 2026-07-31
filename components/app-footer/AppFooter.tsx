@@ -8,8 +8,12 @@ import { CDN_SVG } from '../../constants/cdn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // Tab IDs match Figma bottom nav order exactly:
-//   0 = Home  1 = Matches  2 = Likes  4 = Search  3 = Membership
-// (Kept numeric IDs consistent with Angular mapping; 4 replaces old Messages=5)
+//   0 = Home  1 = Matches  2 = Likes  4 = Contacted profiles  3 = Membership
+// (Kept numeric IDs consistent with Angular mapping.) Tab 4's label
+// (GENERAL.ICON_5 = "Contacted profiles") and icon (a call/phone glyph) always
+// pointed at this screen — it was temporarily wired to navigate('Search') as a
+// placeholder before MessagerListScreen existed. Fixed to navigate('MessagerList')
+// everywhere this switch appears (see handleTabPress in each screen).
 
 export type FooterTab = 0 | 1 | 2 | 3 | 4
 

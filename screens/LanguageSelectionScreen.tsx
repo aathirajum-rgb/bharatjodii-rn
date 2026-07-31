@@ -77,7 +77,7 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
       case 1: navigation.navigate('Matches');  break
       case 2: navigation.navigate('Activity'); break
       case 3: paymentTrack('31'); navigation.navigate('recharge', { fromTab: true }); break
-      case 4: navigation.navigate('Search');   break
+      case 4: navigation.navigate('MessagerList'); break
     }
   }
 

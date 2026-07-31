@@ -59,6 +59,11 @@ export interface IPaymentConfig {
   // Razorpay's Key ID; not decrypted, passed to the SDK as-is per the old
   // Android app). Only present/meaningful when PAYSOURCE == '2'.
   PAYU_MERCHANT_KEY?: string
+  // Angular: PAYCONFIG.GOOGLEPAY.AUTOPAYFLAG — payment.service.ts:371-373
+  // forces PAYSOURCE back to '1' (Razorpay) for a recurring/autopay-mandate
+  // registration when this isn't '1', since PayU can't handle that specific
+  // account's autopay setup even though it's the account's normal gateway.
+  PAYU_AUTOPAY_FLAG?: string
 }
 
 // Angular: payment-mode.page.html *ngFor over PAYMENTMETHODS — RECOMMEND ('1'/'0')
@@ -253,7 +258,8 @@ export async function redirectToMembershipPage(fromPage = '', replaceStack = fal
 // cleared elsewhere) missing PAYSOURCE/PAYU_MERCHANT_KEY forever on any
 // device that already cached a config before those fields existed, silently
 // defeating the PayU routing in initPayUNative() for upgraded installs.
-const PAYCONFIG_CACHE_VERSION = 2
+// v3 added PAYU_AUTOPAY_FLAG.
+const PAYCONFIG_CACHE_VERSION = 3
 
 // Angular: payment.service.ts callNativeForPayment() — real param is TYPE=PAYCONFIG
 // (confirmed against a live network capture); 'CHECKOUT' was never a valid value
@@ -296,6 +302,9 @@ export async function getPaymentConfig(mode = 'PAYCONFIG'): Promise<IPaymentConf
   }
   if (payConfig?.GOOGLEPAY?.Key) {
     payConfig.PAYU_MERCHANT_KEY = payConfig.GOOGLEPAY.Key
+  }
+  if (payConfig?.GOOGLEPAY?.AUTOPAYFLAG != null) {
+    payConfig.PAYU_AUTOPAY_FLAG = String(payConfig.GOOGLEPAY.AUTOPAYFLAG)
   }
 
   // Angular: callNativeForPayment() — PAYMENTMETHODS.filter(item => item.FLAG != 0)
@@ -1114,7 +1123,7 @@ export function initPayUNative(options: PayUCheckoutOptions): Promise<{ success:
     })
 
     const { si, ...rest } = options
-    PayUBridge.openCheckout(si ? {
+    const nativeOptions = si ? {
       ...rest,
       si:                true,
       siBillingAmount:   si.billingAmount,
@@ -1123,7 +1132,14 @@ export function initPayUNative(options: PayUCheckoutOptions): Promise<{ success:
       siBillingInterval: si.billingInterval,
       siPaymentStartDate: si.paymentStartDate,
       siPaymentEndDate:   si.paymentEndDate,
-    } : rest)
+    } : rest
+    console.error('DBG_PAYU_OPTIONS', JSON.stringify(nativeOptions))
+    try {
+      PayUBridge.openCheckout(nativeOptions)
+    } catch (err: any) {
+      console.error('DBG_PAYU_OPENCHECKOUT_THROW', err?.message, err?.stack)
+      settle({ success: false, response: { code: 0, description: err?.message || 'PayU bridge threw' } })
+    }
   })
 }
 

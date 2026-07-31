@@ -370,7 +370,7 @@ export default function ActivityScreen({ navigation }: Props) {
       case 0: navigation.navigate('Home');     break
       case 1: navigation.navigate('Matches');  break
       case 3: paymentTrack('31'); navigation.navigate('recharge', { fromTab: true }); break
-      case 4: navigation.navigate('Search');   break
+      case 4: navigation.navigate('MessagerList'); break
       // case 2 is this screen — do nothing
     }
   }

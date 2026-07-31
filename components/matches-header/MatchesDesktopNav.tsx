@@ -11,6 +11,10 @@ import { Colors } from '../../constants/colors'
 
 // Reuses AppFooter's TAB_ICONS ([inactive, active] pairs) and TAB_LABEL_KEYS
 // (i18n keys, translated below via t()) instead of re-listing either a second time.
+// Tab 4 = "Contacted profiles" (MessagerListScreen) — see AppFooter.tsx's
+// FooterTab comment. Figma "Jodii Desktop — Registration" node 693:54's top
+// nav shows Home / Matches / Liked profiles / Contacted profiles (no Search
+// link), which this array now matches exactly.
 const NAV_TABS: FooterTab[] = [0, 1, 2, 4]
 
 type Props = {

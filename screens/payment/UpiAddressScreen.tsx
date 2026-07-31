@@ -155,7 +155,11 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
           productInfo: checkout.productinfo ?? '',
           firstName:   checkout.firstname ?? '',
           email:       checkout.email || 'jodii@matrimony.com',
-          amount:      checkout.amount ?? '',
+          // PayUBridgeModule.kt reads this via getString() (unlike Razorpay's
+          // bridge, which uses getInt()) — the backend sends amount as a raw
+          // JSON number, which crashes ReadableMap.getString() if not
+          // stringified first (confirmed via a real device crash trace).
+          amount:      String(checkout.amount ?? ''),
           phone:       checkout.MOBILENO ?? '',
           surl:        checkout.surl ?? '',
           furl:        checkout.furl ?? '',

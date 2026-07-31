@@ -60,7 +60,7 @@ export default function RechargeScreen({ navigation, route }: Props) {
       case 0: navigation.navigate('Home');     break
       case 1: navigation.navigate('Matches');  break
       case 2: navigation.navigate('Activity'); break
-      case 4: navigation.navigate('Search');   break
+      case 4: navigation.navigate('MessagerList'); break
       // case 3 (Membership) — already here, no-op.
     }
   }

@@ -102,6 +102,7 @@ export const Colors = {
   addPhotoGradientStart:   '#F2F4FF',   // add-photo banner gradient start
   addPhotoGradientEnd:     '#DCFFF0',   // add-photo banner gradient end
   addPhotoCtaBg:           '#1C644C',   // add-photo banner CTA fallback background
+  bulkLikeGradientStart:   '#FFF0F4',   // Bulk Like screen background gradient start (→ white)
   membershipCardBg:        '#FFFBF0',   // membership/festival offer card background
 
   // ── Payment options screen ───────────────────────────────────────────────────

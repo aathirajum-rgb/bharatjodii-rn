@@ -50,13 +50,14 @@ export async function callActivityApi(
   return apiCall(config.endpoint, 'POST', config.params(matriId, start, limit))
 }
 
-// ActivityScreen's liked-profile tabs ('likedyou'/'likesent') need the same
-// SwiperItem-shaped data MatchesScreen consumes (so they can reuse MatchCard
-// as-is) — this pipes the raw RESPONSE/TOTAL envelope through the exact same
-// mapper homeService.ts's own listing fetchers use, rather than a second
-// hand-rolled raw-field adapter.
+// ActivityScreen's liked-profile tabs ('likedyou'/'likesent') and
+// MessagerListScreen's phone-view tabs ('whoseviewednumber'/'whoviewednumber')
+// all need the same SwiperItem-shaped data MatchesScreen consumes (so they can
+// reuse MatchCard-family components as-is) — this pipes the raw RESPONSE/TOTAL
+// envelope through the exact same mapper homeService.ts's own listing fetchers
+// use, rather than a second hand-rolled raw-field adapter.
 export async function fetchActivityListingPage(
-  type: 'likedyou' | 'likesent',
+  type: 'likedyou' | 'likesent' | 'whoseviewednumber' | 'whoviewednumber',
   matriId: string,
   start = 0,
   limit = 20,

@@ -45,6 +45,9 @@ class PayUWebView : AppCompatActivity() {
     val bankcode     = intent.getStringExtra("bankcode") ?: ""
     val upiAppPkg    = intent.getStringExtra("upiAppPackageName")
 
+    Log.d(TAG, "onCreate: merchantKey=$merchantKey txnId=$txnId bankcode=$bankcode upiAppPkg=$upiAppPkg " +
+      "amount=$amount hasHash=${hash.isNotEmpty()} si=${intent.getBooleanExtra("si", false)}")
+
     try {
       val paymentParams = PaymentParamsUpiSdk()
       paymentParams.setKey(merchantKey)
@@ -63,6 +66,7 @@ class PayUWebView : AppCompatActivity() {
       paymentParams.setUserCredentials("default")
       paymentParams.setPhone(phone)
       paymentParams.setHash(hash)
+      Log.d(TAG, "paymentParams built OK")
 
       if (intent.getBooleanExtra("si", false)) {
         val siDetails = SIParamsDetails()
@@ -79,6 +83,7 @@ class PayUWebView : AppCompatActivity() {
         siParams.setFree_trial(false)
         siParams.setSi_details(siDetails)
         paymentParams.setSiParams(siParams)
+        Log.d(TAG, "siParams attached OK")
       }
 
       val postData = PostDataGenerate.PostDataBuilder(this)
@@ -86,17 +91,23 @@ class PayUWebView : AppCompatActivity() {
         .setPaymentParamUpiSdk(paymentParams)
         .build()
         .toString()
+      Log.d(TAG, "postData built OK, length=${postData.length}")
 
       val upiConfig = UpiConfig()
       upiConfig.setMerchantKey(merchantKey)
       upiConfig.setPayuPostData(postData)
       upiConfig.setPostUrl("https://secure.payu.in/_payment")
       if (!upiAppPkg.isNullOrEmpty()) upiConfig.setPackageNameForSpecificApp(upiAppPkg)
+      Log.d(TAG, "upiConfig built OK, calling Upi.getInstance().makePayment")
 
       Upi.getInstance().makePayment(callback, this, upiConfig)
-    } catch (e: Exception) {
-      Log.e(TAG, "PayU payment submit failed", e)
-      sendResult(false, null, "EXCEPTION", e.message)
+      Log.d(TAG, "makePayment call returned (async — waiting on callback)")
+    } catch (e: Throwable) {
+      // Throwable (not just Exception) — a NoSuchMethodError/NoClassDefFoundError
+      // from R8/ProGuard stripping a PayU SDK class in the release build would
+      // otherwise bypass a plain `catch (e: Exception)` and crash the whole app.
+      Log.e(TAG, "PayU payment submit failed: ${e.javaClass.name}: ${e.message}", e)
+      sendResult(false, null, "EXCEPTION", "${e.javaClass.simpleName}: ${e.message}")
     }
   }
 
