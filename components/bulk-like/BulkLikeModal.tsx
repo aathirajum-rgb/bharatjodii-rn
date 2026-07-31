@@ -15,7 +15,9 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import SelectableProfileTile from './SelectableProfileTile'
+import BulkLikeSentSheet from './BulkLikeSentSheet'
 import { sendBulkLikes } from '../../service/profileService'
 import { Colors } from '../../constants/colors'
 
@@ -75,79 +77,99 @@ export default function BulkLikeModal({
   }
 
   return (
-    // `transparent` — every other Modal in this app passes it (BulkLikeModal was
-    // the sole exception); a non-transparent Modal is a known react-native-web
-    // pitfall where its content can render correctly but stop receiving pointer
-    // events entirely, which is exactly what made both the close X and Send
-    // buttons unresponsive on desktop web despite the cursor showing a pointer.
-    // `s.screen`'s own opaque white background already fills the full screen, so
-    // this doesn't change how it looks.
+    // Two sibling <Modal>s, not one nested inside the other — same convention
+    // MatchesScreen uses when pairing this modal with a BottomSheet; nesting
+    // RN Modals is a known source of z-order/rendering quirks on Android.
+    <>
+    {/* `transparent` — every other Modal in this app passes it (BulkLikeModal was
+        the sole exception); a non-transparent Modal is a known react-native-web
+        pitfall where its content can render correctly but stop receiving pointer
+        events entirely, which is exactly what made both the close X and Send
+        buttons unresponsive on desktop web despite the cursor showing a pointer.
+        `s.screen`'s own opaque white background already fills the full screen, so
+        this doesn't change how it looks. */}
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
-      <View style={s.screen}>
+      <LinearGradient
+        colors={[Colors.bulkLikeGradientStart, Colors.white]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 0, y: 1 }}
+        style={s.screen}
+      >
         <View style={s.header}>
-          <Text style={s.title}>{t('MATCHES.BULK_LIKE_TITLE').replace(/<br\s*\/?>/gi, ' ')}</Text>
+          {/* Figma (119:268) renders this as two literal lines, not a single
+              wrapped line — replacing <br> with a space instead produced a
+              double space, since the translation already has one before it. */}
+          <Text style={s.title}>
+            {t('MATCHES.BULK_LIKE_TITLE').split(/<br\s*\/?>/gi).map(line => line.trim()).join('\n')}
+          </Text>
           <Pressable onPress={onClose} hitSlop={8}>
             <Text style={s.close}>✕</Text>
           </Pressable>
         </View>
 
-        {sent ? (
-          <View style={s.sentBox}>
-            <Text style={s.sentText}>{t('MATCHES.BULK_BTM_TEXT')}</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={candidates}
-            keyExtractor={c => String(c.MATRIID)}
-            renderItem={({ item }) => (
-              <SelectableProfileTile
-                candidate={item}
-                checked={selected.has(String(item.MATRIID))}
-                onToggle={() => toggle(String(item.MATRIID))}
-              />
-            )}
-          />
-        )}
+        <FlatList
+          data={candidates}
+          keyExtractor={c => String(c.MATRIID)}
+          contentContainerStyle={s.list}
+          renderItem={({ item }) => (
+            <SelectableProfileTile
+              candidate={item}
+              checked={selected.has(String(item.MATRIID))}
+              onToggle={() => toggle(String(item.MATRIID))}
+            />
+          )}
+        />
 
-        {!sent && (
-          <Pressable
-            style={[s.sendBtn, selected.size === 0 && s.sendBtnDisabled]}
-            onPress={handleSend}
-            disabled={selected.size === 0 || sending}
-          >
-            {sending
-              ? <ActivityIndicator size="small" color={Colors.white} />
-              : <Text style={s.sendBtnText}>{t('MATCHES.BULK_LIKE_CTA')} ({selected.size})</Text>
-            }
-          </Pressable>
-        )}
-      </View>
+        <Pressable
+          style={[s.sendBtn, selected.size === 0 && s.sendBtnDisabled]}
+          onPress={handleSend}
+          disabled={selected.size === 0 || sending}
+        >
+          {sending
+            ? <ActivityIndicator size="small" color={Colors.white} />
+            : <Text style={s.sendBtnText}>{t('MATCHES.BULK_LIKE_CTA')} ({selected.size})</Text>
+          }
+        </Pressable>
+      </LinearGradient>
     </Modal>
+
+    <BulkLikeSentSheet visible={sent} />
+    </>
   )
 }
 
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.white },
+  screen: { flex: 1 },
   header: {
     flexDirection:     'row',
     alignItems:        'center',
     justifyContent:    'space-between',
-    paddingHorizontal: 20,
-    paddingVertical:   16,
+    paddingLeft:       16,
+    paddingRight:      20,
+    paddingVertical:   24,
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderSubtle,
   },
   title: {
+    flex:       1,
     fontFamily: 'Poppins-SemiBold',
     fontSize:   18,
-    color:      Colors.textDark,
+    lineHeight: 24,
+    color:      Colors.textPrimary,
+    paddingRight: 12,
   },
   close: {
-    fontSize: 20,
-    color:    Colors.textSecondary,
+    fontSize: 18,
+    color:    Colors.textPrimary,
+  },
+  list: {
+    paddingHorizontal: 16,
+    paddingTop:        16,
+    paddingBottom:     16,
+    gap:               20,
   },
   sendBtn: {
-    backgroundColor:   Colors.primary,
+    backgroundColor:   Colors.primaryDark,
     borderRadius:      8,
     paddingVertical:   14,
     alignItems:        'center',
@@ -161,17 +183,5 @@ const s = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
     fontSize:   15,
     color:      Colors.white,
-  },
-  sentBox: {
-    flex:           1,
-    alignItems:     'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  sentText: {
-    fontFamily: 'Poppins-Medium',
-    fontSize:   16,
-    color:      Colors.textDark,
-    textAlign:  'center',
   },
 })

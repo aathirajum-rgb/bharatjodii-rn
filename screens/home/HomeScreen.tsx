@@ -776,7 +776,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     switch (tab) {
       case 1: navigation.navigate('Matches');  break
       case 2: navigation.navigate('Activity'); break
-      case 4: navigation.navigate('Search');   break
+      case 4: navigation.navigate('MessagerList'); break
       // Angular: footer.component.ts — paymentTrack(31) fires right before
       // routing a free member to the payment intermediate page.
       case 3: paymentTrack('31'); navigation.navigate('recharge', { fromTab: true }); break

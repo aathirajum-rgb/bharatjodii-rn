@@ -10,6 +10,9 @@ import { TAB_LABEL_KEYS, type FooterTab } from '../app-footer/AppFooter'
 import { LANG_LABELS } from './MatchesHeader'
 import { Colors } from '../../constants/colors'
 
+// Tab 4 = "Contacted profiles" (MessagerListScreen) — see AppFooter.tsx's
+// FooterTab comment. This matches Figma's top nav: Home / Matches / Liked
+// profiles / Contacted profiles (no Search link).
 const NAV_TABS: FooterTab[] = [0, 1, 2, 4]
 
 // Figma: each nav item gets its own dedicated icon (not the mobile bottom-nav

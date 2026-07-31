@@ -1,31 +1,13 @@
-// One row inside BulkLikeModal — photo + name + basic info + checkbox.
-// Angular: fullpage-modalpopup.component.html <app-list-view-card> rows,
-// [showCheckbox]="true", basic info from bindBasicView() joining
-// AGE/EDUCATION/OCCUPATION/INCOME/CITY (a different field order than the main
-// match card's buildBasicView, which is why this isn't reused from
-// matchesCard.shared.tsx — the raw bulk-like API response also uses different
-// field names, e.g. MATRIID/NAME/THUMBIMG, not the adapted MatchProfile shape).
+// Grid card inside BulkLikeDesktopModal — desktop sibling of SelectableProfileTile.
+// Figma: "Jodii Desktop - Registration" (UaPAN9aG6MfZf6CRpwXf1L, node 1047:11645)
+// card 1047:34240 — 348x136 white card, 120x120 photo, checkbox top-right.
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import ProfilePhoto from '../profile-photo/ProfilePhoto'
 import BasicInfoLine from './BasicInfoLine'
 import { Colors } from '../../constants/colors'
+import { getBasicLineParts } from './SelectableProfileTile'
 
-// Shared with SelectableProfileCardDesktop.tsx, which renders the "|"
-// separators dimmed and so needs the raw parts rather than a joined string.
-// AGE comes back from the bulk-like API already unit-suffixed (e.g. "19
-// years", not a bare number) — appending a unit here duplicated it ("19
-// years yrs").
-export function getBasicLineParts(candidate: Record<string, any>): string[] {
-  const parts: string[] = []
-  if (candidate.AGE)        parts.push(String(candidate.AGE))
-  if (candidate.EDUCATION)  parts.push(candidate.EDUCATION)
-  if (candidate.OCCUPATION) parts.push(candidate.OCCUPATION)
-  if (candidate.INCOME)     parts.push(candidate.INCOME)
-  if (candidate.CITY)       parts.push(candidate.CITY)
-  return parts
-}
-
-export default function SelectableProfileTile({
+export default function SelectableProfileCardDesktop({
   candidate, checked, onToggle,
 }: {
   candidate: Record<string, any>
@@ -38,16 +20,16 @@ export default function SelectableProfileTile({
     <Pressable style={s.card} onPress={onToggle}>
       <ProfilePhoto
         profileImage={photoUri}
-        height={96}
+        height={120}
         style={{
-          width: 96,
+          width: 120,
           borderTopLeftRadius: 8, borderTopRightRadius: 8,
           borderBottomLeftRadius: 8, borderBottomRightRadius: 8,
         }}
       />
       <View style={s.info}>
         <Text style={s.name} numberOfLines={1}>{candidate.NAME}</Text>
-        <BasicInfoLine parts={getBasicLineParts(candidate)} style={s.basicLine} numberOfLines={3} />
+        <BasicInfoLine parts={getBasicLineParts(candidate)} style={s.basicLine} numberOfLines={4} />
       </View>
       <View style={[s.checkbox, checked && s.checkboxChecked]}>
         {checked && <Text style={s.checkmark}>✓</Text>}
@@ -58,19 +40,23 @@ export default function SelectableProfileTile({
 
 const s = StyleSheet.create({
   card: {
+    width:  348,
+    height: 136,
     flexDirection:   'row',
-    alignItems:      'flex-start',
-    padding:         8,
-    gap:             12,
     backgroundColor: Colors.surface,
     borderRadius:    12,
+    padding:         8,
     shadowColor:     Colors.shadow,
     shadowOffset:    { width: 0, height: 6 },
     shadowOpacity:   0.08,
     shadowRadius:    16,
     elevation:       3,
   },
-  info: { flex: 1, paddingRight: 24 },
+  info: {
+    flex:        1,
+    marginLeft:  12,
+    paddingRight: 24,
+  },
   name: {
     fontFamily: 'Poppins-SemiBold',
     fontSize:   16,
@@ -78,8 +64,8 @@ const s = StyleSheet.create({
   },
   basicLine: {
     fontFamily: 'Poppins-Regular',
-    fontSize:   12,
-    lineHeight: 16,
+    fontSize:   14,
+    lineHeight: 20,
     color:      Colors.black,
     marginTop:  4,
   },
@@ -90,7 +76,7 @@ const s = StyleSheet.create({
     width:           20,
     height:          20,
     borderRadius:    4,
-    borderWidth:     1,
+    borderWidth:     1.5,
     borderColor:     Colors.inputBorder,
     backgroundColor: Colors.surface,
     alignItems:      'center',

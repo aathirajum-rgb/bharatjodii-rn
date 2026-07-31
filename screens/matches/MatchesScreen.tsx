@@ -73,6 +73,7 @@ import { StorageKeys } from '../../constants/storage.keys'
 import Constants from 'expo-constants'
 import GamBanner from '../../components/gam-banner/GamBanner'
 import BulkLikeModal from '../../components/bulk-like/BulkLikeModal'
+import BulkLikeDesktopModal from '../../components/bulk-like/BulkLikeDesktopModal'
 import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
 import StickyBanner from '../../components/sticky-banner/StickyBanner'
 import AppRatingModal from '../../components/app-rating/AppRatingModal'
@@ -1870,7 +1871,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
       // Angular: footer.component.ts — paymentTrack(31) fires right before
       // routing a free member to the payment intermediate page.
       case 3: paymentTrack('31'); navigation.navigate('recharge', { fromTab: true }); break
-      case 4: navigation.navigate('Search');   break
+      case 4: navigation.navigate('MessagerList'); break
     }
   }
 
@@ -2040,7 +2041,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             {...(activeSticky === 'paymentFailed' ? { countdownDeadlineMs: paymentStickyInfo!.deadlineMs } : {})}
           />
         )}
-        <BulkLikeModal
+        <BulkLikeDesktopModal
           visible={showBulkLike}
           candidates={bulkLikeCandidates}
           showPhotoPromo={loginGender === 'M' && showPhotoPromotion}
