@@ -209,7 +209,7 @@ export default function HomeDesktopLayout({
             <DiscoverMatchesSection
               categories={categories}
               onCategoryPress={cat => navigation.navigate('Matches', { exploreType: cat.id, exploreLabel: cat.label })}
-              onDiscoverAllPress={() => navigation.navigate('Matches')}
+              onDiscoverAllPress={() => navigation.navigate('DiscoverMatches')}
             />
           </View>
 

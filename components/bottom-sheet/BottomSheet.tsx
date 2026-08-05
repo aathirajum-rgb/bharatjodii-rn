@@ -48,6 +48,7 @@ export type BottomSheetType =
   | 'enableNotification'
   | 'addPhotoPrompt'
   | 'viewPhoneConfirm'
+  | 'photoPrivacy'
 
 // A single bulleted row for BottomSheetData.benefits (icon + text).
 export interface BottomSheetBenefit {

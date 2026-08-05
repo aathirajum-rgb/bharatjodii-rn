@@ -3,6 +3,10 @@ import { getItem } from '../service/storageService'
 import { StorageKeys } from '../constants/storage.keys'
 import { registerLogoutCallback } from '../service/apiClient'
 import { getSessionValue } from '../service/registrationService'
+import { loadDrProfiles } from '../service/drService'
+import { refreshSession } from '../service/homeService'
+import { handlePageLanding } from '../service/pageLandingService'
+import { waitForNavigationReady } from '../utils/navigationRef'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,7 +32,7 @@ async function resolveInitialRoute(goToOnboarding: boolean): Promise<InitialRout
 }
 
 interface AuthContextValue extends AuthState {
-  loginUpdate: (userId: string, goToOnboarding?: boolean) => Promise<void>
+  loginUpdate: (userId: string, goToOnboarding?: boolean, pageId?: string) => Promise<void>
   logoutUpdate: () => void
 }
 
@@ -63,9 +67,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isNewUser: false,     // returning user → go straight to Home (unless free-member redirect below)
       initialRoute,
     })
+
+    // Angular: the native shell calls login/autologin/v1 every time the app is
+    // opened (not gated by the 1hr guard in RootNavigation.tsx, which is a
+    // separate token-freshness concern for API calls already in-session) and
+    // routes via webview.page.ts's pageLandingFunc() on the page_id it returns.
+    // initialRoute above is already committed (from cache) so the app doesn't
+    // sit on a blank screen waiting on this network round-trip — this can
+    // still redirect once the real answer comes back.
+    if (token && userId) {
+      const ready = await waitForNavigationReady()
+      if (ready) {
+        const { pageId } = await refreshSession()
+        await handlePageLanding(pageId, userId)
+      }
+    }
   }
 
-  async function loginUpdate(userId: string, goToOnboarding = true) {
+  async function loginUpdate(userId: string, goToOnboarding = true, pageId?: string) {
     const initialRoute = await resolveInitialRoute(goToOnboarding)
     setState({
       isAuthenticated: true,
@@ -74,6 +93,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isNewUser: goToOnboarding,
       initialRoute,
     })
+
+    // Angular: webview.page.ts's pageLandingFunc() — case "1" (goToRegistrationPage,
+    // brand-new registration) never calls loadDrProfiles, matched here by skipping
+    // this whole block when goToOnboarding.
+    if (!goToOnboarding) {
+      const ready = await waitForNavigationReady()
+      if (ready) {
+        if (pageId) {
+          // Real page_id available (OTP-verify's own WEBVIEWURL) — full dispatch.
+          await handlePageLanding(pageId, userId)
+        } else {
+          // No page_id captured — fall back to the DR-only check (the dominant
+          // real-world outcome for most page_ids anyway; see pageLandingService.ts).
+          await loadDrProfiles(userId, 'login', initialRoute)
+        }
+      }
+    }
   }
 
   function logoutUpdate() {

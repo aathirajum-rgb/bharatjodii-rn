@@ -111,6 +111,13 @@ export async function deletePhoto(photoId: string): Promise<any> {
   return apiCall(Endpoints.profile.deletePhoto, 'POST', `ID=${userId}&PHOTOID=${photoId}`)
 }
 
+// ─── setMainPhoto ─────────────────────────────────────────────────────────────
+
+export async function setMainPhoto(photoId: string): Promise<any> {
+  const userId = await getItem(SK.Auth.USER_ID)
+  return apiCall(Endpoints.profile.setMainPhoto, 'POST', `ID=${userId}&PHOTOID=${photoId}`)
+}
+
 // ─── fetchBulkLikeMatches ─────────────────────────────────────────────────────
 
 export async function fetchBulkLikeMatches(start = 0, limit = 20): Promise<any[]> {

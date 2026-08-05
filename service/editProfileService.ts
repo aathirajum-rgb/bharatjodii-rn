@@ -54,6 +54,9 @@ export type FieldKey = keyof typeof FIELD_TYPE_CODE
 
 export interface EditProfileInfo {
   name?:           string | undefined
+  // Not confirmed against a live capture — inferred raw key, same caution as
+  // other fields in this file that carry a similar note.
+  gender?:         string | undefined
   age?:            string | undefined
   dateOfBirth?:    string | undefined
   height?:         string | undefined
@@ -62,6 +65,10 @@ export interface EditProfileInfo {
   noOfChildren?:   string | undefined
   physicalStatus?: string | undefined
   motherTongue?:   string | undefined
+  // Raw CREATEDBY code (e.g. Angular's registrationArray.PROFILECREATEDBY key) —
+  // display-only on the hub, resolved via fetchProfileCreatedByOptions(). Not
+  // confirmed against a live capture.
+  createdBy?:      string | undefined
 
   state?:      string | undefined
   city?:       string | undefined
@@ -170,6 +177,8 @@ export async function fetchEditProfileInfo(): Promise<EditProfileInfo | null> {
 
   return {
     name:           r['NAME'],
+    gender:         r['GENDER'],
+    createdBy:      r['CREATEDBY'],
     age:            r['AGE'],
     dateOfBirth:    r['DATEOFBIRTH'],
     height:         r['HEIGHT'],

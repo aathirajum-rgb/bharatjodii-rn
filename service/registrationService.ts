@@ -11,6 +11,7 @@ import { StorageKeys as SK } from '../constants/storage.keys'
 import { navigate } from '../utils/navigationRef'
 import { ENavigation } from '../types/enums/navigation.enum'
 import { setAppsFlyerUserId } from './analyticsService'
+import { fetchEditProfileInfo, type EditProfileInfo } from './editProfileService'
 
 // ─── Registration value store ─────────────────────────────────────────────────
 // Single AsyncStorage object for all onboarding field values.
@@ -158,22 +159,28 @@ export async function autoLogin(
 
 // ─── WEBVIEWURL parser — heart of the login flow ──────────────────────────────
 // Server embeds full user session as JSON inside the webview URL.
-// URL format: https://...#/login/{ ...user JSON... }/2
+// URL format: https://...#/webview/login/{ ...user JSON... }/28
+// That trailing "/28" is Angular's ActivatedRoute :page_id param — webview.page.ts's
+// pageLandingFunc() switches on it to decide post-login/post-autologin routing
+// (see service/pageLandingService.ts). Returns it so callers driving that same
+// decision (refreshSession() on every app open) don't have to re-parse the URL.
 
-export async function parseAndStoreWebViewURL(webViewUrl: string): Promise<void> {
+export async function parseAndStoreWebViewURL(webViewUrl: string): Promise<string | undefined> {
   try {
     const loginSegment = webViewUrl.split('login/')[1]
-    if (!loginSegment) return
+    if (!loginSegment) return undefined
     // Locate the outermost JSON object by first { and last }
     // Splitting on '/2' was fragile — the JSON itself can contain '/2'
     const jsonStart = loginSegment.indexOf('{')
     const jsonEnd   = loginSegment.lastIndexOf('}')
-    if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) return
+    if (jsonStart === -1 || jsonEnd === -1 || jsonEnd <= jsonStart) return undefined
     const jsonStr = loginSegment.slice(jsonStart, jsonEnd + 1)
     const data    = JSON.parse(jsonStr)
     await storeWebURLData(data)
+    return loginSegment.slice(jsonEnd + 1).match(/\d+/)?.[0]
   } catch (e) {
     if (__DEV__) console.error('[parseWebViewURL]', e)
+    return undefined
   }
 }
 
@@ -243,6 +250,15 @@ export async function fetchMaritalStatusOptions(
   }
   return []
 }
+
+// No dedicated options endpoint for "number of children" — same small closed
+// set every marital-status-history flow uses (Angular form-fields). Shared
+// constant so PersonalReligiousDesktopStep.tsx and Edit Profile's marital
+// screen don't each hardcode their own copy.
+export const CHILDREN_OPTIONS: Array<{ key: string; label: string }> = [
+  { key: '1', label: '1 child' }, { key: '2', label: '2 children' },
+  { key: '3', label: '3 children' }, { key: '4', label: '4+ children' },
+]
 
 // Reads REGISTRATIONARRAYS from cache (AsyncStorage) or fetches fresh from API and saves.
 // Angular stores the full initialfetch response under this key — mirrors that pattern.
@@ -331,11 +347,18 @@ export async function fetchSmokingHabitOptions(): Promise<Array<{ key: string; l
   return []
 }
 
-// Fetches gothram options for the selected caste.
+// Fetches gothram options for the given caste (or the registration flow's
+// current CASTE reg-value when omitted — preserves the original zero-arg
+// call sites: GothraScreen.tsx, PersonalReligiousDesktopStep.tsx).
 // Angular: type=gothra&caste=${CASTE}&LANG=${lang} → RESPONSE.GOTHRAM (plain object)
 // Key '998' = "All except your gothra" — excluded from registration list.
 // Returns [] when response is "no gothram" string.
-export async function fetchGothraOptions(): Promise<Array<{ key: string; label: string }>> {
+//
+// Cache is scoped by caste (GOTHRAM_CASTE alongside GOTHRAM) — without this,
+// a cached list from a previously-viewed caste (e.g. Edit Profile's Religious
+// screen, where caste can change on the same screen) would be silently reused
+// for a different caste.
+export async function fetchGothraOptions(caste?: string): Promise<Array<{ key: string; label: string }>> {
   const toList = (raw: any): Array<{ key: string; label: string }> => {
     if (raw === 'no gothram' || !raw) return []
     if (Array.isArray(raw)) {
@@ -352,31 +375,49 @@ export async function fetchGothraOptions(): Promise<Array<{ key: string; label: 
     return []
   }
 
-  // Check cache (Angular stores under GOTHRAM inside REGISTRATIONARRAYS)
+  const casteId = caste ?? (await getRegValue('CASTE')) ?? ''
+
+  // Check cache (Angular stores under GOTHRAM inside REGISTRATIONARRAYS) —
+  // only trust it if it was cached for this same caste.
   const arrays = await getRegistrationArrays()
-  if (arrays?.GOTHRAM && arrays.GOTHRAM !== 'no gothram') {
+  if (arrays?.GOTHRAM_CASTE === casteId && arrays.GOTHRAM && arrays.GOTHRAM !== 'no gothram') {
     const cached = toList(arrays.GOTHRAM)
     if (cached.length > 0) return cached
   }
 
   // Fetch fresh — must send caste + lang (same as Angular: type=gothra&caste=X&LANG=en)
-  const caste = (await getRegValue('CASTE')) ?? ''
   const lang  = (await getItem(SK.Auth.LANG)) ?? 'en'
   const res   = await apiCall(
     Endpoints.registration.initialFetch,
     'POST',
-    `type=gothra&caste=${caste}&LANG=${lang}`,
+    `type=gothra&caste=${casteId}&LANG=${lang}`,
   )
   // Angular: responseData["GOTHRAM"] — gothra API returns at root level
   const gothram = res?.GOTHRAM ?? res?.RESPONSE?.GOTHRAM
 
   if (gothram !== undefined) {
     // Cache it so re-entry is instant
-    const updated = { ...arrays, GOTHRAM: gothram }
+    const updated = { ...arrays, GOTHRAM: gothram, GOTHRAM_CASTE: casteId }
     await setItem('REGISTRATIONARRAYS', JSON.stringify(updated))
     return toList(gothram)
   }
   return []
+}
+
+// Whether gothram applies to the given caste — Angular reads
+// REGISTRATIONARRAYS.GOTHRAAVAILCASTE and checks membership. Factored out of
+// getNextPageAfterCaste() so Edit Profile's Religious screen can reuse the
+// exact same signal to decide whether to show the Gothram field.
+async function gothraAppliesToCaste(caste: string): Promise<boolean> {
+  const arrays          = await getRegistrationArrays()
+  const gothraAvailList = arrays?.GOTHRAAVAILCASTE
+  if (!gothraAvailList) return true                   // no list → assume gothra available
+  if (!Array.isArray(gothraAvailList)) return true
+  return gothraAvailList.map(String).includes(String(caste))
+}
+
+export async function isGothraApplicableForCaste(caste: string): Promise<boolean> {
+  return gothraAppliesToCaste(caste)
 }
 
 // Fetches caste list for a given religion.
@@ -475,11 +516,7 @@ export async function fetchSubcasteOptions(
 // Angular reads REGISTRATIONARRAYS.GOTHRAAVAILCASTE — if the array includes selectedCaste,
 // go to page 16; if the array is missing, default to page 16 (gothra available).
 export async function getNextPageAfterCaste(selectedCaste: string): Promise<string> {
-  const arrays          = await getRegistrationArrays()
-  const gothraAvailList = arrays?.GOTHRAAVAILCASTE
-  if (!gothraAvailList) return '16'                  // no list → assume gothra available
-  if (!Array.isArray(gothraAvailList)) return '16'
-  return gothraAvailList.map(String).includes(String(selectedCaste)) ? '16' : '20'
+  return (await gothraAppliesToCaste(selectedCaste)) ? '16' : '20'
 }
 
 // Fetches religion options from REGISTRATIONARRAYS.RELIGION.
@@ -899,6 +936,11 @@ export async function storeWebURLData(data: Record<string, any>): Promise<void> 
     // back to '0', so the horoscope section always rendered the "add your own
     // horoscope" prompt regardless of the account's real state.
     'HOROSCOPEAVAILABLE',
+    // Angular: webview.page.ts's pageLandingFunc() case "11" — cascades through
+    // these six to decide which profile-completion field to prompt for next
+    // (pageLandingService.ts). Also missing from this list until now, for the
+    // same reason HOROSCOPEAVAILABLE was — never read back anywhere before.
+    'FAMILYPROPERTY', 'BROTHERS', 'SISTERS', 'RAASI', 'STAR', 'DOSHAM',
   ]
   SCALAR_KEYS.forEach(k => { if (data[k] !== undefined) session[k] = String(data[k]) })
 
@@ -1257,6 +1299,11 @@ export async function submitFullRegistration(): Promise<{ matriId?: string; resp
     // Establish auth session (ATN) via autologin so subsequent endpoints
     // like familyinfo/v1 and starraasi/v1 that require ATN work correctly.
     await autoLogin(String(matriId), false, false)
+    // Angular: registration.service.ts's handleRegistrationSuccess() sets this
+    // right after a successful registration — MatchesScreen's bulkLike()-equivalent
+    // check reads it on the very next Matches load and removes it (one-time use),
+    // so the bulk-like prompt only ever appears once, right after registering.
+    await setItem('bulklikechk', '1')
   }
   return result
 }
@@ -1366,4 +1413,147 @@ export function getMatchedItem(
 ): string {
   return list.find(item => item.KEY === keyToFind)?.VALUE ?? ''
 }
+
+// ─── AI profile validation (webview page_id 61) ────────────────────────────────
+// Angular: webview.page.ts's handleAiProfileValidation() → registration.service.ts's
+// callAiProfileValidation() (GET editprofile/aiprfvalidation/v1) and
+// fetchEditFormValuesForValidation() (refreshes REGISTRATIONVALUES from the
+// member's current saved profile before validation runs). Both are real, wired
+// Angular functions — confirmed by reading registration.service.ts directly;
+// an earlier pass here had wrongly assumed they didn't exist.
+
+// Angular: registration.service.ts's callAiProfileValidation(matriId, type) —
+// params come from the SAME REGISTRATIONVALUES store getRegValues()/setRegValues()
+// already use everywhere else in this file. `type` mirrors Angular's own second
+// arg: webview.page.ts's case 61 calls with type=2 (initial check); the
+// validation screen's own in-place resubmit calls with the default (1).
+export async function callAiProfileValidation(matriId: string, type: number | string = 1): Promise<any> {
+  const rv = await getRegValues()
+  const ipAddress = (await getItem('USERIP')) ?? (await fetchUserIp()) ?? ''
+  const params = [
+    `ID=${matriId}`,
+    `ProfileCreatedBy=${rv.CREATEDBY ?? ''}`,
+    `CountryCode=${rv.COUNTRYCODE ?? ''}`,
+    `Gender=${rv.GENDER ?? ''}`,
+    `Name=${encodeURIComponent(rv.NAME ?? '')}`,
+    `MaritalStatus=${rv.MARITALSTATUS ?? ''}`,
+    `noofchildren=${rv.NOOFCHILD ?? rv.NOOFCHILDREN ?? ''}`,
+    `EatingHabits=${rv.EATINGHABITS ?? ''}`,
+    `physicalstatus=${rv.PHYSICALSTATUS ?? ''}`,
+    `Year=${rv.YEAR ?? ''}`,
+    `Month=${rv.MONTH ?? ''}`,
+    `Date=${rv.DATE ?? ''}`,
+    `Age=${rv.AGE ?? ''}`,
+    `Height=${rv.HEIGHT ?? ''}`,
+    `MotherTongue=${rv.MOTHERTONGUE ?? ''}`,
+    `country=${rv.COUNTRY ?? ''}`,
+    `City=${rv.CITY ?? ''}`,
+    `State=${rv.STATE ?? ''}`,
+    `NativeCountry=${rv.NATIVECOUNTRY ?? ''}`,
+    `NativeState=${rv.NATIVESTATE ?? ''}`,
+    `NativeCity=${rv.NATIVECITY ?? ''}`,
+    `HomeState=${rv.HOMESTATE ?? ''}`,
+    `HomeCity=${rv.HOMECITY ?? ''}`,
+    `Education=${rv.QUALIFICATION ?? ''}`,
+    `Occupation=${rv.OCCUPATION ?? ''}`,
+    `MonthlyIncome=${rv.MONTHLYINCOME ?? ''}`,
+    `IncomeCurrency=${rv.INCOMETYPE ?? ''}`,
+    `Religion=${rv.RELIGION ?? ''}`,
+    `Caste=${rv.CASTE ?? ''}`,
+    `SubCaste=${rv.SUBCASTE ?? ''}`,
+    `Gothram=${rv.GOTHRA ?? ''}`,
+    `IpAddress=${ipAddress}`,
+    `phoneverify=1`,
+    `DEVICEID=`,
+    `TYPE=${type}`,
+  ].join('&')
+  return apiCall(Endpoints.profile.aiValidation, 'GET', params)
+}
+
+// Angular: registration.service.ts's fetchEditFormValuesForValidation() — pulls the
+// member's CURRENT saved profile (the same editprofileinfo API
+// editProfileService.ts's fetchEditProfileInfo() already wraps) and writes it into
+// REGISTRATIONVALUES so callAiProfileValidation()'s params reflect the live
+// profile, not stale onboarding-time values. Field renames match Angular exactly:
+// EDUCATION→QUALIFICATION, GOTHRAM→GOTHRA, NOOFCHILDREN written to both
+// NOOFCHILD and NOOFCHILDREN (Angular reads either depending on call site).
+export async function fetchEditFormValuesForValidation(): Promise<EditProfileInfo | null> {
+  const info = await fetchEditProfileInfo()
+  if (!info) return null
+
+  const loginGender = (await getItem(SK.User.LOGIN_GENDER)) ?? ''
+  let year = '', month = '', date = ''
+  if (info.dateOfBirth && info.dateOfBirth !== '0000-00-00') {
+    const parts = info.dateOfBirth.split('-')
+    year  = parts[0] ?? ''
+    month = parts[1] ? String(Number(parts[1])) : ''
+    date  = parts[2] ? String(Number(parts[2])) : ''
+  }
+
+  await setRegValues({
+    GENDER:        loginGender.toUpperCase() === 'F' ? '0' : '1',
+    CREATEDBY:     info.createdBy ?? '1',
+    NAME:          info.name ?? '',
+    MARITALSTATUS: info.maritalStatus ?? '',
+    NOOFCHILD:     info.noOfChildren ?? '',
+    NOOFCHILDREN:  info.noOfChildren ?? '',
+    RELIGION:      info.religion ?? '',
+    CASTE:         info.caste ?? '',
+    SUBCASTE:      info.subCaste ?? '',
+    GOTHRA:        info.gothram ?? '',
+    MOTHERTONGUE:  info.motherTongue ?? '',
+    QUALIFICATION: info.education ?? '',
+    OCCUPATION:    info.occupation ?? '',
+    MONTHLYINCOME: info.income ?? '',
+    INCOMETYPE:    info.incomeType || 'INR',
+    STATE:         info.state ?? '',
+    CITY:          info.city ?? '',
+    AGE:           info.age ?? '',
+    YEAR:          year,
+    MONTH:         month,
+    DATE:          date,
+  })
+  return info
+}
+
+// Angular: core/config/registration.config.ts's VIOLATIONFIELDMAP — maps the AI
+// response's raw violated-field names onto the canonical field keys
+// shouldShowField() checks against.
+const VIOLATION_FIELD_MAP: Record<string, string> = {
+  NAME: 'NAME',
+  AGE: 'DOB', DOB: 'DOB', MONTH: 'DOB',
+  MARITALSTATUS: 'MARITALSTATUS', MARITALSTATUSFEMALE: 'MARITALSTATUS', MARITALSTATUSMALE: 'MARITALSTATUS',
+  NOOFCHILDREN: 'NOOFCHILDREN',
+  EDUCATION: 'QUALIFICATION',
+  MONTHLYINCOME: 'MONTHLYINCOME',
+  MOTHERTONGUES: 'MOTHERTONGUE', APPTYPE: 'MOTHERTONGUE', DOMAIN: 'MOTHERTONGUE',
+  OCCUPATION: 'OCCUPATION',
+  RELIGION: 'RELIGION',
+  CASTE: 'CASTE',
+  SUBCASTE: 'SUBCASTE',
+  STATE: 'STATE',
+}
+
+// Angular: registration.service.ts's c2ViolationFields() — dedupes and maps the
+// raw VIOLATIONFIELD list (each item either a plain string or {VALUE: '...'})
+// through VIOLATIONFIELDMAP.
+export function mapViolationFields(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return []
+  const mapped = raw
+    .map(field => {
+      const name = (field && typeof field === 'object' ? (field as any).VALUE : field) ?? ''
+      return VIOLATION_FIELD_MAP[String(name).toUpperCase()]
+    })
+    .filter((v): v is string => !!v)
+  return Array.from(new Set(mapped))
+}
+
+// Angular: core/config/registration.config.ts's CONFIRM2_EDITABLE_VIOLATION_FIELDS
+// — fields the confirm2 screen can actually show an editor for. A violation
+// limited to a non-editable field (e.g. NAME) would render an empty page, so
+// callers complete registration instead of showing the screen.
+export const CONFIRM2_EDITABLE_VIOLATION_FIELDS = [
+  'MARITALSTATUS', 'NOOFCHILDREN', 'DOB', 'MOTHERTONGUE', 'STATE', 'CITY',
+  'QUALIFICATION', 'OCCUPATION', 'MONTHLYINCOME', 'RELIGION', 'CASTE', 'SUBCASTE', 'GOTHRA',
+]
 

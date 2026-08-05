@@ -19,6 +19,7 @@ import { apiCall } from '../../service/apiClient'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
 import { getRegValue } from '../../service/registrationService'
+import { deletePhoto, setMainPhoto } from '../../service/profileService'
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
@@ -178,11 +179,7 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
           try {
-            const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-            const res = await apiCall(
-              Endpoints.profile.deletePhoto, 'POST',
-              `ID=${userId}&PHOTOID=${photo.PHOTOID}`,
-            )
+            const res = await deletePhoto(photo.PHOTOID)
             if (res?.RESPONSECODE == 1) await loadPhotos()
           } catch {
             Alert.alert('Error', 'Could not delete photo.')
@@ -196,11 +193,7 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
 
   async function setAsMain(photo: Photo) {
     try {
-      const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-      const res = await apiCall(
-        Endpoints.profile.setMainPhoto, 'POST',
-        `ID=${userId}&PHOTOID=${photo.PHOTOID}`,
-      )
+      const res = await setMainPhoto(photo.PHOTOID)
       if (res?.RESPONSECODE == 1) await loadPhotos()
     } catch {
       Alert.alert('Error', 'Could not set main photo.')

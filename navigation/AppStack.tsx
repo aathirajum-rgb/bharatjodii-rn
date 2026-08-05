@@ -7,7 +7,7 @@ import ButtonRevamp from '../components/button-revamp/ButtonRevamp'
 import { Colors } from '../constants/colors'
 import { StorageKeys } from '../constants/storage.keys'
 import { OnboardingCtx, FooterState, FooterHandlers } from '../contexts/OnboardingContext'
-import { getItem } from '../service/storageService'
+import { getItem, setItem } from '../service/storageService'
 import { useAuth } from '../contexts/AuthContext'
 import { useIsDesktopWeb } from '../hooks/useIsDesktopWeb'
 import ComponentShowcaseScreen    from '../screens/dev/ComponentShowcaseScreen'
@@ -60,7 +60,12 @@ import RechargeScreen              from '../screens/payment/RechargeScreen'
 import type { SelectedPackage }    from '../service/paymentService'
 import PermissionDemoScreen        from '../screens/PermissionDemoScreen'
 import MatchesScreen               from '../screens/matches/MatchesScreen'
+import DailyRecommendationScreen   from '../screens/daily-recommendation/DailyRecommendationScreen'
 import ViewProfileScreen           from '../screens/viewprofile/ViewProfileScreen'
+import BlockerScreen               from '../screens/verify/BlockerScreen'
+import ValidationScreen            from '../screens/validation/ValidationScreen'
+import DiscoverMatchesScreen       from '../screens/discover-matches/DiscoverMatchesScreen'
+import AddPhotoIntermediateScreen  from '../screens/addphoto-intermediate/AddPhotoIntermediateScreen'
 import StarMatchingScreen          from '../screens/star-matching/StarMatchingScreen'
 import ActivityScreen               from '../screens/activity/ActivityScreen'
 import MessagerListScreen           from '../screens/messagerList/MessagerListScreen'
@@ -89,6 +94,9 @@ import BasicDetailsScreen                   from '../screens/edit-profile/BasicD
 import LifestyleDetailsScreen               from '../screens/edit-profile/LifestyleDetailsScreen'
 import FamilyDetailsEditScreen               from '../screens/edit-profile/FamilyDetailsScreen'
 import PropertyDetailsEditScreen             from '../screens/edit-profile/PropertyDetailsScreen'
+import EditProfileAgeHeightScreen           from '../screens/edit-profile/EditProfileAgeHeightScreen'
+import EditProfileMaritalScreen             from '../screens/edit-profile/EditProfileMaritalScreen'
+import AddHoroscopeScreen                   from '../screens/edit-profile/AddHoroscopeScreen'
 import ExternalPageScreen                  from '../screens/external-page/ExternalPageScreen'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -158,6 +166,9 @@ export type AppStackParamList = {
   EditProfileLifestyle: undefined
   EditProfileFamily: undefined
   EditProfileProperty: undefined
+  EditProfileAgeHeight: undefined
+  EditProfileMarital: undefined
+  EditProfileHoroscope: undefined
   'payment-options': { selectedPackage?: SelectedPackage; amountLabel?: string; preselectedMethod?: string } | undefined
   'card-payment': { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
   'upi-address':  { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
@@ -180,6 +191,21 @@ export type AppStackParamList = {
   // Angular: viewprofile.page.ts route params (:module/:id) — fromPage drives the
   // "from" context communicationBtnOnClick needs for its paywall/report-popup logic.
   viewProfile: { matriId: string; fromPage: string; showRating?: boolean; profileIds?: string[] } | undefined
+  // Angular: drService.ts's loadDrProfiles() → router.navigate(['dailyrecommendations'],
+  // { queryParams: { frm_page } }) — frm_page drives DailyRecommendationScreen's
+  // own end-of-list auto-navigate destination (navigatteToPaywall()).
+  'daily-recommendations': { frm_page?: string } | undefined
+  // Angular: pages/addphoto-intermediate/:page — webview.page.ts's page_id "23"
+  // (CONGRATS) plus drService.ts's handleAfterDr() cases 27/59/60 (ADDPHOTO/
+  // ADDPHOTOPUBLISH).
+  'addphoto-intermediate': { page?: string } | undefined
+  // Angular: pages/blockerpage — webview.page.ts's page_id "51" (fraud blocker)
+  BlockerPage: undefined
+  // Angular: components/validation — webview.page.ts's page_id "61" (AI profile
+  // validation confirm2 screen)
+  Validation: undefined
+  // Angular: pages/discover-matches — webview.page.ts's page_id "55"
+  DiscoverMatches: undefined
   // Angular: redirectiontoStarMatchReport() passes the already-fetched result via
   // router state to skip a redundant API call — same idea here via route params.
   // `data` is the raw starmatch API REPONSE (COMPATIBILITY/SUMMARY/USERPROFILE/
@@ -239,6 +265,18 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
   // own visual footer state via useOnboardingFooter on mount.
   useEffect(() => {
     handlers.current = { onNext: () => {} }
+  }, [pageNo])
+
+  // Angular: dozens of screens scattered across registration.page.ts/
+  // registration-revamp.component.ts/form-fields.component.ts each call
+  // setStorageValue('REGISTERURL', nextPage) at their own step transition, so
+  // that pageLandingService.ts's case "1" (goToRegistrationPage) can resume an
+  // abandoned registration at the right step on the next autologin. Since RN's
+  // whole wizard is this one parameterized route, one central write here
+  // covers every step instead of touching each screen file. Cleared on actual
+  // completion in HomeScreen.tsx (every onboarding exit path funnels there).
+  useEffect(() => {
+    setItem('REGISTERURL', pageNo)
   }, [pageNo])
 
   const setFooterState = useCallback((s: FooterState) => {
@@ -434,7 +472,20 @@ export default function AppStack() {
       initialRouteName={initialRoute}
     >
       <Stack.Screen name="Matches"   component={MatchesScreen} />
+      <Stack.Screen name="daily-recommendations" component={DailyRecommendationScreen} />
       <Stack.Screen name="viewProfile" component={ViewProfileScreen} />
+      <Stack.Screen
+        name="BlockerPage"
+        component={BlockerScreen}
+        options={{ gestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="Validation"
+        component={ValidationScreen}
+        options={{ gestureEnabled: false }}
+      />
+      <Stack.Screen name="DiscoverMatches" component={DiscoverMatchesScreen} />
+      <Stack.Screen name="addphoto-intermediate" component={AddPhotoIntermediateScreen} />
       <Stack.Screen name="star-matching" component={StarMatchingScreen} />
       <Stack.Screen name="Home"      component={HomeScreen} />
       <Stack.Screen name="dashboard" component={HomeScreen} />
@@ -492,6 +543,9 @@ export default function AppStack() {
       <Stack.Screen name="EditProfileLifestyle" component={LifestyleDetailsScreen} />
       <Stack.Screen name="EditProfileFamily" component={FamilyDetailsEditScreen} />
       <Stack.Screen name="EditProfileProperty" component={PropertyDetailsEditScreen} />
+      <Stack.Screen name="EditProfileAgeHeight" component={EditProfileAgeHeightScreen} />
+      <Stack.Screen name="EditProfileMarital" component={EditProfileMaritalScreen} />
+      <Stack.Screen name="EditProfileHoroscope" component={AddHoroscopeScreen} />
       <Stack.Screen name="ExternalPage" component={ExternalPageScreen} />
       <Stack.Screen
         name="ComponentShowcase"

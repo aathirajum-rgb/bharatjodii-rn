@@ -66,7 +66,7 @@ export async function updateDrProfiles(oppositeId: string): Promise<void> {
 export async function loadDrProfiles(
   userId: string,
   fromPage = '',
-  fallback = ENavigation.MATCHES,
+  fallback: string = ENavigation.MATCHES,
 ): Promise<void> {
   if (!userId) {
     resetTo(fallback)
@@ -81,7 +81,21 @@ export async function loadDrProfiles(
     const shown = await getItem('showDRSwipes')
     if (!shown) await setItem('showDRSwipes', '1')
 
-    navigate(ENavigation.DAILY_RECOMMENDATIONS, { frm_page: fromPage === 'login' ? 'login' : 'matches' })
+    // Angular: router.navigate(['dailyrecommendations'], {..., replaceUrl: true})
+    resetTo(ENavigation.DAILY_RECOMMENDATIONS, { frm_page: fromPage === 'login' ? 'login' : 'matches' })
+    return
+  }
+
+  // Angular: dr.service.ts's loadDrProfiles() — when frmPage=='login' (the
+  // landingPageHandle()-driven cases: page_ids 5/7/24/27/28/57/59/60) and
+  // there are literally zero DR profiles today, it doesn't just fall back to
+  // Matches — it calls handleAfterDr(LANDPAGEID) for a further per-page_id
+  // redirect. pageId comes from storage (set by pageLandingService.ts before
+  // calling here), matching Angular's own localStorage read rather than a
+  // threaded parameter.
+  if (fromPage === 'login') {
+    const pageId = (await getItem('LANDPAGEID')) ?? ''
+    await handleAfterDr(pageId)
     return
   }
 
@@ -110,7 +124,7 @@ export async function handleAfterDr(pageId: string | number): Promise<void> {
       navigate(ENavigation.EDIT_FORM, { pageNo: 20, source: 'pushnotify' })
       break
     case '27':
-      navigate(ENavigation.ADD_PHOTO_INTERMEDIATE)
+      navigate(ENavigation.ADD_PHOTO_INTERMEDIATE, { page: 'ADDPHOTO' })
       break
     case '28':
     case '32':
@@ -121,7 +135,7 @@ export async function handleAfterDr(pageId: string | number): Promise<void> {
       break
     case '59':
     case '60':
-      navigate(ENavigation.ADD_PHOTO_PUBLISH)
+      navigate(ENavigation.ADD_PHOTO_INTERMEDIATE, { page: 'ADDPHOTOPUBLISH' })
       break
     default:
       navigate(ENavigation.MATCHES)

@@ -66,6 +66,13 @@ export type CommActionResult =
   | { type: 'fup_limit'; header: string; body: string; cta: string; cta1: string } // ERRCODE:12
   | { type: 'profile_validation'; title: string; content: string; cta: string; image?: string | undefined } // RESPONSECODE:1,ERRCODE:13
   | { type: 'phone_number_left'; profile: any } // RESPONSECODE:3 — renewal/upgrade sub-flow, not yet built (see showContactDetails)
+  // Angular communication.service.ts's afterHttpServiceResponse() ERRCODE:11 branch,
+  // 'like' action only — daily like-limit reached (CONFIG.DAILYLIMITREACHCONFIG).
+  // Angular emits onLimitExceedPopupClosed IMMEDIATELY here (not on sheet dismiss) so
+  // daily-recommendation.component.ts's restoreDRCard() puts the swiped card straight
+  // back — callers should restore optimistic UI as soon as this result comes back,
+  // not wait for the limitReachInfo sheet's own dismiss.
+  | { type: 'like_limit_exceeded'; body?: string | undefined }
   | { type: 'error';             message: string }
 
 export type CommunicationAction =
@@ -485,6 +492,15 @@ async function callHttpAction(
   const msg = result?.RESPONSE?.MSG ?? result?.MSG
   if (result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1) {
     return { type: 'api_success', data: result.RESPONSE, action, message: msg ? String(msg) : undefined }
+  }
+  // Angular communication.service.ts:492-505 — ERRCODE:11 is checked BEFORE the
+  // generic message fallback, and only 'like' shows the daily-limit sheet (any
+  // other action with ERRCODE:11 falls through to Angular's generic
+  // limitExceedPopup(), which this port doesn't need since only 'like' is
+  // reachable via this function's own callers for that scenario today).
+  if (action === 'like' && String(result?.ERRCODE ?? '') === '11') {
+    const body = result?.BODY ?? result?.RESPONSE?.BODY
+    return { type: 'like_limit_exceeded', body: body ? String(body).replace('<br>', '') : undefined }
   }
   return { type: 'error', message: msg ? String(msg) : 'Action failed' }
 }

@@ -12,6 +12,7 @@ import { Text, View, StyleSheet } from 'react-native'
 import OnboardingDesktopLayout, { DesktopSectionTitle } from './OnboardingDesktopLayout'
 import DesktopSelectField, { type SelectOption } from '../../components/desktop-select-field/DesktopSelectField'
 import {
+  CHILDREN_OPTIONS,
   fetchCasteOptions, fetchGenderOptions,
   fetchGothraOptions, fetchHeightCategoryOptions, fetchMaritalStatusOptions, fetchMotherTongueOptions,
   fetchReligionOptions, fetchSubcasteOptions, getNextPageAfterCaste, getRegValues, loadAndStoreStatesForMotherTongue,
@@ -41,12 +42,6 @@ function buildDays(month: string, year: string): SelectOption[] {
 function stripHtml(raw: string): string {
   return raw.replace(/<[^>]+>/g, '').trim()
 }
-// Angular form-fields — no dedicated options endpoint for this field, same
-// small closed set every marital-status-history flow uses.
-const CHILDREN_OPTIONS: SelectOption[] = [
-  { key: '1', label: '1 child' }, { key: '2', label: '2 children' },
-  { key: '3', label: '3 children' }, { key: '4', label: '4+ children' },
-]
 const YEARS = buildYears()
 
 type Props = { navigation: any }

@@ -6,24 +6,24 @@
 // its own Submit) → a picker reusing onboarding's SearchablePicker/
 // MultiSelectPicker components.
 //
-// Scope of THIS file: layout + read-only display only. Row taps currently stub
-// with "Coming soon" (matching MenuScreen's established convention for
-// not-yet-built destinations) — the group screens are being built one at a
-// time as a follow-up, per plan.
+// Photo management delegates to screens/onboarding/ManagePhotosScreen.tsx
+// (onboarding page 21, entered `standalone` — the exact mechanism
+// HelpCenterScreen.tsx already uses to open it from outside the onboarding
+// wizard) rather than rebuilding add/delete/set-main here — that screen
+// already has a real, working implementation.
 //
-// Known gaps, flagged rather than silently worked around:
-//  - Jodii ID / "Profile created by" / Mobile number rows exist in Angular but
-//    were not visible in the Figma frame — omitted until confirmed.
-//  - Drinking/Smoking habits have no option-fetching function anywhere in this
-//    app yet (only Eating habits does) — their raw stored value is shown as-is
-//    rather than resolved to a label, since there's nothing to resolve against.
-//  - Photo grid is display-only here — add/reorder/privacy interactions are a
-//    separate, later step.
+// Jodii ID / Profile created by / Mobile number are display-only, no
+// navigation — matches Angular exactly (Profile created by's click handler is
+// commented out there too; Jodii ID and Mobile number never had one).
+//
+// Drinking/Smoking habits have no option-fetching function anywhere in this
+// app yet (only Eating habits does) — their raw stored value is shown as-is
+// rather than resolved to a label, since there's nothing to resolve against.
 
 import { useCallback, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -35,18 +35,38 @@ import { getItem } from '../../service/storageService'
 import { managePhotos } from '../../service/profileService'
 import { fetchEditProfileInfo, type EditProfileInfo } from '../../service/editProfileService'
 import {
+  CHILDREN_OPTIONS,
   fetchReligionOptions, fetchCasteOptions, fetchOccupationOptions,
   fetchQualificationOptions, fetchMotherTongueOptions,
   fetchEatingHabitOptions, fetchRaasiOptions,
   fetchStarOptions, fetchMonthlyIncomeOptions, fetchPropertyOptions,
-  fetchStates, fetchCities,
+  fetchStates, fetchCities, fetchHeightCategoryOptions,
+  fetchMaritalStatusOptions, fetchPhysicalStatusOptions, fetchProfileCreatedByOptions,
 } from '../../service/registrationService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import PhotoPrivacySheet from '../../components/photo-privacy/PhotoPrivacySheet'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import EditProfileDesktopScreen from './EditProfileDesktopScreen'
 
 const ICON_BACK  = CDN_REACT + '/menu_back_arrow.svg'
 const ICON_ARROW = CDN_REACT + '/menu_right_arrow.svg'
+
+// Photo mosaic (Figma node 2192-9135) — 1 large tile (spans 2x2 of the small-
+// tile grid) + 5 small tiles: two stacked to its right, three in a row below.
+// Matches Angular's 6-slot photo grid exactly (slot 0 = main/profile photo).
+const MOSAIC_TILE = 98
+const MOSAIC_GAP  = 8
+const MOSAIC_MAIN = MOSAIC_TILE * 2 + MOSAIC_GAP // 204
+const PHOTO_GRID_SLOTS = 6
+
+function photoSlotPosition(i: number): { left: number; top: number } {
+  if (i === 0) return { left: 0, top: 0 }
+  if (i === 1) return { left: MOSAIC_MAIN + MOSAIC_GAP, top: 0 }
+  if (i === 2) return { left: MOSAIC_MAIN + MOSAIC_GAP, top: MOSAIC_TILE + MOSAIC_GAP }
+  if (i === 3) return { left: 0, top: MOSAIC_MAIN + MOSAIC_GAP }
+  if (i === 4) return { left: MOSAIC_TILE + MOSAIC_GAP, top: MOSAIC_MAIN + MOSAIC_GAP }
+  return { left: MOSAIC_MAIN + MOSAIC_GAP, top: MOSAIC_MAIN + MOSAIC_GAP }
+}
 
 type Props = { navigation: any }
 
@@ -66,13 +86,17 @@ function labelsFor(list: Opt[], codes: string[] | undefined): string | undefined
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
 function FieldRow({
-  label, value, missingText, onPress, showDivider,
+  label, value, missingText, onPress, showDivider, hideArrow,
 }: {
   label: string
   value?: string | undefined
   missingText?: string | undefined
   onPress: () => void
   showDivider?: boolean | undefined
+  // Display-only rows (Jodii ID, Profile created by, Mobile number — none of
+  // which Angular makes editable either) — no chevron, so the row doesn't
+  // look like a dead tap target.
+  hideArrow?: boolean | undefined
 }) {
   const isMissing = !value && !!missingText
   return (
@@ -89,7 +113,7 @@ function FieldRow({
             <Text style={r.rowValue} numberOfLines={2}>{value ?? '—'}</Text>
           )}
         </View>
-        <CdnSvg uri={ICON_ARROW} width={16} height={16} />
+        {!hideArrow && <CdnSvg uri={ICON_ARROW} width={16} height={16} />}
       </Pressable>
       {showDivider && <View style={r.rowDivider} />}
     </>
@@ -117,6 +141,8 @@ export default function EditProfileScreen({ navigation }: Props) {
   const [photos,  setPhotos]    = useState<any[]>([])
   const [labels,  setLabels]    = useState<Record<string, Opt[]>>({})
   const [ownId,   setOwnId]     = useState('')
+  const [createdByLabel, setCreatedByLabel] = useState<string | undefined>(undefined)
+  const [photoPrivacyVisible, setPhotoPrivacyVisible] = useState(false)
 
   const load = useCallback(async () => {
     const [id, info, photoData] = await Promise.all([
@@ -130,9 +156,12 @@ export default function EditProfileScreen({ navigation }: Props) {
 
     if (!info) { setLoading(false); return }
 
+    const gender = info.gender ?? (await getItem(SK.User.LOGIN_GENDER)) ?? '1'
+
     const [
       religion, occupation, education, motherTongue,
       eatingHabit, raasi, income, property, states,
+      heightCategory, maritalStatus, physicalStatus, createdByList,
     ] = await Promise.all([
       fetchReligionOptions(),
       fetchOccupationOptions(),
@@ -143,6 +172,10 @@ export default function EditProfileScreen({ navigation }: Props) {
       fetchMonthlyIncomeOptions(),
       fetchPropertyOptions(),
       fetchStates(),
+      fetchHeightCategoryOptions(gender),
+      fetchMaritalStatusOptions(gender),
+      fetchPhysicalStatusOptions(),
+      fetchProfileCreatedByOptions(),
     ])
 
     const [caste, star, cities, homeCities] = await Promise.all([
@@ -156,14 +189,16 @@ export default function EditProfileScreen({ navigation }: Props) {
       religion, occupation, education, motherTongue,
       eatingHabit, raasi, income, property, states,
       caste, star, cities, homeCities,
+      heightCategory, maritalStatus, physicalStatus,
     })
+    setCreatedByLabel(createdByList.find(o => o.key === info.createdBy)?.label)
     setLoading(false)
   }, [])
 
   useFocusEffect(useCallback(() => { load() }, [load]))
 
-  function stub(label: string) {
-    Alert.alert(label, 'Coming soon')
+  function openManagePhotos() {
+    navigation.navigate('onboarding', { pageNo: '21', standalone: true })
   }
 
   function openPreview() {
@@ -187,6 +222,15 @@ export default function EditProfileScreen({ navigation }: Props) {
   const propertiesLabel = labelsFor(labels.property ?? [], profile.properties)
   const vehiclesLabel   = labelsFor(labels.property ?? [], profile.vehicles)
 
+  // Angular: HEIGHTCATEGORY in 101-104 shows the bucket label; otherwise the
+  // exact height (VIEWHEIGHT) is shown as-is. Category labels carry raw HTML
+  // from the API (same quirk HeightScreen.tsx strips) — strip it here too.
+  const heightCategoryLabel = profile.heightCategory
+    ? labelFor(labels.heightCategory ?? [], profile.heightCategory)?.replace(/<[^>]+>/g, '').trim()
+    : undefined
+  const heightLabel = heightCategoryLabel ?? profile.height
+  const childrenVisible = !!profile.maritalStatus && profile.maritalStatus !== '1'
+
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
@@ -201,30 +245,80 @@ export default function EditProfileScreen({ navigation }: Props) {
         {/* ── Photo ── */}
         <View style={s.photoHeaderRow}>
           <Text style={s.sectionTitle}>{t('EDITPROFILE.PHOTOS')}</Text>
-          <Pressable onPress={() => stub('Photo privacy')} hitSlop={8}>
+          <Pressable
+            onPress={() => (photos.length > 0 ? setPhotoPrivacyVisible(true) : openManagePhotos())}
+            hitSlop={8}
+          >
             <Text style={s.photoPrivacyLink}>{t('EDITPROFILE.PHOTO_PRIVACY')}</Text>
           </Pressable>
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={s.photoRow} contentContainerStyle={{ gap: 8 }}>
-          {photos.map((p, i) => (
-            <Pressable key={i} onPress={() => stub('Manage photo')}>
-              <Image source={{ uri: p.PHOTOTHUMB || p.PHOTOURL }} style={s.photoThumb} contentFit="cover" />
-            </Pressable>
-          ))}
-          <Pressable style={s.photoAddSlot} onPress={() => stub('Add photo')}>
-            <Text style={s.photoAddPlus}>+</Text>
-          </Pressable>
-        </ScrollView>
+
+        {/* Figma node 2192-9135: a fixed 1-large + 5-small mosaic (matches
+            Angular's 6-slot photo grid), not a horizontal scroll of equal
+            tiles. Main tile spans 2x2 of the small-tile grid; every empty
+            slot (not just the last one) is its own add-photo trigger. */}
+        <View style={s.photoGrid}>
+          {Array.from({ length: PHOTO_GRID_SLOTS }, (_, i) => {
+            const photo = photos[i]
+            const pos = photoSlotPosition(i)
+            const size = i === 0 ? MOSAIC_MAIN : MOSAIC_TILE
+            if (photo) {
+              return (
+                <Pressable key={i} style={[s.photoTile, i === 0 && s.photoTileMain, pos, { width: size, height: size }]} onPress={openManagePhotos}>
+                  <Image source={{ uri: photo.PHOTOTHUMB || photo.PHOTOURL }} style={s.photoTileImg} contentFit="cover" />
+                  {i === 0 && (
+                    <View style={s.mainPhotoBadge}>
+                      <Text style={s.mainPhotoBadgeText}>{t('EDITPROFILE.PROFILE_PHOTO')}</Text>
+                    </View>
+                  )}
+                </Pressable>
+              )
+            }
+            return (
+              <Pressable key={i} style={[s.photoAddSlot, pos, { width: size, height: size }]} onPress={openManagePhotos}>
+                <View style={s.photoAddCircle}>
+                  <Text style={s.photoAddPlus}>+</Text>
+                </View>
+              </Pressable>
+            )
+          })}
+        </View>
         <Text style={s.photoHint}>{t('EDITPROFILE.DRAG_PHOTO')}</Text>
 
         {/* ── Basic details ── */}
         <Section title={t('EDITPROFILE.BASIC_DETAILS')}>
+          <FieldRow label={t('EDITPROFILE.JODIIID')} value={ownId} onPress={() => {}} hideArrow showDivider />
+          <FieldRow label={t('EDITPROFILE.CREATEDFOR')} value={createdByLabel} onPress={() => {}} hideArrow showDivider />
           <FieldRow label={t('EDITPROFILE.NAME')} value={profile.name} onPress={() => navigation.navigate('EditProfileBasic')} showDivider />
-          <FieldRow label={t('EDITPROFILE.AGE')} value={profile.age ? `${profile.age} years old` : undefined} onPress={() => stub('Age')} showDivider />
-          <FieldRow label={t('EDITPROFILE.HEIGHT')} value={profile.heightCategory ?? profile.height} onPress={() => stub('Height')} showDivider />
+          <FieldRow label={t('EDITPROFILE.AGE')} value={profile.age ? `${profile.age} years old` : undefined} onPress={() => navigation.navigate('EditProfileAgeHeight')} showDivider />
+          <FieldRow label={t('EDITPROFILE.HEIGHT')} value={heightLabel} onPress={() => navigation.navigate('EditProfileAgeHeight')} showDivider />
+          <FieldRow
+            label={t('EDITPROFILE.MARITALSTATUS')}
+            value={labelFor(labels.maritalStatus ?? [], profile.maritalStatus)}
+            missingText={t('EDITPROFILE.ADD_DETAILS_TXT')}
+            onPress={() => navigation.navigate('EditProfileMarital')}
+            showDivider
+          />
+          {childrenVisible && (
+            <FieldRow
+              label={t('EDITPROFILE.CHILDREN')}
+              value={labelFor(CHILDREN_OPTIONS, profile.noOfChildren)}
+              missingText={t('EDITPROFILE.ADD_DETAILS_TXT')}
+              onPress={() => navigation.navigate('EditProfileMarital')}
+              showDivider
+            />
+          )}
+          <FieldRow
+            label={t('EDITPROFILE.PHYSICALSTATUS')}
+            value={labelFor(labels.physicalStatus ?? [], profile.physicalStatus)}
+            missingText={t('EDITPROFILE.ADD_DETAILS_TXT')}
+            onPress={() => navigation.navigate('EditProfileMarital')}
+            showDivider
+          />
           <FieldRow label={t('EDITPROFILE.MOTHERTONGUE')} value={labelFor(labels.motherTongue ?? [], profile.motherTongue)} onPress={() => navigation.navigate('EditProfileBasic')} showDivider />
           <FieldRow label={t('EDITPROFILE.CURRENT_LOCATION')} value={cityLabel} onPress={() => navigation.navigate('EditProfileBasic')} showDivider />
-          <FieldRow label={t('EDITPROFILE.NATIVE_PLACE')} value={homeCityLabel} onPress={() => navigation.navigate('EditProfileBasic')} />
+          <FieldRow label={t('EDITPROFILE.NATIVE_PLACE')} value={homeCityLabel} onPress={() => navigation.navigate('EditProfileBasic')} showDivider />
+          <FieldRow label={t('EDITPROFILE.MOBILENO')} value={profile.mobileNo} onPress={() => {}} hideArrow />
         </Section>
 
         {/* ── Professional details ── */}
@@ -261,9 +355,12 @@ export default function EditProfileScreen({ navigation }: Props) {
           />
           <FieldRow
             label={t('EDITPROFILE.HOROSCOPE')}
-            value={profile.horoscopeAvailable ? t('EDITPROFILE.ADDEDON') : undefined}
+            value={profile.horoscopeAvailable
+              ? `${t('EDITPROFILE.ADDEDON')}${profile.horoInfo?.birthDay ? ` ${profile.horoInfo.birthDay}` : ''}`
+              : undefined}
             missingText={t('EDITPROFILE.ADDYOURHORO')}
-            onPress={() => stub('Horoscope')}
+            onPress={() => !profile.horoscopeAvailable && navigation.navigate('EditProfileHoroscope')}
+            hideArrow={!!profile.horoscopeAvailable}
           />
         </Section>
 
@@ -302,6 +399,11 @@ export default function EditProfileScreen({ navigation }: Props) {
           <Text style={s.previewBtnText}>{t('EDITPROFILE.PREVIEW')}</Text>
         </Pressable>
       </View>
+
+      <PhotoPrivacySheet
+        visible={photoPrivacyVisible}
+        onClose={() => setPhotoPrivacyVisible(false)}
+      />
     </View>
   )
 }
@@ -323,13 +425,37 @@ const s = StyleSheet.create({
 
   photoHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   photoPrivacyLink: { fontSize: 14, color: Colors.link, textDecorationLine: 'underline' },
-  photoRow: { marginTop: 16 },
-  photoThumb: { width: 98, height: 98, borderRadius: 8, backgroundColor: Colors.surfaceDim },
+
+  // Fixed-size mosaic — width/height match the 3-col/3-row tile grid exactly
+  // (3 tiles + 2 gaps = 310), so absolutely-positioned children line up.
+  photoGrid: {
+    marginTop: 16,
+    width: MOSAIC_MAIN + MOSAIC_GAP + MOSAIC_TILE,
+    height: MOSAIC_MAIN + MOSAIC_GAP + MOSAIC_TILE,
+  },
+  photoTile: {
+    position: 'absolute', borderRadius: 8, overflow: 'hidden', backgroundColor: Colors.surfaceDim,
+  },
+  // Only the main/profile tile (slot 0) gets the red border in Figma —
+  // small tiles are plain rounded photos.
+  photoTileMain: { borderWidth: 2, borderColor: Colors.primaryDark },
+  photoTileImg: { width: '100%', height: '100%' },
+  mainPhotoBadge: {
+    position: 'absolute', left: 0, bottom: 0, backgroundColor: Colors.primaryDark,
+    paddingHorizontal: 8, paddingVertical: 4, borderTopRightRadius: 16, borderBottomLeftRadius: 8,
+  },
+  mainPhotoBadgeText: { fontSize: 12, fontWeight: '500', color: Colors.white, textTransform: 'capitalize' },
+
   photoAddSlot: {
-    width: 98, height: 98, borderRadius: 8, borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.borderSubtle,
+    position: 'absolute', borderRadius: 8, borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.borderSubtle,
     backgroundColor: 'rgba(230,230,230,0.3)', alignItems: 'center', justifyContent: 'center',
   },
-  photoAddPlus: { fontSize: 28, color: Colors.textTertiary },
+  photoAddCircle: {
+    width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.textTertiary,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  photoAddPlus: { fontSize: 18, fontWeight: '600', color: Colors.white, lineHeight: 20 },
+
   photoHint: { fontSize: 12, color: '#585858', marginTop: 8 },
 
   section: { marginTop: 24 },

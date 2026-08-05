@@ -67,7 +67,8 @@ import { shouldShowRatingPopup, markRatingPopupShown } from '../../service/appRa
 import { requestPushNotificationPermission } from '../../service/permissionService'
 import { fetchSurveyPopup, type SurveyPopupData } from '../../service/surveyService'
 import { subscribeIdVerified } from '../../service/eventBus'
-import { getItem, setItem, getJson } from '../../service/storageService'
+import { getItem, setItem, getJson, removeItem } from '../../service/storageService'
+import { enablePaywall } from '../../service/payWallService'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
 import { StorageKeys } from '../../constants/storage.keys'
 import Constants from 'expo-constants'
@@ -1028,6 +1029,11 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         setFacets(result.facets ?? [])
         apiStartRef.current = result.items.length  // cursor for next page
 
+        // Angular: bulkLike() reads/consumes 'bulklikechk' (set once, right after
+        // registration, by registrationService.ts's submitFullRegistration()) —
+        // only THIS check fetches matches / shows the modal, not every load.
+        const bulkLikeArmed = (await getItem('bulklikechk')) === '1'
+
         // Step 3 — Angular: parallel post-matches calls
         // newcount + extendedmatches + ppSetData + dailyRecommendations + menuPromo
         const [extCount, , promo, bulkLikeResult] = await Promise.all([
@@ -1185,19 +1191,27 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             }
           }),
           fetchMenuPromo(),
-          fetchBulkLikeMatches(),
+          bulkLikeArmed ? fetchBulkLikeMatches() : Promise.resolve([]),
         ])
-        // Angular: bulkLike() — show the modal once, only when there are
-        // enough candidates and enough total matches (matches.page.ts:3204).
-        const bulkLikeShown = includePopups && bulkLikeResult.length >= 4 && result.totalCount >= 20
 
         if (!ctrl.cancelled) {
           setExtendedCount(extCount)
           if (promo) setMenuPromo(promo)
-          if (bulkLikeShown) {
+        }
+
+        // Angular: bulkLike() — checked on every ionViewDidEnter(), but the
+        // 'bulklikechk' flag is consumed (removed) here regardless of outcome,
+        // so in practice this only ever fires once, right after registration.
+        let bulkLikeShown = false
+        if (bulkLikeArmed) {
+          if (!ctrl.cancelled && bulkLikeResult.length >= 4 && result.totalCount >= 20) {
             setBulkLikeCandidates(bulkLikeResult)
             setShowBulkLike(true)
+            bulkLikeShown = true
+          } else if (!ctrl.cancelled) {
+            enablePaywall().catch(() => {})
           }
+          await removeItem('bulklikechk')
         }
 
         // One-time popups/stickies (rating, survey, notification-permission, payment-failed) —

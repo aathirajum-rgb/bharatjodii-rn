@@ -26,7 +26,7 @@ import StickyBanner from '../../components/sticky-banner/StickyBanner'
 import { paymentTrack, getHeroBannerDetails, getMenuPromo, redirectToIntermediatePage } from '../../service/paymentService'
 import { communicationBtnOnClick } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
-import { getItem, setItem } from '../../service/storageService'
+import { getItem, setItem, removeItem } from '../../service/storageService'
 import { getRegistrationArrays } from '../../service/registrationService'
 import { logScreen } from '../../service/analyticsService'
 import { socketConnection, emitNotificationDetails, onNotificationList } from '../../service/socketService'
@@ -763,6 +763,14 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       return () => { ctrl.cancelled = true }
     }, [loadHome])
   )
+
+  // Angular: registration.service.ts's navigateToMatches() — clears REGISTERURL
+  // once the user has genuinely reached Home, the one place every onboarding
+  // exit path (mobile DoshamScreen.tsx, desktop OtherDetailsDesktopStep.tsx)
+  // funnels through. Harmless no-op if the key was never set (returning user).
+  useEffect(() => {
+    removeItem('REGISTERURL')
+  }, [])
 
   // Angular: changeLanguage() (explore.component.ts) — switching language tears
   // down and rebuilds the whole page so every server-rendered string re-fetches

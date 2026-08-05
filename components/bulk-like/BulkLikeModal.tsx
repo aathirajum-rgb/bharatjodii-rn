@@ -9,9 +9,11 @@
 // - Skips the 3-way post-submit bottom-sheet branching (plain success /
 //   male-photo-upsell / skip-with-continue-prompt) — this shows a lightweight
 //   inline confirmation instead, then closes.
-// - Skips the localStorage 'bulklikechk' trigger flag (origin not found
-//   anywhere in this app) — MatchesScreen shows this once per mount instead,
-//   gated only on the candidate-count condition.
+// - The 'bulklikechk' trigger flag (Angular: registration.service.ts's
+//   handleRegistrationSuccess(), set once right after registration) is now
+//   wired: registrationService.ts's submitFullRegistration() sets it, and
+//   MatchesScreen.tsx's load effect reads/consumes it — so this only shows
+//   once, right after registering, not on every Matches mount.
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native'

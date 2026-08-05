@@ -26,7 +26,7 @@ import { fetchEditProfileInfo } from '../../service/editProfileService'
 import { submitFieldChanges, type FieldChange } from '../../service/editProfileService'
 import {
   fetchReligionOptions, fetchCasteOptions, fetchRaasiOptions,
-  fetchStarOptions, fetchDoshamOptions,
+  fetchStarOptions, fetchDoshamOptions, fetchGothraOptions, isGothraApplicableForCaste,
 } from '../../service/registrationService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import SelectField from '../../components/input/SelectField'
@@ -35,7 +35,7 @@ import SearchablePicker, { type PickerOption } from '../../components/searchable
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
 type Props = { navigation: any }
-type Picker = 'religion' | 'caste' | 'raasi' | 'star' | 'doshamYesNo' | 'doshamType' | null
+type Picker = 'religion' | 'caste' | 'gothram' | 'raasi' | 'star' | 'doshamYesNo' | 'doshamType' | null
 
 export default function ReligiousDetailsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
@@ -47,14 +47,20 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
 
   const [religion, setReligion]         = useState<PickerOption | null>(null)
   const [caste, setCaste]               = useState<PickerOption | null>(null)
+  const [gothram, setGothram]           = useState<PickerOption | null>(null)
+  const [showGothra, setShowGothra]     = useState(false)
   const [raasi, setRaasi]               = useState<PickerOption | null>(null)
   const [star, setStar]                 = useState<PickerOption | null>(null)
   const [doshamYesNo, setDoshamYesNo]   = useState<PickerOption | null>(null)
   const [doshamType, setDoshamType]     = useState<PickerOption | null>(null)
 
+  const [religionEditable, setReligionEditable] = useState(true)
+  const [casteEditable, setCasteEditable]       = useState(true)
+
   const [original, setOriginal] = useState<{
     religion?: string | undefined
     caste?:    string | undefined
+    gothram?:  string | undefined
     raasi?:    string | undefined
     star?:     string | undefined
     dosham?:   string | undefined
@@ -62,6 +68,7 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
 
   const [religionOptions, setReligionOptions]     = useState<PickerOption[]>([])
   const [casteOptions, setCasteOptions]           = useState<PickerOption[]>([])
+  const [gothramOptions, setGothramOptions]       = useState<PickerOption[]>([])
   const [raasiOptions, setRaasiOptions]           = useState<PickerOption[]>([])
   const [starOptions, setStarOptions]             = useState<PickerOption[]>([])
   const [doshamYesNoOptions, setDoshamYesNoOptions] = useState<PickerOption[]>([])
@@ -75,9 +82,12 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
     if (!info) { setLoading(false); return }
 
     setMotherTongue(info.motherTongue ?? '')
+    setReligionEditable(info.religionEditable)
+    setCasteEditable(info.casteEditable)
     setOriginal({
       religion: info.religion,
       caste:    info.caste,
+      gothram:  info.gothram,
       raasi:    info.raasi,
       star:     info.star,
       dosham:   info.doshamType?.[0] ?? info.dosham,
@@ -101,6 +111,16 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
     setCaste(casteList.find(o => o.key === info.caste) ?? null)
     setStar(starList.find(o => o.key === info.star) ?? null)
 
+    if (info.caste) {
+      const applicable = await isGothraApplicableForCaste(info.caste)
+      if (applicable || info.gothram) {
+        const gothramList = await fetchGothraOptions(info.caste)
+        setGothramOptions(gothramList)
+        setShowGothra(applicable || gothramList.length > 0 || !!info.gothram)
+        setGothram(gothramList.find(o => o.key === info.gothram) ?? null)
+      }
+    }
+
     if (info.star && info.raasi) {
       const { dosham: yesNoList, doshamHash } = await fetchDoshamOptions(info.star, info.raasi, info.motherTongue)
       setDoshamYesNoOptions(yesNoList)
@@ -123,8 +143,22 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
     setActivePicker(null)
     if (opt.key === religion?.key) return
     setCaste(null)
+    setGothram(null)
+    setGothramOptions([])
+    setShowGothra(false)
     const list = await fetchCasteOptions(opt.key, motherTongue)
     setCasteOptions(list)
+  }
+
+  async function handleSelectCaste(opt: PickerOption) {
+    setCaste(opt)
+    setActivePicker(null)
+    if (opt.key === caste?.key) return
+    setGothram(null)
+    const applicable = await isGothraApplicableForCaste(opt.key)
+    const list = applicable ? await fetchGothraOptions(opt.key) : []
+    setGothramOptions(list)
+    setShowGothra(applicable || list.length > 0)
   }
 
   async function handleSelectRaasi(opt: PickerOption) {
@@ -162,11 +196,14 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
     setSubmitting(true)
 
     const changes: FieldChange[] = []
-    if (religion && religion.key !== original.religion) {
+    if (religionEditable && religion && religion.key !== original.religion) {
       changes.push({ field: 'RELIGION', value: religion.key, existingValue: original.religion })
     }
-    if (caste && caste.key !== original.caste) {
+    if (casteEditable && caste && caste.key !== original.caste) {
       changes.push({ field: 'CASTE', value: caste.key, existingValue: original.caste })
+    }
+    if (showGothra && gothram && gothram.key !== original.gothram) {
+      changes.push({ field: 'GOTHRA', value: gothram.key, existingValue: original.gothram })
     }
     if (raasi && raasi.key !== original.raasi) {
       changes.push({ field: 'RAASI', value: raasi.key, existingValue: original.raasi })
@@ -200,6 +237,10 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
     navigation.goBack()
   }
 
+  function showRestricted() {
+    Alert.alert(t('EDITPROFILE.RESTRICT_FIELD'), t('EDITPROFILE.RESTRICT_SUPPORT'))
+  }
+
   if (loading) {
     return (
       <View style={[s.screen, s.center, { paddingTop: insets.top }]}>
@@ -220,8 +261,19 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 16 }]} showsVerticalScrollIndicator={false}>
         <Text style={s.heading}>{t('EDITPROFILE.RELIGIOUSDETAIL')}</Text>
 
-        <SelectField label="Select your religion" value={religion?.label} onPress={() => setActivePicker('religion')} />
-        <SelectField label="Select your caste" value={caste?.label} onPress={() => setActivePicker('caste')} />
+        {religionEditable ? (
+          <SelectField label="Select your religion" value={religion?.label} onPress={() => setActivePicker('religion')} />
+        ) : (
+          <SelectField label="Select your religion" value={religion?.label} locked onPress={showRestricted} />
+        )}
+        {casteEditable ? (
+          <SelectField label="Select your caste" value={caste?.label} onPress={() => setActivePicker('caste')} />
+        ) : (
+          <SelectField label="Select your caste" value={caste?.label} locked onPress={showRestricted} />
+        )}
+        {showGothra && (
+          <SelectField label="Select your gothram" value={gothram?.label} onPress={() => setActivePicker('gothram')} />
+        )}
         <SelectField label="Select your raasi" value={raasi?.label} onPress={() => setActivePicker('raasi')} />
         <SelectField label="Select your star" value={star?.label} onPress={() => setActivePicker('star')} />
         <SelectField label="Do you have dosham" value={doshamYesNo?.label} onPress={() => setActivePicker('doshamYesNo')} />
@@ -249,7 +301,16 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
         placeholder="Search caste..."
         options={casteOptions}
         selectedKey={caste?.key}
-        onSelect={opt => { setCaste(opt); setActivePicker(null) }}
+        onSelect={handleSelectCaste}
+        onClose={() => setActivePicker(null)}
+      />
+      <SearchablePicker
+        visible={activePicker === 'gothram'}
+        title="Select your gothram"
+        placeholder="Search gothram..."
+        options={gothramOptions}
+        selectedKey={gothram?.key}
+        onSelect={opt => { setGothram(opt); setActivePicker(null) }}
         onClose={() => setActivePicker(null)}
       />
       <SearchablePicker

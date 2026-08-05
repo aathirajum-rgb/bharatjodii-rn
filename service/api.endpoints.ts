@@ -61,6 +61,7 @@ export const Endpoints = {
     deletePhoto:         `${api}editprofile/deletepicture/v1`,
     editInfo:            `${api}editprofile/editmemberinfo/v1`,
     updateInfo:          `${api}editprofile/updatememberinfo/v1`,
+    aiValidation:        `${api}editprofile/aiprfvalidation/v1`,
     viewHoro:            `${api}editprofile/viewhoroscope/v1`,
     paymentFailure:      `${api}editprofile/paymentfailure/v1`,
     reportProfileForm:   `${api}editprofile/reportprofileform/v1`,

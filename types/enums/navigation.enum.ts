@@ -17,7 +17,10 @@ export enum ENavigation {
   SELFIE_VERIFICATION = 'selfie-verification',
   GALLERY = 'gallery',
   ACTIVITY = 'activity',
-  MATCHES = 'matches',
+  // Registered screen name is capital-M "Matches" (see AppStack.tsx) — every
+  // other call site in the app navigates with that literal string directly;
+  // this enum member must match or navigate()/resetTo() silently no-op.
+  MATCHES = 'Matches',
   DASHBOARD_MATCHES = 'dashboard-matches',
   MESSAGES = 'messages',
   CHAT_LIST = 'chatlist',
@@ -67,4 +70,6 @@ export enum ENavigation {
   ADD_PHOTO_INTERMEDIATE = 'addphoto-intermediate',
   ADD_PHOTO_PUBLISH      = 'addphoto-publish',
   PHOTO_REJECTION        = 'photo-rejection',
+  VALIDATION             = 'Validation',
+  DISCOVER_MATCHES       = 'DiscoverMatches',
 }

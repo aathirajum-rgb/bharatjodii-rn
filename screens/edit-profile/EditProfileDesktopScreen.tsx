@@ -25,18 +25,18 @@
 //    codes together (Figma shows one "Properties owned" row, not mobile's
 //    two-row split) — recombined into one PROPERTIES change on Save exactly
 //    like PropertyDetailsScreen.tsx already does.
-//  - "Horoscope details missing" is a single derived link (`!raasi || !star`)
-//    — no such combined element exists in mobile (confirmed: mobile shows
-//    three separate per-field missing hints instead); built directly from
-//    the same underlying data.
+//  - "Horoscope details missing" is derived from `!horoscopeAvailable` (the
+//    server-confirmed flag), not from Raasi/Star presence — those are
+//    independently editable on this same screen and aren't a reliable proxy.
 //
 // Known, flagged gaps (NOT silently invented):
-//  - Age, Height, Profile created by are read-only here. Age/Height mirror
-//    BasicDetailsScreen.tsx's own explicit deferral (full DOB flow / height
-//    category-or-exact panel needs a focused follow-up pass). Profile
-//    created by has no current-value field anywhere in EditProfileInfo and
-//    no edit-profile save wiring exists in this codebase at all yet — shown
-//    from the locally cached registration value for display only.
+//  - Age, Height, Jodii ID, Profile created by, and Mobile number are
+//    read-only here. Age/Height mirror BasicDetailsScreen.tsx's own explicit
+//    deferral (full DOB flow / height category-or-exact panel is mobile-only
+//    for now — a native `<input type=date>`/numeric web equivalent is a
+//    reasonable low-cost follow-up, out of scope for this pass). Jodii ID /
+//    Profile created by / Mobile number have no edit-profile save wiring
+//    anywhere in this codebase (Angular doesn't make them editable either).
 //  - Drinking/Smoking habits: pickers work but Submit never sends them —
 //    Angular's own TYPE-code map has no code for either, so this matches
 //    real (if buggy) behavior rather than inventing an unconfirmed code,
@@ -58,12 +58,15 @@ import { getItem, setItem } from '../../service/storageService'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { paymentTrack } from '../../service/paymentService'
 import { fetchEditProfileInfo, submitFieldChanges, type FieldChange } from '../../service/editProfileService'
+import { deletePhoto, setMainPhoto } from '../../service/profileService'
+import PhotoPrivacySheet from '../../components/photo-privacy/PhotoPrivacySheet'
 import {
+  CHILDREN_OPTIONS,
   fetchMotherTongueOptions, fetchStates, fetchCities,
   fetchQualificationOptions, fetchOccupationOptions, fetchMonthlyIncomeOptions,
   fetchReligionOptions, fetchCasteOptions, fetchRaasiOptions, fetchStarOptions, fetchDoshamOptions,
   fetchDrinkingHabitOptions, fetchSmokingHabitOptions, fetchEatingHabitOptions, fetchPropertyOptions,
-  fetchProfileCreatedByOptions, getRegValue,
+  fetchProfileCreatedByOptions, fetchMaritalStatusOptions, fetchPhysicalStatusOptions, getRegValue,
 } from '../../service/registrationService'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 
@@ -97,11 +100,28 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
   // ── Photos ──
   const [photos, setPhotos]         = useState<Photo[]>([])
   const [uploading, setUploading]   = useState(false)
+  const [photoPrivacyVisible, setPhotoPrivacyVisible] = useState(false)
 
   // ── Read-only fields ──
   const [ageDisplay, setAgeDisplay]       = useState<string | undefined>(undefined)
   const [heightDisplay, setHeightDisplay] = useState<string | undefined>(undefined)
   const [createdByLabel, setCreatedByLabel] = useState<string | undefined>(undefined)
+  const [jodiiId, setJodiiId]         = useState<string | undefined>(undefined)
+  const [mobileNo, setMobileNo]       = useState<string | undefined>(undefined)
+
+  // ── Marital status / children / physical status ──
+  const [maritalStatus, setMaritalStatus] = useState<Opt | null>(null)
+  const [noOfChildren, setNoOfChildren]   = useState<Opt | null>(null)
+  const [physicalStatus, setPhysicalStatus] = useState<Opt | null>(null)
+  const [maritalStatusOptions, setMaritalStatusOptions] = useState<Opt[]>([])
+  const [physicalStatusOptions, setPhysicalStatusOptions] = useState<Opt[]>([])
+
+  // ── One-time-edit locks ──
+  const [incomeEditable, setIncomeEditable]     = useState(true)
+  const [casteEditable, setCasteEditable]       = useState(true)
+  const [religionEditable, setReligionEditable] = useState(true)
+
+  const [horoscopeAvailable, setHoroscopeAvailable] = useState(false)
 
   // ── Basic details ──
   const [motherTongue, setMotherTongue] = useState<Opt | null>(null)
@@ -139,6 +159,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     religion?: string | undefined; caste?: string | undefined; raasi?: string | undefined
     star?: string | undefined; dosham?: string | undefined
     eating?: string | undefined; properties: string[]
+    maritalStatus?: string | undefined; noOfChildren?: string | undefined; physicalStatus?: string | undefined
   }>({ properties: [] })
 
   // ── Option lists ──
@@ -161,17 +182,27 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
 
   const load = useCallback(async () => {
     setLoading(true)
-    const [name, createdByKey, info] = await Promise.all([
+    const [name, createdByKey, userId, loginGender, info] = await Promise.all([
       getItem(SK.User.NAME),
       getRegValue('CREATEDBY'),
+      getItem(SK.Auth.USER_ID),
+      getItem(SK.User.LOGIN_GENDER),
       fetchEditProfileInfo(),
     ])
     setUserName(name ?? '')
+    setJodiiId(userId ?? undefined)
     if (!info) { setLoading(false); return }
+
+    const gender = info.gender ?? loginGender ?? '1'
 
     setAgeDisplay(info.age ? `${info.age} years old` : undefined)
     setHeightDisplay(info.heightCategory ?? info.height)
     setMotherTongueEditable(info.motherTongueEditable)
+    setIncomeEditable(info.incomeEditable)
+    setCasteEditable(info.casteEditable)
+    setReligionEditable(info.religionEditable)
+    setMobileNo(info.mobileNo)
+    setHoroscopeAvailable(!!info.horoscopeAvailable)
 
     setOriginal({
       motherTongue: info.motherTongue, state: info.state, city: info.city,
@@ -181,6 +212,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
       dosham: info.doshamType?.[0] ?? info.dosham,
       eating: info.eatingHabits,
       properties: [...(info.properties ?? []), ...(info.vehicles ?? [])],
+      maritalStatus: info.maritalStatus, noOfChildren: info.noOfChildren, physicalStatus: info.physicalStatus,
     })
     setProperties(new Set([...(info.properties ?? []), ...(info.vehicles ?? [])]))
 
@@ -189,6 +221,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
       educationList, occupationList, incomeList,
       religionList, raasiList,
       drinkingList, smokingList, eatingList, propertyList,
+      maritalStatusList, physicalStatusList,
     ] = await Promise.all([
       fetchProfileCreatedByOptions(),
       fetchMotherTongueOptions(),
@@ -202,6 +235,8 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
       fetchSmokingHabitOptions(),
       fetchEatingHabitOptions(),
       fetchPropertyOptions(),
+      fetchMaritalStatusOptions(gender),
+      fetchPhysicalStatusOptions(),
     ])
 
     setCreatedByLabel(createdByList.find(o => o.key === createdByKey)?.label)
@@ -216,6 +251,8 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     setSmokingOptions(smokingList)
     setEatingOptions(eatingList)
     setPropertyOptions(propertyList)
+    setMaritalStatusOptions(maritalStatusList)
+    setPhysicalStatusOptions(physicalStatusList)
 
     setMotherTongue(motherTongueList.find(o => o.key === info.motherTongue) ?? null)
     setState(stateList.find(o => o.key === info.state) ?? null)
@@ -228,6 +265,9 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     setDrinking(drinkingList.find(o => o.key === info.drinkingHabits) ?? null)
     setSmoking(smokingList.find(o => o.key === info.smokingHabits) ?? null)
     setEating(eatingList.find(o => o.key === info.eatingHabits) ?? null)
+    setMaritalStatus(maritalStatusList.find(o => o.key === info.maritalStatus) ?? null)
+    setNoOfChildren(CHILDREN_OPTIONS.find(o => o.key === info.noOfChildren) ?? null)
+    setPhysicalStatus(physicalStatusList.find(o => o.key === info.physicalStatus) ?? null)
 
     const [cityList, homeCityList, casteList, starList] = await Promise.all([
       info.state ? fetchCities(info.state) : Promise.resolve([]),
@@ -349,8 +389,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
       {
         text: 'Delete', style: 'destructive',
         onPress: async () => {
-          const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-          const res = await apiCall(Endpoints.profile.deletePhoto, 'POST', `ID=${userId}&PHOTOID=${photo.PHOTOID}`)
+          const res = await deletePhoto(photo.PHOTOID)
           if (res?.RESPONSECODE == 1) await loadPhotos()
         },
       },
@@ -358,8 +397,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
   }
 
   async function setAsMain(photo: Photo) {
-    const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-    const res = await apiCall(Endpoints.profile.setMainPhoto, 'POST', `ID=${userId}&PHOTOID=${photo.PHOTOID}`)
+    const res = await setMainPhoto(photo.PHOTOID)
     if (res?.RESPONSECODE == 1) await loadPhotos()
   }
 
@@ -385,13 +423,13 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     if (occupation && occupation.key !== original.occupation) {
       changes.push({ field: 'OCCUPATION', value: occupation.key, existingValue: original.occupation })
     }
-    if (income && income.key !== original.income) {
+    if (incomeEditable && income && income.key !== original.income) {
       changes.push({ field: 'INCOME', value: income.key, existingValue: original.income })
     }
-    if (religion && religion.key !== original.religion) {
+    if (religionEditable && religion && religion.key !== original.religion) {
       changes.push({ field: 'RELIGION', value: religion.key, existingValue: original.religion })
     }
-    if (caste && caste.key !== original.caste) {
+    if (casteEditable && caste && caste.key !== original.caste) {
       changes.push({ field: 'CASTE', value: caste.key, existingValue: original.caste })
     }
     if (raasi && raasi.key !== original.raasi) {
@@ -411,6 +449,20 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
       && currentProperties.every(k => original.properties.includes(k))
     if (!sameProperties) {
       changes.push({ field: 'PROPERTIES', value: currentProperties.join('~'), existingValue: original.properties.join('~') })
+    }
+    if (maritalStatus && maritalStatus.key !== original.maritalStatus) {
+      changes.push({ field: 'MARITALSTATUS', value: maritalStatus.key, existingValue: original.maritalStatus })
+    }
+    const showChildren = !!maritalStatus && maritalStatus.key !== '1'
+    if (showChildren) {
+      if (noOfChildren && noOfChildren.key !== original.noOfChildren) {
+        changes.push({ field: 'NOOFCHILDREN', value: noOfChildren.key, existingValue: original.noOfChildren })
+      }
+    } else if (original.noOfChildren) {
+      changes.push({ field: 'NOOFCHILDREN', value: '', existingValue: original.noOfChildren })
+    }
+    if (physicalStatus && physicalStatus.key !== original.physicalStatus) {
+      changes.push({ field: 'PHYSICALSTATUS', value: physicalStatus.key, existingValue: original.physicalStatus })
     }
     // Drinking/Smoking intentionally excluded — see file header note.
 
@@ -440,7 +492,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     }
   }
 
-  const missingHoroscope = !raasi || !star
+  const missingHoroscope = !horoscopeAvailable
 
   if (loading) {
     return (
@@ -463,7 +515,10 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
         <View style={s.card}>
           <View style={s.photoHeaderRow}>
             <Text style={s.sectionTitle}>{t('EDITPROFILE.PHOTOS')}</Text>
-            <Pressable onPress={() => Alert.alert('Photo privacy', 'Coming soon')} hitSlop={8}>
+            <Pressable
+              onPress={() => (photos.length > 0 ? setPhotoPrivacyVisible(true) : openFilePicker())}
+              hitSlop={8}
+            >
               <Text style={s.link}>{t('EDITPROFILE.PHOTO_PRIVACY')}</Text>
             </Pressable>
           </View>
@@ -501,37 +556,54 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
           <Text style={s.sectionTitle}>{t('EDITPROFILE.BASIC_DETAILS')}</Text>
           <View style={s.grid}>
             <View style={[s.cell, rowZ(0)]}>
-              <DesktopSelectField label={t('EDITPROFILE.CREATEDBY', 'Profile created by')} options={createdByLabel ? [{ key: '_', label: createdByLabel }] : []} selectedKey={createdByLabel ? '_' : null} onSelect={() => {}} disabled />
+              <DesktopSelectField label={t('EDITPROFILE.JODIIID')} options={jodiiId ? [{ key: '_', label: jodiiId }] : []} selectedKey={jodiiId ? '_' : null} onSelect={() => {}} disabled />
             </View>
             <View style={[s.cell, rowZ(0)]}>
+              <DesktopSelectField label={t('EDITPROFILE.CREATEDFOR', 'Profile created by')} options={createdByLabel ? [{ key: '_', label: createdByLabel }] : []} selectedKey={createdByLabel ? '_' : null} onSelect={() => {}} disabled />
+            </View>
+            <View style={[s.cell, rowZ(1)]}>
               <DesktopSelectField label={t('EDITPROFILE.AGE')} options={ageDisplay ? [{ key: '_', label: ageDisplay }] : []} selectedKey={ageDisplay ? '_' : null} onSelect={() => {}} disabled />
             </View>
             <View style={[s.cell, rowZ(1)]}>
               <DesktopSelectField label={t('EDITPROFILE.HEIGHT')} options={heightDisplay ? [{ key: '_', label: heightDisplay }] : []} selectedKey={heightDisplay ? '_' : null} onSelect={() => {}} disabled />
             </View>
-            <View style={[s.cell, rowZ(1)]}>
+            <View style={[s.cell, rowZ(2)]}>
               <DesktopSelectField
                 label={t('EDITPROFILE.MOTHERTONGUE')} options={motherTongueOptions} selectedKey={motherTongue?.key ?? null}
                 onSelect={setMotherTongue} disabled={!motherTongueEditable}
               />
             </View>
             <View style={[s.cell, rowZ(2)]}>
+              <DesktopSelectField label={t('EDITPROFILE.MOBILENO')} options={mobileNo ? [{ key: '_', label: mobileNo }] : []} selectedKey={mobileNo ? '_' : null} onSelect={() => {}} disabled />
+            </View>
+            <View style={[s.cell, rowZ(3)]}>
               <DesktopSelectField label={t('EDITPROFILE.CURRENT_LOCATION')} options={stateOptions} selectedKey={state?.key ?? null} onSelect={handleSelectState} />
             </View>
-            <View style={[s.cell, rowZ(2)]}>
+            <View style={[s.cell, rowZ(3)]}>
               <DesktopSelectField
                 label="City" options={cityOptions} selectedKey={city?.key ?? null} onSelect={setCity}
                 disabled={!state} {...(state ? {} : { placeholder: 'Select state first' })}
               />
             </View>
-            <View style={[s.cell, rowZ(3)]}>
+            <View style={[s.cell, rowZ(4)]}>
               <DesktopSelectField label={t('EDITPROFILE.NATIVE_PLACE')} options={stateOptions} selectedKey={homeState?.key ?? null} onSelect={handleSelectHomeState} />
             </View>
-            <View style={[s.cell, rowZ(3)]}>
+            <View style={[s.cell, rowZ(4)]}>
               <DesktopSelectField
                 label="Hometown city" options={homeCityOptions} selectedKey={homeCity?.key ?? null} onSelect={setHomeCity}
                 disabled={!homeState} {...(homeState ? {} : { placeholder: 'Select state first' })}
               />
+            </View>
+            <View style={[s.cell, rowZ(5)]}>
+              <DesktopSelectField label={t('EDITPROFILE.MARITALSTATUS')} options={maritalStatusOptions} selectedKey={maritalStatus?.key ?? null} onSelect={setMaritalStatus} />
+            </View>
+            {!!maritalStatus && maritalStatus.key !== '1' && (
+              <View style={[s.cell, rowZ(5)]}>
+                <DesktopSelectField label={t('EDITPROFILE.CHILDREN')} options={CHILDREN_OPTIONS} selectedKey={noOfChildren?.key ?? null} onSelect={setNoOfChildren} />
+              </View>
+            )}
+            <View style={[s.cell, rowZ(6)]}>
+              <DesktopSelectField label={t('EDITPROFILE.PHYSICALSTATUS')} options={physicalStatusOptions} selectedKey={physicalStatus?.key ?? null} onSelect={setPhysicalStatus} />
             </View>
           </View>
         </View>
@@ -547,7 +619,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
               <DesktopSelectField label={t('EDITPROFILE.OCCUPATION')} options={occupationOptions} selectedKey={occupation?.key ?? null} onSelect={setOccupation} />
             </View>
             <View style={[s.cell, rowZ(1)]}>
-              <DesktopSelectField label={t('EDITPROFILE.INCOME')} options={incomeOptions} selectedKey={income?.key ?? null} onSelect={setIncome} />
+              <DesktopSelectField label={t('EDITPROFILE.INCOME')} options={incomeOptions} selectedKey={income?.key ?? null} onSelect={setIncome} disabled={!incomeEditable} />
             </View>
           </View>
         </View>
@@ -557,10 +629,10 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
           <Text style={s.sectionTitle}>{t('EDITPROFILE.RELIGIOUSDETAIL')}</Text>
           <View style={s.grid}>
             <View style={[s.cell, rowZ(0)]}>
-              <DesktopSelectField label={t('EDITPROFILE.RELIGION')} options={religionOptions} selectedKey={religion?.key ?? null} onSelect={handleSelectReligion} />
+              <DesktopSelectField label={t('EDITPROFILE.RELIGION')} options={religionOptions} selectedKey={religion?.key ?? null} onSelect={handleSelectReligion} disabled={!religionEditable} />
             </View>
             <View style={[s.cell, rowZ(0)]}>
-              <DesktopSelectField label={t('EDITPROFILE.CASTESUB')} options={casteOptions} selectedKey={caste?.key ?? null} onSelect={setCaste} />
+              <DesktopSelectField label={t('EDITPROFILE.CASTESUB')} options={casteOptions} selectedKey={caste?.key ?? null} onSelect={setCaste} disabled={!casteEditable} />
             </View>
             <View style={[s.cell, rowZ(1)]}>
               <DesktopSelectField label={t('EDITPROFILE.STAR')} options={starOptions} selectedKey={star?.key ?? null} onSelect={handleSelectStar} />
@@ -611,6 +683,11 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
 
         <ButtonRevamp label="Save changes" variant="primary" loading={saving} onPress={handleSave} style={s.saveBtn} />
       </View>
+
+      <PhotoPrivacySheet
+        visible={photoPrivacyVisible}
+        onClose={() => setPhotoPrivacyVisible(false)}
+      />
     </DesktopPageShell>
   )
 }

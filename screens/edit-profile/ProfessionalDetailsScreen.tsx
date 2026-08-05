@@ -40,6 +40,7 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
   const [education, setEducation]   = useState<PickerOption | null>(null)
   const [occupation, setOccupation] = useState<PickerOption | null>(null)
   const [income, setIncome]         = useState<PickerOption | null>(null)
+  const [incomeEditable, setIncomeEditable] = useState(true)
 
   const [original, setOriginal] = useState<{
     education?:  string | undefined
@@ -59,6 +60,7 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
     if (!info) { setLoading(false); return }
 
     setOriginal({ education: info.education, occupation: info.occupation, income: info.income })
+    setIncomeEditable(info.incomeEditable)
 
     const [educationList, occupationList, incomeList] = await Promise.all([
       fetchQualificationOptions(),
@@ -88,7 +90,7 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
     if (occupation && occupation.key !== original.occupation) {
       changes.push({ field: 'OCCUPATION', value: occupation.key, existingValue: original.occupation })
     }
-    if (income && income.key !== original.income) {
+    if (incomeEditable && income && income.key !== original.income) {
       changes.push({ field: 'INCOME', value: income.key, existingValue: original.income })
     }
 
@@ -109,6 +111,10 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
       return
     }
     navigation.goBack()
+  }
+
+  function showRestricted() {
+    Alert.alert(t('EDITPROFILE.RESTRICT_FIELD'), t('EDITPROFILE.RESTRICT_SUPPORT'))
   }
 
   if (loading) {
@@ -133,7 +139,11 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
 
         <SelectField label="Higher education" value={education?.label} onPress={() => setActivePicker('education')} />
         <SelectField label={t('EDITPROFILE.OCCUPATION')} value={occupation?.label} onPress={() => setActivePicker('occupation')} />
-        <SelectField label="Monthly Income" value={income?.label} onPress={() => setActivePicker('income')} />
+        {incomeEditable ? (
+          <SelectField label="Monthly Income" value={income?.label} onPress={() => setActivePicker('income')} />
+        ) : (
+          <SelectField label="Monthly Income" value={income?.label} locked onPress={showRestricted} />
+        )}
 
         <Pressable style={s.submitBtn} onPress={handleSubmit} disabled={submitting}>
           {submitting ? <ActivityIndicator color={Colors.white} /> : <Text style={s.submitBtnText}>{t('GENERAL.SUBMIT')}</Text>}

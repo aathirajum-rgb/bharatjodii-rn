@@ -59,7 +59,10 @@ export const EMPTY_LISTING: ListingResult = { items: [], bannerSlots: [], totalC
 
 // ─── Profile mapper ───────────────────────────────────────────────────────────
 
-function toProfile(p: Record<string, any>): SwiperItem {
+// Exported so DailyRecommendationScreen can run drService's raw (uncached-envelope)
+// profile array through the exact same raw->SwiperItem mapping fetchMatches()/
+// fetchDailyRecommendations() below already use, instead of hand-rolling a second one.
+export function toProfile(p: Record<string, any>): SwiperItem {
   return {
     // Angular: profile.MATRIID is the primary ID in matches API response
     profileId:           p['MATRIID']  ?? p['NBID']  ?? p['ID'],
@@ -189,7 +192,16 @@ export async function fetchHomeSession(): Promise<HomeSession> {
 // On ERRCODE=="0": store ATN/RTN from top-level response, then parse WEBVIEWURL if present.
 // On ERRCODE=="1" && RESPONSECODE=="2": session is fully expired — caller handles.
 
-export async function refreshSession(): Promise<boolean> {
+export interface RefreshSessionResult {
+  success: boolean
+  // Angular: webview.page.ts's :page_id route param, embedded as the trailing
+  // segment of WEBVIEWURL — drives pageLandingService.ts's handlePageLanding().
+  // Existing callers here all fire-and-forget (`await refreshSession()`, result
+  // unused), so widening this from a plain boolean is safe.
+  pageId?: string | undefined
+}
+
+export async function refreshSession(): Promise<RefreshSessionResult> {
   const [
     userId,
     ipAddress,
@@ -210,7 +222,7 @@ export async function refreshSession(): Promise<boolean> {
     getItem(StorageKeys.App.NALLOW),
   ])
 
-  if (!userId) return false
+  if (!userId) return { success: false }
 
   const params = [
     `ID=${userId}`,
@@ -232,16 +244,16 @@ export async function refreshSession(): Promise<boolean> {
     if (result.RTN) await setItem(StorageKeys.Auth.REFRESH_TOKEN, result.RTN)
     // Parse WEBVIEWURL for full session data (user profile, flags, etc.)
     const webViewUrl = result?.RESPONSE?.WEBVIEWURL
-    if (webViewUrl) await parseAndStoreWebViewURL(webViewUrl)
-    return true
+    const pageId = webViewUrl ? await parseAndStoreWebViewURL(webViewUrl) : undefined
+    return { success: true, pageId }
   }
 
   if (result?.ERRCODE == 1 && result?.RESPONSECODE == 2) {
     // Both tokens dead — callers should redirect to login
-    return false
+    return { success: false }
   }
 
-  return false
+  return { success: false }
 }
 
 // ─── Notification count ───────────────────────────────────────────────────────
@@ -530,6 +542,30 @@ export async function fetchExplore(filterType: string, start = 0, limit = 20, qS
   ]
   if (qSearch) parts.push(`QSEARCH=${qSearch}`)
   const res = await apiCall(Endpoints.listing.explore, 'POST', parts.join('&'))
+  return toListingResult(res)
+}
+
+// ─── Nearby matches ─────────────────────────────────────────────────────────────
+// Angular: webview.page.ts's callingListAPI("nearbymatches") — its own dedicated
+// endpoint (listing/nearbymatches/v1), not the generic explore/v1 FILTERTYPE
+// mechanism fetchExplore() uses. Param shape is callingListAPI's plain
+// (non-notify, non-dailyrecommendations) branch: LIMIT=20, no BANNERFLAG/
+// LOGINCOUNT/FREEMATCHFLAG (those are fetchMatches()-specific additions).
+
+export async function fetchNearbyMatches(start = 0, limit = 20): Promise<ListingResult> {
+  const userId = await getItem(StorageKeys.Auth.USER_ID)
+  const parts = [
+    `ID=${userId ?? ''}`,
+    `START=${start}`,
+    `LIMIT=${limit}`,
+    'LIKED=1',
+    'VIEWED=1',
+    'REPORTED=1',
+    'BLOCKED=1',
+    'REMOVED=1',
+    'SKIPED=1',
+  ]
+  const res = await apiCall(Endpoints.listing.nearbyMatches, 'POST', parts.join('&'))
   return toListingResult(res)
 }
 

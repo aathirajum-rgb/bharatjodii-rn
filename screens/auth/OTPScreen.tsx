@@ -56,6 +56,9 @@ export default function OTPScreen({ navigation, route }: Props) {
   // Hold userId + new-user flag until OTPSuccessSheet dismisses
   const pendingUserId = useRef<string>('')
   const pendingIsNew  = useRef<boolean>(false)
+  // Angular: webview.page.ts's :page_id route param, extracted from WEBVIEWURL —
+  // drives pageLandingService.ts's post-login routing dispatch.
+  const pendingPageId = useRef<string | undefined>(undefined)
 
   const inputRefs     = useRef<Array<TextInput | null>>(Array(OTP_LENGTH).fill(null))
 
@@ -153,7 +156,7 @@ export default function OTPScreen({ navigation, route }: Props) {
           if (res.ATN) await setItem(StorageKeys.Auth.TOKEN, res.ATN)
           if (res.RTN) await setItem(StorageKeys.Auth.REFRESH_TOKEN, res.RTN)
           if (res?.RESPONSE?.WEBVIEWURL) {
-            await parseAndStoreWebViewURL(res.RESPONSE.WEBVIEWURL)
+            pendingPageId.current = await parseAndStoreWebViewURL(res.RESPONSE.WEBVIEWURL)
           }
           pendingUserId.current = (await getItem(StorageKeys.Auth.USER_ID)) ?? ''
           // Angular authguard: LASTAPPLOGINAT tracks when we last autologined.
@@ -331,7 +334,7 @@ export default function OTPScreen({ navigation, route }: Props) {
           Existing login    → AppStack opens at 'Home'. */}
       <OTPSuccessSheet
         visible={showSuccess}
-        onDismiss={() => loginUpdate(pendingUserId.current, isRegistrationFlow)}
+        onDismiss={() => loginUpdate(pendingUserId.current, isRegistrationFlow, pendingPageId.current)}
       />
     </View>
   )
