@@ -15,6 +15,7 @@ import ProfilePhoto, { type PhotoVariant } from '../profile-photo/ProfilePhoto'
 // Angular: core/config/button.config.ts's SEE_ALL — textColor: 'linkColor'
 // (--ion-color-link-color: #29339B), not the brand red.
 const SEE_ALL_LINK_COLOR = '#29339B'
+const FWD_ICON = `${CDN_SVG}revamp/forward-icon-link.svg`
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -123,7 +124,7 @@ const SECTION_VARIANT: Record<CardSection, PhotoVariant> = {
   whoviewednumber:      'viewedyou',
   similarprofiles:      'matches',
   viewlater:            'default',
-  likedprofile:         'matches',
+  likedprofile:         'likedProfile',
   successstory:         'successStory',
 }
 
@@ -224,8 +225,11 @@ export default function ProfileCard({
     case 1: {
       const isDR = section === 'dailyrecommendations'
       return (
-        <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]} onPress={onPress}>
-          <ProfilePhoto {...photoProps} height={photoH}>
+        <Pressable
+          style={({ pressed }) => [styles.card, isDR && styles.cardDR, pressed && { opacity: 0.85 }]}
+          onPress={onPress}
+        >
+          <ProfilePhoto {...photoProps} height={photoH} showGradientScrim>
             <InfoOverlay name={name} detail={basicDetail()} />
           </ProfilePhoto>
 
@@ -248,7 +252,7 @@ export default function ProfileCard({
       const isLikedYou = section === 'likedyou'
       return (
         <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]} onPress={onPress}>
-          <ProfilePhoto {...photoProps} height={photoH}>
+          <ProfilePhoto {...photoProps} height={photoH} showGradientScrim>
             <InfoOverlay
               name={name}
               detail={[age, education].filter(Boolean).join(', ')}
@@ -281,7 +285,13 @@ export default function ProfileCard({
       // colored pink eye-icon + pink text, not the default white viewed-icon.
       const isNew = isNewLabel === true
       return (
-        <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]} onPress={onPress}>
+        // Angular: .card-type-3 (outer, own border-radius+shadow) wraps
+        // .viewedbyme/.viewedyou/.whoviewednumber.card-ht3 (photo, its OWN
+        // independent border-radius+overflow:hidden) — redundant unless the
+        // photo is genuinely inset with a gap, which Figma confirms (252px
+        // card, 220px photo, 16px inset on every side) — not full-bleed like
+        // variant 1/2's cards.
+        <Pressable style={({ pressed }) => [styles.card, styles.cardInset3, pressed && { opacity: 0.85 }]} onPress={onPress}>
           <ProfilePhoto {...photoProps} height={photoH} variant="viewedyou">
             <View style={[styles.viewedOverlay, isNew && styles.viewedOverlayNew]}>
               <CdnSvg
@@ -294,13 +304,19 @@ export default function ProfileCard({
             </View>
           </ProfilePhoto>
 
-          <View style={styles.cardInfo}>
+          <View style={styles.cardInfo3}>
             {!!name         && <Text style={styles.nameText}   numberOfLines={1}>{name}</Text>}
-            {!!fullDetail() && <Text style={styles.detailText} numberOfLines={1}>{fullDetail()}</Text>}
+            {/* Angular: .black-color (#000000), not the shared cardInfo's
+                gray detailText — confirmed distinct from variants 4/6/7/8
+                which aren't reviewed yet, so scoped to this case only. */}
+            {!!fullDetail() && <Text style={[styles.detailText, styles.detailText3]} numberOfLines={1}>{fullDetail()}</Text>}
             {/* Angular: ENUMS.EButtonText.viewProfiles → 'MATCHES.VIEW_PROFILE'
-                → "View full profile" (locales/en.json:642), not "View Profile". */}
-            <Pressable onPress={onPress} style={styles.linkBtn}>
-              <Text style={styles.linkBtnText}>View full profile →</Text>
+                → "View full profile" (locales/en.json:642), not "View Profile"
+                — and a real forward-chevron icon, not an embedded arrow
+                character (matches every other link-style CTA in this app). */}
+            <Pressable onPress={onPress} style={[styles.linkBtn, styles.linkBtnRow]}>
+              <Text style={styles.linkBtnText}>View full profile</Text>
+              <CdnSvg uri={FWD_ICON} width={12} height={12} />
             </Pressable>
           </View>
         </Pressable>
@@ -382,10 +398,14 @@ export default function ProfileCard({
     }
 
     // ── 8 · Liked Profile (profiles I liked) ─────────────────────────────────
-    // Photo with optional eye-badge → name + details → "You liked her on…" footer.
+    // Photo with optional eye-badge → name + details → "You liked her on…"
+    // footer. Angular: .card-type-8's padding:8px wraps the ENTIRE card
+    // (photo, name block, footer alike) — everything sits flush with the
+    // photo's own left edge, confirmed against the Figma render (no extra
+    // indent beyond that shared 8px inset).
     case 8: {
       return (
-        <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]} onPress={onPress}>
+        <Pressable style={({ pressed }) => [styles.card, styles.card8, pressed && { opacity: 0.85 }]} onPress={onPress}>
           <ProfilePhoto {...photoProps} height={photoH}>
             {isNewLabel && !!labelContent && (
               <View style={styles.eyeBadge}>
@@ -400,15 +420,24 @@ export default function ProfileCard({
             )}
           </ProfilePhoto>
 
-          <View style={[styles.cardInfo, styles.cardInfoIndented]}>
+          <View style={styles.cardInfo8}>
             {!!name         && <Text style={styles.nameText}   numberOfLines={1}>{name}</Text>}
             {!!fullDetail() && <Text style={styles.detailText} numberOfLines={1}>{fullDetail()}</Text>}
           </View>
 
+          {/* Angular: .liked-profile-card — peach-to-white gradient, only the
+              LEFT corners rounded (24px), border on 3 sides (not right) —
+              confirmed matching almost exactly between Figma and Angular's
+              live CSS. */}
           {!!likedViewedDateText && (
-            <View style={styles.likedFooter}>
-              <Text style={styles.likedFooterText}>{likedViewedDateText}</Text>
-            </View>
+            <LinearGradient
+              colors={['#FFEBD3', '#FFFFFF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={styles.likedFooter}
+            >
+              <Text style={styles.likedFooterText} numberOfLines={1}>{likedViewedDateText}</Text>
+            </LinearGradient>
           )}
         </Pressable>
       )
@@ -423,41 +452,68 @@ export default function ProfileCard({
 
 const styles = StyleSheet.create({
 
-  // Card shell — matches Angular box-shadow: 0 2px 12px 0 rgba(0,0,0,0.34)
+  // Card shell — Angular profile-card.component.scss:6 (live, not the
+  // commented-out 0.2-opacity line above it): box-shadow: 0 2px 12px 0 rgba(0,0,0,0.34)
   card: {
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: Colors.surface,
     shadowColor: Colors.shadow,
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
+    shadowOpacity: 0.34,
+    shadowRadius: 12,
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
+  // Daily Recommendation's card has its own visible white halo behind the
+  // photo+button (unlike every other variant, where the card shell IS the
+  // photo) — confirmed via get_design_context: box-shadow 0 0 7px rgba(0,0,0,0.15),
+  // lighter/tighter than the shared shadow above.
+  cardDR: {
+    shadowOpacity: 0.15,
+    shadowRadius: 3.5,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 2,
+  },
+  // viewedyou/viewedbyme/whoviewednumber's photo is inset within the card,
+  // not full-bleed — confirmed via get_design_context (16px on every side).
+  cardInset3: {
+    padding: 16,
+  },
+  // Angular: .card-type-8 { border-radius:24px; padding:8px } — bigger
+  // radius than the shared 12px, and the padding wraps photo+name+footer
+  // alike (not just the photo). Shadow is Figma-specific per explicit
+  // direction — Angular's real CSS reuses the shared 0.34/12 shadow instead.
+  card8: {
+    borderRadius: 24,
+    padding: 8,
+    shadowOpacity: 0.24,
+    shadowRadius: 40,
+    shadowOffset: { width: 0, height: 6 },
+  },
 
   // ── Info overlay (types 1 & 2) ─────────────────────────────────────────────
-  // Angular: linear-gradient(rgba(0,0,0,0) → rgba(0,0,0,1))
-  // Achieved here with a two-layer approach: transparent spacer + solid footer.
+  // Just positions the text now — ProfilePhoto's full-card LinearGradient
+  // scrim (Figma spec) provides the darkening behind it.
+  // Angular: .information-block { padding: 16px 12px }
   infoOverlay: {
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
     paddingHorizontal: 12,
-    paddingTop: 40,          // extra top pad lets gradient feel tall
-    paddingBottom: 12,
-    backgroundColor: 'rgba(0, 0, 0, 0.62)',
-    borderBottomLeftRadius:  12,
-    borderBottomRightRadius: 12,
+    paddingVertical: 16,
   },
+  // Angular: .heading3-semibold-16 { font-family: var(--english-semibold-poppins) }
   overlayName: {
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 16,
-    fontWeight: '600',
     color: Colors.white,
     marginBottom: 2,
   },
+  // Angular: .body2-regular-14 { font-family: var(--english-regular-poppins) }
   overlayDetail: {
-    fontSize: 13,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
     color: Colors.white,
     opacity: 0.88,
   },
@@ -480,12 +536,23 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 10,
   },
-  cardInfoIndented: {
-    paddingLeft: 20,
+  // Angular: cardPadding is '' for whoviewednumber/viewedbyme (no extra
+  // horizontal padding class) — this case's own cardInset3 already provides
+  // the horizontal inset, so cardInfo would double it up.
+  cardInfo3: {
+    paddingTop: 16,
   },
+  // Angular: type='8's name/detail block sits flush with the photo's own
+  // left edge (both inherit only the outer card8's 8px padding) — confirmed
+  // against the Figma render, not the extra indent a literal reading of the
+  // Angular template's ml-8+cardPadding classes would otherwise suggest.
+  cardInfo8: {
+    paddingTop: 12,
+  },
+  // Angular: .heading3-semibold-16 { font-family: var(--english-semibold-poppins) }
   nameText: {
+    fontFamily: 'Poppins-SemiBold',
     fontSize: 16,
-    fontWeight: '600',
     color: Colors.textPrimary,
     marginBottom: 4,
   },
@@ -494,6 +561,14 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     marginBottom: 2,
   },
+  // Angular: type='3's detail line is .black-color + .body2-regular-14, not
+  // this shared style's gray — scoped here rather than changed on the shared
+  // style since variants 4/6/7/8 haven't been reviewed yet.
+  detailText3: {
+    fontFamily: 'Poppins-Regular',
+    fontSize: 14,
+    color: Colors.black,
+  },
   dateText: {
     fontSize: 12,
     color: Colors.textTertiary,
@@ -501,17 +576,20 @@ const styles = StyleSheet.create({
   },
 
   // ── Primary action button ──────────────────────────────────────────────────
+  // Angular: button.config.ts's PRIMARY_BTN.background → EButtonBackground.primary
+  // → .primaryBg → --ion-color-primary, which is #B50033 (Colors.primaryDark)
+  // — NOT Colors.primary (#C62828), despite the name.
   primaryBtn: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.primaryDark,
     paddingVertical: 13,
     borderRadius: 8,
     alignItems: 'center',
     width: '100%',
   },
   primaryBtnText: {
+    fontFamily: 'Poppins-SemiBold',
     color: Colors.white,
-    fontSize: 15,
-    fontWeight: '700',
+    fontSize: 14,
     letterSpacing: 0.2,
   },
 
@@ -652,19 +730,26 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 
-  // ── Liked footer (type 8) ──────────────────────────────────────────────────
+  // ── Liked footer (type 8) — Angular: .liked-profile-card — a "ticket
+  // stub" pill: peach-to-white gradient (rendered via LinearGradient at the
+  // call site), only the left corners rounded, border on 3 sides (not
+  // right), width:fit-content (not full-width) — confirmed matching almost
+  // exactly between Figma and Angular's live CSS. ──────────────────────────
   likedFooter: {
-    marginHorizontal: 10,
-    marginBottom: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: Colors.primarySurface,
-    borderRadius: 8,
+    alignSelf: 'flex-start',
+    marginTop: 6,   // detailText's own marginBottom:2 + this 6 = Figma's confirmed 8px gap
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderTopLeftRadius: 24,
+    borderBottomLeftRadius: 24,
+    borderTopWidth: 1,
+    borderBottomWidth: 1,
+    borderLeftWidth: 1,
+    borderColor: Colors.white,
   },
   likedFooterText: {
+    fontFamily: 'Poppins-Regular',
     fontSize: 12,
-    color: Colors.textPrimary,
-    textAlign: 'center',
-    lineHeight: 18,
+    color: Colors.black,
   },
 })

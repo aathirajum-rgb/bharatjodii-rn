@@ -36,6 +36,10 @@ export const Colors = {
   divider:          '#f0f0f0',   // list dividers, card top borders
   borderBadge:      '#ffcccc',   // badge / chip border (light red)
 
+  // ── Swiper pagination dots ────────────────────────────────────────────────
+  // Angular global.scss: .explore-pagination .swiper-pagination-bullet
+  paginationDotInactive: '#F4CECE',
+
   // ── Utility ───────────────────────────────────────────────────────────────
   white:            '#ffffff',
   black:            '#000000',

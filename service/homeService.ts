@@ -653,92 +653,89 @@ export async function fetchLikedYou(): Promise<ListingResult> {
 }
 
 // ─── Explore categories ───────────────────────────────────────────────────────
-// NEEDS LIVE VERIFICATION: unlike the other listing functions in this file,
-// there's no confirmed Angular contract for "list all discover categories with
-// labels/images" as a single API call — Angular's Discover grid tiles come from
-// PPSET's DISCOVERKEY-derived static config, with fetchExploreCounts (above)
-// separately supplying live counts per category. This PAGENO=1 call against
-// listing/explore/v1 (the same endpoint fetchExplore() uses with a required
-// FILTERTYPE) is unconfirmed and likely needs the same param-shape fix applied
-// above if it turns out to be hitting the wrong contract — flagged rather than
-// guessed further without a documented shape to base a fix on.
+// Angular: getExploreMatchesCount() → listing/explorecount/v1. TYPES is built
+// from PPSET's DISCOVERKEY — an array of {TYPE, KEY} entries, NOT a ready-made
+// string — by common.discoverType(DISCOVERKEY, ['0']): keep entries whose
+// TYPE === '0' (the only value Home ever calls with), collect their KEY, join
+// with '~'. Response's RESPONSE is an object keyed by arbitrary group names,
+// each value an ARRAY of item objects (TITLE/ICON/FILTER/BGCOLOUR/COUNT) —
+// confirmed against explore.component.ts's own parsing (flattens every key's
+// array together, keeps items with COUNT > 0). This one call is Home's entire
+// data source for the section — there's no separate "list categories" call.
 
-export async function fetchExploreCategories(): Promise<ExploreCategory[]> {
-  const res = await apiCall(Endpoints.listing.explore, 'POST', 'PAGENO=1')
-  const raw = res['LIST'] ?? res['LISTDATA'] ?? []
-  if (!Array.isArray(raw)) return []
-  return raw.map((item: Record<string, any>, idx: number) => ({
-    // Angular: explore-card.component.html's ACTIVE (non-commented) template
-    // reads exploreData.TITLE (count already baked in server-side, no separate
-    // count element) and exploreData.ICON (a small icon, not a full tile image).
-    id:       item['ID']       ?? item['FILTER']  ?? item['TYPE'] ?? String(idx),
-    label:    item['TITLE']    ?? item['LABEL']   ?? '',
-    count:    Number(item['COUNT'] ?? 0),
-    imageUrl: item['ICON']     ?? item['IMAGEURL'] ?? item['IMGURL'] ?? '',
-    bgColor:  item['BGCOLOUR'] ?? item['BGCOLOR']  ?? undefined,
-  }))
+function discoverKeyTypes(discoverKey: unknown): string {
+  if (!Array.isArray(discoverKey)) return ''
+  return discoverKey
+    .filter((entry: any) => String(entry?.['TYPE']) === '0')
+    .map((entry: any) => entry?.['KEY'])
+    .filter(Boolean)
+    .join('~')
 }
 
-// ─── Explore / Discover tile counts ───────────────────────────────────────────
-// Angular: getExploreMatchesCount() → listing/explorecount/v1 — ID,TYPES=<pipe~
-// joined discover keys>,START=0,LIMIT=1,LISTTYPE=COUNT,LIKED=1,VIEWED=0,
-// REPORTED=1,BLOCKED=1,REMOVED=1,SKIPED=1,BANNERFLAG=0. `discoverKey` here is
-// PPSET's DISCOVERKEY value itself (already the pipe-joined key string per
-// Angular's common.discoverType()), passed straight through as TYPES.
-// Response shape is still unconfirmed against a live payload — mapper below
-// tries both an object-keyed-by-category and a flat-list shape, falling back
-// to an empty map (tiles render without a count) if neither matches.
-
-export async function fetchExploreCounts(discoverKey?: string): Promise<Record<string, number>> {
+export async function fetchExploreCategories(discoverKey?: unknown): Promise<ExploreCategory[]> {
   const userId = await getItem(StorageKeys.Auth.USER_ID)
   const parts = [
     `ID=${userId ?? ''}`,
-    `TYPES=${discoverKey ?? ''}`,
+    `TYPES=${discoverKeyTypes(discoverKey)}`,
     'START=0', 'LIMIT=1', 'LISTTYPE=COUNT',
     'LIKED=1', 'VIEWED=0', 'REPORTED=1', 'BLOCKED=1', 'REMOVED=1', 'SKIPED=1', 'BANNERFLAG=0',
   ]
   const res = await apiCall(Endpoints.listing.exploreCount, 'POST', parts.join('&'))
-  if (String(res?.RESPONSECODE) !== '1' || String(res?.ERRCODE) !== '0') return {}
-
-  const counts: Record<string, number> = {}
   const respObj = res['RESPONSE']
-  if (respObj && !Array.isArray(respObj) && typeof respObj === 'object') {
-    for (const [key, value] of Object.entries(respObj)) {
-      const count = Array.isArray(value) ? Number((value[0] as any)?.['COUNT'] ?? 0) : Number((value as any)?.['COUNT'] ?? value ?? 0)
-      if (!Number.isNaN(count)) counts[key] = count
-    }
-    return counts
+  if (!respObj || typeof respObj !== 'object') return []
+
+  const items: Record<string, any>[] = []
+  for (const value of Object.values(respObj)) {
+    if (Array.isArray(value)) items.push(...value)
   }
-  const rawList = res['LIST'] ?? res['LISTDATA'] ?? (Array.isArray(respObj) ? respObj : [])
-  if (Array.isArray(rawList)) {
-    for (const item of rawList) {
-      const key = String(item?.['KEY'] ?? item?.['TYPE'] ?? '')
-      if (key) counts[key] = Number(item?.['COUNT'] ?? 0)
-    }
-  }
-  return counts
+  return items
+    .filter(item => Number(item['COUNT']) > 0)
+    .map((item, idx) => ({
+      // Angular: explore-card.component.html's ACTIVE (non-commented) template
+      // reads exploreData.TITLE (count already baked in server-side, no separate
+      // count element) and exploreData.ICON (a small icon, not a full tile image).
+      id:       item['FILTER'] ?? String(idx),
+      label:    String(item['TITLE'] ?? ''),
+      count:    Number(item['COUNT'] ?? 0),
+      imageUrl: String(item['ICON'] ?? ''),
+      bgColor:  item['BGCOLOUR'] ?? undefined,
+    }))
 }
 
 // ─── Profile-validation-rejected sticky banner ────────────────────────────────
 // Angular: common.getProfileValidationData() → registrationform/v1?type=PROFILEVALID,
 // shown as a sticky above the footer (PISTATUS in [5,13] — profile rejected/under
-// review). No existing caller to copy the shape from; lowercase `type=` matches
-// every other caller of this endpoint in registrationService.ts (getRegistrationArrays
-// uses `type=all`).
-// NEEDS LIVE VERIFICATION: response field names (PROSTICKY/PROBOTTOM per the
-// Angular analysis) — mapped defensively below with fallbacks.
+// review). Confirmed against common.ts's getProfileValidationData()
+// (`type=PROFILEVALID&LANG=...`, no ID param) and bottom-sheet.service.ts's
+// assignStickyData()/assignBottomUpData() for the exact response shape:
+// RESPONSE.PROSTICKY = {TITLE, CTA, IMG} (the sticky's own content — TITLE is
+// the sticky text) and RESPONSE.PROBOTTOM = {TITLE, CONTENT, CTA, IMG, CTAIMG}
+// (the bottom sheet shown when the sticky is tapped).
 
-export async function fetchProfileValidationBanner(): Promise<{ show: boolean; message: string; ctaLabel: string } | null> {
-  const userId = await getItem(StorageKeys.Auth.USER_ID)
-  const res = await apiCall(Endpoints.registration.initialFetch, 'POST', `type=PROFILEVALID&ID=${userId ?? ''}`)
-  if (String(res?.ERRCODE) !== '0') return null
-  const data = res['RESPONSE'] ?? res['PROSTICKY'] ?? res
-  const message = data?.['MESSAGE'] ?? data?.['CONTENT'] ?? data?.['STICKYCONTENT'] ?? ''
-  if (!message) return null
+export interface ProfileValidationBanner {
+  stickyContent:  string
+  stickyImg?:     string | undefined
+  bottomTitle:    string
+  bottomContent:  string
+  bottomImg?:     string | undefined
+  bottomCtaLabel: string
+}
+
+export async function fetchProfileValidationBanner(): Promise<ProfileValidationBanner | null> {
+  const lang = (await getItem(StorageKeys.Auth.LANG)) ?? 'en'
+  const res = await apiCall(Endpoints.registration.initialFetch, 'POST', `type=PROFILEVALID&LANG=${lang}`)
+  if (String(res?.ERRCODE) !== '0' || !res?.RESPONSE) return null
+  const sticky = res.RESPONSE['PROSTICKY'] ?? {}
+  const bottom  = res.RESPONSE['PROBOTTOM'] ?? {}
+  const stickyContent = sticky['TITLE']
+  if (!stickyContent) return null
   return {
-    show:     true,
-    message:  String(message),
-    ctaLabel: String(data?.['CTA'] ?? data?.['CTALABEL'] ?? 'Know more'),
+    stickyContent:  String(stickyContent),
+    stickyImg:      sticky['IMG'] || undefined,
+    bottomTitle:    String(bottom['TITLE'] ?? ''),
+    bottomContent:  String(bottom['CONTENT'] ?? ''),
+    bottomImg:      bottom['IMG'] || undefined,
+    bottomCtaLabel: String(bottom['CTA'] ?? ''),
   }
 }
 

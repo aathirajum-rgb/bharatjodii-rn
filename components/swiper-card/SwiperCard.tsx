@@ -28,9 +28,14 @@ const FWD_ICON = `${CDN_SVG}revamp/forward-icon-link.svg`
 // onScroll (see handleScroll below) rather than only on scroll-settle, since
 // react-native-web doesn't reliably fire onMomentumScrollEnd for mouse-drag/
 // trackpad scrolling.
-function PaginationDots({ total, activeIndex }: { total: number; activeIndex: number }) {
+// Angular: dailyrecommendations' own drmatches config uses dynamicMainBullets:2
+// instead of the 5 every other section's swiper config uses — exported so
+// CoverflowSwiper.tsx (that section's dedicated carousel) can reuse this with
+// its own window size instead of duplicating the dot logic.
+export function PaginationDots({
+  total, activeIndex, maxVisible = 5,
+}: { total: number; activeIndex: number; maxVisible?: number }) {
   if (total <= 1) return null
-  const maxVisible = 5
   const half = Math.floor(maxVisible / 2)
   let start = Math.max(0, Math.min(activeIndex - half, total - maxVisible))
   start = Math.max(0, start)
@@ -140,8 +145,12 @@ export interface SwiperCardProps {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CARD_GAP   = 12
-const CARD_PAD   = 16   // horizontal padding on the FlatList
+// Angular: home.config.ts's per-section swiper `spaceBetween: 16` (every
+// section but selfHelp, which is 1 — not special-cased here, the difference
+// is imperceptible). app-swiper.component.html's wrapping ion-row is
+// `pr-24 pl-24` — confirmed against global.scss, not the design file alone.
+const CARD_GAP   = 16
+const CARD_PAD   = 24   // horizontal padding on the FlatList
 
 // ─── SwiperCard ───────────────────────────────────────────────────────────────
 // Horizontal scrollable section of ProfileCards.
@@ -307,8 +316,10 @@ export default function SwiperCard({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  // Angular: app-swiper.component.html's outer ion-grid — pb-12 trailing gap
+  // after the whole section, before the next section's divider.
   container: {
-    marginBottom: 24,
+    marginBottom: 12,
   },
 
   // ── Header ────────────────────────────────────────────────────────────────
@@ -317,7 +328,10 @@ const styles = StyleSheet.create({
     alignItems:        'center',
     justifyContent:    'space-between',
     paddingHorizontal: CARD_PAD,
-    marginBottom:      12,
+    // Angular: header's own ion-row is pb-24 (pb-8 for likedprofile only,
+    // not distinguished here — see SCOPE note if that section's spacing
+    // gets reviewed separately).
+    marginBottom:      24,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -325,9 +339,10 @@ const styles = StyleSheet.create({
     gap:           8,
     flex:          1,
   },
+  // Angular: .heading2-semibold-18 { font-family: var(--english-semibold-poppins) }
   headerTitle: {
+    fontFamily: 'Poppins-SemiBold',
     fontSize:   18,
-    fontWeight: '700',
     color:      Colors.textPrimary,
     flexShrink: 1,
   },
@@ -380,17 +395,21 @@ const styles = StyleSheet.create({
     alignItems:    'center',
     gap:           4,
   },
+  // Angular global.scss: .explore-pagination .swiper-pagination-bullet —
+  // 5x5 circle, #F4CECE.
   dot: {
-    width:           6,
-    height:          6,
-    borderRadius:    3,
-    backgroundColor: Colors.border,
+    width:           5,
+    height:          5,
+    borderRadius:    2.5,
+    backgroundColor: Colors.paginationDotInactive,
   },
+  // Angular global.scss: .explore-pagination .swiper-pagination-bullet-active
+  // — 20x5 pill, #B50033 (Colors.primaryDark, not the brighter Colors.primary).
   dotActive: {
-    width:           16,
-    height:          6,
-    borderRadius:    3,
-    backgroundColor: Colors.primary,
+    width:           20,
+    height:          5,
+    borderRadius:    2.5,
+    backgroundColor: Colors.primaryDark,
   },
   dotSmall: {
     width:        4,

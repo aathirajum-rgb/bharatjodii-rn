@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import CdnSvg from '../cdn-svg/CdnSvg'
+import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
 import Badge from '../badge/Badge'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
@@ -178,8 +178,13 @@ export default function AppHeader({
               live screenshot — plain avatar, no badge) — not rendered here
               either, `completionPct` is kept in the prop interface only in
               case a future revamp re-enables it. */}
+          {/* Angular: .avatar { width/height: 13.5vmin } with no border at
+              all — the red ring here had no CSS basis, removed. Also:
+              userImg is a real uploaded photo (JPG/PNG) when set, not
+              guaranteed SVG like the fallback placeholder is, so this needs
+              CdnImage's format detection, not a hardcoded CdnSvg. */}
           <Pressable style={styles.h1AvatarWrap} onPress={onAvatarPress}>
-            <CdnSvg
+            <CdnImage
               uri={userImg ?? ownAvatarFallback}
               width={48}
               height={48}
@@ -189,6 +194,9 @@ export default function AppHeader({
 
           <Pressable style={styles.h1NameBlock} onPress={onEditProfilePress}>
             <Text style={styles.h1UserName} numberOfLines={1}>{userName ?? ''}</Text>
+            {/* Angular: componentData.LINKCTACOLOR — always 'linkColor'
+                (--ion-color-link-color: #29339B) for Home's header1 in every
+                state this app reaches, not the brand red this used. */}
             <View style={styles.h1EditRow}>
               <Text style={styles.h1EditLabel}>Edit profile</Text>
               <CdnSvg uri={ICONS.fwdLink} width={12} height={12} />
@@ -280,14 +288,13 @@ const styles = StyleSheet.create({
     marginTop:     10,
   },
 
-  // Avatar with completion % badge
+  // Avatar — Angular: .avatar { width/height: 13.5vmin } — no border/ring
+  // exists in the real CSS at all (the completion-% overlay that DOES have
+  // a red border is separately confirmed dead/commented-out).
   h1AvatarWrap: {
-    width:          52,
-    height:         52,
-    borderRadius:   26,
-    borderWidth:    2,
-    borderColor:    Colors.primary,
-    overflow:       'visible',
+    width:          48,
+    height:         48,
+    borderRadius:   24,
     alignItems:     'center',
     justifyContent: 'center',
     position:       'relative',
@@ -333,10 +340,12 @@ const styles = StyleSheet.create({
     gap:           4,
     marginTop:     1,
   },
+  // Angular: componentData.LINKCTACOLOR resolves to 'linkColor'
+  // (--ion-color-link-color: #29339B), not the brand red.
   h1EditLabel: {
     fontFamily: 'Poppins-Regular',
     fontSize:   12,
-    color:      Colors.primary,
+    color:      Colors.link,
   },
   h1EditIcon: {
     width:     12,
@@ -376,13 +385,12 @@ const styles = StyleSheet.create({
     height: 12,
   },
 
-  // Icon buttons — blue bordered squares
-  // Measured directly off the live Angular app (.home-header-icon computed
-  // style): 36×36, 8px radius, transparent fill, solid black 1px border —
-  // not the light-blue filled pill this previously guessed at.
+  // Icon buttons — Angular: .home-header-icon (8px radius, transparent fill,
+  // solid black 1px border) wraps .width-height-32 (9vmin ≈ 32px on a
+  // typical phone width) — corrected from an earlier, too-large 36×36 guess.
   h1IconBtn: {
-    width:           36,
-    height:          36,
+    width:           32,
+    height:          32,
     borderRadius:    8,
     backgroundColor: 'transparent',
     borderWidth:     1,

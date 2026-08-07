@@ -11,7 +11,9 @@ import {
   type ViewStyle,
 } from 'react-native'
 import { BlurView } from 'expo-blur'
+import { LinearGradient } from 'expo-linear-gradient'
 import * as ImagePicker from 'expo-image-picker'
+import { useTranslation } from 'react-i18next'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
@@ -20,7 +22,7 @@ import { getOppGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 // Drives border-radius variants — mirrors Angular .matches / .viewedyou / .successStory
-export type PhotoVariant = 'matches' | 'viewedyou' | 'successStory' | 'default'
+export type PhotoVariant = 'matches' | 'viewedyou' | 'successStory' | 'default' | 'likedProfile'
 
 export interface ProfilePhotoProps {
   // ── Image source ──────────────────────────────────────────────────────────
@@ -51,6 +53,10 @@ export interface ProfilePhotoProps {
 
   // ── Layout ────────────────────────────────────────────────────────────────
   variant?:  PhotoVariant | undefined
+  // Angular: .information-block — only card types 1 & 2's templates include
+  // this dark gradient div; types 3/4/6/7/8 don't, so this must be opt-in
+  // rather than rendered for every ProfilePhoto instance.
+  showGradientScrim?: boolean | undefined
   style?:    StyleProp<ViewStyle> | undefined
   children?: React.ReactNode    // card-specific overlays (InfoOverlay, eyeBadge, etc.)
 
@@ -89,8 +95,43 @@ const ICONS = {
 const RADIUS: Record<PhotoVariant, { tl: number; tr: number; bl: number; br: number }> = {
   default:      { tl: 12, tr: 12, bl: 12, br: 12 },
   matches:      { tl: 16, tr: 16, bl: 16, br: 16 },
-  viewedyou:    { tl: 12, tr: 12, bl:  0, br:  0 },
+  // Angular: .viewedyou/.viewedbyme/.whoviewednumber.card-ht3 { border-radius:
+  // 12px } — full rounding (the photo is inset within its own card, not
+  // full-bleed with a flat bottom edge like variant 1/2's cards).
+  viewedyou:    { tl: 12, tr: 12, bl: 12, br: 12 },
   successStory: { tl: 12, tr: 12, bl:  0, br:  0 },
+  // Angular: type='8's app-photo-new gets [btmRadiusClass]="'border-radius-24'"
+  // — a distinct 24px radius, matching the outer .card-type-8 card shell's
+  // own 24px (not the 16px 'matches' shares with newmatches/dailyrecommendations/etc).
+  likedProfile: { tl: 24, tr: 24, bl: 24, br: 24 },
+}
+
+// ─── Newly-joined badge sub-component ────────────────────────────────────────
+// Angular: .newly-joined's background SVG has no intrinsic size of its own to
+// read — `width:fit-content` means the SHAPE stretches (background-size:cover)
+// to whatever the icon+text+padding content naturally computes to. RN can't
+// size an SvgUri/Image to "cover an as-yet-unmeasured parent", so this renders
+// text-only on the first frame, measures itself via onLayout, then adds the
+// real background SVG behind the content at that exact size.
+
+function NewlyJoinedBadge() {
+  const { t } = useTranslation()
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null)
+
+  return (
+    <View
+      style={styles.newlyJoinedBadge}
+      onLayout={e => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+    >
+      {!!size && (
+        <CdnSvg uri={ICONS.newlyJoinedBg} width={size.width} height={size.height} style={StyleSheet.absoluteFill} />
+      )}
+      <CdnSvg uri={ICONS.newlyJoinedStar} width={16} height={16} />
+      {/* Angular: MATCHES.NEW_BADGE — "Newly Joined", not the "New" this
+          previously hardcoded. */}
+      <Text style={styles.newlyJoinedText}>{t('MATCHES.NEW_BADGE')}</Text>
+    </View>
+  )
 }
 
 // ─── PhotoRequest overlay sub-component ──────────────────────────────────────
@@ -152,6 +193,7 @@ export default function ProfilePhoto({
   dontShowLabel = "Don't show this profile",
   showThreeDots = false,
   variant = 'default',
+  showGradientScrim = false,
   style,
   children,
   onPress,
@@ -301,19 +343,38 @@ export default function ProfilePhoto({
         />
       )}
 
-      {/* ── Gradient scrim at the bottom (matches Angular .information-block) ── */}
-      <View style={[styles.scrim, { borderBottomLeftRadius: r.bl, borderBottomRightRadius: r.br }]} />
+      {/* ── Gradient scrim, full card (types 1 & 2 only) — Figma: linear-
+          gradient(180deg, rgba(0,0,0,0) 50%, rgba(0,0,0,0.9) 100%), confirmed
+          via get_design_context's `from-1/2 from-rgba(0,0,0,0) to-rgba(0,0,0,0.9)`
+          on an inset-0 layer (spans the whole card, not just a bottom strip —
+          differs from Angular's own shorter, fully-opaque .information-block
+          gradient; this follows the Figma spec per explicit direction). ── */}
+      {showGradientScrim && (
+        <LinearGradient
+          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.9)']}
+          locations={[0, 0.5, 1]}
+          style={[
+            StyleSheet.absoluteFill,
+            {
+              borderTopLeftRadius:     r.tl,
+              borderTopRightRadius:    r.tr,
+              borderBottomLeftRadius:  r.bl,
+              borderBottomRightRadius: r.br,
+            },
+          ]}
+        />
+      )}
 
       {/* ── Card-level overlays passed from parent (InfoOverlay, eyeBadge, etc.) ── */}
       {children}
 
-      {/* ── Newly-joined badge (top-left ribbon) ── */}
-      {isNewlyJoined && (
-        <View style={styles.newlyJoinedBadge}>
-          <CdnSvg uri={ICONS.newlyJoinedStar} width={14} height={14} style={styles.newlyJoinedStar} />
-          <Text style={styles.newlyJoinedText}>New</Text>
-        </View>
-      )}
+      {/* ── Newly-joined badge (top-left ribbon) ── Angular: .newly-joined —
+          a background SVG (newly-joined.svg, background-size:cover),
+          width:fit-content — not a flat color + corner-radius rectangle.
+          RN can't stretch an SVG to an as-yet-unknown auto-sized parent
+          without measuring first, so the background renders only once
+          onLayout reports the content's real size. ── */}
+      {isNewlyJoined && <NewlyJoinedBadge />}
 
       {/* ── Shortlist pill (top-right) ── */}
       {isShortlisted && (
@@ -405,41 +466,27 @@ const styles = StyleSheet.create({
     top: 0,
     left: 0,
   },
-  // Gradient scrim — matches Angular .information-block
-  scrim: {
-    position:  'absolute',
-    bottom:    0,
-    left:      0,
-    right:     0,
-    height:    75,
-    // LinearGradient not available without expo-linear-gradient;
-    // using opaque black at bottom achieves same visual
-    backgroundColor: 'transparent',
-    // Native shadow approach: semi-transparent fill at very bottom
-  },
 
   // ── Newly-joined badge ──────────────────────────────────────────────────────
   // Matches Angular .newly-joined (ribbon at top-left, custom SVG bg)
+  // Angular: .newly-joined { padding: 4px 20px 4px 12px } — shape comes from
+  // the real background SVG (rendered in NewlyJoinedBadge above), not a flat
+  // color + corner-radius.
   newlyJoinedBadge: {
     position:        'absolute',
     top:             0,
     left:            0,
     flexDirection:   'row',
     alignItems:      'center',
-    backgroundColor: Colors.primaryDark,
     paddingVertical:   4,
     paddingLeft:      12,
     paddingRight:     20,
-    borderBottomRightRadius: 20,
   },
-  newlyJoinedStar: {
-    width:  14,
-    height: 14,
-  },
+  // Angular: .textcta-medium-12 { font-family: var(--english-medium-poppins) }
   newlyJoinedText: {
+    fontFamily: 'Poppins-Medium',
     color:      Colors.white,
     fontSize:   12,
-    fontWeight: '500',
     marginLeft:  4,
   },
 

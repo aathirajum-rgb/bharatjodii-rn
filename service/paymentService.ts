@@ -160,6 +160,13 @@ export async function redirectToIntermediatePage(
   fromPage = '',
   paymentId?: string,
   type?: string,
+  // Angular: payment.service.ts's reDirectPage() takes its own replaceURL
+  // param, defaulting to false at most call sites but explicitly passed
+  // `true` from dr.service.ts's redirectPaymentPage() — i.e. when this is
+  // reached AFTER a screen already shown via replaceUrl (like DR), the
+  // payment screen should replace it too, not stack on top. Defaults to
+  // false here to keep every existing call site's push behavior unchanged.
+  replace = false,
 ): Promise<void> {
   const renewalFlag = String((await getSessionValue('PAYRENEWALFLAG')) ?? '')
   const renewalKey  = String((await getSessionValue('RENEWALENABLEKEY')) ?? '')
@@ -170,7 +177,9 @@ export async function redirectToIntermediatePage(
     fromPage !== 'renewal'
 
   const destination = goToRenewal ? ENavigation.RENEWAL : ENavigation.RECHARGE
-  navigate(destination, { from: fromPage, paymentId, type })
+  const params = { from: fromPage, paymentId, type }
+  if (replace) resetTo(destination, params)
+  else navigate(destination, params)
 }
 
 // ─── UPI Autopay renewal (RenewalScreen) ──────────────────────────────────────

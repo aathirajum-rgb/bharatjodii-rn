@@ -3,7 +3,6 @@ import {
   Dimensions,
   FlatList,
   Image,
-  ImageBackground,
   Linking,
   Modal,
   Pressable,
@@ -17,20 +16,25 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTranslation } from 'react-i18next'
 import { useVideoPlayer, VideoView } from 'expo-video'
-import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CdnSvg, { CdnImage, CdnSvgBackground } from '../../components/cdn-svg/CdnSvg'
+import CdnLottie from '../../components/CdnLottie'
 import AppHeader, { type ToolbarItem } from '../../components/app-header/AppHeader'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import SwiperCard, { type SwiperItem } from '../../components/swiper-card/SwiperCard'
+import CoverflowSwiper from '../../components/swiper-card/CoverflowSwiper'
 import Loader from '../../components/loader/Loader'
 import StickyBanner from '../../components/sticky-banner/StickyBanner'
+import PhotoPromoSticky from '../../components/sticky-banner/PhotoPromoSticky'
+import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import { paymentTrack, getHeroBannerDetails, getMenuPromo, redirectToIntermediatePage } from '../../service/paymentService'
-import { communicationBtnOnClick } from '../../service/communicationService'
+import { communicationBtnOnClick, fetchContactDetails } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
-import { getItem, setItem, removeItem } from '../../service/storageService'
+import { getItem, setItem, removeItem, getJson } from '../../service/storageService'
 import { getRegistrationArrays } from '../../service/registrationService'
 import { logScreen } from '../../service/analyticsService'
 import { socketConnection, emitNotificationDetails, onNotificationList } from '../../service/socketService'
 import { StorageKeys } from '../../constants/storage.keys'
+import { APP_VERSION } from '../../constants/appVersion'
 import { EnvConfig } from '../../constants/env'
 import { Colors } from '../../constants/colors'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
@@ -57,15 +61,18 @@ import {
   fetchExploreCategories, fetchHomeSession, fetchAndStorePPSetData, fetchMatches,
   fetchViewedYou, fetchDailyRec, fetchNewlyJoined, fetchViewedByMe,
   fetchLikedByMe, fetchLikedYou, fetchSuccessStories, fetchFaqVideos,
-  fetchCustomerCare, fetchNotifCount, fetchExploreCounts, refreshSession,
-  mapCompleteProfileCards, fetchProfileValidationBanner,
+  fetchCustomerCare, fetchNotifCount, refreshSession,
+  mapCompleteProfileCards, fetchProfileValidationBanner, type ProfileValidationBanner,
   type ExploreCategory, type HelpVideo, type CompleteProfileCard, type ComCountEntry,
 } from '../../service/homeService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN = 'https://imgs.jodii.app/assets/images/svg/'
+const FWD_ICON = `${CDN}revamp/forward-icon-link.svg`
 const { width: SW } = Dimensions.get('window')
+// Angular: .success-story-image img { width: 35vw; height: 35vw }
+const HAND_SIZE = SW * 0.35
 
 // ─── Toolbar ──────────────────────────────────────────────────────────────────
 // Angular: core/config/home.config.ts's homeToolBar — discover-matches (search
@@ -163,24 +170,37 @@ export interface CompleteProfileSectionProps {
   onCardPress: (card: CompleteProfileCard) => void
 }
 
+// Angular: complete-profile.component.html's cardType==='completeprofile'
+// branch — a plain *ngFor (each card its own bordered/gradient
+// .complete-profile-block, mt-16 between them), NOT the <swiper> element
+// that same component's [swiper-config] input might suggest — that config
+// is only consumed by the *ngIf="selfVideo" branch (the FAQ-video carousel),
+// a different cardType entirely.
 export function CompleteProfileSection({ cards, onCardPress }: CompleteProfileSectionProps) {
   if (cards.length === 0) return null
   return (
-    <View style={s.cpCard}>
-      {cards.map((card, idx) => (
-        <View key={card.type}>
-          <Pressable style={s.cpRow} onPress={() => onCardPress(card)}>
-            {/* Angular: card?.THUMBIMG — a per-card image URL from the server,
-                not a client-guessed icon; plain Image (not CdnSvg) since the
-                format isn't guaranteed to be SVG. */}
-            <View style={s.cpIcon}>
-              {!!card.imageUrl && <Image source={{ uri: card.imageUrl }} style={s.cpIconImg} resizeMode="contain" />}
+    <View style={s.cpList}>
+      {cards.map(card => (
+        <Pressable key={card.type} onPress={() => onCardPress(card)}>
+          <LinearGradient
+            colors={['#E8EFFF', '#FFFFFF']}
+            start={{ x: 0, y: 0.15 }}
+            end={{ x: 1, y: 0 }}
+            style={s.cpCard}
+          >
+            {/* Angular: card?.THUMBIMG — a per-card image URL from the server;
+                format isn't guaranteed, so CdnImage picks SvgUri vs Image by
+                extension instead of assuming either way. */}
+            {!!card.imageUrl && <CdnImage uri={card.imageUrl} width={48} height={48} />}
+            <View style={s.cpInfo}>
+              <Text style={s.cpTitle}>{card.label}</Text>
+              <View style={s.cpCtaRow}>
+                <Text style={s.cpCtaText}>{card.ctaLabel}</Text>
+                <CdnSvg uri={FWD_ICON} width={16} height={16} />
+              </View>
             </View>
-            <Text style={s.cpText}>{card.label}</Text>
-            <Text style={s.cpAdd}>{card.ctaLabel} {'>'}</Text>
-          </Pressable>
-          {idx < cards.length - 1 && <View style={s.cpDivider} />}
-        </View>
+          </LinearGradient>
+        </Pressable>
       ))}
     </View>
   )
@@ -206,10 +226,10 @@ export function LikedProfilesSection({
   const items = likedTab === 'likedbyme' ? likedByMe : likedMe
   return (
     <>
-      {/* No confirmed i18n key for this combined "Liked profiles (N)" header —
-          left in English pending source verification; the tab labels below
-          are confirmed against LIKE_LIST.LIKEDYOU_HOME/LIKESENT_HOME. */}
-      <Text style={s.sectionTitle}>{'Liked profiles (' + (likedByCount + likedMeCount) + ')'}</Text>
+      {/* Angular: app-swiper.component.ts's setHeader() — swiperHeader is
+          sectionTitle.likedprofile = 'GENERAL.ICON_3' ("Liked profiles"),
+          suffixed with (likedYouCount + likedByMeCount) when > 0. */}
+      <Text style={s.sectionTitle}>{`${t('GENERAL.ICON_3')} (${likedByCount + likedMeCount})`}</Text>
       <View style={s.tabRow}>
         <Pressable style={[s.tabPill, likedTab === 'likedyou'  && s.tabPillActive]} onPress={() => onTabChange('likedyou')}>
           <Text style={[s.tabPillText, likedTab === 'likedyou'  && s.tabPillTextActive]}>{`${t('LIKE_LIST.LIKEDYOU_HOME')} (${likedMeCount})`}</Text>
@@ -278,7 +298,7 @@ export function ExploreCategoriesSection({
               style={s.catTile}
             >
               <View style={s.catIconWrap}>
-                {!!cat.imageUrl && <Image source={{ uri: cat.imageUrl }} style={s.catIconImg} resizeMode="contain" />}
+                {!!cat.imageUrl && <CdnImage uri={cat.imageUrl} width={28} height={28} />}
               </View>
               <Text style={s.catLabel} numberOfLines={2}>
                 {cat.label}{'  '}
@@ -302,10 +322,20 @@ export function SuccessStoriesSection({
   const subtitle = t('HOME.HAPPILY_MARRIED_CONTENT').replace(/<br\s*\/?>/gi, '\n')
   return (
     <>
-      <View style={s.storyHeader}>
-        <Text style={s.storyTitle}>{headLine1}</Text>
-        <Text style={s.storyTitleBold}>{headLine2}</Text>
-        <Text style={s.storySubtitle}>{subtitle}</Text>
+      {/* Angular: an 80x80 success-heart-animation.json Lottie sits above the
+          header text (pl-24, pulled up 18px to overlap it), with
+          success-story-hand.svg absolutely positioned top-right of the whole
+          row (35vw square) — both were missing entirely before this fix. */}
+      <View style={s.storyHeaderRow}>
+        <View>
+          <CdnLottie uri={`${CDN}revamp/animation/success-heart-animation.json`} width={80} height={80} />
+          <View style={s.storyHeader}>
+            <Text style={s.storyTitle}>{headLine1}</Text>
+            <Text style={s.storyTitle}>{headLine2}</Text>
+            <Text style={s.storySubtitle}>{subtitle}</Text>
+          </View>
+        </View>
+        <CdnSvg uri={`${CDN}success-story-hand.svg`} width={HAND_SIZE} height={HAND_SIZE} style={s.storyHandImage} />
       </View>
       {/* No cardWidth override — Angular: card-ht4 is 91.111vmin square, not
           the previous guessed 68% width. Let SwiperCard's per-section default
@@ -403,7 +433,7 @@ export function HelpSection({
           <Text style={s.helpCtaChevron}>{'›'}</Text>
         </Pressable>
       </View>
-      <Image source={{ uri: `${CDN}call-24-7.svg` }} style={s.helpImage} resizeMode="contain" />
+      <CdnSvg uri={`${CDN}call-24-7.svg`} width={80} height={80} />
     </LinearGradient>
   )
 }
@@ -447,7 +477,24 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   // priority, same as MatchesScreen.tsx's judgment call) and the profile-
   // validation-rejected banner (PISTATUS in [5,13]).
   const [forceUpdateInfo, setForceUpdateInfo]           = useState<ForceUpdateInfo | null>(null)
-  const [profileValidationBanner, setProfileValidationBanner] = useState<{ show: boolean; message: string; ctaLabel: string } | null>(null)
+  const [profileValidationBanner, setProfileValidationBanner] = useState<ProfileValidationBanner | null>(null)
+  // Angular: tapping the ProfileValidSticky opens bottomSheetService.showBtmSheet()
+  // (action='profileValidation') — a SEPARATE open/close state from the sticky
+  // itself, which stays visible underneath (Row B has no close button of its own).
+  const [profileValidationSheetVisible, setProfileValidationSheetVisible] = useState(false)
+  // Angular: getPPSETData()'s if/elseif chain — the SAME 3 conditions that pick
+  // the hero banner variant (photo_promo_free_female/non_id_verify_male/
+  // paid_verified_no_photo) ALSO populate a sticky nudge simultaneously, reading
+  // a DIFFERENT sub-key off the same REGISTRATIONARRAYS entry (.Shortlist/.sticky
+  // instead of the hero banner's .Banner). type drives both the tap target and
+  // (implicitly) that this sticky has no close button, matching Angular's
+  // CLOSE_IMG='' for this content.
+  const [photoPromoSticky, setPhotoPromoSticky] = useState<{ content: string; imageUrl?: string | undefined; type: 'ADDPHOTO' | 'IDVERIFY' } | null>(null)
+  // Angular: getContactsData() — the pending-UPI-autopay-renewal-payment nudge.
+  // Only ever checked when checkProfileStatus() DIDN'T already show the
+  // profile-validation sticky (PISTATUS not 5/13) — mutually exclusive with it
+  // by construction in Angular, matched below by gating the fetch the same way.
+  const [autopaySticky, setAutopaySticky] = useState<{ content: string; ctaLabel: string } | null>(null)
   const [stickyDismissed, setStickyDismissed]           = useState(false)
   // Angular: logScrollEnd() hides the sticky banner once the user has scrolled
   // past the header while actively scrolling down (shows again scrolling up or
@@ -514,10 +561,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
     getItem(StorageKeys.User.PHOTO_URL).then(photo => { if (!ctrl.cancelled && photo) setUserImg(photo) })
 
-    fetchExploreCategories().then(result => {
-      if (!ctrl.cancelled && result.length > 0) setCategories(result)
-    })
-
     Promise.all([fetchHomeSession(), fetchAndStorePPSetData()]).then(async ([session, data]) => {
       if (ctrl.cancelled) return
       if (session.userName) setUserName(session.userName)
@@ -527,12 +570,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       const completeness = Number(data?.['PROFILECOMPLETENESS'])
       if (!Number.isNaN(completeness)) setCompletionPct(completeness)
 
-      const [g, ekyc, paid, renewal, discoverCounts] = await Promise.all([
+      const [g, ekyc, paid, renewal, exploreCategories] = await Promise.all([
         getItem(StorageKeys.User.LOGIN_GENDER),
         getItem('EKYCSTATUS'),
         getItem(StorageKeys.Payment.PAY_P_FLAG),
         getItem(StorageKeys.Payment.PAY_RENEWAL_FLAG),
-        fetchExploreCounts(data?.['DISCOVERKEY']),
+        fetchExploreCategories(data?.['DISCOVERKEY']),
       ])
       if (ctrl.cancelled) return
       const resolvedGender: 'M' | 'F' = g === 'M' ? 'M' : 'F'
@@ -547,13 +590,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       const rawCards = mapCompleteProfileCards(data)
       setCompleteCards(filterCompleteProfileCards(rawCards, session.horoAvailable, photoApproved))
 
-      // Merge live counts into the Explore/Discover grid (best-effort — see
-      // fetchExploreCounts' NEEDS LIVE VERIFICATION note).
-      if (Object.keys(discoverCounts).length > 0) {
-        setCategories(prev => prev.map(cat => (
-          discoverCounts[cat.id] !== undefined ? { ...cat, count: discoverCounts[cat.id] } : cat
-        )))
-      }
+      if (exploreCategories.length > 0) setCategories(exploreCategories)
 
       // ── Hero banner precedence chain (Angular: explore.component.ts's
       // getPPSETData() chain, same order MatchesScreen.tsx's applyHeroBanner
@@ -596,6 +633,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       })
       if (ctrl.cancelled) return
       setHeroBannerVariant(variant)
+      setPhotoPromoSticky(null)
 
       if (variant === 'payment_failed' && paymentFailedContent) {
         setHeroBannerContent(paymentFailedContent)
@@ -613,6 +651,21 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           ctaBgColor: raw['CTABGCOLOR']?.startsWith?.('#') ? raw['CTABGCOLOR'] : undefined,
           ctaColor:   raw['CTACOLOR']?.startsWith?.('#')   ? raw['CTACOLOR']   : undefined,
         })
+
+        // Angular: photo_promo_free_female reads PHOTOPUBLISHED.Shortlist;
+        // non_id_verify_male reads PROFILEVERIFYPAID.sticky; paid_verified_no_photo
+        // reads PHOTOPUBLISHPAID.sticky (lowercase 'sticky', capitalized
+        // 'Shortlist' — matched exactly as in the Angular source, not a typo here).
+        const stickySubKey = variant === 'photo_promo_free_female' ? 'Shortlist' : 'sticky'
+        const stickyRaw = reg?.[bannerKey]?.[stickySubKey] ?? {}
+        const stickyContent = stickyRaw['TITLE']
+        if (stickyContent) {
+          setPhotoPromoSticky({
+            content:  String(stickyContent),
+            imageUrl: stickyRaw['IMG'] || undefined,
+            type:     variant === 'non_id_verify_male' ? 'IDVERIFY' : 'ADDPHOTO',
+          })
+        }
       } else if (variant === 'default') {
         const details = await getHeroBannerDetails(false)
         if (ctrl.cancelled) return
@@ -661,15 +714,32 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       // exact comparison, copied verbatim for parity) takes priority; else the
       // profile-validation-rejected banner when PISTATUS is 5 (rejected) or 13
       // (under review).
+      // Was reading Constants.expoConfig?.version (app.json's "1.0.0" Expo
+      // scaffolding default, a separate native-build identifier never meant
+      // to track this) instead of the app's own real version — with any
+      // APPFORCEUPDATE.APPVERSION starting '2'-'9', "1.0.0" < that string
+      // lexicographically, so this fired almost unconditionally.
       const psUpdateFlag = await getItem('PLAYSTOREUPDATE')
-      const appVersion = Constants.expoConfig?.version ?? '1.0.0'
-      const forceUpdate = computeForceUpdateInfo(data?.['APPFORCEUPDATE'], psUpdateFlag, appVersion, isFreeFemalePhotoPromo)
+      const forceUpdate = computeForceUpdateInfo(data?.['APPFORCEUPDATE'], psUpdateFlag, APP_VERSION, isFreeFemalePhotoPromo)
       if (ctrl.cancelled) return
       setForceUpdateInfo(forceUpdate)
 
-      if (!forceUpdate && ['5', '13'].includes(String(data?.['PISTATUS']))) {
-        const validationBanner = await fetchProfileValidationBanner()
-        if (!ctrl.cancelled && validationBanner?.show) setProfileValidationBanner(validationBanner)
+      if (!forceUpdate) {
+        if (['5', '13'].includes(String(data?.['PISTATUS']))) {
+          setAutopaySticky(null)
+          const validationBanner = await fetchProfileValidationBanner()
+          if (!ctrl.cancelled && validationBanner) setProfileValidationBanner(validationBanner)
+        } else {
+          setProfileValidationBanner(null)
+          setAutopaySticky(null)
+          // Angular: checkProfileStatus()'s else branch → getContactsData().
+          await fetchContactDetails()
+          if (ctrl.cancelled) return
+          const paymentDetails = (await getJson<Record<string, any>>('CONTACT_DETAIL'))?.['PAYMENTDETAILS']
+          if (!ctrl.cancelled && paymentDetails?.['paypendingflag'] === '1' && paymentDetails?.['status']) {
+            setAutopaySticky({ content: String(paymentDetails['status']), ctaLabel: String(paymentDetails['cta2'] ?? '') })
+          }
+        }
       }
     })
 
@@ -826,12 +896,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   }
 
   function handleToolbarPress(toolType: string) {
-    // Angular: header.component.ts's reDirectPage() — discover-matches icon
-    // goes to /search; notification icon goes to /notification (no dedicated
-    // notification route exists in this app yet — Activity is the closest
-    // existing equivalent, same underlying activity counts).
-    if (toolType === 'discover-matches') navigation.navigate('Search')
-    if (toolType === 'notification')     navigation.navigate('Activity')
+    // Angular: header.component.html's icon click is reDirectPage('/' +
+    // toolbar.toolType) — the search icon's toolType is literally
+    // 'discover-matches' (home.config.ts's homeToolBar), so it navigates to
+    // /discover-matches, not /search. Notification icon goes to /notification.
+    if (toolType === 'discover-matches') navigation.navigate('DiscoverMatches')
+    if (toolType === 'notification')     navigation.navigate('Notification')
     if (toolType === 'menu')             navigation.navigate('Menu')
   }
 
@@ -846,7 +916,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         navigation.navigate('Gallery')
         break
       case 'non_id_verify_male':
-        /* TODO: no verify-id screen registered yet */
+        navigation.navigate('verify-id')
         break
       default:
         paymentTrack('98')
@@ -879,19 +949,57 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     setItem(StorageKeys.Promotions.ASSISTED_PROMO, '1')
   }
 
-  // ── Sticky banner (force-update / profile-validation) ─────────────────────
-  const activeSticky: 'forceUpdate' | 'profileValidation' | null =
-    stickyDismissed ? null : forceUpdateInfo ? 'forceUpdate' : profileValidationBanner ? 'profileValidation' : null
+  // ── Sticky banner (force-update / photo-promo nudge / profile-validation) ──
+  // Angular: getPPSETData()'s force-update branch explicitly checks
+  // `!this.showPhotoPromotion` before showing — force-update wins over the
+  // free-female photo nudge specifically. The other two photoPromo variants
+  // (non-id-verify, paid-no-photo) aren't excluded quite so explicitly in the
+  // source, but since only one sticky slot exists on screen at all, the same
+  // forceUpdate-wins precedence is applied uniformly here rather than
+  // reproducing that narrow, likely-unintentional overlap.
+  const activeSticky: 'forceUpdate' | 'photoPromo' | 'autopay' | 'profileValidation' | null =
+    stickyDismissed ? null
+    : forceUpdateInfo ? 'forceUpdate'
+    : photoPromoSticky ? 'photoPromo'
+    : autopaySticky ? 'autopay'
+    : profileValidationBanner ? 'profileValidation'
+    : null
 
   function handleStickyPress() {
     if (activeSticky === 'forceUpdate') {
       const url = String(Constants.expoConfig?.extra?.['playStoreUrl'] ?? 'https://play.google.com/store/apps/details?id=jodii.app')
       Linking.openURL(url)
+    } else if (activeSticky === 'photoPromo') {
+      if (photoPromoSticky?.type === 'ADDPHOTO') {
+        navigation.navigate('Gallery')
+      } else {
+        navigation.navigate('verify-id')
+      }
+    } else if (activeSticky === 'autopay') {
+      // Angular: stickiyBtnEmit() → router.navigate(['/my-membership']). Not
+      // substituting 'recharge' — that's a different screen, matching
+      // pageLandingService.ts's own note that the two aren't equivalent.
+      navigation.navigate('my-membership')
     } else if (activeSticky === 'profileValidation') {
-      // Angular: opens a PCS bottom sheet to fix the flagged profile fields —
-      // closest existing equivalent screen is EditProfile.
-      navigation.navigate('EditProfile')
+      // Angular: bottomSheetService.showBtmSheet(pi_BottomPopupData) — a plain
+      // informational sheet (why the profile isn't active), NOT a field-editor.
+      // Confirmed by reading the real component: the CTA button's dismiss
+      // action ('upgradeNow', from the shared generic click handler every
+      // other action in that template also uses) never matches what
+      // showBtmSheet()'s onDidDismiss actually checks for ('ProfileValidationBtmSheet')
+      // — so tapping it is dead code in Angular itself, a no-op beyond closing
+      // the sheet. Given the button's own label is overwritten with the
+      // customer-care phone number right before the sheet opens
+      // (`componentData.CTA = phoneNo`), wiring it to actually dial support —
+      // matching BlockerScreen.tsx's existing pattern — is what this was
+      // clearly meant to do, not reproducing the apparent bug.
+      setProfileValidationSheetVisible(true)
     }
+  }
+
+  function handleProfileValidationCtaPress() {
+    setProfileValidationSheetVisible(false)
+    if (customerCare.phone) Linking.openURL(`tel:${customerCare.phone}`)
   }
 
   function handleStickyClose() {
@@ -966,7 +1074,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       case 'DIET':        navigation.navigate('onboarding', { pageNo: '38', standalone: true }); break
       case 'HOMETOWN':    navigation.navigate('onboarding', { pageNo: '44', standalone: true }); break
       case 'HOROSCOPE':   navigation.navigate('onboarding', { pageNo: '29', standalone: true }); break
-      case 'IDVERIFY':    /* TODO: no verify-id screen registered yet */ break
+      case 'IDVERIFY':    navigation.navigate('verify-id'); break
     }
   }
 
@@ -990,9 +1098,13 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         assistContent={assistDismissed ? null : assistContent}
         onAssistPress={handleAssistPress}
         onAssistDismiss={handleAssistDismiss}
-        activeSticky={activeSticky}
-        stickyText={activeSticky === 'forceUpdate' ? t('APP_UPDATE.NOTE') : profileValidationBanner?.message ?? ''}
-        stickyCtaLabel={activeSticky === 'forceUpdate' ? t('APP_UPDATE.CTA') : profileValidationBanner?.ctaLabel ?? ''}
+        // photoPromo/autopay stickies are mobile-scoped for now (this pass) —
+        // HomeDesktopLayout doesn't render them yet, so they're narrowed away
+        // here rather than widening that component's prop type for variants
+        // it can't show.
+        activeSticky={activeSticky === 'photoPromo' || activeSticky === 'autopay' ? null : activeSticky}
+        stickyText={activeSticky === 'forceUpdate' ? t('APP_UPDATE.NOTE') : profileValidationBanner?.stickyContent ?? ''}
+        stickyCtaLabel={activeSticky === 'forceUpdate' ? t('APP_UPDATE.CTA') : profileValidationBanner?.bottomCtaLabel ?? ''}
         onStickyPress={handleStickyPress}
         onStickyClose={handleStickyClose}
         allMatches={allMatches}
@@ -1038,11 +1150,9 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         completionPct={completionPct}
         hasPaidBatch={hasPaidBadge}
         homeToolBar={toolbar}
-        // Angular: avatar tap opens "my profile" (self view-profile). No
-        // self-view route/flow exists anywhere in this app yet (confirmed —
-        // not just here) and viewProfile requires a real matriId, so this
-        // routes to EditProfile instead of passing an empty one that could
-        // break ViewProfileScreen — TODO once a self-view route exists.
+        // Angular: header.component.html's avatar click is reDirectPage('/edit-profile')
+        // — there's no self-view-profile flow in the real app at all, this is
+        // the actual, correct target, not a stand-in for a missing one.
         onAvatarPress={() => navigation.navigate('EditProfile')}
         onEditProfilePress={() => navigation.navigate('onboarding', { pageNo: '2', standalone: true })}
         onToolbarItemPress={handleToolbarPress}
@@ -1131,7 +1241,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         {completeCards.length > 0 && (
           <>
             <View style={s.section}>
-              <Text style={s.sectionTitle}>{t('HOME.COMPLETE_PROFILE_HEADER')}</Text>
+              {/* Angular: complete-profile.component.html's header text is
+                  .color-1f1e1b, not the generic textPrimary black every other
+                  section header here uses; wrapping row is mt-16 before the
+                  first card (not sectionTitle's shared 12px). */}
+              <Text style={[s.sectionTitle, s.cpSectionTitle]}>{t('HOME.COMPLETE_PROFILE_HEADER')}</Text>
               <CompleteProfileSection cards={completeCards} onCardPress={handleCompleteProfileCard} />
             </View>
             <View style={s.divider} />
@@ -1146,13 +1260,13 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         {todayMatches.length > 0 && (
           <>
             <View style={s.section}>
-              <SwiperCard
+              {/* Angular: home.config.ts's drmatches is the only swiper config
+                  with coverflowEffect — a centered, tilted-neighbor carousel,
+                  not the flat scroll every other section uses. */}
+              <CoverflowSwiper
                 swiperHeader={`${t('DAILYRECOMMENDATIONS.DAILY_RECOMMENDATIONS')} (${todayTotal})`}
-                cardVariant={1}
-                cardSection="dailyrecommendations"
                 items={todayMatches.slice(0, 4)}
                 moreItems={moreItemsFrom(todayMatches, 4)}
-                showSeeAll
                 onCardPress={item => goToProfile(item, todayMatches, 'home_dailyrec')}
                 onLikePress={likeTodayMatches}
                 onSeeAllPress={() => navigation.navigate('Matches')}
@@ -1191,11 +1305,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           <>
             <View style={s.section}>
               <SwiperCard
-                // No dedicated HOME.* key found for this section's header —
-                // LIKE_LIST.VIEWEDBYME_TITLE ("Viewed by me") is the closest
-                // confirmed match (same 'viewedbyme' sectionType from Angular's
-                // home.enum.ts) and is translated for every locale we ship.
-                swiperHeader={`${t('LIKE_LIST.VIEWEDBYME_TITLE')} (${profilesViewedTotal})`}
+                // Angular: home.enum.ts's sectionTitle.viewedbyme = 'GENERAL.VIEWEDBYME'
+                // ("Profiles you viewed"), the exact key this section's live
+                // template binds swiperHeader to.
+                swiperHeader={`${t('GENERAL.VIEWEDBYME')} (${profilesViewedTotal})`}
                 newCount={comCountFor(comCount, 'viewedbyme')}
                 cardVariant={3}
                 cardSection="viewedbyme"
@@ -1216,7 +1329,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             cover-fit background SVG, not plain white. */}
         {(likedByMeTotal > 0 || likedMeTotal > 0) && (
           <>
-            <ImageBackground source={{ uri: `${CDN}liked-profiles-bg.svg` }} style={s.section} resizeMode="cover">
+            <CdnSvgBackground uri={`${CDN}liked-profiles-bg.svg`} style={s.section}>
               <LikedProfilesSection
                 likedTab={likedTab}
                 onTabChange={setLikedTab}
@@ -1227,7 +1340,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 onCardPress={item => goToProfile(item, likedTab === 'likedbyme' ? likedByMe : likedMe, 'home_liked')}
                 onLikePress={likedTab === 'likedbyme' ? likeLikedByMe : likeLikedMe}
               />
-            </ImageBackground>
+            </CdnSvgBackground>
             <View style={s.divider} />
           </>
         )}
@@ -1238,7 +1351,14 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <View style={s.section}>
               <ExploreCategoriesSection
                 categories={categories}
-                tileWidth={(SW - 32 - 8) / 2}
+                // Angular: ion-row's pl-4/pr-24 + ion-col's size="5.4" offset="0.6"
+                // in a 12-col grid — computes to a ~20.6px left / 24px right
+                // margin and a ~16.6px gap between the two tiles, not the
+                // previous 16px margin / 8px gap. Approximated symmetrically
+                // (24px margin, 16px gap) since RN's flexbox can't cheaply
+                // reproduce Angular's asymmetric offset-per-column math, and
+                // the ~3px difference is imperceptible.
+                tileWidth={(SW - 48 - 16) / 2}
                 onCategoryPress={cat => navigation.navigate('Matches', { exploreType: cat.id, exploreLabel: cat.label })}
               />
             </View>
@@ -1246,10 +1366,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           </>
         )}
 
-        {/* ════════════ SUCCESS STORIES ════════════ */}
+        {/* ════════════ SUCCESS STORIES ════════════
+            Angular: .success-story-section { background: #FEF2F6 } — a light
+            pink section background, missing entirely before this fix. */}
         {stories.length > 1 && (
           <>
-            <View style={s.section}>
+            <View style={[s.section, s.successStorySection]}>
               <SuccessStoriesSection
                 stories={stories}
                 // Success stories are married couples, not viewable member
@@ -1290,14 +1412,41 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       {activeSticky === 'forceUpdate' && !hideStickyOnScroll && (
         <ForceUpdateCard onPress={handleStickyPress} onClose={handleStickyClose} />
       )}
-      {activeSticky === 'profileValidation' && !hideStickyOnScroll && (
+      {activeSticky === 'photoPromo' && !hideStickyOnScroll && (
+        <PhotoPromoSticky
+          content={photoPromoSticky!.content}
+          imageUrl={photoPromoSticky!.imageUrl}
+          onPress={handleStickyPress}
+        />
+      )}
+      {activeSticky === 'autopay' && !hideStickyOnScroll && (
         <StickyBanner
-          text={profileValidationBanner!.message}
-          ctaLabel={profileValidationBanner!.ctaLabel}
+          text={autopaySticky!.content}
+          ctaLabel={autopaySticky!.ctaLabel}
           onPress={handleStickyPress}
           onClose={handleStickyClose}
         />
       )}
+      {activeSticky === 'profileValidation' && !hideStickyOnScroll && (
+        <PhotoPromoSticky
+          content={profileValidationBanner!.stickyContent}
+          imageUrl={profileValidationBanner!.stickyImg}
+          onPress={handleStickyPress}
+        />
+      )}
+
+      <BottomSheet
+        visible={profileValidationSheetVisible}
+        type="profileValidation"
+        data={{
+          title:    profileValidationBanner?.bottomTitle,
+          content:  profileValidationBanner?.bottomContent,
+          image:    profileValidationBanner?.bottomImg,
+          ctaLabel: customerCare.phone || profileValidationBanner?.bottomCtaLabel,
+        }}
+        onClose={() => setProfileValidationSheetVisible(false)}
+        onPrimaryPress={handleProfileValidationCtaPress}
+      />
 
       <Modal visible={!!videoModalUrl} animationType="slide" onRequestClose={() => setVideoModalUrl(null)}>
         <View style={s.videoModal}>
@@ -1330,15 +1479,30 @@ const s = StyleSheet.create({
   hList:   { paddingHorizontal: 16 },
 
   sectionTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: Colors.textPrimary, paddingHorizontal: 16, marginBottom: 12 },
+  // Angular: complete-profile.component.html's outer grid is pl-24 pr-0
+  // (not the generic 16px every other section header uses), header color is
+  // the specific .color-1f1e1b (not textPrimary), and the cards-wrapping row
+  // is mt-16 below it (not the generic 12px).
+  cpSectionTitle: { paddingHorizontal: 24, color: '#1F1E1B', marginBottom: 16 },
 
-  // Complete profile card
-  cpCard:    { marginHorizontal: 16, borderRadius: 10, borderWidth: 1, borderColor: Colors.divider, backgroundColor: Colors.white },
-  cpRow:     { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 14, paddingVertical: 14 },
-  cpIcon:    { width: 40, height: 40, borderRadius: 8, backgroundColor: '#F0F4FF', alignItems: 'center', justifyContent: 'center', marginRight: 12 },
-  cpIconImg: { width: 24, height: 24 },
-  cpText:    { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textPrimary },
-  cpAdd:     { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.primary },
-  cpDivider: { height: 1, backgroundColor: Colors.divider, marginHorizontal: 14 },
+  // Complete profile — Angular: .complete-profile-block (separate bordered/
+  // gradient box per card, not one shared container with divider rows).
+  cpList: { marginHorizontal: 24, gap: 16 },
+  cpCard: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    gap:               12,
+    borderRadius:      12,
+    borderWidth:       1,
+    borderColor:       '#E6E6E6',
+    paddingHorizontal: 12,
+    paddingVertical:   8,
+  },
+  cpInfo:    { flex: 1, gap: 8 },
+  // Angular: .body1-medium-14 { font-family: var(--english-medium-poppins) }
+  cpTitle:   { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.black },
+  cpCtaRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  cpCtaText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#29339B' },
 
   // Liked profiles tabs
   tabRow:             { flexDirection: 'row', marginHorizontal: 16, marginBottom: 12, backgroundColor: '#F5F5F5', borderRadius: 8, padding: 3 },
@@ -1351,18 +1515,35 @@ const s = StyleSheet.create({
   // Angular: .discover-new-bg — 12px radius, 1px #E6E6E6 border, compact
   // icon+text row (not a big image tile), default background a light diagonal
   // gradient (applied via LinearGradient at the call site, not here).
-  catGrid:      { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 16, gap: 8 },
+  // Angular: ion-row's pl-4/pr-24 + ion-col's size="5.4" offset="0.6" — see
+  // tileWidth's own call-site comment for the exact math this approximates.
+  catGrid:      { flexDirection: 'row', flexWrap: 'wrap',gap: 16 },
   catTile:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#E6E6E6', paddingVertical: 8, paddingHorizontal: 8, minHeight: 64 },
   catIconWrap:  { width: 32, height: 32, marginRight: 8, alignItems: 'center', justifyContent: 'center' },
-  catIconImg:   { width: 28, height: 28 },
   catLabel:     { flex: 1, fontFamily: 'Poppins-Medium', fontSize: 12, color: Colors.textPrimary, lineHeight: 16 },
   catChevron:   { color: '#29339B', fontFamily: 'Poppins-SemiBold' },
 
-  // Success stories header
-  storyHeader:    { paddingHorizontal: 16, marginBottom: 12 },
-  storyTitle:     { fontFamily: 'Poppins-Regular', fontSize: 18, color: Colors.textPrimary },
-  storyTitleBold: { fontFamily: 'Poppins-Bold',    fontSize: 22, color: Colors.primary },
-  storySubtitle:  { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textPrimary, marginTop: 8, lineHeight: 20 },
+  // Angular: .success-story-section { background: #FEF2F6 }
+  successStorySection: { backgroundColor: '#FEF2F6' },
+
+  // Angular: ion-row wrapping the heart animation + text column and the
+  // absolutely-positioned hand image alongside it.
+  storyHeaderRow: { position: 'relative' },
+  // Angular: .success-story-image { position:absolute; right:6px } — no top
+  // offset in the source, so it stays flush with the row's top edge.
+  storyHandImage: { position: 'absolute', top: 0, right: 6 },
+
+  // Success stories header — Angular: both lines of the translated header
+  // ("Got married<br>through Jodii" — NOT the "Made with Love in Jodii" the
+  // .html template shows, which is just static placeholder scaffolding the
+  // live `| translate` pipe always overrides) share ONE style —
+  // heading2-semibold-18 + whiteColor — not a two-tone regular/bold split.
+  // Angular: .negative-mt-18 pulls this block up to overlap the heart
+  // animation above it.
+  storyHeader:    { paddingHorizontal: 24, marginTop: -18, marginBottom: 12 },
+  storyTitle:     { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.white },
+  // Angular: .body2-regular-14.black-color.line-height-20
+  storySubtitle:  { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, marginTop: 8, lineHeight: 20 },
 
   // Self-help videos
   videoCard:     { borderRadius: 10, overflow: 'hidden', position: 'relative', backgroundColor: Colors.white },
@@ -1381,7 +1562,6 @@ const s = StyleSheet.create({
   helpCta:       { flexDirection: 'row', alignItems: 'center' },
   helpCtaText:   { fontFamily: 'Poppins-Medium', fontSize: 13, color: '#29339B' },
   helpCtaChevron: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#29339B', marginLeft: 4 },
-  helpImage:     { width: 80, height: 80 },
 
   // Self-help video modal
   videoModal:      { flex: 1, backgroundColor: '#000' },

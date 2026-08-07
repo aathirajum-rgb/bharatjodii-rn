@@ -10,7 +10,7 @@ export default function LottiePlayer({ onFinish }: Props) {
       autoPlay
       loop={false}
       onAnimationFinish={onFinish}
-      style={StyleSheet.absoluteFillObject}
+      style={StyleSheet.absoluteFill}
     />
   );
 }

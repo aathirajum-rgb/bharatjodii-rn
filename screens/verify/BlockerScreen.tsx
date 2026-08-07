@@ -40,7 +40,7 @@ interface IdProofAttempt {
   GOVTPROOFATTEMPT?:  string
 }
 
-export default function BlockerScreen({ navigation: _navigation }: { navigation: any }) {
+export default function BlockerScreen({ navigation }: { navigation: any }) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
 
@@ -220,13 +220,12 @@ export default function BlockerScreen({ navigation: _navigation }: { navigation:
                   </View>
                 )}
                 {showGovtIdActive && (
-                  // Angular: onPress → verifyIdPage('1') → '/verify-id'. That
-                  // screen doesn't exist in this port yet — left non-interactive.
-                  <View style={[styles.row, styles.rowUpload]}>
+                  // Angular: onPress → verifyIdPage('1') → '/verify-id'.
+                  <Pressable style={[styles.row, styles.rowUpload]} onPress={() => navigation.navigate('verify-id')}>
                     <CdnSvg uri={ICONS.camera} width={28} height={28} />
                     <Text style={styles.rowLabel}>{t('VERIFY_BLOCKER.VERIFY_GOVT_PROOF')}</Text>
                     <Text style={styles.chevron}>›</Text>
-                  </View>
+                  </Pressable>
                 )}
                 {showGovtIdFailed && (
                   <View style={[styles.row, styles.rowFailed]}>

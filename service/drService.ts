@@ -1,8 +1,9 @@
 import { apiCall } from './apiClient'
 import { Endpoints } from './api.endpoints'
 import { getItem, setItem, getJson, setJson, removeItem } from './storageService'
-import { navigate, resetTo } from '../utils/navigationRef'
+import { resetTo } from '../utils/navigationRef'
 import { ENavigation } from '../types/enums/navigation.enum'
+import { redirectToIntermediatePage } from './paymentService'
 
 const DR_LIMIT = 15
 
@@ -105,39 +106,74 @@ export async function loadDrProfiles(
 // ─── handleAfterDr ───────────────────────────────────────────────────────────
 // Onboarding page routing after no DR profiles remain.
 // pageId values come from the server-driven NEXTPAGE in login response.
+//
+// Angular's real targets (dr.service.ts's own handleAfterDr, lines 115-207) —
+// verified directly, since ENavigation.HOROSCOPE/VERIFY_ID/PAYMENT/EDIT_FORM/
+// PHOTO_REJECTION were never actually registered as navigable screens
+// anywhere in AppStack.tsx. navigate()/resetTo() silently no-op on an
+// unregistered name (no error, no navigation) — from the user's side this
+// looked exactly like "the close button doesn't close", because whichever of
+// these 5 cases matched their own LANDPAGEID silently did nothing:
+//  - "5" (horoscope) / "20"+"24" (add photo, female) → Angular's own targets
+//    are a different route family (editform-pushnotify/:page) this port never
+//    built. Routed to the closest real onboarding-style single-field editors
+//    instead — GenerateHoroscopeScreen / AddPhotoScreen — via the same
+//    navigate('onboarding', {pageNo, standalone:true}) pattern
+//    HomeScreen.tsx's own complete-profile-card handler already uses for the
+//    identical fields.
+//  - "18"/"28"/"32" (payment) → Angular's redirectPaymentPage() is the exact
+//    same renewal-vs-recharge decision paymentService.ts's
+//    redirectToIntermediatePage() already implements (used by
+//    pageLandingService.ts's cases 6/10/15/16/26/32) — reused directly rather
+//    than a second navigate() to an unregistered 'payment' screen.
+//  - "57" (photo rejection) → Angular's own conditional target
+//    (/addphoto-intermediate/photorejection, only when PHOTOSTATUSARRAY
+//    matches a specific rejection shape, else plain /matches) — routed
+//    through the same registered addphoto-intermediate screen case 23 built,
+//    which safely falls back to Gallery for any non-CONGRATS page rather than
+//    silently failing.
+//  - "7" (verify-id) has no real screen anywhere in this port yet (same
+//    documented gap as pageLandingService.ts's cases 12/17/53) — falls to the
+//    same default Matches landing Angular's own unhandled-case default uses.
+//
+// ALL of these Angular targets use `replaceUrl: true` (confirmed per-case —
+// cases 20/24/27/57/59/60's own router.navigate calls, and dr.service.ts's
+// redirectPaymentPage() → payment.service.ts's reDirectPage(..., replaceURL
+// param explicitly passed as `true` from here) — this REPLACES whatever
+// screen called handleAfterDr() (always DR, reached via its own resetTo)
+// rather than stacking on top of it. Every branch below uses resetTo(),
+// never navigate(), to match — a previous pass here used navigate() for all
+// of them, which left DR reachable underneath via the hardware/gesture back
+// action even though it was already closed/exhausted on screen.
 
 export async function handleAfterDr(pageId: string | number): Promise<void> {
   const pid = String(pageId)
 
   switch (pid) {
     case '5':
-      navigate(ENavigation.HOROSCOPE)
-      break
-    case '7':
-      navigate(ENavigation.VERIFY_ID)
-      break
-    case '18':
-      navigate(ENavigation.PAYMENT)
+      resetTo(ENavigation.ONBOARDING, { pageNo: '29', standalone: true })
       break
     case '20':
     case '24':
-      navigate(ENavigation.EDIT_FORM, { pageNo: 20, source: 'pushnotify' })
+      resetTo(ENavigation.ONBOARDING, { pageNo: '20', standalone: true })
       break
-    case '27':
-      navigate(ENavigation.ADD_PHOTO_INTERMEDIATE, { page: 'ADDPHOTO' })
-      break
+    case '18':
     case '28':
     case '32':
-      navigate(ENavigation.PAYMENT)
+      await redirectToIntermediatePage('notify', undefined, undefined, true)
+      break
+    case '27':
+      resetTo(ENavigation.ADD_PHOTO_INTERMEDIATE, { page: 'ADDPHOTO' })
       break
     case '57':
-      navigate(ENavigation.PHOTO_REJECTION)
+      resetTo(ENavigation.ADD_PHOTO_INTERMEDIATE, { page: 'photorejection' })
       break
     case '59':
     case '60':
-      navigate(ENavigation.ADD_PHOTO_INTERMEDIATE, { page: 'ADDPHOTOPUBLISH' })
+      resetTo(ENavigation.ADD_PHOTO_INTERMEDIATE, { page: 'ADDPHOTOPUBLISH' })
       break
+    case '7':
     default:
-      navigate(ENavigation.MATCHES)
+      resetTo(ENavigation.MATCHES)
   }
 }

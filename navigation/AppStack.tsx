@@ -63,6 +63,8 @@ import MatchesScreen               from '../screens/matches/MatchesScreen'
 import DailyRecommendationScreen   from '../screens/daily-recommendation/DailyRecommendationScreen'
 import ViewProfileScreen           from '../screens/viewprofile/ViewProfileScreen'
 import BlockerScreen               from '../screens/verify/BlockerScreen'
+import VerifyIdScreen               from '../screens/verify/VerifyIdScreen'
+import MenuContactsScreen           from '../screens/menu-contacts/MenuContactsScreen'
 import ValidationScreen            from '../screens/validation/ValidationScreen'
 import DiscoverMatchesScreen       from '../screens/discover-matches/DiscoverMatchesScreen'
 import AddPhotoIntermediateScreen  from '../screens/addphoto-intermediate/AddPhotoIntermediateScreen'
@@ -87,6 +89,7 @@ import SearchScreen                       from '../screens/search/SearchScreen'
 import FaqScreen                          from '../screens/help-center/FaqScreen'
 import IgnoredProfilesScreen               from '../screens/ignored-profiles/IgnoredProfilesScreen'
 import SearchByIdScreen                    from '../screens/search-by-id/SearchByIdScreen'
+import NotificationScreen                  from '../screens/notification/NotificationScreen'
 import EditProfileScreen                   from '../screens/edit-profile/EditProfileScreen'
 import ReligiousDetailsScreen               from '../screens/edit-profile/ReligiousDetailsScreen'
 import ProfessionalDetailsScreen            from '../screens/edit-profile/ProfessionalDetailsScreen'
@@ -204,6 +207,14 @@ export type AppStackParamList = {
   // Angular: components/validation — webview.page.ts's page_id "61" (AI profile
   // validation confirm2 screen)
   Validation: undefined
+  // Angular: pages/verify-id — STUB (see screens/verify/VerifyIdScreen.tsx),
+  // real govt-ID verification flow not ported yet.
+  'verify-id': undefined
+  // Angular: '/my-membership' route → pages/menu-contacts — STUB (see
+  // screens/menu-contacts/MenuContactsScreen.tsx), real flow not ported yet.
+  'my-membership': undefined
+  // Angular: pages/notification — the in-app notification list (not push).
+  Notification: undefined
   // Angular: pages/discover-matches — webview.page.ts's page_id "55"
   DiscoverMatches: undefined
   // Angular: redirectiontoStarMatchReport() passes the already-fetched result via
@@ -484,6 +495,9 @@ export default function AppStack() {
         component={ValidationScreen}
         options={{ gestureEnabled: false }}
       />
+      <Stack.Screen name="verify-id" component={VerifyIdScreen} />
+      <Stack.Screen name="my-membership" component={MenuContactsScreen} />
+      <Stack.Screen name="Notification" component={NotificationScreen} />
       <Stack.Screen name="DiscoverMatches" component={DiscoverMatchesScreen} />
       <Stack.Screen name="addphoto-intermediate" component={AddPhotoIntermediateScreen} />
       <Stack.Screen name="star-matching" component={StarMatchingScreen} />

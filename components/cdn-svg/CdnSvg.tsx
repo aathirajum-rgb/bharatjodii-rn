@@ -13,14 +13,15 @@
 // on web via React Native's <Image>, which becomes a real <img> tag there.
 // Native keeps using <SvgUri>, since native <Image> can't decode remote SVGs
 // without extra native libraries, and native has no CORS restriction anyway.
-import { Image, Platform } from 'react-native'
+import { useState } from 'react'
+import { Image, Platform, StyleSheet, View, type LayoutChangeEvent } from 'react-native'
 import { SvgUri } from 'react-native-svg'
 
 type Props = {
   uri:    string
   width:  number | string
   height: number | string
-  style?: object
+  style?: object | undefined
 }
 
 export default function CdnSvg({ uri, width, height, style }: Props) {
@@ -30,4 +31,45 @@ export default function CdnSvg({ uri, width, height, style }: Props) {
     return <Image source={{ uri }} style={[{ width, height }, style]} resizeMode="contain" />
   }
   return <SvgUri uri={uri} width={width} height={height} style={style} />
+}
+
+// For server-supplied icon URLs whose file format isn't guaranteed (e.g. PCS
+// THUMBIMG, explore category ICON) — Angular renders these with a plain <img>,
+// which displays either raster or SVG fine, so the real source data doesn't
+// pin down which one it'll send. Branching on the extension keeps this correct
+// either way instead of guessing.
+export function CdnImage({ uri, width, height, style, onError }: Props & { onError?: () => void }) {
+  if (/\.svg(\?|$)/i.test(uri)) {
+    return <CdnSvg uri={uri} width={width} height={height} style={style} />
+  }
+  return <Image source={{ uri }} style={[{ width, height }, style]} resizeMode="contain" onError={onError} />
+}
+
+// For an SVG used the way CSS `background-image` would (Angular: e.g.
+// .liked-profile-bg { background:url(...); background-size:cover }) — an
+// ImageBackground-style wrapper, but SVG-aware. Native SvgUri needs an
+// explicit width/height (no "auto-fill the parent" mode), so this measures
+// the container via onLayout before drawing the SVG behind `children`.
+export function CdnSvgBackground({
+  uri, children, style,
+}: { uri: string; children?: React.ReactNode; style?: object }) {
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null)
+
+  function handleLayout(e: LayoutChangeEvent) {
+    const { width, height } = e.nativeEvent.layout
+    setSize({ width, height })
+  }
+
+  return (
+    <View style={style} onLayout={handleLayout}>
+      {!!size && (
+        Platform.OS === 'web'
+          // react-native-web's <Image> compiles to a plain <img> tag — no
+          // CORS-blocked fetch, and resizeMode="cover" matches background-size:cover.
+          ? <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          : <SvgUri uri={uri} width={size.width} height={size.height} style={StyleSheet.absoluteFill} />
+      )}
+      {children}
+    </View>
+  )
 }

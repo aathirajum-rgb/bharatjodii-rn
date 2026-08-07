@@ -72,6 +72,7 @@ import { enablePaywall } from '../../service/payWallService'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
 import { StorageKeys } from '../../constants/storage.keys'
 import Constants from 'expo-constants'
+import { APP_VERSION } from '../../constants/appVersion'
 import GamBanner from '../../components/gam-banner/GamBanner'
 import BulkLikeModal from '../../components/bulk-like/BulkLikeModal'
 import BulkLikeDesktopModal from '../../components/bulk-like/BulkLikeDesktopModal'
@@ -1115,11 +1116,14 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             // explore.component's actual wiring as the reference (Angular's own Matches
             // page computes this but never renders it). Same naive string/number `<`
             // comparison as Angular — not "fixed" here, to match source behavior.
+            // appVersion must be the app's own real version (APP_VERSION), not
+            // Constants.expoConfig?.version (app.json's still-"1.0.0" Expo
+            // scaffolding default) — that read made this fire almost
+            // unconditionally, since "1.0.0" < almost any real APPVERSION string.
             if (!ctrl.cancelled) {
               const forceUpdate  = ppSetData?.APPFORCEUPDATE
               const psUpdateFlag = await getItem('PLAYSTOREUPDATE')
-              const appVersion   = Constants.expoConfig?.version ?? '1.0.0'
-              if (forceUpdate?.APPVERSION && psUpdateFlag !== '1' && appVersion < forceUpdate.APPVERSION) {
+              if (forceUpdate?.APPVERSION && psUpdateFlag !== '1' && APP_VERSION < forceUpdate.APPVERSION) {
                 setForceUpdateInfo({ minVersion: forceUpdate.APPVERSION })
               }
             }

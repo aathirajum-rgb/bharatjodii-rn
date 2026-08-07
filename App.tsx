@@ -14,6 +14,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import './i18n'
 import i18n from './i18n'
+import { APP_VERSION } from './constants/appVersion'
 import { StorageKeys } from './constants/storage.keys'
 import { AuthProvider } from './contexts/AuthContext'
 import { useOTAUpdate } from './hooks/useOTAUpdate'
@@ -36,7 +37,7 @@ function makeDeviceId(): string {
 // Must run before any API call so buildCommonParams reads correct values.
 async function initializeAppConfig(): Promise<void> {
   const appType = String(Constants.expoConfig?.extra?.appType ?? process.env.EXPO_PUBLIC_APP_TYPE ?? '115')
-  const version = '7.4'
+  const version = APP_VERSION
 
   // Persist a stable device ID on first install; reuse on subsequent launches
   let deviceId = await getItem('DEVICEID')
