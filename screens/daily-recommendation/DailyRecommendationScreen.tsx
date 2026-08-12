@@ -24,6 +24,8 @@ import Animated, {
 
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import BottomSheet, { type BottomSheetData } from '../../components/bottom-sheet/BottomSheet'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import DailyRecommendationDesktopLayout from './DailyRecommendationDesktopLayout'
 import { MatchCard } from '../matches/MatchesScreen'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
@@ -94,7 +96,11 @@ function stackOffsetRem(index: number, profiles: DrProfile[]): number {
 
 // Angular: daily-recommendation.component.scss's .base-container —
 // `--background: linear-gradient(180deg, #fff0f4 0%, #fff 100%), #fff`.
-function ScreenBackground({ children }: { children: React.ReactNode }) {
+// Exported so DailyRecommendationDesktopLayout.tsx can reuse the exact same
+// gradient — the Figma desktop screenshot shows the same pale-pink-to-white
+// wash behind its content, not the flat grey background other desktop
+// screens (Home/Matches/EditProfile) use.
+export function ScreenBackground({ children }: { children: React.ReactNode }) {
   const { LinearGradient } = require('expo-linear-gradient')
   return (
     <LinearGradient
@@ -118,8 +124,9 @@ function toBottomSheetData(call: Record<string, any> | undefined): BottomSheetDa
   }
 }
 
-export default function DailyRecommendationScreen({ navigation: _navigation, route }: { navigation: any; route?: any }) {
-  const { t } = useTranslation()
+export default function DailyRecommendationScreen({ navigation, route }: { navigation: any; route?: any }) {
+  const { t, i18n } = useTranslation()
+  const isDesktop = useIsDesktopWeb()
   // Angular: frm_page defaults to 'matches', overridden by the queryParams the
   // component was navigated with (drService.ts's loadDrProfiles sends this).
   const frmPage = (route?.params?.frm_page as string | undefined) ?? 'matches'
@@ -602,6 +609,66 @@ export default function DailyRecommendationScreen({ navigation: _navigation, rou
           </Animated.View>
         </Animated.View>
       </GestureDetector>
+    )
+  }
+
+  // ── Desktop web layout (Figma "Jodii Desktop") ──────────────────────────────
+  // Wide browser window only — mobile/native/narrow-web keep the JSX below,
+  // untouched, sharing all the same state/handlers defined above. No drag/
+  // tutorial/fly-off here — Figma's desktop card has no swipe affordance, just
+  // the three action buttons, so the parent's mobile-only gesture state
+  // (cardX/cardY/panGesture/tutorial overlay) simply isn't used on this path.
+  if (isDesktop) {
+    return (
+      <>
+        <DailyRecommendationDesktopLayout
+          langCode={i18n.language}
+          onTabPress={tab => {
+            switch (tab) {
+              case 0: navigation.navigate('Home');     break
+              case 1: navigation.navigate('Matches');  break
+              case 2: navigation.navigate('Activity'); break
+              case 3: paymentTrack('31'); navigation.navigate('recharge', { fromTab: true }); break
+              case 4: navigation.navigate('MessagerList'); break
+            }
+          }}
+          onLanguagePress={() => navigation.navigate('LanguageSelection')}
+          oppGender={gating.oppGender}
+          contentLoaded={contentLoaded}
+          profiles={profiles}
+          currentIndex={currentIndex}
+          totalCount={totalCount}
+          showEndCard={showEndCard}
+          progressPct={progressPct}
+          onClose={handleClose}
+          onLike={() => commitButtonSwipe('like')}
+          onDontShow={() => commitButtonSwipe('skip')}
+          onViewLater={() => commitButtonSwipe('viewlater')}
+          onViewProfile={p => navigate(ENavigation.VIEW_PROFILE, { matriId: p.profileId, fromPage: 'dailyrecommendations' })}
+        />
+
+        <BottomSheet
+          visible={!!photoPopupSheet}
+          type="photoPopUp"
+          data={photoPopupSheet ?? undefined}
+          onClose={() => setPhotoPopupSheet(null)}
+          onPrimaryPress={() => setPhotoPopupSheet(null)}
+        />
+
+        <BottomSheet
+          visible={limitSheet.visible}
+          type="limitReachInfo"
+          data={{
+            title:    t('MATCHES.LIMIT_REACHED'),
+            content:  limitSheet.body ?? t('MATCHES.LIMIT_REACHED_SUB'),
+            image:    `${CDN_SVG}revamp/alert-circle.svg`,
+            ctaLabel: t('GENERAL.GOT_IT'),
+            showClose: true,
+          }}
+          onClose={() => setLimitSheet({ visible: false })}
+          onPrimaryPress={() => setLimitSheet({ visible: false })}
+        />
+      </>
     )
   }
 

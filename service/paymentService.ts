@@ -250,6 +250,24 @@ export async function submitUpiAutopayRenewal(): Promise<RenewalChargeResult> {
   return { outcome: 'failure', message: result?.RESPONSE?.MSG }
 }
 
+// ─── My Membership — auto-renewal toggle + refund ─────────────────────────────
+// Angular: menu-contacts.page.ts toggleAutoRenewal()/tapHereRefund() →
+// payment.service.ts updateAutoRenewal()/requestAutopayRefund().
+// VALUE='1' = turn auto-renewal on, VALUE='2' = confirmed cancellation.
+
+export async function updateAutoRenewal(value: '1' | '2'): Promise<boolean> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const result = await apiCall(Endpoints.auth.autoRenewalUpdate, 'POST', `ID=${userId}&TYPE=&VALUE=${value}`)
+  return String(result?.RESPONSECODE) === '1'
+}
+
+export async function requestAutopayRefund(): Promise<{ accepted: boolean; usedContacts?: string }> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const result = await apiCall(Endpoints.payment.autopayRefund, 'POST', `ID=${userId}&TYPE=3`)
+  const accepted = String(result?.RESPONSECODE) === '1' && String(result?.ERRCODE) === '0'
+  return { accepted, usedContacts: result?.RESPONSE?.phoneNumbersUsed ?? result?.phoneNumbersUsed }
+}
+
 export async function redirectToMembershipPage(fromPage = '', replaceStack = false): Promise<void> {
   const entryType = String((await getSessionValue('ENTRYTYPE')) ?? '')
   const target    = entryType === 'P' ? ENavigation.MY_MEMBERSHIP : ENavigation.RECHARGE

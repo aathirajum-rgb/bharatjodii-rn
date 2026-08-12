@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import { clearSession } from '../../service/apiClient'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import DeleteProfileSuccessDesktopLayout from './DeleteProfileSuccessDesktopLayout'
 
 const SUCCESS_GIF = CDN_REACT + '/delete_success.gif'
 
@@ -16,6 +18,7 @@ type Props = { navigation: any; route: any }
 
 export default function DeleteProfileSuccessScreen({ route }: Props) {
   const insets = useSafeAreaInsets()
+  const isDesktop = useIsDesktopWeb()
 
   const {
     successMsg = 'Your profile has been successfully deleted',
@@ -49,6 +52,10 @@ export default function DeleteProfileSuccessScreen({ route }: Props) {
 
     return () => clearTimeout(timer)
   }, [])
+
+  if (isDesktop) {
+    return <DeleteProfileSuccessDesktopLayout message={displayMsg} />
+  }
 
   return (
     <View style={[s.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>

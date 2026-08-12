@@ -34,7 +34,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import { getItem } from '../../service/storageService'
+import { getItem, getJson, setJson } from '../../service/storageService'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import SearchDesktopLayout from './SearchDesktopLayout'
 import { fetchSearchResults } from '../../service/homeService'
 import {
   getSelectedObject, saveFilterState, getSearchPPCheckBox,
@@ -90,13 +92,13 @@ const FIELD_ICON: Record<FieldKey, string> = {
 
 type Props = { navigation: any }
 
-type FieldKey =
+export type FieldKey =
   | 'AGE' | 'LOCATION' | 'RELIGION' | 'CASTE' | 'STAR' | 'DOSHAM' | 'OCCUPATION'
   | 'MONTHLYINCOME' | 'EDUCATION' | 'HEIGHT' | 'MOTHERTONGUE' | 'MARITALSTATUS'
   | 'EATINGHABITS' | 'PHYSICALSTATUS' | 'PROFILECREATED'
 
 // Multi-select fields sharing one generic checkbox-list editor.
-const SIMPLE_MULTI_FIELDS = new Set<FieldKey>([
+export const SIMPLE_MULTI_FIELDS = new Set<FieldKey>([
   'RELIGION', 'DOSHAM', 'OCCUPATION', 'MONTHLYINCOME', 'EDUCATION',
   'MOTHERTONGUE', 'MARITALSTATUS', 'EATINGHABITS', 'PHYSICALSTATUS', 'PROFILECREATED',
 ])
@@ -119,7 +121,7 @@ function getProfileCreatedOptions(t: (key: string) => string): MultiSelectOption
   ]
 }
 
-const AGE_OPTIONS: PickerOption[] = Array.from({ length: 53 }, (_, i) => {
+export const AGE_OPTIONS: PickerOption[] = Array.from({ length: 53 }, (_, i) => {
   const age = 18 + i
   return { key: String(age), label: `${age} yrs` }
 })
@@ -129,6 +131,7 @@ const AGE_OPTIONS: PickerOption[] = Array.from({ length: 53 }, (_, i) => {
 export default function SearchScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+  const isDesktop = useIsDesktopWeb()
 
   const [loading,    setLoading]    = useState(true)
   const [eventType,  setEventType]  = useState<'filter' | 'pp'>('pp')
@@ -137,9 +140,17 @@ export default function SearchScreen({ navigation }: Props) {
   const [religion,   setReligion]   = useState('0')
   const [gender,     setGender]     = useState('1')
   const [matriId,    setMatriId]    = useState('')
+  const [userName,   setUserName]   = useState('')
 
   const [matchCount,   setMatchCount]   = useState(0)
   const [countLoading, setCountLoading] = useState(false)
+
+  // Desktop-only "Strict {field} filter" toggles (Figma node 647:13268) — no
+  // equivalent exists in mobile or in the old Angular app's filter API at
+  // all, so this is UI-only for now: persisted locally so it survives a
+  // reload, but deliberately NOT sent to buildSearchParams/the search API
+  // since there's no confirmed backend contract for it yet.
+  const [strictPrefs, setStrictPrefs] = useState<Record<string, boolean>>({})
 
   // key -> {key,label}[] cache, populated the first time a field's options are
   // fetched — used both to render the picker and to resolve display labels.
@@ -157,22 +168,34 @@ export default function SearchScreen({ navigation }: Props) {
 
   useEffect(() => {
     (async () => {
-      const [obj, pp, evType, id, gen] = await Promise.all([
+      const [obj, pp, evType, id, gen, name, strict] = await Promise.all([
         getSelectedObject(),
         getSearchPPCheckBox(),
         getFilterEventType(),
         getItem(SK.Auth.USER_ID),
         getItem(SK.User.LOGIN_GENDER),
+        getItem(SK.User.NAME),
+        getJson<Record<string, boolean>>('PP_STRICT_FILTERS'),
       ])
       setSelected(obj)
       setPpCheckBox(pp)
       setEventType(evType)
       setMatriId(id ?? '')
       setGender(gen ?? '1')
+      setUserName(name ?? '')
+      setStrictPrefs(strict ?? {})
       setReligion(obj.RELIGION?.[0] ?? '0')
       setLoading(false)
     })()
   }, [])
+
+  function toggleStrictPref(key: string, value: boolean) {
+    setStrictPrefs(prev => {
+      const next = { ...prev, [key]: value }
+      setJson('PP_STRICT_FILTERS', next).catch(() => {})
+      return next
+    })
+  }
 
   // ── Live match-count preview ─────────────────────────────────────────────
   // Angular: search.component.ts getMatchesCount() — re-fires on every field edit.
@@ -286,6 +309,22 @@ export default function SearchScreen({ navigation }: Props) {
     setStarStep('raasi')
   }
 
+  // Shared by mobile's SearchablePicker onSelect and SearchDesktopLayout's
+  // DesktopSelectField onSelect — same State→City / Raasi→Star cascade either way.
+  async function selectState(opt: PickerOption) {
+    updateField('STATE', [opt.key])
+    updateField('CITY', ['0'])
+    const cities = await ensureOptions('CITY', () => fetchCities(opt.key))
+    setLabelCache(prev => ({ ...prev, CITY: cities }))
+    setLocationStep('city')
+  }
+
+  async function selectRaasi(opt: PickerOption) {
+    const stars = await ensureOptions(`STAR_${opt.key}`, () => fetchStarOptions(opt.key))
+    setLabelCache(prev => ({ ...prev, STAR: stars }))
+    setStarStep('star')
+  }
+
   async function openHeight(bound: 'min' | 'max') {
     const opts = await ensureOptions('HEIGHT', () => fetchExactHeightOptions(gender))
     setHeightOptions(opts.map(o => ({ key: o.key, label: o.label.replace(/<[^>]+>/g, '') })))
@@ -323,14 +362,13 @@ export default function SearchScreen({ navigation }: Props) {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  if (loading) {
-    return (
-      <View style={[s.screen, s.center, { paddingTop: insets.top }]}>
-        <ActivityIndicator color={Colors.primaryDark} size="large" />
-      </View>
-    )
-  }
-
+  // Figma's desktop "Edit preferences" card (node 647:11468) doesn't render an
+  // Eating Habits row in its own mockup data — most likely a content gap in
+  // that specific mockup rather than an intentional field removal, since every
+  // other field mobile supports IS shown. Appended after Physical status
+  // (Figma's last row) rather than dropped, so desktop doesn't regress a field
+  // mobile users can already edit.
+  // Mobile's own row order (kept below, unrelated to isDesktop).
   const rows: Array<{ key: FieldKey; label: string; hidden?: boolean }> = [
     { key: 'AGE',            label: t('FILTER.AGE') },
     { key: 'LOCATION',       label: t('FILTER.LOCATION') },
@@ -348,6 +386,78 @@ export default function SearchScreen({ navigation }: Props) {
     { key: 'PHYSICALSTATUS', label: t('FILTER.PHYSICALSTATUS') },
     { key: 'PROFILECREATED', label: t('FILTER.PROFILECREATED'), hidden: eventType !== 'filter' },
   ]
+
+  // Figma's desktop card (node 647:11468) orders rows differently from mobile
+  // (Religion sits near the end, after Mother tongue, not right after
+  // Location) and its own mockup data doesn't render an Eating Habits row at
+  // all — most likely a content gap in that mockup rather than an intentional
+  // removal, since every other field mobile supports IS shown. Reordered to
+  // match Figma exactly, with Eating habits appended after Physical status
+  // instead of dropped, so desktop doesn't regress a field mobile can edit.
+  const desktopRows: typeof rows = [
+    rows[0],  // AGE
+    rows[1],  // LOCATION
+    rows[3],  // CASTE
+    rows[4],  // STAR
+    rows[5],  // DOSHAM
+    rows[6],  // OCCUPATION
+    rows[7],  // MONTHLYINCOME
+    rows[8],  // EDUCATION
+    rows[9],  // HEIGHT
+    rows[10], // MOTHERTONGUE
+    rows[2],  // RELIGION
+    rows[11], // MARITALSTATUS
+    rows[13], // PHYSICALSTATUS
+    rows[12], // EATINGHABITS
+    rows[14], // PROFILECREATED (hidden unless filter mode)
+  ]
+
+  if (isDesktop) {
+    return (
+      <SearchDesktopLayout
+        navigation={navigation}
+        userName={userName}
+        loading={loading}
+        rows={desktopRows}
+        rowValue={rowValue}
+        selected={selected}
+        labelCache={labelCache}
+        heightOptions={heightOptions}
+        matchCount={matchCount}
+        countLoading={countLoading}
+        strictPrefs={strictPrefs}
+        onToggleStrictPref={toggleStrictPref}
+        ageEditor={ageEditor}
+        setAgeEditor={setAgeEditor}
+        heightEditor={heightEditor}
+        setHeightEditor={setHeightEditor}
+        locationStep={locationStep}
+        setLocationStep={setLocationStep}
+        starStep={starStep}
+        setStarStep={setStarStep}
+        multiEditor={multiEditor}
+        setMultiEditor={setMultiEditor}
+        updateField={updateField}
+        openSimpleMulti={openSimpleMulti}
+        openCaste={openCaste}
+        openLocation={openLocation}
+        openStar={openStar}
+        openHeight={openHeight}
+        selectState={selectState}
+        selectRaasi={selectRaasi}
+        onReset={handleReset}
+        onShowMatches={handleShowMatches}
+      />
+    )
+  }
+
+  if (loading) {
+    return (
+      <View style={[s.screen, s.center, { paddingTop: insets.top }]}>
+        <ActivityIndicator color={Colors.primaryDark} size="large" />
+      </View>
+    )
+  }
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
@@ -483,13 +593,7 @@ export default function SearchScreen({ navigation }: Props) {
         placeholder={t('FILTER.SEARCH_STATE')}
         options={(labelCache.STATE ?? []).map(o => ({ key: o.key, label: o.label }))}
         selectedKey={selected.STATE?.[0]}
-        onSelect={async opt => {
-          updateField('STATE', [opt.key])
-          updateField('CITY', ['0'])
-          const cities = await ensureOptions('CITY', () => fetchCities(opt.key))
-          setLabelCache(prev => ({ ...prev, CITY: cities }))
-          setLocationStep('city')
-        }}
+        onSelect={selectState}
         onClose={() => setLocationStep(null)}
       />
       <MultiSelectPicker
@@ -510,11 +614,7 @@ export default function SearchScreen({ navigation }: Props) {
         placeholder=""
         options={labelCache.RAASI ?? []}
         selectedKey={undefined}
-        onSelect={async opt => {
-          const stars = await ensureOptions(`STAR_${opt.key}`, () => fetchStarOptions(opt.key))
-          setLabelCache(prev => ({ ...prev, STAR: stars }))
-          setStarStep('star')
-        }}
+        onSelect={selectRaasi}
         onClose={() => setStarStep(null)}
       />
       <MultiSelectPicker

@@ -153,7 +153,6 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
     try {
       const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
       const res = await apiCall(Endpoints.profile.managePhoto, 'POST', `ID=${userId}`)
-      console.log('DBG_MANAGEPHOTO userId=', userId, 'res=', JSON.stringify(res))
       if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOS) {
         setPhotos(res.RESPONSE.PHOTOS)
       }

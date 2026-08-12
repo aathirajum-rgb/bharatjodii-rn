@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
@@ -15,9 +15,12 @@ import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { StorageKeys } from '../../constants/storage.keys'
-import { getMultiple } from '../../service/storageService'
+import { getItem, getMultiple } from '../../service/storageService'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import DeleteProfileMrgReasonDesktopLayout from './DeleteProfileMrgReasonDesktopLayout'
+import type { FooterTab } from '../../components/app-footer/AppFooter'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -68,9 +71,15 @@ function RadioCard({ label, selected, onPress }: RadioCardProps) {
 export default function DeleteProfileMrgReasonScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
   const { t }  = useTranslation()
+  const isDesktop = useIsDesktopWeb()
 
   const [selectedMrgReason, setSelectedMrgReason] = useState<MrgKey>('1')
   const [deleting,          setDeleting]          = useState(false)
+  const [userName,          setUserName]          = useState('')
+
+  useEffect(() => {
+    getItem(StorageKeys.User.NAME).then(name => setUserName(name ?? ''))
+  }, [])
 
   // Angular page 2: MRGFIXEDREASON '3' → callDeleteAPI('2') directly
   async function handleDirectDelete() {
@@ -146,6 +155,32 @@ export default function DeleteProfileMrgReasonScreen({ navigation, route }: Prop
     key:   k,
     label: t(`DELETE_PROFILE.MRG_REASON_${k}`),
   }))
+
+  function handleTabPress(tab: FooterTab) {
+    switch (tab) {
+      case 0: navigation.navigate('Home');     break
+      case 1: navigation.navigate('Matches');  break
+      case 2: navigation.navigate('Activity'); break
+      case 3: navigation.navigate('recharge', { fromTab: true }); break
+      case 4: navigation.navigate('MessagerList'); break
+    }
+  }
+
+  if (isDesktop) {
+    return (
+      <DeleteProfileMrgReasonDesktopLayout
+        navigation={navigation}
+        userName={userName}
+        onTabPress={handleTabPress}
+        options={options}
+        selectedOption={selectedMrgReason}
+        onSelectOption={key => setSelectedMrgReason(key as MrgKey)}
+        isDeleting={deleting}
+        onNext={handleNext}
+        nextLabel={selectedMrgReason === '3' ? t('DELETE_PROFILE.DELETE_CTA') : t('DELETE_PROFILE.NEXT_CTA')}
+      />
+    )
+  }
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>

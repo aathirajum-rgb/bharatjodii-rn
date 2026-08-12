@@ -34,17 +34,6 @@ const BRIDGE_SCRIPT = `
   true;
 `
 
-// Diagnostics only — reports what actually rendered, in case the hosted
-// page never calls the bridge at all (e.g. an empty/error response body).
-const DEBUG_BODY_DUMP_SCRIPT = `
-  window.ReactNativeWebView.postMessage(JSON.stringify({
-    event_name: 'DBG_BODY_DUMP',
-    length: document.body ? document.body.innerHTML.length : -1,
-    snippet: document.body ? document.body.innerHTML.slice(0, 500) : '(no body)',
-  }));
-  true;
-`
-
 type Props = {
   navigation: any
   route: {
@@ -78,20 +67,6 @@ export default function HostedCheckoutWebViewScreen({ navigation, route }: Props
         navigation.goBack()
         return
       }
-      // Diagnostics only — bypasses the WebView entirely to see the exact
-      // raw response (status/content-type/body) independent of whether the
-      // WebView can render it as HTML at all.
-      fetch(req.uri, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: req.body,
-      }).then(async res => {
-        const text = await res.text()
-        console.error('DBG_HOSTED_CHECKOUT_RAW_FETCH', method, res.status,
-          JSON.stringify(Object.fromEntries(res.headers.entries())), text.slice(0, 800))
-      }).catch(err => {
-        console.error('DBG_HOSTED_CHECKOUT_RAW_FETCH_ERR', method, err?.message)
-      })
       setRequest(req)
     })
     return () => { cancelled = true }
@@ -123,7 +98,6 @@ export default function HostedCheckoutWebViewScreen({ navigation, route }: Props
   }
 
   async function handleBridgeMessage(event: WebViewMessageEvent) {
-    console.error('DBG_HOSTED_CHECKOUT_BRIDGE', method, event.nativeEvent.data)
     if (settledRef.current) return
     let data: any
     try {
@@ -149,20 +123,15 @@ export default function HostedCheckoutWebViewScreen({ navigation, route }: Props
     }
   }
 
-  // Diagnostics only — onMessage/BRIDGE_SCRIPT is the real completion path.
-  // Without these, a hosted page that fails to load (blocked by the bank's
-  // anti-embedding checks, mixed-content, wrong response) shows "processing"
-  // then a blank WebView with nothing logged anywhere.
-  function handleLoadError(event: WebViewErrorEvent) {
-    console.error('DBG_HOSTED_CHECKOUT_LOAD_ERROR', method, JSON.stringify(event.nativeEvent))
-  }
-  function handleHttpError(event: WebViewHttpErrorEvent) {
-    console.error('DBG_HOSTED_CHECKOUT_HTTP_ERROR', method, JSON.stringify(event.nativeEvent))
-  }
+  // NOTE: onMessage/BRIDGE_SCRIPT is the real completion path — a hosted
+  // page that fails to load entirely (blocked by the bank's anti-embedding
+  // checks, mixed-content, wrong response) currently has no fallback here
+  // and leaves the user on the loading overlay indefinitely. Out of scope
+  // for this cleanup pass; flagged for a follow-up rather than silently left
+  // as dead debug logging.
+  function handleLoadError(_event: WebViewErrorEvent) {}
+  function handleHttpError(_event: WebViewHttpErrorEvent) {}
   async function handleNavStateChange(nav: WebViewNavigation) {
-    console.error('DBG_HOSTED_CHECKOUT_NAV', method, JSON.stringify({
-      url: nav.url, loading: nav.loading, title: nav.title,
-    }))
     if (settledRef.current) return
 
     // Fallback outcome detection — confirmed via a real device trace that
@@ -200,7 +169,6 @@ export default function HostedCheckoutWebViewScreen({ navigation, route }: Props
       <WebView
         source={{ uri: request.uri, method: 'POST', body: request.body }}
         injectedJavaScriptBeforeContentLoaded={BRIDGE_SCRIPT}
-        injectedJavaScript={DEBUG_BODY_DUMP_SCRIPT}
         onMessage={handleBridgeMessage}
         onLoadStart={() => setPageLoading(true)}
         onLoadEnd={() => setPageLoading(false)}

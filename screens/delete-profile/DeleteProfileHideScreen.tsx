@@ -18,6 +18,9 @@ import { StorageKeys } from '../../constants/storage.keys'
 import { getItem, getMultiple } from '../../service/storageService'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import DeleteProfileHideDesktopLayout from './DeleteProfileHideDesktopLayout'
+import type { FooterTab } from '../../components/app-footer/AppFooter'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -70,6 +73,7 @@ function RadioCard({ label, selected, onPress }: RadioCardProps) {
 export default function DeleteProfileHideScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
   const { t }  = useTranslation()
+  const isDesktop = useIsDesktopWeb()
 
   const { reasonName = '' } = route.params ?? {}
 
@@ -77,6 +81,11 @@ export default function DeleteProfileHideScreen({ navigation, route }: Props) {
   const [selectedKey,   setSelectedKey]   = useState('')
   const [hidingProfile, setHidingProfile] = useState(false)
   const [deletingDirect,setDeletingDirect]= useState(false)
+  const [userName,      setUserName]      = useState('')
+
+  useEffect(() => {
+    getItem(StorageKeys.User.NAME).then(name => setUserName(name ?? ''))
+  }, [])
 
   // Load HIDDENDAYS options from cached registration arrays
   useEffect(() => {
@@ -172,7 +181,34 @@ export default function DeleteProfileHideScreen({ navigation, route }: Props) {
 
   const isLoading = hidingProfile || deletingDirect
 
+  function handleTabPress(tab: FooterTab) {
+    switch (tab) {
+      case 0: navigation.navigate('Home');     break
+      case 1: navigation.navigate('Matches');  break
+      case 2: navigation.navigate('Activity'); break
+      case 3: navigation.navigate('recharge', { fromTab: true }); break
+      case 4: navigation.navigate('MessagerList'); break
+    }
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
+
+  if (isDesktop) {
+    return (
+      <DeleteProfileHideDesktopLayout
+        navigation={navigation}
+        userName={userName}
+        onTabPress={handleTabPress}
+        options={options}
+        selectedKey={selectedKey}
+        onSelectKey={setSelectedKey}
+        hidingProfile={hidingProfile}
+        deletingDirect={deletingDirect}
+        onHideProfile={handleHideProfile}
+        onDirectDelete={handleDirectDelete}
+      />
+    )
+  }
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>

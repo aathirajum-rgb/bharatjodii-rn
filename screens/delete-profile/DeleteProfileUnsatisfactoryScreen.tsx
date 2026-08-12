@@ -20,6 +20,9 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { getItem, getMultiple } from '../../service/storageService'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import DeleteProfileUnsatisfactoryDesktopLayout from './DeleteProfileUnsatisfactoryDesktopLayout'
+import type { FooterTab } from '../../components/app-footer/AppFooter'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -28,7 +31,6 @@ const R = CDN_REACT + '/'
 const ICON = {
   back:  R + 'menu_back_arrow.svg',
   phone: R + 'call_icon.svg',
-  mic:   R + 'mic_icon.svg',
 }
 
 // ─── Fallback list if REGISTRATIONARRAYS not loaded ───────────────────────────
@@ -76,6 +78,7 @@ function CheckboxCard({ label, checked, onPress }: CheckboxCardProps) {
 export default function DeleteProfileUnsatisfactoryScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
   const { t }  = useTranslation()
+  const isDesktop = useIsDesktopWeb()
 
   const { reasonName = '' } = route.params ?? {}
 
@@ -83,6 +86,11 @@ export default function DeleteProfileUnsatisfactoryScreen({ navigation, route }:
   const [concernText,  setConcernText]  = useState('')
   const [customerCare, setCustomerCare] = useState('')
   const [submitting,   setSubmitting]   = useState(false)
+  const [userName,     setUserName]     = useState('')
+
+  useEffect(() => {
+    getItem(StorageKeys.User.NAME).then(name => setUserName(name ?? ''))
+  }, [])
 
   const isOtherSelected = options.some(o => o.KEY === OTHER_KEY && o.checked)
 
@@ -177,7 +185,36 @@ export default function DeleteProfileUnsatisfactoryScreen({ navigation, route }:
     }
   }
 
+  function handleTabPress(tab: FooterTab) {
+    switch (tab) {
+      case 0: navigation.navigate('Home');     break
+      case 1: navigation.navigate('Matches');  break
+      case 2: navigation.navigate('Activity'); break
+      case 3: navigation.navigate('recharge', { fromTab: true }); break
+      case 4: navigation.navigate('MessagerList'); break
+    }
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
+
+  if (isDesktop) {
+    return (
+      <DeleteProfileUnsatisfactoryDesktopLayout
+        navigation={navigation}
+        userName={userName}
+        onTabPress={handleTabPress}
+        options={options}
+        onToggleOption={toggleOption}
+        isOtherSelected={isOtherSelected}
+        concernText={concernText}
+        onChangeConcernText={setConcernText}
+        customerCare={customerCare}
+        canSubmit={canSubmit}
+        submitting={submitting}
+        onSubmit={handleSubmit}
+      />
+    )
+  }
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
@@ -233,18 +270,6 @@ export default function DeleteProfileUnsatisfactoryScreen({ navigation, route }:
               textAlignVertical="top"
               maxLength={500}
             />
-
-            {/* TODO: audio recording — implement later
-            <View style={s.orRow}>
-              <View style={s.orLine} />
-              <Text style={s.orText}>{t('DELETE_PROFILE.OR')}</Text>
-              <View style={s.orLine} />
-            </View>
-            <Pressable style={s.recordBtn} accessibilityRole="button">
-              <CdnSvg uri={ICON.mic} width={20} height={20} />
-              <Text style={s.recordBtnText}>{t('DELETE_PROFILE.RECORD_CONCERN')}</Text>
-            </Pressable>
-            */}
           </View>
         )}
 
@@ -417,43 +442,6 @@ const s = StyleSheet.create({
     fontWeight:        '400',
     color:             '#000000',
     backgroundColor:   Colors.white,
-  },
-
-  // ── OR divider ──
-  orRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    marginVertical: 16,
-    gap:            12,
-  },
-  orLine: {
-    flex:            1,
-    height:          1,
-    backgroundColor: '#e6e6e6',
-  },
-  orText: {
-    fontSize:      12,
-    fontWeight:    '400',
-    color:         '#777777',
-    letterSpacing: 0.36,
-  },
-
-  // ── Record button ──
-  recordBtn: {
-    height:          44,
-    borderRadius:    8,
-    borderWidth:     1,
-    borderColor:     PRIMARY,
-    flexDirection:   'row',
-    alignItems:      'center',
-    justifyContent:  'center',
-    gap:             8,
-    backgroundColor: Colors.white,
-  },
-  recordBtnText: {
-    fontSize:   14,
-    fontWeight: '400',
-    color:      '#000000',
   },
 
   // ── Customer support ──

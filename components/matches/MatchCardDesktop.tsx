@@ -23,13 +23,12 @@ const CDN = CDN_SVG
 
 // Figma node 606:6239's photo frame (606:6240) is a 248×248 SQUARE, not the
 // 220×260 rectangle this previously guessed at.
-const PHOTO_W = 248
-const PHOTO_H = 248
+const DEFAULT_PHOTO_SIZE = 248
 
 export default function MatchCardDesktop({
   profile, oppGender, ownEntryType, femaleFreeEligible, indNumbersLeft,
   onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp,
-  showLikedBadge, menu,
+  showLikedBadge, menu, photoSize,
 }: {
   profile:            MatchProfile
   oppGender:          'M' | 'F'
@@ -51,8 +50,15 @@ export default function MatchCardDesktop({
   // placeholder desktop layout did. Only Activity's desktop layout passes
   // this — Matches desktop has no per-card menu, so it's optional.
   menu?: { open: boolean; onPress: () => void; content: ReactNode } | undefined
+  // IgnoredProfilesDesktopScreen (Figma node 659:8567/735:31320) uses a
+  // deliberately smaller 160×160 photo — a genuinely different card size in
+  // that real desktop frame, not a guess. Every other caller omits this and
+  // keeps the 248 default.
+  photoSize?: number | undefined
 }) {
   const { t } = useTranslation()
+  const PHOTO_W = photoSize ?? DEFAULT_PHOTO_SIZE
+  const PHOTO_H = photoSize ?? DEFAULT_PHOTO_SIZE
 
   // Same context mobile's MatchCard builds (MatchesScreen.tsx) — drives the after-like
   // CTA's dynamic content/label/icon/FREE-badge/contacts-left line below. Previously
@@ -75,7 +81,7 @@ export default function MatchCardDesktop({
       {/* Plain View, not Pressable — PhotoSwiper below owns its own tap/drag gesture
           handling (PanResponder); nesting it inside another Pressable would make the
           two compete for the same touch, breaking drag-to-swipe. */}
-      <View style={c.photoBox}>
+      <View style={[c.photoBox, { width: PHOTO_W, height: PHOTO_H }]}>
         {profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0 ? (
           <PhotoSwiper
             images={profile.photos}
@@ -274,8 +280,8 @@ const c = StyleSheet.create({
     marginBottom:      16,
   },
   photoBox: {
-    width:            PHOTO_W,
-    height:           PHOTO_H,
+    width:            DEFAULT_PHOTO_SIZE,
+    height:           DEFAULT_PHOTO_SIZE,
     // Figma node 606:6240: 8px radius (this used 10 — a plausible-looking guess).
     borderRadius:     8,
     overflow:         'hidden',

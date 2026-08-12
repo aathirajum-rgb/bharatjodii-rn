@@ -5,15 +5,13 @@
 // effectively hardcoded to that value throughout, which is why isFUPVerify()
 // and the '/fup-verify' back-button/header branch aren't ported.
 //
-// SCOPED: "Take a selfie" and "Verify with a Govt ID" show their correct
-// state (deactivated/active/failed/success) but aren't wired to an onPress —
-// their targets (a camera-based selfie-capture screen and a govt-ID-verify
-// screen) don't exist in this port yet. "Upload Photo" and "Contact Customer
-// Support" are fully functional.
+// "Take a selfie", "Verify with a Govt ID", "Upload Photo", and "Contact
+// Customer Support" are all fully functional.
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
+import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
@@ -55,7 +53,11 @@ export default function BlockerScreen({ navigation }: { navigation: any }) {
   const [idProofAttempt, setIdProofAttempt] = useState<IdProofAttempt>({})
   const [customerCare,   setCustomerCare]   = useState('')
 
-  useEffect(() => {
+  // useFocusEffect (not a plain mount-only effect) so returning here after a
+  // selfie/govt-ID attempt — or after uploading a photo via Gallery —
+  // refreshes the status rows instead of showing stale pre-attempt state.
+  useFocusEffect(
+    useCallback(() => {
     let cancelled = false
     ;(async () => {
       const [userId, gender, mcode, cc, storedPhotoCount] = await Promise.all([
@@ -91,7 +93,8 @@ export default function BlockerScreen({ navigation }: { navigation: any }) {
       setLoading(false)
     })()
     return () => { cancelled = true }
-  }, [])
+    }, [])
+  )
 
   // ── Derived — mirrors Angular's checkIdProofAttemptData()/isOptionShown() ──
 
@@ -184,23 +187,24 @@ export default function BlockerScreen({ navigation }: { navigation: any }) {
               </View>
             )}
             {showSelfieActive && (
-              // Angular: onPress → openCamera() → '/selfie-verification'. That
-              // screen doesn't exist in this port yet — left non-interactive.
-              <View style={[styles.row, styles.rowUpload]}>
+              // Angular: onPress → openCamera() → '/selfie-verification'.
+              <Pressable style={[styles.row, styles.rowUpload]} onPress={() => navigation.navigate('selfie-verification')}>
                 <CdnSvg uri={ICONS.camera} width={28} height={28} />
                 <Text style={styles.rowLabel}>{t('VERIFY_BLOCKER.TAKE_SELFIE')}</Text>
                 <Text style={styles.chevron}>›</Text>
-              </View>
+              </Pressable>
             )}
             {showSelfieFailed && (
-              <View style={[styles.row, styles.rowFailed]}>
+              // Angular: caller-side clickOnTryAgainCTA() lets a failed
+              // attempt retake the selfie the same way.
+              <Pressable style={[styles.row, styles.rowFailed]} onPress={() => navigation.navigate('selfie-verification')}>
                 <CdnSvg uri={ICONS.failed} width={28} height={28} />
                 <View style={styles.rowTextCol}>
                   <Text style={styles.rowLabel}>{t('VERIFY_BLOCKER.SELFIE_UNSUCCESSFUL')}</Text>
                   <Text style={styles.attemptsText}>{attemptsLeftText(selfieAttemptsLeft, 'selfie')}</Text>
                 </View>
                 <Text style={styles.chevron}>›</Text>
-              </View>
+              </Pressable>
             )}
             {showSelfieSuccess && (
               <View style={[styles.row, styles.rowSuccess]}>

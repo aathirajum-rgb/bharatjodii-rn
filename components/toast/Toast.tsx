@@ -4,12 +4,12 @@
 // confirmation messages on the Matches card.
 //
 // The Like action's own toast (communication.service.ts's showCustomToaster(),
-// cssClass 'liked-toast') is the ONE case that also carries an "Undo" button —
+// cssClass 'liked-toast') was the FIRST case that carried an "Undo" button —
 // confirmed via source: same dark #333333/white styling, no special button
-// color, tapping it dismisses immediately and fires a `dislike` call. No other
-// toast in the app (dislike's own, view-later, etc.) has this button — its
-// `buttons` array is commented out there — so `onUndo` must stay optional and
-// only ever be passed by the Like flow.
+// color, tapping it dismisses immediately and fires a `dislike` call. Since
+// then, EditProfileDesktopScreen.tsx's own delete-photo/make-main-photo toasts
+// reuse the same optional `onUndo` for their own (real, not decorative) undo
+// actions — so this prop is no longer Like-exclusive, just optional.
 import { useEffect, useRef, useState } from 'react'
 import { Animated, Pressable, StyleSheet, Text } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'

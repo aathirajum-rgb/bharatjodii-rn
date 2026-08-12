@@ -50,8 +50,9 @@ import DesktopPageShell from '../../components/desktop-page-shell/DesktopPageShe
 import DesktopSelectField, { type SelectOption } from '../../components/desktop-select-field/DesktopSelectField'
 import DesktopMultiSelectField from '../../components/desktop-select-field/DesktopMultiSelectField'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG } from '../../constants/cdn'
+import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import { Endpoints } from '../../service/api.endpoints'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { getItem, setItem } from '../../service/storageService'
@@ -59,7 +60,10 @@ import { StorageKeys as SK } from '../../constants/storage.keys'
 import { paymentTrack } from '../../service/paymentService'
 import { fetchEditProfileInfo, submitFieldChanges, type FieldChange } from '../../service/editProfileService'
 import { deletePhoto, setMainPhoto } from '../../service/profileService'
-import PhotoPrivacySheet from '../../components/photo-privacy/PhotoPrivacySheet'
+import PhotoPrivacyDesktopModal from '../../components/photo-privacy/PhotoPrivacyDesktopModal'
+import PhotoViewerModal, { type ViewerPhoto } from '../../components/edit-profile/PhotoViewerModal'
+import DeletePhotoConfirmModal from '../../components/edit-profile/DeletePhotoConfirmModal'
+import Toast, { type ToastRequest } from '../../components/toast/Toast'
 import {
   CHILDREN_OPTIONS,
   fetchMotherTongueOptions, fetchStates, fetchCities,
@@ -72,6 +76,21 @@ import type { FooterTab } from '../../components/app-footer/AppFooter'
 
 const PLACEHOLDER = CDN_SVG + 'add-photo.svg'
 const MAX_PHOTOS = 10
+// How long the delete-photo toast's "Undo" stays live — deletePicture/v1 has
+// no matching "undelete", so Undo only works by NOT calling it yet: the
+// photo is removed from the grid immediately (optimistic), but the real API
+// call is deferred until this window elapses with no Undo tap. Longer than
+// Toast's own 2000ms default so there's a real window to react in.
+const DELETE_UNDO_WINDOW_MS = 3000
+// Figma node 642:2780 ("with photos" state) — real pixel specs: 204×204
+// primary tile (left) + a wrapping grid of 98×98 tiles (right, 16px column
+// gap / 9px row gap), NOT one uniform flex-wrap row of same-size tiles like
+// this screen previously rendered (which broke the moment a photo existed —
+// see the bug report screenshot). Icons are downloaded assets, not text
+// glyphs — Figma's trash-2/plus-circle already bake in their own white
+// rounded-square / grey-circle backdrops, confirmed from the real SVGs.
+const DELETE_ICON = CDN_REACT + '/edit-profile-photo-delete-icon.svg'
+const ADD_ICON    = CDN_REACT + '/edit-profile-photo-add-icon.svg'
 
 // Each grid cell's own dropdown already escapes ITS OWN stacking context
 // (DesktopSelectField's wrapperOpen), but that only out-ranks siblings within
@@ -92,6 +111,16 @@ type Props = { navigation: any }
 export default function EditProfileDesktopScreen({ navigation }: Props) {
   const { t } = useTranslation()
   const inputRef = useRef<HTMLInputElement | null>(null)
+  // Set right before openFilePicker() fires for a "Replace this photo"
+  // action (vs. a plain add) — handleFiles() checks this to know it should
+  // delete the old PHOTOID after the new upload succeeds, and to only take
+  // the first picked file (the hidden <input> stays `multiple` for the
+  // regular add-photo case). See PhotoViewerModal.tsx's header comment for
+  // why this compose-from-two-calls approach, not a dedicated endpoint.
+  const replacingPhotoRef = useRef<Photo | null>(null)
+  // The one in-flight "deferred delete" (see DELETE_UNDO_WINDOW_MS above) —
+  // cleared either when its timer fires for real, or when Undo cancels it.
+  const pendingDeleteRef = useRef<{ photo: Photo; index: number; timer: ReturnType<typeof setTimeout> } | null>(null)
 
   const [loading, setLoading]   = useState(true)
   const [saving, setSaving]     = useState(false)
@@ -101,6 +130,9 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
   const [photos, setPhotos]         = useState<Photo[]>([])
   const [uploading, setUploading]   = useState(false)
   const [photoPrivacyVisible, setPhotoPrivacyVisible] = useState(false)
+  const [photoViewerIndex, setPhotoViewerIndex] = useState<number | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Photo | null>(null)
+  const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
 
   // ── Read-only fields ──
   const [ageDisplay, setAgeDisplay]       = useState<string | undefined>(undefined)
@@ -358,10 +390,15 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
   async function handleFiles(e: any) {
     const files: File[] = Array.from(e.target.files ?? [])
     if (!files.length) return
+    const replacing = replacingPhotoRef.current
+    replacingPhotoRef.current = null
     setUploading(true)
     try {
       const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-      for (const file of files) {
+      // Replace targets exactly one photo — only the first picked file
+      // applies even if the browser's file picker allowed multi-select.
+      const filesToUpload = replacing ? files.slice(0, 1) : files
+      for (const file of filesToUpload) {
         const formData = new FormData()
         formData.append('ID', userId)
         formData.append('UPLOADPHOTO', file, file.name)
@@ -370,7 +407,16 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
           await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
         }
       }
+      if (replacing) await deletePhoto(replacing.PHOTOID)
       await loadPhotos()
+      // "Profile photo updated successfully" is specifically about the MAIN
+      // photo changing — only fires here when the replaced photo was the
+      // current main. No Undo: unlike delete, there's no deferred-call trick
+      // available (the old photo's file is already gone), so a real revert
+      // isn't possible.
+      if (replacing?.MAINPHOTO == 1) {
+        setToastRequest({ message: t('EDITPROFILE.PHOTO_UPDATED_TOAST', 'Profile photo updated successfully'), key: Date.now() })
+      }
     } catch {
       Alert.alert('Error', 'Upload failed. Please try again.')
     } finally {
@@ -380,25 +426,99 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
   }
 
   function openFilePicker() {
+    replacingPhotoRef.current = null
+    inputRef.current?.click()
+  }
+
+  function openReplacePicker(photo: Photo) {
+    replacingPhotoRef.current = photo
     inputRef.current?.click()
   }
 
   function confirmDelete(photo: Photo) {
-    Alert.alert('Delete photo', 'Remove this photo from your profile?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Delete', style: 'destructive',
-        onPress: async () => {
-          const res = await deletePhoto(photo.PHOTOID)
-          if (res?.RESPONSECODE == 1) await loadPhotos()
-        },
-      },
-    ])
+    setDeleteTarget(photo)
   }
 
-  async function setAsMain(photo: Photo) {
+  // ── Photo viewer modal actions — mirrors confirmDelete/setMainPhoto, but
+  // closes the modal afterward instead of leaving it open against a
+  // possibly-reordered `photos` array (deleting/setting-main/replacing all
+  // change array order or length, so re-syncing the modal's own index would
+  // just be extra risk for no real benefit — reopening is one click). ──
+
+  function handleViewerDelete(photo: ViewerPhoto) {
+    setPhotoViewerIndex(null)
+    const target = photos.find(p => p.PHOTOID === photo.PHOTOID)
+    if (target) setDeleteTarget(target)
+  }
+
+  // Real Angular copy/flow (modalpopup.component.html's `deletePhoto` action,
+  // see DeletePhotoConfirmModal.tsx's header comment) — single destructive
+  // "Delete" CTA, no separate Cancel button. The confirm modal closes right
+  // away; the actual deletePicture/v1 call is deferred (see
+  // DELETE_UNDO_WINDOW_MS) so the toast's "Undo" can genuinely cancel it
+  // instead of being decorative.
+  function handleConfirmDeletePhoto() {
+    if (!deleteTarget) return
+    const target = deleteTarget
+    setDeleteTarget(null)
+
+    // Any earlier deferred delete that's still pending gets flushed for
+    // real right away — only one "undo window" is tracked at a time, so
+    // starting a second one without resolving the first would leak it.
+    if (pendingDeleteRef.current) {
+      clearTimeout(pendingDeleteRef.current.timer)
+      const prev = pendingDeleteRef.current
+      pendingDeleteRef.current = null
+      deletePhoto(prev.photo.PHOTOID).then(() => loadPhotos())
+    }
+
+    const removedIndex = Math.max(0, photos.findIndex(p => p.PHOTOID === target.PHOTOID))
+    setPhotos(prev => prev.filter(p => p.PHOTOID !== target.PHOTOID))
+
+    const timer = setTimeout(() => {
+      pendingDeleteRef.current = null
+      deletePhoto(target.PHOTOID).then(() => loadPhotos())
+    }, DELETE_UNDO_WINDOW_MS)
+    pendingDeleteRef.current = { photo: target, index: removedIndex, timer }
+
+    setToastRequest({
+      message: t('EDITPROFILE.PHOTO_DELETED_TOAST', 'Photo deleted successfully'),
+      key: Date.now(),
+      duration: DELETE_UNDO_WINDOW_MS,
+      onUndo: () => {
+        const pending = pendingDeleteRef.current
+        if (!pending) return
+        clearTimeout(pending.timer)
+        pendingDeleteRef.current = null
+        setPhotos(prev => {
+          const next = [...prev]
+          next.splice(Math.min(pending.index, next.length), 0, pending.photo)
+          return next
+        })
+      },
+    })
+  }
+
+  async function handleViewerSetMain(photo: ViewerPhoto) {
+    setPhotoViewerIndex(null)
+    const previousMain = photos[0]
     const res = await setMainPhoto(photo.PHOTOID)
-    if (res?.RESPONSECODE == 1) await loadPhotos()
+    if (res?.RESPONSECODE == 1) {
+      await loadPhotos()
+      setToastRequest({
+        message: t('EDITPROFILE.PHOTO_UPDATED_TOAST', 'Profile photo updated successfully'),
+        key: Date.now(),
+        onUndo: previousMain ? () => {
+          setMainPhoto(previousMain.PHOTOID).then(() => loadPhotos())
+        } : undefined,
+      })
+    }
+  }
+
+  function handleViewerReplace(photo: ViewerPhoto) {
+    setPhotoViewerIndex(null)
+    const target = photos.find(p => p.PHOTOID === photo.PHOTOID)
+    if (target) openReplacePicker(target)
   }
 
   // ── Save ──
@@ -505,7 +625,17 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
   return (
     <DesktopPageShell navigation={navigation} userName={userName} activeItem="editProfile" onTabPress={handleTabPress}>
       {Platform.OS === 'web' && (
-        <input ref={inputRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={handleFiles} />
+        // `display: 'none'` looks equivalent but isn't — Safari (and older
+        // WebKit generally) silently refuses to honor a programmatic
+        // .click() on a file input that's display:none, so openFilePicker()/
+        // openReplacePicker() would appear to do nothing there (works fine
+        // in Chrome/Chromium, which is why this wasn't caught by testing).
+        // Keeping it in the layout as a 1×1 fully transparent element instead
+        // of removing it from rendering satisfies that check in every browser.
+        <input
+          ref={inputRef} type="file" accept="image/*" multiple onChange={handleFiles}
+          style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden' }}
+        />
       )}
 
       <View style={s.main}>
@@ -523,29 +653,47 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
             </Pressable>
           </View>
 
-          <View style={s.photoGrid}>
-            {photos.map((p, idx) => (
-              <View key={p.PHOTOID} style={[s.photoTile, idx === 0 && s.photoTileMain]}>
-                <Pressable style={s.photoTilePress} onPress={idx === 0 ? undefined : () => setAsMain(p)}>
-                  <Image source={{ uri: p.PHOTOURL || p.PHOTOTHUMB || '' }} style={s.photoTileImg} contentFit="cover" />
-                </Pressable>
-                {idx === 0 && <View style={s.mainLabel}><Text style={s.mainLabelText}>Profile Picture</Text></View>}
-                <Pressable style={s.photoDeleteBtn} onPress={() => confirmDelete(p)} hitSlop={4}>
-                  <Text style={s.photoDeleteIcon}>🗑</Text>
-                </Pressable>
-              </View>
-            ))}
-            {photos.length < MAX_PHOTOS && (
-              <Pressable style={s.photoAddTile} onPress={openFilePicker}>
-                {uploading ? <ActivityIndicator color={Colors.textSecondary} /> : (
-                  photos.length === 0
-                    ? <Image source={{ uri: PLACEHOLDER }} style={{ width: 40, height: 40 }} contentFit="contain" />
-                    : <Text style={s.photoAddPlus}>+</Text>
-                )}
+          <View style={s.photoRow}>
+            {photos.length > 0 ? (
+              <Pressable style={s.primaryTile} onPress={() => setPhotoViewerIndex(0)}>
+                <Image source={{ uri: photos[0].PHOTOURL || photos[0].PHOTOTHUMB || '' }} style={s.primaryTileImg} contentFit="cover" />
+                <View style={s.primaryLabel}>
+                  <Text style={s.primaryLabelText}>{t('EDITPROFILE.PROFILE_PICTURE', 'Profile picture')}</Text>
+                </View>
+              </Pressable>
+            ) : (
+              <Pressable style={s.primaryTileEmpty} onPress={openFilePicker}>
+                {uploading
+                  ? <ActivityIndicator color={Colors.textSecondary} />
+                  : <Image source={{ uri: PLACEHOLDER }} style={{ width: 40, height: 40 }} contentFit="contain" />}
               </Pressable>
             )}
+
+            {photos.length > 0 && (
+              <View style={s.smallGrid}>
+                {photos.slice(1).map((p, i) => (
+                  <View key={p.PHOTOID} style={s.smallTile}>
+                    <Pressable style={s.smallTilePress} onPress={() => setPhotoViewerIndex(i + 1)}>
+                      <Image source={{ uri: p.PHOTOURL || p.PHOTOTHUMB || '' }} style={s.smallTileImg} contentFit="cover" />
+                    </Pressable>
+                    <Pressable style={s.smallDeleteBtn} onPress={() => confirmDelete(p)} hitSlop={4}>
+                      <CdnSvg uri={DELETE_ICON} width={24} height={24} />
+                    </Pressable>
+                  </View>
+                ))}
+                {photos.length < MAX_PHOTOS && (
+                  <Pressable style={s.smallAddTile} onPress={openFilePicker}>
+                    {uploading
+                      ? <ActivityIndicator color={Colors.textSecondary} />
+                      : <CdnSvg uri={ADD_ICON} width={24} height={24} />}
+                  </Pressable>
+                )}
+              </View>
+            )}
           </View>
-          <Text style={s.photoHint}>{photos.length === 0 ? t('EDITPROFILE.DRAG_PHOTO', 'Add your photos') : t('EDITPROFILE.DRAG_PHOTO')}</Text>
+          <Text style={photos.length === 0 ? s.photoHintEmpty : s.photoHint}>
+            {photos.length === 0 ? t('EDITPROFILE.ADDYOURPHOTO', 'Add your photos') : t('EDITPROFILE.DRAG_PHOTO')}
+          </Text>
           <Pressable onPress={() => Alert.alert('Photo guidelines', 'Use clear, recent photos with good lighting.')}>
             <Text style={s.guidelines}>ⓘ Check out our photo tips</Text>
           </Pressable>
@@ -645,7 +793,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
             </View>
             {missingHoroscope && (
               <View style={[s.cell, rowZ(2)]}>
-                <Pressable style={s.missingBox} onPress={() => Alert.alert('Horoscope', 'Coming soon')}>
+                <Pressable style={s.missingBox} onPress={() => navigation.navigate('EditProfileHoroscope')}>
                   <Text style={s.missingBoxText}>Horoscope details missing</Text>
                   <Text style={s.missingBoxBang}>!</Text>
                 </Pressable>
@@ -684,65 +832,116 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
         <ButtonRevamp label="Save changes" variant="primary" loading={saving} onPress={handleSave} style={s.saveBtn} />
       </View>
 
-      <PhotoPrivacySheet
+      <PhotoPrivacyDesktopModal
         visible={photoPrivacyVisible}
         onClose={() => setPhotoPrivacyVisible(false)}
       />
+
+      <PhotoViewerModal
+        visible={photoViewerIndex !== null}
+        photos={photos}
+        initialIndex={photoViewerIndex ?? 0}
+        uploading={uploading}
+        onClose={() => setPhotoViewerIndex(null)}
+        onDelete={handleViewerDelete}
+        onSetMain={handleViewerSetMain}
+        onReplace={handleViewerReplace}
+      />
+
+      <DeletePhotoConfirmModal
+        visible={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleConfirmDeletePhoto}
+      />
+
+      <Toast request={toastRequest} />
     </DesktopPageShell>
   )
 }
 
-const CELL_W = 338
+// main(700) minus card's 20px padding on each side leaves 660px of content
+// width; two columns + the grid's 20px gap must fit inside that — 320*2+20=660.
+// (Was 338, which needed 696 and forced flexWrap to drop every field to its
+// own row — the exact single-column bug this fixes.)
+const CELL_W = 320
 
 const s = StyleSheet.create({
   main: { width: 700, paddingBottom: 24 },
   center: { alignItems: 'center', justifyContent: 'center', minHeight: 300 },
-  pageTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.textDark, marginBottom: 16 },
+  pageTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.textDark, marginBottom: 16 },
 
   card: {
-    backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.surface, borderRadius: 16,
     padding: 20, marginBottom: 16,
+    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.1, shadowRadius: 5,
+    elevation: 3,
   },
-  sectionTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.textDark, marginBottom: 16 },
+  sectionTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.textDark, marginBottom: 16 },
   link: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.link, textDecorationLine: 'underline' },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 20 },
   cell: { width: CELL_W },
 
   photoHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  photoGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  photoTile: {
-    width: 100, height: 100, borderRadius: 10, overflow: 'hidden', position: 'relative',
-    backgroundColor: Colors.surfaceInput,
+
+  // Figma node 642:2780: a 204×204 primary tile (left) beside a wrapping
+  // grid of 98×98 tiles (right) — two distinct regions, not one uniform
+  // flex-wrap row (that previously made the primary tile shrink to 100×100
+  // and lose its own layout the moment a photo existed).
+  photoRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
+
+  primaryTile: {
+    width: 204, height: 204, borderRadius: 8, overflow: 'hidden', position: 'relative',
+    borderWidth: 2, borderColor: Colors.primaryDark, backgroundColor: Colors.surfaceInput,
   },
-  photoTileMain: { borderWidth: 2, borderColor: Colors.primaryDark },
-  photoTilePress: { flex: 1 },
-  photoTileImg: { width: '100%', height: '100%' },
-  mainLabel: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.5)', paddingVertical: 4, paddingLeft: 6 },
-  mainLabelText: { fontSize: 10, fontWeight: '700', color: Colors.white },
-  photoDeleteBtn: {
-    position: 'absolute', top: 5, right: 5, width: 22, height: 22, borderRadius: 6,
-    backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center',
+  primaryTileImg: { width: '100%', height: '100%' },
+  // Figma: bg #b50033, 100×22, rounded bottom-left 8 / top-right 16, flush
+  // to the tile's bottom-left corner (no outer margin).
+  primaryLabel: {
+    position: 'absolute', left: 0, bottom: 0, minWidth: 100, height: 22,
+    backgroundColor: Colors.primaryDark, alignItems: 'center', justifyContent: 'center',
+    paddingHorizontal: 8, borderBottomLeftRadius: 8, borderTopRightRadius: 16,
   },
-  photoDeleteIcon: { fontSize: 11 },
-  photoAddTile: {
-    width: 100, height: 100, borderRadius: 10, borderWidth: 1.5, borderStyle: 'dashed', borderColor: Colors.borderNeutral,
+  primaryLabelText: { fontFamily: 'Poppins-Medium', fontSize: 12, color: '#fffefe', letterSpacing: 0.12 },
+  // Empty state — Figma's main upload slot uses the same "needs attention"
+  // pink as the hint text below it, distinct from the neutral grey used
+  // once at least one photo already exists.
+  primaryTileEmpty: {
+    width: 204, height: 204, borderRadius: 16, borderWidth: 1.5, borderStyle: 'dashed', borderColor: Colors.inputError,
     alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surfaceInput,
   },
-  photoAddPlus: { fontSize: 24, fontWeight: '300', color: Colors.textSecondary },
+
+  // Figma: 16px column gap / 9px row gap — deliberately different values,
+  // not a copy-paste of one into the other.
+  smallGrid: { flexDirection: 'row', flexWrap: 'wrap', width: 440, columnGap: 16, rowGap: 9 },
+  smallTile: {
+    width: 98, height: 98, borderRadius: 8, overflow: 'hidden', position: 'relative',
+    backgroundColor: Colors.surfaceInput,
+  },
+  smallTilePress: { flex: 1 },
+  smallTileImg: { width: '100%', height: '100%' },
+  // Figma: the trash-2 icon asset already bakes in its own white
+  // rounded-square backdrop — no extra wrapper needed. Bottom-right corner,
+  // 8px inset (66,66 within a 98×98 tile for a 24×24 icon).
+  smallDeleteBtn: { position: 'absolute', bottom: 8, right: 8 },
+  smallAddTile: {
+    width: 98, height: 98, borderRadius: 8, borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.borderSubtle,
+    backgroundColor: 'rgba(230,230,230,0.3)', alignItems: 'center', justifyContent: 'center',
+  },
   photoHint: { fontSize: 12, color: Colors.link, marginTop: 8 },
+  photoHintEmpty: { fontSize: 12, color: Colors.inputError, marginTop: 8 },
   guidelines: { fontSize: 12, color: Colors.textSecondary, textDecorationLine: 'underline', marginTop: 8 },
 
   missingBox: {
-    height: 56, borderWidth: 1, borderColor: Colors.primaryDark, borderRadius: 8,
+    height: 56, borderWidth: 1, borderColor: Colors.inputError, borderRadius: 8,
     paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
   missingBoxText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.textDark },
   missingBoxBang: {
-    width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.primaryDark, color: Colors.white,
+    width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.inputError, color: Colors.white,
     fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 18, overflow: 'hidden',
   },
   missingHint: { fontSize: 12, color: Colors.link, marginTop: 6 },
 
-  saveBtn: { alignSelf: 'flex-end', width: 200, marginTop: 8 },
+  saveBtn: { alignSelf: 'center', width: 312, marginTop: 8 },
 })

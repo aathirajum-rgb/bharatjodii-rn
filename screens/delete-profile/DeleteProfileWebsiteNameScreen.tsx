@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
@@ -18,9 +18,12 @@ import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { StorageKeys } from '../../constants/storage.keys'
-import { getMultiple } from '../../service/storageService'
+import { getItem, getMultiple } from '../../service/storageService'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import DeleteProfileWebsiteNameDesktopLayout from './DeleteProfileWebsiteNameDesktopLayout'
+import type { FooterTab } from '../../components/app-footer/AppFooter'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -39,11 +42,17 @@ type Props = { navigation: any; route: any }
 export default function DeleteProfileWebsiteNameScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
   const { t }  = useTranslation()
+  const isDesktop = useIsDesktopWeb()
 
   const { mrgReasonName = '' } = route.params ?? {}
 
   const [websiteName, setWebsiteName] = useState('')
   const [submitting,  setSubmitting]  = useState(false)
+  const [userName,    setUserName]    = useState('')
+
+  useEffect(() => {
+    getItem(StorageKeys.User.NAME).then(name => setUserName(name ?? ''))
+  }, [])
 
   async function callDeleteAPI() {
     if (submitting || !websiteName.trim()) return
@@ -96,6 +105,31 @@ export default function DeleteProfileWebsiteNameScreen({ navigation, route }: Pr
   }
 
   const canSubmit = websiteName.trim().length > 0
+
+  function handleTabPress(tab: FooterTab) {
+    switch (tab) {
+      case 0: navigation.navigate('Home');     break
+      case 1: navigation.navigate('Matches');  break
+      case 2: navigation.navigate('Activity'); break
+      case 3: navigation.navigate('recharge', { fromTab: true }); break
+      case 4: navigation.navigate('MessagerList'); break
+    }
+  }
+
+  if (isDesktop) {
+    return (
+      <DeleteProfileWebsiteNameDesktopLayout
+        navigation={navigation}
+        userName={userName}
+        onTabPress={handleTabPress}
+        websiteName={websiteName}
+        onChangeWebsiteName={setWebsiteName}
+        canSubmit={canSubmit}
+        submitting={submitting}
+        onSubmit={callDeleteAPI}
+      />
+    )
+  }
 
   return (
     <KeyboardAvoidingView

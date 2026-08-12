@@ -20,6 +20,8 @@ import { Endpoints } from '../../service/api.endpoints'
 import { fetchCustomerCare } from '../../service/homeService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import LinkCTA from '../../components/link-cta/LinkCTA'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import HelpCenterDesktopScreen from './HelpCenterDesktopScreen'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -71,6 +73,7 @@ function Row({ title, onPress, showDivider }: RowProps) {
 // stub until their target screens are migrated.
 
 export default function HelpCenterScreen({ navigation }: Props) {
+  const isDesktop = useIsDesktopWeb()
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
 
@@ -140,6 +143,15 @@ export default function HelpCenterScreen({ navigation }: Props) {
     { type: SUPPORT_TOPIC_TYPES[1], title: t('FAQ_DETAILS.HEADER_2') },
     { type: SUPPORT_TOPIC_TYPES[2], title: t('FAQ_DETAILS.HEADER_4') },
   ]
+
+  // Desktop (Figma "Jodii Desktop - Registration" node 659:21644) needs the
+  // one-big-white-card layout with chevron-down rows — see
+  // HelpCenterDesktopScreen.tsx's header comment. Standalone screen with its
+  // own state, same split EditProfileScreen.tsx uses. Checked after (not
+  // before) the hooks above since isDesktop can flip live on resize.
+  if (isDesktop) {
+    return <HelpCenterDesktopScreen navigation={navigation} />
+  }
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>

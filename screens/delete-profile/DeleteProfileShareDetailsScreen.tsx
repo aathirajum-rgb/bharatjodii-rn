@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Animated,
@@ -18,8 +18,13 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
+import { StorageKeys } from '../../constants/storage.keys'
+import { getItem } from '../../service/storageService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import DeleteProfileShareDetailsDesktopLayout from './DeleteProfileShareDetailsDesktopLayout'
+import type { FooterTab } from '../../components/app-footer/AppFooter'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -33,7 +38,7 @@ const ICON = {
 
 // ─── Date picker constants ────────────────────────────────────────────────────
 
-const MONTHS = [
+export const MONTHS = [
   { key: '1',  label: 'January'   }, { key: '2',  label: 'February'  },
   { key: '3',  label: 'March'     }, { key: '4',  label: 'April'     },
   { key: '5',  label: 'May'       }, { key: '6',  label: 'June'      },
@@ -45,7 +50,7 @@ const MONTHS = [
 const ITEM_H      = 40
 const MAX_VISIBLE = 7
 
-function buildMarriageYears(): { key: string; label: string }[] {
+export function buildMarriageYears(): { key: string; label: string }[] {
   const max = new Date().getFullYear()
   const min = 1990
   return Array.from({ length: max - min + 1 }, (_, i) => {
@@ -54,7 +59,7 @@ function buildMarriageYears(): { key: string; label: string }[] {
   })
 }
 
-function getDaysInMonth(month: string, year: string): { key: string; label: string }[] {
+export function getDaysInMonth(month: string, year: string): { key: string; label: string }[] {
   const m     = Number(month) || 1
   const y     = Number(year)  || 2000
   const count = new Date(y, m, 0).getDate()
@@ -67,12 +72,12 @@ function getDaysInMonth(month: string, year: string): { key: string; label: stri
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Props        = { navigation: any; route: any }
-type DateChip     = 'fixed' | 'not_fixed' | null
+export type DateChip = 'fixed' | 'not_fixed' | null
 type MrgDateField = 'date' | 'month' | 'year'
 type DropdownPos  = { top: number; left: number; width: number; fieldBottom: number }
 
 // "Getting married in" month options (from Angular's DATENOTFIXED registration array)
-const MONTHS_OPTIONS = [
+export const MONTHS_OPTIONS = [
   { key: '1', value: 'Getting married in 3 months'  },
   { key: '2', value: 'Getting married in 6 months'  },
   { key: '3', value: 'Getting married in 9 months'  },
@@ -157,6 +162,12 @@ function MonthPickerSheet({ visible, selected, onSelect, onClose }: MonthPickerP
 export default function DeleteProfileShareDetailsScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
   const { t }  = useTranslation()
+  const isDesktop = useIsDesktopWeb()
+  const [userName, setUserName] = useState('')
+
+  useEffect(() => {
+    getItem(StorageKeys.User.NAME).then(name => setUserName(name ?? ''))
+  }, [])
 
   // Partner name
   const [partnerName,    setPartnerName]    = useState('')
@@ -264,6 +275,23 @@ export default function DeleteProfileShareDetailsScreen({ navigation, route }: P
     setMrgPickerField(null)
   }
 
+  // Shared by mobile's MonthPickerSheet onSelect and the desktop layout's
+  // DesktopSelectField onSelect for the "Married in" dropdown.
+  function selectMarriedIn(key: string, value: string) {
+    setMarriedInKey(key)
+    setMarriedInLabel(value)
+  }
+
+  function handleTabPress(tab: FooterTab) {
+    switch (tab) {
+      case 0: navigation.navigate('Home');     break
+      case 1: navigation.navigate('Matches');  break
+      case 2: navigation.navigate('Activity'); break
+      case 3: navigation.navigate('recharge', { fromTab: true }); break
+      case 4: navigation.navigate('MessagerList'); break
+    }
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   const mrgDropStyle = {
@@ -271,6 +299,29 @@ export default function DeleteProfileShareDetailsScreen({ navigation, route }: P
     top:      mrgDropdownPos.fieldBottom,
     left:     mrgDropdownPos.left,
     width:    mrgDropdownPos.width,
+  }
+
+  if (isDesktop) {
+    return (
+      <DeleteProfileShareDetailsDesktopLayout
+        navigation={navigation}
+        userName={userName}
+        onTabPress={handleTabPress}
+        partnerName={partnerName}
+        onChangePartnerName={text => { setPartnerName(text); if (text.trim().length >= 3) setNameError(false) }}
+        nameError={nameError}
+        dateChip={dateChip}
+        onSelectChip={handleSelectChip}
+        selDate={selDate}
+        selMonth={selMonth}
+        selYear={selYear}
+        onSelectMrgField={handleMrgPickerSelect}
+        marriedInKey={marriedInKey}
+        onSelectMarriedIn={selectMarriedIn}
+        nextEnabled={nextEnabled()}
+        onNext={handleNext}
+      />
+    )
   }
 
   return (
@@ -431,7 +482,7 @@ export default function DeleteProfileShareDetailsScreen({ navigation, route }: P
       <MonthPickerSheet
         visible={pickerVisible}
         selected={marriedInKey}
-        onSelect={(key, value) => { setMarriedInKey(key); setMarriedInLabel(value) }}
+        onSelect={selectMarriedIn}
         onClose={() => setPickerVisible(false)}
       />
 

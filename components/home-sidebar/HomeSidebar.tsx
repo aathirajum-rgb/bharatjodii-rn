@@ -2,7 +2,9 @@
 // 1034:6600, "Sidebar") — user profile summary card + account menu, matching
 // the Figma design's own row set exactly (confirmed against the live "Jodii
 // Desktop" and "Jodii Desktop - Scroll view" frames — the card has exactly
-// 7 rows below the Edit profile/Edit preferences pair, with no Logout row).
+// 7 rows below the Edit profile/Edit preferences pair, with no Logout row
+// here — per explicit correction, Logout lives only inside Settings (see
+// SettingsScreen.tsx), reusing the same LogoutConfirmModal.tsx popup there).
 //
 // Icons load from the CDN (imgs.jodii.app), the same way the Angular app's
 // own menu.page.html loads its account-menu icons, instead of bundling local
@@ -83,9 +85,9 @@ export default function HomeSidebar({ navigation, userName, userId, photoUrl, ac
 
         <View style={s.divider} />
 
-        <SidebarRow iconUri={ICON.settings} iconSize={24} title="Settings" active={activeItem === 'settings'} onPress={() => { /* TODO: no dedicated Settings screen registered yet */ }} />
+        <SidebarRow iconUri={ICON.settings} iconSize={24} title="Settings" active={activeItem === 'settings'} onPress={() => navigation.navigate('Settings')} />
         <SidebarRow iconUri={ICON.searchProfile} title="Search profile by ID" active={activeItem === 'searchById'} onPress={() => navigation.navigate('SearchById')} />
-        <SidebarRow iconUri={ICON.viewLater} title="Profile marked as view later" active={activeItem === 'viewLater'} onPress={() => { /* TODO: no dedicated view-later list screen registered yet */ }} />
+        <SidebarRow iconUri={ICON.viewLater} title="Profile marked as view later" active={activeItem === 'viewLater'} onPress={() => navigation.navigate('ViewLater')} />
         <SidebarRow iconUri={ICON.ignoredProfiles} title="Ignored profiles" active={activeItem === 'ignoredProfiles'} onPress={() => navigation.navigate('IgnoredProfiles')} />
         <SidebarRow iconUri={ICON.successStories} title="Jodii success stories" active={activeItem === 'successStories'} onPress={() => navigation.navigate('SuccessStories')} />
         <SidebarRow iconUri={ICON.customerSupport} title="Contact Customer support" active={activeItem === 'customerSupport'} onPress={() => navigation.navigate('HelpCenter')} />

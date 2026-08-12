@@ -259,7 +259,6 @@ export default function CustomGalleryScreen({ navigation, route }: Props) {
         } as any)
 
         const res = await uploadFile(Endpoints.media.addProfilePic, formData)
-        console.log('DBG_UPLOAD userId=', userId, 'res=', JSON.stringify(res))
         if (res?.RESPONSECODE == 1) {
           if (res?.RESPONSE?.PHOTOURL) {
             await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))

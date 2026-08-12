@@ -27,3 +27,9 @@ envs/.env.*
 # Android/iOS generated firebase files
 android/app/google-services.json
 ios/GoogleService-Info.plist
+
+# Playwright MCP debug logs/snapshots — not project source
+.playwright-mcp/
+
+# Ad-hoc screenshots dropped at repo root during testing
+/edit-profile-desktop-1.png

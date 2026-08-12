@@ -20,6 +20,8 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { getItem } from '../../service/storageService'
 import { apiCall } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import SuccessStoriesDesktopScreen from './SuccessStoriesDesktopScreen'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -167,6 +169,7 @@ function PhotoViewer({ photos, onClose, insets }: PhotoViewerProps) {
 // ─── SuccessStoriesScreen ─────────────────────────────────────────────────────
 
 export default function SuccessStoriesScreen({ navigation }: Props) {
+  const isDesktop = useIsDesktopWeb()
   const insets = useSafeAreaInsets()
   const { t }  = useTranslation()
 
@@ -249,6 +252,15 @@ export default function SuccessStoriesScreen({ navigation }: Props) {
   // ── Render ────────────────────────────────────────────────────────────────
 
   const title = t('MENU.SUCCESS_STORIES')
+
+  // Desktop (Figma "Jodii Desktop - Registration" node 659:36170) needs a
+  // static 3-column photo grid instead of this screen's scrollable hero+list
+  // — see SuccessStoriesDesktopScreen.tsx's header comment. Standalone screen
+  // with its own state, same split EditProfileScreen.tsx uses. Checked after
+  // (not before) the hooks above since isDesktop can flip live on resize.
+  if (isDesktop) {
+    return <SuccessStoriesDesktopScreen navigation={navigation} />
+  }
 
   return (
     <View style={[c.screen, { paddingTop: insets.top }]}>

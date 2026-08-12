@@ -125,12 +125,18 @@ export default function PhotoUploadDesktopStep({ navigation }: Props) {
       nextLoading={uploading}
     >
       {Platform.OS === 'web' && (
+        // `display: 'none'` looks equivalent but isn't — Safari silently
+        // refuses to honor a programmatic .click() on a display:none file
+        // input (works fine in Chrome, which is why this wasn't caught by
+        // testing). A 1×1 fully transparent element still satisfies that
+        // check in every browser — see EditProfileDesktopScreen.tsx's own
+        // fix for the same bug.
         <input
           ref={inputRef}
           type="file"
           accept="image/*"
           multiple
-          style={{ display: 'none' }}
+          style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden' }}
           onChange={handleFiles}
         />
       )}

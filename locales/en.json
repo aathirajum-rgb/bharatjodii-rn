@@ -460,6 +460,13 @@
        "PHONE_POPUP_CTA1":"Yes, I'm sure",
        "PHONE_POPUP_CTA2":"No, change settings",
 
+       "PHONE_OPTION_1_TITLE":"Allow members to contact me directly",
+       "PHONE_OPTION_1_CONTENT":"Your phone number will be visible to paid members. This helps in getting maximum responses",
+       "PHONE_OPTION_2_TITLE":"Allow members whom I like to contact me directly",
+       "PHONE_OPTION_2_CONTENT":"Your phone number will be visible to paid members whom you liked",
+       "PHONE_OPTION_3_TITLE":"Don't allow anyone to contact me directly",
+       "PHONE_OPTION_3_CONTENT":"You will get the phone numbers of paid members via SMS when they request to view your contact",
+
        "BLOCK_HEADER":"Confirm block",
        "BLOCK_CONTENT":"Do you want to block this person? Remember, once blocked you both will not be able to contact each other until unblocked",
        "BLOCK_TITLE":"Do you want to block this person?",

@@ -21,9 +21,12 @@ import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { StorageKeys } from '../../constants/storage.keys'
-import { getMultiple } from '../../service/storageService'
+import { getItem, getMultiple } from '../../service/storageService'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import DeleteProfileDesktopLayout from './DeleteProfileDesktopLayout'
+import type { FooterTab } from '../../components/app-footer/AppFooter'
 
 const SCREEN_H = Dimensions.get('window').height
 
@@ -161,26 +164,35 @@ function BreakSheet({ visible, onClose, onHide, onDelete, deleting }: BreakSheet
 export default function DeleteProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
   const { t }  = useTranslation()
+  const isDesktop = useIsDesktopWeb()
 
   const [selectedReason,   setSelectedReason]   = useState<ReasonKey>('1')
   const [showBreakSheet,   setShowBreakSheet]   = useState(false)
   const [deleting,         setDeleting]         = useState(false)
   const [otherReasonText,  setOtherReasonText]  = useState('')
   const [submittingOther,  setSubmittingOther]  = useState(false)
+  const [userName,         setUserName]         = useState('')
+
+  useEffect(() => {
+    getItem(StorageKeys.User.NAME).then(name => setUserName(name ?? ''))
+  }, [])
 
   function handleNext() {
     const reasonName = t(`DELETE_PROFILE.REASON_${selectedReason}`)
     if (selectedReason === '1') {
       navigation.navigate('DeleteProfileMrgReason', { reason: selectedReason, reasonName })
+    } else if (selectedReason === '2') {
+      // Angular: landingDetails.REASON['2'].nextId === '4' → pageName['4'] ===
+      // 'HIDDENDAYS' — the same hide-or-delete page DeleteProfileHideScreen.tsx
+      // already implements (it reads REGISTRATIONARRAYS.DELETEPROFILE.PAGE4
+      // and takes this same reasonName param), just never wired up from here.
+      navigation.navigate('DeleteProfileHide', { reasonName })
     } else if (selectedReason === '3') {
       setShowBreakSheet(true)
     } else if (selectedReason === '4') {
       navigation.navigate('DeleteProfileUnsatisfactory', { reasonName })
-    } else if (selectedReason === '5') {
-      handleOtherReasonSubmit(reasonName)
     } else {
-      // TODO: wire remaining flows ('2')
-      navigation.navigate('DeleteProfileMrgReason', { reason: selectedReason, reasonName })
+      handleOtherReasonSubmit(reasonName)
     }
   }
 
@@ -279,6 +291,42 @@ export default function DeleteProfileScreen({ navigation }: Props) {
     key:   k,
     label: t(`DELETE_PROFILE.REASON_${k}`),
   }))
+
+  function handleTabPress(tab: FooterTab) {
+    switch (tab) {
+      case 0: navigation.navigate('Home');     break
+      case 1: navigation.navigate('Matches');  break
+      case 2: navigation.navigate('Activity'); break
+      case 3: navigation.navigate('recharge', { fromTab: true }); break
+      case 4: navigation.navigate('MessagerList'); break
+    }
+  }
+
+  if (isDesktop) {
+    return (
+      <DeleteProfileDesktopLayout
+        navigation={navigation}
+        userName={userName}
+        onTabPress={handleTabPress}
+        reasons={reasons}
+        selectedReason={selectedReason}
+        onSelectReason={key => setSelectedReason(key as ReasonKey)}
+        isOtherSelected={selectedReason === '5'}
+        otherReasonText={otherReasonText}
+        onChangeOtherReasonText={setOtherReasonText}
+        submittingOther={submittingOther}
+        onNext={handleNext}
+        showBreakOffer={showBreakSheet}
+        onCloseBreakOffer={() => setShowBreakSheet(false)}
+        onHideFromBreak={() => {
+          setShowBreakSheet(false)
+          navigation.navigate('DeleteProfileHide', { reasonName: t('DELETE_PROFILE.REASON_3') })
+        }}
+        onDeleteFromBreak={handleDirectDelete}
+        deleting={deleting}
+      />
+    )
+  }
 
   return (
     <KeyboardAvoidingView style={s.flex1} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

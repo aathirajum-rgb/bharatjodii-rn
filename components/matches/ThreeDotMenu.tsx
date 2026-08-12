@@ -11,24 +11,34 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 
-const REMOVE_ICON_URI = CDN_SVG + 'remove-photo-img.svg'
-const REPORT_ICON_URI = CDN_SVG + 'viewprofile/report-profile-img.svg'
+const REMOVE_ICON_URI  = CDN_SVG + 'remove-photo-img.svg'
+const REPORT_ICON_URI  = CDN_SVG + 'viewprofile/report-profile-img.svg'
+// Confirmed real asset (old Angular: assets/images/svg/unblock-jodii-chat-img.svg) —
+// no dedicated "unblock" icon existed anywhere else in this port's CDN usage yet.
+const UNBLOCK_ICON_URI = CDN_SVG + 'unblock-jodii-chat-img.svg'
 
 export interface ThreeDotMenuProps {
   // Angular: report-remove-profile.component.ts's @Input IsShowRemoveProfile/
   // IsShowReportProfile — both default false, caller opts each in. Order is
   // fixed in the real markup: Remove ABOVE Report when both show.
-  showRemove: boolean
-  showReport: boolean
-  onRemove:   () => void
-  onReport:   () => void
+  showRemove?: boolean | undefined
+  showReport?: boolean | undefined
+  onRemove?:   (() => void) | undefined
+  onReport?:   (() => void) | undefined
+  // Desktop "Ignored profiles" screen's Blocked tab (Figma node 735:31320) —
+  // a single "Unblock this profile" item, mutually exclusive with Remove/Report
+  // in practice (no caller passes both today).
+  showUnblock?: boolean | undefined
+  onUnblock?:   (() => void) | undefined
   // Desktop cards anchor this button inline in the icon row (relatively
   // positioned wrapper), not floating over the whole card's photo like
   // mobile does — override top/right to anchor to that smaller wrapper.
   positionStyle?: StyleProp<ViewStyle>
 }
 
-export default function ThreeDotMenu({ showRemove, showReport, onRemove, onReport, positionStyle }: ThreeDotMenuProps) {
+export default function ThreeDotMenu({
+  showRemove, showReport, onRemove, onReport, showUnblock, onUnblock, positionStyle,
+}: ThreeDotMenuProps) {
   const { t } = useTranslation()
   return (
     <View style={[s.dropdown, positionStyle]}>
@@ -42,6 +52,12 @@ export default function ThreeDotMenu({ showRemove, showReport, onRemove, onRepor
         <Pressable style={s.item} onPress={onReport}>
           <CdnSvg uri={REPORT_ICON_URI} width={20} height={20} />
           <Text style={s.itemText}>{t('MATCHES.MORE_OPT_2')}</Text>
+        </Pressable>
+      )}
+      {showUnblock && (
+        <Pressable style={s.item} onPress={onUnblock}>
+          <CdnSvg uri={UNBLOCK_ICON_URI} width={20} height={20} />
+          <Text style={s.itemText}>{t('PROFILES.UNBLOCK')}</Text>
         </Pressable>
       )}
     </View>

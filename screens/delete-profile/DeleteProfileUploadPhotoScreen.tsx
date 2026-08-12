@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,9 +19,12 @@ import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { StorageKeys } from '../../constants/storage.keys'
-import { getMultiple } from '../../service/storageService'
+import { getItem, getMultiple } from '../../service/storageService'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import DeleteProfileUploadPhotoDesktopLayout from './DeleteProfileUploadPhotoDesktopLayout'
+import type { FooterTab } from '../../components/app-footer/AppFooter'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -39,6 +43,7 @@ type Props = { navigation: any; route: any }
 export default function DeleteProfileUploadPhotoScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
   const { t }  = useTranslation()
+  const isDesktop = useIsDesktopWeb()
 
   const {
     partnerName      = '',
@@ -50,8 +55,16 @@ export default function DeleteProfileUploadPhotoScreen({ navigation, route }: Pr
   } = route.params ?? {}
 
   const [photoUri,   setPhotoUri]   = useState<string | null>(null)
+  // Web only — FormData needs a real File/Blob, not the {uri,name,type} object
+  // RN's FormData polyfill accepts on native. photoUri still drives the preview.
+  const [photoFile,  setPhotoFile]  = useState<File | null>(null)
   const [address,    setAddress]    = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [userName,   setUserName]   = useState('')
+
+  useEffect(() => {
+    getItem(StorageKeys.User.NAME).then(name => setUserName(name ?? ''))
+  }, [])
 
   // ── Image picker ──────────────────────────────────────────────────────────
 
@@ -69,6 +82,11 @@ export default function DeleteProfileUploadPhotoScreen({ navigation, route }: Pr
     if (!result.canceled && result.assets[0]) {
       setPhotoUri(result.assets[0].uri)
     }
+  }
+
+  function pickPhotoWeb(file: File) {
+    setPhotoFile(file)
+    setPhotoUri(URL.createObjectURL(file))
   }
 
   // ── API call ──────────────────────────────────────────────────────────────
@@ -97,7 +115,9 @@ export default function DeleteProfileUploadPhotoScreen({ navigation, route }: Pr
       formData.append('MRGINMONTHS',    mrgInMonthsName)
       formData.append('ADDRESS',        address)
 
-      if (photoUri) {
+      if (Platform.OS === 'web' && photoFile) {
+        formData.append('UPLOADIMAGE', photoFile, photoFile.name)
+      } else if (photoUri) {
         const filename = photoUri.split('/').pop() ?? 'photo.jpg'
         const ext      = filename.split('.').pop()?.toLowerCase() ?? 'jpg'
         const mimeType = ext === 'png' ? 'image/png' : 'image/jpeg'
@@ -136,7 +156,34 @@ export default function DeleteProfileUploadPhotoScreen({ navigation, route }: Pr
     await callDeleteAPI()
   }
 
+  function handleTabPress(tab: FooterTab) {
+    switch (tab) {
+      case 0: navigation.navigate('Home');     break
+      case 1: navigation.navigate('Matches');  break
+      case 2: navigation.navigate('Activity'); break
+      case 3: navigation.navigate('recharge', { fromTab: true }); break
+      case 4: navigation.navigate('MessagerList'); break
+    }
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
+
+  if (isDesktop) {
+    return (
+      <DeleteProfileUploadPhotoDesktopLayout
+        navigation={navigation}
+        userName={userName}
+        onTabPress={handleTabPress}
+        photoUri={photoUri}
+        onPickPhotoWeb={pickPhotoWeb}
+        address={address}
+        onChangeAddress={setAddress}
+        submitting={submitting}
+        onSkip={handleSkip}
+        onSubmit={handleSubmit}
+      />
+    )
+  }
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>

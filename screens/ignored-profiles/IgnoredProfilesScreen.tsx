@@ -33,6 +33,8 @@ import {
 import { unblockProfile } from '../../service/communicationService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import IgnoredProfilesDesktopScreen from './IgnoredProfilesDesktopScreen'
 
 const DEFAULT_PHOTO_MALE   = CDN_REACT + '/ignore_profile_male.svg'
 const DEFAULT_PHOTO_FEMALE = CDN_REACT + '/ignore_profile_female.svg'
@@ -105,6 +107,7 @@ function ProfileCard({
 // ─── IgnoredProfilesScreen ────────────────────────────────────────────────────
 
 export default function IgnoredProfilesScreen({ navigation }: Props) {
+  const isDesktop = useIsDesktopWeb()
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
 
@@ -206,6 +209,17 @@ export default function IgnoredProfilesScreen({ navigation }: Props) {
   }
 
   const emptyText = activeTab === 'dontshow' ? t('PROFILES.NORESULT_1') : t('PROFILES.NORESULT_22')
+
+  // Desktop (Figma "Jodii Desktop - Registration" nodes 659:8567/735:31320)
+  // needs the full MatchCardDesktop treatment (badges, Call/WhatsApp, "View
+  // full profile") this screen's own IgnoredProfile shape can't drive — see
+  // IgnoredProfilesDesktopScreen.tsx's header comment. Standalone screen with
+  // its own state, same split EditProfileScreen.tsx uses. Checked after (not
+  // before) the hooks above, matching that same precedent — isDesktop can
+  // flip live on browser resize, so every hook here must run unconditionally.
+  if (isDesktop) {
+    return <IgnoredProfilesDesktopScreen navigation={navigation} />
+  }
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>

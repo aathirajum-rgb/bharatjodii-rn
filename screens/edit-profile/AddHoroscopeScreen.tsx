@@ -37,6 +37,8 @@ import { fetchStates, fetchHoroCities, generateHoroscope, type HoroCity } from '
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import SelectField from '../../components/input/SelectField'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import AddHoroscopeDesktopScreen from './AddHoroscopeDesktopScreen'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
@@ -64,6 +66,7 @@ function parseDob(raw: string | undefined): { date: string; month: string; year:
 }
 
 export default function AddHoroscopeScreen({ navigation }: Props) {
+  const isDesktop = useIsDesktopWeb()
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
 
@@ -109,6 +112,16 @@ export default function AddHoroscopeScreen({ navigation }: Props) {
       setLoading(false)
     })()
   }, [])
+
+  // Desktop (Figma "Jodii Desktop - Registration" node 1151:10688) needs an
+  // intro step (illustration + Generate/Upload/Skip) before this same
+  // form — see AddHoroscopeDesktopScreen.tsx's header comment. Standalone
+  // screen with its own state, same split EditProfileScreen.tsx uses.
+  // Checked after (not before) the hooks above since isDesktop can flip
+  // live on browser resize.
+  if (isDesktop) {
+    return <AddHoroscopeDesktopScreen navigation={navigation} />
+  }
 
   async function handleSelectState(opt: PickerOption) {
     setSelectedState(opt)

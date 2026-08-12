@@ -24,6 +24,7 @@ export const Endpoints = {
     missedCallVerify:    `${api}login/missedcallverified/v1`,
     impUpdate:           `${api}login/IMPUpdate/v1`,
     payWallUpdate:       `${api}login/paywallupd/v1`,
+    autoRenewalUpdate:   `${api}login/autorenewupd/v1`,
   },
 
   registration: {
@@ -160,6 +161,7 @@ export const Endpoints = {
     failedDetails:       `${api}payment/nbpaymentfaileddet/v1`,
     upiAutoPay:          `${payNg}payment/nbupiautopay`,
     upiPayLink:          `${api}payment/nbupipaylink/v1`,
+    autopayRefund:       `${api}payment/autopayrefund/v1`,
   },
 
   notify: {

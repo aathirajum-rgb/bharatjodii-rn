@@ -74,6 +74,8 @@ import MessagerListScreen           from '../screens/messagerList/MessagerListSc
 import LanguageSelectionScreen     from '../screens/LanguageSelectionScreen'
 import MenuScreen                  from '../screens/menu/MenuScreen'
 import BiodataScreen                from '../screens/menu/BiodataScreen'
+import SettingsScreen               from '../screens/settings/SettingsScreen'
+import PhonePrivacyScreen           from '../screens/settings/PhonePrivacyScreen'
 import DeleteProfileScreen             from '../screens/delete-profile/DeleteProfileScreen'
 import DeleteProfileMrgReasonScreen    from '../screens/delete-profile/DeleteProfileMrgReasonScreen'
 import DeleteProfileHideScreen         from '../screens/delete-profile/DeleteProfileHideScreen'
@@ -81,13 +83,13 @@ import DeleteProfileShareDetailsScreen  from '../screens/delete-profile/DeletePr
 import DeleteProfileWebsiteNameScreen   from '../screens/delete-profile/DeleteProfileWebsiteNameScreen'
 import DeleteProfileUploadPhotoScreen       from '../screens/delete-profile/DeleteProfileUploadPhotoScreen'
 import DeleteProfileUnsatisfactoryScreen   from '../screens/delete-profile/DeleteProfileUnsatisfactoryScreen'
-import DeleteProfileOtherReasonScreen      from '../screens/delete-profile/DeleteProfileOtherReasonScreen'
 import DeleteProfileSuccessScreen          from '../screens/delete-profile/DeleteProfileSuccessScreen'
 import SuccessStoriesScreen               from '../screens/success-stories/SuccessStoriesScreen'
 import HelpCenterScreen                   from '../screens/help-center/HelpCenterScreen'
 import SearchScreen                       from '../screens/search/SearchScreen'
 import FaqScreen                          from '../screens/help-center/FaqScreen'
 import IgnoredProfilesScreen               from '../screens/ignored-profiles/IgnoredProfilesScreen'
+import ViewLaterScreen                     from '../screens/view-later/ViewLaterScreen'
 import SearchByIdScreen                    from '../screens/search-by-id/SearchByIdScreen'
 import NotificationScreen                  from '../screens/notification/NotificationScreen'
 import EditProfileScreen                   from '../screens/edit-profile/EditProfileScreen'
@@ -137,11 +139,12 @@ export type AppStackParamList = {
   MessagerList:      undefined
   Menu:              undefined
   Biodata:           undefined
+  Settings:          undefined
+  PhonePrivacy:      undefined
   DeleteProfile:         undefined
   DeleteProfileMrgReason:    { reason: string; reasonName?: string }
   DeleteProfileHide:              { reasonName: string }
   DeleteProfileUnsatisfactory:    { reasonName: string }
-  DeleteProfileOtherReason:       { reasonName: string }
   DeleteProfileWebsiteName:       { mrgReasonName: string }
   DeleteProfileShareDetails: { reason: string; mrgReason: string; reasonName?: string; mrgReasonName?: string }
   DeleteProfileUploadPhoto: {
@@ -161,6 +164,7 @@ export type AppStackParamList = {
   Search: undefined
   Faq: { type: 'PROFILE' | 'CONTACTMATCHES' | 'PAYMENT'; itemId?: number }
   IgnoredProfiles: undefined
+  ViewLater: undefined
   SearchById: undefined
   EditProfile: undefined
   EditProfileReligious: undefined
@@ -535,11 +539,12 @@ export default function AppStack() {
       <Stack.Screen name="MessagerList" component={MessagerListScreen} />
       <Stack.Screen name="Menu" component={MenuScreen} />
       <Stack.Screen name="Biodata" component={BiodataScreen} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
+      <Stack.Screen name="PhonePrivacy" component={PhonePrivacyScreen} />
       <Stack.Screen name="DeleteProfile" component={DeleteProfileScreen} />
       <Stack.Screen name="DeleteProfileMrgReason" component={DeleteProfileMrgReasonScreen} />
       <Stack.Screen name="DeleteProfileHide" component={DeleteProfileHideScreen} />
       <Stack.Screen name="DeleteProfileUnsatisfactory" component={DeleteProfileUnsatisfactoryScreen} />
-      <Stack.Screen name="DeleteProfileOtherReason" component={DeleteProfileOtherReasonScreen} />
       <Stack.Screen name="DeleteProfileWebsiteName" component={DeleteProfileWebsiteNameScreen} />
       <Stack.Screen name="DeleteProfileShareDetails" component={DeleteProfileShareDetailsScreen} />
       <Stack.Screen name="DeleteProfileUploadPhoto" component={DeleteProfileUploadPhotoScreen} />
@@ -549,6 +554,7 @@ export default function AppStack() {
       <Stack.Screen name="Search" component={SearchScreen} />
       <Stack.Screen name="Faq" component={FaqScreen} />
       <Stack.Screen name="IgnoredProfiles" component={IgnoredProfilesScreen} />
+      <Stack.Screen name="ViewLater" component={ViewLaterScreen} />
       <Stack.Screen name="SearchById" component={SearchByIdScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
       <Stack.Screen name="EditProfileReligious" component={ReligiousDetailsScreen} />

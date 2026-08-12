@@ -538,12 +538,21 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   // once-per-install first-land ping) so they don't refire every time the user
   // tabs back to Home.
   const loadHome = useCallback(async (ctrl: { cancelled: boolean }, includePopups: boolean) => {
+    // TEMP DEBUG — pinpointing a reported 5+ second "stuck" feeling on native
+    // right after landing on Home. Times the two biggest suspects: the
+    // blocking refreshSession() await (network-bound — everything below is
+    // serialized behind it) vs. overall loadHome wall-clock (render-churn
+    // territory, if refreshSession itself is fast but the total isn't).
+    // Remove once the real bottleneck is confirmed from device logs.
+    const __t0 = Date.now()
+
     // Angular's RN port convention (MatchesScreen.tsx's loadMatches() step 1):
     // every screen that fires listing API calls must refreshSession() first to
     // guarantee a valid/upgraded ATN — this was missing here, and its absence
     // is why every single Home listing call was failing with ERRCODE 23
     // ("Token expired") uniformly, all at once, regardless of endpoint.
     await refreshSession()
+    if (__DEV__) console.log('DBG_HOME_TIMING refreshSession took', Date.now() - __t0, 'ms')
     if (ctrl.cancelled) return
 
     if (includePopups) {
@@ -816,6 +825,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     // skeleton-loader treatment after that.
     Promise.all([fetchHomeSession(), fetchAndStorePPSetData()]).finally(() => {
       if (!ctrl.cancelled) setContentLoaded(true)
+      // TEMP DEBUG — see note at loadHome's top. This is when the header/
+      // footer-critical chain (refreshSession + fetchHomeSession +
+      // fetchAndStorePPSetData) has fully resolved.
+      if (__DEV__) console.log('DBG_HOME_TIMING contentLoaded flipped at', Date.now() - __t0, 'ms')
     })
   }, [assistDismissed, paymentFailedDismissed])
 
@@ -826,6 +839,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const isFirstFocusRef = useRef(true)
   useFocusEffect(
     useCallback(() => {
+      // TEMP DEBUG — see note at loadHome's top.
+      if (__DEV__) console.log('DBG_HOME_TIMING focus fired', Date.now())
       const ctrl = { cancelled: false }
       const includePopups = isFirstFocusRef.current
       isFirstFocusRef.current = false
@@ -1136,10 +1151,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     )
   }
 
-  if (!contentLoaded) {
-    return <Loader variant="spinner" fullPage />
-  }
-
   return (
     <View style={s.screen}>
 
@@ -1159,6 +1170,15 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />
 
+      {!contentLoaded ? (
+        // Angular: ionViewDidEnter() re-runs loadHome() on every focus, same
+        // as this screen's own useFocusEffect — but the header/footer never
+        // disappeared in Angular either. Keeping them mounted here (instead
+        // of gating the whole screen behind contentLoaded, which used to hide
+        // AppFooter too) matches MatchesScreen.tsx/ActivityScreen.tsx's own
+        // pattern of never re-blanking the footer on a refocus reload.
+        <Loader variant="spinner" fullPage />
+      ) : (
       <ScrollView
         style={s.scroll}
         showsVerticalScrollIndicator={false}
@@ -1408,6 +1428,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
         <View style={{ height: 16 }} />
       </ScrollView>
+      )}
 
       {activeSticky === 'forceUpdate' && !hideStickyOnScroll && (
         <ForceUpdateCard onPress={handleStickyPress} onClose={handleStickyClose} />

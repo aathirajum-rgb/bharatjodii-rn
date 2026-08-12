@@ -63,13 +63,15 @@ export default function CustomGalleryScreen({ navigation }: Props) {
         <Text style={styles.title}>Add your photo</Text>
         <Text style={styles.subtitle}>Select up to 10 photos from your device</Text>
 
-        {/* Hidden native file input */}
+        {/* Hidden native file input — 1×1/opacity:0, NOT display:none, since
+            Safari silently blocks a programmatic .click() on a display:none
+            file input (see EditProfileDesktopScreen.tsx's fix for the same bug) */}
         <input
           ref={inputRef}
           type="file"
           accept="image/*"
           multiple
-          style={{ display: 'none' }}
+          style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden' }}
           onChange={handleFiles}
         />
 
