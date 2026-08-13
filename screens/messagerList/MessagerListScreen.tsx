@@ -19,7 +19,7 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { fetchActivityListingPage } from '../../service/activityService'
 import { redirectToViewProfile } from '../../service/buttonService'
-import { paymentTrack } from '../../service/paymentService'
+import { openMembershipTab, paymentTrack } from '../../service/paymentService'
 import { fetchNotifCount } from '../../service/homeService'
 import { getSessionValue } from '../../service/registrationService'
 import { logEvent, logScreen } from '../../service/analyticsService'
@@ -190,7 +190,7 @@ export default function MessagerListScreen({ navigation }: Props) {
       case 0: navigation.navigate('Home');     break
       case 1: navigation.navigate('Matches');  break
       case 2: navigation.navigate('Activity'); break
-      case 3: paymentTrack('31'); navigation.navigate('recharge', { fromTab: true }); break
+      case 3: openMembershipTab(); break
       // case 4 is this screen — do nothing
     }
   }

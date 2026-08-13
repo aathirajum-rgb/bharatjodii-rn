@@ -10,14 +10,12 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import { Colors } from '../../constants/colors'
-import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
   fetchPropertyOptions,
   getRegValues,
   setRegValue,
   submitPropertyDetails,
 } from '../../service/registrationService'
-import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
@@ -51,16 +49,10 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
   const [options,      setOptions]      = useState<Option[]>([])
   const [fetching,     setFetching]     = useState(true)
   const [selected,     setSelected]     = useState<Set<string>>(new Set())
-  const [customerCare, setCustomerCare] = useState('')
   const [submitting,   setSubmitting]   = useState(false)
 
   useEffect(() => {
-    Promise.all([
-      getRegValues(),
-      getItem(SK.App.CUSTOMER_CARE),
-    ]).then(([regVals, cc]) => {
-      if (cc) setCustomerCare(cc)
-
+    getRegValues().then((regVals) => {
       const existing = regVals.PROPERTIES
       if (existing) {
         const keys = Array.isArray(existing)
@@ -247,48 +239,5 @@ const styles = StyleSheet.create({
     fontSize:   13,
     fontWeight: '700',
     lineHeight: 16,
-  },
-
-  // Skip — always below Next button
-  skipRow: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    justifyContent:  'center',
-    paddingVertical: 12,
-  },
-  skipText: {
-    fontSize:   15,
-    fontWeight: '500',
-    color:      Colors.textMedium,
-  },
-  skipArrow: {
-    fontSize:   18,
-    color:      Colors.textMedium,
-    lineHeight: 22,
-  },
-
-  divider: {
-    height:          StyleSheet.hairlineWidth,
-    backgroundColor: Colors.border,
-    marginTop:       4,
-    marginBottom:    12,
-  },
-  helpRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            6,
-  },
-  helpText: {
-    fontSize:      14,
-    fontWeight:    '400',
-    color:         Colors.textPrimary,
-    letterSpacing: 0.42,
-  },
-  helpPhone: {
-    fontSize:      14,
-    fontWeight:    '500',
-    color:         Colors.link,
-    letterSpacing: 0.42,
   },
 })

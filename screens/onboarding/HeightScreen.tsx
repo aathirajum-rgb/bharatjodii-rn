@@ -16,7 +16,6 @@ import {
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
-import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
   HeightGroup,
   callPartialRegistrationAPI,
@@ -25,7 +24,6 @@ import {
   getRegValue,
   setRegValues,
 } from '../../service/registrationService'
-import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE, PICKER_PANEL_WIDTH } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
@@ -83,7 +81,6 @@ export default function HeightScreen({ navigation }: Props) {
   const [selectedHeight,   setSelectedHeight]    = useState<Option | null>(null)
   const [createdBy,        setCreatedBy]         = useState('4')
   const [submitting,       setSubmitting]        = useState(false)
-  const [customerCare,     setCustomerCare]      = useState('')
   const [panelVisible,     setPanelVisible]      = useState(false)
 
   const slideAnim = useRef(new Animated.Value(0)).current
@@ -94,11 +91,9 @@ export default function HeightScreen({ navigation }: Props) {
       getRegValue('GENDER'),
       getRegValue('HEIGHTCATEGORY'),
       getRegValue('HEIGHT'),
-      getItem(SK.App.CUSTOMER_CARE),
-    ]).then(([cb, gender, savedCat, savedHeight, cc]) => {
+    ]).then(([cb, gender, savedCat, savedHeight]) => {
       const g2 = gender ?? '1'
       setCreatedBy(cb ?? '4')
-      if (cc) setCustomerCare(cc)
 
       Promise.all([
         fetchHeightCategoryOptions(g2),
@@ -462,31 +457,6 @@ const styles = StyleSheet.create({
     fontSize:   22,
     color:      Colors.textPrimary,
     lineHeight: 26,
-  },
-
-  divider: {
-    height:          1,
-    backgroundColor: Colors.inputBorder,
-    marginTop:       16,
-    marginBottom:    16,
-  },
-  helpRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            6,
-  },
-  helpText: {
-    fontSize:      14,
-    fontWeight:    '400',
-    color:         Colors.textPrimary,
-    letterSpacing: 0.42,
-  },
-  helpPhone: {
-    fontSize:      14,
-    fontWeight:    '500',
-    color:         Colors.link,
-    letterSpacing: 0.42,
   },
 
   // Right-side sliding panel (85 % of screen width)

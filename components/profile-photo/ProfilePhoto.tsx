@@ -630,11 +630,6 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
   },
-  uploadIcon: {
-    width:  28,
-    height: 28,
-    tintColor: Colors.white,
-  },
   uploadLabel: {
     color:      Colors.white,
     fontSize:   13,

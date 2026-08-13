@@ -13,7 +13,7 @@ import { useIsDesktopWeb } from '../hooks/useIsDesktopWeb';
 import LanguageSelectionDesktopLayout from './LanguageSelectionDesktopLayout';
 import { getItem } from '../service/storageService';
 import { StorageKeys } from '../constants/storage.keys';
-import { paymentTrack } from '../service/paymentService';
+import { openMembershipTab } from '../service/paymentService';
 import type { FooterTab } from '../components/app-footer/AppFooter';
 
 // Language order matches Figma design (en.json node-id 11851:6689)
@@ -76,7 +76,7 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
       case 0: navigation.navigate('Home');     break
       case 1: navigation.navigate('Matches');  break
       case 2: navigation.navigate('Activity'); break
-      case 3: paymentTrack('31'); navigation.navigate('recharge', { fromTab: true }); break
+      case 3: openMembershipTab(); break
       case 4: navigation.navigate('MessagerList'); break
     }
   }

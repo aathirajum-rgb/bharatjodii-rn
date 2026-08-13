@@ -26,7 +26,7 @@ import Loader from '../../components/loader/Loader'
 import StickyBanner from '../../components/sticky-banner/StickyBanner'
 import PhotoPromoSticky from '../../components/sticky-banner/PhotoPromoSticky'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
-import { paymentTrack, getHeroBannerDetails, getMenuPromo, redirectToIntermediatePage } from '../../service/paymentService'
+import { openMembershipTab, paymentTrack, getHeroBannerDetails, getMenuPromo, redirectToIntermediatePage } from '../../service/paymentService'
 import { communicationBtnOnClick, fetchContactDetails } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import { getItem, setItem, removeItem, getJson } from '../../service/storageService'
@@ -906,7 +906,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       case 4: navigation.navigate('MessagerList'); break
       // Angular: footer.component.ts — paymentTrack(31) fires right before
       // routing a free member to the payment intermediate page.
-      case 3: paymentTrack('31'); navigation.navigate('recharge', { fromTab: true }); break
+      case 3: openMembershipTab(); break
     }
   }
 

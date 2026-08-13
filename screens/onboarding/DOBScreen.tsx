@@ -3,7 +3,6 @@ import { useTranslation } from 'react-i18next'
 import {
   FlatList,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   Pressable,
@@ -19,9 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
-import { StorageKeys as SK } from '../../constants/storage.keys'
 import { callPartialRegistrationAPI, getRegValue, setRegValue, setRegValues } from '../../service/registrationService'
-import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
@@ -90,7 +87,6 @@ export default function DOBScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
 
   const [createdBy,    setCreatedBy]    = useState('1')
-  const [customerCare, setCustomerCare] = useState('')
   const [submitting,   setSubmitting]   = useState(false)
 
   const [selDate,  setSelDate]  = useState('')
@@ -116,10 +112,8 @@ export default function DOBScreen({ navigation }: Props) {
     Promise.all([
       getRegValue('CREATEDBY'),
       getRegValue('DATEOFBIRTH'),
-      getItem(SK.App.CUSTOMER_CARE),
-    ]).then(([cb, dob, cc]) => {
+    ]).then(([cb, dob]) => {
       if (cb) setCreatedBy(cb)
-      if (cc) setCustomerCare(cc)
       if (dob && dob !== '0000-00-00') {
         const p = dob.split('-')
         if (p.length === 3) {
@@ -576,33 +570,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color:      Colors.link,
     lineHeight: 20,
-  },
-
-  // ── Sticky footer ─────────────────────────────────────────────────────────────
-
-  divider: {
-    height:          1,
-    backgroundColor: Colors.inputBorder,
-    marginTop:       16,
-    marginBottom:    16,
-  },
-  helpRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            6,
-  },
-  helpText: {
-    fontSize:      14,
-    fontWeight:    '400',
-    color:         Colors.textPrimary,
-    letterSpacing: 0.42,
-  },
-  helpPhone: {
-    fontSize:      14,
-    fontWeight:    '500',
-    color:         Colors.link,
-    letterSpacing: 0.42,
   },
 
   // ── Inline dropdown (rendered inside Modal, positioned at field location) ──────

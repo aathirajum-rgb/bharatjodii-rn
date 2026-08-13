@@ -2,8 +2,6 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Linking,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -61,7 +59,6 @@ export default function LocationScreen({ navigation }: Props) {
 
   // ─── Core state ─────────────────────────────────────────────────────────────
   const [createdBy,      setCreatedBy]      = useState('4')
-  const [customerCare,   setCustomerCare]   = useState('')
   const [countryCode,    setCountryCode]    = useState('91')
 
   // Location selections
@@ -88,13 +85,11 @@ export default function LocationScreen({ navigation }: Props) {
   useEffect(() => {
     Promise.all([
       getRegValue('CREATEDBY'),
-      getItem(SK.App.CUSTOMER_CARE),
       getItem(SK.User.COUNTRY_CODE),
       getRegValues(),
-    ]).then(async ([cb, cc, ccode, rv]) => {
+    ]).then(async ([cb, ccode, rv]) => {
       const { COUNTRY: savedCountry, STATE: savedState, CITY: savedCity } = rv as Record<string, string>
       if (cb)    setCreatedBy(cb)
-      if (cc)    setCustomerCare(cc)
       if (ccode) setCountryCode(ccode)
 
       // Angular checkIsNRIUser(): country/state (no city) for non-Indian users
@@ -413,30 +408,6 @@ const styles = StyleSheet.create({
   // 32px between every field, including title-to-first-field (matches Figma exactly)
   fieldsContainer: {
     gap: 32,
-  },
-
-  divider: {
-    height:          1,
-    backgroundColor: Colors.inputBorder,
-    marginTop:       16,
-    marginBottom:    16,
-  },
-  helpRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            6,
-  },
-  helpText: {
-    fontSize:      14,
-    color:         Colors.textPrimary,
-    letterSpacing: 0.42,
-  },
-  helpPhone: {
-    fontSize:      14,
-    fontWeight:    '500',
-    color:         Colors.link,
-    letterSpacing: 0.42,
   },
 })
 

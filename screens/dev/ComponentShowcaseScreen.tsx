@@ -1310,7 +1310,6 @@ function MatchesCardShowcase() {
       desc:  'Standard matches card. Photo swiper + name row + Don\'t Show / View Later / Like CTAs.',
       node: (
         <MatchesCard
-          profileId="DEMO001"
           name="Priya Sharma"
           age="26 Yrs" height="5ft 4in" caste="Brahmin"
           education="MBA" occupation="Software Engineer"
@@ -1332,7 +1331,6 @@ function MatchesCardShowcase() {
       desc:  'likedStatus="1" — shows "View Contact" primary button and post-like message.',
       node: (
         <MatchesCard
-          profileId="DEMO002"
           name="Divya Krishnan"
           age="24 Yrs" height="5ft 2in" caste="Nadar"
           education="B.Tech" occupation="Doctor"
@@ -1352,7 +1350,6 @@ function MatchesCardShowcase() {
       desc:  'likedStatus="2" — mutual match. Paid Member + ID Verified badges shown.',
       node: (
         <MatchesCard
-          profileId="DEMO003"
           name="Ananya Reddy"
           age="27 Yrs" height="5ft 5in"
           education="CA" occupation="Chartered Accountant"
@@ -1373,7 +1370,6 @@ function MatchesCardShowcase() {
       desc:  'isActivityLabel=true — shows activity icon + label text (viewedyou / likedyou sections).',
       node: (
         <MatchesCard
-          profileId="DEMO004"
           name="Meena Venkat"
           age="25 Yrs" education="B.Com"
           city="Madurai" state="Tamil Nadu"

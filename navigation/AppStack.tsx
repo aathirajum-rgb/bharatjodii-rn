@@ -214,8 +214,8 @@ export type AppStackParamList = {
   // Angular: pages/verify-id — STUB (see screens/verify/VerifyIdScreen.tsx),
   // real govt-ID verification flow not ported yet.
   'verify-id': undefined
-  // Angular: '/my-membership' route → pages/menu-contacts — STUB (see
-  // screens/menu-contacts/MenuContactsScreen.tsx), real flow not ported yet.
+  // Angular: '/my-membership' route → pages/menu-contacts (see
+  // screens/menu-contacts/MenuContactsScreen.tsx + MenuContactsDesktopLayout.tsx).
   'my-membership': undefined
   // Angular: pages/notification — the in-app notification list (not push).
   Notification: undefined

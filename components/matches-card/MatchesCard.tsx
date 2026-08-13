@@ -26,8 +26,6 @@ export interface PhotoItem {
 export type LikedStatus = '0' | '1' | '2' | '3'
 
 export interface MatchesCardProps {
-  profileId: string
-
   // ── Profile info ──────────────────────────────────────────────────────────
   name?:       string | undefined
   age?:        string | undefined
@@ -193,7 +191,6 @@ function PhotoSwiper({ images, height, photoProps, onPress }: PhotoSwiperProps) 
 // Stateless regarding like status — parent owns and updates likedStatus.
 
 export default function MatchesCard({
-  profileId: _profileId,
   name,
   age,
   height:     profileHeight,

@@ -10,9 +10,12 @@
 // ActivityScreen.tsx / MessagerListScreen.tsx. This screen's one real entry
 // point is HomeScreen.tsx's autopay-renewal sticky banner.
 //
+// Restyled to match Figma "Jodii Desktop - Registration" nodes 551:89 ->
+// 555:8499 (desktop) and "Jodii Auto-Renewal" nodes 24:680 -> 135:8293
+// (mobile) — see membershipTierTheme.ts for the tier-color mapping this pulls
+// in, and MenuContactsDesktopLayout.tsx for the desktop presentational split.
+//
 // Deliberately out of scope (documented rather than silently dropped):
-//   - The separate "expired membership" grid layout — this port adapts the
-//     same layout via badge color/copy instead of a second template.
 //   - RENEWALENABLEKEY localStorage gate on Renew Plan — not tracked
 //     client-side anywhere in this port; gating on emicomplete alone stands in.
 //   - reDirectRecharePage()'s real target (an untraced "Super pack
@@ -21,6 +24,10 @@
 //     popover still works on tap, just without the automatic trigger.
 //   - Refund-decline's used-contacts count via a separate activity API call —
 //     uses CONTACT_DETAIL.phoneNumbersUsed directly if present.
+//   - The Figma "Super pack upgrade upsell" card (rocket icon, "pay extra
+//     ₹250", offer countdown) — confirmed dead/disabled code in the old
+//     Angular app too (`*ngIf="false"`, hardcoded placeholder copy), with no
+//     real backend field ever built to drive it. Not building fake numbers.
 import { useEffect, useState } from 'react'
 import {
   ActivityIndicator,
@@ -31,6 +38,7 @@ import {
   Text,
   View,
 } from 'react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
@@ -38,15 +46,27 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import BottomSheet, { type BottomSheetData } from '../../components/bottom-sheet/BottomSheet'
 import Popover from '../../components/popover/Popover'
 import { Colors } from '../../constants/colors'
-import { CDN, CDN_REACT } from '../../constants/cdn'
+import { CDN, CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import { fetchContactDetails } from '../../service/communicationService'
 import { getJson } from '../../service/storageService'
-import { updateAutoRenewal, requestAutopayRefund } from '../../service/paymentService'
+import { getPPSetData } from '../../service/profileService'
+import { getSessionValue } from '../../service/registrationService'
+import { updateAutoRenewal, requestAutopayRefund, stripHtml, parseAmount, formatAmount } from '../../service/paymentService'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import { getMembershipTierTheme } from './membershipTierTheme'
+import MenuContactsDesktopLayout from './MenuContactsDesktopLayout'
+import type { FooterTab } from '../../components/app-footer/AppFooter'
 
 const ICONS = {
-  back: CDN_REACT + '/menu_back_arrow.svg',
-  info: CDN + 'verified-info.svg',
+  back:      CDN_REACT + '/menu_back_arrow.svg',
+  info:      CDN + 'verified-info.svg',
   lostBenefit: CDN + 'revamp/close-icon.svg',
+  crown:     CDN_SVG + 'revamp/crown-white.svg',
+  // Both already proven in this exact app: alert-circle via
+  // PaymentRestrictedSheet.tsx, green_tick via paymentService.ts's
+  // AUTO_RENEWAL_BENEFITS_FALLBACK — reused instead of sourcing new assets.
+  alert:     CDN + 'assets/images/svg/alert-circle.svg',
+  success:   CDN_SVG + 'green_tick.svg',
 }
 
 type UsageRow = {
@@ -64,13 +84,26 @@ type EmiStep = { icon?: string; key?: string; cta?: string; value?: string }
 
 type TxnRow = { packname?: string; packduration?: string; amount?: string; paydate?: string }
 
+type MissingBenefit = { icon?: string; value?: string }
+
 export default function MenuContactsScreen({ navigation }: { navigation: any }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const insets = useSafeAreaInsets()
+  const isDesktop = useIsDesktopWeb()
+
+  function handleTabPress(tab: FooterTab) {
+    switch (tab) {
+      case 0: navigation.navigate('Home');     break
+      case 1: navigation.navigate('Matches');  break
+      case 2: navigation.navigate('Activity'); break
+      case 4: navigation.navigate('MessagerList'); break
+    }
+  }
 
   const [loading, setLoading] = useState(true)
   const [contactDetail, setContactDetail] = useState<Record<string, any> | null>(null)
   const [autoRenewOn, setAutoRenewOn] = useState(false)
+  const [isExpired, setIsExpired] = useState(false)
 
   const [showCancelConfirm, setShowCancelConfirm] = useState(false)
   const [showCancelSuccess, setShowCancelSuccess] = useState(false)
@@ -83,12 +116,21 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
-      await fetchContactDetails()
+      const [, ppSetData, entryType] = await Promise.all([
+        fetchContactDetails(),
+        getPPSetData(),
+        getSessionValue('ENTRYTYPE'),
+      ])
       if (cancelled) return
       const detail = await getJson<Record<string, any>>('CONTACT_DETAIL')
       if (cancelled) return
       setContactDetail(detail)
       setAutoRenewOn(String(detail?.MEMBERSHIPDETAILS?.autorenewalstatus) === '1')
+      // Angular: getPPSETData()'s membershipExpiry = NUMBEROFPAYMENTS > 0,
+      // combined with ENTRYTYPE=='F' (HomeScreen.tsx's footer-badge uses the
+      // same two-part formula) — a fully-lapsed membership, distinct from the
+      // "expiring soon" urgency badge below (which is still an ACTIVE plan).
+      setIsExpired(Number(ppSetData?.NUMBEROFPAYMENTS ?? 0) > 0 && String(entryType) === 'F')
       setLoading(false)
     })()
     return () => { cancelled = true }
@@ -103,11 +145,15 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
     .map((part: string) => part.trim())
 
   const expiryDays = Number(contactDetail?.membershipExpiryDays ?? 99)
-  const isExpiring = expiryDays <= 5
+  const isExpiring = !isExpired && expiryDays <= 5
+
+  const tierTheme = getMembershipTierTheme(membership?.packagetype)
 
   const usageRows: UsageRow[] = Array.isArray(membership?.CONACTDETAILS)
     ? membership.CONACTDETAILS.filter((row: UsageRow) => row.type !== 'chat')
     : []
+
+  const missingBenefits: MissingBenefit[] = Array.isArray(membership?.benefits) ? membership.benefits : []
 
   const emiSteps: EmiStep[] = Array.isArray(paymentInfo?.emidetails) ? paymentInfo.emidetails : []
   const txnRows: TxnRow[] = Array.isArray(transactions?.DATA) ? transactions.DATA : []
@@ -168,7 +214,8 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
 
   const cancelData = contactDetail?.CANCELAUTORENEWAL
   const cancelSheet: BottomSheetData = {
-    title: cancelData?.TITLE ?? "Are you sure you want to cancel auto-renewal?",
+    image: ICONS.alert,
+    title: cancelData?.TITLE ?? 'Are you sure you want to cancel auto-renewal?',
     content: cancelData?.CONTENT ?? "Your auto-renewal will be cancelled and you won't be charged any more",
     benefits: (Array.isArray(cancelData?.DISABLEBENEFITS) ? cancelData.DISABLEBENEFITS : [
       "You can't Call/WhatsApp matches",
@@ -180,6 +227,7 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
   }
 
   const cancelSuccessSheet: BottomSheetData = {
+    image: ICONS.success,
     title: cancelData?.SUCCESS?.TITLE ?? 'Auto-renewal cancelled successfully!',
     content: cancelData?.SUCCESS?.CONTENT
       ?? `You can use your membership benefits till ${membership?.expiryTextVal ?? ''} and after that you won't be charged any more`,
@@ -188,6 +236,7 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
 
   const refundData = contactDetail?.REFUNDDET
   const refundConfirmSheet: BottomSheetData = {
+    image: ICONS.alert,
     title: refundData?.TITLE ?? 'Request a Refund?',
     content: refundData?.CONTENT ?? 'This will cancel your current plan and you will lose access to all premium features immediately.',
     ctaLabel: refundData?.CTA ?? 'Request refund',
@@ -195,6 +244,7 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
     showSecondaryCta: true,
   }
   const refundSuccessSheet: BottomSheetData = {
+    image: ICONS.success,
     title: refundData?.SUCCESS?.TITLE ?? 'Refund initiated!',
     content: refundData?.SUCCESS?.CONTENT ?? 'Your amount will be credited into your bank account within 3-7 business days.',
     ctaLabel: refundData?.SUCCESS?.CTA ?? 'Got it',
@@ -206,7 +256,56 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
     ctaLabel: refundData?.CANCEL?.CTA ?? 'Got it',
   }
 
-  // ── Render ──────────────────────────────────────────────────────────────
+  // ── Desktop web layout (Figma "Jodii Desktop - Registration", nodes
+  // 551:89 -> 555:8499) — wide browser window only; this screen still owns
+  // all state/handlers, passed down as props (same split as RechargeScreen/
+  // PaymentOptionsScreen). The 4 BottomSheet flows below are shared as-is —
+  // BottomSheet already renders as a centered dialog on desktop internally.
+  if (isDesktop) {
+    return (
+      <MenuContactsDesktopLayout
+        loading={loading}
+        membership={membership}
+        paymentInfo={paymentInfo}
+        planTitle={planTitle}
+        planDuration={planDuration}
+        isExpired={isExpired}
+        isExpiring={isExpiring}
+        tierTheme={tierTheme}
+        usageRows={usageRows}
+        missingBenefits={missingBenefits}
+        emiSteps={emiSteps}
+        txnRows={txnRows}
+        showRenewPlan={showRenewPlan}
+        autoRenewOn={autoRenewOn}
+        onToggleAutoRenew={handleToggleAutoRenew}
+        onRequestRefund={() => setShowRefundConfirm(true)}
+        onGoToRecharge={goToRecharge}
+        onAttentionPress={handleAttentionPress}
+        rowIsWarning={rowIsWarning}
+        langCode={i18n.language}
+        onTabPress={handleTabPress}
+        onLanguagePress={() => navigation.navigate('LanguageSelection')}
+        cancelSheet={cancelSheet}
+        cancelSuccessSheet={cancelSuccessSheet}
+        refundConfirmSheet={refundConfirmSheet}
+        refundSuccessSheet={refundSuccessSheet}
+        refundDeclineSheet={refundDeclineSheet}
+        showCancelConfirm={showCancelConfirm}
+        showCancelSuccess={showCancelSuccess}
+        showRefundConfirm={showRefundConfirm}
+        refundResult={refundResult}
+        attentionInfo={attentionInfo}
+        onConfirmCancelAutoRenew={confirmCancelAutoRenew}
+        onDeclineCancelAutoRenew={declineCancelAutoRenew}
+        onCloseCancelSuccess={() => setShowCancelSuccess(false)}
+        onConfirmRefund={confirmRefund}
+        onCloseRefundConfirm={() => setShowRefundConfirm(false)}
+        onCloseRefundResult={() => setRefundResult(null)}
+        onCloseAttentionInfo={() => setAttentionInfo(null)}
+      />
+    )
+  }
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
@@ -230,66 +329,107 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
       ) : (
         <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 24 }]}>
 
-          {/* ── Membership status card ── */}
+          {/* ── Membership hero card ── */}
           <View style={s.card}>
-            <View style={s.cardHeaderRow}>
-              {!!membership.headericon && (
-                <CdnSvg uri={membership.headericon} width={36} height={36} />
-              )}
-              <View style={s.cardHeaderText}>
-                <Text style={s.planTitle}>{planTitle || membership.packageName || ''}</Text>
-                {!!planDuration && <Text style={s.planDuration}>{planDuration}</Text>}
-              </View>
-              <View style={[s.statusBadge, isExpiring ? s.statusBadgeWarn : s.statusBadgeActive]}>
-                <Text style={[s.statusBadgeText, isExpiring ? s.statusBadgeTextWarn : s.statusBadgeTextActive]} numberOfLines={1}>
-                  {membership.membershipStatus ?? (isExpiring ? 'Expiring soon' : 'Active')}
+            <LinearGradient
+              colors={tierTheme.gradientColors}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 0, y: 1 }}
+              style={s.heroTop}
+            >
+              <View style={[s.statusBadge, isExpired || isExpiring ? s.statusBadgeWarn : s.statusBadgeActive]}>
+                <Text style={[s.statusBadgeText, isExpired || isExpiring ? s.statusBadgeTextWarn : s.statusBadgeTextActive]} numberOfLines={1}>
+                  {isExpired
+                    ? 'Membership Expired'
+                    : isExpiring
+                      ? `Expiring in ${expiryDays} day${expiryDays === 1 ? '' : 's'}`
+                      : 'Active'}
                 </Text>
               </View>
-            </View>
 
-            {!!membership.packexpirytext && (
-              <Text style={s.expiryText}>{membership.packexpirytext}</Text>
-            )}
-
-            {/* Auto-renewal toggle */}
-            {String(membership.autorenewalsection) === '1' && (
-              <View style={s.renewRow}>
-                <View style={s.renewTextCol}>
-                  <Text style={s.renewLabel}>{t('RECHARGE.AUTORENEWAL', 'Auto renewal')}</Text>
-                  {!!membership.expiryTextVal && <Text style={s.renewSub}>{membership.expiryTextVal}</Text>}
+              <View style={s.heroRow}>
+                <View style={s.heroTextCol}>
+                  <Text style={s.planTitle} numberOfLines={2}>
+                    {isExpired
+                      ? `Your ${planTitle || 'membership'} has expired!`
+                      : (planTitle || membership.packageName || '')}
+                  </Text>
+                  {isExpired
+                    ? !!membership.packexpirytext && <Text style={s.planDuration}>{stripHtml(membership.packexpirytext)}</Text>
+                    : !!planDuration && <Text style={s.planDuration}>{planDuration}</Text>}
                 </View>
-                <Switch
-                  value={autoRenewOn}
-                  onValueChange={handleToggleAutoRenew}
-                  trackColor={{ true: Colors.primaryDark, false: Colors.border }}
+                <View style={[s.crownBadge, { backgroundColor: isExpired ? Colors.primaryDark : tierTheme.crownBadgeBg }]}>
+                  <CdnSvg uri={isExpired ? ICONS.alert : ICONS.crown} width={28} height={28} />
+                </View>
+              </View>
+            </LinearGradient>
+
+            {isExpired ? (
+              <View style={s.expiredBody}>
+                <Text style={s.sectionTitle}>You are missing the following membership benefits. Renew now!</Text>
+                {missingBenefits.map((b, idx) => (
+                  <View key={idx} style={s.usageRow}>
+                    {!!b.icon && <CdnSvg uri={b.icon} width={20} height={20} />}
+                    <Text style={s.usageTitle}>{b.value}</Text>
+                  </View>
+                ))}
+                <ButtonRevamp
+                  label={t('MENU.RENEW_PLAN', 'Renew plan')}
+                  variant="primary" size="standard" fullWidth
+                  icon="forward-icon-white" iconPosition="end"
+                  onPress={goToRecharge}
+                  style={s.renewPlanBtn}
                 />
               </View>
-            )}
+            ) : (
+              <>
+                {/* Auto-renewal toggle */}
+                {String(membership.autorenewalsection) === '1' && (
+                  <View style={s.renewRow}>
+                    <View style={s.renewTextCol}>
+                      <Text style={s.renewLabel}>{t('RECHARGE.AUTORENEWAL', 'Auto renewal')}</Text>
+                      {!!membership.expiryTextVal && <Text style={s.renewSub}>{membership.expiryTextVal}</Text>}
+                    </View>
+                    <Switch
+                      value={autoRenewOn}
+                      onValueChange={handleToggleAutoRenew}
+                      trackColor={{ true: Colors.primaryDark, false: Colors.border }}
+                    />
+                  </View>
+                )}
 
-            {/* Refund note */}
-            {String(membership.payrefundsection) === '1' && (
-              <View style={s.refundNote}>
-                <Text style={s.refundNoteText}>
-                  {t('RECHARGE.AUTORENEWAL_NOTE', 'Get full refund even after renewal, if no paid benefits are used')}{'  '}
-                  <Text style={s.refundLink} onPress={() => setShowRefundConfirm(true)}>
-                    {t('RECHARGE.TAP_HERE', 'Tap here')}
-                  </Text>
-                </Text>
-              </View>
-            )}
+                {/* Refund note */}
+                {String(membership.payrefundsection) === '1' && (
+                  <View style={s.refundNote}>
+                    <Text style={s.refundNoteText}>
+                      {t('RECHARGE.AUTORENEWAL_NOTE', 'Get full refund even after renewal, if no paid benefits are used')}{'  '}
+                      <Text style={s.refundLink} onPress={() => setShowRefundConfirm(true)}>
+                        {t('RECHARGE.TAP_HERE', 'Tap here')}
+                      </Text>
+                    </Text>
+                  </View>
+                )}
 
-            {showRenewPlan && (
-              <ButtonRevamp
-                label={t('MENU.RENEW_PLAN', 'Renew Plan')}
-                variant="primary" size="standard" fullWidth
-                onPress={goToRecharge}
-                style={s.renewPlanBtn}
-              />
+                {showRenewPlan && (
+                  <ButtonRevamp
+                    label={t('MENU.RENEW_PLAN', 'Renew Plan')}
+                    variant="primary" size="standard" fullWidth
+                    onPress={goToRecharge}
+                    style={s.renewPlanBtn}
+                  />
+                )}
+
+                {!!membership.packexpirytext && (
+                  <View style={[s.footerStrip, { backgroundColor: tierTheme.footerBg }]}>
+                    <Text style={s.expiryText}>{stripHtml(membership.packexpirytext)}</Text>
+                  </View>
+                )}
+              </>
             )}
           </View>
 
           {/* ── Payment / EMI status ── */}
-          {!!paymentInfo && (!!paymentInfo.content || emiSteps.length > 0) && (
+          {!isExpired && !!paymentInfo && (!!paymentInfo.content || emiSteps.length > 0) && (
             <View style={s.card}>
               {!!paymentInfo.title && <Text style={s.sectionTitle}>{paymentInfo.title}</Text>}
 
@@ -315,7 +455,7 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
           )}
 
           {/* ── Package usage details ── */}
-          {usageRows.length > 0 && (
+          {!isExpired && usageRows.length > 0 && (
             <View style={s.card}>
               <Text style={s.sectionTitle}>{membership.content ?? 'Package Usage Details'}</Text>
               {usageRows.map((row, idx) => {
@@ -352,7 +492,7 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
                     {!!txn.packduration && <Text style={s.usageSub}>{txn.packduration}</Text>}
                   </View>
                   <View style={s.txnRightCol}>
-                    <Text style={s.txnAmount}>{`-₹${txn.amount ?? ''}`}</Text>
+                    <Text style={s.txnAmount}>{`-${formatAmount(parseAmount(txn.amount))}`}</Text>
                     {!!txn.paydate && <Text style={s.usageSub}>{txn.paydate}</Text>}
                   </View>
                 </View>
@@ -422,66 +562,74 @@ const s = StyleSheet.create({
   content: { padding: 16, gap: 16 },
 
   card: {
-    backgroundColor: Colors.membershipCardBg,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.borderSubtle,
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3,
   },
 
-  cardHeaderRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  cardHeaderText: { flex: 1 },
-  planTitle: { fontSize: 16, fontWeight: '700', color: Colors.textPrimary },
-  planDuration: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  heroTop: { padding: 16, gap: 12 },
+  heroRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  heroTextCol: { flex: 1 },
 
-  statusBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  statusBadgeActive: { backgroundColor: Colors.badgePaidBg },
-  statusBadgeWarn: { backgroundColor: Colors.primarySurface },
-  statusBadgeText: { fontSize: 11, fontWeight: '700' },
-  statusBadgeTextActive: { color: Colors.badgePaidText },
-  statusBadgeTextWarn: { color: Colors.inputError },
+  statusBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
+  statusBadgeActive: { backgroundColor: '#10B981' },
+  statusBadgeWarn: { backgroundColor: '#C70038' },
+  statusBadgeText: { fontSize: 11, fontFamily: 'Poppins-Medium', color: Colors.white },
+  statusBadgeTextActive: {},
+  statusBadgeTextWarn: {},
 
-  expiryText: { fontSize: 12, color: Colors.textSecondary, marginTop: 10 },
+  planTitle: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B' },
+  planDuration: { fontSize: 13, color: '#4C4C4C', marginTop: 2 },
+
+  crownBadge: {
+    width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+
+  expiredBody: { padding: 16, paddingTop: 16, gap: 12 },
 
   renewRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginTop: 16, paddingTop: 16, borderTopWidth: 1, borderTopColor: Colors.borderSubtle,
+    padding: 16, borderTopWidth: 1, borderTopColor: Colors.borderSubtle,
   },
   renewTextCol: { flex: 1 },
-  renewLabel: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
-  renewSub: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  renewLabel: { fontSize: 14, fontFamily: 'Poppins-Medium', color: '#1F1E1B' },
+  renewSub: { fontSize: 12, color: '#545454', marginTop: 2 },
 
-  refundNote: { marginTop: 12 },
-  refundNoteText: { fontSize: 12, color: Colors.textSecondary, lineHeight: 18 },
-  refundLink: { color: Colors.link, fontWeight: '600', textDecorationLine: 'underline' },
+  refundNote: { paddingHorizontal: 16, paddingBottom: 12 },
+  refundNoteText: { fontSize: 12, color: '#1F1E1B', lineHeight: 18 },
+  refundLink: { color: Colors.link, fontFamily: 'Poppins-SemiBold', textDecorationLine: 'underline' },
 
-  renewPlanBtn: { marginTop: 16 },
+  renewPlanBtn: { marginHorizontal: 16, marginBottom: 16 },
 
-  sectionTitle: { fontSize: 15, fontWeight: '700', color: Colors.textPrimary, marginBottom: 12 },
+  footerStrip: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 },
+  expiryText: { fontSize: 12, color: '#1F1E1B' },
 
-  emiStepper: { gap: 12, marginBottom: 12 },
+  sectionTitle: { fontSize: 15, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B', padding: 16, paddingBottom: 12 },
+
+  emiStepper: { gap: 12, paddingHorizontal: 16, marginBottom: 12 },
   emiStep: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   emiKey: { flex: 1, fontSize: 13, color: Colors.textSecondary },
-  emiValue: { fontSize: 13, fontWeight: '600', color: Colors.textPrimary },
+  emiValue: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B' },
 
-  paymentContent: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
-  paymentContent2: { fontSize: 12, color: Colors.textSecondary, marginTop: 4 },
+  paymentContent: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B', paddingHorizontal: 16 },
+  paymentContent2: { fontSize: 12, color: Colors.textSecondary, marginTop: 4, paddingHorizontal: 16, paddingBottom: 16 },
 
   usageRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.borderSubtle,
+    paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.borderSubtle,
   },
   usageTextCol: { flex: 1 },
-  usageTitle: { fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
+  usageTitle: { flex: 1, fontSize: 14, fontFamily: 'Poppins-Medium', color: '#1F1E1B' },
   usageSub: { fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
-  usageBalance: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  usageBalance: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B' },
   usageBalanceWarn: { color: Colors.inputError },
   infoBtn: { paddingLeft: 4 },
 
   txnRow: {
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
-    paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.borderSubtle,
+    paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.borderSubtle,
   },
   txnRightCol: { alignItems: 'flex-end' },
-  txnAmount: { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  txnAmount: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B' },
 })

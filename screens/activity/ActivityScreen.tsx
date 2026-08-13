@@ -35,7 +35,7 @@ import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { fetchActivityListingPage } from '../../service/activityService'
 import { communicationBtnOnClick, shouldSkipPhoneConfirm } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
-import { paymentTrack } from '../../service/paymentService'
+import { openMembershipTab } from '../../service/paymentService'
 import { fetchNotifCount } from '../../service/homeService'
 import { logEvent, logScreen } from '../../service/analyticsService'
 import { getItem, getJson, setJson } from '../../service/storageService'
@@ -369,7 +369,7 @@ export default function ActivityScreen({ navigation }: Props) {
     switch (tab) {
       case 0: navigation.navigate('Home');     break
       case 1: navigation.navigate('Matches');  break
-      case 3: paymentTrack('31'); navigation.navigate('recharge', { fromTab: true }); break
+      case 3: openMembershipTab(); break
       case 4: navigation.navigate('MessagerList'); break
       // case 2 is this screen — do nothing
     }

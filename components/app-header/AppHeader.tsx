@@ -302,27 +302,6 @@ const styles = StyleSheet.create({
   h1AvatarRadius: {
     borderRadius: 24,
   },
-  completionBadge: {
-    position:          'absolute',
-    bottom:            -6,
-    left:              '50%',
-    transform:         [{ translateX: -16 }],
-    backgroundColor:   Colors.primary,
-    borderRadius:      20,
-    paddingVertical:   2,
-    paddingHorizontal: 6,
-    borderWidth:       1.5,
-    borderColor:       Colors.white,
-    minWidth:          32,
-    alignItems:        'center',
-  },
-  completionText: {
-    fontFamily: 'Poppins-SemiBold',
-    color:      Colors.white,
-    fontSize:   9,
-    lineHeight: 12,
-  },
-
   // Name + edit profile block
   h1NameBlock: {
     flex:       1,
@@ -347,11 +326,6 @@ const styles = StyleSheet.create({
     fontSize:   12,
     color:      Colors.link,
   },
-  h1EditIcon: {
-    width:     12,
-    height:    12,
-    tintColor: Colors.primary,
-  },
   h1PaidBadge: {
     marginTop: 6,
   },
@@ -371,20 +345,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     height:            36,
   },
-  h1LangIcon: {
-    width:  20,
-    height: 20,
-  },
   h1LangText: {
     fontFamily: 'Poppins-Medium',
     fontSize:   11,
     color:      Colors.textPrimary,
   },
-  h1ChevIcon: {
-    width:  12,
-    height: 12,
-  },
-
   // Icon buttons — Angular: .home-header-icon (8px radius, transparent fill,
   // solid black 1px border) wraps .width-height-32 (9vmin ≈ 32px on a
   // typical phone width) — corrected from an earlier, too-large 36×36 guess.
@@ -399,11 +364,6 @@ const styles = StyleSheet.create({
     justifyContent:  'center',
     position:        'relative',
   },
-  h1Icon: {
-    width:  19,
-    height: 19,
-  },
-
   // Badge on toolbar icon
   badgeWrap: {
     position:          'absolute',
@@ -476,17 +436,9 @@ const styles = StyleSheet.create({
     height:            36,
     marginTop:         4,
   },
-  langIcon: {
-    width:  24,
-    height: 24,
-  },
   langText: {
     fontFamily: 'Poppins-Medium',
     fontSize:   12,
     color:      Colors.textPrimary,
-  },
-  chevIcon: {
-    width:  12,
-    height: 12,
   },
 })

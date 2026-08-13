@@ -19,6 +19,7 @@ import {
   ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
+import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
@@ -47,6 +48,7 @@ type Props = { navigation: any; route: any }
 export default function RechargeScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
   const isDesktop = useIsDesktopWeb()
+  const { i18n } = useTranslation()
 
   // Reached two different ways: tapping the footer "Membership" tab (shows
   // as tab content — no back arrow, bottom tab bar visible), or from a
@@ -145,7 +147,7 @@ export default function RechargeScreen({ navigation, route }: Props) {
   }
   const payLabel = payLabelFor(selectedPlan)
 
-  // ── Desktop web layout (Figma "Jodii Desktop - Registration", 1047-10280) ──
+  // ── Desktop web layout (Figma "Jodii Desktop - Registration", 969:2785) ──
   // Wide browser window only — mobile/native/narrow-web keep the JSX below,
   // untouched, sharing all the same state/handlers defined above.
   if (isDesktop) {
@@ -155,7 +157,6 @@ export default function RechargeScreen({ navigation, route }: Props) {
         loading={loading}
         selectedId={selectedId}
         onSelect={setSelected}
-        onClose={handleClose}
         onViewAllPlans={openAllPlans}
         showAllPlans={showAllPlans}
         onCloseAllPlans={() => setShowAllPlans(false)}
@@ -165,6 +166,9 @@ export default function RechargeScreen({ navigation, route }: Props) {
         onPay={() => proceedWithPlan(selectedPlan)}
         sheetPayLabel={payLabelFor(sheetSelectedPlan)}
         onSheetPay={() => proceedWithPlan(sheetSelectedPlan)}
+        langCode={i18n.language}
+        onTabPress={handleTabPress}
+        onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />
     )
   }

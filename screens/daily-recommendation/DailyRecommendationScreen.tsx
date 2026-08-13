@@ -37,7 +37,7 @@ import { communicationBtnOnClick, type CommActionResult } from '../../service/co
 import { checkAddPhotoPromotion } from '../../service/buttonService'
 import { markProfileViewed } from '../../service/viewProfileService'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
-import { paymentTrack } from '../../service/paymentService'
+import { openMembershipTab, paymentTrack } from '../../service/paymentService'
 import { getItem, setItem, getJson } from '../../service/storageService'
 import { navigate, resetTo } from '../../utils/navigationRef'
 import { ENavigation } from '../../types/enums/navigation.enum'
@@ -628,7 +628,7 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
               case 0: navigation.navigate('Home');     break
               case 1: navigation.navigate('Matches');  break
               case 2: navigation.navigate('Activity'); break
-              case 3: paymentTrack('31'); navigation.navigate('recharge', { fromTab: true }); break
+              case 3: openMembershipTab(); break
               case 4: navigation.navigate('MessagerList'); break
             }
           }}

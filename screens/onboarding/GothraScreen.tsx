@@ -11,7 +11,6 @@ import {
 import { Image } from 'expo-image'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
-import { StorageKeys as SK } from '../../constants/storage.keys'
 import RegistrationSuccessSheet from '../../components/registration-success-sheet/RegistrationSuccessSheet'
 import {
   fetchGothraOptions,
@@ -19,7 +18,6 @@ import {
   setRegValue,
   submitFullRegistration,
 } from '../../service/registrationService'
-import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
@@ -49,7 +47,6 @@ export default function GothraScreen({ navigation }: Props) {
   const [selected,      setSelected]      = useState<Option | null>(null)
   const [createdBy,     setCreatedBy]     = useState('4')
   const [submitting,    setSubmitting]    = useState(false)
-  const [customerCare,  setCustomerCare]  = useState('')
   const [panelVisible,   setPanelVisible]   = useState(false)
   const [successVisible, setSuccessVisible] = useState(false)
 
@@ -57,10 +54,8 @@ export default function GothraScreen({ navigation }: Props) {
     Promise.all([
       getRegValue('CREATEDBY'),
       getRegValue('GOTHRA'),
-      getItem(SK.App.CUSTOMER_CARE),
-    ]).then(([cb, savedGothra, cc]) => {
+    ]).then(([cb, savedGothra]) => {
       if (cb) setCreatedBy(cb)
-      if (cc) setCustomerCare(cc)
 
       fetchGothraOptions()
         .then(list => {
@@ -223,30 +218,5 @@ const styles = StyleSheet.create({
     fontSize:   22,
     color:      Colors.textPrimary,
     lineHeight: 26,
-  },
-
-  divider: {
-    height:          1,
-    backgroundColor: Colors.inputBorder,
-    marginTop:       16,
-    marginBottom:    16,
-  },
-  helpRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            6,
-  },
-  helpText: {
-    fontSize:      14,
-    fontWeight:    '400',
-    color:         Colors.textPrimary,
-    letterSpacing: 0.42,
-  },
-  helpPhone: {
-    fontSize:      14,
-    fontWeight:    '500',
-    color:         Colors.link,
-    letterSpacing: 0.42,
   },
 })

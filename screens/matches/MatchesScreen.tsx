@@ -62,7 +62,7 @@ import {
 import { fetchBulkLikeMatches } from '../../service/profileService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import { setFilterEventType } from '../../service/filterService'
-import { getHeroBannerDetails, paymentTrack } from '../../service/paymentService'
+import { getHeroBannerDetails, openMembershipTab } from '../../service/paymentService'
 import { shouldShowRatingPopup, markRatingPopupShown } from '../../service/appRatingService'
 import { requestPushNotificationPermission } from '../../service/permissionService'
 import { fetchSurveyPopup, type SurveyPopupData } from '../../service/surveyService'
@@ -1888,7 +1888,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
       case 2: navigation.navigate('Activity'); break
       // Angular: footer.component.ts — paymentTrack(31) fires right before
       // routing a free member to the payment intermediate page.
-      case 3: paymentTrack('31'); navigation.navigate('recharge', { fromTab: true }); break
+      case 3: openMembershipTab(); break
       case 4: navigation.navigate('MessagerList'); break
     }
   }

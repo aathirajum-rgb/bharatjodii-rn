@@ -11,7 +11,6 @@ import {
 import { Image } from 'expo-image'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
-import { StorageKeys as SK } from '../../constants/storage.keys'
 import {
   fetchRaasiOptions,
   fetchStarOptions,
@@ -19,7 +18,6 @@ import {
   setRegValues,
   submitHoroscopeDetails,
 } from '../../service/registrationService'
-import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
@@ -54,14 +52,12 @@ export default function StarRaasiScreen({ navigation }: Props) {
   const [fetchingRaasi, setFetchingRaasi] = useState(true)
   const [fetchingStar,  setFetchingStar]  = useState(false)
   const [submitting,    setSubmitting]    = useState(false)
-  const [customerCare,  setCustomerCare]  = useState('')
   const [createdBy,     setCreatedBy]     = useState('1')
   const [activePanel,   setActivePanel]   = useState<ActivePanel>(null)
 
   useEffect(() => {
-    Promise.all([getRegValues(), getItem(SK.App.CUSTOMER_CARE)]).then(([rv, cc]) => {
+    getRegValues().then((rv) => {
       if (rv.CREATEDBY) setCreatedBy(rv.CREATEDBY)
-      if (cc) setCustomerCare(cc)
 
       fetchRaasiOptions()
         .then(list => {
@@ -294,46 +290,4 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
 
-  skipRow: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    justifyContent:  'center',
-    paddingVertical: 14,
-    gap:             4,
-  },
-  skipText: {
-    fontSize:   15,
-    fontWeight: '500',
-    color:      Colors.scrim,
-  },
-  skipArrow: {
-    fontSize:   18,
-    color:      Colors.scrim,
-    lineHeight: 22,
-  },
-
-  divider: {
-    height:          1,
-    backgroundColor: Colors.inputBorder,
-    marginTop:       16,
-    marginBottom:    16,
-  },
-  helpRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            6,
-  },
-  helpText: {
-    fontSize:      14,
-    fontWeight:    '400',
-    color:         Colors.textPrimary,
-    letterSpacing: 0.42,
-  },
-  helpPhone: {
-    fontSize:      14,
-    fontWeight:    '500',
-    color:         Colors.link,
-    letterSpacing: 0.42,
-  },
 })

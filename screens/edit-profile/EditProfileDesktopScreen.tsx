@@ -57,7 +57,7 @@ import { Endpoints } from '../../service/api.endpoints'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { getItem, setItem } from '../../service/storageService'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import { paymentTrack } from '../../service/paymentService'
+import { openMembershipTab } from '../../service/paymentService'
 import { fetchEditProfileInfo, submitFieldChanges, type FieldChange } from '../../service/editProfileService'
 import { deletePhoto, setMainPhoto } from '../../service/profileService'
 import PhotoPrivacyDesktopModal from '../../components/photo-privacy/PhotoPrivacyDesktopModal'
@@ -607,7 +607,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
       case 0: navigation.navigate('Home');     break
       case 1: navigation.navigate('Matches');  break
       case 2: navigation.navigate('Activity'); break
-      case 3: paymentTrack('31'); navigation.navigate('recharge', { fromTab: true }); break
+      case 3: openMembershipTab(); break
       case 4: navigation.navigate('MessagerList'); break
     }
   }

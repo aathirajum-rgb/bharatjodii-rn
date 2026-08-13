@@ -56,7 +56,6 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
   const [selectedCurrency,    setSelectedCurrency]    = useState('INR')  // 'INR' or NRI currency
   const [currencyDropdownOpen, setCurrencyDropdownOpen] = useState(false)
   const [submitting,          setSubmitting]          = useState(false)
-  const [customerCare,        setCustomerCare]        = useState('')
 
   // Context
   const [createdBy,  setCreatedBy]  = useState('4')
@@ -67,13 +66,11 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
     Promise.all([
       getRegValue('CREATEDBY'),
       getItem(SK.User.COUNTRY_CODE),
-      getItem(SK.App.CUSTOMER_CARE),
       getRegValues(),
-    ]).then(async ([cb, ccode, cc, regVals]) => {
+    ]).then(async ([cb, ccode, regVals]) => {
       const { GENDER: gnd, COUNTRY: country, INCOME: savedIncome, INCOMETYPE: savedIncomeType } = regVals
       if (cb)  setCreatedBy(cb)
       if (gnd) setGender(gnd)
-      if (cc)  setCustomerCare(cc)
 
       const nri = ccode !== '91' && !!ccode
       setIsNRI(nri)
@@ -411,32 +408,6 @@ const styles = StyleSheet.create({
     height:          10,
     borderRadius:    5,
     backgroundColor: Colors.primaryDark,
-  },
-
-  // ─── Footer ───────────────────────────────────────────────────────────────
-  divider: {
-    height:          1,
-    backgroundColor: Colors.inputBorder,
-    marginTop:       16,
-    marginBottom:    16,
-  },
-  helpRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            6,
-  },
-  helpText: {
-    fontSize:      14,
-    fontWeight:    '400',
-    color:         Colors.textPrimary,
-    letterSpacing: 0.42,
-  },
-  helpPhone: {
-    fontSize:      14,
-    fontWeight:    '500',
-    color:         Colors.link,
-    letterSpacing: 0.42,
   },
 
   emptyText: {

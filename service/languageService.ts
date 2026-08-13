@@ -53,20 +53,6 @@ export async function getDynamicPopulateArrayList(lang?: string, force = false):
   return null
 }
 
-// ─── Language list ────────────────────────────────────────────────────────────
-// Returns the list of supported languages from storage or server.
-
-export async function getLanguageList(): Promise<any[]> {
-  const raw = await getItem('DOMAINLANG')
-  if (raw) {
-    const parsed = JSON.parse(raw)
-    return parsed?.LANGUAGELIST ?? []
-  }
-
-  const fetched = await getDynamicPopulateArrayList()
-  return fetched?.LANGUAGELIST ?? []
-}
-
 export async function getCurrentLanguage(): Promise<string> {
   return (await getItem(SK.Auth.LANG)) ?? 'en'
 }

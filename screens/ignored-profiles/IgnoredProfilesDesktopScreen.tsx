@@ -39,6 +39,7 @@ import { unblockProfile } from '../../service/communicationService'
 import { communicationBtnOnClick, shouldSkipPhoneConfirm } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import { getItem } from '../../service/storageService'
+import { openMembershipTab } from '../../service/paymentService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { Colors } from '../../constants/colors'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
@@ -242,7 +243,7 @@ export default function IgnoredProfilesDesktopScreen({ navigation }: Props) {
       case 0: navigation.navigate('Home');     break
       case 1: navigation.navigate('Matches');  break
       case 2: navigation.navigate('Activity'); break
-      case 3: navigation.navigate('recharge', { fromTab: true }); break
+      case 3: openMembershipTab(); break
       case 4: navigation.navigate('MessagerList'); break
     }
   }

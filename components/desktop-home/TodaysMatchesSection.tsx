@@ -31,7 +31,7 @@ export default function TodaysMatchesSection({ items, total, onCardPress, onSeeA
       onSeeAllPress={onSeeAllPress}
       renderCard={item => (
         <View style={[s.card, { width: CARD_W }]}>
-          <View style={s.photoInset}>
+          <View>
             <PhotoOverlayCard
               width={PHOTO_SIZE}
               height={PHOTO_SIZE}
@@ -63,7 +63,6 @@ const s = StyleSheet.create({
     elevation:       2,
     gap:             16,
   },
-  photoInset: {},
   viewBtn: {
     backgroundColor: Colors.primaryDark,
     borderRadius:    8,

@@ -31,7 +31,7 @@ import {
 } from '../../service/homeService'
 import { ExploreCategoriesSection } from '../home/HomeScreen'
 import { ENavigation } from '../../types/enums/navigation.enum'
-import { paymentTrack } from '../../service/paymentService'
+import { openMembershipTab } from '../../service/paymentService'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 const { width: SW } = Dimensions.get('window')
@@ -66,7 +66,7 @@ export default function DiscoverMatchesScreen({ navigation }: Props) {
       case 0: navigation.navigate('Home');     break
       case 1: navigation.navigate('Matches');  break
       case 2: navigation.navigate('Activity'); break
-      case 3: paymentTrack('31'); navigation.navigate('recharge', { fromTab: true }); break
+      case 3: openMembershipTab(); break
       case 4: navigation.navigate('MessagerList'); break
     }
   }

@@ -10,7 +10,6 @@ import { Endpoints } from './api.endpoints'
 import { getItem, setItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { getRegistrationArrays } from './registrationService'
-import { navigate } from '../utils/navigationRef'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -165,10 +164,6 @@ export function getFirstMissingBiodataField(
   if (!p.FAMILYINFO?.SISTERS)  return { screen: 'EditProfileFamily' }
   if (!hasPropertyDetails(p.FAMILYINFO)) return { screen: 'EditProfileProperty' }
   return null
-}
-
-export function goToBiodataEditScreen(screen: string): void {
-  navigate(screen)
 }
 
 // ─── Theme selection persistence ───────────────────────────────────────────────

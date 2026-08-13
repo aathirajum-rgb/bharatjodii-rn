@@ -268,12 +268,23 @@ export async function requestAutopayRefund(): Promise<{ accepted: boolean; usedC
   return { accepted, usedContacts: result?.RESPONSE?.phoneNumbersUsed ?? result?.phoneNumbersUsed }
 }
 
-export async function redirectToMembershipPage(fromPage = '', replaceStack = false): Promise<void> {
+// Angular: footer.component.ts's bottom-nav "Membership"/"Upgrade" tab press —
+// paid members ('P') go straight to their membership status page; everyone
+// else fires the paymentTrack(31) beacon and lands on the plan-selection
+// screen (fromTab:true, same contract RechargeScreen.tsx already reads to
+// show its tab-bar chrome instead of a back arrow). Every screen with an
+// AppFooter/MatchesDesktopNav should route tab index 3 through this single
+// function rather than hardcoding navigate('recharge') — that hardcoding was
+// the bug that sent paid members back to the payment flow instead of
+// 'my-membership'.
+export async function openMembershipTab(): Promise<void> {
   const entryType = String((await getSessionValue('ENTRYTYPE')) ?? '')
-  const target    = entryType === 'P' ? ENavigation.MY_MEMBERSHIP : ENavigation.RECHARGE
-
-  if (replaceStack) resetTo(target, { from: fromPage })
-  else navigate(target, { from: fromPage })
+  if (entryType === 'P') {
+    navigate(ENavigation.MY_MEMBERSHIP)
+  } else {
+    await paymentTrack('31')
+    navigate(ENavigation.RECHARGE, { fromTab: true })
+  }
 }
 
 // ─── Payment config (PAYCONFIG) ────────────────────────────────────────────────
@@ -354,17 +365,6 @@ export async function getPaymentConfig(mode = 'PAYCONFIG'): Promise<IPaymentConf
   payConfig._cacheVersion = PAYCONFIG_CACHE_VERSION
   await setJson(PAYMENT_CACHE_KEYS.PAYCONFIG, payConfig)
   return payConfig
-}
-
-// ─── Recharge packages ───────────────────────────────────────────────────────
-
-export async function getRechargePackages(): Promise<any[]> {
-  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-  const result = await apiCall(Endpoints.payment.recharge, 'POST', `ID=${userId}&TYPE=RECHARGE`)
-  if (result?.RESPONSECODE === '1' && result?.ERRCODE === '0') {
-    return result.RESPONSE?.PACKAGES ?? result.RESPONSE ?? []
-  }
-  return []
 }
 
 // ─── Net banking bank list ────────────────────────────────────────────────────
@@ -837,6 +837,37 @@ export async function getHostedCheckoutRequest(
   return { uri: Endpoints.payment.checkout, body }
 }
 
+// ─── Web hosted checkout (browser only) — real form POST, new tab ───────────
+// react-native-webview has no web build, so the native WebView rendering of
+// the {uri, body} pair above (HostedCheckoutWebViewScreen.tsx) doesn't work
+// on web. A real browser <form> POST is the direct equivalent — it navigates
+// a new tab straight to the same bank/gateway hosted page with the exact
+// same fields, matching what the WebView does under the hood. The caller is
+// responsible for polling checkPaymentStatus() in the original tab afterwards
+// (see PaymentFailedScreen.tsx's existing 'pending' poll for the pattern) —
+// there's no cross-origin way to read the new tab's outcome directly.
+export function submitHostedCheckoutFormOnWeb(request: HostedCheckoutRequest): void {
+  const form = document.createElement('form')
+  form.method = 'POST'
+  form.action = request.uri
+  form.target = '_blank'
+  form.style.display = 'none'
+
+  for (const pair of request.body.split('&')) {
+    if (!pair) continue
+    const [key, value] = pair.split('=')
+    const input = document.createElement('input')
+    input.type  = 'hidden'
+    input.name  = decodeURIComponent(key ?? '')
+    input.value = decodeURIComponent((value ?? '').replace(/\+/g, ' '))
+    form.appendChild(input)
+  }
+
+  document.body.appendChild(form)
+  form.submit()
+  document.body.removeChild(form)
+}
+
 // ─── Analytics tracking ───────────────────────────────────────────────────────
 // Angular: common.ts paymentTrack() (~line 987) — fire-and-forget POST to
 // nbtrack; the response is never read anywhere in the app. Swallow errors so a
@@ -924,6 +955,61 @@ export async function initUPIPayment(
       theme: { color: '#C62828' },
     })
     return { success: true, response }
+  } catch (error: any) {
+    return { success: false, response: error }
+  }
+}
+
+// ─── Web checkout (browser only) — Razorpay Standard Checkout JS SDK ─────────
+// react-native-razorpay has no web build (single native-only entry point,
+// confirmed against its package.json) — this is the browser sibling of
+// initUPIPayment() above, using Razorpay's own hosted checkout.js script
+// instead of the native bridge. Same options shape, same
+// Promise<{success, response}> contract, so call sites only need to branch
+// on Platform.OS to pick this over the native function.
+
+let razorpayScriptPromise: Promise<void> | null = null
+
+function loadRazorpayCheckoutScript(): Promise<void> {
+  if (razorpayScriptPromise) return razorpayScriptPromise
+  razorpayScriptPromise = new Promise((resolve, reject) => {
+    if ((window as any).Razorpay) { resolve(); return }
+    const script = document.createElement('script')
+    script.src = 'https://checkout.razorpay.com/v1/checkout.js'
+    script.async = true
+    script.onload = () => resolve()
+    script.onerror = () => reject(new Error('Could not load Razorpay checkout script'))
+    document.body.appendChild(script)
+  })
+  return razorpayScriptPromise
+}
+
+export async function initRazorpayWebCheckout(
+  upiDetails: any,
+  saltKey: string,
+): Promise<{ success: boolean; response: any }> {
+  try {
+    await loadRazorpayCheckoutScript()
+    return await new Promise(resolve => {
+      const razorpay = new (window as any).Razorpay({
+        key:       saltKey,
+        amount:    upiDetails.amount,
+        currency:  'INR',
+        order_id:  upiDetails.orderId ?? '',
+        name:      'Jodii Matrimony',
+        method:    { upi: true },
+        'upi.vpa': upiDetails.VPA ?? '',
+        theme:     { color: '#C62828' },
+        handler:   (response: any) => resolve({ success: true, response }),
+        modal: {
+          // Same "user cancelled" shape the native bridges' back-press/
+          // AppState-timeout paths resolve with (see initRazorpayNative()).
+          ondismiss: () => resolve({ success: false, response: { code: 0, description: 'Payment cancelled' } }),
+        },
+      })
+      razorpay.on('payment.failed', (resp: any) => resolve({ success: false, response: resp?.error ?? resp }))
+      razorpay.open()
+    })
   } catch (error: any) {
     return { success: false, response: error }
   }
@@ -1343,7 +1429,11 @@ function resolveTimerEnd(offEndTime?: string | number): number | undefined {
 
 // The API's *TITLE/*CONTENT fields are meant for Angular's [innerHTML] — RN
 // has no innerHTML, so strip tags rather than let literal markup show up.
-function stripHtml(value?: string): string | undefined {
+// Exported since several *TEXT/*CONTENT-style fields across the payment and
+// membership APIs carry the same inline markup (e.g. MEMBERSHIPDETAILS.
+// packexpirytext's "<span>...</span>"-wrapped date, confirmed via a live
+// account showing the raw tags in MenuContactsScreen.tsx before this fix).
+export function stripHtml(value?: string): string | undefined {
   if (!value) return value
   return value.replace(/<[^>]+>/g, '').trim()
 }

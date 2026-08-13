@@ -1,6 +1,4 @@
 import * as Font from 'expo-font'
-import { useEffect, useState } from 'react'
-import i18n from '../i18n'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -124,27 +122,4 @@ export async function loadLangFonts(lang: string): Promise<void> {
   }
 
   loaded.add(lang)
-}
-
-// ─── Hook ─────────────────────────────────────────────────────────────────────
-
-export function useLangFont(): LangFontSet {
-  const [fontSet, setFontSet] = useState<LangFontSet>(
-    LANG_FONTS[i18n.language] ?? POPPINS,
-  )
-
-  useEffect(() => {
-    function onLangChanged(lang: string) {
-      const next = LANG_FONTS[lang] ?? POPPINS
-      loadLangFonts(lang).then(() => setFontSet(next))
-    }
-    i18n.on('languageChanged', onLangChanged)
-    // Load current language if not English
-    loadLangFonts(i18n.language).then(() =>
-      setFontSet(LANG_FONTS[i18n.language] ?? POPPINS),
-    )
-    return () => { i18n.off('languageChanged', onLangChanged) }
-  }, [])
-
-  return fontSet
 }

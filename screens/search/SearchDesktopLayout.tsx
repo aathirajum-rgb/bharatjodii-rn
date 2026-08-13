@@ -26,6 +26,7 @@ import type { PickerOption } from '../../components/searchable-picker/Searchable
 import type { FieldKey } from './SearchScreen'
 import { AGE_OPTIONS, SIMPLE_MULTI_FIELDS } from './SearchScreen'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { openMembershipTab } from '../../service/paymentService'
 
 const ICON_ARROW = CDN_REACT + '/menu_right_arrow.svg'
 
@@ -96,7 +97,7 @@ export default function SearchDesktopLayout(props: SearchDesktopLayoutProps) {
       case 0: navigation.navigate('Home');     break
       case 1: navigation.navigate('Matches');  break
       case 2: navigation.navigate('Activity'); break
-      case 3: navigation.navigate('recharge', { fromTab: true }); break
+      case 3: openMembershipTab(); break
       case 4: navigation.navigate('MessagerList'); break
     }
   }

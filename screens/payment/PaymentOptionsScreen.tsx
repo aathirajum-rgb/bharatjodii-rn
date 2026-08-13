@@ -21,6 +21,8 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import LinkCTA from '../../components/link-cta/LinkCTA'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
+import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import PaymentOptionsDesktopLayout from './payment-options-desktop/PaymentOptionsDesktopLayout'
 import {
   findUpiPackageName, formatAmount, getAutoRenewalBenefits, getCheckoutDetails, getFinalAmount,
   getPaymentConfig, getRechargeHelpline, getRetryRemainingMs, getUpiAppList, handlePaymentSuccess,
@@ -59,7 +61,8 @@ type Props = { navigation: any; route: any }
 
 export default function PaymentOptionsScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const isDesktop = useIsDesktopWeb()
 
   const selectedPackage: SelectedPackage | undefined = route.params?.selectedPackage
 
@@ -159,6 +162,31 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
   const discountAmountNum = parseAmount(selectedPackage.discountamount) - parseAmount(selectedPackage.extradiscount)
   const hasDiscount       = discountAmountNum > 0
   const finalTotalNum     = getFinalAmount(selectedPackage)
+
+  // ── Desktop web layout (Figma "Jodii Desktop - Registration", nodes
+  // 533:2467 -> 536:14130) — wide browser window only; mobile/native/narrow-
+  // web keep the JSX below, untouched. Unlike RechargeScreen's split, this
+  // desktop layout owns its own per-tab data loading (see
+  // PaymentOptionsDesktopLayout.tsx's header comment for why) — it only
+  // needs the already-computed order-summary numbers and the selected
+  // package from this screen.
+  if (isDesktop) {
+    return (
+      <PaymentOptionsDesktopLayout
+        selectedPackage={selectedPackage}
+        amountLabel={formatAmount(finalTotalNum)}
+        planName={planName}
+        planDuration={planDuration}
+        priceNum={priceNum}
+        discountAmountNum={discountAmountNum}
+        finalTotalNum={finalTotalNum}
+        onClose={handleBack}
+        onEditPlan={() => navigation.navigate('recharge')}
+        langCode={i18n.language}
+        onLanguagePress={() => navigation.navigate('LanguageSelection')}
+      />
+    )
+  }
 
   const showRenewalCheckbox =
     selectedPackage.autopayflag === '1' && AUTOPAY_CAPABLE_KEYS.has(selectedKey)

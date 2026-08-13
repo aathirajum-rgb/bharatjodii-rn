@@ -26,6 +26,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
+import { openMembershipTab } from '../../service/paymentService'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { ICON, LogoutSheet, performLogout } from '../menu/MenuScreen'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
@@ -56,7 +57,7 @@ export default function SettingsScreen({ navigation }: Props) {
       case 0: navigation.navigate('Home');     break
       case 1: navigation.navigate('Matches');  break
       case 2: navigation.navigate('Activity'); break
-      case 3: navigation.navigate('recharge', { fromTab: true }); break
+      case 3: openMembershipTab(); break
       case 4: navigation.navigate('MessagerList'); break
     }
   }

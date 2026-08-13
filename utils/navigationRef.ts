@@ -21,10 +21,6 @@ export function resetTo(name: string, params?: Record<string, unknown>): void {
   }
 }
 
-export function currentRoute(): string | undefined {
-  return navigationRef.getCurrentRoute()?.name
-}
-
 // Waits until the NavigationContainer has mounted and navigationRef.isReady()
 // is true. Needed right after a login-state flip: AppStack mounts in the same
 // render pass as isAuthenticated flipping true, so a navigate()/resetTo() call

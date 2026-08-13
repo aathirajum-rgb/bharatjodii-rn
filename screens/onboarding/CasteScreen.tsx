@@ -11,7 +11,6 @@ import {
 import { Image } from 'expo-image'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
-import { StorageKeys as SK } from '../../constants/storage.keys'
 import RegistrationSuccessSheet from '../../components/registration-success-sheet/RegistrationSuccessSheet'
 import {
   callPartialRegistrationAPI,
@@ -23,7 +22,6 @@ import {
   getRegValue,
   submitFullRegistration,
 } from '../../service/registrationService'
-import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
@@ -63,7 +61,6 @@ export default function CasteScreen({ navigation }: Props) {
   const [hasSubcaste,      setHasSubcaste]      = useState(false)
   const [submitting,       setSubmitting]       = useState(false)
   const [successVisible,   setSuccessVisible]   = useState(false)
-  const [customerCare,     setCustomerCare]     = useState('')
 
   // Panel state — single modal, one at a time
   const [activePanel, setActivePanel] = useState<ActivePanel>(null)
@@ -78,14 +75,12 @@ export default function CasteScreen({ navigation }: Props) {
   useEffect(() => {
     Promise.all([
       getRegValue('CREATEDBY'),
-      getItem(SK.App.CUSTOMER_CARE),
       getRegValues(),
-    ]).then(async ([cb, cc, regVals]) => {
+    ]).then(async ([cb, regVals]) => {
       const { RELIGION: rel, MOTHERTONGUE: mt, CASTE: savedCaste, SUBCASTE: savedSubcaste } = regVals
       if (cb)  setCreatedBy(cb)
       if (rel) setReligion(rel)
       if (mt)  setMothertongue(mt)
-      if (cc)  setCustomerCare(cc)
 
       try {
         const list = await fetchCasteOptions(rel ?? '', mt ?? '')
@@ -374,30 +369,5 @@ const styles = StyleSheet.create({
     fontSize:   22,
     color:      Colors.textPrimary,
     lineHeight: 26,
-  },
-
-  divider: {
-    height:          1,
-    backgroundColor: Colors.inputBorder,
-    marginTop:       16,
-    marginBottom:    16,
-  },
-  helpRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
-    justifyContent: 'center',
-    gap:            6,
-  },
-  helpText: {
-    fontSize:      14,
-    fontWeight:    '400',
-    color:         Colors.textPrimary,
-    letterSpacing: 0.42,
-  },
-  helpPhone: {
-    fontSize:      14,
-    fontWeight:    '500',
-    color:         Colors.link,
-    letterSpacing: 0.42,
   },
 })

@@ -501,11 +501,6 @@ const styles = StyleSheet.create({
   iconBtn: {
     marginRight: 12,
   },
-  iconImg: {
-    width:  28,
-    height: 28,
-  },
-
   // ViewProfileFooterBtn
   vpRow: {
     flexDirection: 'row',
@@ -541,10 +536,6 @@ const styles = StyleSheet.create({
     padding:       16,
     gap:           8,
   },
-  menuIcon: {
-    width:  20,
-    height: 20,
-  },
   menuText: {
     fontSize: 14,
     color:    Colors.textPrimary,
@@ -555,10 +546,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems:    'center',
     gap:           8,
-  },
-  textRowIcon: {
-    width:  20,
-    height: 20,
   },
   textRowLabel: {
     fontSize: 14,
@@ -575,15 +562,6 @@ const styles = StyleSheet.create({
     width:  18,
     height: 18,
   },
-  iconHdrImg: {
-    width:  18,
-    height: 18,
-  },
-  iconSmall: {
-    width:  20,
-    height: 20,
-  },
-
   // vpCallWhatsApp
   waRow: {
     flexDirection:   'row',

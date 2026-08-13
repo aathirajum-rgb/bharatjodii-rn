@@ -1,5 +1,5 @@
 import * as Updates from 'expo-updates';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { Alert } from 'react-native';
 
 // Tracks how many times THIS bundle instance has called reloadAsync.
@@ -56,23 +56,3 @@ async function runOTACheck() {
   }
 }
 
-export function useOTAInfo() {
-  const isEmbedded = Updates.isEmbeddedLaunch;
-  const updateId = Updates.updateId;
-  const channel = Updates.channel ?? 'none';
-
-  if (isEmbedded || !updateId) {
-    return `embedded / ch:${channel}`;
-  }
-  return `OTA: ${updateId.slice(0, 8)}`;
-}
-
-export function useOTAStatus() {
-  const [status] = useState<string>(() => {
-    const id = Updates.updateId;
-    const isEmb = Updates.isEmbeddedLaunch;
-    if (isEmb || !id) return 'EMBEDDED';
-    return `OTA ${id.slice(0, 8)}`;
-  });
-  return status;
-}
