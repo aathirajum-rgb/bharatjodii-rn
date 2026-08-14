@@ -57,11 +57,16 @@ export default function NameScreen({ navigation }: Props) {
     })
   }, [])
 
-  // Auto-focus input after mount
+  // Auto-focus once the push transition finishes (not a fixed setTimeout) — if the
+  // keyboard opens while the screen is still mid-transition, KeyboardAvoidingView's
+  // first resize computation runs before its layout has settled and gets silently
+  // dropped, leaving the footer CTA hidden behind the keyboard. See OTPScreen.tsx.
   useEffect(() => {
-    const id = setTimeout(() => inputRef.current?.focus(), 300)
-    return () => clearTimeout(id)
-  }, [])
+    const sub = navigation.addListener('transitionEnd', () => {
+      inputRef.current?.focus()
+    })
+    return sub
+  }, [navigation])
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -122,8 +127,8 @@ export default function NameScreen({ navigation }: Props) {
     <View style={os.flex1}>
       <KeyboardAvoidingView
         style={os.flex1}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={insets.top + 56}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
       >
         <ScrollView
           style={os.flex1}

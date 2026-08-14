@@ -135,7 +135,7 @@ export default function DeleteProfileWebsiteNameScreen({ navigation, route }: Pr
   return (
     <KeyboardAvoidingView
       style={s.flex1}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={[s.screen, { paddingTop: insets.top }]}>
 

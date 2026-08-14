@@ -38,6 +38,7 @@ import { getItem, getJson, setJson } from '../../service/storageService'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import SearchDesktopLayout from './SearchDesktopLayout'
 import { fetchSearchResults } from '../../service/homeService'
+import { resolveFilterLabel } from '../../adapters/filterPreference.adapter'
 import {
   getSelectedObject, saveFilterState, getSearchPPCheckBox,
   getFilterEventType, resetFilter, buildSearchParams, DEFAULT_FILTER,
@@ -233,11 +234,12 @@ export default function SearchScreen({ navigation }: Props) {
     return opts
   }
 
+  // Shared with hooks/useFilterDisplayValues.ts (desktop Matches filter
+  // sidebar) via adapters/filterPreference.adapter.ts — same "Any"-sentinel +
+  // code->label resolution rule, just fed this screen's own lazily-cached
+  // per-field option list instead of the sidebar's eagerly-fetched one.
   function labelsFor(key: string, keys: string[]): string {
-    if (!keys || keys.length === 0 || keys[0] === '0') return t('SEARCH.ANY')
-    const opts = labelCache[key] ?? []
-    const labels = keys.map(k => opts.find(o => o.key === k)?.label ?? k)
-    return labels.length > 0 ? labels.join(', ') : t('SEARCH.ANY')
+    return resolveFilterLabel(labelCache[key] ?? [], keys, t('SEARCH.ANY'))
   }
 
   // ── Row value display ────────────────────────────────────────────────────

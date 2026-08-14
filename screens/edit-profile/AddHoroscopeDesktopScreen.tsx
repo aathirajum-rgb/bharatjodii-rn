@@ -46,9 +46,27 @@ const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
+const MONTH_OPTIONS = MONTHS.map((label, i) => ({ key: String(i + 1), label }))
 const HOURS     = Array.from({ length: 12 }, (_, i) => ({ key: String(i + 1), label: String(i + 1).padStart(2, '0') }))
 const MINUTES   = Array.from({ length: 60 }, (_, i) => ({ key: String(i), label: String(i).padStart(2, '0') }))
 const MERIDIANS = [{ key: 'AM', label: 'AM' }, { key: 'PM', label: 'PM' }]
+
+// See AddHoroscopeScreen.tsx's header comment on this same helper set.
+function buildYears(): SelectOption[] {
+  const max = new Date().getFullYear() - 18
+  const min = max - 82
+  return Array.from({ length: max - min + 1 }, (_, i) => {
+    const y = String(max - i)
+    return { key: y, label: y }
+  })
+}
+function getDaysInMonth(month: string, year: string): SelectOption[] {
+  const m     = Number(month) || 1
+  const y     = Number(year)  || 2000
+  const count = new Date(y, m, 0).getDate()
+  return Array.from({ length: count }, (_, i) => ({ key: String(i + 1), label: String(i + 1).padStart(2, '0') }))
+}
+const YEAR_OPTIONS = buildYears()
 
 type Props = { navigation: any }
 type Step  = 'intro' | 'form'
@@ -58,9 +76,17 @@ function parseDob(raw: string | undefined): { date: string; month: string; year:
   const parts = raw.split(/[-/]/).map(p => p.trim()).filter(Boolean)
   if (parts.length !== 3) return null
   const [a, b, c] = parts as [string, string, string]
-  if (a.length === 4) return { year: a, month: String(Number(b)), date: String(Number(c)) }
-  if (c.length === 4) return { year: c, month: String(Number(b)), date: String(Number(a)) }
-  return null
+  let year: string, month: string, date: string
+  if (a.length === 4)      { year = a; month = String(Number(b)); date = String(Number(c)) }
+  else if (c.length === 4) { year = c; month = String(Number(b)); date = String(Number(a)) }
+  else return null
+
+  // See AddHoroscopeScreen.tsx's header comment on this same check — the
+  // server sends "0000-00-00" as a placeholder when DOB was never set.
+  const y = Number(year), m = Number(month), d = Number(date)
+  if (!y || m < 1 || m > 12 || d < 1 || d > 31) return null
+
+  return { year, month, date }
 }
 
 export default function AddHoroscopeDesktopScreen({ navigation }: Props) {
@@ -84,6 +110,12 @@ export default function AddHoroscopeDesktopScreen({ navigation }: Props) {
   const [selHour, setSelHour]         = useState<SelectOption | null>(null)
   const [selMinute, setSelMinute]     = useState<SelectOption | null>(null)
   const [selMeridian, setSelMeridian] = useState<SelectOption | null>(null)
+
+  // Manual DOB entry — only used when the profile's own DOB is missing/
+  // invalid, matching AddHoroscopeScreen.tsx's mobile counterpart.
+  const [dobYear, setDobYear]   = useState<SelectOption | null>(null)
+  const [dobMonth, setDobMonth] = useState<SelectOption | null>(null)
+  const [dobDate, setDobDate]   = useState<SelectOption | null>(null)
 
   useEffect(() => {
     getRegValue('CREATEDBY').then(cb => { if (cb) setCreatedBy(cb) })
@@ -133,16 +165,34 @@ export default function AddHoroscopeDesktopScreen({ navigation }: Props) {
     'Please give your #PROFILETYPE# time of birth and location to generate free horoscope',
   ).replace('#PROFILETYPE#', translatedProfileType).replace('  ', ' ').trim()
 
+  function handleSelectDobMonth(opt: SelectOption) {
+    setDobMonth(opt)
+    if (dobDate) {
+      const days = getDaysInMonth(opt.key, dobYear?.key ?? '')
+      if (Number(dobDate.key) > days.length) setDobDate(null)
+    }
+  }
+
+  function handleSelectDobYear(opt: SelectOption) {
+    setDobYear(opt)
+    if (dobDate && dobMonth?.key === '2') {
+      const days = getDaysInMonth(dobMonth.key, opt.key)
+      if (Number(dobDate.key) > days.length) setDobDate(null)
+    }
+  }
+
   const dobLabel = dob ? `${dob.date.padStart(2, '0')} ${MONTHS[Number(dob.month) - 1] ?? ''} ${dob.year}` : undefined
-  const canSubmit = !!(dob && selectedState && selectedCity && selHour && selMinute && selMeridian)
+  const manualDobComplete = !!(dobYear && dobMonth && dobDate)
+  const canSubmit = !!((dob || manualDobComplete) && selectedState && selectedCity && selHour && selMinute && selMeridian)
 
   async function handleSubmit() {
-    if (submitting || !canSubmit || !dob || !selectedState || !selectedCity || !selHour || !selMinute || !selMeridian) return
+    const effectiveDob = dob ?? (manualDobComplete ? { year: dobYear!.key, month: dobMonth!.key, date: dobDate!.key } : null)
+    if (submitting || !canSubmit || !effectiveDob || !selectedState || !selectedCity || !selHour || !selMinute || !selMeridian) return
     setSubmitting(true)
     try {
       await setItem(SK.Profile.HOROSCOPE_AVAILABLE, horoscopeAvailable ? '1' : '0')
       const ok = await generateHoroscope({
-        date: dob.date, month: dob.month, year: dob.year,
+        date: effectiveDob.date, month: effectiveDob.month, year: effectiveDob.year,
         hour: selHour.key, minute: selMinute.key, meridian: selMeridian.key as 'AM' | 'PM',
         stateId: selectedState.key, cityKey: selectedCity.key,
       })
@@ -200,7 +250,24 @@ export default function AddHoroscopeDesktopScreen({ navigation }: Props) {
                 <Text style={s.dobValue}>{dobLabel}</Text>
               </View>
             ) : (
-              <Text style={s.dobMissing}>We couldn't read your date of birth — please add it under Basic details first.</Text>
+              <>
+                <Text style={s.dobMissing}>We couldn't find your date of birth — please add it below to generate your horoscope.</Text>
+                <View style={s.timeRow}>
+                  <View style={s.timeCell}>
+                    <DesktopSelectField label="Year" options={YEAR_OPTIONS} selectedKey={dobYear?.key ?? null} onSelect={handleSelectDobYear} />
+                  </View>
+                  <View style={s.timeCell}>
+                    <DesktopSelectField label="Month" options={MONTH_OPTIONS} selectedKey={dobMonth?.key ?? null} onSelect={handleSelectDobMonth} />
+                  </View>
+                  <View style={s.timeCell}>
+                    <DesktopSelectField
+                      label="Date" options={dobYear && dobMonth ? getDaysInMonth(dobMonth.key, dobYear.key) : []}
+                      selectedKey={dobDate?.key ?? null} placeholder={dobYear && dobMonth ? 'Date' : 'Pick year/month first'}
+                      disabled={!dobYear || !dobMonth} onSelect={setDobDate}
+                    />
+                  </View>
+                </View>
+              </>
             )}
 
             <DesktopSelectField label="Birth state" options={stateOptions} selectedKey={selectedState?.key ?? null} onSelect={handleSelectState} />

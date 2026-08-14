@@ -99,6 +99,7 @@ export default function DOBScreen({ navigation }: Props) {
   const [showAgeSheet, setShowAgeSheet] = useState(false)
   const [ageInput,     setAgeInput]     = useState('')
   const [ageError,     setAgeError]     = useState('')
+  const ageInputRef = useRef<TextInput>(null)
 
   const dateRef  = useRef<View>(null)
   const monthRef = useRef<View>(null)
@@ -389,6 +390,12 @@ export default function DOBScreen({ navigation }: Props) {
         transparent
         animationType="slide"
         onRequestClose={() => setShowAgeSheet(false)}
+        // Focus once the slide-in animation has actually finished presenting —
+        // matches the OTPScreen 'transitionEnd' fix. `autoFocus` on the input
+        // instead fires the instant it mounts, racing the Modal's own opening
+        // animation: the keyboard would open before KeyboardAvoidingView('height')
+        // has a settled layout to resize against, so the sheet never rises.
+        onShow={() => ageInputRef.current?.focus()}
       >
         <TouchableWithoutFeedback onPress={() => setShowAgeSheet(false)}>
           <View style={styles.overlay} />
@@ -396,20 +403,20 @@ export default function DOBScreen({ navigation }: Props) {
 
         <KeyboardAvoidingView
           style={[styles.ageSheet, { paddingBottom: insets.bottom + 20 }]}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
           <View style={styles.dragHandle} />
           <Text style={styles.ageSheetTitle}>Enter age</Text>
 
           <View style={styles.ageInputOuter}>
             <TextInput
+              ref={ageInputRef}
               style={styles.ageInputBox}
               keyboardType="number-pad"
               value={ageInput}
               onChangeText={v => { setAgeInput(v.replace(/\D/g, '')); setAgeError('') }}
               maxLength={2}
               returnKeyType="done"
-              autoFocus
               onSubmitEditing={handleAgeSubmit}
             />
             <View style={styles.ageLabelWrap} pointerEvents="none">

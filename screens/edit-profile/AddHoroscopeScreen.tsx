@@ -46,12 +46,34 @@ const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ]
+const MONTH_OPTIONS = MONTHS.map((label, i) => ({ key: String(i + 1), label }))
 const HOURS     = Array.from({ length: 12 }, (_, i) => ({ key: String(i + 1), label: String(i + 1).padStart(2, '0') }))
 const MINUTES   = Array.from({ length: 60 }, (_, i) => ({ key: String(i), label: String(i).padStart(2, '0') }))
 const MERIDIANS = [{ key: 'AM', label: 'AM' }, { key: 'PM', label: 'PM' }]
 
+// ── DOB helpers — Angular's registration.page.html varPageType 23 (reached
+// from edit-profile's "Add Horoscope" CTA via editform/22→23) lets the user
+// pick Year/Month/Date of birth inline as part of the horoscope flow itself,
+// rather than requiring it to already exist on the profile — same helpers as
+// onboarding's DOBScreen.tsx, since the underlying date math is identical. ──
+function buildYears(): PickerOption[] {
+  const max = new Date().getFullYear() - 18
+  const min = max - 82
+  return Array.from({ length: max - min + 1 }, (_, i) => {
+    const y = String(max - i)
+    return { key: y, label: y }
+  })
+}
+function getDaysInMonth(month: string, year: string): PickerOption[] {
+  const m     = Number(month) || 1
+  const y     = Number(year)  || 2000
+  const count = new Date(y, m, 0).getDate()
+  return Array.from({ length: count }, (_, i) => ({ key: String(i + 1), label: String(i + 1).padStart(2, '0') }))
+}
+const YEAR_OPTIONS = buildYears()
+
 type Props   = { navigation: any }
-type Picker  = 'state' | 'city' | 'hour' | 'minute' | 'meridian' | null
+type Picker  = 'state' | 'city' | 'hour' | 'minute' | 'meridian' | 'dobYear' | 'dobMonth' | 'dobDate' | null
 
 // Defensive parse — server format for DATEOFBIRTH is unconfirmed. Tries
 // YYYY-MM-DD, DD-MM-YYYY, DD/MM/YYYY in turn.
@@ -60,9 +82,22 @@ function parseDob(raw: string | undefined): { date: string; month: string; year:
   const parts = raw.split(/[-/]/).map(p => p.trim()).filter(Boolean)
   if (parts.length !== 3) return null
   const [a, b, c] = parts as [string, string, string]
-  if (a.length === 4) return { year: a, month: String(Number(b)), date: String(Number(c)) }   // YYYY-MM-DD
-  if (c.length === 4) return { year: c, month: String(Number(b)), date: String(Number(a)) }   // DD-MM-YYYY / DD/MM/YYYY
-  return null
+  let year: string, month: string, date: string
+  if (a.length === 4)      { year = a; month = String(Number(b)); date = String(Number(c)) }   // YYYY-MM-DD
+  else if (c.length === 4) { year = c; month = String(Number(b)); date = String(Number(a)) }   // DD-MM-YYYY / DD/MM/YYYY
+  else return null
+
+  // Server sends "0000-00-00" as a placeholder when DOB was never actually
+  // set (confirmed against a live account: DATEOFBIRTH "0000-00-00" +
+  // DOBEDIT 0) — that's not a real date. Treating it as valid let this
+  // screen send DATE=00/MONTH=00/YEAR=0000 straight to generateHoroscope(),
+  // which the server correctly rejects ("Error in generating Horoscope").
+  // Reject it here instead, so the existing "couldn't read your date of
+  // birth" fallback below actually fires.
+  const y = Number(year), m = Number(month), d = Number(date)
+  if (!y || m < 1 || m > 12 || d < 1 || d > 31) return null
+
+  return { year, month, date }
 }
 
 export default function AddHoroscopeScreen({ navigation }: Props) {
@@ -84,6 +119,13 @@ export default function AddHoroscopeScreen({ navigation }: Props) {
   const [selHour, setSelHour]         = useState<PickerOption | null>(null)
   const [selMinute, setSelMinute]     = useState<PickerOption | null>(null)
   const [selMeridian, setSelMeridian] = useState<PickerOption | null>(null)
+
+  // Manual DOB entry — only used when the profile's own DOB is missing/
+  // invalid (parseDob(info.dateOfBirth) returned null), matching Angular's
+  // inline "Date of birth" picker in this same flow.
+  const [dobYear, setDobYear]   = useState<PickerOption | null>(null)
+  const [dobMonth, setDobMonth] = useState<PickerOption | null>(null)
+  const [dobDate, setDobDate]   = useState<PickerOption | null>(null)
 
   const [activePicker, setActivePicker] = useState<Picker>(null)
 
@@ -131,17 +173,39 @@ export default function AddHoroscopeScreen({ navigation }: Props) {
     setCityOptions(cityList)
   }
 
-  const dobLabel = dob ? `${dob.date.padStart(2, '0')} ${MONTHS[Number(dob.month) - 1] ?? ''} ${dob.year}` : undefined
-  const canSubmit = !!(dob && selectedState && selectedCity && selHour && selMinute && selMeridian)
+  function handleSelectDobMonth(opt: PickerOption) {
+    setDobMonth(opt)
+    setActivePicker(null)
+    // Reset date if it's no longer valid for the newly picked month/year
+    if (dobDate) {
+      const days = getDaysInMonth(opt.key, dobYear?.key ?? '')
+      if (Number(dobDate.key) > days.length) setDobDate(null)
+    }
+  }
+
+  function handleSelectDobYear(opt: PickerOption) {
+    setDobYear(opt)
+    setActivePicker(null)
+    if (dobDate && dobMonth?.key === '2') {
+      const days = getDaysInMonth(dobMonth.key, opt.key)
+      if (Number(dobDate.key) > days.length) setDobDate(null)
+    }
+  }
+
+  const dobLabel   = dob ? `${dob.date.padStart(2, '0')} ${MONTHS[Number(dob.month) - 1] ?? ''} ${dob.year}` : undefined
+  // Profile DOB missing/invalid → fall back to the manually-picked one below.
+  const manualDobComplete = !!(dobYear && dobMonth && dobDate)
+  const canSubmit = !!((dob || manualDobComplete) && selectedState && selectedCity && selHour && selMinute && selMeridian)
 
   async function handleSubmit() {
-    if (submitting || !canSubmit || !dob || !selectedState || !selectedCity || !selHour || !selMinute || !selMeridian) return
+    const effectiveDob = dob ?? (manualDobComplete ? { year: dobYear!.key, month: dobMonth!.key, date: dobDate!.key } : null)
+    if (submitting || !canSubmit || !effectiveDob || !selectedState || !selectedCity || !selHour || !selMinute || !selMeridian) return
     setSubmitting(true)
 
     try {
       await setItem(SK.Profile.HOROSCOPE_AVAILABLE, horoscopeAvailable ? '1' : '0')
       const ok = await generateHoroscope({
-        date: dob.date, month: dob.month, year: dob.year,
+        date: effectiveDob.date, month: effectiveDob.month, year: effectiveDob.year,
         hour: selHour.key, minute: selMinute.key, meridian: selMeridian.key as 'AM' | 'PM',
         stateId: selectedState.key, cityKey: selectedCity.key,
       })
@@ -180,7 +244,25 @@ export default function AddHoroscopeScreen({ navigation }: Props) {
         {dobLabel ? (
           <SelectField label="Date of birth" value={dobLabel} locked onPress={() => {}} />
         ) : (
-          <Text style={s.dobMissing}>We couldn't read your date of birth — please add it under Basic details first.</Text>
+          <>
+            <Text style={s.dobMissing}>We couldn't find your date of birth — please add it below to generate your horoscope.</Text>
+            <View style={s.dobRow}>
+              <View style={s.dobField}>
+                <SelectField label="Year" value={dobYear?.label} placeholder="Year" onPress={() => setActivePicker('dobYear')} />
+              </View>
+              <View style={s.dobField}>
+                <SelectField label="Month" value={dobMonth?.label} placeholder="Month" onPress={() => setActivePicker('dobMonth')} />
+              </View>
+              <View style={s.dobField}>
+                <SelectField
+                  label="Date"
+                  value={dobDate?.label}
+                  placeholder={dobYear && dobMonth ? 'Date' : 'Pick year/month first'}
+                  onPress={() => dobYear && dobMonth && setActivePicker('dobDate')}
+                />
+              </View>
+            </View>
+          </>
         )}
 
         <SelectField label="Birth state" value={selectedState?.label} onPress={() => setActivePicker('state')} />
@@ -244,6 +326,33 @@ export default function AddHoroscopeScreen({ navigation }: Props) {
         onSelect={opt => { setSelMeridian(opt); setActivePicker(null) }}
         onClose={() => setActivePicker(null)}
       />
+      <SearchablePicker
+        visible={activePicker === 'dobYear'}
+        title="Select year"
+        placeholder="Search year..."
+        options={YEAR_OPTIONS}
+        selectedKey={dobYear?.key}
+        onSelect={handleSelectDobYear}
+        onClose={() => setActivePicker(null)}
+      />
+      <SearchablePicker
+        visible={activePicker === 'dobMonth'}
+        title="Select month"
+        placeholder=""
+        options={MONTH_OPTIONS}
+        selectedKey={dobMonth?.key}
+        onSelect={handleSelectDobMonth}
+        onClose={() => setActivePicker(null)}
+      />
+      <SearchablePicker
+        visible={activePicker === 'dobDate'}
+        title="Select date"
+        placeholder=""
+        options={dobYear && dobMonth ? getDaysInMonth(dobMonth.key, dobYear.key) : []}
+        selectedKey={dobDate?.key}
+        onSelect={opt => { setDobDate(opt); setActivePicker(null) }}
+        onClose={() => setActivePicker(null)}
+      />
     </View>
   )
 }
@@ -263,7 +372,9 @@ const s = StyleSheet.create({
 
   content: { paddingHorizontal: 24, paddingTop: 32 },
   heading: { fontSize: 16, fontWeight: '500', color: Colors.textSecondary, marginBottom: 24 },
-  dobMissing: { fontSize: 13, color: Colors.inputError, marginBottom: 20 },
+  dobMissing: { fontSize: 13, color: Colors.inputError, marginBottom: 12 },
+  dobRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
+  dobField: { flex: 1 },
 
   submitBtn: {
     height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,

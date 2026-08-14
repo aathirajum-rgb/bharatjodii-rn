@@ -5,6 +5,7 @@ import { Endpoints } from './api.endpoints'
 import { StorageKeys } from '../constants/storage.keys'
 import i18n from '../i18n'
 import type { SwiperItem } from '../components/swiper-card/SwiperCard'
+import { stripAgeUnit, pickListingPhoto } from '../adapters/profileListing.adapter'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -70,7 +71,7 @@ export function toProfile(p: Record<string, any>): SwiperItem {
     // Some listing endpoints (e.g. pagination/explore) send AGE already suffixed
     // ("27 Yrs"), others send a bare number ("27") — strip any existing unit before
     // appending our own, or a pre-suffixed value doubles up ("27 Yrs" + " Yrs").
-    age:                 p['AGE']   ? `${String(p['AGE']).replace(/\s*(yrs|years)/i, '').trim()} Yrs` : undefined,
+    age:                 p['AGE']   ? `${stripAgeUnit(p['AGE'])} Yrs` : undefined,
     // Angular card receives profile.HEIGHTCATEGORY (formatted string like "5'4\"")
     height:              p['HEIGHTCATEGORY'] ?? p['HEIGHT'],
     education:           p['EDUCATION'],
@@ -79,9 +80,7 @@ export function toProfile(p: Record<string, any>): SwiperItem {
     location:            (p['NRISTATE'] && p['NRICOUNTRY'])
                             ? `${p['NRISTATE']}, ${p['NRICOUNTRY']}`
                             : p['LOCATION'] || [p['CITY'], p['STATE']].filter(Boolean).join(', ') || '',
-    // Angular: FUNC.getPartnerImg() — prefers the full-size PHOTO[0].IMAGE over the
-    // low-res THUMBIMG, which looked blurry once stretched to near full card width.
-    profileImg:          p['PHOTO']?.[0]?.['IMAGE'] || p['THUMBIMG'],
+    profileImg:          pickListingPhoto(p),
     // Full photo array for the multi-photo swiper (Angular: matches-card.component's
     // profileImageArr). Falls back to a single-item array from profileImg/THUMBIMG so
     // callers can always treat `photos` as the source of truth.
@@ -390,24 +389,7 @@ export async function fetchDailyRecommendations(): Promise<SwiperItem[]> {
   const res = await apiCall(Endpoints.listing.dailyRecommendations, 'POST', params)
   if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0) {
     const raw = Array.isArray(res.RESPONSE) ? res.RESPONSE : []
-    return raw.map((p: Record<string, any>) => ({
-      profileId:        p['NBID']          ?? p['MATRIID'],
-      name:             p['NAME'],
-      age:              p['AGE'] ? `${p['AGE']} Yrs` : undefined,
-      height:           p['HEIGHT'],
-      education:        p['EDUCATION'],
-      occupation:       p['OCCUPATION'],
-      location:         p['LOCATION'] || [p['CITY'], p['STATE']].filter(Boolean).join(', ') || '',
-      // Angular: FUNC.getPartnerImg() — prefers the full-size PHOTO[0].IMAGE over THUMBIMG
-      profileImg:       p['PHOTO']?.[0]?.['IMAGE'] || p['THUMBIMG'],
-      isPhotoAvailable: p['PHOTOAVAILABLE'] == 'Y',
-      isPhotoProtect:   p['PHOTOPROTECTED'] == 'Y',
-      likedStatus:      p['LIKEDSTATUS']  as SwiperItem['likedStatus'],
-      isPaidMember:     (p['ENTRYTYPE'] ?? p['MEMBERSHIPTYPE']) !== undefined ? !['B', 'F'].includes(String(p['ENTRYTYPE'] ?? p['MEMBERSHIPTYPE'])) : p['PAIDMEMBER'] == '1',
-      isIdVerified:     p['IDVERIFY'] == '1' || p['IDVERIFYSTATUS'] == '1' || p['IDVERIFIED'] == '1',
-      caste:            p['CASTE'],
-      income:           p['INCOME'] ?? p['MONTHLYINCOME'],
-    }))
+    return raw.map(toProfile)
   }
   return []
 }

@@ -14,6 +14,7 @@ import { CDN_SVG } from '../../constants/cdn'
 import ProfilePhoto from '../profile-photo/ProfilePhoto'
 import Badge from '../badge/Badge'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
+import { showLikeCTA, showAfterLikeCTA } from '../matches/matchesCard.shared'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -104,14 +105,9 @@ const ICONS = {
 }
 
 // ─── CTA logic (mirrors Angular FUNC helpers) ─────────────────────────────────
-
-function showLikeCTA(likedStatus?: LikedStatus): boolean {
-  return likedStatus === '0'
-}
-
-function showAfterLikeContent(likedStatus?: LikedStatus): boolean {
-  return likedStatus === '1' || likedStatus === '2' || likedStatus === '3'
-}
+// showLikeCTA/showAfterLikeCTA imported from matchesCard.shared — same rule
+// MatchesScreen, MatchCardDesktop, and ViewProfile already share; this component
+// used to keep its own private, functionally-identical copy of both.
 
 function getPrimaryBtnLabel(likedStatus?: LikedStatus, phoneViewed?: string): string {
   if (likedStatus === '0') return 'Like Her'
@@ -280,7 +276,7 @@ export default function MatchesCard({
 
   // CTA state
   const showLike    = showLikeCTA(likedStatus)
-  const showContact = showAfterLikeContent(likedStatus)
+  const showContact = showAfterLikeCTA(likedStatus)
 
   return (
     <View style={[styles.card, isProfileHighlighter && styles.cardHighlighted]}>

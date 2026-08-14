@@ -1,11 +1,12 @@
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppHeader from '../components/app-header/AppHeader';
 import ButtonRevamp from '../components/button-revamp/ButtonRevamp';
 import { Colors } from '../constants/colors';
+import { FontSizes } from '../constants/fontSizes';
 import { LANG_FONTS, loadLangFonts } from '../constants/fonts';
 import i18n from '../i18n';
 import { getCurrentLanguage, submitLanguage } from '../service/languageService';
@@ -115,7 +116,10 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: FOOTER_H + (Platform.OS === 'ios' ? insets.bottom : 20) + 12 },
+          // Header (when shown) already handles the top inset via its own
+          // SafeAreaView — only add it here for the header-less onboarding case.
+          { paddingTop: (presentedAsModal ? 0 : insets.top) + 20 },
+          { paddingBottom: FOOTER_H + insets.bottom + 12 },
         ]}
         showsVerticalScrollIndicator={false}
       >
@@ -158,7 +162,7 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
       <View
         style={[
           styles.footer,
-          { paddingBottom: Platform.OS === 'ios' ? insets.bottom : 20 },
+          { paddingBottom: insets.bottom + 20 },
         ]}
       >
         <ButtonRevamp
@@ -191,17 +195,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
 
-  // Scrollable content
+  // Scrollable content (paddingTop set inline — depends on safe-area insets)
   scrollContent: {
     paddingHorizontal: GRID_H_PAD,
-    paddingTop:        20,
   },
   title: {
     fontFamily:   LANG_FONTS.en.semiBold,
-    fontSize:     20,
+    fontSize:     FontSizes.font22,
     fontWeight:   '600',
     color:        Colors.textPrimary,
-    marginBottom: 24,
+    marginBottom: 37,
   },
 
   // 2-column grid using flexWrap (avoids FlatList numColumns quirks)
@@ -222,7 +225,7 @@ const styles = StyleSheet.create({
     flexDirection:   'row',
     alignItems:      'center',
     paddingLeft:     16,
-    paddingRight:    10,
+    paddingRight:    16,
   },
   cardSelected: {
     borderColor:     Colors.primaryDark,
@@ -233,13 +236,13 @@ const styles = StyleSheet.create({
     gap:  8,
   },
   nativeName: {
-    fontSize:   16,
+    fontSize:   FontSizes.font16,
     fontWeight: '600',
     color:      Colors.textPrimary,
   },
   englishName: {
     fontFamily: LANG_FONTS.en.regular,
-    fontSize:   12,
+    fontSize:   FontSizes.font12,
     color:      Colors.textSecondary,
   },
 

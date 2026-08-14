@@ -330,7 +330,7 @@ export default function DeleteProfileScreen({ navigation }: Props) {
   }
 
   return (
-    <KeyboardAvoidingView style={s.flex1} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <KeyboardAvoidingView style={s.flex1} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
     <View style={[s.screen, { paddingTop: insets.top }]}>
 
       {/* Header */}

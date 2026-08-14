@@ -8,6 +8,7 @@ import { Endpoints } from './api.endpoints'
 import { getItem, setItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { getSession } from './registrationService'
+import { stripAgeUnit, pickListingPhoto } from '../adapters/profileListing.adapter'
 
 // TEMP DEBUG — remove once the real API's response envelope is confirmed live.
 // Lets ViewProfileScreen show exactly what came back when adapting fails, instead
@@ -262,9 +263,11 @@ function toSimilarCard(p: Record<string, any>): SimilarProfileCard {
   return {
     matriId:          String(p['MATRIID'] ?? p['MATRID'] ?? p['NBID'] ?? ''),
     name:             p['NAME'] ?? '',
-    age:              p['AGE'] ? String(p['AGE']).replace(/\s*(yrs|years)/i, '').trim() : undefined,
+    age:              p['AGE'] ? stripAgeUnit(p['AGE']) : undefined,
     education:        p['EDUCATION'] || undefined,
-    photoUri:         (Array.isArray(p['PHOTO']) && p['PHOTO'][0]?.IMAGE) || p['THUMBIMG'] || p['PROFILEIMG'] || undefined,
+    // pickListingPhoto() covers PHOTO[0].IMAGE/THUMBIMG (same as the matches-listing
+    // mappers); PROFILEIMG is this endpoint's own extra fallback on top of that.
+    photoUri:         pickListingPhoto(p) || p['PROFILEIMG'] || undefined,
     // Angular / homeService.ts's own toProfile() mapper for this exact raw shape:
     // PHOTOAVAILABLE=='Y' ALONE decides it — no OR-fallback to "PHOTO array has an
     // entry". The listing API sends a placeholder/default silhouette PHOTO entry

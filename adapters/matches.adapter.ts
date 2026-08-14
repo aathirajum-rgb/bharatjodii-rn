@@ -5,6 +5,7 @@
 import type { Adapter } from '../core/base/base.adapter'
 import type { SwiperItem } from '../components/swiper-card/SwiperCard'
 import type { MatchProfile } from '../types/interfaces/matches.interface'
+import { stripAgeUnit } from './profileListing.adapter'
 
 export class MatchProfileAdapter implements Adapter<MatchProfile> {
 
@@ -13,9 +14,7 @@ export class MatchProfileAdapter implements Adapter<MatchProfile> {
       profileId:        item.profileId        ?? '',
       name:             item.name             ?? '',
       // Strip trailing "yrs"/"years" — API returns "27 Yrs", UI only needs "27".
-      // Global flag: some sources double up the unit (see homeService.ts's toProfile),
-      // and a non-global replace here would leave one occurrence behind uncaught.
-      age:              item.age?.replace(/\s*(yrs|years)/gi, '').trim() ?? '',
+      age:              stripAgeUnit(item.age),
       location:         item.location         ?? '',
       isPaidMember:     item.isPaidMember      ?? false,
       isIdVerified:     item.isIdVerified      ?? false,

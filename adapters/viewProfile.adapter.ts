@@ -6,10 +6,7 @@
 
 import type { Adapter } from '../core/base/base.adapter'
 import type { ViewProfileModel, PropertyItem } from '../types/interfaces/viewProfile.interface'
-
-function stripAgeUnit(raw: unknown): string {
-  return raw ? String(raw).replace(/\s*(yrs|years)/gi, '').trim() : ''
-}
+import { stripAgeUnit } from './profileListing.adapter'
 
 function toLikedStatus(raw: unknown): '0' | '1' | '2' | '3' {
   const s = String(raw ?? '0')

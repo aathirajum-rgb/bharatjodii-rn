@@ -1,6 +1,6 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppHeader from '../components/app-header/AppHeader'
 import ButtonRevamp from '../components/button-revamp/ButtonRevamp'
@@ -351,7 +351,13 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
 
   return (
     <OnboardingCtx.Provider value={{ setFooterState, handlers }}>
-      <View style={shell.screen}>
+      {/* The persistent footer below lives outside every per-step screen's own
+          component tree, so it needs its OWN keyboard-avoiding behavior here —
+          a screen focusing its input can't lift a footer it doesn't render. */}
+      <KeyboardAvoidingView
+        style={shell.screen}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      >
 
         {/* Persistent header — never unmounts */}
         <AppHeader
@@ -412,7 +418,7 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
           )}
         </View>
 
-      </View>
+      </KeyboardAvoidingView>
     </OnboardingCtx.Provider>
   )
 }

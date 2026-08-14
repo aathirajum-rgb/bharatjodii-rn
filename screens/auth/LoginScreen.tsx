@@ -158,7 +158,7 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
     .replace(/\s*<br\s*\/?>\s*/gi, '\n')
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <View style={styles.screen}>
       {/* Header: back | audio | language pill */}
       <AppHeader
         type="registration"
@@ -169,8 +169,8 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
 
       <KeyboardAvoidingView
         style={styles.flex1}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={insets.top + 56}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
       >
         <ScrollView
           style={styles.flex1}

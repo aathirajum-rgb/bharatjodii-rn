@@ -24,6 +24,7 @@ import {
 } from 'react-native'
 import Svg, { Path, Circle } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import AppHeader from '../../components/app-header/AppHeader'
 import { Colors } from '../../constants/colors'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { Endpoints } from '../../service/api.endpoints'
@@ -45,6 +46,13 @@ const PAGE_SIZE  = 60
 type Props = {
   navigation: any
   route:      any
+  // Embedded mode (e.g. opened as a Modal directly from EditProfileScreen,
+  // outside the onboarding wizard's stack/shell): when provided, this screen
+  // stops navigating anywhere on its own and instead hands control back to
+  // whoever opened it. Omitted → original onboarding-flow behavior
+  // (navigation.push to pageNo '21'), unchanged.
+  onClose?:    () => void
+  onUploaded?: () => void
 }
 
 type AlbumInfo = {
@@ -101,7 +109,7 @@ function CheckBadge() {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function CustomGalleryScreen({ navigation, route }: Props) {
+export default function CustomGalleryScreen({ navigation, route, onClose, onUploaded }: Props) {
   const insets        = useSafeAreaInsets()
   const existingCount = (route.params?.existingCount as number | undefined) ?? 0
   const remaining     = Math.max(0, MAX_PHOTOS - existingCount)
@@ -267,7 +275,11 @@ export default function CustomGalleryScreen({ navigation, route }: Props) {
         }
       }
 
-      navigation.push('onboarding', { pageNo: '21', pendingUri: firstPendingUri, standalone: route.params?.standalone })
+      if (onUploaded) {
+        onUploaded()
+      } else {
+        navigation.push('onboarding', { pageNo: '21', pendingUri: firstPendingUri, standalone: route.params?.standalone })
+      }
     } catch {
       Alert.alert('Error', 'Upload failed. Please try again.')
     } finally {
@@ -305,11 +317,16 @@ export default function CustomGalleryScreen({ navigation, route }: Props) {
 
   if (permissionGranted === false) {
     return (
-      <View style={styles.permDenied}>
-        <Text style={styles.permTitle}>Photo access needed</Text>
-        <Text style={styles.permSub}>
-          Allow Jodii to access your photos in Settings to choose a profile picture.
-        </Text>
+      <View style={os.flex1}>
+        {onClose && (
+          <AppHeader type="registration" showBackBtn closeIcon onBackPress={onClose} />
+        )}
+        <View style={styles.permDenied}>
+          <Text style={styles.permTitle}>Photo access needed</Text>
+          <Text style={styles.permSub}>
+            Allow Jodii to access your photos in Settings to choose a profile picture.
+          </Text>
+        </View>
       </View>
     )
   }
@@ -319,6 +336,13 @@ export default function CustomGalleryScreen({ navigation, route }: Props) {
 
   return (
     <View style={os.flex1}>
+
+      {/* Embedded mode has no persistent onboarding-shell header to close it
+          with — render one here. Normal onboarding-flow entry (onClose
+          omitted) keeps relying on that shared header, unchanged. */}
+      {onClose && (
+        <AppHeader type="registration" showBackBtn closeIcon onBackPress={onClose} />
+      )}
 
       {/* Sub-header */}
       <View style={styles.subHeader}>
@@ -355,7 +379,7 @@ export default function CustomGalleryScreen({ navigation, route }: Props) {
       )}
 
       {/* Bottom bar */}
-      <View style={[styles.bottomBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 16 }]}>
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 20 }]}>
         <Text style={styles.limitText}>
           You can select up to {remaining} more photo{remaining !== 1 ? 's' : ''}.
         </Text>
@@ -418,11 +442,9 @@ const styles = StyleSheet.create({
     flexDirection:     'row',
     alignItems:        'center',
     justifyContent:    'space-between',
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     paddingVertical:   14,
     backgroundColor:   '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#ebebeb',
   },
   albumBtn: {
     flexDirection: 'row',
@@ -452,6 +474,8 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
     gap:             6,
+    borderWidth:     1,
+    borderColor:     '#fff',
   },
   cameraLabel: {
     fontSize:   12,
@@ -460,8 +484,10 @@ const styles = StyleSheet.create({
   },
 
   cell: {
-    width:  CELL_SIZE,
-    height: CELL_SIZE,
+    width:       CELL_SIZE,
+    height:      CELL_SIZE,
+    borderWidth: 1,
+    borderColor: '#fff',
   },
   cellImage: {
     width:  '100%',
@@ -476,21 +502,26 @@ const styles = StyleSheet.create({
 
   bottomBar: {
     backgroundColor:   '#fff',
-    paddingHorizontal: 20,
-    paddingTop:        12,
-    borderTopWidth:    1,
-    borderTopColor:    '#ebebeb',
-    gap:               10,
+    paddingHorizontal: 24,
+    paddingTop:        20,
+    gap:               4,
+    // Figma: drop-shadow(0px -3px 8px rgba(0,0,0,0.08)) — no border line
+    shadowColor:       '#000',
+    shadowOffset:      { width: 0, height: -3 },
+    shadowOpacity:     0.08,
+    shadowRadius:      8,
+    elevation:         8,
   },
   limitText: {
-    fontSize:  13,
-    color:     Colors.primary,
+    fontSize:  12,
+    lineHeight: 16,
+    color:     Colors.inputError,
     textAlign: 'center',
   },
   nextBtn: {
-    height:          52,
-    backgroundColor: Colors.primary,
-    borderRadius:    12,
+    height:          44,
+    backgroundColor: Colors.primaryDark,
+    borderRadius:    8,
     alignItems:      'center',
     justifyContent:  'center',
   },
@@ -498,8 +529,8 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   nextBtnLabel: {
-    fontSize:   16,
-    fontWeight: '600',
+    fontSize:   14,
+    fontWeight: '500',
     color:      '#fff',
   },
 

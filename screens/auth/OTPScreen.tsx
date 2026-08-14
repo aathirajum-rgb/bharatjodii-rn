@@ -62,11 +62,19 @@ export default function OTPScreen({ navigation, route }: Props) {
 
   const inputRefs     = useRef<Array<TextInput | null>>(Array(OTP_LENGTH).fill(null))
 
-  // Auto-focus first box on mount — matches Angular ionViewDidEnter setFocusOnOtpPage
+  // Auto-focus first box once the push transition finishes — matches Angular
+  // ionViewDidEnter setFocusOnOtpPage. Waiting for 'transitionEnd' (rather than a
+  // fixed setTimeout) avoids a KeyboardAvoidingView('height') quirk on Android:
+  // if the keyboard opens while the screen is still mid-transition, its very
+  // first resize computation runs before the view's layout has settled and gets
+  // silently dropped — the CTA then stays hidden behind the keyboard until the
+  // next focus change.
   useEffect(() => {
-    const timer = setTimeout(() => inputRefs.current[0]?.focus(), 300)
-    return () => clearTimeout(timer)
-  }, [])
+    const sub = navigation.addListener('transitionEnd', () => {
+      inputRefs.current[0]?.focus()
+    })
+    return sub
+  }, [navigation])
 
   // Countdown timer — matches Angular startCountdown()
   useEffect(() => {
@@ -223,8 +231,8 @@ export default function OTPScreen({ navigation, route }: Props) {
 
       <KeyboardAvoidingView
         style={styles.flex1}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={insets.top + 56}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
       >
         <ScrollView
           style={styles.flex1}

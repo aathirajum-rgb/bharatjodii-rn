@@ -25,6 +25,10 @@ import { ENavigation } from '../types/enums/navigation.enum'
 import { paymentTrack, redirectToIntermediatePage } from './paymentService'
 import { loadDrProfiles } from './drService'
 import { getRegistrationArrays } from './registrationService'
+import {
+  getPastingTime, computeNotificationBucketBoundaries, classifyNotificationBucket,
+} from '../adapters/notification.adapter'
+export { parseRichNotificationText, type RichTextSegment } from '../adapters/notification.adapter'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -82,56 +86,9 @@ export async function parseNotificationDetail(raw: string | undefined): Promise<
 
 // Angular: title1/notificationdetails[1] are both bound with [innerHTML] —
 // live payloads wrap the sender's name in <span class='name-notification'>
-// (bold, notification.page.scss), inline with the rest of the sentence, e.g.
-// "<span class='name-notification'>RAGUL S</span> viewed your number
-// recently.". RN's <Text> doesn't interpret HTML, so without this the raw
-// tags render as literal text. Parses into segments so the caller can render
-// the tagged portion bold and the rest plain, matching Angular's visual
-// result instead of just stripping the markup.
-export interface RichTextSegment {
-  text: string
-  bold: boolean
-}
-
-const NAME_SPAN_RE = /<span[^>]*>([\s\S]*?)<\/span>/gi
-
-function stripTags(value: string): string {
-  return value.replace(/<[^>]*>/g, '')
-}
-
-export function parseRichNotificationText(raw: string | undefined): RichTextSegment[] {
-  const value = raw ?? ''
-  if (!value.includes('<')) return value ? [{ text: value, bold: false }] : []
-
-  const segments: RichTextSegment[] = []
-  let lastIndex = 0
-  let match: RegExpExecArray | null
-  NAME_SPAN_RE.lastIndex = 0
-  while ((match = NAME_SPAN_RE.exec(value))) {
-    if (match.index > lastIndex) {
-      const before = stripTags(value.slice(lastIndex, match.index))
-      if (before) segments.push({ text: before, bold: false })
-    }
-    const name = stripTags(match[1] ?? '')
-    if (name) segments.push({ text: name, bold: true })
-    lastIndex = match.index + match[0].length
-  }
-  if (lastIndex < value.length) {
-    const after = stripTags(value.slice(lastIndex))
-    if (after) segments.push({ text: after, bold: false })
-  }
-  return segments
-}
-
-// Angular: getPastingTime() — "Now" under 1 min, "Xm" under 1 hour, "Xh"
-// under 1 day, empty string ('') once a day old — not a date, not "1d".
-export function getPastingTime(dateaddedMs: number): string {
-  const diffSec = (Date.now() - dateaddedMs) / 1000
-  if (diffSec < 60) return 'Now'
-  if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m`
-  if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h`
-  return ''
-}
+// (bold, notification.page.scss) — see parseRichNotificationText() in
+// adapters/notification.adapter.ts (re-exported above) for how that's parsed
+// into boldable segments for RN's <Text>, which doesn't interpret HTML.
 
 // Angular: common.ts checkPhotoLimit() — true while the login user's current
 // PHOTOCOUNT is still under REGISTRATIONARRAYS.MAXPHOTOADD (server-configured
@@ -164,16 +121,11 @@ async function getCtaLabel(notificationType: number, t: (key: string) => string)
 }
 
 // ─── Grouping ─────────────────────────────────────────────────────────────────
-// Angular: calculateDate()/addNotifyList() — bucket by day-of-month match
-// against: today, yesterday, "this week" (2-6 days back), "last week" (7-9
-// days back) — first match wins. Anything older falls through every bucket
-// and is silently dropped, same as source (not a bug introduced here).
-
-function daysAgo(n: number): number {
-  const d = new Date()
-  d.setDate(d.getDate() - n)
-  return d.getDate()
-}
+// Day-of-month bucket boundaries + per-item classification now live in
+// adapters/notification.adapter.ts (computeNotificationBucketBoundaries()/
+// classifyNotificationBucket()) — pure, testable in isolation. Anything older
+// than "last week" falls through every bucket and is silently dropped, same
+// as Angular's source (not a bug introduced here).
 
 export async function groupNotifications(
   rawList: Record<string, any>[],
@@ -183,10 +135,7 @@ export async function groupNotifications(
     return { today: [], yesterday: [], thisWeek: [], lastWeek: [], isEmpty: true }
   }
 
-  const todayDom     = daysAgo(0)
-  const yesterdayDom = daysAgo(1)
-  const thisWeekDoms = [2, 3, 4, 5, 6].map(daysAgo)
-  const lastWeekDoms = [7, 8, 9].map(daysAgo)
+  const boundaries = computeNotificationBucketBoundaries()
 
   const today: NotificationItem[] = []
   const yesterday: NotificationItem[] = []
@@ -196,7 +145,7 @@ export async function groupNotifications(
   for (const raw of rawList) {
     const notificationType = Number(raw['notificationtype'])
     const dateaddedMs = Number(raw['dateadded']) || 0
-    const dom = new Date(dateaddedMs).getDate()
+    const bucket = classifyNotificationBucket(dateaddedMs, boundaries)
     const { avatarUrl, text } = await parseNotificationDetail(raw['notificationdetails'])
 
     const item: NotificationItem = {
@@ -213,10 +162,10 @@ export async function groupNotifications(
       dateadded:        new Date(dateaddedMs),
     }
 
-    if (dom === todayDom)          today.push(item)
-    else if (dom === yesterdayDom) yesterday.push(item)
-    else if (thisWeekDoms.includes(dom)) thisWeek.push(item)
-    else if (lastWeekDoms.includes(dom)) lastWeek.push(item)
+    if (bucket === 'today')          today.push(item)
+    else if (bucket === 'yesterday') yesterday.push(item)
+    else if (bucket === 'thisWeek')  thisWeek.push(item)
+    else if (bucket === 'lastWeek')  lastWeek.push(item)
   }
 
   return { today, yesterday, thisWeek, lastWeek, isEmpty: false }

@@ -14,8 +14,8 @@ import { CDN_SVG } from '../constants/cdn'
 import { getItem } from '../service/storageService'
 import { StorageKeys } from '../constants/storage.keys'
 
-export const FEMALE_AVATAR_URL = `${CDN_SVG}female_avatar_new.svg`
-export const MALE_AVATAR_URL   = `${CDN_SVG}male_avatar_new.svg`
+export const FEMALE_AVATAR_URL = `${CDN_SVG}female_avatar_new.svg?v=1`
+export const MALE_AVATAR_URL   = `${CDN_SVG}male_avatar_new.svg?v=1`
 
 export async function getOwnGenderAvatarUrl(): Promise<string> {
   const gender = await getItem(StorageKeys.User.LOGIN_GENDER)

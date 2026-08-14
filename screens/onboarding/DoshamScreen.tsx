@@ -77,6 +77,7 @@ export default function DoshamScreen({ navigation }: Props) {
 
   async function handleNo() {
     if (submitting) return
+    setHasDosham(false)
     setSubmitting(true)
     try {
       await setRegValue('DOSHAM', '2')
@@ -176,16 +177,18 @@ export default function DoshamScreen({ navigation }: Props) {
               )}
             </Pressable>
 
+            {/* No active/checkmark state here (unlike the No button above) —
+                handleYes() flips hasDosham to true immediately, which un-renders
+                this whole step-1 block in the same tick, so an "active Yes" look
+                could never actually be seen. */}
             <Pressable
-              style={[styles.yesNoBtn, hasDosham === true && styles.yesNoBtnActive]}
+              style={styles.yesNoBtn}
               onPress={handleYes}
               disabled={submitting}
               accessibilityRole="button"
             >
-              <View style={[styles.yesNoIcon, hasDosham === true && styles.yesNoIconActive]}>
-                {hasDosham === true && <Text style={styles.yesNoCheckmark}>✓</Text>}
-              </View>
-              <Text style={[styles.yesNoBtnText, hasDosham === true && styles.yesNoBtnTextActive]}>
+              <View style={styles.yesNoIcon} />
+              <Text style={styles.yesNoBtnText}>
                 Yes
               </Text>
             </Pressable>

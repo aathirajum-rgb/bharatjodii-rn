@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next'
 import { getSelectedObject, DEFAULT_FILTER } from '../service/filterService'
 import { getItem } from '../service/storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
+import { isAnySelection, resolveFilterLabel, type FilterOption } from '../adapters/filterPreference.adapter'
 import {
   fetchReligionOptions, fetchCasteOptions, fetchDivisionOptions,
   fetchRaasiOptions, fetchStarOptions, fetchDoshamOptions,
@@ -29,18 +30,16 @@ export type FilterFieldKey =
   | 'MONTHLYINCOME' | 'EDUCATION' | 'HEIGHT' | 'MOTHERTONGUE' | 'MARITALSTATUS'
   | 'EATINGHABITS' | 'PHYSICALSTATUS' | 'PROFILECREATED'
 
-type Opt = { key: string; label: string }
+type Opt = FilterOption
 
 export interface FilterDisplayResult {
   values: Record<FilterFieldKey, string>
   active: Record<FilterFieldKey, boolean>
 }
 
-// '0' (or an empty/missing array) is filterService's own "Any" sentinel for
-// every multi-select field — same check SearchScreen.tsx's labelsFor() uses.
-function isAny(v: any): boolean {
-  return !v || v.length === 0 || v[0] === '0'
-}
+// isAnySelection()/resolveFilterLabel() — shared with SearchScreen.tsx's own
+// code->label resolution via adapters/filterPreference.adapter.ts.
+const isAny = isAnySelection
 
 // Returns [result, reload] — reload lets the caller force a refetch (e.g. via
 // useFocusEffect) after the user comes back from editing preferences in
@@ -54,9 +53,7 @@ export function useFilterDisplayValues(): [FilterDisplayResult | null, () => voi
     const empty: Opt[] = []
 
     function labelsFor(opts: Opt[], keys: any): string {
-      if (isAny(keys)) return ANY
-      const labels = (keys as string[]).map(k => opts.find(o => o.key === k)?.label ?? k)
-      return labels.length > 0 ? labels.join(', ') : ANY
+      return resolveFilterLabel(opts, keys, ANY)
     }
 
     const [selected, gender] = await Promise.all([

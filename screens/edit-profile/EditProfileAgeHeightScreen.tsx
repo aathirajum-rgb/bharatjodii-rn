@@ -453,7 +453,7 @@ export default function EditProfileAgeHeightScreen({ navigation }: Props) {
         <TouchableWithoutFeedback onPress={() => setShowAgeSheet(false)}>
           <View style={h.overlay} />
         </TouchableWithoutFeedback>
-        <KeyboardAvoidingView style={[h.ageSheet, { paddingBottom: insets.bottom + 20 }]} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <KeyboardAvoidingView style={[h.ageSheet, { paddingBottom: insets.bottom + 20 }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
           <View style={h.dragHandle} />
           <Text style={h.ageSheetTitle}>Enter age</Text>
           <View style={h.ageInputOuter}>

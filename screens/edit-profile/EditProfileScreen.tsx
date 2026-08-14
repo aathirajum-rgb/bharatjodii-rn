@@ -6,11 +6,12 @@
 // its own Submit) → a picker reusing onboarding's SearchablePicker/
 // MultiSelectPicker components.
 //
-// Photo management delegates to screens/onboarding/ManagePhotosScreen.tsx
-// (onboarding page 21, entered `standalone` — the exact mechanism
-// HelpCenterScreen.tsx already uses to open it from outside the onboarding
-// wizard) rather than rebuilding add/delete/set-main here — that screen
-// already has a real, working implementation.
+// Photo management is fully embedded on this screen: adding opens the
+// gallery picker directly (CustomGalleryScreen as a modal, or a hidden file
+// input on web — see openGalleryPicker), and tapping an existing photo opens
+// PhotoAlbumViewerMobile (the swipeable view/delete/set-main/replace flow,
+// ported from Angular's managephoto.page.ts `showAlbum` state) — no
+// navigation to the onboarding wizard's own routes for either case.
 //
 // Jodii ID / Profile created by / Mobile number are display-only, no
 // navigation — matches Angular exactly (Profile created by's click handler is
@@ -20,10 +21,10 @@
 // app yet (only Eating habits does) — their raw stored value is shown as-is
 // rather than resolved to a label, since there's nothing to resolve against.
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -31,9 +32,14 @@ import { Image } from 'expo-image'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import { getItem } from '../../service/storageService'
+import { getItem, setItem } from '../../service/storageService'
+import { Endpoints } from '../../service/api.endpoints'
+import { uploadFile } from '../../service/apiClient'
 import { managePhotos } from '../../service/profileService'
+import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import { fetchEditProfileInfo, type EditProfileInfo } from '../../service/editProfileService'
+import CustomGalleryScreen from '../onboarding/CustomGalleryScreen'
+import PhotoAlbumViewerMobile from '../../components/edit-profile/PhotoAlbumViewerMobile'
 import {
   CHILDREN_OPTIONS,
   fetchReligionOptions, fetchCasteOptions, fetchOccupationOptions,
@@ -143,6 +149,46 @@ export default function EditProfileScreen({ navigation }: Props) {
   const [ownId,   setOwnId]     = useState('')
   const [createdByLabel, setCreatedByLabel] = useState<string | undefined>(undefined)
   const [photoPrivacyVisible, setPhotoPrivacyVisible] = useState(false)
+  const [galleryVisible, setGalleryVisible] = useState(false)
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null)
+  const [genderAvatarUrl, setGenderAvatarUrl] = useState('')
+  // Photo failed to load (broken URL / still processing) — fall back to the
+  // gender avatar instead of a blank tile, same as an empty slot.
+  const [failedPhotos, setFailedPhotos] = useState<Set<number>>(new Set())
+
+  useEffect(() => {
+    getOwnGenderAvatarUrl().then(setGenderAvatarUrl)
+  }, [])
+  const [webUploading, setWebUploading] = useState(false)
+  // Web only — see EditProfileDesktopScreen.tsx for the same pattern. Browsers
+  // only allow a file picker to open from a direct, synchronous user click, so
+  // there's no "landing screen" step to skip on web: this hidden input IS the
+  // picker, triggered straight from the Pressable's own onPress.
+  const webFileInputRef = useRef<HTMLInputElement | null>(null)
+
+  async function handleWebFiles(e: any) {
+    const files: File[] = Array.from(e.target.files ?? [])
+    if (!files.length) return
+    setWebUploading(true)
+    try {
+      const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+      for (const file of files) {
+        const formData = new FormData()
+        formData.append('ID', userId)
+        formData.append('UPLOADPHOTO', file, file.name)
+        const res = await uploadFile(Endpoints.media.addProfilePic, formData)
+        if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
+          await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
+        }
+      }
+      await load()
+    } catch {
+      Alert.alert('Error', 'Upload failed. Please try again.')
+    } finally {
+      setWebUploading(false)
+      if (webFileInputRef.current) webFileInputRef.current.value = ''
+    }
+  }
 
   const load = useCallback(async () => {
     const [id, info, photoData] = await Promise.all([
@@ -153,6 +199,7 @@ export default function EditProfileScreen({ navigation }: Props) {
     setOwnId(id ?? '')
     setProfile(info)
     setPhotos(photoData.photos)
+    if (__DEV__) console.log('[EditProfile] managePhotos() returned:', JSON.stringify(photoData))
 
     if (!info) { setLoading(false); return }
 
@@ -197,8 +244,16 @@ export default function EditProfileScreen({ navigation }: Props) {
 
   useFocusEffect(useCallback(() => { load() }, [load]))
 
-  function openManagePhotos() {
-    navigation.navigate('onboarding', { pageNo: '21', standalone: true })
+  // Opens the photo picker directly — no navigation to the onboarding
+  // wizard's own routes, so there's nothing to "come back from". On web this
+  // has to be the file input's own .click() call, right here, so it stays a
+  // trusted user gesture; on native it opens the embedded gallery modal.
+  function openGalleryPicker() {
+    if (Platform.OS === 'web') {
+      webFileInputRef.current?.click()
+    } else {
+      setGalleryVisible(true)
+    }
   }
 
   function openPreview() {
@@ -246,7 +301,7 @@ export default function EditProfileScreen({ navigation }: Props) {
         <View style={s.photoHeaderRow}>
           <Text style={s.sectionTitle}>{t('EDITPROFILE.PHOTOS')}</Text>
           <Pressable
-            onPress={() => (photos.length > 0 ? setPhotoPrivacyVisible(true) : openManagePhotos())}
+            onPress={() => (photos.length > 0 ? setPhotoPrivacyVisible(true) : openGalleryPicker())}
             hitSlop={8}
           >
             <Text style={s.photoPrivacyLink}>{t('EDITPROFILE.PHOTO_PRIVACY')}</Text>
@@ -262,10 +317,18 @@ export default function EditProfileScreen({ navigation }: Props) {
             const photo = photos[i]
             const pos = photoSlotPosition(i)
             const size = i === 0 ? MOSAIC_MAIN : MOSAIC_TILE
-            if (photo) {
+            if (photo && !failedPhotos.has(i)) {
               return (
-                <Pressable key={i} style={[s.photoTile, i === 0 && s.photoTileMain, pos, { width: size, height: size }]} onPress={openManagePhotos}>
-                  <Image source={{ uri: photo.PHOTOTHUMB || photo.PHOTOURL }} style={s.photoTileImg} contentFit="cover" />
+                <Pressable key={i} style={[s.photoTile, i === 0 && s.photoTileMain, pos, { width: size, height: size }]} onPress={() => setViewerIndex(i)}>
+                  <Image
+                    source={{ uri: photo.PHOTOURL || photo.PHOTOTHUMB }}
+                    style={s.photoTileImg}
+                    contentFit="cover"
+                    onError={(e) => {
+                      if (__DEV__) console.warn(`[EditProfile] photo[${i}] failed to load:`, photo.PHOTOURL || photo.PHOTOTHUMB, e.error)
+                      setFailedPhotos(prev => new Set(prev).add(i))
+                    }}
+                  />
                   {i === 0 && (
                     <View style={s.mainPhotoBadge}>
                       <Text style={s.mainPhotoBadgeText}>{t('EDITPROFILE.PROFILE_PHOTO')}</Text>
@@ -274,11 +337,15 @@ export default function EditProfileScreen({ navigation }: Props) {
                 </Pressable>
               )
             }
+            // Empty slot (or a photo whose image failed to load) — same
+            // gender-avatar placeholder Angular falls back to (common.ts's
+            // getAvatarImg(false)), not a generic "+" icon.
             return (
-              <Pressable key={i} style={[s.photoAddSlot, pos, { width: size, height: size }]} onPress={openManagePhotos}>
-                <View style={s.photoAddCircle}>
-                  <Text style={s.photoAddPlus}>+</Text>
-                </View>
+              <Pressable key={i} style={[s.photoAddSlot, pos, { width: size, height: size }]} onPress={openGalleryPicker} disabled={webUploading}>
+                {webUploading
+                  ? <ActivityIndicator color={Colors.textTertiary} size="small" />
+                  : !!genderAvatarUrl && <CdnSvg uri={genderAvatarUrl} width={size} height={size} />
+                }
               </Pressable>
             )
           })}
@@ -404,6 +471,44 @@ export default function EditProfileScreen({ navigation }: Props) {
         visible={photoPrivacyVisible}
         onClose={() => setPhotoPrivacyVisible(false)}
       />
+
+      {/* Photo picker — embedded directly (no navigation to the onboarding
+          wizard's own routes): closing or finishing an upload just dismisses
+          this modal and refreshes the grid below, in place. */}
+      <Modal
+        visible={galleryVisible}
+        animationType="slide"
+        onRequestClose={() => setGalleryVisible(false)}
+        presentationStyle="fullScreen"
+      >
+        <CustomGalleryScreen
+          navigation={navigation}
+          route={{ params: { existingCount: photos.length } }}
+          onClose={() => setGalleryVisible(false)}
+          onUploaded={() => { setGalleryVisible(false); load() }}
+        />
+      </Modal>
+
+      {/* Web only — hidden file input IS the picker (see openGalleryPicker) */}
+      {Platform.OS === 'web' && (
+        // @ts-ignore — raw DOM element, react-native-web only
+        <input
+          ref={webFileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden' }}
+          onChange={handleWebFiles}
+        />
+      )}
+
+      <PhotoAlbumViewerMobile
+        visible={viewerIndex !== null}
+        photos={photos}
+        initialIndex={viewerIndex ?? 0}
+        onClose={() => setViewerIndex(null)}
+        onChanged={load}
+      />
     </View>
   )
 }
@@ -450,11 +555,6 @@ const s = StyleSheet.create({
     position: 'absolute', borderRadius: 8, borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.borderSubtle,
     backgroundColor: 'rgba(230,230,230,0.3)', alignItems: 'center', justifyContent: 'center',
   },
-  photoAddCircle: {
-    width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.textTertiary,
-    alignItems: 'center', justifyContent: 'center',
-  },
-  photoAddPlus: { fontSize: 18, fontWeight: '600', color: Colors.white, lineHeight: 20 },
 
   photoHint: { fontSize: 12, color: '#585858', marginTop: 8 },
 

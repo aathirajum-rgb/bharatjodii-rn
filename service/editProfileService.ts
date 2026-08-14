@@ -179,11 +179,17 @@ export async function fetchEditProfileInfo(): Promise<EditProfileInfo | null> {
     name:           r['NAME'],
     gender:         r['GENDER'],
     createdBy:      r['CREATEDBY'],
-    age:            r['AGE'],
+    // AGE/HEIGHT/MARITALSTATUS: the API returns these as raw JSON numbers (not
+    // strings like every other field here) — confirmed against a live capture
+    // (MARITALSTATUS: 3, AGE: 27, HEIGHT: 0). Left as numbers, MARITALSTATUS
+    // silently failed every labelFor() lookup against the (string-keyed)
+    // options list — '3' === 3 is false — so a real update always fell back
+    // to the "Add info" placeholder.
+    age:            r['AGE'] != null ? String(r['AGE']) : undefined,
     dateOfBirth:    r['DATEOFBIRTH'],
-    height:         r['HEIGHT'],
+    height:         r['HEIGHT'] != null ? String(r['HEIGHT']) : undefined,
     heightCategory: r['HEIGHTCATEGORY'],
-    maritalStatus:  r['MARITALSTATUS'],
+    maritalStatus:  r['MARITALSTATUS'] != null ? String(r['MARITALSTATUS']) : undefined,
     noOfChildren:   r['NOOFCHILDREN'],
     physicalStatus: r['PHYSICALSTATUS'],
     motherTongue:   r['MOTHERTONGUE'],
