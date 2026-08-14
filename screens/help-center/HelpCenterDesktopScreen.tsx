@@ -31,6 +31,7 @@ import { getItem } from '../../service/storageService'
 import { apiCall } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
 import { fetchCustomerCare } from '../../service/homeService'
+import { setFilterEventType } from '../../service/filterService'
 import { openMembershipTab } from '../../service/paymentService'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 
@@ -87,6 +88,7 @@ export default function HelpCenterDesktopScreen({ navigation }: Props) {
     } else if (cta === 'Membership Plan') {
       navigation.navigate('recharge')
     } else if (cta === 'Edit filter') {
+      setFilterEventType('pp')
       navigation.navigate('Search')
     } else if (cta === 'Newly Joined') {
       navigation.navigate('Matches', { exploreType: 'NEYLYJOINED', exploreLabel: title })

@@ -19,6 +19,8 @@ import DesktopPageShell from '../../components/desktop-page-shell/DesktopPageShe
 import DesktopSelectField, { type SelectOption } from '../../components/desktop-select-field/DesktopSelectField'
 import DesktopMultiSelectField from '../../components/desktop-select-field/DesktopMultiSelectField'
 import PreferenceFieldModal from '../../components/preference-field-modal/PreferenceFieldModal'
+import StrictFilterManageModal from '../../components/search/StrictFilterManageModal'
+import { STRICT_FIELD_COPY, STRICT_EXCLUDED_FIELDS } from '../../constants/strictFilter.config'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import type { MultiSelectOption } from '../../components/multi-select-picker/MultiSelectPicker'
@@ -40,12 +42,15 @@ export interface SearchDesktopLayoutProps {
   selected:  Record<string, any>
   labelCache: Record<string, MultiSelectOption[]>
   heightOptions: PickerOption[]
+  fieldIcon: Record<FieldKey, string>
 
   matchCount:   number
   countLoading: boolean
 
   strictPrefs: Record<string, boolean>
   onToggleStrictPref: (key: string, value: boolean) => void
+  manageStrictOpen: boolean
+  setManageStrictOpen: (v: boolean) => void
 
   ageEditor:    'min' | 'max' | null
   setAgeEditor: (v: 'min' | 'max' | null) => void
@@ -71,20 +76,19 @@ export interface SearchDesktopLayoutProps {
   onShowMatches: () => void
 }
 
-function strictCopyFor(key: FieldKey | 'DIVISION', label: string) {
-  const isRange = key === 'AGE' || key === 'HEIGHT'
-  return {
-    label: `Strict ${label.toLowerCase()} filter`,
-    description: isRange
-      ? `See matches strictly within the specified ${label.toLowerCase()} range`
-      : `See matches strictly matching your selected ${label.toLowerCase()}`,
-  }
+// Angular's real per-field STRICT_* i18n strings (constants/strictFilter.config.ts,
+// ported from en.json) — DIVISION isn't a real FieldKey (Islam's caste-equivalent
+// field), so it falls back to CASTE's copy, the closest real match.
+function strictCopyFor(key: FieldKey | 'DIVISION') {
+  const copy = STRICT_FIELD_COPY[key === 'DIVISION' ? 'CASTE' : key]
+  return { label: copy.label, description: copy.description }
 }
 
 export default function SearchDesktopLayout(props: SearchDesktopLayoutProps) {
   const {
-    navigation, userName, loading, rows, rowValue, selected, labelCache, heightOptions,
+    navigation, userName, loading, rows, rowValue, selected, labelCache, heightOptions, fieldIcon,
     matchCount, countLoading, strictPrefs, onToggleStrictPref,
+    manageStrictOpen, setManageStrictOpen,
     ageEditor, setAgeEditor, heightEditor, setHeightEditor, locationStep, setLocationStep,
     starStep, setStarStep, multiEditor, setMultiEditor,
     updateField, openSimpleMulti, openCaste, openLocation, openStar, openHeight,
@@ -136,7 +140,13 @@ export default function SearchDesktopLayout(props: SearchDesktopLayoutProps) {
     setMultiEditor(null)
   }
 
-  const strictCopy = activeKey ? strictCopyFor(activeKey, activeLabel) : { label: '', description: '' }
+  const strictCopy = activeKey ? strictCopyFor(activeKey) : { label: '', description: '' }
+  // Angular: filter-popup.component.ts's showStrictFilter getter — Occupation
+  // is excluded from strict filtering entirely, and a field left at "Any" has
+  // nothing to strictly match against yet.
+  const showStrict = !!activeKey
+    && !STRICT_EXCLUDED_FIELDS.has(activeKey as FieldKey)
+    && (rowValue as any)[activeKey] !== t('SEARCH.ANY', 'Any')
 
   function toSelectOptions(opts: MultiSelectOption[] | undefined): SelectOption[] {
     return (opts ?? []).map(o => ({ key: o.key, label: o.label }))
@@ -161,9 +171,7 @@ export default function SearchDesktopLayout(props: SearchDesktopLayoutProps) {
               By turning on strict filters, you will only see matches that exactly meet your specified preferences
             </Text>
           </View>
-          {/* No dedicated Strict-Filters management screen exists yet — each
-              field's own popup already exposes its own Strict toggle. */}
-          <Pressable style={s.manageBtn} onPress={() => {}}>
+          <Pressable style={s.manageBtn} onPress={() => setManageStrictOpen(true)}>
             <Text style={s.manageBtnText}>Manage Strict Filters</Text>
           </Pressable>
         </View>
@@ -206,6 +214,7 @@ export default function SearchDesktopLayout(props: SearchDesktopLayoutProps) {
         strictDescription={strictCopy.description}
         strictEnabled={!!(activeKey && strictPrefs[activeKey])}
         onToggleStrict={v => activeKey && onToggleStrictPref(activeKey, v)}
+        showStrict={showStrict}
       >
         {activeKey === 'AGE' && (
           <>
@@ -307,6 +316,21 @@ export default function SearchDesktopLayout(props: SearchDesktopLayoutProps) {
           />
         )}
       </PreferenceFieldModal>
+
+      <StrictFilterManageModal
+        visible={manageStrictOpen}
+        onClose={() => setManageStrictOpen(false)}
+        strictState={strictPrefs as Record<FieldKey, boolean>}
+        onToggle={onToggleStrictPref}
+        onEditField={fieldRowPress}
+        fieldIcon={fieldIcon}
+        fieldLabel={Object.fromEntries(rows.map(r => [r.key, r.label])) as Record<FieldKey, string>}
+        fieldValue={rowValue as Record<FieldKey, string>}
+        anyLabel={t('SEARCH.ANY')}
+        matchCount={matchCount}
+        countLoading={countLoading}
+        onShowMatches={onShowMatches}
+      />
     </DesktopPageShell>
   )
 }

@@ -1,5 +1,7 @@
 import { getItem, setItem, getJson, setJson, removeItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
+import { STRICT_FIELD_ORDER } from '../constants/strictFilter.config'
+import type { FieldKey } from '../screens/search/SearchScreen'
 
 // ─── Filter defaults ──────────────────────────────────────────────────────────
 
@@ -30,7 +32,15 @@ const K = {
   FILTERS:  'SELECTEDFILTERS',
   EVTYPE:   'FILTEREVENTTYPE',
   PARAMS:   'SEARCH_PARAMS',
+  STRICT:   'STRICT_FILTER_STATE',
 }
+
+// Angular: filter.service.ts's default — every field strict-on until the
+// user turns one off. Replaces the ad-hoc 'PP_STRICT_FILTERS' key this app
+// used before the backend contract (STRICKPP) was confirmed.
+const DEFAULT_STRICT_STATE: Record<FieldKey, boolean> = Object.fromEntries(
+  STRICT_FIELD_ORDER.map(key => [key, true]),
+) as Record<FieldKey, boolean>
 
 // ─── State accessors ──────────────────────────────────────────────────────────
 
@@ -51,6 +61,15 @@ export async function getFilterEventType(): Promise<'filter' | 'pp'> {
 export async function setFilterEventType(eventType: 'filter' | 'pp'): Promise<void> {
   if (eventType === 'filter') await setItem(K.EVTYPE, 'filter')
   else await removeItem(K.EVTYPE)
+}
+
+export async function getStrictFilterState(): Promise<Record<FieldKey, boolean>> {
+  const stored = await getJson<Record<string, boolean>>(K.STRICT)
+  return { ...DEFAULT_STRICT_STATE, ...stored } as Record<FieldKey, boolean>
+}
+
+export async function setStrictFilterState(state: Record<FieldKey, boolean>): Promise<void> {
+  await setJson(K.STRICT, state)
 }
 
 export async function saveFilterState(
@@ -109,10 +128,25 @@ function incomeParams(obj: Record<string, any>): string {
   return 'STARTINCOME=0&ENDINCOME='
 }
 
+// Angular: filter.service.ts's getStrictFilterParam() — builds the 14-flag
+// pipe-delimited STRICKPP string in STRICT_FIELD_ORDER. CASTE is forced to
+// '0' whenever RELIGION is unselected/"Any" (Angular: isSelectionAny() check),
+// since caste has no meaning without a religion chosen.
+export function getStrictFilterParam(
+  strictState: Record<FieldKey, boolean>,
+  obj: Record<string, any>,
+): string {
+  const religionIsAny = !obj.RELIGION?.length || obj.RELIGION[0] === '0'
+  return STRICT_FIELD_ORDER
+    .map(key => (key === 'CASTE' && religionIsAny) ? '0' : (strictState[key] ? '1' : '0'))
+    .join('|')
+}
+
 export async function buildSearchParams(matriId: string, start = 0, limit = 20): Promise<string> {
   const obj       = await getSelectedObject()
   const ppCheckBox = await getSearchPPCheckBox()
   const isFilter  = (await getItem(K.EVTYPE)) === 'filter'
+  const strictState = await getStrictFilterState()
 
   let extra = ''
   let setPP = [...DEFAULT_PP_CHECKBOX]
@@ -122,7 +156,7 @@ export async function buildSearchParams(matriId: string, start = 0, limit = 20):
     setPP = [...DEFAULT_PP_CHECKBOX, '0', '0', '0']
   }
 
-  const params = `ID=${matriId}&START=${start}&LIMIT=${limit}&LIKED=1&VIEWED=1&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&BANNERFLAG=0&${baseParams(obj)}&${incomeParams(obj)}${extra}&SETPP=${setPP.join('|')}&FILTERPP=${ppCheckBox.join('|')}`
+  const params = `ID=${matriId}&START=${start}&LIMIT=${limit}&LIKED=1&VIEWED=1&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&BANNERFLAG=0&${baseParams(obj)}&${incomeParams(obj)}${extra}&SETPP=${setPP.join('|')}&FILTERPP=${ppCheckBox.join('|')}&STRICKPP=${getStrictFilterParam(strictState, obj)}`
   await setItem(K.PARAMS, params)
   return params
 }
@@ -136,6 +170,10 @@ export async function resetFilter(eventType = 'filter'): Promise<void> {
     'SELECTEDKEYS', 'SELECTEDVALUES', 'MATCHESTOTALCOUNT',
     'FILTERCOUNT', 'MATCHESOLDCOUNT', K.PPCHECK,
     'ISCALLEDAPI', K.FILTERS,
+    // Angular: reset forces every strict flag back to '1' — clearing this key
+    // has the same effect, since getStrictFilterState() falls back to
+    // DEFAULT_STRICT_STATE (all-true) when nothing is persisted.
+    K.STRICT,
   ]
 
   if (eventType === 'pp') keysToRemove.push(K.EVTYPE)

@@ -26,6 +26,7 @@ import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import LinkCTA from '../../components/link-cta/LinkCTA'
 import { fetchFaqContent, stripHtml, type FaqType, type FaqContentItem } from '../../service/faqService'
+import { setFilterEventType } from '../../service/filterService'
 
 const R = CDN_REACT + '/'
 const ICON_BACK  = R + 'menu_back_arrow.svg'
@@ -60,6 +61,7 @@ function directRowAction(type: FaqType, id: number, navigation: any): boolean {
   if (type === 'CONTACTMATCHES' && id === 2) {
     // Angular: searchProfileRedirection() — tapping "How to get suitable
     // matches?" goes straight to the filter screen, no detail view.
+    setFilterEventType('pp')
     navigation.navigate('Search')
     return true
   }
@@ -178,6 +180,7 @@ function FaqDetail({
     // Angular: navigationPages('edit-filter') / navigationPages('activity') —
     // both real, already-built RN destinations.
     if (type === 'CONTACTMATCHES' && label === item.CTA1) {
+      setFilterEventType('pp')
       navigation.navigate('Search')
       return
     }

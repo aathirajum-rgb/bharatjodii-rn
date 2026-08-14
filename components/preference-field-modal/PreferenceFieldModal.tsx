@@ -25,12 +25,17 @@ export interface PreferenceFieldModalProps {
   strictDescription: string
   strictEnabled:     boolean
   onToggleStrict:    (value: boolean) => void
+  // Angular: filter-popup.component.ts's showStrictFilter getter — Occupation
+  // is excluded from strict filtering entirely, and any field left at "Any"
+  // has nothing to strictly match against yet. Defaults true so every other
+  // existing call site keeps showing the toggle unchanged.
+  showStrict?:       boolean
   children:          React.ReactNode
 }
 
 export default function PreferenceFieldModal({
   visible, title, onClose, onApply, matchCount, countLoading,
-  strictLabel, strictDescription, strictEnabled, onToggleStrict, children,
+  strictLabel, strictDescription, strictEnabled, onToggleStrict, showStrict = true, children,
 }: PreferenceFieldModalProps) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
@@ -47,17 +52,19 @@ export default function PreferenceFieldModal({
           {/* Figma: "Strict age filter" toggle — persisted locally only (see
               SearchScreen.tsx's strictPrefs comment for why this isn't sent
               to the search API yet). */}
-          <View style={s.strictBanner}>
-            <View style={s.strictTextCol}>
-              <Text style={s.strictTitle}>{strictLabel}</Text>
-              <Text style={s.strictDesc}>{strictDescription}</Text>
+          {showStrict && (
+            <View style={s.strictBanner}>
+              <View style={s.strictTextCol}>
+                <Text style={s.strictTitle}>{strictLabel}</Text>
+                <Text style={s.strictDesc}>{strictDescription}</Text>
+              </View>
+              <Switch
+                value={strictEnabled}
+                onValueChange={onToggleStrict}
+                trackColor={{ true: Colors.primaryDark, false: Colors.border }}
+              />
             </View>
-            <Switch
-              value={strictEnabled}
-              onValueChange={onToggleStrict}
-              trackColor={{ true: Colors.primaryDark, false: Colors.border }}
-            />
-          </View>
+          )}
 
           <View style={s.footer}>
             <View style={s.matchesCol}>

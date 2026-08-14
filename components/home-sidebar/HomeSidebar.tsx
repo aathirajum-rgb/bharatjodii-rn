@@ -18,6 +18,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
 import { ICON as MENU_ICON } from '../../screens/menu/MenuScreen'
+import { setFilterEventType } from '../../service/filterService'
 
 const ICON = {
   editProfile:     `${CDN_SVG}menu/edit-profile.svg`,
@@ -81,7 +82,7 @@ export default function HomeSidebar({ navigation, userName, userId, photoUrl, ac
           single internal divider, not separate boxed groups. ── */}
       <View style={s.card}>
         <SidebarRow iconUri={ICON.editProfile} title="Edit profile" active={activeItem === 'editProfile'} onPress={() => navigation.navigate('EditProfile')} />
-        <SidebarRow iconUri={ICON.editPreferences} iconSize={24} title="Edit preferences" active={activeItem === 'editPreferences'} onPress={() => navigation.navigate('Search')} />
+        <SidebarRow iconUri={ICON.editPreferences} iconSize={24} title="Edit preferences" active={activeItem === 'editPreferences'} onPress={() => { setFilterEventType('pp'); navigation.navigate('Search') }} />
 
         <View style={s.divider} />
 

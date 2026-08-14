@@ -32,6 +32,7 @@ import {
 import { ExploreCategoriesSection } from '../home/HomeScreen'
 import { ENavigation } from '../../types/enums/navigation.enum'
 import { openMembershipTab } from '../../service/paymentService'
+import { setFilterEventType } from '../../service/filterService'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 const { width: SW } = Dimensions.get('window')
@@ -94,7 +95,7 @@ export default function DiscoverMatchesScreen({ navigation }: Props) {
           <ButtonRevamp
             label={t('GENERAL.CTA_MODIFY_PREFERENCE')}
             variant="secondary"
-            onPress={() => navigation.navigate('Search')}
+            onPress={() => { setFilterEventType('pp'); navigation.navigate('Search') }}
             style={s.emptyBtn}
           />
         </View>

@@ -18,6 +18,7 @@ import { getItem } from '../../service/storageService'
 import { apiCall } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
 import { fetchCustomerCare } from '../../service/homeService'
+import { setFilterEventType } from '../../service/filterService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import LinkCTA from '../../components/link-cta/LinkCTA'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
@@ -124,6 +125,7 @@ export default function HelpCenterScreen({ navigation }: Props) {
     } else if (cta === 'Membership Plan') {
       navigation.navigate('recharge')
     } else if (cta === 'Edit filter') {
+      setFilterEventType('pp')
       navigation.navigate('Search')
     } else if (cta === 'Newly Joined') {
       navigation.navigate('Matches', { exploreType: 'NEYLYJOINED', exploreLabel: title })

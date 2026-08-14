@@ -766,6 +766,16 @@ const iv = StyleSheet.create({
   },
 })
 
+// "Edit preferences" / "No matches" entry points into Search must force PP
+// mode — otherwise a stale 'filter' flag left over from the "Filter" chip
+// above (same getFilterEventType() flag, only ever reset back to 'pp' by
+// this call) makes Partner Preferences show the "Filters" header with no
+// Strict Filters banner, since that banner is gated to PP mode only.
+async function goToEditPreferences(navigation: any) {
+  await setFilterEventType('pp')
+  navigation.navigate('Search')
+}
+
 // ─── MatchesScreen ────────────────────────────────────────────────────────────
 
 export default function MatchesScreen({ navigation, route }: { navigation: any; route?: any }) {
@@ -2042,7 +2052,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           onViewLater={handleViewLater}
           onCall={handleCall}
           onWhatsApp={handleWhatsApp}
-          onEditPreferences={() => navigation.navigate('Search')}
+          onEditPreferences={() => goToEditPreferences(navigation)}
           loadingMore={loadingMore}
           onLoadMore={loadMore}
           selectedChip={selectedChip}
@@ -2169,7 +2179,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         selectedChip={selectedChip}
         onChipSelect={applyQuickFilter}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
-        onEditPreferences={() => navigation.navigate('Search')}
+        onEditPreferences={() => goToEditPreferences(navigation)}
         onHeaderLayout={handleHeaderLayout}
         onTitleLayout={handleTitleLayout}
         facets={facets}
@@ -2187,7 +2197,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         </View>
       ) : totalCount === 0 ? (
         <View style={{ flex: 1, paddingTop: headerH }}>
-          <NoMatchesCard onPress={() => navigation.navigate('Search')} />
+          <NoMatchesCard onPress={() => goToEditPreferences(navigation)} />
         </View>
       ) : (
         <FlatList

@@ -34,7 +34,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import { getItem, getJson, setJson } from '../../service/storageService'
+import { getItem } from '../../service/storageService'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import SearchDesktopLayout from './SearchDesktopLayout'
 import { fetchSearchResults } from '../../service/homeService'
@@ -42,7 +42,13 @@ import { resolveFilterLabel } from '../../adapters/filterPreference.adapter'
 import {
   getSelectedObject, saveFilterState, getSearchPPCheckBox,
   getFilterEventType, resetFilter, buildSearchParams, DEFAULT_FILTER,
+  getStrictFilterState, setStrictFilterState,
 } from '../../service/filterService'
+import StrictFilterManageModal from '../../components/search/StrictFilterManageModal'
+import {
+  MANAGE_FILTER_CTA, STRICT_FILTERS_TITLE, STRICT_FILTERS_NOTE,
+} from '../../constants/strictFilter.config'
+import StrictFieldEditorScreen, { CompactFieldRow } from '../../components/search/StrictFieldEditorScreen'
 import {
   fetchReligionOptions, fetchCasteOptions, fetchDivisionOptions,
   fetchRaasiOptions, fetchStarOptions, fetchDoshamOptions,
@@ -146,12 +152,17 @@ export default function SearchScreen({ navigation }: Props) {
   const [matchCount,   setMatchCount]   = useState(0)
   const [countLoading, setCountLoading] = useState(false)
 
-  // Desktop-only "Strict {field} filter" toggles (Figma node 647:13268) — no
-  // equivalent exists in mobile or in the old Angular app's filter API at
-  // all, so this is UI-only for now: persisted locally so it survives a
-  // reload, but deliberately NOT sent to buildSearchParams/the search API
-  // since there's no confirmed backend contract for it yet.
+  // Strict Filter (Angular JODII-453, Figma node 647:13268) — per-field
+  // toggles, persisted via filterService's getStrictFilterState()/
+  // setStrictFilterState() and sent to the search API as the STRICKPP param
+  // (buildSearchParams() reads this same storage internally).
   const [strictPrefs, setStrictPrefs] = useState<Record<string, boolean>>({})
+  const [manageStrictOpen, setManageStrictOpen] = useState(false)
+  // Mobile per-field wrapper (Figma nodes 1364:2128 / 1385:302) — which of the
+  // 14 strict fields is currently shown in its own "Select preferred X" +
+  // strict-toggle screen. Stacks on top of manageStrictOpen's Modal when
+  // opened via the manage-list's edit-pencil (both stay mounted/visible).
+  const [fieldEditorOpen, setFieldEditorOpen] = useState<FieldKey | null>(null)
 
   // key -> {key,label}[] cache, populated the first time a field's options are
   // fetched — used both to render the picker and to resolve display labels.
@@ -176,7 +187,7 @@ export default function SearchScreen({ navigation }: Props) {
         getItem(SK.Auth.USER_ID),
         getItem(SK.User.LOGIN_GENDER),
         getItem(SK.User.NAME),
-        getJson<Record<string, boolean>>('PP_STRICT_FILTERS'),
+        getStrictFilterState(),
       ])
       setSelected(obj)
       setPpCheckBox(pp)
@@ -184,7 +195,7 @@ export default function SearchScreen({ navigation }: Props) {
       setMatriId(id ?? '')
       setGender(gen ?? '1')
       setUserName(name ?? '')
-      setStrictPrefs(strict ?? {})
+      setStrictPrefs(strict)
       setReligion(obj.RELIGION?.[0] ?? '0')
       setLoading(false)
     })()
@@ -193,7 +204,7 @@ export default function SearchScreen({ navigation }: Props) {
   function toggleStrictPref(key: string, value: boolean) {
     setStrictPrefs(prev => {
       const next = { ...prev, [key]: value }
-      setJson('PP_STRICT_FILTERS', next).catch(() => {})
+      setStrictFilterState(next as Record<FieldKey, boolean>).catch(() => {})
       return next
     })
   }
@@ -219,7 +230,7 @@ export default function SearchScreen({ navigation }: Props) {
     }, 400)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selected, ppCheckBox, loading, matriId])
+  }, [selected, ppCheckBox, strictPrefs, loading, matriId])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -333,13 +344,21 @@ export default function SearchScreen({ navigation }: Props) {
     setHeightEditor(bound)
   }
 
-  function fieldRowPress(key: FieldKey) {
+  function openFieldPicker(key: FieldKey) {
     if (key === 'AGE') { setAgeEditor('min'); return }
     if (key === 'HEIGHT') { openHeight('min'); return }
     if (key === 'LOCATION') { openLocation(); return }
     if (key === 'STAR') { openStar(); return }
     if (key === 'CASTE') { openCaste(); return }
     if (SIMPLE_MULTI_FIELDS.has(key)) { openSimpleMulti(key); return }
+  }
+
+  // PROFILECREATED is Filter-mode-only, never a strict field (not in
+  // STRICT_FIELD_ORDER) — it bypasses StrictFieldEditorScreen and opens its
+  // picker directly, same as before this wrapper existed.
+  function fieldRowPress(key: FieldKey) {
+    if (key === 'PROFILECREATED') { openFieldPicker(key); return }
+    setFieldEditorOpen(key)
   }
 
   // ── Reset / Apply ─────────────────────────────────────────────────────────
@@ -364,17 +383,16 @@ export default function SearchScreen({ navigation }: Props) {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  // Figma's desktop "Edit preferences" card (node 647:11468) doesn't render an
-  // Eating Habits row in its own mockup data — most likely a content gap in
-  // that specific mockup rather than an intentional field removal, since every
-  // other field mobile supports IS shown. Appended after Physical status
-  // (Figma's last row) rather than dropped, so desktop doesn't regress a field
-  // mobile users can already edit.
-  // Mobile's own row order (kept below, unrelated to isDesktop).
+  // Row order matches Figma's "Jodii - Filters (Partner Preferences)" mobile
+  // list (node 1364:1711) exactly — confirmed via screenshot: Age, Location,
+  // Caste, Star, Dosham, Occupation, Monthly income, Education, Height,
+  // Mother tongue, Religion, Marital status, Physical status. Religion sits
+  // near the end (after Mother tongue), not right after Location, contrary
+  // to this port's original (pre-Figma-review) guess. Same order the desktop
+  // card (node 647:11468) already used, so one array now serves both.
   const rows: Array<{ key: FieldKey; label: string; hidden?: boolean }> = [
     { key: 'AGE',            label: t('FILTER.AGE') },
     { key: 'LOCATION',       label: t('FILTER.LOCATION') },
-    { key: 'RELIGION',       label: t('FILTER.RELIGION') },
     { key: 'CASTE',          label: isIslam ? t('FILTER.DIVISION') : t('FILTER.CASTE') },
     { key: 'STAR',           label: t('FILTER.STAR') },
     { key: 'DOSHAM',         label: t('FILTER.DOSHAM') },
@@ -383,35 +401,11 @@ export default function SearchScreen({ navigation }: Props) {
     { key: 'EDUCATION',      label: t('FILTER.EDUCATION') },
     { key: 'HEIGHT',         label: t('FILTER.HEIGHT') },
     { key: 'MOTHERTONGUE',   label: t('FILTER.MOTHERTONGUE') },
+    { key: 'RELIGION',       label: t('FILTER.RELIGION') },
     { key: 'MARITALSTATUS',  label: t('FILTER.MARITALSTATUS') },
-    { key: 'EATINGHABITS',   label: t('FILTER.EATINGHABITS') },
     { key: 'PHYSICALSTATUS', label: t('FILTER.PHYSICALSTATUS') },
+    { key: 'EATINGHABITS',   label: t('FILTER.EATINGHABITS') },
     { key: 'PROFILECREATED', label: t('FILTER.PROFILECREATED'), hidden: eventType !== 'filter' },
-  ]
-
-  // Figma's desktop card (node 647:11468) orders rows differently from mobile
-  // (Religion sits near the end, after Mother tongue, not right after
-  // Location) and its own mockup data doesn't render an Eating Habits row at
-  // all — most likely a content gap in that mockup rather than an intentional
-  // removal, since every other field mobile supports IS shown. Reordered to
-  // match Figma exactly, with Eating habits appended after Physical status
-  // instead of dropped, so desktop doesn't regress a field mobile can edit.
-  const desktopRows: typeof rows = [
-    rows[0],  // AGE
-    rows[1],  // LOCATION
-    rows[3],  // CASTE
-    rows[4],  // STAR
-    rows[5],  // DOSHAM
-    rows[6],  // OCCUPATION
-    rows[7],  // MONTHLYINCOME
-    rows[8],  // EDUCATION
-    rows[9],  // HEIGHT
-    rows[10], // MOTHERTONGUE
-    rows[2],  // RELIGION
-    rows[11], // MARITALSTATUS
-    rows[13], // PHYSICALSTATUS
-    rows[12], // EATINGHABITS
-    rows[14], // PROFILECREATED (hidden unless filter mode)
   ]
 
   if (isDesktop) {
@@ -420,15 +414,18 @@ export default function SearchScreen({ navigation }: Props) {
         navigation={navigation}
         userName={userName}
         loading={loading}
-        rows={desktopRows}
+        rows={rows}
         rowValue={rowValue}
         selected={selected}
         labelCache={labelCache}
         heightOptions={heightOptions}
+        fieldIcon={FIELD_ICON}
         matchCount={matchCount}
         countLoading={countLoading}
         strictPrefs={strictPrefs}
         onToggleStrictPref={toggleStrictPref}
+        manageStrictOpen={manageStrictOpen}
+        setManageStrictOpen={setManageStrictOpen}
         ageEditor={ageEditor}
         setAgeEditor={setAgeEditor}
         heightEditor={heightEditor}
@@ -482,6 +479,18 @@ export default function SearchScreen({ navigation }: Props) {
         {eventType !== 'filter' && (
           <View style={s.subHeader}>
             <Text style={s.subHeaderText}>{t('FILTER.FILTER_SUB_HEADER')}</Text>
+          </View>
+        )}
+
+        {/* Strict Filter entry point (Figma node 1364:1711) — Partner-
+            Preference mode only (same gate as the sub-header above). */}
+        {eventType !== 'filter' && (
+          <View style={s.strictBanner}>
+            <Text style={s.strictBannerTitle}>{STRICT_FILTERS_TITLE}</Text>
+            <Text style={s.strictBannerDesc}>{STRICT_FILTERS_NOTE}</Text>
+            <Pressable style={s.manageStrictBtn} onPress={() => setManageStrictOpen(true)} accessibilityRole="button">
+              <Text style={s.manageStrictBtnText}>{MANAGE_FILTER_CTA}</Text>
+            </Pressable>
           </View>
         )}
 
@@ -656,6 +665,76 @@ export default function SearchScreen({ navigation }: Props) {
           onClose={() => setMultiEditor(null)}
         />
       )}
+
+      <StrictFilterManageModal
+        visible={manageStrictOpen}
+        onClose={() => setManageStrictOpen(false)}
+        strictState={strictPrefs as Record<FieldKey, boolean>}
+        onToggle={toggleStrictPref}
+        onEditField={key => setFieldEditorOpen(key)}
+        fieldIcon={FIELD_ICON}
+        fieldLabel={Object.fromEntries(rows.map(r => [r.key, r.label])) as Record<FieldKey, string>}
+        fieldValue={rowValue as Record<FieldKey, string>}
+        anyLabel={t('SEARCH.ANY')}
+        matchCount={matchCount}
+        countLoading={countLoading}
+        onShowMatches={handleShowMatches}
+      />
+
+      {/* ── Per-field strict wrapper (Figma nodes 1364:2128 / 1385:302) ──
+          Sits AROUND the field's own existing picker (opened unchanged via
+          openFieldPicker) rather than replacing it — the picker's own Modal
+          stacks on top of this one when the CompactFieldRow below is tapped. */}
+      {fieldEditorOpen && (
+        <StrictFieldEditorScreen
+          visible={!!fieldEditorOpen}
+          onClose={() => setFieldEditorOpen(null)}
+          fieldKey={fieldEditorOpen}
+          fieldLabel={rows.find(r => r.key === fieldEditorOpen)?.label ?? ''}
+          fieldValue={(rowValue as any)[fieldEditorOpen]}
+          strictEnabled={!!strictPrefs[fieldEditorOpen]}
+          onToggleStrict={value => toggleStrictPref(fieldEditorOpen, value)}
+          anyLabel={t('SEARCH.ANY')}
+          matchCount={matchCount}
+          countLoading={countLoading}
+        >
+          {fieldEditorOpen === 'AGE' && (
+            <>
+              <CompactFieldRow
+                label={t('FILTER.LBL_MIN_AGE')}
+                value={`${selected.STARTAGE ?? '18'} yrs`}
+                onPress={() => setAgeEditor('min')}
+              />
+              <CompactFieldRow
+                label={t('FILTER.LBL_MAX_AGE')}
+                value={`${selected.ENDAGE ?? '50'} yrs`}
+                onPress={() => setAgeEditor('max')}
+              />
+            </>
+          )}
+          {fieldEditorOpen === 'HEIGHT' && (
+            <>
+              <CompactFieldRow
+                label={t('FILTER.LBL_MIN_HEIGHT')}
+                value={selected.STARTHEIGHT?.[0] ? labelsFor('HEIGHT', selected.STARTHEIGHT) : t('SEARCH.ANY')}
+                onPress={() => openHeight('min')}
+              />
+              <CompactFieldRow
+                label={t('FILTER.LBL_MAX_HEIGHT')}
+                value={selected.ENDHEIGHT?.[0] ? labelsFor('HEIGHT', selected.ENDHEIGHT) : t('SEARCH.ANY')}
+                onPress={() => openHeight('max')}
+              />
+            </>
+          )}
+          {fieldEditorOpen !== 'AGE' && fieldEditorOpen !== 'HEIGHT' && (
+            <CompactFieldRow
+              label={rows.find(r => r.key === fieldEditorOpen)?.label ?? ''}
+              value={(rowValue as any)[fieldEditorOpen]}
+              onPress={() => openFieldPicker(fieldEditorOpen)}
+            />
+          )}
+        </StrictFieldEditorScreen>
+      )}
     </View>
   )
 }
@@ -698,6 +777,18 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
   subHeaderText: { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 20, color: Colors.black },
+
+  strictBanner: {
+    backgroundColor: '#FBF2F5', borderWidth: 1, borderColor: '#FFE3EC',
+    borderRadius: 8, padding: 12, marginBottom: 4, gap: 8,
+  },
+  strictBannerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
+  strictBannerDesc:  { fontFamily: 'Poppins-Regular', fontSize: 12, lineHeight: 20, color: Colors.black },
+  manageStrictBtn: {
+    height: 40, borderWidth: 1, borderColor: Colors.primaryDark, borderRadius: 4,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  manageStrictBtnText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.primaryDark },
 
   card: { backgroundColor: Colors.white, borderRadius: 12, overflow: 'hidden' },
 
