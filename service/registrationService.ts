@@ -1004,23 +1004,23 @@ function objToOptions(raw: any): Array<{ key: string; label: string }> {
   return []
 }
 
+// Angular: registration.page.ts's assignArrayData() — profileBrothers/
+// profileSisters come from the shared initialfetch response ("BOTHER"/
+// "SISTER" keys), same source as every other option list in this file
+// (fetchEatingHabitOptions etc.), NOT from the family-info submit endpoint.
+// Previously this POSTed blank BROTHERS/SISTERS values to
+// Endpoints.registration.updateFamily (the SAVE endpoint) hoping to scrape
+// options out of its response — unreliable outside the registration flow,
+// which is why Edit Profile's Family screen showed no options at all.
 export async function fetchFamilyOptions(): Promise<{
   brothers: Array<{ key: string; label: string }>
   sisters:  Array<{ key: string; label: string }>
 }> {
-  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-  const res = await apiCall(
-    Endpoints.registration.updateFamily,
-    'POST',
-    `ID=${userId}&PROPERTY=&BROTHERS=&SISTERS=`,
-  )
-  if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0 && res?.RESPONSE) {
-    return {
-      brothers: objToOptions(res.RESPONSE.BOTHER),
-      sisters:  objToOptions(res.RESPONSE.SISTER),
-    }
+  const data = await getRegistrationArrays()
+  return {
+    brothers: objToOptions(data?.BOTHER),
+    sisters:  objToOptions(data?.SISTER),
   }
-  return { brothers: [], sisters: [] }
 }
 
 export async function submitFamilyDetails(brothers: string, sisters: string): Promise<void> {
@@ -1032,17 +1032,15 @@ export async function submitFamilyDetails(brothers: string, sisters: string): Pr
   )
 }
 
+// Angular: registration.page.ts's assignArrayData() — profileProperty comes
+// from the shared initialfetch response ("ASSETS" key), the same function
+// (and same underlying call) that populates BOTHER/SISTER above. Previously
+// this POSTed blank values to Endpoints.registration.updateFamily (the SAVE
+// endpoint) instead — same bug as fetchFamilyOptions() had, and for the same
+// reason: unreliable outside the registration flow.
 export async function fetchPropertyOptions(): Promise<Array<{ key: string; label: string }>> {
-  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-  const res = await apiCall(
-    Endpoints.registration.updateFamily,
-    'POST',
-    `ID=${userId}&PROPERTY=&BROTHERS=&SISTERS=`,
-  )
-  if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0 && res?.RESPONSE) {
-    return objToOptions(res.RESPONSE.ASSETS)
-  }
-  return []
+  const data = await getRegistrationArrays()
+  return objToOptions(data?.ASSETS)
 }
 
 export async function submitPropertyDetails(properties: string[]): Promise<void> {
@@ -1095,29 +1093,35 @@ export async function fetchStarOptions(raasiId: string): Promise<Array<{ key: st
   return []
 }
 
+// `star`/`raasi` params are kept only for signature compatibility with
+// existing callers — see below, neither is actually used anymore.
 export async function fetchDoshamOptions(
-  star: string,
-  raasi: string,
+  _star: string,
+  _raasi: string,
   motherTongue?: string,
 ): Promise<{ dosham: Array<{ key: string; label: string }>; doshamHash: Array<{ key: string; label: string }> }> {
-  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-  const res = await apiCall(
-    Endpoints.registration.updateReligious,
-    'POST',
-    `ID=${userId}&STAR=${star}&RAASI=${raasi}&DOSHAM=`,
-  )
-  if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0 && res?.RESPONSE) {
-    const hash = res.RESPONSE.DOSHAMHASH
-    // Angular: Tamil mother tongue (key "47") uses TAMIL branch, all others use OTHER
-    const filteredHash = hash
-      ? ((motherTongue === '47' ? hash.TAMIL : hash.OTHER) ?? hash)
-      : {}
-    return {
-      dosham:     objToOptions(res.RESPONSE.DOSHAM ?? {}),
-      doshamHash: objToOptions(filteredHash),
-    }
+  // BOTH the Yes/No list and the specific dosham-*type* breakdown are static
+  // reference data from the shared initialfetch cache — Angular:
+  // assignArrayData()'s `profileDosham = apiResponse["DOSHAM"]` and the
+  // `apiResponse["DOSHAMHASH"]` block right after it (same function, same
+  // initialfetch call that populates BOTHER/SISTER/ASSETS). DOSHAMHASH is
+  // filtered only by mother tongue (TAMIL vs OTHER) — there is no live,
+  // star+raasi-dependent lookup at all. Two earlier fixes wrongly assumed
+  // this needed the zodiacinfo endpoint (by loose analogy with
+  // fetchRaasiOptions' blank-param call) — direct reading of Angular's
+  // source proves both fields live in the initialfetch response instead.
+  const registrationArrays = await getRegistrationArrays()
+  const dosham = objToOptions(registrationArrays?.DOSHAM)
+
+  const hash = registrationArrays?.DOSHAMHASH
+  const filteredHash = hash
+    ? ((motherTongue === '47' ? hash.TAMIL : hash.OTHER) ?? hash)
+    : {}
+
+  return {
+    dosham,
+    doshamHash: objToOptions(filteredHash),
   }
-  return { dosham: [], doshamHash: [] }
 }
 
 export async function submitHoroscopeDetails(

@@ -82,6 +82,10 @@ const MAX_PHOTOS = 10
 // call is deferred until this window elapses with no Undo tap. Longer than
 // Toast's own 2000ms default so there's a real window to react in.
 const DELETE_UNDO_WINDOW_MS = 3000
+// Angular's edit-profile.page.html explicitly filters these out of
+// VIEWPROPERTIES ("remove vehicle related changes") — see
+// PropertyDetailsScreen.tsx's header comment for the full story.
+const VEHICLE_CODES = new Set(['5', '6', '7'])
 // Figma node 642:2780 ("with photos" state) — real pixel specs: 204×204
 // primary tile (left) + a wrapping grid of 98×98 tiles (right, 16px column
 // gap / 9px row gap), NOT one uniform flex-wrap row of same-size tiles like
@@ -282,7 +286,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     setDrinkingOptions(drinkingList)
     setSmokingOptions(smokingList)
     setEatingOptions(eatingList)
-    setPropertyOptions(propertyList)
+    setPropertyOptions(propertyList.filter(o => !VEHICLE_CODES.has(o.key)))
     setMaritalStatusOptions(maritalStatusList)
     setPhysicalStatusOptions(physicalStatusList)
 
@@ -316,8 +320,12 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     setCaste(casteList.find(o => o.key === info.caste) ?? null)
     setStar(starList.find(o => o.key === info.star) ?? null)
 
-    if (info.star && info.raasi) {
-      const { dosham: yesNoList, doshamHash } = await fetchDoshamOptions(info.star, info.raasi, info.motherTongue)
+    // See ReligiousDetailsScreen.tsx's header comment on this same fix — the
+    // Yes/No dosham list is static reference data (like fetchRaasiOptions()'s
+    // own all-blank-params call), not dependent on star/raasi actually being
+    // set. Only DOSHAMHASH (specific dosham types) genuinely needs them.
+    {
+      const { dosham: yesNoList, doshamHash } = await fetchDoshamOptions(info.star ?? '', info.raasi ?? '', info.motherTongue)
       const combined = [...yesNoList.filter(o => o.key !== '1'), ...doshamHash]
       setDoshamOptions(combined)
       const currentDoshamKey = info.doshamType?.[0] ?? info.dosham

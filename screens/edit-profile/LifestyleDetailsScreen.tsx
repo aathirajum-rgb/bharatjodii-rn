@@ -1,19 +1,13 @@
 // New screen — same rationale as the other Edit Profile group screens.
 //
-// IMPORTANT, confirmed against Angular source (not assumed): edit-profile.
-// page.html does let you tap into Drinking habits and Smoking habits and pick
-// a new value (goToEditScreen('36')/('37') are real, reachable rows) — but
-// the shared save logic's TYPE-code map (registration.page.ts's
-// editProfileUpdateObj) has NO entry for either field, only for Eating
-// (EATING: "24"), and DRINKINGHABITS/SMOKINGHABITS never appear anywhere else
-// in that file except as dropdown-option population — there is no dedicated
-// endpoint for them either. So there is no known-safe TYPE code to submit:
-// every code 1-31 is already claimed by another field, and guessing one risks
-// silently overwriting unrelated profile data server-side, which would be
-// worse than the current gap. Per product decision, Drinking/Smoking are
-// shown read-only (locked, like the income-restricted pattern elsewhere in
-// this group) rather than left editable with no way to save the change —
-// only Eating habits has a real save path and stays interactive.
+// Drinking/Smoking habits ARE editable — registration.page.ts's own
+// editProfileUpdateObj copy has no TYPE code for either field, but the actual
+// submit path for these two fields is the shared <app-form-fields> component
+// (components/form-fields/form-fields.component.ts), which has a SEPARATE,
+// more complete copy of that same map: SMOKING:'21', DRINKING:'22'. Confirmed
+// by reading that second copy directly — see FIELD_TYPE_CODE's own comment
+// in editProfileService.ts. Both now save through the same generic
+// editprofileupdate call as every other field on this screen.
 
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -32,7 +26,7 @@ import SearchablePicker, { type PickerOption } from '../../components/searchable
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
 type Props = { navigation: any }
-type Picker = 'eating' | null
+type Picker = 'drinking' | 'smoking' | 'eating' | null
 
 export default function LifestyleDetailsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
@@ -45,9 +39,15 @@ export default function LifestyleDetailsScreen({ navigation }: Props) {
   const [smoking, setSmoking]   = useState<PickerOption | null>(null)
   const [eating, setEating]     = useState<PickerOption | null>(null)
 
-  const [original, setOriginal] = useState<{ eating?: string | undefined }>({})
+  const [original, setOriginal] = useState<{
+    drinking?: string | undefined
+    smoking?:  string | undefined
+    eating?:   string | undefined
+  }>({})
 
-  const [eatingOptions, setEatingOptions] = useState<PickerOption[]>([])
+  const [drinkingOptions, setDrinkingOptions] = useState<PickerOption[]>([])
+  const [smokingOptions, setSmokingOptions]   = useState<PickerOption[]>([])
+  const [eatingOptions, setEatingOptions]     = useState<PickerOption[]>([])
 
   const [activePicker, setActivePicker] = useState<Picker>(null)
 
@@ -56,13 +56,15 @@ export default function LifestyleDetailsScreen({ navigation }: Props) {
     const info = await fetchEditProfileInfo()
     if (!info) { setLoading(false); return }
 
-    setOriginal({ eating: info.eatingHabits })
+    setOriginal({ drinking: info.drinkingHabits, smoking: info.smokingHabits, eating: info.eatingHabits })
 
     const [drinkingList, smokingList, eatingList] = await Promise.all([
       fetchDrinkingHabitOptions(),
       fetchSmokingHabitOptions(),
       fetchEatingHabitOptions(),
     ])
+    setDrinkingOptions(drinkingList)
+    setSmokingOptions(smokingList)
     setEatingOptions(eatingList)
     setDrinking(drinkingList.find(o => o.key === info.drinkingHabits) ?? null)
     setSmoking(smokingList.find(o => o.key === info.smokingHabits) ?? null)
@@ -73,19 +75,17 @@ export default function LifestyleDetailsScreen({ navigation }: Props) {
 
   useEffect(() => { load() }, [load])
 
-  function showNotEditable() {
-    Alert.alert(
-      'Not editable yet',
-      "Updating this from the app isn't supported yet. Please check back in a future update.",
-    )
-  }
-
   async function handleSubmit() {
     if (submitting) return
     setSubmitting(true)
 
-    // Only Eating habits has a real save path — see file header note.
     const changes: FieldChange[] = []
+    if (drinking && drinking.key !== original.drinking) {
+      changes.push({ field: 'DRINKING', value: drinking.key, existingValue: original.drinking })
+    }
+    if (smoking && smoking.key !== original.smoking) {
+      changes.push({ field: 'SMOKING', value: smoking.key, existingValue: original.smoking })
+    }
     if (eating && eating.key !== original.eating) {
       changes.push({ field: 'EATING', value: eating.key, existingValue: original.eating })
     }
@@ -129,12 +129,8 @@ export default function LifestyleDetailsScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 16 }]} showsVerticalScrollIndicator={false}>
         <Text style={s.heading}>Life style details</Text>
 
-        <SelectField label={t('EDITPROFILE.DRINKING')} value={drinking?.label} locked onPress={showNotEditable} />
-        <Text style={s.lockedNote}>Editing this isn’t supported yet</Text>
-
-        <SelectField label="Smoking habits" value={smoking?.label} locked onPress={showNotEditable} />
-        <Text style={s.lockedNote}>Editing this isn’t supported yet</Text>
-
+        <SelectField label={t('EDITPROFILE.DRINKING')} value={drinking?.label} onPress={() => setActivePicker('drinking')} />
+        <SelectField label="Smoking habits" value={smoking?.label} onPress={() => setActivePicker('smoking')} />
         <SelectField label={t('EDITPROFILE.EATING')} value={eating?.label} onPress={() => setActivePicker('eating')} />
 
         <Pressable style={s.submitBtn} onPress={handleSubmit} disabled={submitting}>
@@ -142,6 +138,24 @@ export default function LifestyleDetailsScreen({ navigation }: Props) {
         </Pressable>
       </ScrollView>
 
+      <SearchablePicker
+        visible={activePicker === 'drinking'}
+        title={t('EDITPROFILE.DRINKING')}
+        placeholder="Search..."
+        options={drinkingOptions}
+        selectedKey={drinking?.key}
+        onSelect={opt => { setDrinking(opt); setActivePicker(null) }}
+        onClose={() => setActivePicker(null)}
+      />
+      <SearchablePicker
+        visible={activePicker === 'smoking'}
+        title="Smoking habits"
+        placeholder="Search..."
+        options={smokingOptions}
+        selectedKey={smoking?.key}
+        onSelect={opt => { setSmoking(opt); setActivePicker(null) }}
+        onClose={() => setActivePicker(null)}
+      />
       <SearchablePicker
         visible={activePicker === 'eating'}
         title={t('EDITPROFILE.EATING')}
@@ -170,8 +184,6 @@ const s = StyleSheet.create({
 
   content: { paddingHorizontal: 24, paddingTop: 32 },
   heading: { fontSize: 20, fontWeight: '600', color: Colors.black, marginBottom: 24 },
-
-  lockedNote: { fontSize: 12, color: Colors.textTertiary, marginTop: -12, marginBottom: 20 },
 
   submitBtn: {
     height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,

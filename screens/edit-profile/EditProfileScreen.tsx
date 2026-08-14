@@ -44,10 +44,11 @@ import {
   CHILDREN_OPTIONS,
   fetchReligionOptions, fetchCasteOptions, fetchOccupationOptions,
   fetchQualificationOptions, fetchMotherTongueOptions,
-  fetchEatingHabitOptions, fetchRaasiOptions,
+  fetchEatingHabitOptions, fetchDrinkingHabitOptions, fetchSmokingHabitOptions, fetchRaasiOptions,
   fetchStarOptions, fetchMonthlyIncomeOptions, fetchPropertyOptions,
   fetchStates, fetchCities, fetchHeightCategoryOptions,
   fetchMaritalStatusOptions, fetchPhysicalStatusOptions, fetchProfileCreatedByOptions,
+  fetchFamilyOptions,
 } from '../../service/registrationService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import PhotoPrivacySheet from '../../components/photo-privacy/PhotoPrivacySheet'
@@ -207,14 +208,16 @@ export default function EditProfileScreen({ navigation }: Props) {
 
     const [
       religion, occupation, education, motherTongue,
-      eatingHabit, raasi, income, property, states,
-      heightCategory, maritalStatus, physicalStatus, createdByList,
+      eatingHabit, drinkingHabit, smokingHabit, raasi, income, property, states,
+      heightCategory, maritalStatus, physicalStatus, createdByList, familyOptions,
     ] = await Promise.all([
       fetchReligionOptions(),
       fetchOccupationOptions(),
       fetchQualificationOptions(),
       fetchMotherTongueOptions(),
       fetchEatingHabitOptions(),
+      fetchDrinkingHabitOptions(),
+      fetchSmokingHabitOptions(),
       fetchRaasiOptions(),
       fetchMonthlyIncomeOptions(),
       fetchPropertyOptions(),
@@ -223,6 +226,7 @@ export default function EditProfileScreen({ navigation }: Props) {
       fetchMaritalStatusOptions(gender),
       fetchPhysicalStatusOptions(),
       fetchProfileCreatedByOptions(),
+      fetchFamilyOptions(),
     ])
 
     const [caste, star, cities, homeCities] = await Promise.all([
@@ -234,9 +238,10 @@ export default function EditProfileScreen({ navigation }: Props) {
 
     setLabels({
       religion, occupation, education, motherTongue,
-      eatingHabit, raasi, income, property, states,
+      eatingHabit, drinkingHabit, smokingHabit, raasi, income, property, states,
       caste, star, cities, homeCities,
       heightCategory, maritalStatus, physicalStatus,
+      brothers: familyOptions.brothers, sisters: familyOptions.sisters,
     })
     setCreatedByLabel(createdByList.find(o => o.key === info.createdBy)?.label)
     setLoading(false)
@@ -274,8 +279,11 @@ export default function EditProfileScreen({ navigation }: Props) {
 
   const cityLabel     = labelFor(labels.cities ?? [], profile.city) ?? labelFor(labels.states ?? [], profile.state)
   const homeCityLabel = labelFor(labels.homeCities ?? [], profile.homeCity) ?? labelFor(labels.states ?? [], profile.homeState)
+  // Angular's edit-profile.page.html has exactly one "Properties owned" row —
+  // codes '5'/'6'/'7' are explicitly excluded from it (comment: "remove
+  // vehicle related changes"), never shown as their own "Own Vehicle" row —
+  // see PropertyDetailsScreen.tsx's header comment for the full story.
   const propertiesLabel = labelsFor(labels.property ?? [], profile.properties)
-  const vehiclesLabel   = labelsFor(labels.property ?? [], profile.vehicles)
 
   // Angular: HEIGHTCATEGORY in 101-104 shows the bucket label; otherwise the
   // exact height (VIEWHEIGHT) is shown as-is. Category labels carry raw HTML
@@ -433,8 +441,8 @@ export default function EditProfileScreen({ navigation }: Props) {
 
         {/* ── Life style details ── */}
         <Section title="Life style details">
-          <FieldRow label={t('EDITPROFILE.DRINKING')} value={profile.drinkingHabits} onPress={() => navigation.navigate('EditProfileLifestyle')} showDivider />
-          <FieldRow label="Smoking habits" value={profile.smokingHabits} onPress={() => navigation.navigate('EditProfileLifestyle')} showDivider />
+          <FieldRow label={t('EDITPROFILE.DRINKING')} value={labelFor(labels.drinkingHabit ?? [], profile.drinkingHabits)} onPress={() => navigation.navigate('EditProfileLifestyle')} showDivider />
+          <FieldRow label="Smoking habits" value={labelFor(labels.smokingHabit ?? [], profile.smokingHabits)} onPress={() => navigation.navigate('EditProfileLifestyle')} showDivider />
           <FieldRow label={t('EDITPROFILE.EATING')} value={labelFor(labels.eatingHabit ?? [], profile.eatingHabits)} onPress={() => navigation.navigate('EditProfileLifestyle')} />
         </Section>
 
@@ -442,21 +450,20 @@ export default function EditProfileScreen({ navigation }: Props) {
         <Section title={t('EDITPROFILE.FAMILYDETAILS')}>
           <FieldRow
             label={t('EDITPROFILE.BROTHERS')}
-            value={profile.brothers ? `${profile.brothers} brother${profile.brothers === '1' ? '' : 's'}` : undefined}
+            value={labelFor(labels.brothers ?? [], profile.brothers)}
             onPress={() => navigation.navigate('EditProfileFamily')}
             showDivider
           />
           <FieldRow
             label={t('EDITPROFILE.SISTERS')}
-            value={profile.sisters ? `${profile.sisters} sister${profile.sisters === '1' ? '' : 's'}` : undefined}
+            value={labelFor(labels.sisters ?? [], profile.sisters)}
             onPress={() => navigation.navigate('EditProfileFamily')}
           />
         </Section>
 
         {/* ── Property details ── */}
         <Section title="Property details">
-          <FieldRow label="Properties owned" value={propertiesLabel} onPress={() => navigation.navigate('EditProfileProperty')} showDivider />
-          <FieldRow label="Own Vehicle" value={vehiclesLabel} onPress={() => navigation.navigate('EditProfileProperty')} />
+          <FieldRow label="Properties owned" value={propertiesLabel} onPress={() => navigation.navigate('EditProfileProperty')} />
         </Section>
 
       </ScrollView>

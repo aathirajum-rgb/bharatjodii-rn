@@ -39,6 +39,13 @@ export const FIELD_TYPE_CODE = {
   SISTERS:        '17',
   PROPERTIES:     '18',
   MOBILENO:       '19',
+  // Missing from Angular's registration.page.ts's own editProfileUpdateObj
+  // copy — but the actual submit path for these two fields is the shared
+  // <app-form-fields> component, which has a SEPARATE, more complete copy
+  // of this same map (components/form-fields/form-fields.component.ts) that
+  // does include them. Confirmed by reading that second copy directly.
+  SMOKING:        '21',
+  DRINKING:       '22',
   MOTHERTONGUE:   '23',
   EATING:         '24',
   NOOFCHILDREN:   '25',

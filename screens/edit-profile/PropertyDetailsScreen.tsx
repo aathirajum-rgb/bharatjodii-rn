@@ -1,15 +1,20 @@
 // New screen — same rationale as the other Edit Profile group screens.
 //
-// Different shape from everything built so far: Angular's PROPERTIES field
-// (TYPE code 18) is a single multi-select array covering BOTH "Properties
-// owned" (house/land/shop/agricultural) AND "Own Vehicle" (four/three/two
-// wheeler) together — confirmed by editProfileUpdateObj having exactly one
-// code for the whole FAMILYPROPERTY field, plus the "remove vehicle related
-// changes" filter (codes '5','6','7') already ported into editProfileService's
-// splitProperties(). The hub screen splits it into two rows for display, but
-// under the hood it's one field — so this screen keeps two separate
-// multi-select boxes (matching the hub's two-row layout) but recombines them
-// into ONE PROPERTIES update on Submit, not two.
+// Angular's PROPERTIES field (TYPE code 18) is a single multi-select array,
+// and edit-profile.page.html has exactly ONE row for it — "Properties
+// owned" — displaying VIEWPROPERTIES. Codes '5'/'6'/'7' are explicitly
+// filtered OUT of that display (comment: "remove vehicle related changes");
+// they are never shown as a selectable "Own Vehicle" list anywhere in the
+// real app (confirmed: onboarding's own PropertyDetailsScreen.tsx fallback
+// options only cover codes 1-4 — house/land/other land/shop — no vehicle
+// concept exists there either). An earlier version of this screen invented
+// a second "Own Vehicle" picker from that filter comment, which had no real
+// options to show since the assumption was wrong.
+//
+// Any pre-existing vehicle codes on a profile are carried through unchanged
+// on Submit (recombined into the single PROPERTIES value alongside the
+// user's real edits) rather than silently dropped — there's just no UI to
+// view or change them, matching the real app.
 
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -27,7 +32,7 @@ const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 const VEHICLE_CODES = new Set(['5', '6', '7'])
 
 type Props = { navigation: any }
-type Picker = 'properties' | 'vehicles' | null
+type Picker = 'properties' | null
 
 export default function PropertyDetailsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
@@ -37,11 +42,11 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
   const [submitting, setSubmitting] = useState(false)
 
   const [properties, setProperties] = useState<string[]>([])
-  const [vehicles, setVehicles]     = useState<string[]>([])
+  // Not editable anywhere in the real app — carried through as-is on Submit.
+  const [legacyVehicleCodes, setLegacyVehicleCodes] = useState<string[]>([])
   const [originalAll, setOriginalAll] = useState<string[]>([])
 
   const [propertyOptions, setPropertyOptions] = useState<MultiSelectOption[]>([])
-  const [vehicleOptions, setVehicleOptions]   = useState<MultiSelectOption[]>([])
 
   const [activePicker, setActivePicker] = useState<Picker>(null)
 
@@ -51,12 +56,11 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
     if (!info) { setLoading(false); return }
 
     setProperties(info.properties ?? [])
-    setVehicles(info.vehicles ?? [])
+    setLegacyVehicleCodes(info.vehicles ?? [])
     setOriginalAll([...(info.properties ?? []), ...(info.vehicles ?? [])])
 
     const allOptions = await fetchPropertyOptions()
     setPropertyOptions(allOptions.filter(o => !VEHICLE_CODES.has(o.key)))
-    setVehicleOptions(allOptions.filter(o => VEHICLE_CODES.has(o.key)))
 
     setLoading(false)
   }, [])
@@ -73,7 +77,7 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
     if (submitting) return
     setSubmitting(true)
 
-    const currentAll = [...properties, ...vehicles]
+    const currentAll = [...properties, ...legacyVehicleCodes]
     const changes: FieldChange[] = []
     const sameSet = currentAll.length === originalAll.length
       && currentAll.every(k => originalAll.includes(k))
@@ -130,12 +134,6 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
           placeholder="Select properties"
           onPress={() => setActivePicker('properties')}
         />
-        <SelectField
-          label="Own Vehicle"
-          value={labelsFor(vehicleOptions, vehicles)}
-          placeholder="Select vehicles"
-          onPress={() => setActivePicker('vehicles')}
-        />
 
         <Pressable style={s.submitBtn} onPress={handleSubmit} disabled={submitting}>
           {submitting ? <ActivityIndicator color={Colors.white} /> : <Text style={s.submitBtnText}>{t('GENERAL.SUBMIT')}</Text>}
@@ -148,14 +146,6 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
         options={propertyOptions}
         selectedKeys={properties}
         onApply={keys => { setProperties(keys); setActivePicker(null) }}
-        onClose={() => setActivePicker(null)}
-      />
-      <MultiSelectPicker
-        visible={activePicker === 'vehicles'}
-        title="Own Vehicle"
-        options={vehicleOptions}
-        selectedKeys={vehicles}
-        onApply={keys => { setVehicles(keys); setActivePicker(null) }}
         onClose={() => setActivePicker(null)}
       />
     </View>

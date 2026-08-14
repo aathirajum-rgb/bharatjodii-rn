@@ -121,8 +121,15 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
       }
     }
 
-    if (info.star && info.raasi) {
-      const { dosham: yesNoList, doshamHash } = await fetchDoshamOptions(info.star, info.raasi, info.motherTongue)
+    // The Yes/No dosham list is static reference data, same as fetchRaasiOptions()
+    // fetching RAASI with all-blank params — it doesn't actually depend on star/
+    // raasi being set. Only DOSHAMHASH (the specific dosham *type* breakdown)
+    // genuinely needs a real star+raasi to compute. Previously this whole call
+    // was gated behind `info.star && info.raasi`, so a profile with neither set
+    // (like a fresh account) never even fetched the Yes/No list, let alone its
+    // existing dosham value.
+    {
+      const { dosham: yesNoList, doshamHash } = await fetchDoshamOptions(info.star ?? '', info.raasi ?? '', info.motherTongue)
       setDoshamYesNoOptions(yesNoList)
       setDoshamTypeOptions(doshamHash)
       setDoshamYesNo(yesNoList.find(o => o.key === info.dosham) ?? null)

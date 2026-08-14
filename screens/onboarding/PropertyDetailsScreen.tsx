@@ -23,7 +23,6 @@ import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'property.svg'
-const FOOTER_H      = 160
 
 const FALLBACK_OPTIONS = [
   { key: '1', label: 'Own house' },
