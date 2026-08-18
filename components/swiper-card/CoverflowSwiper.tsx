@@ -212,11 +212,16 @@ const styles = StyleSheet.create({
     width:  CARD_WIDTH,
     height: CARD_HEIGHT,
   },
+  // Angular: same shared app-swiper "explore-pagination" row every other
+  // section uses (dots left, "See all" right) — this component's own
+  // coverflowEffect config only changes the CARD track's layout, not this
+  // row underneath it. Previously centered here, unlike SwiperCard.tsx's
+  // correct space-between — 24px matches that component's own CARD_PAD.
   bottomRow: {
     flexDirection:     'row',
     alignItems:        'center',
-    justifyContent:    'center',
-    gap:               12,
+    justifyContent:    'space-between',
+    paddingHorizontal: 24,
     marginTop:         16,
   },
   seeAllBtn:  { flexDirection: 'row', alignItems: 'center', gap: 4 },

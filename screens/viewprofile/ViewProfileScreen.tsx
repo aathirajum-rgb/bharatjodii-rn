@@ -41,7 +41,7 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import {
   getViewProfile, markProfileViewed, getSimilarProfiles, viewHoroscope, getStarMatch,
   getBioDataLink, getEnlargedPhotos, getBiodataExtras, saveBiodataThemeId,
-  _debugLastViewProfileResult,
+  _debugLastViewProfileResult, _consumeInvalidMatriIdMessage,
   type SimilarProfileCard, type StarMatchResult, type BiodataTheme,
 } from '../../service/viewProfileService'
 import { viewProfileAdapter } from '../../adapters/viewProfile.adapter'
@@ -282,6 +282,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   const [neighborPreviews, setNeighborPreviews] = useState<Record<string, { name: string; photoUri?: string }>>({})
 
   const [profile, setProfile] = useState<ViewProfileModel | null>(null)
+  const [invalidMatriIdMessage, setInvalidMatriIdMessage] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   // Prev/Next just swaps matriId, re-running the load effect below — without this,
   // every chevron tap set `loading` true again, which tears down the ENTIRE screen
@@ -400,6 +401,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     async function load() {
       if (isFirstLoadRef.current) setLoading(true)
       isFirstLoadRef.current = false
+      setInvalidMatriIdMessage(null)
       // Angular: common.ts's getContactDetails(), called on every profile-view
       // page load — populates CONTACT_DETAIL BEFORE it's read just below, so
       // the confirm sheet's quota footer (contactQuota) has real numbers
@@ -522,6 +524,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
             if (preview.photos[0]) Image.prefetch(preview.photos[0]).catch(() => {})
           }).catch(() => {})
         })
+      } else {
+        // JODII-499: surface the real "Invalid MatriID" message when that's
+        // confirmed the cause — the TEMP DEBUG fallback below still covers
+        // every other failure shape.
+        setInvalidMatriIdMessage(_consumeInvalidMatriIdMessage())
       }
       setLoading(false)
 
@@ -1090,6 +1097,20 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     return (
       <SafeAreaView style={s.loaderScreen}>
         <ActivityIndicator size="large" color={Colors.primary} />
+      </SafeAreaView>
+    )
+  }
+  if (!profile && invalidMatriIdMessage) {
+    // JODII-499: the confirmed "Invalid MatriID" case (RESPONSECODE 2, ERRCODE
+    // 3) — Angular shows this as a toast; there's nothing else to render on
+    // this screen once it's known the id itself is bad, so this replaces the
+    // generic TEMP DEBUG fallback below rather than sitting on top of it.
+    return (
+      <SafeAreaView style={s.loaderScreen}>
+        <Text style={s.notFoundText}>{invalidMatriIdMessage}</Text>
+        <Pressable style={s.backBtnInline} onPress={() => navigation.goBack()}>
+          <Text style={s.backBtnInlineText}>{'‹ Back'}</Text>
+        </Pressable>
       </SafeAreaView>
     )
   }

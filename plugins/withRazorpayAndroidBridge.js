@@ -13,7 +13,15 @@ const path = require('path');
 
 const PACKAGE_PATH = 'jodii/app';
 const SRC_DIR = path.join(__dirname, 'android-native-src', 'razorpay');
-const RAZORPAY_GRADLE_DEP = 'implementation "com.razorpay:customui:3.9.22"';
+const RAZORPAY_GRADLE_DEP = `// Razorpay Custom Integration SDK — enables per-UPI-app targeting
+    // (getAppsWhichSupportUpi + upi_app_package_name intent flow) and direct
+    // card submission, neither of which react-native-razorpay's Standard
+    // Checkout SDK (com.razorpay:checkout) supports. These two Razorpay
+    // artifacts ship overlapping classes and cannot coexist in one Android
+    // build (confirmed: duplicate class com.razorpay.AdvertisingIdUtil etc.)
+    // — react-native-razorpay's Android autolinking is disabled in
+    // react-native.config.js for exactly this reason; iOS still uses it.
+    implementation "com.razorpay:customui:3.9.22"`;
 // TEMP: real test key stripped before push — restore the actual value here
 // before the next native build. Only used as a manifest placeholder (see
 // AndroidManifest.xml comment); real per-transaction keys come from the

@@ -4,11 +4,11 @@ const stg: IEnvConfig = {
   env:        'stg',
   production: false,
   release:    '138',
-  api:        'https://stgoapi.jodii.app/',
-  payment:    'https://stgoapi.jodii.app/',
-  paymentNg:  'https://stgng.jodii.app/',
-  notify:     'https://stgmc.jodii.app/',
-  image:      'https://stgimg.jodii.app/',
+ api:        'https://oapi.jodii.app/',
+  payment:    'https://oapi.jodii.app/',
+  paymentNg:  'https://ng.jodii.app/',
+  notify:     'https://mc.jodii.app',
+  image:      'https://imgs.jodii.app/',
 }
 
 export default stg

@@ -18,7 +18,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ActivityIndicator, Dimensions, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
@@ -35,7 +35,6 @@ import { openMembershipTab } from '../../service/paymentService'
 import { setFilterEventType } from '../../service/filterService'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
-const { width: SW } = Dimensions.get('window')
 
 type Props = { navigation: any }
 
@@ -101,12 +100,14 @@ export default function DiscoverMatchesScreen({ navigation }: Props) {
         </View>
       ) : (
         <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 24 }]} showsVerticalScrollIndicator={false}>
+          {/* Angular: same ion-row pl-4/pr-24 + ion-col size="5.4" offset="0.6"
+              grid as Home's own explore-matches section — ExploreCategoriesSection
+              now applies that exact left/right padding + gap itself (see
+              EXPLORE_TILE_WIDTH's header comment in HomeScreen.tsx), so this
+              screen's own content padding must stay vertical-only or the two
+              would stack and double the margin. */}
           <ExploreCategoriesSection
             categories={categories}
-            // Angular: same ion-row pl-4/pr-24 + ion-col size="5.4" offset="0.6"
-            // grid as Home's own explore-matches section — see that call
-            // site's comment (HomeScreen.tsx) for the exact math.
-            tileWidth={(SW - 48 - 16) / 2}
             onCategoryPress={cat => navigation.navigate(ENavigation.MATCHES, { exploreType: cat.id, exploreLabel: cat.label })}
           />
         </ScrollView>
@@ -134,7 +135,9 @@ const s = StyleSheet.create({
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
   headerTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
 
-  content: { paddingHorizontal: 16, paddingTop: 24 },
+  // No horizontal padding here — ExploreCategoriesSection applies its own
+  // exact left/right padding (see its header comment in HomeScreen.tsx).
+  content: { paddingTop: 24 },
 
   emptyState:  { paddingHorizontal: 32 },
   emptyText:   { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, textAlign: 'center', marginTop: 6, marginBottom: 16, lineHeight: 20 },

@@ -1099,9 +1099,11 @@
         "LOCATION":"Location",        
         "CURRENT_LOCATION":"Current location",
         "EDUCATION":"Education",
+        "EDUCATIONGROUP":"Education group",
         "OCCUPATION":"Occupation",
+        "JOBDETAIL":"Job details",
         "INCOME":"Income",
-        
+
 
         "RELIGIOUSDETAIL":"Religious Details",        
         "RELIGION":"Religion",
@@ -2405,11 +2407,16 @@
         "HOMETOWN": "Select your #PROFILETYPE# hometown",
         
         "QUALIFICATION": "What is your #PROFILETYPE# highest qualification?",
+        "EDUCATIONGROUP": "Education",
+        "SELECTEDUCATIONGROUP": "Select education",
+        "SEARCHEDUCATIONGROUP": "Search education",
 
         "OCCUPATION": "What is your #PROFILETYPE# occupation?",
         "OCCUPATIONLABEL": "Occupation",
         "SELECTOCCUPATION": "Select occupation",
-        
+        "JOBDETAIL": "Job details",
+        "OCCUPATION_TXT": "Please provide a valid occupation",
+
         "INCOME": "What is your #PROFILETYPE# monthly income?",
 
         "RELIGION": "Select your #PROFILETYPE# religion",

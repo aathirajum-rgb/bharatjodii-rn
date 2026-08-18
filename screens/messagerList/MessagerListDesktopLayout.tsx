@@ -9,7 +9,6 @@ import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from '
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import MatchesDesktopNav from '../../components/matches-header/MatchesDesktopNav'
 import ContactedProfileCardDesktop from '../../components/messagerList/ContactedProfileCardDesktop'
-import { communicationBtnOnClick } from '../../service/communicationService'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
@@ -38,22 +37,22 @@ export interface MessagerListDesktopLayoutProps {
   onEmptyAction:   () => void
   onLanguagePress: () => void
   onTabPress:      (tab: FooterTab) => void
+  // JODII-499: the "photo protected" nudge card's WhatsApp button — owned by
+  // the parent screen (like onPress/onDeletedPress above) so it can run the
+  // full communicationBtnOnClick() dispatch and render whatever sheet/modal
+  // the result calls for. Previously this component called the dispatcher
+  // itself and discarded the result, so the button did nothing visible at all.
+  onWhatsApp:      (p: MatchProfile) => void
 
-  children?: ReactNode  // Toast rendered by MessagerListScreen.tsx, shown on top of this layout
+  children?: ReactNode  // Toast/sheets rendered by MessagerListScreen.tsx, shown on top of this layout
 }
 
 export default function MessagerListDesktopLayout({
   activeTab, tabLabel, tabUnreadCount, current, initialLoad, showPaywall,
   emptyHeading, emptySubtext, emptyButtonText, langCode,
-  onSwitchTab, onLoadMore, onPress, onDeletedPress, onEmptyAction, onLanguagePress, onTabPress, children,
+  onSwitchTab, onLoadMore, onPress, onDeletedPress, onEmptyAction, onLanguagePress, onTabPress, onWhatsApp, children,
 }: MessagerListDesktopLayoutProps) {
   const { t } = useTranslation()
-
-  // Angular: "photo protected" nudge card's WhatsApp button — same reveal-
-  // contact dispatcher every other screen's WhatsApp button already uses.
-  function handleWhatsApp(profile: MatchProfile) {
-    communicationBtnOnClick('messagerlist', 'whatsapp', { MATRIID: profile.profileId }).catch(() => {})
-  }
 
   function renderItem({ item }: { item: MatchProfile }) {
     return (
@@ -61,7 +60,7 @@ export default function MessagerListDesktopLayout({
         profile={item}
         onPress={() => onPress(item)}
         onDeletedPress={onDeletedPress}
-        onWhatsApp={() => handleWhatsApp(item)}
+        onWhatsApp={() => onWhatsApp(item)}
       />
     )
   }

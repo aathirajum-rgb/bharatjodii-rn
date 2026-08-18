@@ -18,6 +18,22 @@ export function _debugLastViewProfileResult(): any {
   return _lastRawResult
 }
 
+// JODII-499: Angular's chat.service.ts/messages.component.ts show a dedicated
+// "Invalid MatriID" toast for RESPONSECODE==2 && ERRCODE==3 (checked in three
+// near-identical, uncentralized call sites there, all off the chatCount API).
+// There's no chat-thread screen in this port yet to reuse that exact call site,
+// so this is surfaced at the closest reachable RN equivalent — viewing a
+// profile by a bad matriId — via the same one-shot "debug slot" pattern as
+// _lastRawResult above, rather than changing getViewProfile()'s return shape
+// (which ~15 other call sites in ViewProfileScreen.tsx depend on staying a
+// plain Record<string,any> | null).
+let _lastInvalidMatriIdMessage: string | null = null
+export function _consumeInvalidMatriIdMessage(): string | null {
+  const msg = _lastInvalidMatriIdMessage
+  _lastInvalidMatriIdMessage = null
+  return msg
+}
+
 export async function getViewProfile(matriId: string): Promise<Record<string, any> | null> {
   const [userId, entryType, session] = await Promise.all([
     getItem(SK.Auth.USER_ID),
@@ -39,6 +55,11 @@ export async function getViewProfile(matriId: string): Promise<Record<string, an
   if (result?.RESPONSECODE == 1 && result?.ERRCODE == 0) {
     const payload = result.REPONSE
     return payload && typeof payload === 'object' ? payload : null
+  }
+  if (result?.RESPONSECODE == 2 && result?.ERRCODE == 3) {
+    _lastInvalidMatriIdMessage = String(
+      result?.RESPONSE?.MSG ?? result?.RESPONSE?.MESSAGE ?? result?.MSG ?? 'Invalid MatriID',
+    )
   }
   return null
 }

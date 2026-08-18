@@ -8,17 +8,23 @@
 // actions — just "View full profile".
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, FlatList, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
+import BottomSheet from '../../components/bottom-sheet/BottomSheet'
+import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
+import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import ContactedProfileCard from '../../components/messagerList/ContactedProfileCard'
 import MessagerListDesktopLayout from './MessagerListDesktopLayout'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import { useContactGating } from '../../hooks/useContactGating'
+import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { fetchActivityListingPage } from '../../service/activityService'
 import { redirectToViewProfile } from '../../service/buttonService'
+import { communicationBtnOnClick, shouldSkipPhoneConfirm } from '../../service/communicationService'
 import { openMembershipTab, paymentTrack } from '../../service/paymentService'
 import { fetchNotifCount } from '../../service/homeService'
 import { getSessionValue } from '../../service/registrationService'
@@ -54,6 +60,8 @@ export default function MessagerListScreen({ navigation }: Props) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const isDesktop = useIsDesktopWeb()
+  const gating = useContactGating()
+  const phoneInfo = usePhoneInfoSheet()
 
   const [activeTab,   setActiveTab]   = useState<MessageTab>('whoseviewednumber')
   const [initialLoad, setInitialLoad] = useState(true)
@@ -69,8 +77,79 @@ export default function MessagerListScreen({ navigation }: Props) {
   const [viewedTabs, setViewedTabs] = useState<Record<string, boolean>>({})
   const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
 
+  // JODII-499: "photo protected" nudge card's WhatsApp button (desktop only —
+  // see MessagerListDesktopLayout.tsx/ContactedProfileCardDesktop.tsx) — same
+  // confirm → communicationBtnOnClick → result dispatch every other screen's
+  // Call/WhatsApp button already uses (ActivityScreen.tsx/ViewLaterScreen.tsx/
+  // IgnoredProfilesDesktopScreen.tsx). Previously this button called the
+  // dispatcher and threw the result away, so it did nothing visible at all.
+  const [contactConfirm, setContactConfirm] = useState<{ profile: MatchProfile; action: 'call' | 'whatsapp' } | null>(null)
+  const [contactDetails, setContactDetails] = useState<{
+    name: string; mobile?: string | undefined; dialNumber?: string | undefined; whatsappNumber?: string | undefined
+    showCounter?: boolean | undefined; viewedCount?: string | undefined; totalCount?: string | undefined
+    idVerified?: boolean | undefined
+  } | null>(null)
+  const [whatsappPaywallProfile, setWhatsappPaywallProfile] = useState<MatchProfile | null>(null)
+
   function showToast(message: string) {
     setToastRequest({ message, key: Date.now() })
+  }
+
+  function confirmThenContact(profile: MatchProfile, action: 'call' | 'whatsapp') {
+    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, gating.indNumbersLeft, gating.ownEntryType)) {
+      handleContactConfirmYes({ profile, action })
+    } else {
+      setContactConfirm({ profile, action })
+    }
+  }
+
+  function getContactConfirmContent(): string {
+    if (!contactConfirm) return ''
+    const question = t('VIEWPROFILE.VIEWPHONECONFIRM')
+      .replace('#HISHER#', t(`PRONOUN.${gating.oppGender}.hisher`))
+      .replace('#HIMHER#', t(`PRONOUN.${gating.oppGender}.himher`))
+    const quota = t('VIEWPROFILE.VIEWPHONEDETAIL')
+      .replace('#VAR#', gating.contactQuota.viewed)
+      .replace('#VAR1#', gating.contactQuota.left)
+      .replace('#VAR2#', gating.contactQuota.expiry)
+    return `${question}\n\n${quota}`
+  }
+
+  function handleContactConfirmClose() {
+    setContactConfirm(null)
+  }
+
+  async function handleContactConfirmYes(override?: { profile: MatchProfile; action: 'call' | 'whatsapp' }) {
+    const pending = override ?? contactConfirm
+    if (!pending) return
+    const { profile, action } = pending
+    setContactConfirm(null)
+    try {
+      const result = await communicationBtnOnClick('messagerlist', action, { MATRIID: profile.profileId })
+      if (result.type === 'show_contact') {
+        setContactDetails({
+          name: profile.name, mobile: result.mobile, dialNumber: result.dialNumber, whatsappNumber: result.whatsappNumber,
+          showCounter: result.showCounter, viewedCount: result.viewedCount, totalCount: result.totalCount,
+          idVerified: profile.isIdVerified,
+        })
+      } else if (result.type === 'payment_promo') {
+        if (action === 'whatsapp') setWhatsappPaywallProfile(profile)
+        else navigation.navigate('recharge')
+      } else if (result.type === 'error') {
+        showToast(result.message)
+      } else {
+        await phoneInfo.handleResult(result)
+      }
+    } catch { /* silent — matches this app's established convention */ }
+  }
+
+  function handleContactDetailsClose() { setContactDetails(null) }
+  function handleContactDetailsCall() {
+    if (contactDetails?.dialNumber) Linking.openURL(`tel:${contactDetails.dialNumber}`)
+  }
+  function handleContactDetailsWhatsApp() {
+    const num = contactDetails?.whatsappNumber?.replace(/\D/g, '')
+    if (num) Linking.openURL(`https://wa.me/${num}`)
   }
 
   // ── Data helpers ─────────────────────────────────────────────────────────────
@@ -260,7 +339,46 @@ export default function MessagerListScreen({ navigation }: Props) {
         onEmptyAction={handleEmptyAction}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
         onTabPress={handleTabPress}
+        onWhatsApp={(p) => confirmThenContact(p, 'whatsapp')}
       >
+        <BottomSheet
+          visible={!!contactConfirm}
+          type="viewPhoneConfirm"
+          data={{ content: getContactConfirmContent(), ctaLabel: t('ACCOUNT.YES', 'Yes') }}
+          onClose={handleContactConfirmClose}
+          onPrimaryPress={handleContactConfirmYes}
+        />
+        {contactDetails && (
+          <ContactDetailsSheet
+            visible
+            name={contactDetails.name}
+            mobile={contactDetails.mobile}
+            whatsappNumber={contactDetails.whatsappNumber}
+            showCounter={contactDetails.showCounter}
+            viewedCount={contactDetails.viewedCount}
+            totalCount={contactDetails.totalCount}
+            showNotVerifiedNote={!contactDetails.idVerified && gating.loginGender === 'F'}
+            onClose={handleContactDetailsClose}
+            onCall={handleContactDetailsCall}
+            onWhatsApp={handleContactDetailsWhatsApp}
+          />
+        )}
+        <WhatsAppPaywallModal
+          visible={!!whatsappPaywallProfile}
+          profile={whatsappPaywallProfile}
+          oppGender={gating.oppGender}
+          onClose={() => setWhatsappPaywallProfile(null)}
+          onPayNow={() => { setWhatsappPaywallProfile(null); navigation.navigate('recharge') }}
+        />
+        <BottomSheet
+          visible={!!phoneInfo.sheet}
+          type="phonePrivacyInfo"
+          data={phoneInfo.getData(t)}
+          onClose={phoneInfo.close}
+          onPrimaryPress={() => phoneInfo.primaryPress(navigation)}
+          onSecondaryPress={() => phoneInfo.secondaryPress(navigation)}
+          onLinkPress={phoneInfo.close}
+        />
         <Toast request={toastRequest} />
       </MessagerListDesktopLayout>
     )

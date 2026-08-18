@@ -44,7 +44,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
 import { Image } from 'expo-image'
 import DesktopPageShell from '../../components/desktop-page-shell/DesktopPageShell'
 import DesktopSelectField, { type SelectOption } from '../../components/desktop-select-field/DesktopSelectField'
@@ -71,6 +71,8 @@ import {
   fetchReligionOptions, fetchCasteOptions, fetchRaasiOptions, fetchStarOptions, fetchDoshamOptions,
   fetchDrinkingHabitOptions, fetchSmokingHabitOptions, fetchEatingHabitOptions, fetchPropertyOptions,
   fetchProfileCreatedByOptions, fetchMaritalStatusOptions, fetchPhysicalStatusOptions, getRegValue,
+  fetchEducationGroupOptions, isEducationGroupEligible, isJobDetailEligible,
+  isValidJobDetailFormat, updateFewMoreDetail,
 } from '../../service/registrationService'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 
@@ -169,7 +171,10 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
 
   // ── Professional details ──
   const [education, setEducation]   = useState<Opt | null>(null)
+  const [educationGroup, setEducationGroup] = useState<Opt | null>(null)
   const [occupation, setOccupation] = useState<Opt | null>(null)
+  const [jobDetail, setJobDetail]   = useState('')
+  const [jobDetailError, setJobDetailError] = useState<string | undefined>(undefined)
   const [income, setIncome]         = useState<Opt | null>(null)
 
   // ── Religious details ──
@@ -191,7 +196,8 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
   const [original, setOriginal] = useState<{
     motherTongue?: string | undefined; state?: string | undefined; city?: string | undefined
     homeState?: string | undefined; homeCity?: string | undefined
-    education?: string | undefined; occupation?: string | undefined; income?: string | undefined
+    education?: string | undefined; educationGroup?: string | undefined
+    occupation?: string | undefined; jobDetail?: string | undefined; income?: string | undefined
     religion?: string | undefined; caste?: string | undefined; raasi?: string | undefined
     star?: string | undefined; dosham?: string | undefined
     eating?: string | undefined; properties: string[]
@@ -204,6 +210,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
   const [cityOptions, setCityOptions]                   = useState<Opt[]>([])
   const [homeCityOptions, setHomeCityOptions]           = useState<Opt[]>([])
   const [educationOptions, setEducationOptions]         = useState<Opt[]>([])
+  const [educationGroupOptions, setEducationGroupOptions] = useState<Opt[]>([])
   const [occupationOptions, setOccupationOptions]       = useState<Opt[]>([])
   const [incomeOptions, setIncomeOptions]               = useState<Opt[]>([])
   const [religionOptions, setReligionOptions]           = useState<Opt[]>([])
@@ -243,7 +250,8 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     setOriginal({
       motherTongue: info.motherTongue, state: info.state, city: info.city,
       homeState: info.homeState, homeCity: info.homeCity,
-      education: info.education, occupation: info.occupation, income: info.income,
+      education: info.education, educationGroup: info.educationGroup,
+      occupation: info.occupation, jobDetail: info.jobDetail, income: info.income,
       religion: info.religion, caste: info.caste, raasi: info.raasi, star: info.star,
       dosham: info.doshamType?.[0] ?? info.dosham,
       eating: info.eatingHabits,
@@ -305,11 +313,12 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     setNoOfChildren(CHILDREN_OPTIONS.find(o => o.key === info.noOfChildren) ?? null)
     setPhysicalStatus(physicalStatusList.find(o => o.key === info.physicalStatus) ?? null)
 
-    const [cityList, homeCityList, casteList, starList] = await Promise.all([
+    const [cityList, homeCityList, casteList, starList, educationGroupList] = await Promise.all([
       info.state ? fetchCities(info.state) : Promise.resolve([]),
       info.homeState ? fetchCities(info.homeState) : Promise.resolve([]),
       info.religion ? fetchCasteOptions(info.religion, info.motherTongue ?? '') : Promise.resolve([]),
       info.raasi ? fetchStarOptions(info.raasi) : Promise.resolve([]),
+      (info.education && isEducationGroupEligible(info.education)) ? fetchEducationGroupOptions(info.education) : Promise.resolve([]),
     ])
     setCityOptions(cityList)
     setHomeCityOptions(homeCityList)
@@ -319,6 +328,9 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     setHomeCity(homeCityList.find(o => o.key === info.homeCity) ?? null)
     setCaste(casteList.find(o => o.key === info.caste) ?? null)
     setStar(starList.find(o => o.key === info.star) ?? null)
+    setEducationGroupOptions(educationGroupList)
+    setEducationGroup(educationGroupList.find(o => o.key === info.educationGroup) ?? null)
+    setJobDetail(info.jobDetail ?? '')
 
     // See ReligiousDetailsScreen.tsx's header comment on this same fix — the
     // Yes/No dosham list is static reference data (like fetchRaasiOptions()'s
@@ -358,6 +370,21 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     if (opt.key === homeState?.key) return
     setHomeCity(null)
     setHomeCityOptions(await fetchCities(opt.key))
+  }
+
+  async function handleSelectEducation(opt: Opt) {
+    setEducation(opt)
+    if (opt.key === education?.key) return
+    setEducationGroup(null)
+    setEducationGroupOptions(isEducationGroupEligible(opt.key) ? await fetchEducationGroupOptions(opt.key) : [])
+  }
+
+  function handleSelectOccupation(opt: Opt) {
+    setOccupation(opt)
+    if (opt.key !== occupation?.key && !isJobDetailEligible(opt.key)) {
+      setJobDetail('')
+      setJobDetailError(undefined)
+    }
   }
 
   async function handleSelectReligion(opt: Opt) {
@@ -533,6 +560,15 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
 
   async function handleSave() {
     if (saving) return
+
+    // JODII-490: Job Detail format check happens client-side first — mirrors
+    // Angular's edit-profile submitOccupation() blocking behavior (see
+    // registrationService.ts's isValidJobDetailFormat() header comment).
+    if (jobDetail && !isValidJobDetailFormat(jobDetail)) {
+      setJobDetailError(t('REGISTRATION.OCCUPATION_TXT', 'Please provide a valid occupation'))
+      return
+    }
+    setJobDetailError(undefined)
     setSaving(true)
 
     const changes: FieldChange[] = []
@@ -594,12 +630,38 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     }
     // Drinking/Smoking intentionally excluded — see file header note.
 
-    if (changes.length === 0) {
+    const educationGroupEligible = isEducationGroupEligible(education?.key ?? '')
+    const jobDetailEligible      = isJobDetailEligible(occupation?.key ?? '')
+    const educationGroupValue    = educationGroupEligible ? (educationGroup?.key ?? '') : ''
+    const jobDetailValue         = jobDetailEligible ? jobDetail.trim() : ''
+    const educationGroupChanged  = educationGroupValue !== (original.educationGroup ?? '')
+    const jobDetailChanged       = jobDetailValue !== (original.jobDetail ?? '')
+
+    if (changes.length === 0 && !educationGroupChanged && !jobDetailChanged) {
       setSaving(false)
       return
     }
 
-    const result = await submitFieldChanges(changes)
+    const result = changes.length > 0
+      ? await submitFieldChanges(changes)
+      : { succeeded: [], failed: [] }
+
+    // Job Detail save can be rejected by the server (OCCDETAILSVALID) — stop
+    // here with a visible error, same as Angular's edit-profile flow.
+    if (jobDetailChanged) {
+      const { valid } = await updateFewMoreDetail('OCCDETAILS', jobDetailValue)
+      if (!valid) {
+        setSaving(false)
+        setJobDetailError(t('REGISTRATION.OCCUPATION_TXT', 'Please provide a valid occupation'))
+        return
+      }
+    }
+    // Education Group has no equivalent validity flag in the Angular source —
+    // fire-and-forget, same as onboarding.
+    if (educationGroupChanged) {
+      await updateFewMoreDetail('EDUDETAILS', educationGroupValue)
+    }
+
     setSaving(false)
 
     if (result.failed.length > 0) {
@@ -769,12 +831,30 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
           <Text style={s.sectionTitle}>Professional details</Text>
           <View style={s.grid}>
             <View style={[s.cell, rowZ(0)]}>
-              <DesktopSelectField label={t('EDITPROFILE.EDUCATION')} options={educationOptions} selectedKey={education?.key ?? null} onSelect={setEducation} />
+              <DesktopSelectField label={t('EDITPROFILE.EDUCATION')} options={educationOptions} selectedKey={education?.key ?? null} onSelect={handleSelectEducation} />
             </View>
-            <View style={[s.cell, rowZ(0)]}>
-              <DesktopSelectField label={t('EDITPROFILE.OCCUPATION')} options={occupationOptions} selectedKey={occupation?.key ?? null} onSelect={setOccupation} />
-            </View>
+            {isEducationGroupEligible(education?.key ?? '') && (
+              <View style={[s.cell, rowZ(0)]}>
+                <DesktopSelectField
+                  label={t('EDITPROFILE.EDUCATIONGROUP', 'Education group')} options={educationGroupOptions}
+                  selectedKey={educationGroup?.key ?? null} onSelect={setEducationGroup}
+                  placeholder={t('REGISTRATION.SELECTEDUCATIONGROUP', 'Select education')}
+                />
+              </View>
+            )}
             <View style={[s.cell, rowZ(1)]}>
+              <DesktopSelectField label={t('EDITPROFILE.OCCUPATION')} options={occupationOptions} selectedKey={occupation?.key ?? null} onSelect={handleSelectOccupation} />
+            </View>
+            {isJobDetailEligible(occupation?.key ?? '') && (
+              <View style={[s.cell, rowZ(1)]}>
+                <DesktopTextField
+                  label={t('EDITPROFILE.JOBDETAIL', 'Job details')} value={jobDetail}
+                  onChangeText={text => { setJobDetail(text); setJobDetailError(undefined) }}
+                  errorMessage={jobDetailError} maxLength={60}
+                />
+              </View>
+            )}
+            <View style={[s.cell, rowZ(2)]}>
               <DesktopSelectField label={t('EDITPROFILE.INCOME')} options={incomeOptions} selectedKey={income?.key ?? null} onSelect={setIncome} disabled={!incomeEditable} />
             </View>
           </View>
@@ -866,6 +946,57 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     </DesktopPageShell>
   )
 }
+
+// Free-text counterpart to DesktopSelectField — visually matches it (56px
+// bordered field, floating label above the border once filled) but no other
+// screen in this file needs a plain text grid cell today, so this stays a
+// small file-local component rather than a new shared one.
+function DesktopTextField({ label, value, onChangeText, placeholder, errorMessage, maxLength }: {
+  label: string
+  value: string
+  onChangeText: (text: string) => void
+  placeholder?: string
+  errorMessage?: string | undefined
+  maxLength?: number
+}) {
+  const [focused, setFocused] = useState(false)
+  return (
+    <View style={dtf.wrapper}>
+      <View style={[dtf.field, focused && dtf.fieldFocused, !!errorMessage && dtf.fieldError]}>
+        <TextInput
+          style={dtf.input}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder ?? label}
+          placeholderTextColor={Colors.textSecondary}
+          maxLength={maxLength}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+        />
+      </View>
+      {!!value && (
+        <View style={dtf.labelBadge} pointerEvents="none">
+          <Text style={dtf.labelText}>{label}</Text>
+        </View>
+      )}
+      {!!errorMessage && <Text style={dtf.errorText}>{errorMessage}</Text>}
+    </View>
+  )
+}
+
+const dtf = StyleSheet.create({
+  wrapper: { position: 'relative' },
+  field: {
+    height: 56, borderWidth: 1, borderColor: Colors.inputBorder, borderRadius: 8,
+    paddingHorizontal: 16, justifyContent: 'center', backgroundColor: Colors.surface,
+  },
+  fieldFocused: { borderColor: Colors.primaryDark },
+  fieldError: { borderColor: Colors.inputError },
+  input: { fontSize: 15, fontWeight: '500', color: Colors.textPrimary, padding: 0 },
+  labelBadge: { position: 'absolute', top: -9, left: 12, backgroundColor: Colors.surface, paddingHorizontal: 4 },
+  labelText: { fontSize: 12, fontWeight: '400', color: Colors.textSecondary },
+  errorText: { marginTop: 4, fontSize: 12, color: Colors.inputError },
+})
 
 // main(700) minus card's 20px padding on each side leaves 660px of content
 // width; two columns + the grid's 20px gap must fit inside that — 320*2+20=660.

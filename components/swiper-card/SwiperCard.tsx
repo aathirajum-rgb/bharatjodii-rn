@@ -141,6 +141,8 @@ export interface SwiperCardProps {
   onLikePress?:     ((item: SwiperItem, index: number) => void) | undefined
   onViewMorePress?: (() => void) | undefined
   onSeeAllPress?:   (() => void) | undefined
+  // Photo-protected/no-photo overlay's WhatsApp CTA — see ProfilePhoto.tsx.
+  onWhatsAppPress?: ((item: SwiperItem, index: number) => void) | undefined
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -170,6 +172,7 @@ export default function SwiperCard({
   onLikePress,
   onViewMorePress,
   onSeeAllPress,
+  onWhatsAppPress,
 }: SwiperCardProps) {
   const { t } = useTranslation()
   // Angular: card-htN classes set min-width === min-height per section — reuse
@@ -269,6 +272,7 @@ export default function SwiperCard({
               viewMoreContent={item.viewMoreContent}
               onPress={() => onCardPress?.(item, index)}
               onLikePress={() => onLikePress?.(item, index)}
+              onWhatsApp={() => onWhatsAppPress?.(item, index)}
               onViewMorePress={onViewMorePress}
             />
           </View>

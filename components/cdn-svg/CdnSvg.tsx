@@ -38,11 +38,13 @@ export default function CdnSvg({ uri, width, height, style }: Props) {
 // which displays either raster or SVG fine, so the real source data doesn't
 // pin down which one it'll send. Branching on the extension keeps this correct
 // either way instead of guessing.
-export function CdnImage({ uri, width, height, style, onError }: Props & { onError?: () => void }) {
+export function CdnImage({
+  uri, width, height, style, onError, resizeMode = 'contain',
+}: Props & { onError?: () => void; resizeMode?: 'contain' | 'cover' | 'stretch' }) {
   if (/\.svg(\?|$)/i.test(uri)) {
     return <CdnSvg uri={uri} width={width} height={height} style={style} />
   }
-  return <Image source={{ uri }} style={[{ width, height }, style]} resizeMode="contain" onError={onError} />
+  return <Image source={{ uri }} style={[{ width, height }, style]} resizeMode={resizeMode} onError={onError} />
 }
 
 // For an SVG used the way CSS `background-image` would (Angular: e.g.

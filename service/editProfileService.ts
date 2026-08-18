@@ -86,7 +86,12 @@ export interface EditProfileInfo {
   homeCity?:   string | undefined
 
   education?:  string | undefined   // Angular's EDUCATION → QUALIFICATION
+  // JODII-490: raw EDUDETAILS/OCCDETAILS values, saved via the dedicated
+  // registration/updprofileinfo/v1 endpoint (registrationService.ts's
+  // updateFewMoreDetail()) — NOT part of the FIELD_TYPE_CODE map below.
+  educationGroup?: string | undefined
   occupation?: string | undefined
+  jobDetail?:  string | undefined
   income?:     string | undefined   // Angular's MONTHLYINCOME → INCOME
   incomeType?: string | undefined
 
@@ -209,8 +214,10 @@ export async function fetchEditProfileInfo(): Promise<EditProfileInfo | null> {
     homeState:  r['HOMESTATE'],
     homeCity:   r['HOMECITY'],
 
-    education:  r['EDUCATION'],
-    occupation: r['OCCUPATION'],
+    education:      r['EDUCATION'],
+    educationGroup: r['EDUDETAILS'],
+    occupation:     r['OCCUPATION'],
+    jobDetail:      r['OCCDETAILS'],
     income:     r['MONTHLYINCOME'],
     incomeType: r['INCOMETYPE'],
 

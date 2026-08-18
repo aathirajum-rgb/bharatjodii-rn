@@ -47,6 +47,9 @@ export const Endpoints = {
     signzyVerifyOtp:     `${api}registration/signzotpverify/v1`,
     successStory:        `${api}registration/successstory/v1`,
     monthlyIncome:       `${api}registrationform/v1`,
+    // JODII-490: saves/clears EDUGROUP ("EDUDETAILS") or JOBDETAIL ("OCCDETAILS")
+    // — see registrationService.ts's updateFewMoreDetail().
+    updateProfileInfo:   `${api}registration/updprofileinfo/v1`,
   },
 
   profile: {
@@ -167,7 +170,11 @@ export const Endpoints = {
   notify: {
     femaleFree:          `${api}notify/femalefree/v1`,
     paymentFailed:       `${api}notify/paymentfailed/v1`,
-    registerToken:       `${api}notify/registertoken/v1`,
+    // registerToken (notify/registertoken/v1) removed — it was a guessed,
+    // unconfirmed endpoint using Expo push tokens (TOKEN/PLATFORM/TYPE fields).
+    // The real backend contract has no dedicated register-device endpoint:
+    // the FCM token rides piggybacked as REGISTERID on login/verifyotp/
+    // autologin/partialreg (see service/notificationService.ts).
   },
 
   aadhaar: {

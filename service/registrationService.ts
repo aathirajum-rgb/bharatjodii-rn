@@ -672,6 +672,98 @@ export async function fetchQualificationOptions(): Promise<Array<{ key: string; 
   return []
 }
 
+// ─── Education Group / Job Detail (JODII-490 equivalent) ─────────────────────
+// Angular: registration-revamp.component.ts's isEduDetailEligible()/
+// isJobDetailEligible() (registration.config.ts's EDU_DETAIL_KEYS = ['1','2'],
+// JOB_DETAIL_HIDE_OCCUPATION = '8'). These are server-driven option codes, not
+// client constants — assumed identical here since RN and Angular hit the same
+// backend; re-verify against a live qualification/occupation options list if
+// they ever diverge.
+const EDU_DETAIL_QUALIFICATION_KEYS = ['1', '2']
+const JOB_DETAIL_HIDE_OCCUPATION_KEY = '8'
+
+export function isEducationGroupEligible(qualification: string): boolean {
+  return EDU_DETAIL_QUALIFICATION_KEYS.includes(String(qualification ?? ''))
+}
+
+export function isJobDetailEligible(occupation: string): boolean {
+  const occ = String(occupation ?? '')
+  return occ !== '' && occ !== JOB_DETAIL_HIDE_OCCUPATION_KEY
+}
+
+// Angular: registration-revamp.component.ts's buildEducationDetailGroups()/
+// normalizeEducationDetails() read REGISTRATIONARRAYS.EDUCATIONDETAILS — raw
+// { MASTER: {cat: {eduKey: label}}, BACHELOR: {...}, COMMON: {...} } — already
+// present in the same type=all bootstrap this file caches everywhere else, so
+// (unlike Subcaste) this needs no dedicated network call, just a flatten of
+// the cached array for the given qualification plus the always-appended
+// COMMON group. Angular also groups results by EDUCATIONCATEGORY for a
+// section-header UI; SearchablePicker has no section-header support, so this
+// returns one flat list — matches the ungrouped fallback Angular itself uses
+// when category data is unavailable.
+export async function fetchEducationGroupOptions(
+  qualification: string,
+): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const raw  = data?.EDUCATIONDETAILS
+  if (!raw || typeof raw !== 'object') return []
+
+  const flatten = (grouped: any): Record<string, string> => {
+    if (!grouped || typeof grouped !== 'object') return {}
+    const isNested = Object.values(grouped).some(v => v && typeof v === 'object')
+    if (!isNested) return grouped as Record<string, string>
+    const flat: Record<string, string> = {}
+    Object.values(grouped).forEach((cat: any) => {
+      if (cat && typeof cat === 'object') Object.assign(flat, cat)
+    })
+    return flat
+  }
+
+  const groupKey  = qualification === '1' ? 'MASTER' : qualification === '2' ? 'BACHELOR' : null
+  const groupMap  = groupKey ? flatten(raw[groupKey]) : {}
+  const commonMap = flatten(raw['COMMON'])
+
+  const toOptions = (obj: Record<string, string>) =>
+    Object.entries(obj).map(([key, label]) => ({ key, label: String(label) }))
+
+  return [...toOptions(groupMap), ...toOptions(commonMap)].filter(o => o.key !== '')
+}
+
+// Saves or clears EDUGROUP/JOBDETAIL against the live profile.
+// Angular: registration.service.ts's updateRegProfileInfo(fieldName, value) →
+// POST registration/updprofileinfo/v1 (ID + <fieldKey>=<value>). The response
+// carries OCCDETAILSVALID for JOBDETAIL saves ('1' = accepted, anything else =
+// rejected); no equivalent flag exists for EDUGROUP saves anywhere in the
+// Angular source, so an absent flag is treated as accepted for both fields —
+// matches Angular's actual (not necessarily intentional) behavior.
+export type FewMoreDetailFieldKey = 'EDUDETAILS' | 'OCCDETAILS'
+
+export async function updateFewMoreDetail(
+  fieldKey: FewMoreDetailFieldKey,
+  value: string,
+): Promise<{ valid: boolean }> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const res = await apiCall(
+    Endpoints.registration.updateProfileInfo,
+    'POST',
+    `ID=${userId}&${fieldKey}=${encodeURIComponent(value)}`,
+  )
+  const validFlag = res?.RESPONSE?.OCCDETAILSVALID ?? res?.OCCDETAILSVALID
+  const valid = validFlag === undefined || validFlag === null || String(validFlag) === '1'
+  return { valid }
+}
+
+// Job Detail free-text format check.
+// Angular: registration-functions.ts's symbolsOnlyAllowDotComma() plus the
+// form's Validators.pattern — letters/marks/spaces/./, only, no digits,
+// minimum 3 trimmed characters. Empty string is always valid (field is optional).
+export function isValidJobDetailFormat(value: string): boolean {
+  const trimmed = value.trim()
+  if (trimmed === '') return true
+  if (trimmed.length < 3) return false
+  return /^[\p{L}\p{M}\s.,]*$/u.test(value)
+}
+
 // Fetches height CATEGORY options (Below average / Average / Above average / Tall)
 // Angular: apiResponse["HEIGHTMALE"] / ["HEIGHTFEMALE"] — labels contain HTML (strips on return).
 export async function fetchHeightCategoryOptions(

@@ -26,31 +26,52 @@ export default function LikedProfilesSection({
   likedTab, onTabChange, likedByMe, likedByMeTotal, likedMe, likedMeTotal, onCardPress, onSeeAllPress,
 }: Props) {
   const avatarFallback = useOppGenderAvatarUrl()
-  const items = likedTab === 'likedbyme' ? likedByMe : likedMe
-  const total = likedTab === 'likedbyme' ? likedByMeTotal : likedMeTotal
+
+  // Angular: app-swiper.component.ts's hasLikedYouData()/hasLikedByMeData() +
+  // showLikedProfileTabs — the tab switcher only makes sense when BOTH sides
+  // have data; otherwise it's a dead "(0)" pill with nothing to switch to.
+  // NOT ORing in `.length > 0` here (unlike Angular) — this port's likedMe/
+  // likedByMe arrays can keep showing leftover mock placeholder data when the
+  // real fetch legitimately returns zero items (HomeScreen's loadHome() only
+  // calls setLikedMe/setLikedByMe when the result is non-empty), which
+  // previously kept a "(0)" tab visible. likedByMeTotal/likedMeTotal are
+  // already the trustworthy comTotalFor(comCount, ...) values by the time
+  // they reach this component — no mock fallback on those.
+  const hasLikedByMe = likedByMeTotal > 0
+  const hasLikedMe   = likedMeTotal > 0
+  const showTabs = hasLikedByMe && hasLikedMe
+
+  const items = showTabs
+    ? (likedTab === 'likedbyme' ? likedByMe : likedMe)
+    : hasLikedByMe ? likedByMe : likedMe
+  const total = showTabs
+    ? (likedTab === 'likedbyme' ? likedByMeTotal : likedMeTotal)
+    : hasLikedByMe ? likedByMeTotal : likedMeTotal
 
   if (likedByMeTotal === 0 && likedMeTotal === 0) return null
 
   return (
     <View style={{ gap: 24 }}>
-      <View style={s.tabs}>
-        <Pressable
-          style={[s.tabPill, likedTab === 'likedbyme' && s.tabPillActive]}
-          onPress={() => onTabChange('likedbyme')}
-        >
-          <Text style={[s.tabText, likedTab === 'likedbyme' && s.tabTextActive]}>
-            {`Liked by you (${likedByMeTotal})`}
-          </Text>
-        </Pressable>
-        <Pressable
-          style={[s.tabPill, likedTab === 'likedyou' && s.tabPillActive]}
-          onPress={() => onTabChange('likedyou')}
-        >
-          <Text style={[s.tabText, likedTab === 'likedyou' && s.tabTextActive]}>
-            {`Liked you (${likedMeTotal})`}
-          </Text>
-        </Pressable>
-      </View>
+      {showTabs && (
+        <View style={s.tabs}>
+          <Pressable
+            style={[s.tabPill, likedTab === 'likedbyme' && s.tabPillActive]}
+            onPress={() => onTabChange('likedbyme')}
+          >
+            <Text style={[s.tabText, likedTab === 'likedbyme' && s.tabTextActive]}>
+              {`Liked by you (${likedByMeTotal})`}
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[s.tabPill, likedTab === 'likedyou' && s.tabPillActive]}
+            onPress={() => onTabChange('likedyou')}
+          >
+            <Text style={[s.tabText, likedTab === 'likedyou' && s.tabTextActive]}>
+              {`Liked you (${likedMeTotal})`}
+            </Text>
+          </Pressable>
+        </View>
+      )}
 
       <CarouselSection
         title={`Liked profiles (${total})`}

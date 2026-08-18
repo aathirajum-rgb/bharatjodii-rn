@@ -500,6 +500,20 @@ export async function fetchMatches(start = 0, limit = 20, quickFilters?: QuickFi
   return toListingResult(res)
 }
 
+// ─── Home's "All Matches" preview ───────────────────────────────────────────────
+// Angular: explore.component.ts's getAllMatches() — a DIFFERENT, narrower param
+// string than the Matches screen's own callMatchesApi() (fetchMatches() above):
+// LIMIT=50, no BANNERFLAG/LOGINCOUNT/FREEMATCHFLAG/EKYCFLAG. Home's preview row
+// never shows banner slots or the freematch paywall gate, so those params don't
+// apply here.
+
+export async function fetchHomeAllMatches(): Promise<ListingResult> {
+  const userId = await getItem(StorageKeys.Auth.USER_ID)
+  const params = `ID=${userId ?? ''}&START=0&LIMIT=50&LIKED=1&VIEWED=0&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&MYHOME=1`
+  const res = await apiCall(Endpoints.listing.matches, 'POST', params)
+  return toListingResult(res)
+}
+
 // ─── Explore by category ───────────────────────────────────────────────────────
 // Angular: callMatchesApi() explorePage branch (matches.page.ts:988-1002) — same
 // listing shape as fetchMatches, filtered to one category (FILTERTYPE) instead of
@@ -645,6 +659,15 @@ export async function fetchLikedYou(): Promise<ListingResult> {
 // array together, keeps items with COUNT > 0). This one call is Home's entire
 // data source for the section — there's no separate "list categories" call.
 
+// Angular: filter.service.ts's reDirectFromExplore() — exploreTypeObj remaps
+// just these 3 FILTER values before navigating; every other FILTER passes
+// through unchanged.
+const EXPLORE_TYPE_REMAP: Record<string, string> = {
+  INCOME: 'byincome',
+  STAR: 'bystar',
+  EDUCATION: 'byeducation',
+}
+
 function discoverKeyTypes(discoverKey: unknown): string {
   if (!Array.isArray(discoverKey)) return ''
   return discoverKey
@@ -676,8 +699,15 @@ export async function fetchExploreCategories(discoverKey?: unknown): Promise<Exp
       // Angular: explore-card.component.html's ACTIVE (non-commented) template
       // reads exploreData.TITLE (count already baked in server-side, no separate
       // count element) and exploreData.ICON (a small icon, not a full tile image).
-      id:       item['FILTER'] ?? String(idx),
-      label:    String(item['TITLE'] ?? ''),
+      // filter.service.ts's reDirectFromExplore() remaps exactly these 3 FILTER
+      // values before using them as the matches-page route param (and thus the
+      // FILTERTYPE sent to listing/explore/v1) — everything else passes through.
+      id:       EXPLORE_TYPE_REMAP[item['FILTER']] ?? item['FILTER'] ?? String(idx),
+      // Angular renders TITLE via [innerHTML], so a literal "<br>" inside it
+      // (confirmed live: "With matching <br> stars") becomes a real line
+      // break there. RN's <Text> doesn't interpret HTML, so left as-is this
+      // showed the raw "<br>" characters — swap it for an actual newline.
+      label:    String(item['TITLE'] ?? '').replace(/<br\s*\/?>/gi, '\n'),
       count:    Number(item['COUNT'] ?? 0),
       imageUrl: String(item['ICON'] ?? ''),
       bgColor:  item['BGCOLOUR'] ?? undefined,

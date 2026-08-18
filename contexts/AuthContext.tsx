@@ -7,6 +7,7 @@ import { loadDrProfiles } from '../service/drService'
 import { refreshSession } from '../service/homeService'
 import { handlePageLanding } from '../service/pageLandingService'
 import { waitForNavigationReady } from '../utils/navigationRef'
+import { requestPermissionAndGetToken } from '../service/notificationService'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,6 +77,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // sit on a blank screen waiting on this network round-trip — this can
     // still redirect once the real answer comes back.
     if (token && userId) {
+      // Fire-and-forget — matches legacy's own "check every app open" pattern
+      // (onNewToken/re-check ran on every launch, not just first login), and
+      // must never block getting the user to their landing screen.
+      requestPermissionAndGetToken()
+
       const ready = await waitForNavigationReady()
       if (ready) {
         const { pageId } = await refreshSession()
@@ -93,6 +99,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       isNewUser: goToOnboarding,
       initialRoute,
     })
+
+    // Fire-and-forget — never block navigation on the permission prompt/token fetch.
+    requestPermissionAndGetToken()
 
     // Angular: webview.page.ts's pageLandingFunc() — case "1" (goToRegistrationPage,
     // brand-new registration) never calls loadDrProfiles, matched here by skipping

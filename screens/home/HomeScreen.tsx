@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  Alert,
   Dimensions,
   FlatList,
   Image,
@@ -26,8 +27,12 @@ import Loader from '../../components/loader/Loader'
 import StickyBanner from '../../components/sticky-banner/StickyBanner'
 import PhotoPromoSticky from '../../components/sticky-banner/PhotoPromoSticky'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
+import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
+import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
+import { useContactGating } from '../../hooks/useContactGating'
+import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
 import { openMembershipTab, paymentTrack, getHeroBannerDetails, getMenuPromo, redirectToIntermediatePage } from '../../service/paymentService'
-import { communicationBtnOnClick, fetchContactDetails } from '../../service/communicationService'
+import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import { getItem, setItem, removeItem, getJson } from '../../service/storageService'
 import { getRegistrationArrays } from '../../service/registrationService'
@@ -58,7 +63,7 @@ import {
   type ForceUpdateInfo,
 } from './homeGating'
 import {
-  fetchExploreCategories, fetchHomeSession, fetchAndStorePPSetData, fetchMatches,
+  fetchExploreCategories, fetchHomeSession, fetchAndStorePPSetData, fetchHomeAllMatches,
   fetchViewedYou, fetchDailyRec, fetchNewlyJoined, fetchViewedByMe,
   fetchLikedByMe, fetchLikedYou, fetchSuccessStories, fetchFaqVideos,
   fetchCustomerCare, fetchNotifCount, refreshSession,
@@ -71,6 +76,23 @@ import {
 const CDN = 'https://imgs.jodii.app/assets/images/svg/'
 const FWD_ICON = `${CDN}revamp/forward-icon-link.svg`
 const { width: SW } = Dimensions.get('window')
+
+// Angular: explore.component.html / discover-matches.component.html both wrap
+// the category grid in <ion-row class="... pl-4 pr-24">, with each
+// <ion-col size="5.4" offset="0.6"> in Ionic's 12-column grid — every tile
+// (including the first) is preceded by a 0.6-unit gap, and nothing follows
+// the last tile beyond the row's own 24px right padding. RN has no per-column
+// "offset" primitive, so this reproduces the same asymmetric result with
+// plain padding + a shared gap: an enlarged left padding (4px + one gap unit)
+// and a flat 24px right padding. A previous pass approximated this
+// symmetrically (24px both sides, 16px gap) "since the difference is
+// imperceptible" — it wasn't; the real left margin/gap only come out to
+// ~22px/~18px on a typical phone width, and the asymmetry itself was visible.
+const EXPLORE_ROW_PL    = 4
+const EXPLORE_ROW_PR    = 24
+const EXPLORE_GRID_UNIT = (SW - EXPLORE_ROW_PL - EXPLORE_ROW_PR) / 12
+export const EXPLORE_TILE_WIDTH = EXPLORE_GRID_UNIT * 5.4
+const EXPLORE_GRID_GAP  = EXPLORE_GRID_UNIT * 0.6
 // Angular: .success-story-image img { width: 35vw; height: 35vw }
 const HAND_SIZE = SW * 0.35
 
@@ -90,6 +112,16 @@ function buildToolbar(comCount: ComCountEntry[]): ToolbarItem[] {
 
 function comCountFor(comCount: ComCountEntry[], type: string): number {
   return Number(comCount.find(c => c.comtype === type)?.newcount ?? 0)
+}
+
+// Angular: explore.component.ts's setCountListValue() — the "Who viewed you"/
+// "Profiles you viewed"/"Liked you"/"Liked by me" section HEADER counts all
+// come from this SAME communication/newcount response's per-comtype
+// `totalCount` field, not from each section's own listing API response (which
+// is independently capped by that listing's own LIMIT param — e.g. viewedbyme's
+// LIMIT=10 — and was showing that smaller, unrelated number instead).
+function comTotalFor(comCount: ComCountEntry[], type: string): number {
+  return Number(comCount.find(c => c.comtype === type)?.totalCount ?? 0)
 }
 
 // Angular: cardMoreItemsData = cardMoreItems.splice(cap, 3) — the 3 items just
@@ -223,21 +255,52 @@ export function LikedProfilesSection({
   likedTab, onTabChange, likedByMe, likedMe, likedByCount, likedMeCount, onCardPress, onLikePress,
 }: LikedProfilesSectionProps) {
   const { t } = useTranslation()
-  const items = likedTab === 'likedbyme' ? likedByMe : likedMe
+
+  // Angular: app-swiper.component.ts's hasLikedYouData()/hasLikedByMeData()
+  // OR the count with actual returned items — but NOT replicated here: this
+  // port's likedMe/likedByMe arrays default to (and can keep showing) mock
+  // placeholder data whenever the real fetch legitimately returns zero items
+  // (see HomeScreen's loadHome() — setLikedMe/setLikedByMe are only called
+  // when the result is non-empty), so ORing in `.length > 0` picked up that
+  // leftover mock data and kept a "(0)" tab visible. likedMeCount/likedByCount
+  // (comTotalFor, no mock fallback) are the only trustworthy signal here.
+  // "LikedYou" in Angular (people who liked the viewer) = this port's
+  // likedMe/likedMeCount; "LikedByMe" (people the viewer liked) = likedByMe/likedByCount.
+  const hasLikedMe   = likedMeCount > 0
+  const hasLikedByMe = likedByCount > 0
+  // Angular: showLikedProfileTabs — the segmented tab switcher only renders
+  // when BOTH sides have data. Previously this always showed both pills even
+  // when one was a dead "(0)" tab with nothing to switch to.
+  const showTabs = hasLikedMe && hasLikedByMe
+  const items = showTabs
+    ? (likedTab === 'likedbyme' ? likedByMe : likedMe)
+    : hasLikedMe ? likedMe : likedByMe
+
   return (
     <>
       {/* Angular: app-swiper.component.ts's setHeader() — swiperHeader is
           sectionTitle.likedprofile = 'GENERAL.ICON_3' ("Liked profiles"),
           suffixed with (likedYouCount + likedByMeCount) when > 0. */}
       <Text style={s.sectionTitle}>{`${t('GENERAL.ICON_3')} (${likedByCount + likedMeCount})`}</Text>
-      <View style={s.tabRow}>
-        <Pressable style={[s.tabPill, likedTab === 'likedyou'  && s.tabPillActive]} onPress={() => onTabChange('likedyou')}>
-          <Text style={[s.tabPillText, likedTab === 'likedyou'  && s.tabPillTextActive]}>{`${t('LIKE_LIST.LIKEDYOU_HOME')} (${likedMeCount})`}</Text>
-        </Pressable>
-        <Pressable style={[s.tabPill, likedTab === 'likedbyme' && s.tabPillActive]} onPress={() => onTabChange('likedbyme')}>
-          <Text style={[s.tabPillText, likedTab === 'likedbyme' && s.tabPillTextActive]}>{`${t('LIKE_LIST.LIKESENT_HOME')} (${likedByCount})`}</Text>
-        </Pressable>
-      </View>
+      {showTabs ? (
+        <View style={s.tabRow}>
+          <Pressable style={[s.tabPill, likedTab === 'likedyou'  && s.tabPillActive]} onPress={() => onTabChange('likedyou')}>
+            <Text style={[s.tabPillText, likedTab === 'likedyou'  && s.tabPillTextActive]}>{`${t('LIKE_LIST.LIKEDYOU_HOME')} (${likedMeCount})`}</Text>
+          </Pressable>
+          <Pressable style={[s.tabPill, likedTab === 'likedbyme' && s.tabPillActive]} onPress={() => onTabChange('likedbyme')}>
+            <Text style={[s.tabPillText, likedTab === 'likedbyme' && s.tabPillTextActive]}>{`${t('LIKE_LIST.LIKESENT_HOME')} (${likedByCount})`}</Text>
+          </Pressable>
+        </View>
+      ) : (
+        // Angular: showOnlyLikedYouText/showOnlyLikedByMeText — no tab
+        // switcher at all when only one side has data, just this sub-heading.
+        // Key names look swapped at a glance but aren't: LIKESENT_SUB's real
+        // copy is "Profiles who liked you" (the likedMe/"liked you" case);
+        // LIKEDYOU_SUB's is "Profiles that you have liked" (the likedByMe case).
+        <Text style={s.onlyOneLikedText}>
+          {t(hasLikedMe ? 'LIKE_LIST.LIKESENT_SUB' : 'LIKE_LIST.LIKEDYOU_SUB')}
+        </Text>
+      )}
       <SwiperCard
         cardVariant={8}
         cardSection="likedprofile"
@@ -272,29 +335,32 @@ function parseGradientColors(bgColor: string | undefined): [string, string, ...s
 
 export interface ExploreCategoriesSectionProps {
   categories: ExploreCategory[]
-  tileWidth:  number
   onCategoryPress: (cat: ExploreCategory) => void
 }
 
 export function ExploreCategoriesSection({
-  categories, tileWidth, onCategoryPress,
+  categories, onCategoryPress,
 }: ExploreCategoriesSectionProps) {
   const { t } = useTranslation()
+  console.log("categories ",categories)
   return (
     <>
       {/* Angular: home.enum.ts's sectionTitle.exploreMatches = 'HOME.EXPLORE_MATCHES_TXT'
           ("Discover matches") — HOME.EXPLORE_MATCHES ("Explore matches based on")
           is a different, unused key. */}
       <Text style={s.sectionTitle}>{t('HOME.EXPLORE_MATCHES_TXT')}</Text>
-      <View style={s.catGrid}>
+      <View style={[s.catGrid, { paddingLeft: EXPLORE_ROW_PL + EXPLORE_GRID_GAP, paddingRight: EXPLORE_ROW_PR, gap: EXPLORE_GRID_GAP }]}>
         {categories.map(cat => (
-          <Pressable key={cat.id} onPress={() => onCategoryPress(cat)} style={{ width: tileWidth }}>
+          <Pressable key={cat.id} onPress={() => onCategoryPress(cat)} style={{ width: EXPLORE_TILE_WIDTH }}>
             {/* Angular: backgroundStyle() — server's BGCOLOUR per category,
-                else this exact default diagonal gradient. */}
+                else this exact default diagonal gradient at 113deg. Converted
+                via the standard CSS-angle-to-corner-points formula (same one
+                HelpSection's 335deg gradient above uses):
+                start=(0.5-sin(θ)·0.5, 0.5+cos(θ)·0.5), end=(0.5+sin(θ)·0.5, 0.5-cos(θ)·0.5). */}
             <LinearGradient
               colors={parseGradientColors(cat.bgColor)}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+              start={{ x: 0.04, y: 0.30 }}
+              end={{ x: 0.96, y: 0.70 }}
               style={s.catTile}
             >
               <View style={s.catIconWrap}>
@@ -445,6 +511,20 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const { t, i18n } = useTranslation()
   const [contentLoaded, setContentLoaded] = useState(false)
 
+  // ── WhatsApp "no photo" CTA (All Matches / New Matches / etc. cards) ──────
+  // Angular: matches-card.component's handleWhatsApp() — same confirm →
+  // communicationBtnOnClick → result dispatch every other screen with a
+  // Call/WhatsApp button already uses (ActivityScreen.tsx/MatchesScreen.tsx).
+  const gating = useContactGating()
+  const phoneInfo = usePhoneInfoSheet()
+  const [contactConfirm, setContactConfirm] = useState<{ item: SwiperItem; action: 'whatsapp' } | null>(null)
+  const [contactDetails, setContactDetails] = useState<{
+    name: string; mobile?: string | undefined; dialNumber?: string | undefined; whatsappNumber?: string | undefined
+    showCounter?: boolean | undefined; viewedCount?: string | undefined; totalCount?: string | undefined
+    idVerified?: boolean | undefined
+  } | null>(null)
+  const [whatsappPaywallItem, setWhatsappPaywallItem] = useState<SwiperItem | null>(null)
+
   const [likedTab, setLikedTab] = useState<LikedTab>('likedbyme')
   const [categories, setCategories] = useState<ExploreCategory[]>(MOCK_CATEGORIES)
 
@@ -516,16 +596,23 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   // ── Listing sections ───────────────────────────────────────────────────────
   const [allMatches, setAllMatches]           = useState(MOCK_ALL_MATCHES)
   const [allMatchesTotal, setAllMatchesTotal] = useState(MOCK_ALL_MATCHES.length)
+  // No viewedMeTotal state — the section's visibility gate reads viewedMe's own
+  // array length (matching Angular's swiperViewedYouList.length check exactly),
+  // and its header count comes from comTotalFor(comCount, 'viewedyou') instead.
   const [viewedMe, setViewedMe]               = useState(MOCK_VIEWED_ME)
-  const [viewedMeTotal, setViewedMeTotal]     = useState(MOCK_VIEWED_ME.length)
   const [todayMatches, setTodayMatches]       = useState(MOCK_TODAY_MATCHES)
   const [todayTotal, setTodayTotal]           = useState(MOCK_TODAY_MATCHES.length)
   const [newlyJoined, setNewlyJoined]         = useState(MOCK_NEWLY_JOINED)
   const [newlyJoinedTotal, setNewlyJoinedTotal] = useState(MOCK_NEWLY_JOINED.length)
+  // No profilesViewedTotal state — Angular sources this section's header
+  // count from comTotalFor(comCount, 'viewedbyme') exclusively (see that
+  // function's header comment), not from this listing's own response.
   const [profilesViewed, setProfilesViewed]   = useState(MOCK_PROFILES_VIEWED)
-  const [profilesViewedTotal, setProfilesViewedTotal] = useState(MOCK_PROFILES_VIEWED.length)
+  // No likedByMeTotal state — the section's visibility gate reads likedByMe's/
+  // likedMe's own array lengths (matching Angular's likedByMeProfiles.length /
+  // likedYouProfiles.length check exactly), and header counts come from
+  // comTotalFor(comCount, ...) instead.
   const [likedByMe, setLikedByMe]             = useState(MOCK_LIKED_BY_ME)
-  const [likedByMeTotal, setLikedByMeTotal]   = useState(MOCK_LIKED_BY_ME.length)
   const [likedMe, setLikedMe]                 = useState(MOCK_LIKED_ME)
   const [likedMeTotal, setLikedMeTotal]       = useState(MOCK_LIKED_ME.length)
   const [stories, setStories]                 = useState<SwiperItem[]>(MOCK_STORIES)
@@ -645,7 +732,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       setPhotoPromoSticky(null)
 
       if (variant === 'payment_failed' && paymentFailedContent) {
-        setHeroBannerContent(paymentFailedContent)
+        // Angular: home-banner.component.html's paymentFailedPromotion grid —
+        // a fixed alert icon (not a campaign image) when it's not the auto-
+        // renewal (PAGETYPE 4/5) variant, which this Home banner never is —
+        // that variant is handled separately by AutoRenewalFailureSheet on
+        // the Payment screens.
+        setHeroBannerContent({ ...paymentFailedContent, imageUrl: CDN + 'alert-triangle.svg' })
       } else if (variant === 'photo_promo_free_female' || variant === 'non_id_verify_male' || variant === 'paid_verified_no_photo') {
         const reg = await getRegistrationArrays()
         if (ctrl.cancelled) return
@@ -657,8 +749,28 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           title:      raw['TITLE'] || 'Profile not active yet!',
           body:       raw['BODY']  || 'Upload your photo to activate profile and let matches see you',
           ctaLabel:   raw['CTA']   || 'Add photo now',
-          ctaBgColor: raw['CTABGCOLOR']?.startsWith?.('#') ? raw['CTABGCOLOR'] : undefined,
-          ctaColor:   raw['CTACOLOR']?.startsWith?.('#')   ? raw['CTACOLOR']   : undefined,
+          // Angular: home-banner.component.html's "add photo banner" grid —
+          // always shows BANNERIMG next to the text; previously dropped here.
+          imageUrl:   raw['BANNERIMG'] || undefined,
+          // Angular: this grid's own "free-trial-bg" CSS class is a FIXED
+          // #FFDDDD→white gradient, not server-driven — same one
+          // MatchesScreen.tsx's PhotoPromotionBanner already uses for this
+          // exact banner type. Previously this fell through to HeroBanner's
+          // generic navy default (wrong — showed as a blue banner instead of
+          // the correct pink one).
+          gradient:   [Colors.photoPromoGradientStart, Colors.white],
+          // Angular: mt-8 body3-regular-12 black-color — this variant's text
+          // is black-on-light-pink, not the white-on-dark every other
+          // variant uses (previously left unset, rendering unreadable white
+          // text on the pink gradient).
+          textColor:  Colors.black,
+          // Angular: data.CTABGCOLOR || Colors.primaryDark / data.CTACOLOR ||
+          // Colors.white — same fallback PhotoPromotionBanner uses when the
+          // server doesn't send explicit hex colors (previously left
+          // undefined here, which fell through to HeroBanner's own unrelated
+          // white/navy default).
+          ctaBgColor: raw['CTABGCOLOR']?.startsWith?.('#') ? raw['CTABGCOLOR'] : Colors.primaryDark,
+          ctaColor:   raw['CTACOLOR']?.startsWith?.('#')   ? raw['CTACOLOR']   : Colors.white,
         })
 
         // Angular: photo_promo_free_female reads PHOTOPUBLISHED.Shortlist;
@@ -678,10 +790,64 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       } else if (variant === 'default') {
         const details = await getHeroBannerDetails(false)
         if (ctrl.cancelled) return
+        // Angular: home-banner.component.ts's isOldBanner() — PROMOTYPE=='0'
+        // uses one set of fields (BANNERIMG/BANNERBG/TITLE1/TITLE2, its own
+        // CONTENT+TIMER countdown line); anything else uses the newer set
+        // (BRIDEIMG/BRIDEBGCOLOR/VALID). Both styles share the same CTA
+        // button styling (CTABGCOLOR/CTABORDERCOLOR/CTATEXTCOLOR/ARROWICON) —
+        // showLinkCTA never applies to this call site (explore.component.html
+        // only sets it on the separate helpBanner usage), so the button style
+        // always applies here.
+        const isOldBanner = String(details?.['PROMOTYPE'] ?? '') === '0'
+        // Angular's [attr.style] binds these fields as raw CSS, so the CMS
+        // can send plain hex, 'transparent' (e.g. a borderless/textual CTA),
+        // or rgb(a)/hsl(a) — RN's `style` prop accepts all of those directly.
+        // Excluded: CSS gradient syntax, which a plain View's backgroundColor
+        // can't render (that case already has its own dedicated `gradient`
+        // field on HeroBannerContent, populated separately where it applies).
+        const hex = (v: any): string | undefined =>
+          typeof v === 'string' && /^(#|rgb|hsl|transparent$)/i.test(v.trim()) && !/gradient/i.test(v)
+            ? v.trim()
+            : undefined
+        const ownTimerDeadline = isOldBanner && details?.['TIMER'] ? Date.parse(details['TIMER']) : NaN
+        const bgColor = hex(isOldBanner ? details?.['BANNERBG'] : details?.['BRIDEBGCOLOR'])
         setHeroBannerContent({
-          title:    details?.['TITLE'] || 'Upgrade your membership',
-          body:     details?.['BODY']  || '',
-          ctaLabel: details?.['CTA']   || 'Upgrade now',
+          title:      details?.['TITLE'] || 'Upgrade your membership',
+          title1:     isOldBanner ? (details?.['TITLE1'] || undefined) : undefined,
+          title2:     isOldBanner ? (details?.['TITLE2'] || undefined) : undefined,
+          body:       details?.['BODY']  || '',
+          validText:  !isOldBanner ? (details?.['VALID'] || undefined) : undefined,
+          ctaLabel:   details?.['CTA']   || 'Upgrade now',
+          imageUrl:   isOldBanner ? details?.['BANNERIMG'] : details?.['BRIDEIMG'],
+          bgColor,
+          // Figma default for this banner when the server sends no resolvable
+          // BANNERBG/BRIDEBGCOLOR: linear-gradient(180deg, #D9E7FF 12.59%, #FFF 137.6%).
+          gradient:          bgColor ? undefined : ['#D9E7FF', '#FFFFFF'],
+          gradientLocations: bgColor ? undefined : [0.1259, 1],
+          // Angular: home-banner.component.html's old-banner block colors
+          // TITLE/BODY/TITLE1/TITLE2 from these 4 independent server fields
+          // (TITLE2 genuinely reuses CTABGCOLOR as its own text color in the
+          // live template) — previously unread here, so this text always
+          // fell through to HeroBanner's hardcoded white default.
+          // Falls back to the same navy the CTA button text already defaults
+          // to (Colors.link, this component's own pre-existing dark-on-light
+          // default) when the server sends neither a color nor a background —
+          // otherwise title/body text stays white-on-white against the
+          // gradient fallback above.
+          titleColor:  hex(details?.['TITLECOLOR']) ?? (bgColor ? undefined : Colors.link),
+          bodyColor:   hex(details?.['CONTENTCOLOR']) ?? (bgColor ? undefined : Colors.link),
+          title1Color: isOldBanner ? hex(details?.['NOTECOLOR']) : undefined,
+          title2Color: isOldBanner ? hex(details?.['CTABGCOLOR']) : undefined,
+          ctaBgColor:     hex(details?.['CTABGCOLOR']),
+          ctaBorderColor: hex(details?.['CTABORDERCOLOR']),
+          ctaColor:       hex(details?.['CTATEXTCOLOR']),
+          arrowIconUrl:   details?.['ARROWICON'] || undefined,
+          ownTimerContent:    isOldBanner ? (details?.['CONTENT'] || undefined) : undefined,
+          ownTimerDeadlineMs: !Number.isNaN(ownTimerDeadline) ? ownTimerDeadline : undefined,
+          // Angular: the CONTENT+TIMER line's own container (not the CTA) —
+          // border/background from these 2 server fields, previously unread.
+          ownTimerBg:          isOldBanner ? hex(details?.['TIMERBG']) : undefined,
+          ownTimerBorderColor: isOldBanner ? hex(details?.['TIMERBORDER']) : undefined,
         })
       } else {
         setHeroBannerContent(null)
@@ -752,7 +918,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       }
     })
 
-    fetchMatches(0, 10).then(result => {
+    fetchHomeAllMatches().then(result => {
       if (ctrl.cancelled) return
       if (result.items.length > 0) {
         setAllMatches(result.items)
@@ -763,7 +929,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     fetchViewedYou().then(result => {
       if (!ctrl.cancelled && result.items.length > 0) {
         setViewedMe(result.items)
-        setViewedMeTotal(result.totalCount)
       }
     })
     fetchDailyRec().then(result => {
@@ -771,7 +936,14 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         // Full array kept in state (not sliced here) — display and the
         // "view more" card's thumbnail preview each slice it separately below.
         setTodayMatches(result.items)
-        setTodayTotal(result.totalCount)
+        // Angular: explore.component.ts's setDRProfiles() — drTotalCount =
+        // resultData.length, the count of items THIS call actually returned
+        // (capped by the API's own LIMIT=15 param above), not a separate
+        // server-side total field. result.totalCount here reads TOTAL/
+        // TOTALCOUNT off the response, which on this endpoint is an unrelated
+        // large number (a different total, not today's recommendation count) —
+        // that's what was showing e.g. "977" instead of the real "15".
+        setTodayTotal(result.items.length)
       }
     })
     fetchNewlyJoined().then(result => {
@@ -785,7 +957,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     fetchViewedByMe().then(result => {
       if (!ctrl.cancelled && result.items.length > 0) {
         setProfilesViewed(result.items)
-        setProfilesViewedTotal(result.totalCount)
       }
     })
     // Fetched together (rather than two independent .then()s) so the default-tab
@@ -797,7 +968,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         if (ctrl.cancelled) return
         if (likedByMeResult.items.length > 0) {
           setLikedByMe(likedByMeResult.items)
-          setLikedByMeTotal(likedByMeResult.totalCount)
         }
         if (likedYouResult.items.length > 0) {
           setLikedMe(likedYouResult.items)
@@ -1063,6 +1233,63 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     }
   }
 
+  function confirmThenWhatsApp(item: SwiperItem) {
+    if (!item.profileId) return
+    if (shouldSkipPhoneConfirm(item.phoneViewed ?? '', item.likedStatus ?? '0', gating.indNumbersLeft, gating.ownEntryType)) {
+      handleContactConfirmYes({ item, action: 'whatsapp' })
+    } else {
+      setContactConfirm({ item, action: 'whatsapp' })
+    }
+  }
+
+  function getContactConfirmContent(): string {
+    if (!contactConfirm) return ''
+    const question = t('VIEWPROFILE.VIEWPHONECONFIRM')
+      .replace('#HISHER#', t(`PRONOUN.${gating.oppGender}.hisher`))
+      .replace('#HIMHER#', t(`PRONOUN.${gating.oppGender}.himher`))
+    const quota = t('VIEWPROFILE.VIEWPHONEDETAIL')
+      .replace('#VAR#', gating.contactQuota.viewed)
+      .replace('#VAR1#', gating.contactQuota.left)
+      .replace('#VAR2#', gating.contactQuota.expiry)
+    return `${question}\n\n${quota}`
+  }
+
+  function handleContactConfirmClose() {
+    setContactConfirm(null)
+  }
+
+  async function handleContactConfirmYes(override?: { item: SwiperItem; action: 'whatsapp' }) {
+    const pending = override ?? contactConfirm
+    if (!pending) return
+    const { item } = pending
+    setContactConfirm(null)
+    try {
+      const result = await communicationBtnOnClick('home_matches', 'whatsapp', { MATRIID: item.profileId })
+      if (result.type === 'show_contact') {
+        setContactDetails({
+          name: item.name ?? '', mobile: result.mobile, dialNumber: result.dialNumber, whatsappNumber: result.whatsappNumber,
+          showCounter: result.showCounter, viewedCount: result.viewedCount, totalCount: result.totalCount,
+          idVerified: item.isIdVerified,
+        })
+      } else if (result.type === 'payment_promo') {
+        setWhatsappPaywallItem(item)
+      } else if (result.type === 'error') {
+        Alert.alert('', result.message)
+      } else {
+        await phoneInfo.handleResult(result)
+      }
+    } catch { /* silent — matches this app's established convention */ }
+  }
+
+  function handleContactDetailsClose() { setContactDetails(null) }
+  function handleContactDetailsCall() {
+    if (contactDetails?.dialNumber) Linking.openURL(`tel:${contactDetails.dialNumber}`)
+  }
+  function handleContactDetailsWhatsApp() {
+    const num = contactDetails?.whatsappNumber?.replace(/\D/g, '')
+    if (num) Linking.openURL(`https://wa.me/${num}`)
+  }
+
   // setX setters are referentially stable across renders, so these don't need
   // useCallback — makeLikeHandler(setX) itself is already a fresh closure per
   // render either way, wrapping it would just add indirection with no benefit.
@@ -1125,21 +1352,25 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         allMatches={allMatches}
         allMatchesTotal={allMatchesTotal}
         viewedMe={viewedMe}
-        viewedMeTotal={viewedMeTotal}
+        // Angular: setCountListValue() — these 4 header totals come from the
+        // communication/newcount response's per-comtype totalCount, not each
+        // section's own (differently-limited) listing API total. See
+        // comTotalFor()'s header comment for the full story.
+        viewedMeTotal={comTotalFor(comCount, 'viewedyou')}
         todayMatches={todayMatches}
         todayTotal={todayTotal}
         newlyJoined={newlyJoined}
         newlyJoinedTotal={newlyJoinedTotal}
         profilesViewed={profilesViewed}
-        profilesViewedTotal={profilesViewedTotal}
+        profilesViewedTotal={comTotalFor(comCount, 'viewedbyme')}
         completeCards={completeCards}
         onCompleteProfileCardPress={handleCompleteProfileCard}
         likedTab={likedTab}
         onLikedTabChange={setLikedTab}
         likedByMe={likedByMe}
-        likedByMeTotal={likedByMeTotal}
+        likedByMeTotal={comTotalFor(comCount, 'likedbyme')}
         likedMe={likedMe}
-        likedMeTotal={likedMeTotal}
+        likedMeTotal={comTotalFor(comCount, 'likedyou')}
         categories={categories}
         stories={stories}
         videos={videos}
@@ -1201,7 +1432,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           />
         ) : null}
 
-        {/* ════════════ ALL MATCHES ════════════ */}
+        {/* ════════════ ALL MATCHES ════════════
+            Angular: no explore-border-top wraps All Matches itself, and none
+            of its own is attached below it either — the divider that follows
+            belongs to whichever next section renders (see below), not to this
+            one. */}
         <View style={s.section}>
           {!allMatchesLoaded ? (
             <Loader variant="skeleton-dashboard" />
@@ -1222,18 +1457,25 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               onCardPress={item => goToProfile(item, allMatches, 'home_matches')}
               onLikePress={likeAllMatches}
               onSeeAllPress={() => navigation.navigate('Matches')}
+              onWhatsAppPress={confirmThenWhatsApp}
             />
           ) : null}
         </View>
 
-        <View style={s.divider} />
-
         {/* ════════════ PROFILES WHO VIEWED ME ════════════
             Angular: profilesWhoviewedYouSection.blockbgColor = 'dot-img-bg' —
             a decorative background SVG plus a light pink-to-white gradient,
-            not the plain white every other (non-special-cased) section uses. */}
-        {viewedMeTotal > 3 && (
+            not the plain white every other (non-special-cased) section uses.
+            Angular wraps this section in its own explore-border-top div — the
+            divider above it is gated on THIS section's own visibility, not on
+            whatever happens to render above it. */}
+        {/* Angular's *ngIf checks swiperViewedYouList.length (the viewedyou
+            listing call's own returned/displayed array, capped to 5), not a
+            separate total-count field — matching that literally instead of
+            trusting viewedMeTotal's TOTAL field to agree with it. */}
+        {viewedMe.length > 3 && (
           <>
+            <View style={s.divider} />
             <LinearGradient colors={['#FFF1FF', '#FFFFFF']} style={s.section}>
               <Image
                 source={{ uri: `${CDN}revamp/who-viewed-bg-color.svg` }}
@@ -1241,7 +1483,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 resizeMode="cover"
               />
               <SwiperCard
-                swiperHeader={`${t('HOME.WHO_VIEWED_YOU_HEADER')} (${viewedMeTotal})`}
+                swiperHeader={`${t('HOME.WHO_VIEWED_YOU_HEADER')} (${comTotalFor(comCount, 'viewedyou')})`}
                 newCount={comCountFor(comCount, 'viewedyou')}
                 cardVariant={3}
                 cardSection="viewedyou"
@@ -1253,13 +1495,13 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 onSeeAllPress={() => navigation.navigate('Activity')}
               />
             </LinearGradient>
-            <View style={s.divider} />
           </>
         )}
 
         {/* ════════════ COMPLETE YOUR PROFILE ════════════ */}
         {completeCards.length > 0 && (
           <>
+            <View style={s.divider} />
             <View style={s.section}>
               {/* Angular: complete-profile.component.html's header text is
                   .color-1f1e1b, not the generic textPrimary black every other
@@ -1268,7 +1510,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               <Text style={[s.sectionTitle, s.cpSectionTitle]}>{t('HOME.COMPLETE_PROFILE_HEADER')}</Text>
               <CompleteProfileSection cards={completeCards} onCardPress={handleCompleteProfileCard} />
             </View>
-            <View style={s.divider} />
           </>
         )}
 
@@ -1279,6 +1520,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             daily-rec data. */}
         {todayMatches.length > 0 && (
           <>
+            <View style={s.divider} />
             <View style={s.section}>
               {/* Angular: home.config.ts's drmatches is the only swiper config
                   with coverflowEffect — a centered, tilted-neighbor carousel,
@@ -1292,43 +1534,52 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 onSeeAllPress={() => navigation.navigate('Matches')}
               />
             </View>
-            <View style={s.divider} />
           </>
         )}
 
         {/* ════════════ NEWLY JOINED ════════════
             Angular: newlyJoinedSection.blockbgColor = 'pink-bg-block' —
             linear-gradient(#FCEBFF → #FFFFFF), not the plain white every
-            other section here uses. */}
-        <LinearGradient colors={['#FCEBFF', '#FFFFFF']} style={s.section}>
-          {!newlyJoinedLoaded ? (
+            other section here uses. Angular: <app-loader *ngIf="!nmContLoaded">
+            sits on plain white BEFORE the *ngIf="nmContLoaded && swiperNewlyMatchContents?.length > 1"
+            wrapper — the pink background + divider only exist once there's
+            real data, not as an empty band while loading or when empty. */}
+        {!newlyJoinedLoaded ? (
+          <View style={s.section}>
             <Loader variant="skeleton-dashboard" />
-          ) : newlyJoined.length > 1 ? (
-            <SwiperCard
-              swiperHeader={`${t('HOME.NEWLY_JOINED_HEADER')} (${newlyJoinedTotal})`}
-              cardVariant={1}
-              cardSection="newmatches"
-              items={newlyJoined.slice(0, 4)}
-              moreItems={moreItemsFrom(newlyJoined, 4)}
-              showSeeAll
-              onCardPress={item => goToProfile(item, newlyJoined, 'home_newmatches')}
-              onLikePress={likeNewlyJoined}
-              onSeeAllPress={() => navigation.navigate('Matches')}
-            />
-          ) : null}
-        </LinearGradient>
+          </View>
+        ) : newlyJoined.length > 1 ? (
+          <>
+            <View style={s.divider} />
+            <LinearGradient colors={['#FCEBFF', '#FFFFFF']} style={s.section}>
+              <SwiperCard
+                swiperHeader={`${t('HOME.NEWLY_JOINED_HEADER')} (${newlyJoinedTotal})`}
+                cardVariant={1}
+                cardSection="newmatches"
+                items={newlyJoined.slice(0, 4)}
+                moreItems={moreItemsFrom(newlyJoined, 4)}
+                showSeeAll
+                onCardPress={item => goToProfile(item, newlyJoined, 'home_newmatches')}
+                onLikePress={likeNewlyJoined}
+                onSeeAllPress={() => navigation.navigate('Matches')}
+              />
+            </LinearGradient>
+          </>
+        ) : null}
 
-        <View style={s.divider} />
-
-        {/* ════════════ PROFILES YOU VIEWED ════════════ */}
+        {/* ════════════ PROFILES YOU VIEWED ════════════
+            Angular wraps this in its own explore-border-top div too — the
+            divider above it is gated on profilesViewed's own length, not on
+            Newly Joined's or Liked Profiles' visibility. */}
         {profilesViewed.length > 0 && (
           <>
+            <View style={s.divider} />
             <View style={s.section}>
               <SwiperCard
                 // Angular: home.enum.ts's sectionTitle.viewedbyme = 'GENERAL.VIEWEDBYME'
                 // ("Profiles you viewed"), the exact key this section's live
                 // template binds swiperHeader to.
-                swiperHeader={`${t('GENERAL.VIEWEDBYME')} (${profilesViewedTotal})`}
+                swiperHeader={`${t('GENERAL.VIEWEDBYME')} (${comTotalFor(comCount, 'viewedbyme')})`}
                 newCount={comCountFor(comCount, 'viewedbyme')}
                 cardVariant={3}
                 cardSection="viewedbyme"
@@ -1340,49 +1591,44 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 onSeeAllPress={() => navigation.navigate('Activity')}
               />
             </View>
-            <View style={s.divider} />
           </>
         )}
 
         {/* ════════════ LIKED PROFILES ════════════
             Angular: enums.likedprofile.blockbgColor = 'liked-profile-bg' — a
-            cover-fit background SVG, not plain white. */}
-        {(likedByMeTotal > 0 || likedMeTotal > 0) && (
-          <>
-            <CdnSvgBackground uri={`${CDN}liked-profiles-bg.svg`} style={s.section}>
-              <LikedProfilesSection
-                likedTab={likedTab}
-                onTabChange={setLikedTab}
-                likedByMe={likedByMe}
-                likedMe={likedMe}
-                likedByCount={likedByMeTotal}
-                likedMeCount={likedMeTotal}
-                onCardPress={item => goToProfile(item, likedTab === 'likedbyme' ? likedByMe : likedMe, 'home_liked')}
-                onLikePress={likedTab === 'likedbyme' ? likeLikedByMe : likeLikedMe}
-              />
-            </CdnSvgBackground>
-            <View style={s.divider} />
-          </>
+            cover-fit background SVG, not plain white. No explore-border-top
+            wrapper in Angular at all — no divider directly above or below
+            this section; Explore Categories' own leading divider (below)
+            supplies the separator that follows it. */}
+        {/* Angular's *ngIf checks likedYouProfiles.length / likedByMeProfiles.length
+            (the actual listing arrays), not the header's communication-count
+            totals — matching that literally rather than trusting comCount to
+            agree with these listing calls' own item counts. */}
+        {(likedByMe.length > 0 || likedMe.length > 0) && (
+          <CdnSvgBackground uri={`${CDN}liked-profiles-bg.svg`} style={s.section}>
+            <LikedProfilesSection
+              likedTab={likedTab}
+              onTabChange={setLikedTab}
+              likedByMe={likedByMe}
+              likedMe={likedMe}
+              likedByCount={comTotalFor(comCount, 'likedbyme')}
+              likedMeCount={comTotalFor(comCount, 'likedyou')}
+              onCardPress={item => goToProfile(item, likedTab === 'likedbyme' ? likedByMe : likedMe, 'home_liked')}
+              onLikePress={likedTab === 'likedbyme' ? likeLikedByMe : likeLikedMe}
+            />
+          </CdnSvgBackground>
         )}
 
         {/* ════════════ EXPLORE CATEGORIES ════════════ */}
         {categories.length > 0 && (
           <>
+            <View style={s.divider} />
             <View style={s.section}>
               <ExploreCategoriesSection
                 categories={categories}
-                // Angular: ion-row's pl-4/pr-24 + ion-col's size="5.4" offset="0.6"
-                // in a 12-col grid — computes to a ~20.6px left / 24px right
-                // margin and a ~16.6px gap between the two tiles, not the
-                // previous 16px margin / 8px gap. Approximated symmetrically
-                // (24px margin, 16px gap) since RN's flexbox can't cheaply
-                // reproduce Angular's asymmetric offset-per-column math, and
-                // the ~3px difference is imperceptible.
-                tileWidth={(SW - 48 - 16) / 2}
                 onCategoryPress={cat => navigation.navigate('Matches', { exploreType: cat.id, exploreLabel: cat.label })}
               />
             </View>
-            <View style={s.divider} />
           </>
         )}
 
@@ -1391,6 +1637,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             pink section background, missing entirely before this fix. */}
         {stories.length > 1 && (
           <>
+            <View style={s.divider} />
             <View style={[s.section, s.successStorySection]}>
               <SuccessStoriesSection
                 stories={stories}
@@ -1402,26 +1649,33 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 onCardPress={() => navigation.navigate('SuccessStories')}
               />
             </View>
-            <View style={s.divider} />
           </>
         )}
 
-        {/* ════════════ SELF-HELP VIDEOS (non-English UI only) ════════════ */}
-        {selfHelpVisible && videos.length > 0 && (
-          <>
-            <View style={s.section}>
-              <SelfHelpVideosSection
-                videos={videos}
-                cardWidth={SW * 0.58}
-                cardHeight={SW * 0.33}
-                onVideoPress={item => item.videoUrl && setVideoModalUrl(item.videoUrl)}
-              />
-            </View>
-            <View style={s.divider} />
-          </>
+        {/* ════════════ SELF-HELP VIDEOS (non-English UI only) ════════════
+            Angular: <app-complete-profile *ngIf="(lang !== 'en')"> — gated on
+            language ALONE, no videos.length check; it still mounts (header +
+            empty carousel) with zero videos. No explore-border-top wrapper
+            either — no divider on either side of this section (none between
+            it and Success Stories above; Help below supplies its own leading
+            divider). */}
+        {selfHelpVisible && (
+          <View style={s.section}>
+            <SelfHelpVideosSection
+              videos={videos}
+              cardWidth={SW * 0.58}
+              cardHeight={SW * 0.33}
+              onVideoPress={item => item.videoUrl && setVideoModalUrl(item.videoUrl)}
+            />
+          </View>
         )}
 
-        {/* ════════════ HELP SECTION ════════════ */}
+        {/* ════════════ HELP SECTION ════════════
+            Angular: *ngIf="helpBannerData" class="explore-border-top" —
+            helpBannerData is static translation content (FAQ_DETAILS.BANNER),
+            not an API-gated flag, so it's always truthy once the screen
+            renders — the divider above Help is effectively unconditional. */}
+        <View style={s.divider} />
         <View style={s.section}>
           <HelpSection onCallPress={handleCallPress} phone={customerCare.phone} />
         </View>
@@ -1478,6 +1732,50 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         </View>
       </Modal>
 
+      {/* WhatsApp "no photo" CTA — confirm → contact-details / paywall */}
+      <BottomSheet
+        visible={!!contactConfirm}
+        type="viewPhoneConfirm"
+        data={{ content: getContactConfirmContent(), ctaLabel: t('ACCOUNT.YES', 'Yes') }}
+        onClose={handleContactConfirmClose}
+        onPrimaryPress={handleContactConfirmYes}
+      />
+      {contactDetails && (
+        <ContactDetailsSheet
+          visible
+          name={contactDetails.name}
+          mobile={contactDetails.mobile}
+          whatsappNumber={contactDetails.whatsappNumber}
+          showCounter={contactDetails.showCounter}
+          viewedCount={contactDetails.viewedCount}
+          totalCount={contactDetails.totalCount}
+          showNotVerifiedNote={!contactDetails.idVerified && gating.loginGender === 'F'}
+          onClose={handleContactDetailsClose}
+          onCall={handleContactDetailsCall}
+          onWhatsApp={handleContactDetailsWhatsApp}
+        />
+      )}
+      <WhatsAppPaywallModal
+        visible={!!whatsappPaywallItem}
+        // WhatsAppPaywallModal only reads .name/.profileImg off `profile` —
+        // both exist on SwiperItem too, so this is safe despite the type gap
+        // (its prop type is MatchProfile since every other caller has one on
+        // hand already; Home's cards only carry the lighter SwiperItem shape).
+        profile={whatsappPaywallItem as any}
+        oppGender={gating.oppGender}
+        onClose={() => setWhatsappPaywallItem(null)}
+        onPayNow={() => { setWhatsappPaywallItem(null); navigation.navigate('recharge') }}
+      />
+      <BottomSheet
+        visible={!!phoneInfo.sheet}
+        type="phonePrivacyInfo"
+        data={phoneInfo.getData(t)}
+        onClose={phoneInfo.close}
+        onPrimaryPress={() => phoneInfo.primaryPress(navigation)}
+        onSecondaryPress={() => phoneInfo.secondaryPress(navigation)}
+        onLinkPress={phoneInfo.close}
+      />
+
       <AppFooter
         activeTab={0}
         likesCount={likedMeTotal}
@@ -1531,6 +1829,9 @@ const s = StyleSheet.create({
   tabPillActive:      { backgroundColor: Colors.white, shadowColor: Colors.shadow, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
   tabPillText:        { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textSecondary },
   tabPillTextActive:  { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: Colors.textPrimary },
+  // Angular: .body2-regular-14 line-height-24, ml-24 mr-24 mb-32 pt-8 — shown
+  // instead of the tab row when only one of likedYou/likedByMe has data.
+  onlyOneLikedText:   { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 24, color: Colors.textPrimary, paddingHorizontal: 16, marginBottom: 12 },
 
   // Explore categories
   // Angular: .discover-new-bg — 12px radius, 1px #E6E6E6 border, compact
@@ -1538,8 +1839,12 @@ const s = StyleSheet.create({
   // gradient (applied via LinearGradient at the call site, not here).
   // Angular: ion-row's pl-4/pr-24 + ion-col's size="5.4" offset="0.6" — see
   // tileWidth's own call-site comment for the exact math this approximates.
-  catGrid:      { flexDirection: 'row', flexWrap: 'wrap',gap: 16 },
-  catTile:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#E6E6E6', paddingVertical: 8, paddingHorizontal: 8, minHeight: 64 },
+  // paddingLeft/paddingRight/gap are computed per-render from screen width —
+  // see EXPLORE_TILE_WIDTH's header comment — and merged in at the call site.
+  catGrid:      { flexDirection: 'row', flexWrap: 'wrap' },
+  // Angular: .discover-new-bg { padding: 8px 4px 8px 8px } — tighter on the
+  // right, where the chevron sits, not a flat 8px on every side.
+  catTile:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#E6E6E6', paddingTop: 8, paddingRight: 4, paddingBottom: 8, paddingLeft: 8, minHeight: 64 },
   catIconWrap:  { width: 32, height: 32, marginRight: 8, alignItems: 'center', justifyContent: 'center' },
   catLabel:     { flex: 1, fontFamily: 'Poppins-Medium', fontSize: 12, color: Colors.textPrimary, lineHeight: 16 },
   catChevron:   { color: '#29339B', fontFamily: 'Poppins-SemiBold' },

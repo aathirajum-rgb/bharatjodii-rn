@@ -10,13 +10,17 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
+import FloatingLabelInput from '../../components/input/FloatingLabelInput'
 import { Colors } from '../../constants/colors'
 import {
   callPartialRegistrationAPI,
   fetchOccupationOptions,
   getRegValues,
+  isJobDetailEligible,
+  isValidJobDetailFormat,
   setRegValue,
   getRegValue,
+  updateFewMoreDetail,
 } from '../../service/registrationService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
@@ -49,14 +53,19 @@ export default function OccupationScreen({ navigation }: Props) {
   const [submitting,   setSubmitting]   = useState(false)
   const [panelVisible, setPanelVisible] = useState(false)
 
+  // ── Job Detail (JODII-490) — dependent optional free-text field, hidden
+  // when occupation is "Not working" (isJobDetailEligible). ────────────────
+  const [jobDetail, setJobDetail] = useState('')
+
   useEffect(() => {
     Promise.all([
       getRegValue('CREATEDBY'),
       getRegValues(),
     ]).then(([cb, rv]) => {
-      const { GENDER: gnd, OCCUPATION: savedOcc } = rv as Record<string, string>
+      const { GENDER: gnd, OCCUPATION: savedOcc, JOBDETAIL: savedJobDetail } = rv as Record<string, string>
       if (cb)  setCreatedBy(cb)
       if (gnd) setGender(gnd)
+      if (savedJobDetail) setJobDetail(savedJobDetail)
 
       fetchOccupationOptions()
         .then(list => {
@@ -79,11 +88,29 @@ export default function OccupationScreen({ navigation }: Props) {
     .trim()
   const nextPage   = gender === '1' ? '12' : '13'
 
+  const jobDetailEligible = isJobDetailEligible(selected?.key ?? '')
+  const jobDetailValid    = isValidJobDetailFormat(jobDetail)
+
   async function handleNext() {
     if (!selected || submitting) return
     setSubmitting(true)
     try {
       await setRegValue('OCCUPATION', selected.key)
+
+      // Job Detail is optional and never blocks Next (same convention as
+      // CasteScreen's Subcaste) — an invalid-format value is simply not
+      // persisted rather than blocking the user. Fire-and-forget save +
+      // silent retroactive clear on server rejection mirrors Angular's
+      // current (2026-08-14) onboarding behavior — see
+      // updateFewMoreDetail()'s header comment.
+      const jobDetailValue = jobDetailEligible && jobDetailValid ? jobDetail.trim() : ''
+      await setRegValue('JOBDETAIL', jobDetailValue)
+      if (jobDetailEligible) {
+        updateFewMoreDetail('OCCDETAILS', jobDetailValue).then(({ valid }) => {
+          if (!valid) setRegValue('JOBDETAIL', '')
+        }).catch(() => {})
+      }
+
       navigation.push('onboarding', { pageNo: nextPage })
       callPartialRegistrationAPI()
     } catch {
@@ -130,6 +157,18 @@ export default function OccupationScreen({ navigation }: Props) {
             <Text style={styles.selectFieldArrow}>›</Text>
           </Pressable>
         )}
+
+        {/* ── Job Detail (JODII-490) — optional, hidden when "Not working" ── */}
+        {!fetching && jobDetailEligible && (
+          <FloatingLabelInput
+            label={t('REGISTRATION.JOBDETAIL', 'Job details')}
+            value={jobDetail}
+            onChangeText={setJobDetail}
+            errorMessage={jobDetail && !jobDetailValid ? t('REGISTRATION.OCCUPATION_TXT', 'Please provide a valid occupation') : undefined}
+            maxLength={60}
+            style={styles.jobDetailInput}
+          />
+        )}
       </ScrollView>
 
       <SearchablePicker
@@ -138,7 +177,10 @@ export default function OccupationScreen({ navigation }: Props) {
         placeholder="Search occupation..."
         options={allOptions}
         selectedKey={selected?.key ?? null}
-        onSelect={(opt) => setSelected(opt)}
+        onSelect={(opt) => {
+          setSelected(opt)
+          if (opt.key !== selected?.key && !isJobDetailEligible(opt.key)) setJobDetail('')
+        }}
         onClose={() => setPanelVisible(false)}
       />
     </View>
@@ -175,5 +217,8 @@ const styles = StyleSheet.create({
     fontSize:   22,
     color:      Colors.textPrimary,
     lineHeight: 26,
+  },
+  jobDetailInput: {
+    marginTop: 32,
   },
 })

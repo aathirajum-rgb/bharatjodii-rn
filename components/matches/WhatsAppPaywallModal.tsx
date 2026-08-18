@@ -66,6 +66,10 @@ export default function WhatsAppPaywallModal({
             <WhatsAppIcon width={40} height={40} />
           </View>
 
+          {/* JODII-499: always show the partner's name in this popup — not
+              localized (a name isn't translated), so it's rendered directly
+              rather than threaded through the i18n copy above. */}
+          {!!profile.name && <Text style={m.name}>{profile.name}</Text>}
           <Text style={m.body}>{bodyText}</Text>
           <Text style={m.title}>{titleText}</Text>
 
@@ -124,6 +128,11 @@ const m = StyleSheet.create({
     height:          60,
     borderRadius:    6,
     backgroundColor: '#F0F0F0',
+  },
+  name: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize:   16,
+    color:      Colors.black,
   },
   body: {
     fontFamily: 'Poppins-Regular',

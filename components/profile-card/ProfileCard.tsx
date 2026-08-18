@@ -81,6 +81,8 @@ export interface ProfileCardProps {
   onPress?:         (() => void) | undefined
   onLikePress?:     (() => void) | undefined
   onViewMorePress?: (() => void) | undefined
+  // Photo-protected/no-photo overlay's WhatsApp CTA — see ProfilePhoto.tsx.
+  onWhatsApp?:      (() => void) | undefined
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -175,6 +177,7 @@ export default function ProfileCard({
   onPress,
   onLikePress,
   onViewMorePress,
+  onWhatsApp,
 }: ProfileCardProps) {
 
   const photoH     = PHOTO_HEIGHT[section] ?? SCREEN_W * 0.7
@@ -194,6 +197,7 @@ export default function ProfileCard({
     isNewlyJoined,
     variant: photoVar,
     onPress,
+    onWhatsApp,
   } as const
 
   // Omits education for 'matches' section (matches Angular getBasicDetail logic).

@@ -15,8 +15,11 @@ import { LinearGradient } from 'expo-linear-gradient'
 import * as ImagePicker from 'expo-image-picker'
 import { useTranslation } from 'react-i18next'
 import CdnSvg from '../cdn-svg/CdnSvg'
+import { WhatsAppUnlockButton } from '../matches/matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
+import { getItem } from '../../service/storageService'
+import { StorageKeys } from '../../constants/storage.keys'
 import { getOppGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -68,6 +71,10 @@ export interface ProfilePhotoProps {
   onViewPhotoRequest?: (() => void) | undefined
   onThreeDotPress?:    (() => void) | undefined
   onImageLoad?:        (() => void) | undefined
+  // Angular: matches-card.component's "no photo at all" overlay — contact
+  // her/him via WhatsApp to ask for a photo, not a generic "send request"
+  // flow (see showAddRequest below).
+  onWhatsApp?:         (() => void) | undefined
 
   // Upload callback — receives the local file URI selected by the user
   onPhotoUpload?: ((uri: string) => void) | undefined
@@ -182,7 +189,6 @@ export default function ProfilePhoto({
   height,
   isPhotoAvailable  = true,
   isPhotoProtect    = false,
-  isAddPhotoRequest = false,
   isViewPhotoRequest = false,
   showReqPhotoElement = true,
   isOwnPhoto = false,
@@ -199,12 +205,13 @@ export default function ProfilePhoto({
   onPress,
   onShortlistPress,
   onDontShowPress,
-  onAddPhotoRequest,
   onViewPhotoRequest,
   onThreeDotPress,
   onImageLoad,
+  onWhatsApp,
   onPhotoUpload,
 }: ProfilePhotoProps) {
+  const { t } = useTranslation()
   const [imgError, setImgError] = useState(false)
   const [uploading, setUploading] = useState(false)
   // Angular: getAvatarImage(profile) → getAvatarImg(getOppGenderType()) — a
@@ -213,9 +220,17 @@ export default function ProfilePhoto({
   // ProfileCard prop chain; callers that need a specific per-item avatar
   // (e.g. the logged-in user's own photo) still override via `defaultImage`.
   const [oppGenderAvatar, setOppGenderAvatar] = useState(FEMALE_AVATAR_URL)
+  // Same single "opposite gender" concept as the avatar above — needed for
+  // the WhatsApp overlay's #HER_HIS# pronoun token.
+  const [oppGenderCode, setOppGenderCode] = useState<'M' | 'F'>('F')
 
   useEffect(() => {
     let cancelled = false
+    getItem(StorageKeys.User.LOGIN_GENDER).then(gender => {
+      if (cancelled) return
+      const opp = gender === 'F' ? 'M' : 'F'
+      setOppGenderCode(opp)
+    })
     getOppGenderAvatarUrl().then(url => { if (!cancelled) setOppGenderAvatar(url) })
     return () => { cancelled = true }
   }, [])
@@ -406,13 +421,24 @@ export default function ProfilePhoto({
         </Pressable>
       )}
 
-      {/* ── Add-photo request overlay ── */}
+      {/* ── No photo at all — Angular: matches-card.component's WhatsApp
+          overlay (getWhatsAppAvatarImg() + request-photo-vp block) — contact
+          her/him on WhatsApp to ask for a photo. NOT the generic "send
+          request" flow the isAddPhotoRequest/onAddPhotoRequest props drove
+          previously (that flow doesn't exist for this case in the real app —
+          there's no "request sent" alternate state here, tapping WhatsApp
+          just opens WhatsApp directly). ── */}
       {showAddRequest && (
-        <View style={styles.requestWrap}>
-          <PhotoRequestOverlay
-            type={isAddPhotoRequest ? 'requestSent' : 'addPhoto'}
-            onPress={onAddPhotoRequest}
-          />
+        // Angular: photoOverlay has no dim scrim of its own — only the blurred
+        // photo behind and the dark floating card itself, unlike requestWrap's
+        // shared 0.45-black tint (which would double-darken this specific case).
+        <View style={styles.whatsappOverlayWrap}>
+          <View style={styles.whatsappOverlayCard}>
+            <Text style={styles.whatsappOverlayText}>
+              {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGenderCode}.hisher`))}
+            </Text>
+            <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={() => onWhatsApp?.()} />
+          </View>
         </View>
       )}
 
@@ -560,6 +586,34 @@ const styles = StyleSheet.create({
     fontSize:   12,
     fontWeight: '500',
     marginLeft:  8,
+  },
+
+  // ── WhatsApp "no photo" overlay ─────────────────────────────────────────────
+  // Angular: matches-card.component's photoOverlay — centered, no dim scrim of
+  // its own (see comment at the call site above).
+  whatsappOverlayWrap: {
+    ...StyleSheet.absoluteFill,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  whatsappOverlayCard: {
+    backgroundColor:   Colors.scrimStrong,
+    marginHorizontal:  24,
+    paddingVertical:   8,
+    paddingHorizontal: 16,
+    borderRadius:      12,
+    borderWidth:       1,
+    borderColor:       Colors.overlayBorder,
+    alignItems:        'center',
+    width:             '80%',
+    gap:               12,
+  },
+  whatsappOverlayText: {
+    fontFamily: 'Poppins-Regular',
+    fontSize:   13,
+    color:      Colors.white,
+    textAlign:  'center',
+    lineHeight: 18,
   },
 
   // ── Photo request overlay ───────────────────────────────────────────────────

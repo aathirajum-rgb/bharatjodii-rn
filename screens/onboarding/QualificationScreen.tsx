@@ -12,10 +12,14 @@ import { Image } from 'expo-image'
 import { Colors } from '../../constants/colors'
 import {
   callPartialRegistrationAPI,
+  fetchEducationGroupOptions,
   fetchQualificationOptions,
   getRegValue,
+  isEducationGroupEligible,
   setRegValue,
+  updateFewMoreDetail,
 } from '../../service/registrationService'
+import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
@@ -45,11 +49,34 @@ export default function QualificationScreen({ navigation }: Props) {
   const [createdBy,  setCreatedBy]  = useState('4')
   const [submitting, setSubmitting] = useState(false)
 
+  // ── Education Group (JODII-490) — dependent optional field, only shown for
+  // Master's/Bachelor's qualifications (isEducationGroupEligible). ──────────
+  const [eduGroupOptions,  setEduGroupOptions]  = useState<Option[]>([])
+  const [selectedEduGroup, setSelectedEduGroup] = useState<Option | null>(null)
+  const [eduGroupPanelVisible, setEduGroupPanelVisible] = useState(false)
+
+  async function loadEduGroup(qualKey: string, restoreKey?: string | null) {
+    if (!isEducationGroupEligible(qualKey)) {
+      setEduGroupOptions([])
+      setSelectedEduGroup(null)
+      return
+    }
+    const list = await fetchEducationGroupOptions(qualKey)
+    setEduGroupOptions(list)
+    if (restoreKey) {
+      const found = list.find(o => o.key === restoreKey)
+      setSelectedEduGroup(found ?? null)
+    } else {
+      setSelectedEduGroup(null)
+    }
+  }
+
   useEffect(() => {
     Promise.all([
       getRegValue('CREATEDBY'),
       getRegValue('QUALIFICATION'),
-    ]).then(([cb, savedQual]) => {
+      getRegValue('EDUGROUP'),
+    ]).then(([cb, savedQual, savedEduGroup]) => {
       if (cb)        setCreatedBy(cb)
       if (savedQual) setSelected(savedQual)
 
@@ -57,8 +84,15 @@ export default function QualificationScreen({ navigation }: Props) {
         .then(list => setOptions(list))
         .catch(() => {})
         .finally(() => setFetching(false))
+
+      if (savedQual) loadEduGroup(savedQual, savedEduGroup)
     })
   }, [])
+
+  async function selectQualification(opt: Option) {
+    setSelected(opt.key)
+    await loadEduGroup(opt.key)
+  }
 
   const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
   const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
@@ -72,6 +106,23 @@ export default function QualificationScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       await setRegValue('QUALIFICATION', selected)
+
+      // Education Group is optional and never blocks Next (same convention as
+      // CasteScreen's Subcaste) — but if the field is eligible, Angular still
+      // fires updprofileinfo even with an empty value, to clear any stale
+      // saved value from a previous qualification. Fire-and-forget + silent
+      // retroactive clear on rejection mirrors Angular's current (2026-08-14)
+      // onboarding behavior — see updateFewMoreDetail()'s header comment.
+      if (isEducationGroupEligible(selected)) {
+        const eduGroupValue = selectedEduGroup?.key ?? ''
+        await setRegValue('EDUGROUP', eduGroupValue)
+        updateFewMoreDetail('EDUDETAILS', eduGroupValue).then(({ valid }) => {
+          if (!valid) setRegValue('EDUGROUP', '')
+        }).catch(() => {})
+      } else {
+        await setRegValue('EDUGROUP', '')
+      }
+
       navigation.push('onboarding', { pageNo: '11' })
       callPartialRegistrationAPI()
     } catch {
@@ -109,7 +160,7 @@ export default function QualificationScreen({ navigation }: Props) {
                 <Pressable
                   key={opt.key}
                   style={[styles.chip, isSelected && styles.chipSelected]}
-                  onPress={() => setSelected(opt.key)}
+                  onPress={() => selectQualification(opt)}
                   accessibilityRole="radio"
                   accessibilityState={{ selected: isSelected }}
                   accessibilityLabel={opt.label}
@@ -125,7 +176,43 @@ export default function QualificationScreen({ navigation }: Props) {
             })}
           </View>
         )}
+
+        {/* ── Education Group (JODII-490) — optional, only for Master's/Bachelor's ── */}
+        {!fetching && selected && isEducationGroupEligible(selected) && (
+          <View style={styles.eduGroupWrapper}>
+            <View style={styles.eduGroupLabelBadge}>
+              <Text style={styles.eduGroupLabelText}>
+                {t('REGISTRATION.EDUCATIONGROUP', 'Education')}{' '}
+                <Text style={styles.eduGroupLabelOptional}>(Optional)</Text>
+              </Text>
+            </View>
+            <Pressable
+              style={styles.selectField}
+              onPress={() => setEduGroupPanelVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel={t('REGISTRATION.SELECTEDUCATIONGROUP', 'Select education')}
+            >
+              <Text
+                style={[styles.selectFieldText, !!selectedEduGroup && styles.selectFieldTextActive]}
+                numberOfLines={1}
+              >
+                {selectedEduGroup ? selectedEduGroup.label : t('REGISTRATION.SELECTEDUCATIONGROUP', 'Select education')}
+              </Text>
+              <Text style={styles.selectFieldArrow}>›</Text>
+            </Pressable>
+          </View>
+        )}
       </ScrollView>
+
+      <SearchablePicker
+        visible={eduGroupPanelVisible}
+        title={t('REGISTRATION.SELECTEDUCATIONGROUP', 'Select education')}
+        placeholder={t('REGISTRATION.SEARCHEDUCATIONGROUP', 'Search education...')}
+        options={eduGroupOptions}
+        selectedKey={selectedEduGroup?.key ?? null}
+        onSelect={(opt) => setSelectedEduGroup(opt)}
+        onClose={() => setEduGroupPanelVisible(false)}
+      />
     </View>
   )
 }
@@ -187,5 +274,56 @@ const styles = StyleSheet.create({
   },
   chipLabelSelected: {
     fontWeight: '500',
+  },
+
+  // Education Group — dependent field, styled like CasteScreen's Subcaste field
+  eduGroupWrapper: {
+    position:  'relative',
+    marginTop: 32,
+  },
+  eduGroupLabelBadge: {
+    position:          'absolute',
+    top:               -8,
+    left:              12,
+    zIndex:            1,
+    backgroundColor:   Colors.surface,
+    paddingHorizontal: 4,
+    flexDirection:     'row',
+    alignItems:        'center',
+  },
+  eduGroupLabelText: {
+    fontSize:   12,
+    fontWeight: '400',
+    color:      Colors.textPrimary,
+  },
+  eduGroupLabelOptional: {
+    fontSize:   12,
+    fontWeight: '400',
+    color:      'rgba(0,0,0,0.4)',
+  },
+  selectField: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    height:          48,
+    borderWidth:     1,
+    borderColor:     Colors.inputBorder,
+    borderRadius:    8,
+    paddingLeft:     16,
+    paddingRight:    12,
+    backgroundColor: Colors.surface,
+  },
+  selectFieldText: {
+    flex:       1,
+    fontSize:   14,
+    fontWeight: '400',
+    color:      Colors.textPrimary,
+  },
+  selectFieldTextActive: {
+    fontWeight: '500',
+  },
+  selectFieldArrow: {
+    fontSize:   22,
+    color:      Colors.textPrimary,
+    lineHeight: 26,
   },
 })

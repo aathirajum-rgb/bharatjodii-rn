@@ -91,7 +91,11 @@ export default function OTPScreen({ navigation, route }: Props) {
     return `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
   }
 
-  function buildParams(otp?: string) {
+  async function buildParams(otp?: string) {
+    const [deviceId, registerId] = await Promise.all([
+      getItem('DEVICEID'),
+      getItem('REGISTERID'),
+    ])
     return {
       ID:           matriId,
       MOBILENO:     mobile,
@@ -99,8 +103,8 @@ export default function OTPScreen({ navigation, route }: Props) {
       NEWREG:       '1',
       APPVERSION:   Constants.expoConfig?.version ?? '1.0.0',
       DEVICEDETAIL: '{}',
-      DEVICEID:     '',
-      REGISTERID:   '',
+      DEVICEID:     deviceId ?? '',
+      REGISTERID:   registerId ?? '',
       ...(otp ? { OTP: otp } : {}),
     }
   }
@@ -152,7 +156,7 @@ export default function OTPScreen({ navigation, route }: Props) {
     setError('')
     try {
       const nallow = await getItem('NALLOW') ?? '0'
-      const res    = await verifyOTP('otp', { ...buildParams(otpValues.join('')), NALLOW: nallow })
+      const res    = await verifyOTP('otp', { ...(await buildParams(otpValues.join(''))), NALLOW: nallow })
       if (res?.RESPONSECODE == 1) {
         // Store tokens — wrapped so a storage failure doesn't block the success UI.
         // ATN/RTN are at root of response; WEBVIEWURL carries profile data only.
@@ -194,7 +198,8 @@ export default function OTPScreen({ navigation, route }: Props) {
     setResending(true)
     setError('')
     try {
-      const res = await resendOTP('resendotp', buildParams())
+      const nallow = await getItem('NALLOW') ?? '0'
+      const res    = await resendOTP('resendotp', { ...(await buildParams()), NALLOW: nallow })
       if (res?.RESPONSECODE == 1) {
         setOtpValues(Array(OTP_LENGTH).fill(''))
         setSeconds(TIMER_START)   // matches Angular clearIntervalTime + startCountdown

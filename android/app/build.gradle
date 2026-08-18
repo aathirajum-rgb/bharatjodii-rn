@@ -198,6 +198,21 @@ configurations.all {
 }
 
 dependencies {
+    // Razorpay Custom Integration SDK — enables per-UPI-app targeting
+    // (getAppsWhichSupportUpi + upi_app_package_name intent flow) and direct
+    // card submission, neither of which react-native-razorpay's Standard
+    // Checkout SDK (com.razorpay:checkout) supports. These two Razorpay
+    // artifacts ship overlapping classes and cannot coexist in one Android
+    // build (confirmed: duplicate class com.razorpay.AdvertisingIdUtil etc.)
+    // — react-native-razorpay's Android autolinking is disabled in
+    // react-native.config.js for exactly this reason; iOS still uses it.
+    implementation "com.razorpay:customui:3.9.22"
+    // PayU Custom Integration — silent per-account substitute for the
+    // Razorpay UPI flow (PAYCONFIG.PAYSOURCE == '2'), matching the old
+    // native Android app's behavior. See PayUBridgeModule/PayUWebView.
+    implementation("in.payu:upisdk:1.7.2") {
+        exclude group: "org.json", module: "json"
+    }
     // The version of react-native is set by the React Native Gradle Plugin
     implementation("com.facebook.react:react-android")
 
@@ -223,22 +238,5 @@ dependencies {
         implementation("com.facebook.react:hermes-android")
     } else {
         implementation jscFlavor
-    }
-
-    // Razorpay Custom Integration SDK — enables per-UPI-app targeting
-    // (getAppsWhichSupportUpi + upi_app_package_name intent flow) and direct
-    // card submission, neither of which react-native-razorpay's Standard
-    // Checkout SDK (com.razorpay:checkout) supports. These two Razorpay
-    // artifacts ship overlapping classes and cannot coexist in one Android
-    // build (confirmed: duplicate class com.razorpay.AdvertisingIdUtil etc.)
-    // — react-native-razorpay's Android autolinking is disabled in
-    // react-native.config.js for exactly this reason; iOS still uses it.
-    implementation "com.razorpay:customui:3.9.22"
-
-    // PayU Custom Integration — silent per-account substitute for the
-    // Razorpay UPI flow (PAYCONFIG.PAYSOURCE == '2'), matching the old
-    // native Android app's behavior. See PayUBridgeModule/PayUWebView.
-    implementation("in.payu:upisdk:1.7.2") {
-        exclude group: "org.json", module: "json"
     }
 }

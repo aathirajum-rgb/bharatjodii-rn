@@ -20,15 +20,18 @@ import { CDN_REACT } from '../../constants/cdn'
 import { fetchEditProfileInfo, submitFieldChanges, type FieldChange } from '../../service/editProfileService'
 import {
   fetchQualificationOptions, fetchOccupationOptions, fetchMonthlyIncomeOptions,
+  fetchEducationGroupOptions, isEducationGroupEligible, isJobDetailEligible,
+  isValidJobDetailFormat, updateFewMoreDetail,
 } from '../../service/registrationService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import SelectField from '../../components/input/SelectField'
+import FloatingLabelInput from '../../components/input/FloatingLabelInput'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
 type Props = { navigation: any }
-type Picker = 'education' | 'occupation' | 'income' | null
+type Picker = 'education' | 'educationGroup' | 'occupation' | 'income' | null
 
 export default function ProfessionalDetailsScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
@@ -38,17 +41,23 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
   const [submitting, setSubmitting] = useState(false)
 
   const [education, setEducation]   = useState<PickerOption | null>(null)
+  const [educationGroup, setEducationGroup] = useState<PickerOption | null>(null)
   const [occupation, setOccupation] = useState<PickerOption | null>(null)
+  const [jobDetail, setJobDetail]   = useState('')
+  const [jobDetailError, setJobDetailError] = useState<string | undefined>(undefined)
   const [income, setIncome]         = useState<PickerOption | null>(null)
   const [incomeEditable, setIncomeEditable] = useState(true)
 
   const [original, setOriginal] = useState<{
     education?:  string | undefined
+    educationGroup?: string | undefined
     occupation?: string | undefined
+    jobDetail?:  string | undefined
     income?:     string | undefined
   }>({})
 
   const [educationOptions, setEducationOptions]   = useState<PickerOption[]>([])
+  const [educationGroupOptions, setEducationGroupOptions] = useState<PickerOption[]>([])
   const [occupationOptions, setOccupationOptions] = useState<PickerOption[]>([])
   const [incomeOptions, setIncomeOptions]         = useState<PickerOption[]>([])
 
@@ -59,7 +68,11 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
     const info = await fetchEditProfileInfo()
     if (!info) { setLoading(false); return }
 
-    setOriginal({ education: info.education, occupation: info.occupation, income: info.income })
+    setOriginal({
+      education: info.education, educationGroup: info.educationGroup,
+      occupation: info.occupation, jobDetail: info.jobDetail,
+      income: info.income,
+    })
     setIncomeEditable(info.incomeEditable)
 
     const [educationList, occupationList, incomeList] = await Promise.all([
@@ -74,6 +87,13 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
     setOccupation(occupationList.find(o => o.key === info.occupation) ?? null)
     setIncome(incomeList.find(o => o.key === info.income) ?? null)
 
+    if (isEducationGroupEligible(info.education ?? '')) {
+      const groupList = await fetchEducationGroupOptions(info.education ?? '')
+      setEducationGroupOptions(groupList)
+      setEducationGroup(groupList.find(o => o.key === info.educationGroup) ?? null)
+    }
+    setJobDetail(info.jobDetail ?? '')
+
     setLoading(false)
   }, [])
 
@@ -81,6 +101,17 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
 
   async function handleSubmit() {
     if (submitting) return
+
+    // JODII-490: Job Detail format check happens client-side first — mirrors
+    // Angular's edit-profile submitOccupation(), which blocks with a visible
+    // error rather than the silent onboarding-wizard behavior (different
+    // component, different UX — see registrationService.ts's
+    // isValidJobDetailFormat()/updateFewMoreDetail() header comments).
+    if (jobDetail && !isValidJobDetailFormat(jobDetail)) {
+      setJobDetailError(t('REGISTRATION.OCCUPATION_TXT', 'Please provide a valid occupation'))
+      return
+    }
+    setJobDetailError(undefined)
     setSubmitting(true)
 
     const changes: FieldChange[] = []
@@ -94,13 +125,39 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
       changes.push({ field: 'INCOME', value: income.key, existingValue: original.income })
     }
 
-    if (changes.length === 0) {
+    const educationGroupEligible = isEducationGroupEligible(education?.key ?? '')
+    const jobDetailEligible      = isJobDetailEligible(occupation?.key ?? '')
+    const educationGroupValue    = educationGroupEligible ? (educationGroup?.key ?? '') : ''
+    const jobDetailValue         = jobDetailEligible ? jobDetail.trim() : ''
+    const educationGroupChanged  = educationGroupValue !== (original.educationGroup ?? '')
+    const jobDetailChanged       = jobDetailValue !== (original.jobDetail ?? '')
+
+    if (changes.length === 0 && !educationGroupChanged && !jobDetailChanged) {
       setSubmitting(false)
       navigation.goBack()
       return
     }
 
-    const result = await submitFieldChanges(changes)
+    const result = changes.length > 0
+      ? await submitFieldChanges(changes)
+      : { succeeded: [], failed: [] }
+
+    // Job Detail save can be rejected by the server (OCCDETAILSVALID) — stop
+    // here with a visible error rather than navigating back, same as Angular.
+    if (jobDetailChanged) {
+      const { valid } = await updateFewMoreDetail('OCCDETAILS', jobDetailValue)
+      if (!valid) {
+        setSubmitting(false)
+        setJobDetailError(t('REGISTRATION.OCCUPATION_TXT', 'Please provide a valid occupation'))
+        return
+      }
+    }
+    // Education Group has no equivalent validity flag in the Angular source —
+    // fire-and-forget, same as onboarding.
+    if (educationGroupChanged) {
+      await updateFewMoreDetail('EDUDETAILS', educationGroupValue)
+    }
+
     setSubmitting(false)
 
     if (result.failed.length > 0) {
@@ -138,7 +195,24 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
         <Text style={s.heading}>Professional details</Text>
 
         <SelectField label="Higher education" value={education?.label} onPress={() => setActivePicker('education')} />
+        {isEducationGroupEligible(education?.key ?? '') && (
+          <SelectField
+            label={t('EDITPROFILE.EDUCATIONGROUP', 'Education group')}
+            value={educationGroup?.label}
+            placeholder={t('REGISTRATION.SELECTEDUCATIONGROUP', 'Select education')}
+            onPress={() => setActivePicker('educationGroup')}
+          />
+        )}
         <SelectField label={t('EDITPROFILE.OCCUPATION')} value={occupation?.label} onPress={() => setActivePicker('occupation')} />
+        {isJobDetailEligible(occupation?.key ?? '') && (
+          <FloatingLabelInput
+            label={t('EDITPROFILE.JOBDETAIL', 'Job details')}
+            value={jobDetail}
+            onChangeText={text => { setJobDetail(text); setJobDetailError(undefined) }}
+            errorMessage={jobDetailError}
+            maxLength={60}
+          />
+        )}
         {incomeEditable ? (
           <SelectField label="Monthly Income" value={income?.label} onPress={() => setActivePicker('income')} />
         ) : (
@@ -156,7 +230,23 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
         placeholder="Search education..."
         options={educationOptions}
         selectedKey={education?.key}
-        onSelect={opt => { setEducation(opt); setActivePicker(null) }}
+        onSelect={async opt => {
+          const changed = opt.key !== education?.key
+          setEducation(opt)
+          setActivePicker(null)
+          if (!changed) return
+          setEducationGroup(null)
+          setEducationGroupOptions(isEducationGroupEligible(opt.key) ? await fetchEducationGroupOptions(opt.key) : [])
+        }}
+        onClose={() => setActivePicker(null)}
+      />
+      <SearchablePicker
+        visible={activePicker === 'educationGroup'}
+        title={t('EDITPROFILE.EDUCATIONGROUP', 'Education group')}
+        placeholder={t('REGISTRATION.SEARCHEDUCATIONGROUP', 'Search education...')}
+        options={educationGroupOptions}
+        selectedKey={educationGroup?.key}
+        onSelect={opt => { setEducationGroup(opt); setActivePicker(null) }}
         onClose={() => setActivePicker(null)}
       />
       <SearchablePicker
@@ -165,7 +255,15 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
         placeholder="Search occupation..."
         options={occupationOptions}
         selectedKey={occupation?.key}
-        onSelect={opt => { setOccupation(opt); setActivePicker(null) }}
+        onSelect={opt => {
+          const changed = opt.key !== occupation?.key
+          setOccupation(opt)
+          setActivePicker(null)
+          if (changed && !isJobDetailEligible(opt.key)) {
+            setJobDetail('')
+            setJobDetailError(undefined)
+          }
+        }}
         onClose={() => setActivePicker(null)}
       />
       <SearchablePicker

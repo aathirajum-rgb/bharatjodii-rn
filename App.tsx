@@ -1,6 +1,7 @@
 import * as SplashScreen from 'expo-splash-screen'
 import { StatusBar } from 'expo-status-bar'
 import Constants from 'expo-constants'
+import { Platform } from 'react-native'
 import {
   Poppins_400Regular,
   Poppins_500Medium,
@@ -26,11 +27,31 @@ import { loadLangFonts } from './constants/fonts'
 // Keep native splash visible until SplashAnimationScreen mounts and calls hideAsync()
 SplashScreen.preventAutoHideAsync()
 
-function makeDeviceId(): string {
+function makeRandomDeviceId(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
     const r = (Math.random() * 16) | 0
     return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16)
   })
+}
+
+// Legacy native Android app sent Settings.Secure.ANDROID_ID as DEVICEID. This
+// RN app ships under the exact same applicationId ('jodii.app'), so matching
+// that scheme (rather than a freshly-generated random UUID) preserves device
+// continuity for anyone upgrading from the old native APK — the backend's
+// existing DEVICEID/REGISTERID pairing for that device keeps resolving to the
+// same DEVICEID. No iOS equivalent existed in the legacy (Android-only) app,
+// so iOS keeps the random-UUID-persisted-on-first-launch approach.
+async function makeDeviceId(): Promise<string> {
+  if (Platform.OS === 'android') {
+    try {
+      const { getAndroidId } = await import('expo-application')
+      const androidId = getAndroidId()
+      if (androidId) return androidId
+    } catch {
+      // fall through to random UUID
+    }
+  }
+  return makeRandomDeviceId()
 }
 
 // Mirrors what the old native app injected into the WebView URL on launch.
@@ -42,7 +63,7 @@ async function initializeAppConfig(): Promise<void> {
   // Persist a stable device ID on first install; reuse on subsequent launches
   let deviceId = await getItem('DEVICEID')
   if (!deviceId) {
-    deviceId = makeDeviceId()
+    deviceId = await makeDeviceId()
     await setItem('DEVICEID', deviceId)
   }
 

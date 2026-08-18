@@ -13,7 +13,10 @@ const path = require('path');
 
 const PACKAGE_PATH = 'jodii/app';
 const SRC_DIR = path.join(__dirname, 'android-native-src', 'payu');
-const PAYU_GRADLE_DEP = `implementation("in.payu:upisdk:1.7.2") {
+const PAYU_GRADLE_DEP = `// PayU Custom Integration — silent per-account substitute for the
+    // Razorpay UPI flow (PAYCONFIG.PAYSOURCE == '2'), matching the old
+    // native Android app's behavior. See PayUBridgeModule/PayUWebView.
+    implementation("in.payu:upisdk:1.7.2") {
         exclude group: "org.json", module: "json"
     }`;
 

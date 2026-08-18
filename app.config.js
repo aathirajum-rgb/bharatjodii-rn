@@ -30,6 +30,12 @@ module.exports = ({ config }) => ({
     },
     package: f.applicationId,
     predictiveBackGestureEnabled: false,
+    // Required so @react-native-firebase/app's own config plugin doesn't throw
+    // during prebuild (it hard-requires this field). It copies this single
+    // flavor's file to the shared android/app/google-services.json fallback —
+    // harmless, since withFirebaseAndroid's per-flavor android/app/src/<flavor>/
+    // copies always take precedence in Gradle's google-services resolution.
+    googleServicesFile: `./firebase/google-services.${flavor}.json`,
     permissions: [
       'ACCESS_FINE_LOCATION',
       'ACCESS_COARSE_LOCATION',
@@ -38,6 +44,7 @@ module.exports = ({ config }) => ({
       'READ_EXTERNAL_STORAGE',
       'CAMERA',
       'RECORD_AUDIO',
+      'POST_NOTIFICATIONS',
     ],
     intentFilters: [
       {
@@ -58,6 +65,9 @@ module.exports = ({ config }) => ({
     ...config.ios,
     bundleIdentifier: f.applicationId,
     associatedDomains: [`applinks:${f.domain}`],
+    // Unlike android/ (one Gradle tree hosts all 3 flavors via productFlavors),
+    // ios/ is regenerated per-flavor by prebuild, so a single active file is correct here.
+    googleServicesFile: `./firebase/GoogleService-Info.${flavor}.plist`,
     infoPlist: {
       NSLocationWhenInUseUsageDescription: 'We need your location to show nearby matches.',
       NSPhotoLibraryUsageDescription: 'We need access to your photos to let you upload a profile picture.',
@@ -84,12 +94,23 @@ module.exports = ({ config }) => ({
   },
   plugins: [
     './plugins/withAndroidFlavors',
+    './plugins/withAndroidBuildCustomizations',
+    './plugins/withFirebaseAndroid',
     './plugins/withRazorpayAndroidBridge',
     './plugins/withPayUAndroidBridge',
+    'expo-font',
     'expo-image',
     'expo-splash-screen',
+    'expo-status-bar',
     'expo-video',
     'expo-web-browser',
+    // Local (chat) notifications + badge only — remote push is owned end-to-end
+    // by @react-native-firebase/messaging (see service/notificationService.ts).
+    // No custom icon/color yet — needs a monochrome status-bar asset from design.
+    'expo-notifications',
+    // iOS-only in practice: AppDelegate Firebase init + GoogleService-Info.plist
+    // wiring. Its Android mods also run (harmless, see withFirebaseAndroid.js).
+    '@react-native-firebase/app',
     ['expo-camera', { barcodeScannerEnabled: false }],
   ],
 });
