@@ -7,6 +7,7 @@
 // to log the user out would be misleading rather than helpful.
 import { StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { Fonts } from '../../src/theme/fonts'
 
 export interface DeleteProfileSuccessDesktopLayoutProps {
   message: string
@@ -37,6 +38,6 @@ const s = StyleSheet.create({
   },
   iconCheck: { fontSize: 28, color: '#1a9c4a', fontWeight: '700' },
   message: {
-    fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, textAlign: 'center', lineHeight: 22,
+    fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, textAlign: 'center', lineHeight: 22,
   },
 })

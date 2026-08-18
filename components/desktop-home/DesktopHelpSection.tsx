@@ -4,6 +4,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 function WhatsAppIcon() {
   return (
@@ -65,9 +66,9 @@ const s = StyleSheet.create({
     gap:               24,
   },
   textCol: { gap: 12, flexShrink: 1 },
-  title: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black },
-  body:  { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 20, color: Colors.black },
-  bold:  { fontFamily: 'Poppins-SemiBold' },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black },
+  body:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 20, color: Colors.black },
+  bold:  { fontFamily: Fonts.poppinsSemiBold },
 
   btnRow: { flexDirection: 'row', gap: 16, flexShrink: 0 },
   btn: {
@@ -83,12 +84,12 @@ const s = StyleSheet.create({
     justifyContent:    'center',
     gap:               8,
   },
-  btnText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black },
+  btnText: { fontFamily: Fonts.poppinsRegular, fontSize: 12, color: Colors.black },
 
   waIconWrap: {
     width: 16, height: 16, borderRadius: 8, backgroundColor: '#25D366',
     alignItems: 'center', justifyContent: 'center',
   },
-  waGlyph:   { color: '#ffffff', fontSize: 10, fontFamily: 'Poppins-Bold' },
+  waGlyph:   { color: '#ffffff', fontSize: 10, fontFamily: Fonts.poppinsBold },
   callGlyph: { fontSize: 14, color: Colors.primaryDark },
 })

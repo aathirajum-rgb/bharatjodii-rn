@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { SectionHeader } from './DesktopHomeShared'
 import { Colors } from '../../constants/colors'
 import type { CompleteProfileCard } from '../../service/homeService'
+import { SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const TINTS: [string, string][] = [
   ['#e8efff', '#ffffff'],
@@ -74,8 +75,8 @@ const s = StyleSheet.create({
   iconWrap: { width: 48, height: 48 },
   icon:     { width: 48, height: 48 },
   textCol:  { flex: 1, gap: 8 },
-  label: { fontFamily: 'Poppins-Medium', fontSize: 14, lineHeight: 20, color: Colors.black },
+  label: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 14, lineHeight: 20, color: Colors.black },
   addRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  addText: { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 20, color: Colors.link },
-  addChevron: { fontFamily: 'Poppins-Regular', fontSize: 16, color: Colors.link },
+  addText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 20, color: Colors.link },
+  addChevron: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 16, color: Colors.link },
 })

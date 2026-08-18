@@ -7,6 +7,7 @@ import { CarouselSection } from './DesktopHomeShared'
 import ViewedProfileCard from './ViewedProfileCard'
 import { Colors } from '../../constants/colors'
 import type { SwiperItem } from '../swiper-card/SwiperCard'
+import { SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CARD_W = 260
 const PHOTO_SIZE = 260
@@ -58,7 +59,7 @@ const s = StyleSheet.create({
     justifyContent:    'center',
   },
   newBadgeText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.headingEnglishMedium,
     fontSize:   14,
     color:      Colors.white,
   },

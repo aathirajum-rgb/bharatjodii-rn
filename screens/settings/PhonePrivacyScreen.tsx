@@ -30,6 +30,7 @@ import { openMembershipTab } from '../../service/paymentService'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { ICON } from '../menu/MenuScreen'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 type Props = { navigation: any }
 
@@ -224,7 +225,7 @@ const s = StyleSheet.create({
     width: 810, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24,
   },
   desktopBackArrow: { fontSize: 22, color: Colors.black },
-  desktopTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black },
+  desktopTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black },
   desktopCard: {
     width: 810, backgroundColor: Colors.white, borderRadius: 24, padding: 40,
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 8,
@@ -237,13 +238,13 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
     backgroundColor: '#EAF4FF', borderRadius: 8, padding: 16, marginBottom: 16,
   },
-  assureText: { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 13, lineHeight: 18, color: Colors.black },
+  assureText: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, lineHeight: 18, color: Colors.black },
 
   option: { paddingVertical: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   optionDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.borderSubtle },
   optionText: { flex: 1, gap: 6 },
-  optionTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
-  optionContent: { fontFamily: 'Poppins-Regular', fontSize: 13, lineHeight: 18, color: Colors.black },
+  optionTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  optionContent: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, lineHeight: 18, color: Colors.black },
 
   recommendedRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, alignSelf: 'flex-start',
@@ -253,7 +254,7 @@ const s = StyleSheet.create({
     width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
   },
-  recommendedText: { fontFamily: 'Poppins-Medium', fontSize: 12, color: Colors.primaryDark },
+  recommendedText: { fontFamily: Fonts.poppinsMedium, fontSize: 12, color: Colors.primaryDark },
 
   radio: {
     width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: Colors.borderNeutral,
@@ -265,8 +266,8 @@ const s = StyleSheet.create({
   submitRow: { marginTop: 24, marginBottom: 16 },
 
   confirmBox: { paddingVertical: 8 },
-  confirmTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, textAlign: 'center' },
-  confirmContent: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.black, textAlign: 'center', marginTop: 8 },
+  confirmTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, textAlign: 'center' },
+  confirmContent: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.black, textAlign: 'center', marginTop: 8 },
   confirmRow: { flexDirection: 'row', gap: 12, marginTop: 24 },
   confirmBtn: { flex: 1 },
 })

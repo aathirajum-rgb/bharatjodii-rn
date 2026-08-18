@@ -18,6 +18,7 @@ import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
+import { SemanticFontsEnglish } from '../../src/theme/fonts'
 import {
   getFinalAmount, getNetBankingList, getRetryRemainingMs,
   type NetBankingItem, type SelectedPackage,
@@ -189,10 +190,10 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white,
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
-  headerTitle: { fontFamily: 'Poppins-Medium', fontSize: 16, color: Colors.black, marginLeft: 16, flex: 1 },
+  headerTitle: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, color: Colors.black, marginLeft: 16, flex: 1 },
 
   content: { padding: 16, gap: 16 },
-  sectionLabel: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.black, marginBottom: 8 },
+  sectionLabel: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 14, color: Colors.black, marginBottom: 8 },
 
   popularGrid: { flexDirection: 'row', gap: 20, flexWrap: 'wrap' },
   popularItem: { width: 58, alignItems: 'center', gap: 6 },
@@ -200,7 +201,7 @@ const s = StyleSheet.create({
     width: 58, height: 58, borderRadius: 8, borderWidth: 1, borderColor: '#E6E6E6',
     backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center',
   },
-  popularLabel: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black, textAlign: 'center' },
+  popularLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black, textAlign: 'center' },
 
   divider: { height: 1, backgroundColor: Colors.divider, marginBottom: 4 },
   otherList: { gap: 0 },
@@ -209,7 +210,7 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     height: 40, paddingHorizontal: 8,
   },
-  otherLabel: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black, flexShrink: 1 },
+  otherLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black, flexShrink: 1 },
 
   // Figma (NEFT/RTGS screen's selected HDFC card, node 2792:9267): the one
   // confirmed selected-state treatment, reused for both the popular grid and

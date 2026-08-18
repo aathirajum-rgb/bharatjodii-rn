@@ -14,6 +14,7 @@ import {
   getPaymentCityList, getPaymentStateList, getPaymentStoreList,
   type PaymentCityItem, type PaymentStateItem, type PaymentStoreItem,
 } from '../../../service/paymentService'
+import { Fonts, SemanticFontsEnglish } from '../../../src/theme/fonts'
 
 const ICON_EDIT         = CDN + 'assets/images/svg/edit-icon.svg'
 const ICON_EXPAND_PLUS  = CDN + 'assets/images/svg/expand-plus-icon.svg'
@@ -190,16 +191,16 @@ export default function PayAtStoreTab() {
 
 const s = StyleSheet.create({
   wrap: { gap: 16 },
-  title: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black },
-  sectionLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black },
+  sectionLabel: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
 
   selectedRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     borderWidth: 1, borderColor: Colors.borderNeutral, borderRadius: 8, padding: 12, height: 48,
   },
   selectedTextBlock: { flexShrink: 1, gap: 2 },
-  selectedLabel: { fontFamily: 'Poppins-Regular', fontSize: 11, color: Colors.textSecondary },
-  selectedValue: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.black },
+  selectedLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 11, color: Colors.textSecondary },
+  selectedValue: { fontFamily: Fonts.poppinsMedium, fontSize: 14, color: Colors.black },
 
   dropdownCard: {
     backgroundColor: Colors.white, borderRadius: 12, borderWidth: 1, borderColor: Colors.borderSubtle,
@@ -210,7 +211,7 @@ const s = StyleSheet.create({
     minHeight: 44, borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
   rowLast: { borderBottomWidth: 0 },
-  rowLabel: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.black, flexShrink: 1 },
+  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.black, flexShrink: 1 },
 
   radioCircle: {
     width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.borderNeutral,
@@ -224,8 +225,8 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     padding: 16, backgroundColor: Colors.background,
   },
-  storeTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black, flexShrink: 1 },
+  storeTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black, flexShrink: 1 },
   storeBody: { padding: 16, paddingTop: 0, gap: 8 },
-  storeText: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary, lineHeight: 20 },
-  storeLink: { color: Colors.link, fontFamily: 'Poppins-Medium' },
+  storeText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary, lineHeight: 20 },
+  storeLink: { color: Colors.link, fontFamily: SemanticFontsEnglish.buttonEnglishMedium },
 })

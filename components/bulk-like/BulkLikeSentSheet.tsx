@@ -13,6 +13,7 @@ import { Animated, Dimensions, Modal, StyleSheet, Text, View } from 'react-nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_LOTTIE } from '../../constants/cdn'
+import { Fonts } from '../../src/theme/fonts'
 
 const SCREEN_H   = Dimensions.get('window').height
 const LOTTIE_URL = CDN_LOTTIE + 'success-new.json'
@@ -78,7 +79,7 @@ const s = StyleSheet.create({
   lottieWrapper: { width: 48, height: 48, overflow: 'hidden' },
   lottie: { width: 48, height: 48 },
   text: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   18,
     lineHeight: 24,
     color:      Colors.black,

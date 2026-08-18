@@ -22,6 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
@@ -393,7 +394,7 @@ const s = StyleSheet.create({
     height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingHorizontal: 24,
   },
-  headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, flex: 1 },
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, flex: 1 },
   headerTitleWithBack: { marginLeft: 16 },
 
   content: { padding: 24, paddingTop: 20, gap: 20 },
@@ -407,13 +408,13 @@ const s = StyleSheet.create({
     position: 'absolute', top: -20, left: 0, height: 40, borderTopLeftRadius: 12, borderTopRightRadius: 12,
     paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center',
   },
-  onlyForYouText: { fontFamily: 'Poppins-Medium', fontSize: 10, color: Colors.white },
+  onlyForYouText: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: 10, color: Colors.white },
 
   mostSoldBadge: {
     position: 'absolute', top: -11, left: 43, height: 20, borderRadius: 20,
     paddingHorizontal: 8, alignItems: 'center', justifyContent: 'center', zIndex: 1,
   },
-  mostSoldText: { fontFamily: 'Poppins-Medium', fontSize: 10, color: Colors.white },
+  mostSoldText: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: 10, color: Colors.white },
 
   card: {
     borderRadius: 16, padding: 12, backgroundColor: Colors.white,
@@ -432,40 +433,40 @@ const s = StyleSheet.create({
   radioCircleSelected: { borderColor: Colors.primaryDark },
   radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: Colors.primaryDark },
 
-  durationText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
-  typeText:     { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#222222', marginTop: 2 },
+  durationText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  typeText:     { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#222222', marginTop: 2 },
 
   cardTopRight: { alignItems: 'flex-end' },
   priceRow:     { flexDirection: 'row', alignItems: 'center', gap: 4 },
   strikePrice:  { fontSize: 12, color: Colors.textPlaceholder, textDecorationLine: 'line-through' },
-  finalPrice:   { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black },
-  saveText:     { fontFamily: 'Poppins-Regular', fontSize: 10, color: '#00A650', marginTop: 4 },
+  finalPrice:   { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black },
+  saveText:     { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 10, color: '#00A650', marginTop: 4 },
 
   divider: { height: 1, backgroundColor: Colors.divider, marginVertical: 12 },
 
   benefitRow:  { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 4 },
   benefitIcon: { marginTop: 1, marginRight: 4 },
-  benefitText: { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black, lineHeight: 16 },
-  benefitBold: { fontFamily: 'Poppins-SemiBold', fontSize: 14 },
+  benefitText: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black, lineHeight: 16 },
+  benefitBold: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14 },
 
   viewAllRow:  { alignItems: 'center', paddingVertical: 4 },
-  viewAllText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.textSecondary, textDecorationLine: 'underline' },
+  viewAllText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.textSecondary, textDecorationLine: 'underline' },
 
   offerBanner: {
     borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16,
     backgroundColor: Colors.membershipCardBg, alignItems: 'center',
   },
-  offerBannerText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#7A1739', textAlign: 'center', lineHeight: 16 },
+  offerBannerText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#7A1739', textAlign: 'center', lineHeight: 16 },
 
   footer: { paddingHorizontal: 24, paddingTop: 12, gap: 8 },
 
   // "View other packages" sheet
   sheetInner:       { maxHeight: '100%' },
-  sheetTitle:       { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, textAlign: 'center', marginBottom: 16 },
+  sheetTitle:       { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, textAlign: 'center', marginBottom: 16 },
   sheetList:        { maxHeight: 480 },
   sheetListContent: { gap: 20, paddingBottom: 8 },
 
   needHelpRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  needHelpText:   { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black },
-  needHelpNumber: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.link, marginLeft: 4 },
+  needHelpText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
+  needHelpNumber: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.link, marginLeft: 4 },
 })

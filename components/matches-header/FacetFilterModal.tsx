@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import type { ExploreFacet } from '../../service/homeService'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export interface FacetFilterModalProps {
   visible:  boolean
@@ -108,7 +109,7 @@ const m = StyleSheet.create({
     borderBottomColor: Colors.divider,
   },
   title: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   16,
     color:      '#000000',
   },
@@ -146,7 +147,7 @@ const m = StyleSheet.create({
   },
   rowText: {
     flex:       1,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      '#000000',
   },
@@ -160,7 +161,7 @@ const m = StyleSheet.create({
     justifyContent:   'center',
   },
   applyText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   15,
     color:      Colors.white,
   },

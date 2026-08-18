@@ -54,6 +54,7 @@ import { redirectToViewProfile } from '../../service/buttonService'
 import { shouldShowCoachMark, markCoachMarkShown } from '../../service/coachMarkService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
 import i18n from '../../i18n'
 import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interface'
@@ -1994,12 +1995,12 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 const s = StyleSheet.create({
   screen:       { flex: 1, backgroundColor: Colors.background },
   loaderScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: Colors.background },
-  notFoundText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 14, color: Colors.textSecondary },
+  notFoundText: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 14, color: Colors.textSecondary },
   backBtnInline:     { paddingHorizontal: 16, paddingVertical: 8 },
-  backBtnInlineText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 14, color: Colors.link },
+  backBtnInlineText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 14, color: Colors.link },
   debugBox:   { maxHeight: 300, width: '100%', paddingHorizontal: 16 },
-  debugLabel: { fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 12, color: Colors.primary, marginTop: 8 },
-  debugText:  { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 11, color: Colors.textSecondary },
+  debugLabel: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 12, color: Colors.primary, marginTop: 8 },
+  debugText:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 11, color: Colors.textSecondary },
 
   scrollView:    { flex: 1 },
   scrollContent: {},
@@ -2018,7 +2019,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primaryDark, height: 24,
     paddingLeft: 8, paddingRight: 12, borderBottomRightRadius: 10, gap: 4,
   },
-  newBadgeText: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 12, color: Colors.white },
+  newBadgeText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 12, color: Colors.white },
   // Feature 2 prev/next-profile chevrons — same dark-circle/white-chevron style
   // as PhotoSwiper's own desktop arrow fallback (matchesCard.shared.tsx). Angular:
   // viewprofile.page.scss:512,523 `top: calc(100vw + 32px)` — just below the square
@@ -2048,10 +2049,10 @@ const s = StyleSheet.create({
     alignItems: 'center', gap: 12, maxWidth: '80%',
   },
   coachMarkText: {
-    fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: Colors.black, textAlign: 'center',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.black, textAlign: 'center',
   },
   coachMarkDismiss: {
-    fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 14, color: Colors.primaryDark,
+    fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 14, color: Colors.primaryDark,
   },
   photoOverlay: {
     ...StyleSheet.absoluteFill,
@@ -2063,7 +2064,7 @@ const s = StyleSheet.create({
     alignItems: 'center', gap: 16,
   },
   overlayText: {
-    fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 12, color: Colors.white,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 12, color: Colors.white,
     textAlign: 'center', lineHeight: 17,
   },
 
@@ -2079,10 +2080,10 @@ const s = StyleSheet.create({
 
   nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   // Angular: heading1-semibold-22 black-color
-  name:    { flex: 1, fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 22, color: Colors.black },
+  name:    { flex: 1, fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 22, color: Colors.black },
   // Angular: body2-regular-14 black-color
-  jodiId:  { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: Colors.black, marginTop: 4 },
-  likedMsg: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 12, color: Colors.likedStripText, marginTop: 6 },
+  jodiId:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.black, marginTop: 4 },
+  likedMsg: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 12, color: Colors.likedStripText, marginTop: 6 },
 
   // Angular: viewprofile.page.html:469-489 — Call/WhatsApp icon buttons beside the name.
   nameIconsRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
@@ -2118,19 +2119,19 @@ const s = StyleSheet.create({
     height: 44, backgroundColor: Colors.white,
     borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
-  ctaDontShowText: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: '#545454' },
+  ctaDontShowText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 14, color: '#545454' },
   ctaViewLater: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, backgroundColor: Colors.white,
     borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
-  ctaViewLaterText: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: '#545454' },
+  ctaViewLaterText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 14, color: '#545454' },
   ctaDisabled: { opacity: 0.4 },
   ctaLike: {
     height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.primaryDark, borderRadius: 8, gap: 6,
   },
-  ctaLikeText: { fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 14, color: Colors.white },
+  ctaLikeText: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 14, color: Colors.white },
 
   // Feature 6 — same pill styling as ctaLike, standing in for the normal
   // Like/Contact CTA when viewing your own profile.
@@ -2138,32 +2139,32 @@ const s = StyleSheet.create({
     height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.primaryDark, borderRadius: 8, marginTop: 16,
   },
-  biodataCtaText: { fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 14, color: Colors.white },
+  biodataCtaText: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 14, color: Colors.white },
 
   afterLikeRow: {
     backgroundColor: Colors.afterLikeBg, borderRadius: 8, borderWidth: 1,
     borderColor: Colors.afterLikeBorder, paddingHorizontal: 14, paddingVertical: 10,
   },
   afterLikeTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  afterLikeText:   { flex: 1, fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 13, color: Colors.black },
+  afterLikeText:   { flex: 1, fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 13, color: Colors.black },
   ctaSendInterestWrap: { position: 'relative', flexShrink: 0 },
   ctaSendInterest: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, backgroundColor: Colors.primaryDark, borderRadius: 8, paddingHorizontal: 16,
   },
-  ctaSendInterestText: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: Colors.white },
+  ctaSendInterestText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 14, color: Colors.white },
   freeBadge: {
     position: 'absolute', top: -10, right: 8, zIndex: 1,
     backgroundColor: Colors.badgeNewBg, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2,
   },
-  freeBadgeText: { fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 10, color: Colors.badgeNewText },
+  freeBadgeText: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 10, color: Colors.badgeNewText },
   contactsLeftText: {
-    fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 11, color: Colors.textSecondary, textAlign: 'center', marginTop: 8,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 11, color: Colors.textSecondary, textAlign: 'center', marginTop: 8,
   },
 
   // Angular: heading1-semibold-20 black-color, line-height:16, mt-24 mb-4
   sectionHeader: {
-    fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 20, color: Colors.black,
+    fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 20, color: Colors.black,
     marginTop: 24, marginBottom: 4,
   },
   // Angular: icon column (ion-col size="1") + text column (size="11", pl-12) —
@@ -2173,22 +2174,22 @@ const s = StyleSheet.create({
   detailRowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(204,204,204,0.5)' },
   detailIconCol: { width: 20, flexShrink: 0 },
   detailTextCol: { flex: 1, paddingLeft: 12 },
-  detailLabel: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: Colors.black },
-  detailValue: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 14, color: Colors.black, marginTop: 8 },
+  detailLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.black },
+  detailValue: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 14, color: Colors.black, marginTop: 8 },
 
-  starMatchText:   { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 13, color: Colors.textDark, marginTop: 8 },
-  starMatchTeaser: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 13, color: Colors.link, marginTop: 8 },
+  starMatchText:   { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 13, color: Colors.textDark, marginTop: 8 },
+  starMatchTeaser: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 13, color: Colors.link, marginTop: 8 },
 
-  horoActionLink:    { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: Colors.link, marginTop: 8 },
+  horoActionLink:    { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 14, color: Colors.link, marginTop: 8 },
   // Feature 6 — own-profile "add missing section" prompts, replacing a section
   // that would otherwise render nothing when its data is empty.
   addDetailPrompt: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
-  addDetailPromptText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 14, color: Colors.link },
+  addDetailPromptText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 14, color: Colors.link },
 
   biodataQrSection: { alignItems: 'center', paddingTop: 24, gap: 16 },
   biodataQrImage: { width: 160, height: 160 },
   biodataQrCaption: {
-    fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 12, color: '#1a1818', textAlign: 'center',
+    fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 12, color: '#1a1818', textAlign: 'center',
   },
 
   // Angular: app-swiper.component.html:2 — `ion-row class="pt-32 ... pb-24"` — header
@@ -2196,7 +2197,7 @@ const s = StyleSheet.create({
   // to the screen edges.
   similarSection: { paddingTop: 32, paddingBottom: 24 },
   similarHeader: {
-    fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 20, color: Colors.black,
+    fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 20, color: Colors.black,
     marginBottom: 12, paddingHorizontal: 24,
   },
   similarListContent: { paddingHorizontal: 24, gap: SIMILAR_CARD_GAP },
@@ -2213,19 +2214,19 @@ const s = StyleSheet.create({
     backgroundColor: Colors.scrimStrong, padding: 10, gap: 8,
   },
   similarCardOverlayText: {
-    fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 11, color: Colors.white, textAlign: 'center', lineHeight: 15,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 11, color: Colors.white, textAlign: 'center', lineHeight: 15,
   },
   similarCardWaBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 4,
     borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6,
   },
-  similarCardWaBtnText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 12, color: Colors.white },
+  similarCardWaBtnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 12, color: Colors.white },
   similarCardCaption: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 8,
   },
-  similarCardName: { fontFamily: 'Poppins-SemiBold', fontWeight: '600', fontSize: 13, color: Colors.white },
-  similarCardMeta: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 11, color: Colors.white, marginTop: 2 },
+  similarCardName: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 13, color: Colors.white },
+  similarCardMeta: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 11, color: Colors.white, marginTop: 2 },
   similarArrowBtn: {
     position: 'absolute', top: '50%', marginTop: -16,
     width: 32, height: 32, borderRadius: 16,
@@ -2249,17 +2250,17 @@ const s = StyleSheet.create({
     backgroundColor: Colors.selectionBg, paddingHorizontal: 16, paddingVertical: 12,
   },
   missingBannerText: {
-    flex: 1, marginRight: 12, fontFamily: 'Poppins-Regular', fontSize: 12,
+    flex: 1, marginRight: 12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12,
     color: '#1e1e1e', letterSpacing: 0.24,
   },
   missingBannerCta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  missingBannerCtaText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.link },
+  missingBannerCtaText: { fontFamily: Fonts.poppinsRegular, fontSize: 12, color: Colors.link },
 
   headerBackBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   headerSpacer: { flex: 1 },
   // Angular: `.vp-profile-name` (global.scss:22188-22192) — font16 (~16px),
   // Poppins-Medium, `--gray-color1` (#1f1e1b) — not SemiBold/pure-black.
-  headerName: { flex: 1, fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 16, color: '#1f1e1b' },
+  headerName: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: 16, color: '#1f1e1b' },
   headerIconBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   menuDots: { fontSize: 20, lineHeight: 20, color: '#333333', fontWeight: '700' },
 
@@ -2270,7 +2271,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white, maxWidth: 120,
   },
   langPillCompact: { maxWidth: 84, paddingRight: 8 },
-  langPillText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 12, color: '#000000' },
+  langPillText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 12, color: '#000000' },
 
   menuDropdown: {
     position: 'absolute', top: 34, right: 0, minWidth: 200,
@@ -2279,6 +2280,6 @@ const s = StyleSheet.create({
     elevation: 6, zIndex: 10,
   },
   menuItem: { paddingHorizontal: 16, paddingVertical: 12 },
-  menuItemText: { fontFamily: 'Poppins-Regular', fontWeight: '400', fontSize: 14, color: Colors.textDark },
+  menuItemText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.textDark },
   menuItemDanger: { color: Colors.primary },
 })

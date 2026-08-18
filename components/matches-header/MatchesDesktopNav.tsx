@@ -9,6 +9,7 @@ import { localAsset } from '../desktop-home/DesktopHomeShared'
 import { TAB_LABEL_KEYS, type FooterTab } from '../app-footer/AppFooter'
 import { LANG_LABELS } from './MatchesHeader'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // Tab 4 = "Contacted profiles" (MessagerListScreen) — see AppFooter.tsx's
 // FooterTab comment. This matches Figma's top nav: Home / Matches / Liked
@@ -115,13 +116,16 @@ const s = StyleSheet.create({
     gap:           4,
   },
   linkText: {
-    fontFamily: 'Poppins-Regular',
+    // This desktop top nav replaces the mobile bottom AppFooter tab bar (see
+    // file header comment) — bottomnav is the matching semantic role even
+    // though it renders at the top here.
+    fontFamily: SemanticFontsEnglish.bottomnavEnglishRegular,
     fontSize:   12,
     lineHeight: 12,
     color:      '#545454',
   },
   linkTextActive: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: Fonts.poppinsMedium,
     color:      Colors.primaryDark,
   },
 
@@ -140,7 +144,7 @@ const s = StyleSheet.create({
     // font family anywhere in this app (App.tsx's useFonts call) — Poppins
     // SemiBold at this tiny size reads near-identically and avoids silently
     // falling back to the OS default system font.
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   10,
     lineHeight: 10,
     color:      Colors.white,
@@ -157,7 +161,7 @@ const s = StyleSheet.create({
     borderRadius:      8,
   },
   langText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   12,
     color:      Colors.black,
   },

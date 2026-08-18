@@ -6,6 +6,7 @@ import ProfilePhoto from '../profile-photo/ProfilePhoto'
 import BasicInfoLine from './BasicInfoLine'
 import { Colors } from '../../constants/colors'
 import { getBasicLineParts } from './SelectableProfileTile'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export default function SelectableProfileCardDesktop({
   candidate, checked, onToggle,
@@ -58,12 +59,12 @@ const s = StyleSheet.create({
     paddingRight: 24,
   },
   name: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   16,
     color:      Colors.black,
   },
   basicLine: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     lineHeight: 20,
     color:      Colors.black,

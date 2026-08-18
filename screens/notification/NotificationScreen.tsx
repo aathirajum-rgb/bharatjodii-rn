@@ -30,6 +30,7 @@ import {
   NOTIFICATION_EMPTY_ANIM, NOTIFICATION_LOADING_ANIM,
   type NotificationItem, type GroupedNotifications, type RichTextSegment,
 } from '../../service/inAppNotificationService'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const FWD_ICON = `${CDN_REVAMP}filter_right_arrow.svg`
 // Angular: onImgErrorHandler() — the [1,2,3,6,7] avatar-broken-image
@@ -213,13 +214,13 @@ const s = StyleSheet.create({
     : { flex: 1 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   emptyText: {
-    fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textSecondary,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary,
     textAlign: 'center', marginTop: 12, lineHeight: 20,
   },
 
   // Angular: .days-text { font-family: Medium; font-size: 16px; color: #000 }
   sectionHeader: { paddingHorizontal: 24, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: '#e2e8f0' },
-  sectionHeaderText: { fontFamily: 'Poppins-Medium', fontSize: 16, color: Colors.black },
+  sectionHeaderText: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, color: Colors.black },
 
   // Angular: ion-item padding pl-24 pt-16 pb-16 pr-16, .bottom-border-notification
   row: {
@@ -237,15 +238,15 @@ const s = StyleSheet.create({
 
   content: { flex: 1, marginLeft: 5 },
   // Angular: .name-notification { font-family: Bold; font-size: 12px }
-  title: { fontFamily: 'Poppins-Bold', fontSize: 12, color: Colors.textPrimary },
+  title: { fontFamily: Fonts.poppinsBold, fontSize: 12, color: Colors.textPrimary },
   subtitleRow: { marginTop: 2 },
   // Angular: .name-subheading-notification { font-family: Regular; font-size: 12px; color: #333 }
-  subtitle: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#333333' },
+  subtitle: { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: 12, color: '#333333' },
   // Angular: .name-notification — the bold <span> wrapping the sender's name
   // when it's embedded inline within notificationdetails[1] rather than title1.
-  subtitleBold: { fontFamily: 'Poppins-Bold', fontSize: 12, color: '#333333' },
+  subtitleBold: { fontFamily: Fonts.poppinsBold, fontSize: 12, color: '#333333' },
   // Angular: .time-notification { color: #808080 }
-  time: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#808080' },
+  time: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#808080' },
 
   // Angular: .notification-image-size { height: 26.5vh; width: 100%; border-radius: 16px }
   notifImage: { marginTop: 8, borderRadius: 16 },
@@ -256,7 +257,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 4, marginTop: 8,
   },
   ctaBtnWithImage: { marginTop: 8 },
-  ctaBtnText: { fontFamily: 'Poppins-Medium', fontSize: 12, color: '#333333', textTransform: 'capitalize' },
+  ctaBtnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 12, color: '#333333', textTransform: 'capitalize' },
 
   // Angular: .filter-forward-icon { width: 6px }
   chevron: { marginLeft: 8, marginTop: 4 },

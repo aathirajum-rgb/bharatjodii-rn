@@ -36,6 +36,7 @@ import { CDN, CDN_SVG } from '../../constants/cdn'
 import { stripHtml, parseAmount, formatAmount } from '../../service/paymentService'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import type { MembershipTierTheme } from './membershipTierTheme'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ICON_CROWN = CDN_SVG + 'revamp/crown-white.svg'
 const ICON_ALERT = CDN + 'assets/images/svg/alert-circle.svg'
@@ -366,7 +367,7 @@ const s = StyleSheet.create({
 
   body: { paddingVertical: 32, gap: 42, maxWidth: 720, alignSelf: 'center', width: '100%' },
 
-  pageTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 24, color: '#1F1E1B', letterSpacing: -0.24 },
+  pageTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 24, color: '#1F1E1B', letterSpacing: -0.24 },
   emptyText: { fontSize: 14, color: Colors.textSecondary, marginTop: 24 },
 
   // Generic card used by the standalone "Payment status" section.
@@ -393,15 +394,15 @@ const s = StyleSheet.create({
   },
   statusBadgeActive: { backgroundColor: '#10B981' },
   statusBadgeWarn: { backgroundColor: '#C70038' },
-  statusBadgeText: { fontSize: 14, fontFamily: 'Poppins-Medium', color: Colors.white },
+  statusBadgeText: { fontSize: 14, fontFamily: Fonts.poppinsMedium, color: Colors.white },
 
-  planTitle: { fontSize: 20, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B' },
-  planDuration: { fontSize: 16, fontFamily: 'Poppins-Medium', color: '#1F1E1B' },
+  planTitle: { fontSize: 20, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
+  planDuration: { fontSize: 16, fontFamily: Fonts.poppinsMedium, color: '#1F1E1B' },
 
   crownBadge: { width: 60, height: 60, borderRadius: 30, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
 
   expiredBody: { paddingHorizontal: 40, paddingVertical: 24, gap: 12 },
-  expiredTitle: { fontSize: 16, fontFamily: 'Poppins-Medium', color: '#1F1E1B', marginBottom: 4 },
+  expiredTitle: { fontSize: 16, fontFamily: SemanticFontsEnglish.headingEnglishMedium, color: '#1F1E1B', marginBottom: 4 },
 
   usageBody: { backgroundColor: Colors.white, paddingHorizontal: 40, paddingVertical: 24, gap: 24 },
   usageList: { gap: 12 },
@@ -413,38 +414,38 @@ const s = StyleSheet.create({
     borderTopWidth: 1, borderTopColor: '#E6E6E6',
   },
   renewTextCol: { flex: 1 },
-  renewLabel: { fontSize: 14, fontFamily: 'Poppins-Medium', color: '#1F1E1B' },
+  renewLabel: { fontSize: 14, fontFamily: Fonts.poppinsMedium, color: '#1F1E1B' },
   renewSub: { fontSize: 12, color: '#545454', marginTop: 2 },
 
   refundNote: { paddingHorizontal: 40, paddingBottom: 16, backgroundColor: Colors.white },
   refundNoteText: { fontSize: 12, color: '#1F1E1B', lineHeight: 18 },
-  refundLink: { color: Colors.link, fontFamily: 'Poppins-SemiBold', textDecorationLine: 'underline' },
+  refundLink: { color: Colors.link, fontFamily: Fonts.poppinsSemiBold, textDecorationLine: 'underline' },
 
   renewPlanBtn: { marginHorizontal: 40, marginBottom: 20, alignSelf: 'flex-start', minWidth: 200 },
 
   footerStrip: { paddingHorizontal: 40, paddingVertical: 16 },
   expiryText: { fontSize: 14, color: '#1F1E1B' },
 
-  sectionTitle: { fontSize: 16, fontFamily: 'Poppins-Medium', color: '#1F1E1B' },
+  sectionTitle: { fontSize: 16, fontFamily: SemanticFontsEnglish.headingEnglishMedium, color: '#1F1E1B' },
 
   emiStepper: { gap: 12, paddingHorizontal: 40, paddingTop: 16 },
   emiStep: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   emiKey: { flex: 1, fontSize: 13, color: Colors.textSecondary },
-  emiValue: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B' },
+  emiValue: { fontSize: 13, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
 
-  paymentContent: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B', paddingHorizontal: 40, marginTop: 12 },
+  paymentContent: { fontSize: 14, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B', paddingHorizontal: 40, marginTop: 12 },
   paymentContent2: { fontSize: 12, color: Colors.textSecondary, marginTop: 4, paddingHorizontal: 40, paddingBottom: 24 },
 
   usageRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 4 },
   usageTextCol: { flex: 1, gap: 4 },
-  usageTitle: { flex: 1, fontSize: 14, fontFamily: 'Poppins-Medium', color: '#1F1E1B' },
+  usageTitle: { flex: 1, fontSize: 14, fontFamily: Fonts.poppinsMedium, color: '#1F1E1B' },
   usageSub: { fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
-  usageBalance: { fontSize: 18, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B' },
-  usageBalanceUnit: { fontSize: 14, fontFamily: 'Poppins-Regular', color: '#1F1E1B' },
+  usageBalance: { fontSize: 18, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
+  usageBalanceUnit: { fontSize: 14, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: '#1F1E1B' },
   usageBalanceWarn: { color: Colors.inputError },
 
   txnSection: { gap: 16 },
-  txnSectionTitle: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B' },
+  txnSectionTitle: { fontSize: 16, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
   txnList: { borderWidth: 1, borderColor: '#E6E6E6', borderRadius: 8, overflow: 'hidden' },
   txnRow: {
     flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between',
@@ -452,5 +453,5 @@ const s = StyleSheet.create({
   },
   txnRowDivider: { borderBottomWidth: 1, borderBottomColor: '#E6E6E6' },
   txnRightCol: { alignItems: 'flex-end' },
-  txnAmount: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B' },
+  txnAmount: { fontSize: 14, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
 })

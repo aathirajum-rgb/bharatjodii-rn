@@ -20,6 +20,7 @@ import {
   handlePaymentSuccess, initRazorpayWebCheckout, recordPaymentFailure, stringifyPaymentResponse, toPaise,
   verifyPaymentSuccess, type QRPaymentData, type SelectedPackage,
 } from '../../../service/paymentService'
+import { Fonts, SemanticFontsEnglish } from '../../../src/theme/fonts'
 
 const QR_LOGO = CDN + 'assets/images/png/logo-icon.png'
 
@@ -204,8 +205,8 @@ export default function UpiTab({ selectedPackage, amountLabel, qrData }: Props) 
 const s = StyleSheet.create({
   wrap: { gap: 8 },
 
-  title:    { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, marginTop: 8 },
-  subtitle: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary, marginBottom: 8 },
+  title:    { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, marginTop: 8 },
+  subtitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary, marginBottom: 8 },
 
   qrBox: {
     width: 154, height: 154, alignSelf: 'center', alignItems: 'center', justifyContent: 'center', marginVertical: 8,
@@ -219,14 +220,14 @@ const s = StyleSheet.create({
     borderRadius: 20, borderWidth: 1, borderColor: Colors.primaryDark, backgroundColor: '#FFF5F7',
     paddingHorizontal: 16, paddingVertical: 8,
   },
-  showQrText: { fontFamily: 'Poppins-Medium', fontSize: 12, color: Colors.primaryDark },
+  showQrText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 12, color: Colors.primaryDark },
 
-  countdown: { textAlign: 'center', fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.black, marginBottom: 8 },
-  countdownBold: { fontFamily: 'Poppins-SemiBold', color: Colors.primaryDark },
+  countdown: { textAlign: 'center', fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.black, marginBottom: 8 },
+  countdownBold: { fontFamily: Fonts.poppinsSemiBold, color: Colors.primaryDark },
 
   orRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 8 },
   orLine: { flex: 1, height: 1, backgroundColor: Colors.divider },
-  orText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textSecondary },
+  orText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textSecondary },
 
   vpaRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   vpaField: { flex: 1 },

@@ -7,6 +7,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ALERT_ICON = 'https://imgs.jodii.app/assets/images/svg/activity-alert-img.svg'
 
@@ -61,7 +62,7 @@ const s = StyleSheet.create({
   },
   note: {
     flex:       1,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   12,
     color:      Colors.textPrimary,
   },
@@ -72,7 +73,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
   },
   ctaText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   12,
     color:      Colors.white,
   },

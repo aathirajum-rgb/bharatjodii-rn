@@ -5,6 +5,7 @@
 // ASSISTEDPROMO fields.
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export interface AssistBannerContent {
   title:    string
@@ -52,13 +53,13 @@ const s = StyleSheet.create({
     color:    Colors.textSecondary,
   },
   title: {
-    fontFamily:   'Poppins-SemiBold',
+    fontFamily:   Fonts.poppinsSemiBold,
     fontSize:     15,
     color:        Colors.textPrimary,
     paddingRight: 20,
   },
   body: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   12,
     color:      Colors.textSecondary,
   },
@@ -71,7 +72,7 @@ const s = StyleSheet.create({
     marginTop:         6,
   },
   ctaText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   13,
     color:      Colors.white,
   },

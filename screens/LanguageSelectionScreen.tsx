@@ -7,7 +7,8 @@ import AppHeader from '../components/app-header/AppHeader';
 import ButtonRevamp from '../components/button-revamp/ButtonRevamp';
 import { Colors } from '../constants/colors';
 import { FontSizes } from '../constants/fontSizes';
-import { LANG_FONTS, loadLangFonts } from '../constants/fonts';
+import { FontsByLanguage } from '../src/theme/fonts';
+import { loadFonts } from '../src/config/fonts';
 import i18n from '../i18n';
 import { getCurrentLanguage, submitLanguage } from '../service/languageService';
 import { useIsDesktopWeb } from '../hooks/useIsDesktopWeb';
@@ -53,7 +54,7 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
   // the app, which only ever needs the current language's font), so every
   // Noto Sans script font must be preloaded here.
   useEffect(() => {
-    Promise.all(LANGUAGES.map(lang => loadLangFonts(lang.id))).then(() => setScriptFontsReady(true));
+    Promise.all(LANGUAGES.map(lang => loadFonts(lang.id))).then(() => setScriptFontsReady(true));
   }, []);
 
   const handleNext = async () => {
@@ -141,7 +142,7 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
                   <Text
                     style={[
                       styles.nativeName,
-                      scriptFontsReady && { fontFamily: LANG_FONTS[lang.id]?.semiBold },
+                      scriptFontsReady && { fontFamily: FontsByLanguage[lang.id]?.semiBold },
                     ]}
                     numberOfLines={1}
                   >
@@ -200,7 +201,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: GRID_H_PAD,
   },
   title: {
-    fontFamily:   LANG_FONTS.en.semiBold,
+    fontFamily:   FontsByLanguage.en.semiBold,
     fontSize:     FontSizes.font22,
     fontWeight:   '600',
     color:        Colors.textPrimary,
@@ -241,7 +242,7 @@ const styles = StyleSheet.create({
     color:      Colors.textPrimary,
   },
   englishName: {
-    fontFamily: LANG_FONTS.en.regular,
+    fontFamily: FontsByLanguage.en.regular,
     fontSize:   FontSizes.font12,
     color:      Colors.textSecondary,
   },

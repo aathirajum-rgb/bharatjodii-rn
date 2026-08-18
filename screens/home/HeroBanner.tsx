@@ -9,6 +9,7 @@ import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Colors } from '../../constants/colors'
 import { CdnImage } from '../../components/cdn-svg/CdnSvg'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // Angular: home-banner.component.scss's .jodii-membership-banner-block —
 // min-height: 42vmin !important — the OLD banner's outer row, not a fixed px
@@ -259,7 +260,7 @@ const s = StyleSheet.create({
     gap:  4,
   },
   title: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   15,
     color:      Colors.white,
     paddingRight: 20,
@@ -270,17 +271,17 @@ const s = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   title1: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.headingEnglishMedium,
     fontSize:   13,
     color:      Colors.white,
   },
   title2: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   16,
     color:      Colors.white,
   },
   body: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   12,
     color:      Colors.white,
     opacity:    0.9,
@@ -298,7 +299,7 @@ const s = StyleSheet.create({
     marginTop:         2,
   },
   ownTimer: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: Fonts.poppinsMedium,
     fontSize:   12,
     color:      '#000000',
   },
@@ -316,13 +317,13 @@ const s = StyleSheet.create({
     marginTop:         6,
   },
   ctaText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   13,
     color:      '#29339B',
   },
   ctaArrow: {},
   validText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   11,
     color:      Colors.white,
     opacity:    0.85,

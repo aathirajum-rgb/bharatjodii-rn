@@ -7,6 +7,7 @@ import { CarouselSection, PhotoOverlayCard, useOppGenderAvatarUrl } from './Desk
 import { NewlyJoinedBadge, VerifiedCheckmark } from './CardBits'
 import { Colors } from '../../constants/colors'
 import type { SwiperItem } from '../swiper-card/SwiperCard'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CARD_W = 280
 const CARD_H = 280
@@ -61,6 +62,6 @@ const s = StyleSheet.create({
   // additionally needs the verified-checkmark next to the name.
   textWrap: { position: 'absolute', left: 16, bottom: 12, right: 16 },
   nameRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  name: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.white },
-  age:  { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 16, color: Colors.white, marginTop: 2 },
+  name: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.white },
+  age:  { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.white, marginTop: 2 },
 })

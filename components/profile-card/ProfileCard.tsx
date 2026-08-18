@@ -10,6 +10,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import ProfilePhoto, { type PhotoVariant } from '../profile-photo/ProfilePhoto'
 
 // Angular: core/config/button.config.ts's SEE_ALL — textColor: 'linkColor'
@@ -509,14 +510,14 @@ const styles = StyleSheet.create({
   },
   // Angular: .heading3-semibold-16 { font-family: var(--english-semibold-poppins) }
   overlayName: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize: 16,
     color: Colors.white,
     marginBottom: 2,
   },
   // Angular: .body2-regular-14 { font-family: var(--english-regular-poppins) }
   overlayDetail: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize: 14,
     color: Colors.white,
     opacity: 0.88,
@@ -555,7 +556,7 @@ const styles = StyleSheet.create({
   },
   // Angular: .heading3-semibold-16 { font-family: var(--english-semibold-poppins) }
   nameText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize: 16,
     color: Colors.textPrimary,
     marginBottom: 4,
@@ -569,7 +570,7 @@ const styles = StyleSheet.create({
   // this shared style's gray — scoped here rather than changed on the shared
   // style since variants 4/6/7/8 haven't been reviewed yet.
   detailText3: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize: 14,
     color: Colors.black,
   },
@@ -591,7 +592,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   primaryBtnText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     color: Colors.white,
     fontSize: 14,
     letterSpacing: 0.2,
@@ -752,7 +753,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.white,
   },
   likedFooterText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize: 12,
     color: Colors.black,
   },

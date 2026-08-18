@@ -16,6 +16,7 @@ import DesktopPageShell from '../components/desktop-page-shell/DesktopPageShell'
 import ButtonRevamp from '../components/button-revamp/ButtonRevamp'
 import { Colors } from '../constants/colors'
 import type { FooterTab } from '../components/app-footer/AppFooter'
+import { Fonts, SemanticFontsEnglish } from '../src/theme/fonts'
 
 const LANGUAGES = [
   { id: 'en', native: 'English',   english: 'English'   },
@@ -107,7 +108,7 @@ const CARD_H = 64
 const s = StyleSheet.create({
   main: { width: 360 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  pageTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.textDark },
+  pageTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.textDark },
   closeX: { fontSize: 16, color: Colors.black },
 
   card: {
@@ -115,7 +116,7 @@ const s = StyleSheet.create({
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 8,
     elevation: 4,
   },
-  heading: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.textDark, marginBottom: 24 },
+  heading: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textDark, marginBottom: 24 },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 24 },
 
@@ -125,8 +126,8 @@ const s = StyleSheet.create({
   },
   langCardSelected: { borderColor: Colors.primaryDark, backgroundColor: Colors.selectionBg },
   langText: { flex: 1, gap: 8 },
-  nativeName: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.textDark },
-  englishName: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textSecondary },
+  nativeName: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.textDark },
+  englishName: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textSecondary },
 
   radio: {
     width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: Colors.borderNeutral,

@@ -27,6 +27,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
 import { apiCall, uploadFile } from '../../service/apiClient'
@@ -178,11 +179,11 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  headerTitle: { flex: 1, fontSize: 16, fontFamily: 'Poppins-Medium', color: '#333333', marginLeft: 6, marginRight: 16 },
+  headerTitle: { flex: 1, fontSize: 16, fontFamily: SemanticFontsEnglish.headingEnglishMedium, color: '#333333', marginLeft: 6, marginRight: 16 },
 
   content: { flex: 1, paddingHorizontal: 24, paddingTop: 32 },
-  heading: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.textPrimary, marginBottom: 16 },
-  tip: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textSecondary, lineHeight: 20, marginBottom: 8 },
+  heading: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textPrimary, marginBottom: 16 },
+  tip: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary, lineHeight: 20, marginBottom: 8 },
   ctaSpacing: { marginTop: 24 },
 
   previewWrap: { flex: 1, backgroundColor: Colors.black },

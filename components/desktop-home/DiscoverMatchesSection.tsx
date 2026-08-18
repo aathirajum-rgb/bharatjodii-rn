@@ -6,6 +6,7 @@
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import { SectionHeader, SeeAllLink } from './DesktopHomeShared'
 import type { ExploreCategory } from '../../service/homeService'
+import { SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const TILE_W = 180
 const PHOTO_H = 148
@@ -75,7 +76,7 @@ const s = StyleSheet.create({
     justifyContent:    'space-between',
     gap:               4,
   },
-  label: { flex: 1, fontFamily: 'Poppins-Medium', fontSize: 12, lineHeight: 16, color: '#333333' },
-  tileChevron: { fontFamily: 'Poppins-Regular', fontSize: 16, color: '#333333' },
+  label: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 12, lineHeight: 16, color: '#333333' },
+  tileChevron: { fontFamily: SemanticFontsEnglish.headingEnglishRegular, fontSize: 16, color: '#333333' },
   footer: { alignItems: 'flex-end' },
 })

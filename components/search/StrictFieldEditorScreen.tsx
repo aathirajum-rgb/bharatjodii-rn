@@ -17,6 +17,7 @@ import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { STRICT_FIELD_COPY, STRICT_EXCLUDED_FIELDS, strictPromptText } from '../../constants/strictFilter.config'
 import type { FieldKey } from '../../screens/search/SearchScreen'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
@@ -136,8 +137,8 @@ const s = StyleSheet.create({
     borderRadius: 8, padding: 12,
   },
   strictTextCol: { flex: 1, gap: 4 },
-  strictTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
-  strictDesc:  { fontFamily: 'Poppins-Regular', fontSize: 12, lineHeight: 16, color: Colors.black },
+  strictTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  strictDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 16, color: Colors.black },
 
   promptText:  { fontSize: 12, lineHeight: 16, color: Colors.black },
   warningText: { color: Colors.inputError },

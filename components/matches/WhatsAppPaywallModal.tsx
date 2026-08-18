@@ -10,6 +10,7 @@ import { SvgXml } from 'react-native-svg'
 import { WhatsAppIcon } from './matchesCard.shared'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 
 const XML_SHARE = `<svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -130,18 +131,18 @@ const m = StyleSheet.create({
     backgroundColor: '#F0F0F0',
   },
   name: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   16,
     color:      Colors.black,
   },
   body: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      Colors.black,
     lineHeight: 19,
   },
   title: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   18,
     color:      Colors.black,
     lineHeight: 24,

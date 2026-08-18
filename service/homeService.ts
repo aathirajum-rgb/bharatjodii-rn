@@ -90,7 +90,10 @@ export function toProfile(p: Record<string, any>): SwiperItem {
     // Angular: IsPhotoAvailable checks PHOTOAVAILABLE == "Y", getPhotoProtect checks PHOTOPROTECTED == 'Y'
     isPhotoAvailable:    p['PHOTOAVAILABLE']  == 'Y',
     isPhotoProtect:      p['PHOTOPROTECTED']  == 'Y',
-    isNewlyJoined:       p['ISNEWLYJOINED']   == '1',
+    // Angular: common-funtions.ts's IsNewMember() — profileInfo.NEWUSER === "1",
+    // NOT a field called ISNEWLYJOINED (that key doesn't exist on the API
+    // response at all, so this always evaluated false).
+    isNewlyJoined:       p['NEWUSER']         == '1',
     // Angular matches card: profile.LIKED (not LIKEDSTATUS) — fallback for other listing APIs
     likedStatus:         (p['LIKED'] ?? p['LIKEDSTATUS']) as SwiperItem['likedStatus'],
     phoneViewed:         p['PHONEVIEWED'],

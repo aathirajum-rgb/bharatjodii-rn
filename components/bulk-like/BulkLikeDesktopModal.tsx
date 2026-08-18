@@ -13,6 +13,7 @@ import SelectableProfileCardDesktop from './SelectableProfileCardDesktop'
 import BulkLikeSentSheetDesktop from './BulkLikeSentSheetDesktop'
 import { sendBulkLikes } from '../../service/profileService'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CARD_GAP   = 24
 const GRID_WIDTH = 348 * 2 + CARD_GAP   // 720 — matches Figma's content column
@@ -155,7 +156,7 @@ const s = StyleSheet.create({
     flex: 1,
   },
   title: {
-    fontFamily:   'Poppins-SemiBold',
+    fontFamily:   Fonts.poppinsSemiBold,
     fontSize:     18,
     lineHeight:   24,
     color:        Colors.textPrimary,
@@ -185,7 +186,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primaryLight,
   },
   sendBtnText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   14,
     color:      Colors.white,
   },

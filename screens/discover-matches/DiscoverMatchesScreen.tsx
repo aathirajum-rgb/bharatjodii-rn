@@ -33,6 +33,7 @@ import { ExploreCategoriesSection } from '../home/HomeScreen'
 import { ENavigation } from '../../types/enums/navigation.enum'
 import { openMembershipTab } from '../../service/paymentService'
 import { setFilterEventType } from '../../service/filterService'
+import { SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
@@ -140,6 +141,6 @@ const s = StyleSheet.create({
   content: { paddingTop: 24 },
 
   emptyState:  { paddingHorizontal: 32 },
-  emptyText:   { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, textAlign: 'center', marginTop: 6, marginBottom: 16, lineHeight: 20 },
+  emptyText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, textAlign: 'center', marginTop: 6, marginBottom: 16, lineHeight: 20 },
   emptyBtn:    { marginTop: 0 },
 })

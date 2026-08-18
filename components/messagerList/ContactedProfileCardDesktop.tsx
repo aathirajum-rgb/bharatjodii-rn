@@ -13,6 +13,7 @@ import ProfilePhoto from '../profile-photo/ProfilePhoto'
 import { VERIFIED_TAG_URI } from '../matches/matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 import { isDeletedProfile } from './ContactedProfileCard'
 
@@ -147,7 +148,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   whatsAppOverlayText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium,
     fontSize: 12,
     color: Colors.white,
     textAlign: 'center',
@@ -159,7 +160,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   whatsAppBtnText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize: 12,
     color: Colors.white,
   },
@@ -174,24 +175,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   name: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize: 18,
     color: Colors.textPrimary,
   },
   detail: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize: 14,
     color: Colors.textSecondary,
     lineHeight: 20,
   },
   link: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize: 14,
     color: Colors.primary,
     marginTop: 4,
   },
   deletedText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize: 13,
     color: Colors.textSecondary,
     marginTop: 4,
@@ -204,7 +205,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   noteText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize: 13,
     color: '#571B00',
   },

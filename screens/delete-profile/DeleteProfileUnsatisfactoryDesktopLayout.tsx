@@ -12,6 +12,7 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ICON_PHONE = CDN_REACT + '/call_icon.svg'
 
@@ -112,14 +113,14 @@ const PRIMARY = '#b50033'
 const s = StyleSheet.create({
   header: { width: 810, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 },
   backArrow: { fontSize: 22, color: Colors.black },
-  title: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black },
 
   card: {
     width: 810, backgroundColor: Colors.white, borderRadius: 24, padding: 40,
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 8,
     elevation: 4, alignItems: 'center',
   },
-  cardTitle: { alignSelf: 'stretch', fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.black, marginBottom: 24 },
+  cardTitle: { alignSelf: 'stretch', fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black, marginBottom: 24 },
 
   rowsWrap: { alignSelf: 'stretch', gap: 12 },
   row: {
@@ -127,8 +128,8 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 16,
   },
   rowSelected: { borderColor: PRIMARY, backgroundColor: 'rgba(181,0,51,0.02)' },
-  rowLabel: { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
-  rowLabelSelected: { fontFamily: 'Poppins-Medium' },
+  rowLabel: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  rowLabelSelected: { fontFamily: Fonts.poppinsMedium },
   checkbox: {
     width: 24, height: 24, borderRadius: 4, borderWidth: 1.5, borderColor: '#8a8a8a',
     alignItems: 'center', justifyContent: 'center',
@@ -137,17 +138,17 @@ const s = StyleSheet.create({
   checkmark: { fontSize: 13, fontWeight: '700', color: Colors.white },
 
   concernSection: { alignSelf: 'stretch', marginTop: 24 },
-  concernTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.black, marginBottom: 12 },
+  concernTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black, marginBottom: 12 },
   concernInput: {
     height: 140, borderRadius: 8, borderWidth: 1, borderColor: '#e6e6e6',
-    paddingHorizontal: 16, paddingVertical: 12, fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black,
+    paddingHorizontal: 16, paddingVertical: 12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black,
     backgroundColor: Colors.white,
   },
 
   supportSection: { alignItems: 'center', gap: 12, marginTop: 24 },
-  supportText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, textAlign: 'center' },
+  supportText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, textAlign: 'center' },
   phoneRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  phoneText: { fontFamily: 'Poppins-Medium', fontSize: 12, color: Colors.link, textDecorationLine: 'underline' },
+  phoneText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 12, color: Colors.link, textDecorationLine: 'underline' },
 
   submitBtn: { width: 312, marginTop: 24 },
   submitBtnLoading: {

@@ -29,6 +29,7 @@ import type { FieldKey } from './SearchScreen'
 import { AGE_OPTIONS, SIMPLE_MULTI_FIELDS } from './SearchScreen'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { openMembershipTab } from '../../service/paymentService'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ICON_ARROW = CDN_REACT + '/menu_right_arrow.svg'
 
@@ -339,35 +340,35 @@ const s = StyleSheet.create({
   header: {
     width: 810, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24,
   },
-  title: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black },
-  resetText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.link },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black },
+  resetText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.link },
 
   card: {
     width: 810, backgroundColor: Colors.white, borderRadius: 24, padding: 40, gap: 24,
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 8,
     elevation: 4, alignItems: 'center',
   },
-  cardTitle: { alignSelf: 'stretch', fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.black },
+  cardTitle: { alignSelf: 'stretch', fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black },
 
   strictBanner: {
     alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 12,
     backgroundColor: '#FBF2F5', borderWidth: 1, borderColor: '#FFE3EC', borderRadius: 4, padding: 16,
   },
   strictTextCol: { flex: 1, gap: 8 },
-  strictTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black },
-  strictDesc:  { fontFamily: 'Poppins-Regular', fontSize: 12, lineHeight: 16, color: Colors.black },
+  strictTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black },
+  strictDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 16, color: Colors.black },
   manageBtn: {
     width: 200, height: 40, borderWidth: 1, borderColor: Colors.primaryDark, borderRadius: 4,
     alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16,
   },
-  manageBtnText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.primaryDark, textAlign: 'center' },
+  manageBtnText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.primaryDark, textAlign: 'center' },
 
   rowsWrap: { alignSelf: 'stretch', gap: 24 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   rowPressed: { opacity: 0.6 },
   rowText: { gap: 8 },
-  rowLabel: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
-  rowValue: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.black },
+  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  rowValue: { fontFamily: Fonts.poppinsMedium, fontSize: 14, color: Colors.black },
   rowChevron: { width: 16, height: 16 },
   rowDivider: { alignSelf: 'stretch', height: StyleSheet.hairlineWidth, backgroundColor: Colors.borderSubtle },
 
@@ -375,5 +376,5 @@ const s = StyleSheet.create({
     width: 312, height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
   },
-  showMatchesText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.white },
+  showMatchesText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.white },
 })

@@ -11,6 +11,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { HtmlText } from './matchesCard.shared'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 function parseCssColor(style: string | undefined, prop: string): string | undefined {
   if (!style) return undefined
@@ -159,14 +160,14 @@ const mb = StyleSheet.create({
   // Angular: breather.component.html:38 — heading1-semibold-22 (English/most languages),
   // heading2-semibold-18 for tm/ml. 22px, not 24 — that was from a different Figma node.
   title: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   22,
     color:      Colors.textStrong,
     lineHeight: 24,
   },
   // Figma: "on paid membership!" line — 14px Poppins-Medium, tracking 0.28
   subtitle: {
-    fontFamily:    'Poppins-Medium',
+    fontFamily:    Fonts.poppinsMedium,
     fontSize:      14,
     color:         Colors.textDark,
     marginTop:     8,
@@ -176,14 +177,14 @@ const mb = StyleSheet.create({
   // Figma: the "₹200 OFF" span specifically — 24px Poppins-SemiBold (vs. the 14/16px
   // surrounding copy) — applied via HtmlText's spanStyle regardless of server markup
   subtitleAmount: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   24,
   },
   // Figma: ribbon pill — 14px Poppins-Regular, h-24 (py-4), rounded left corners only,
   // border on top/bottom/left but NOT right (open ribbon edge, not a closed pill).
   // Angular: breather.component.scss .offerTag { margin-top: 10px } (English)
   valid: {
-    fontFamily:              'Poppins-Regular',
+    fontFamily:              SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:                14,
     lineHeight:              20,
     marginTop:               10,
@@ -215,7 +216,7 @@ const mb = StyleSheet.create({
   },
   // Figma: 14px Poppins-Medium (not Regular/13)
   benefitText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     color:      Colors.textDark,
     flex:       1,
@@ -235,7 +236,7 @@ const mb = StyleSheet.create({
     justifyContent:    'center',
   },
   ctaText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   14,
   },
 })

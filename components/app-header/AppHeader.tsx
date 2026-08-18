@@ -8,6 +8,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
 import { getOwnGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
 import i18n from '../../i18n'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // Angular: header.component.ts's langLableName = getSelectedKeyValue(langArrayList,
 // language) — the FULL language name, not an abbreviation (confirmed against a
@@ -308,7 +309,7 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   h1UserName: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   15,
     color:      Colors.textPrimary,
     lineHeight: 22,
@@ -322,7 +323,7 @@ const styles = StyleSheet.create({
   // Angular: componentData.LINKCTACOLOR resolves to 'linkColor'
   // (--ion-color-link-color: #29339B), not the brand red.
   h1EditLabel: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   12,
     color:      Colors.link,
   },
@@ -346,7 +347,7 @@ const styles = StyleSheet.create({
     height:            36,
   },
   h1LangText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   11,
     color:      Colors.textPrimary,
   },
@@ -380,7 +381,7 @@ const styles = StyleSheet.create({
     borderColor:       Colors.white,
   },
   badgeText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     color:      Colors.white,
     fontSize:   8,
     lineHeight: 12,
@@ -406,7 +407,7 @@ const styles = StyleSheet.create({
     marginRight:     4,
   },
   titleText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.headingEnglishMedium,
     flex:       1,
     fontSize:   16,
     color:      Colors.textDark,
@@ -437,7 +438,7 @@ const styles = StyleSheet.create({
     marginTop:         4,
   },
   langText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   12,
     color:      Colors.textPrimary,
   },

@@ -62,6 +62,7 @@ import SearchablePicker, { type PickerOption } from '../../components/searchable
 import MultiSelectPicker, { type MultiSelectOption } from '../../components/multi-select-picker/MultiSelectPicker'
 import { ICON } from '../viewprofile/ViewProfileScreen'
 import CheckboxGroup from '../../components/checkbox/CheckboxGroup'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -763,8 +764,8 @@ const s = StyleSheet.create({
   // (was a plain system-font 500 weight, #333333); Reset is Poppins-Regular/14
   // and Colors.link (#29339B, indigo) — was Colors.primaryDark, the app's dark
   // RED brand color, a genuinely wrong color for this specific text.
-  headerTitle: { flex: 1, fontFamily: 'Poppins-Medium', fontSize: 16, lineHeight: 24, color: Colors.black, marginLeft: 6 },
-  resetText: { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 16, color: Colors.link, paddingHorizontal: 12 },
+  headerTitle: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, lineHeight: 24, color: Colors.black, marginLeft: 6 },
+  resetText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.link, paddingHorizontal: 12 },
 
   scrollContent: { padding: 16, gap: 12 },
   // Figma (node 15889:2095): a rounded card (5%-opacity tint of the brand red,
@@ -776,19 +777,19 @@ const s = StyleSheet.create({
     padding: 10,
     marginBottom: 4,
   },
-  subHeaderText: { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 20, color: Colors.black },
+  subHeaderText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 20, color: Colors.black },
 
   strictBanner: {
     backgroundColor: '#FBF2F5', borderWidth: 1, borderColor: '#FFE3EC',
     borderRadius: 8, padding: 12, marginBottom: 4, gap: 8,
   },
-  strictBannerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
-  strictBannerDesc:  { fontFamily: 'Poppins-Regular', fontSize: 12, lineHeight: 20, color: Colors.black },
+  strictBannerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  strictBannerDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 20, color: Colors.black },
   manageStrictBtn: {
     height: 40, borderWidth: 1, borderColor: Colors.primaryDark, borderRadius: 4,
     alignItems: 'center', justifyContent: 'center',
   },
-  manageStrictBtnText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.primaryDark },
+  manageStrictBtnText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.primaryDark },
 
   card: { backgroundColor: Colors.white, borderRadius: 12, overflow: 'hidden' },
 
@@ -809,8 +810,8 @@ const s = StyleSheet.create({
   rowText:  { flex: 1, gap: 8 },
   // Figma: label is 14px Poppins-Regular/black (was 12px, gray) — value is
   // 14px Poppins-Medium/black (was a plain 500-weight system font).
-  rowLabel: { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 16, color: Colors.black },
-  rowValue: { fontFamily: 'Poppins-Medium', fontSize: 14, lineHeight: 16, color: Colors.black },
+  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.black },
+  rowValue: { fontFamily: Fonts.poppinsMedium, fontSize: 14, lineHeight: 16, color: Colors.black },
   rowDivider: {
     height:           StyleSheet.hairlineWidth,
     backgroundColor:  'rgba(204,204,204,0.5)',

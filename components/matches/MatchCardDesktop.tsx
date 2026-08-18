@@ -18,6 +18,7 @@ import {
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CDN = CDN_SVG
 
@@ -306,7 +307,7 @@ const c = StyleSheet.create({
     gap: 4,
   },
   newBadgeText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   12,
     color:      Colors.white,
   },
@@ -327,7 +328,7 @@ const c = StyleSheet.create({
     gap:               16,
   },
   overlayText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   11,
     color:      Colors.white,
     textAlign:  'center',
@@ -364,7 +365,7 @@ const c = StyleSheet.create({
     borderRadius: 50,
     paddingHorizontal: 8, paddingVertical: 4, gap: 4,
   },
-  likedText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#4D3A00' },
+  likedText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#4D3A00' },
   contactIcons: {
     flexDirection: 'row',
     alignItems:    'center',
@@ -390,18 +391,18 @@ const c = StyleSheet.create({
   menuDot: { width: 3, height: 3, borderRadius: 1.5, backgroundColor: Colors.black },
 
   name: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   18,
     color:      Colors.black,
   },
   jodiId: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      Colors.black,
     marginTop:  2,
   },
   basicView: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      Colors.black,
     lineHeight: 20,
@@ -414,7 +415,7 @@ const c = StyleSheet.create({
     marginTop:     12,
   },
   viewProfile: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      Colors.link,
   },
@@ -449,7 +450,7 @@ const c = StyleSheet.create({
     borderRadius:      8,
     paddingHorizontal: 14,
   },
-  ctaDontShowText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#545454' },
+  ctaDontShowText: { fontFamily: Fonts.poppinsRegular, fontSize: 14, color: '#545454' },
   ctaViewLater: {
     flex:              144,
     height:            40,
@@ -462,7 +463,7 @@ const c = StyleSheet.create({
     borderRadius:      8,
     paddingHorizontal: 14,
   },
-  ctaViewLaterText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#545454' },
+  ctaViewLaterText: { fontFamily: Fonts.poppinsRegular, fontSize: 14, color: '#545454' },
   ctaDisabled: { opacity: 0.4 },
   ctaLike: {
     flex:              194,
@@ -478,7 +479,7 @@ const c = StyleSheet.create({
     gap:               4,
   },
   // Figma: "Like" text is Poppins-SemiBold (not Medium), 14px (not 13).
-  ctaLikeText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.white },
+  ctaLikeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.white },
 
   // Figma node 629:12230 ("Frame 1707482133"): full-width 52px-tall gradient
   // bar (#FCEAF0 fading toward transparent), rounded 8, pl-16/pr-4/py-4 — the
@@ -501,7 +502,7 @@ const c = StyleSheet.create({
   },
   afterLikeText: {
     flex:       1,
-    fontFamily: 'Poppins-Medium',
+    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     color:      Colors.black,
   },
@@ -522,7 +523,7 @@ const c = StyleSheet.create({
     width: 20, height: 20, flexShrink: 0,
     alignItems: 'center', justifyContent: 'center',
   },
-  ctaSendInterestText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.white },
+  ctaSendInterestText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.white },
   // Figma node 629:12675 ("Trust Badge"): a small ribbon overlapping the CTA
   // button's top-right corner — approximated here as a rounded pill (the
   // exact folded-ribbon vector wasn't worth reproducing for a small badge);
@@ -532,9 +533,9 @@ const c = StyleSheet.create({
     backgroundColor: '#FFF2CC', borderRadius: 10,
     paddingHorizontal: 8, paddingVertical: 2,
   },
-  freeBadgeText: { fontFamily: 'Poppins-Medium', fontSize: 10, color: '#544000' },
+  freeBadgeText: { fontFamily: Fonts.poppinsMedium, fontSize: 10, color: '#544000' },
   contactsLeftText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   11,
     color:      Colors.textSecondary,
     textAlign:  'center',

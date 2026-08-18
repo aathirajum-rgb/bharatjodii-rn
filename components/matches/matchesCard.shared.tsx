@@ -19,6 +19,7 @@ import { SvgXml } from 'react-native-svg'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
+import { SemanticFontsEnglish } from '../../src/theme/fonts'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 
 // ─── Shared card badge/photo CDN URLs ──────────────────────────────────────────
@@ -114,7 +115,7 @@ const waButtonStyles = StyleSheet.create({
     gap:             4,
   },
   text: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   14,
     color:      Colors.white,
   },
@@ -367,7 +368,7 @@ const badgeStyles = StyleSheet.create({
     top:      0,
   },
   text: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium,
     fontSize:   12,
   },
 })

@@ -16,6 +16,7 @@ import DesktopPageShell from '../../components/desktop-page-shell/DesktopPageShe
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export interface DeleteProfileUploadPhotoDesktopLayoutProps {
   navigation: any
@@ -110,17 +111,17 @@ const TILE = 148
 const s = StyleSheet.create({
   header: { width: 810, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 },
   backArrow: { fontSize: 22, color: Colors.black },
-  title: { flex: 1, fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black },
+  title: { flex: 1, fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black },
   skipBtn: { paddingHorizontal: 12, paddingVertical: 8 },
-  skipText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
+  skipText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
 
   card: {
     width: 810, backgroundColor: Colors.white, borderRadius: 24, padding: 40,
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 8,
     elevation: 4, alignItems: 'center',
   },
-  cardTitle: { alignSelf: 'stretch', fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.black, marginBottom: 24, textAlign: 'center' },
-  optional: { fontFamily: 'Poppins-Regular', fontWeight: '400', color: 'rgba(0,0,0,0.4)' },
+  cardTitle: { alignSelf: 'stretch', fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black, marginBottom: 24, textAlign: 'center' },
+  optional: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', color: 'rgba(0,0,0,0.4)' },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, width: TILE * 3 + 24, marginBottom: 24 },
   tile: {
@@ -135,7 +136,7 @@ const s = StyleSheet.create({
     alignSelf: 'stretch', height: 48, borderRadius: 8, borderWidth: 1, borderColor: '#b0b0b0',
     paddingHorizontal: 16, justifyContent: 'center', backgroundColor: Colors.white, marginBottom: 24,
   },
-  addressInput: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, padding: 0, margin: 0 },
+  addressInput: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, padding: 0, margin: 0 },
 
   submitBtn: { width: 312 },
   submitBtnLoading: { width: 312, height: 44, borderRadius: 8, backgroundColor: '#b50033', alignItems: 'center', justifyContent: 'center' },

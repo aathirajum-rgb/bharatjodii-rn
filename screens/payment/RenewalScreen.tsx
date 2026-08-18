@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
@@ -156,21 +157,21 @@ const s = StyleSheet.create({
   centered: { alignItems: 'center', justifyContent: 'center' },
 
   content: { padding: 16 },
-  title:   { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.black, marginBottom: 16 },
+  title:   { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black, marginBottom: 16 },
 
   planCard: {
     backgroundColor: Colors.white, borderRadius: 12, padding: 16, gap: 8, marginBottom: 20,
     borderWidth: 1, borderColor: Colors.borderSubtle,
   },
   row:      { flexDirection: 'row', justifyContent: 'space-between' },
-  rowLabel: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textSecondary },
-  rowValue: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
+  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary },
+  rowValue: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
 
-  benefitsTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black, marginBottom: 8 },
+  benefitsTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black, marginBottom: 8 },
   benefitRow:    { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
-  benefitText:   { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, flexShrink: 1 },
+  benefitText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, flexShrink: 1 },
 
-  cooldownNote: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary, marginTop: 12 },
+  cooldownNote: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary, marginTop: 12 },
 
   footer:   { paddingHorizontal: 16, paddingTop: 12, gap: 8 },
   renewBtn: { backgroundColor: Colors.primaryDark },

@@ -14,6 +14,7 @@ import { Colors } from '../../constants/colors'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 import type { ContactGating } from '../../hooks/useContactGating'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export interface ViewLaterDesktopLayoutProps {
   navigation: any
@@ -90,12 +91,12 @@ export default function ViewLaterDesktopLayout({
 
 const s = StyleSheet.create({
   header: { width: 810, marginBottom: 24 },
-  title: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black },
 
   list: { width: 810 },
   listContent: { paddingBottom: 32 },
   loadingWrap: { width: 810, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   footerLoader: { marginVertical: 16 },
   emptyBox: { alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-  emptyText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, textAlign: 'center' },
+  emptyText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, textAlign: 'center' },
 })

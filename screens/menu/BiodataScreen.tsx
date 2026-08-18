@@ -23,6 +23,7 @@ import {
   propertyContentText, resolveFamilyCountLabel, saveBiodataThemeId, getSavedBiodataThemeId,
   getBioDataDownloadLink, type BiodataProfile, type BiodataTheme,
 } from '../../service/biodataService'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const SCREEN_WIDTH  = Dimensions.get('window').width
 const SCREEN_HEIGHT = Dimensions.get('window').height
@@ -474,15 +475,15 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.borderNeutral, borderRadius: 8,
     paddingHorizontal: 10, paddingVertical: 6,
   },
-  langPillText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black },
+  langPillText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
 
   missingBanner: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: Colors.selectionBg, paddingHorizontal: 16, paddingVertical: 12,
   },
-  missingBannerText: { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 12, color: '#333333' },
+  missingBannerText: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#333333' },
   missingBannerCta: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.primaryDark, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6 },
-  missingBannerCtaText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 10, color: Colors.white },
+  missingBannerCtaText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 10, color: Colors.white },
 
   themedTop: {
     width: SCREEN_WIDTH, minHeight: 260, position: 'relative', overflow: 'hidden',
@@ -515,7 +516,7 @@ const s = StyleSheet.create({
     position: 'absolute', bottom: 8, alignSelf: 'center',
     backgroundColor: Colors.white, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4,
   },
-  photoActionText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 10, color: '#333333' },
+  photoActionText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 10, color: '#333333' },
   photoEditBtn: {
     position: 'absolute', bottom: 4, right: 4, backgroundColor: Colors.white,
     borderRadius: 14, width: 28, height: 28, alignItems: 'center', justifyContent: 'center',
@@ -527,32 +528,32 @@ const s = StyleSheet.create({
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.06, shadowRadius: 8,
     elevation: 3,
   },
-  name: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: '#333333' },
-  matriId: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 12, color: '#333333', marginTop: 8 },
+  name: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: '#333333' },
+  matriId: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 12, color: '#333333', marginTop: 8 },
 
-  sectionTitle: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 14, color: '#333333', marginTop: 16, marginBottom: 8 },
+  sectionTitle: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: 14, color: '#333333', marginTop: 16, marginBottom: 8 },
 
   fieldRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 12, gap: 8 },
-  fieldLabel: { flex: 5, fontFamily: 'Poppins-Regular', fontSize: 12, color: '#333333' },
-  fieldValue: { flex: 7, fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 12, color: '#333333' },
+  fieldLabel: { flex: 5, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#333333' },
+  fieldValue: { flex: 7, fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 12, color: '#333333' },
   fieldAddLink: { flex: 7, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  fieldAddLinkText: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 12, color: '#D99C00' },
+  fieldAddLinkText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 12, color: '#D99C00' },
 
   horoRow: { flexDirection: 'row', gap: 16, marginTop: 8 },
   horoCol: { flex: 1, alignItems: 'center' },
-  horoLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 10, color: '#D8AD6E', marginBottom: 8 },
+  horoLabel: { fontFamily: Fonts.poppinsSemiBold, fontSize: 10, color: '#D8AD6E', marginBottom: 8 },
   horoImg: { width: '100%', height: 100 },
   // Figma (15156-14417): a dashed pink card, not a plain solid-red-border box.
   horoMissingBlock: {
     marginTop: 8, padding: 16, borderRadius: 12, alignItems: 'center',
     backgroundColor: Colors.selectionBg, borderWidth: 1, borderStyle: 'dashed', borderColor: '#EF4444',
   },
-  horoMissingHeader: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 16, color: '#EF4444', textAlign: 'center' },
-  horoMissingBody: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#4C4C4C', textAlign: 'center', marginTop: 4 },
+  horoMissingHeader: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: 16, color: '#EF4444', textAlign: 'center' },
+  horoMissingBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#4C4C4C', textAlign: 'center', marginTop: 4 },
 
   qrSection: { alignItems: 'center', marginTop: 24, gap: 16 },
   qrImage: { width: 160, height: 160 },
-  qrCaption: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 12, color: '#1A1818', textAlign: 'center' },
+  qrCaption: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 12, color: '#1A1818', textAlign: 'center' },
 
   bottomDecorWrap: { marginTop: -35, alignItems: 'center' },
 
@@ -562,6 +563,6 @@ const s = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)',
     alignItems: 'center', justifyContent: 'center', padding: 32, gap: 16,
   },
-  swipeTipTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.white, textAlign: 'center' },
-  swipeTipBody: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.white, textAlign: 'center' },
+  swipeTipTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.white, textAlign: 'center' },
+  swipeTipBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.white, textAlign: 'center' },
 })

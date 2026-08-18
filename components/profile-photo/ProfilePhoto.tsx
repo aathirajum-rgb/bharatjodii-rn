@@ -18,6 +18,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { WhatsAppUnlockButton } from '../matches/matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
+import { SemanticFontsEnglish } from '../../src/theme/fonts'
 import { getItem } from '../../service/storageService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { getOppGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
@@ -510,7 +511,7 @@ const styles = StyleSheet.create({
   },
   // Angular: .textcta-medium-12 { font-family: var(--english-medium-poppins) }
   newlyJoinedText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium,
     color:      Colors.white,
     fontSize:   12,
     marginLeft:  4,
@@ -609,7 +610,7 @@ const styles = StyleSheet.create({
     gap:               12,
   },
   whatsappOverlayText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   13,
     color:      Colors.white,
     textAlign:  'center',

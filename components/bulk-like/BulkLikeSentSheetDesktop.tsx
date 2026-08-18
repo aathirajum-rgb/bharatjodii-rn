@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next'
 import { Animated, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../../constants/colors'
 import { CDN_LOTTIE } from '../../constants/cdn'
+import { Fonts } from '../../src/theme/fonts'
 
 const LOTTIE_URL = CDN_LOTTIE + 'success-new.json'
 
@@ -98,7 +99,7 @@ const s = StyleSheet.create({
   lottieWrapper: { width: 48, height: 48, overflow: 'hidden', marginBottom: 32 },
   lottie: { width: 48, height: 48 },
   text: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   18,
     lineHeight: 24,
     color:      Colors.black,

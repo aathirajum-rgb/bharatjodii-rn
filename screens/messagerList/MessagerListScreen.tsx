@@ -35,6 +35,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import i18n from '../../i18n'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -509,7 +510,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.divider,
   },
-  headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.textDark },
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textDark },
 
   tabBarWrap: { backgroundColor: Colors.surface },
   tabScroll: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
@@ -520,13 +521,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   chipActive: { backgroundColor: Colors.chipSurfaceSelected, borderColor: Colors.chipBorderActive },
-  chipLabel: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textDark },
-  chipLabelActive: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textDark },
+  chipLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textDark },
+  chipLabelActive: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textDark },
   unreadBadge: {
     minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
     backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
   },
-  unreadBadgeText: { fontFamily: 'Poppins-SemiBold', fontSize: 11, color: Colors.white },
+  unreadBadgeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 11, color: Colors.white },
 
   listContent: { flexGrow: 1, padding: 16 },
   rowGap: { height: 16 },
@@ -536,11 +537,11 @@ const styles = StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 32, paddingTop: 40, gap: 12,
   },
-  emptyTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.textPrimary, textAlign: 'center' },
-  emptySubtitle: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  emptyTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textPrimary, textAlign: 'center' },
+  emptySubtitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
   emptyBtn: {
     marginTop: 12, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 6,
     paddingHorizontal: 20, paddingVertical: 10,
   },
-  emptyBtnLabel: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.primary },
+  emptyBtnLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.primary },
 })

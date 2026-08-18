@@ -15,6 +15,7 @@ import {
   getFinalAmount, getHostedCheckoutRequest, getNetBankingList, getRetryRemainingMs,
   submitHostedCheckoutFormOnWeb, type NetBankingItem, type SelectedPackage,
 } from '../../../service/paymentService'
+import { Fonts, SemanticFontsEnglish } from '../../../src/theme/fonts'
 
 const POPULAR_COUNT = 4
 
@@ -155,8 +156,8 @@ export default function NetBankingTab({ selectedPackage, amountLabel }: Props) {
 
 const s = StyleSheet.create({
   wrap: { gap: 8 },
-  title: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, marginBottom: 8 },
-  sectionLabel: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.black, marginBottom: 8 },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, marginBottom: 8 },
+  sectionLabel: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 14, color: Colors.black, marginBottom: 8 },
 
   popularGrid: { flexDirection: 'row', gap: 20, flexWrap: 'wrap' },
   popularItem: { width: 58, alignItems: 'center', gap: 6 },
@@ -164,7 +165,7 @@ const s = StyleSheet.create({
     width: 58, height: 58, borderRadius: 8, borderWidth: 1, borderColor: '#E6E6E6',
     backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center',
   },
-  popularLabel: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black, textAlign: 'center' },
+  popularLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black, textAlign: 'center' },
 
   divider: { height: 1, backgroundColor: Colors.divider, marginVertical: 16 },
   otherList: { gap: 8 },
@@ -172,7 +173,7 @@ const s = StyleSheet.create({
     height: 48, justifyContent: 'center', paddingHorizontal: 8, borderRadius: 8,
     borderWidth: 1, borderColor: Colors.borderSubtle,
   },
-  otherLabel: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.black },
+  otherLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.black },
 
   selectedTint: {
     borderRadius: 8, borderWidth: 1, borderColor: 'rgba(181, 0, 51, 0.40)', backgroundColor: 'rgba(249, 230, 235, 0.20)',
@@ -181,10 +182,10 @@ const s = StyleSheet.create({
   payBtn: { alignSelf: 'flex-start', marginTop: 24, minWidth: 200 },
 
   awaitWrap: { gap: 16, paddingVertical: 24, alignItems: 'center' },
-  awaitTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, textAlign: 'center' },
+  awaitTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, textAlign: 'center' },
   awaitBody: {
-    fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary,
     textAlign: 'center', lineHeight: 20, maxWidth: 360,
   },
-  awaitBack: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.link, marginTop: 4 },
+  awaitBack: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 13, color: Colors.link, marginTop: 4 },
 })

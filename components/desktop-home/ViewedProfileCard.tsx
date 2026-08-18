@@ -8,6 +8,7 @@ import { PhotoOverlayCard, useOppGenderAvatarUrl } from './DesktopHomeShared'
 import { EyeDatePill, ViewProfileLink, VerifiedCheckmark } from './CardBits'
 import { Colors } from '../../constants/colors'
 import type { SwiperItem } from '../swiper-card/SwiperCard'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 type Props = {
   item: SwiperItem
@@ -61,6 +62,6 @@ const s = StyleSheet.create({
   pillWrap:  { position: 'absolute', left: 12, bottom: 12 },
   body:      { padding: 16, gap: 4 },
   nameRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  name: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black },
-  meta: { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 16, color: '#372f3a' },
+  name: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black },
+  meta: { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: 14, lineHeight: 16, color: '#372f3a' },
 })

@@ -75,6 +75,7 @@ import {
   isValidJobDetailFormat, updateFewMoreDetail,
 } from '../../service/registrationService'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const PLACEHOLDER = CDN_SVG + 'add-photo.svg'
 const MAX_PHOTOS = 10
@@ -1007,7 +1008,7 @@ const CELL_W = 320
 const s = StyleSheet.create({
   main: { width: 700, paddingBottom: 24 },
   center: { alignItems: 'center', justifyContent: 'center', minHeight: 300 },
-  pageTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.textDark, marginBottom: 16 },
+  pageTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.textDark, marginBottom: 16 },
 
   card: {
     backgroundColor: Colors.surface, borderRadius: 16,
@@ -1015,8 +1016,8 @@ const s = StyleSheet.create({
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.1, shadowRadius: 5,
     elevation: 3,
   },
-  sectionTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.textDark, marginBottom: 16 },
-  link: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.link, textDecorationLine: 'underline' },
+  sectionTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.textDark, marginBottom: 16 },
+  link: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 13, color: Colors.link, textDecorationLine: 'underline' },
 
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 20 },
   cell: { width: CELL_W },
@@ -1041,7 +1042,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primaryDark, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 8, borderBottomLeftRadius: 8, borderTopRightRadius: 16,
   },
-  primaryLabelText: { fontFamily: 'Poppins-Medium', fontSize: 12, color: '#fffefe', letterSpacing: 0.12 },
+  primaryLabelText: { fontFamily: Fonts.poppinsMedium, fontSize: 12, color: '#fffefe', letterSpacing: 0.12 },
   // Empty state — Figma's main upload slot uses the same "needs attention"
   // pink as the hint text below it, distinct from the neutral grey used
   // once at least one photo already exists.
@@ -1075,7 +1076,7 @@ const s = StyleSheet.create({
     height: 56, borderWidth: 1, borderColor: Colors.inputError, borderRadius: 8,
     paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
   },
-  missingBoxText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.textDark },
+  missingBoxText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.textDark },
   missingBoxBang: {
     width: 18, height: 18, borderRadius: 9, backgroundColor: Colors.inputError, color: Colors.white,
     fontSize: 12, fontWeight: '700', textAlign: 'center', lineHeight: 18, overflow: 'hidden',

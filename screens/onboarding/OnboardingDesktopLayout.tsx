@@ -13,6 +13,7 @@ import type { ReactNode } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CARD_WIDTH = 480
 
@@ -83,12 +84,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 32, backgroundColor: Colors.white,
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
   },
-  logo: { fontFamily: 'Poppins-SemiBold', fontSize: 24, color: Colors.primaryDark },
+  logo: { fontFamily: Fonts.poppinsSemiBold, fontSize: 24, color: Colors.primaryDark },
   langPill: {
     borderWidth: 1, borderColor: Colors.borderNeutral, borderRadius: 8,
     paddingHorizontal: 12, paddingVertical: 8,
   },
-  langPillText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
+  langPillText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
 
   body: { flex: 1, alignItems: 'center', paddingVertical: 48, paddingHorizontal: 24 },
 
@@ -106,5 +107,5 @@ const s = StyleSheet.create({
 
   footer: { paddingHorizontal: 40, paddingBottom: 32, paddingTop: 8 },
 
-  sectionTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.black, marginTop: 8 },
+  sectionTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black, marginTop: 8 },
 })

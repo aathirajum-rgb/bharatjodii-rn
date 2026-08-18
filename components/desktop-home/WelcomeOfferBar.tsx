@@ -9,6 +9,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Colors } from '../../constants/colors'
 import type { HeroBannerContent } from '../../screens/home/HeroBanner'
+import { SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const TIMER_TOKEN = '##TIMER##'
 
@@ -104,7 +105,7 @@ const s = StyleSheet.create({
 
   textCol: { gap: 8, flexShrink: 1 },
   title: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.headingEnglishMedium,
     fontSize:   14,
     lineHeight: 16,
     color:      Colors.black,
@@ -121,7 +122,7 @@ const s = StyleSheet.create({
     paddingVertical:   4,
   },
   bodyText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium,
     fontSize:   14,
     lineHeight: 16,
     color:      Colors.black,
@@ -137,7 +138,7 @@ const s = StyleSheet.create({
     flexShrink:        0,
   },
   ctaText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   14,
     lineHeight: 16,
     color:      Colors.white,

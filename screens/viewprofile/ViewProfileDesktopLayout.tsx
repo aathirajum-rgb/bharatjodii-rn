@@ -29,6 +29,7 @@ import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interf
 import type { SimilarProfileCard, StarMatchResult } from '../../service/viewProfileService'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // Same back-icon asset ViewProfileScreen's own mobile header uses.
 const BACK_ICON_URI = CDN_REACT + '/arrowleft.svg'
@@ -738,12 +739,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 32, paddingVertical: 14,
     backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle,
   },
-  logo: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.primary },
+  logo: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.primary },
   langBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 8,
   },
-  langText: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textDark },
+  langText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textDark },
   langChevron: { fontSize: 10, color: Colors.textSecondary },
 
   // Figma 141:36781 — condensed sticky bar (avatar+name / CTA / prev-next).
@@ -756,7 +757,7 @@ const s = StyleSheet.create({
   },
   stickyLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 160 },
   stickyAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.divider },
-  stickyName: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black, maxWidth: 140 },
+  stickyName: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black, maxWidth: 140 },
   stickyNav: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 160, justifyContent: 'flex-end' },
 
   scroll: { flex: 1 },
@@ -764,7 +765,7 @@ const s = StyleSheet.create({
 
   paginationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   paginationBack: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  paginationText: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.black },
+  paginationText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black },
   paginationNav: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
   neighborBtn: {
@@ -773,7 +774,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.borderNeutral, backgroundColor: Colors.white,
   },
   neighborAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.divider },
-  neighborBtnText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.textDark },
+  neighborBtnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 13, color: Colors.textDark },
 
   heroCard: {
     flexDirection: 'row', gap: 24, backgroundColor: Colors.white,
@@ -797,20 +798,20 @@ const s = StyleSheet.create({
     elevation: 6, zIndex: 10,
   },
   menuItem: { paddingHorizontal: 16, paddingVertical: 12 },
-  menuItemText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textDark },
+  menuItemText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textDark },
   menuItemDanger: { color: Colors.primary },
 
-  name: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black, marginTop: 12 },
-  jodiId: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, marginTop: 4 },
-  likedMsg: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.likedStripText, marginTop: 6 },
-  basicInfo: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary, marginTop: 6, lineHeight: 18 },
+  name: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black, marginTop: 12 },
+  jodiId: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, marginTop: 4 },
+  likedMsg: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.likedStripText, marginTop: 6 },
+  basicInfo: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary, marginTop: 6, lineHeight: 18 },
 
   biodataCta: {
     height: 40, alignSelf: 'flex-start', paddingHorizontal: 20, marginTop: 16,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.primaryDark, borderRadius: 8,
   },
-  biodataCtaText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.white },
+  biodataCtaText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.white },
 
   twoColumn: { flexDirection: 'row', gap: 24 },
   // Figma node 310:11679 — the whole detail-sections column sits on its own
@@ -838,7 +839,7 @@ const s = StyleSheet.create({
   // edge) instead of closing at the same right edge as everything above it.
   similarSection: { width: '100%', overflow: 'hidden', marginTop: 32, paddingVertical: 24, borderRadius: 12 },
   similarHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SIMILAR_LIST_PADDING },
-  similarHeader: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.black, marginBottom: 12 },
+  similarHeader: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black, marginBottom: 12 },
   similarListContent: { paddingHorizontal: SIMILAR_LIST_PADDING, gap: SIMILAR_CARD_GAP },
   // No explicit width needed — this stretches to fill similarSection, which is
   // itself already pinned to leftColWidth (see the inline style override on
@@ -862,17 +863,17 @@ const ds = StyleSheet.create({
   rowsGroup: { gap: 16, marginTop: 24 },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16 },
   rowLabelValue: { flex: 1, flexDirection: 'row', gap: 8 },
-  label: { width: 170, fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
-  value: { flex: 1, fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.black },
-  actionLink: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.link, marginTop: 4 },
+  label: { width: 170, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  value: { flex: 1, fontFamily: Fonts.poppinsMedium, fontSize: 14, color: Colors.black },
+  actionLink: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.link, marginTop: 4 },
   addDetailPrompt: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
-  addDetailPromptText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.link },
+  addDetailPromptText: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: 14, color: Colors.link },
 
-  sectionHeader: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.black, marginTop: 48 },
+  sectionHeader: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black, marginTop: 48 },
   sectionHeaderFirst: { marginTop: 0 },
 
-  starMatchText:   { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.textDark, marginTop: 8 },
-  starMatchTeaser: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.link, marginTop: 8 },
+  starMatchText:   { fontFamily: Fonts.poppinsMedium, fontSize: 13, color: Colors.textDark, marginTop: 8 },
+  starMatchTeaser: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: 13, color: Colors.link, marginTop: 8 },
 
   ctaRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
   ctaDontShow: {
@@ -880,19 +881,19 @@ const ds = StyleSheet.create({
     height: 44, paddingHorizontal: 16, backgroundColor: Colors.white,
     borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
-  ctaDontShowText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#545454' },
+  ctaDontShowText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#545454' },
   ctaViewLater: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, paddingHorizontal: 16, backgroundColor: Colors.white,
     borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
-  ctaViewLaterText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#545454' },
+  ctaViewLaterText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#545454' },
   ctaDisabled: { opacity: 0.4 },
   ctaLike: {
     height: 44, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     backgroundColor: Colors.primaryDark, borderRadius: 8,
   },
-  ctaLikeText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.white },
+  ctaLikeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.white },
   ctaCompact: { height: 36, paddingHorizontal: 12 },
 
   afterLikeRow: {
@@ -900,17 +901,17 @@ const ds = StyleSheet.create({
     backgroundColor: Colors.afterLikeBg, borderRadius: 8, borderWidth: 1, borderColor: Colors.afterLikeBorder,
     paddingHorizontal: 14, paddingVertical: 10,
   },
-  afterLikeText: { flex: 1, fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.black },
+  afterLikeText: { flex: 1, fontFamily: Fonts.poppinsMedium, fontSize: 13, color: Colors.black },
   ctaSendInterestWrap: { position: 'relative', flexShrink: 0 },
   ctaSendInterest: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 40, backgroundColor: Colors.primaryDark, borderRadius: 8, paddingHorizontal: 16,
   },
-  ctaSendInterestText: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.white },
+  ctaSendInterestText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 13, color: Colors.white },
   freeBadge: {
     position: 'absolute', top: -10, right: 8, zIndex: 1,
     backgroundColor: Colors.badgeNewBg, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2,
   },
-  freeBadgeText: { fontFamily: 'Poppins-SemiBold', fontSize: 10, color: Colors.badgeNewText },
-  contactsLeftText: { fontFamily: 'Poppins-Regular', fontSize: 11, color: Colors.textSecondary },
+  freeBadgeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 10, color: Colors.badgeNewText },
+  contactsLeftText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 11, color: Colors.textSecondary },
 })

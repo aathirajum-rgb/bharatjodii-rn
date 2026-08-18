@@ -37,6 +37,7 @@ import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import MembershipBanner from '../../components/matches/MembershipBanner'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN_SVG } from '../../constants/cdn'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { isBanner, type MatchProfile, type BannerItem, type MatchListItem } from '../../types/interfaces/matches.interface'
@@ -479,7 +480,7 @@ const pcs = StyleSheet.create({
   },
   title: {
     marginTop:  16,
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   18,
     color:      '#000000',
     textAlign:  'center',
@@ -493,7 +494,7 @@ const pcs = StyleSheet.create({
     justifyContent: 'center',
   },
   ctaText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: Fonts.poppinsRegular,
     fontSize:   14,
     color:      Colors.white,
   },
@@ -538,7 +539,7 @@ const spb = StyleSheet.create({
   image: { width: 40, height: 40 },
   title: {
     flex:       1,
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.headingEnglishMedium,
     fontSize:   13,
     color:      Colors.textDark,
   },
@@ -551,7 +552,7 @@ const spb = StyleSheet.create({
     paddingHorizontal: 12,
   },
   ctaText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   12,
     color:      Colors.white,
   },
@@ -684,13 +685,13 @@ const n = StyleSheet.create({
     gap:               6,
   },
   title: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   16,
     color:      '#000000',
     textAlign:  'center',
   },
   desc: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      '#000000',
     textAlign:  'center',
@@ -706,7 +707,7 @@ const n = StyleSheet.create({
     paddingVertical:   10,
   },
   ctaText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   14,
     color:      Colors.primaryDark,
   },
@@ -743,12 +744,12 @@ const iv = StyleSheet.create({
   },
   textCol: { flex: 1 },
   title: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   14,
     color:      Colors.textDark,
   },
   body: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   12,
     color:      Colors.textSecondary,
     marginTop:  2,
@@ -760,7 +761,7 @@ const iv = StyleSheet.create({
     paddingHorizontal: 12,
   },
   ctaText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   12,
     color:      Colors.white,
   },
@@ -2361,7 +2362,7 @@ const s = StyleSheet.create({
   loaderBox:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
   footerLoader: { marginVertical: 16 },
   extendedIntroText: {
-    fontFamily:        'Poppins-SemiBold',
+    fontFamily:        Fonts.poppinsSemiBold,
     fontSize:          18,
     color:             Colors.black,
     textAlign:         'center',
@@ -2393,7 +2394,7 @@ const c = StyleSheet.create({
   // Angular no-photo placeholder
   noPhoto:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   noPhotoIcon: { width: 56, height: 56, opacity: 0.35 },
-  noPhotoText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textMuted },
+  noPhotoText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textMuted },
 
   // Angular: .newly-joined posabsolute — uses newly-joined.svg as bg, top-left of photo
   newBadge: {
@@ -2410,7 +2411,7 @@ const c = StyleSheet.create({
     gap: 4,
   },
   newBadgeText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium,
     fontSize:   12,
     color:      Colors.white,
   },
@@ -2424,7 +2425,7 @@ const c = StyleSheet.create({
     gap:              8,
   },
   activityText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     color:      Colors.black,
     flex:       1,
@@ -2432,7 +2433,7 @@ const c = StyleSheet.create({
 
   // Angular: getContentAfterLike() text above Send Interest CTA
   afterLikeText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     color:      Colors.black,
     textAlign:  'center',
@@ -2458,7 +2459,7 @@ const c = StyleSheet.create({
     gap:               12,
   },
   overlayText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   13,
     color:      Colors.white,
     textAlign:  'center',
@@ -2478,7 +2479,7 @@ const c = StyleSheet.create({
     gap:               6,
   },
   waBtnText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   13,
     color:      Colors.white,
   },
@@ -2513,7 +2514,7 @@ const c = StyleSheet.create({
     gap:              4,
   },
   likedIcon: { width: 20, height: 20, flexShrink: 0 },
-  likedText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.likedStripText },
+  likedText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.likedStripText },
 
   // Angular: d-flex align-center-item mt-12 pl-16 pr-16
   nameRow: {
@@ -2524,7 +2525,7 @@ const c = StyleSheet.create({
     gap:              12,
   },
   // Figma: #000000
-  name:       { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: '#000000' },
+  name:       { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: '#000000' },
   iconBtn:    { flexShrink: 0 },
   nameRowIcon:  { width: 24, height: 24 },
   nameRowIconWa:{ width: 28, height: 28 },
@@ -2543,7 +2544,7 @@ const c = StyleSheet.create({
   // Angular: body2-regular-14 mt-2 pl-16 pr-16 bv-minht text-space
   // Figma: solid #000000; the "|" separators alone drop to 20% opacity
   basicView: {
-    fontFamily:       'Poppins-Regular',
+    fontFamily:       SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:         14,
     color:            '#000000',
     lineHeight:       20,
@@ -2562,7 +2563,7 @@ const c = StyleSheet.create({
     gap:               2,
   },
   viewProfileText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   14,
     color:      Colors.link,
   },
@@ -2606,7 +2607,7 @@ const c = StyleSheet.create({
     borderColor:    '#545454',
     borderRadius:   8,
   },
-  ctaDontShowText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#545454' },
+  ctaDontShowText: { fontFamily: Fonts.poppinsRegular, fontSize: 14, color: '#545454' },
 
   ctaViewLater: {
     flex:           1,
@@ -2619,7 +2620,7 @@ const c = StyleSheet.create({
     borderColor:    '#545454',
     borderRadius:   8,
   },
-  ctaViewLaterText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#545454' },
+  ctaViewLaterText: { fontFamily: Fonts.poppinsRegular, fontSize: 14, color: '#545454' },
 
   // Angular: FUNC.disableDontShow()/disableViewLater() — dimmed, non-tappable once
   // the action was already taken on a profile that reappears in a re-fetched list.
@@ -2637,7 +2638,7 @@ const c = StyleSheet.create({
     gap:             6,
   },
   ctaLikeIcon: { width: 24, height: 24 },
-  ctaLikeText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.white },
+  ctaLikeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.white },
 
   // Angular: matches-cta-bg-color (pink gradient) + "Send Interest" primary CTA
   afterLikeRow: {
@@ -2667,7 +2668,7 @@ const c = StyleSheet.create({
     justifyContent: 'center',
   },
   ctaSendInterestText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   14,
     color:      Colors.white,
     lineHeight: 20,
@@ -2683,12 +2684,12 @@ const c = StyleSheet.create({
     paddingVertical:   2,
   },
   freeBadgeText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   10,
     color:      Colors.badgeNewText,
   },
   contactsLeftText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   11,
     color:      Colors.textSecondary,
     textAlign:  'center',
@@ -2738,17 +2739,17 @@ const e = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
   },
-  countNum:   { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: Colors.white, lineHeight: 16 },
-  countLabel: { fontFamily: 'Poppins-Regular',  fontSize: 10, color: Colors.white, lineHeight: 13 },
+  countNum:   { fontFamily: Fonts.poppinsSemiBold, fontSize: 13, color: Colors.white, lineHeight: 16 },
+  countLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular,  fontSize: 10, color: Colors.white, lineHeight: 13 },
   title: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   18,
     color:      Colors.extendedCardTitle,
     textAlign:  'center',
     marginBottom: 8,
   },
   desc: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      Colors.textSecondary,
     textAlign:  'center',
@@ -2806,14 +2807,14 @@ const pb = StyleSheet.create({
   },
   // Angular: heading3-semibold-16 black-color
   title: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   16,
     color:      Colors.black,
     lineHeight: 22,
   },
   // Angular: mt-8 body3-regular-12 black-color
   body: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   12,
     color:      Colors.black,
     marginTop:  8,
@@ -2829,7 +2830,7 @@ const pb = StyleSheet.create({
     alignItems:        'center',
   },
   ctaText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   14,
   },
 })
@@ -2855,14 +2856,14 @@ const ap = StyleSheet.create({
   },
   // Angular: heading1-semibold-22 black-color line-height-32
   title: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   22,
     color:      Colors.black,
     lineHeight: 32,
   },
   // Angular: body1-medium-14 black-color
   subheader: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     color:      Colors.black,
   },
@@ -2885,7 +2886,7 @@ const ap = StyleSheet.create({
   },
   // Angular: body2-regular-14 black-color
   bulletText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      Colors.black,
     flex:       1,
@@ -2899,7 +2900,7 @@ const ap = StyleSheet.create({
     alignItems:      'center',
   },
   ctaText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   14,
     color:      Colors.white,
   },

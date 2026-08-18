@@ -22,6 +22,7 @@ import { Colors } from '../../constants/colors'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { isBanner, type MatchProfile, type BannerItem, type MatchListItem } from '../../types/interfaces/matches.interface'
 import { EEndCardText } from '../../types/enums/common.enum'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export interface MatchesDesktopLayoutProps {
   langCode:          string
@@ -223,7 +224,7 @@ const s = StyleSheet.create({
   // to provide back when this block sat outside the FlatList entirely.
   listHeader: { marginBottom: 16 },
   title: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   24,
     color:      Colors.textDark,
   },
@@ -234,12 +235,12 @@ const s = StyleSheet.create({
     marginTop:     6,
   },
   ppText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      Colors.textDark,
   },
   ppEditText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      Colors.link,
   },
@@ -257,13 +258,13 @@ const s = StyleSheet.create({
     gap:               6,
   },
   emptyTitle: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   16,
     color:      Colors.textDark,
     textAlign:  'center',
   },
   emptyDesc: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      Colors.textDark,
     textAlign:  'center',
@@ -277,7 +278,7 @@ const s = StyleSheet.create({
     paddingVertical:   10,
   },
   emptyCtaText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   14,
     color:      Colors.primary,
   },

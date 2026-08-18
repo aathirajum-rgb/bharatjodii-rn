@@ -7,6 +7,7 @@ import DesktopPageShell from '../../components/desktop-page-shell/DesktopPageShe
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export interface DeleteProfileMrgReasonDesktopLayoutProps {
   navigation: any
@@ -77,16 +78,16 @@ const PRIMARY = '#b50033'
 const s = StyleSheet.create({
   header: { width: 810, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 },
   backArrow: { fontSize: 22, color: Colors.black },
-  title: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black },
 
   card: {
     width: 810, backgroundColor: Colors.white, borderRadius: 24, padding: 40,
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 8,
     elevation: 4,
   },
-  congratsTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 24, color: Colors.black },
-  congratsSub: { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 20, color: Colors.black, marginTop: 8 },
-  sectionTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.black, marginTop: 24, marginBottom: 16 },
+  congratsTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 24, color: Colors.black },
+  congratsSub: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 20, color: Colors.black, marginTop: 8 },
+  sectionTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black, marginTop: 24, marginBottom: 16 },
 
   rowsWrap: { gap: 12 },
   row: {
@@ -94,8 +95,8 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 16,
   },
   rowSelected: { borderColor: PRIMARY, backgroundColor: 'rgba(181,0,51,0.02)' },
-  rowLabel: { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
-  rowLabelSelected: { fontFamily: 'Poppins-Medium' },
+  rowLabel: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  rowLabelSelected: { fontFamily: Fonts.poppinsMedium },
   radio: {
     width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: '#8a8a8a',
     alignItems: 'center', justifyContent: 'center',

@@ -16,6 +16,7 @@ import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { getRegValue } from '../../service/registrationService'
 import { CDN_SVG } from '../../constants/cdn'
 import { os } from './onboardingStyles'
+import { SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -289,7 +290,7 @@ const styles = StyleSheet.create({
   },
   laterText: {
     fontSize:   14,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     color:      '#333333',
   },
   laterChevron: {

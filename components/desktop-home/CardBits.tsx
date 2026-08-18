@@ -9,6 +9,7 @@
 // go missing the same way.
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // "Viewed you on {date}" / "You viewed on {date}" overlay pill on a card photo.
 export function EyeDatePill({ text }: { text: string }) {
@@ -56,7 +57,7 @@ const s = StyleSheet.create({
   },
   eyeGlyph:    { fontSize: 12 },
   eyePillText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: Fonts.poppinsMedium,
     fontSize:   12,
     color:      Colors.white,
   },
@@ -67,13 +68,13 @@ const s = StyleSheet.create({
     gap:           4,
   },
   viewProfileText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     lineHeight: 16,
     color:      Colors.link,
   },
   viewProfileChevron: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   16,
     color:      Colors.link,
   },
@@ -95,7 +96,7 @@ const s = StyleSheet.create({
   },
   starGlyph: { color: '#ffd700', fontSize: 12 },
   newlyJoinedBadgeText: {
-    fontFamily:      'Poppins-Regular',
+    fontFamily:      SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:        12,
     color:           Colors.white,
     textTransform:   'capitalize',

@@ -5,6 +5,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // Tab IDs match Figma bottom nav order exactly:
@@ -196,7 +197,7 @@ const styles = StyleSheet.create({
   },
   // Figma: inactive label #545454
   tabLabel: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bottomnavEnglishRegular,
     fontSize:   10,
     color:      '#545454',
     marginTop:  4,
@@ -204,7 +205,7 @@ const styles = StyleSheet.create({
     textAlign:  'center',
   },
   tabLabelActive: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: Fonts.poppinsMedium,
     color:      '#B50033',
   },
   // Count badge — "99+" red pill (Figma: Likes tab)
@@ -223,7 +224,7 @@ const styles = StyleSheet.create({
     borderColor:       Colors.white,
   },
   countText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     color:      Colors.white,
     fontSize:   8,
     lineHeight: 12,
@@ -239,7 +240,7 @@ const styles = StyleSheet.create({
     justifyContent:    'center',
   },
   upgradeTagText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     color:      Colors.white,
     fontSize:   8,
   },

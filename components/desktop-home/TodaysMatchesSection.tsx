@@ -7,6 +7,7 @@ import { CarouselSection, PhotoOverlayCard, useOppGenderAvatarUrl } from './Desk
 import { NewlyJoinedBadge } from './CardBits'
 import { Colors } from '../../constants/colors'
 import type { SwiperItem } from '../swiper-card/SwiperCard'
+import { Fonts } from '../../src/theme/fonts'
 
 const CARD_W = 312
 const PHOTO_SIZE = 280
@@ -71,7 +72,7 @@ const s = StyleSheet.create({
     justifyContent:  'center',
   },
   viewBtnText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   14,
     color:      Colors.white,
   },

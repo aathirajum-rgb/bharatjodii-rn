@@ -29,6 +29,7 @@ import {
   getFinalAmount, getHostedCheckoutRequest, getRetryRemainingMs, submitHostedCheckoutFormOnWeb,
   type SelectedPackage,
 } from '../../../service/paymentService'
+import { Fonts, SemanticFontsEnglish } from '../../../src/theme/fonts'
 
 function formatCardNumber(raw: string): string {
   const digits = raw.replace(/\D/g, '').slice(0, 16)
@@ -210,7 +211,7 @@ export default function CardTab({ selectedPackage, amountLabel }: Props) {
 const s = StyleSheet.create({
   wrap: { gap: 8 },
 
-  title: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, marginBottom: 8 },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, marginBottom: 8 },
 
   field:    { marginBottom: 8 },
   row:      { flexDirection: 'row', gap: 12 },
@@ -219,10 +220,10 @@ const s = StyleSheet.create({
   payBtn: { alignSelf: 'flex-start', marginTop: 8, minWidth: 200 },
 
   awaitWrap: { gap: 16, paddingVertical: 24, alignItems: 'center' },
-  awaitTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, textAlign: 'center' },
+  awaitTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, textAlign: 'center' },
   awaitBody: {
-    fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary,
     textAlign: 'center', lineHeight: 20, maxWidth: 360,
   },
-  awaitBack: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.link, marginTop: 4 },
+  awaitBack: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 13, color: Colors.link, marginTop: 4 },
 })

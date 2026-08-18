@@ -38,6 +38,7 @@ import { getRegValue } from '../../service/registrationService'
 import { fetchEditProfileInfo } from '../../service/editProfileService'
 import { fetchStates, fetchHoroCities, generateHoroscope, type HoroCity } from '../../service/registrationService'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 const CDN_ILLUSTRATION = CDN_REG + 'horoscope-generate.svg'
@@ -303,7 +304,7 @@ const s = StyleSheet.create({
 
   header: { width: 810, flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 32, marginBottom: 24 },
   backBtn: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black },
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black },
 
   card: {
     width: 810, backgroundColor: Colors.white, borderRadius: 24, alignItems: 'center',
@@ -312,26 +313,26 @@ const s = StyleSheet.create({
   loader: { marginVertical: 48 },
 
   illustration: { width: 200, height: 200, marginBottom: 24 },
-  introTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.black, textAlign: 'center' },
-  introSubtitle: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, textAlign: 'center', marginTop: 8, maxWidth: 460 },
-  uploadLink: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.link, marginTop: 24 },
+  introTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black, textAlign: 'center' },
+  introSubtitle: { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: 14, color: Colors.black, textAlign: 'center', marginTop: 8, maxWidth: 460 },
+  uploadLink: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.link, marginTop: 24 },
 
   generateBtn: {
     width: 360, height: 48, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center', marginTop: 24,
   },
   generateBtnDisabled: { opacity: 0.5 },
-  generateBtnText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.white },
-  skipLink: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textSecondary, marginTop: 16 },
+  generateBtnText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.white },
+  skipLink: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary, marginTop: 16 },
 
   form: { width: '100%', gap: 20 },
   dobField: {
     height: 56, borderWidth: 1, borderColor: Colors.inputBorder, borderRadius: 8,
     paddingHorizontal: 16, justifyContent: 'center', backgroundColor: Colors.surfaceInput,
   },
-  dobLabel: { fontFamily: 'Poppins-Regular', fontSize: 11, color: Colors.textSecondary },
-  dobValue: { fontFamily: 'Poppins-Medium', fontSize: 15, color: Colors.textPrimary, marginTop: 2 },
-  dobMissing: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.inputError },
+  dobLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 11, color: Colors.textSecondary },
+  dobValue: { fontFamily: Fonts.poppinsMedium, fontSize: 15, color: Colors.textPrimary, marginTop: 2 },
+  dobMissing: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.inputError },
 
   timeRow: { flexDirection: 'row', gap: 16 },
   timeCell: { flex: 1 },

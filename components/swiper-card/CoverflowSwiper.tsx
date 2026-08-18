@@ -21,6 +21,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import CdnLottie from '../CdnLottie'
 import ProfileCard, { PHOTO_HEIGHT } from '../profile-card/ProfileCard'
 import { PaginationDots, type SwiperItem } from './SwiperCard'
+import { Fonts } from '../../src/theme/fonts'
 
 const SEE_ALL_LINK_COLOR = '#29339B'
 const FWD_ICON = `${CDN_SVG}revamp/forward-icon-link.svg`
@@ -202,7 +203,7 @@ const styles = StyleSheet.create({
   // — same animation, mirrored via rotate(50deg).
   headerAnimRight: { position: 'absolute', right: 0, top: 0, transform: [{ rotate: '50deg' }] },
   header: {
-    fontFamily:  'Poppins-SemiBold',
+    fontFamily:  Fonts.poppinsSemiBold,
     fontSize:    18,
     color:       Colors.textPrimary,
     textAlign:   'center',

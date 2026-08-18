@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../cdn-svg/CdnSvg'
+import { Fonts } from '../../src/theme/fonts'
 
 // Same back-icon asset ViewProfileScreen's own header uses.
 const BACK_ICON_URI = CDN_REACT + '/arrowleft.svg'
@@ -271,7 +272,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   backBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: '#333333' },
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: '#333333' },
   // Takes the remaining space between the header and the footer CTA (if any) —
   // the photo card's own height is measured off this, not a raw screen-height %.
   photoArea: { flex: 1, justifyContent: 'center' },

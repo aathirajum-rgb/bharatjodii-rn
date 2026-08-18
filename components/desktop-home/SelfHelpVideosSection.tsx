@@ -4,6 +4,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { CarouselSection, CARD_SCRIM_COLORS } from './DesktopHomeShared'
 import type { HelpVideo } from '../../service/homeService'
+import { SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CARD_W = 312
 const CARD_H = 160
@@ -64,7 +65,7 @@ const s = StyleSheet.create({
     left:       16,
     bottom:     12,
     right:      16,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   12,
     lineHeight: 16,
     color:      '#ffffff',

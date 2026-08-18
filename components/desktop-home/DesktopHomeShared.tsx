@@ -12,6 +12,7 @@ import {
 import { LinearGradient } from 'expo-linear-gradient'
 import { Colors } from '../../constants/colors'
 import { getOppGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // Angular: getAvatarImage(profile) → getAvatarImg(getOppGenderType()) — a card
 // with no real photo falls back to the opposite gender's silhouette. Shared
@@ -229,8 +230,8 @@ const o = StyleSheet.create({
   scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
   topLeftBadge: { position: 'absolute', top: 8, left: 8 },
   textWrap: { position: 'absolute', left: 16, bottom: 12, right: 16 },
-  name: { fontFamily: 'Poppins-Medium', fontSize: 16, lineHeight: 16, color: Colors.white },
-  age:  { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 16, color: Colors.white, marginTop: 2 },
+  name: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, lineHeight: 16, color: Colors.white },
+  age:  { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.white, marginTop: 2 },
 })
 
 const s = StyleSheet.create({
@@ -248,7 +249,7 @@ const s = StyleSheet.create({
     flexShrink:    1,
   },
   headerTitle: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   22,
     color:      Colors.textStrong,
     flexShrink: 1,
@@ -262,7 +263,7 @@ const s = StyleSheet.create({
   chevronGlyph: {
     fontSize:   22,
     color:      Colors.textStrong,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.headingEnglishRegular,
   },
 
   seeAll: {
@@ -271,13 +272,13 @@ const s = StyleSheet.create({
     gap:           4,
   },
   seeAllText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   16,
     color:      Colors.link,
   },
   seeAllChevron: {
     fontSize:   18,
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     color:      Colors.link,
   },
 

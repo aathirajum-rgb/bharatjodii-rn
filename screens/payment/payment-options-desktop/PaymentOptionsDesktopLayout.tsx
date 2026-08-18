@@ -29,6 +29,7 @@ import CardTab from './CardTab'
 import NetBankingTab from './NetBankingTab'
 import NeftRtgsTab from './NeftRtgsTab'
 import PayAtStoreTab from './PayAtStoreTab'
+import { Fonts, SemanticFontsEnglish } from '../../../src/theme/fonts'
 
 const ICON_BACK        = CDN_REACT + '/menu_back_arrow.svg'
 const ICON_EDIT_PENCIL = CDN_SVG + 'revamp/primary-edit-pencil.svg'
@@ -200,12 +201,12 @@ const s = StyleSheet.create({
     paddingHorizontal: 32, backgroundColor: Colors.white,
     shadowColor: '#000', shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
-  headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.black, flex: 1, marginLeft: 16 },
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black, flex: 1, marginLeft: 16 },
   langBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 8, paddingVertical: 8,
     borderWidth: 1, borderColor: Colors.borderNeutral, borderRadius: 8,
   },
-  langText: { fontFamily: 'Poppins-Medium', fontSize: 12, color: Colors.black },
+  langText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 12, color: Colors.black },
 
   body: { flex: 1, flexDirection: 'row', paddingHorizontal: 32, paddingVertical: 32, gap: 24 },
 
@@ -216,8 +217,8 @@ const s = StyleSheet.create({
   },
   tabRow: { height: 48, justifyContent: 'center', paddingHorizontal: 16 },
   tabRowActive: { backgroundColor: '#FFF5F7' },
-  tabLabel: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.black },
-  tabLabelActive: { fontFamily: 'Poppins-Medium', color: Colors.primaryDark },
+  tabLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.black },
+  tabLabelActive: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, color: Colors.primaryDark },
 
   content: {
     flex: 1, backgroundColor: Colors.white, borderRadius: 16, padding: 24,
@@ -233,39 +234,39 @@ const s = StyleSheet.create({
   },
   summaryTopRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
   planNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
-  planName:     { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
-  planDuration: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textSecondary },
-  planPrice:    { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
+  planName:     { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  planDuration: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textSecondary },
+  planPrice:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
 
   discountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
-  discountLabel: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black },
-  discountValue: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.discountGreen },
+  discountLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
+  discountValue: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.discountGreen },
 
   summaryDivider: { height: 1, backgroundColor: Colors.divider, marginVertical: 16 },
 
   totalRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  totalLabel:  { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
+  totalLabel:  { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
   totalValues: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   strikeThrough: { fontSize: 12, color: Colors.borderNeutral, textDecorationLine: 'line-through' },
-  totalValue: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.black },
+  totalValue: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black },
 
   qrCard: {
     backgroundColor: Colors.white, borderRadius: 16, padding: 20, gap: 12,
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
-  qrTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
-  qrNote:  { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textSecondary, lineHeight: 18 },
+  qrTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  qrNote:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textSecondary, lineHeight: 18 },
   whatsappBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     borderWidth: 1, borderColor: Colors.primaryDark, borderRadius: 24, paddingVertical: 10,
   },
-  whatsappLabel: { fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.primaryDark },
+  whatsappLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 13, color: Colors.primaryDark },
 
   needHelpCard: {
     backgroundColor: Colors.white, borderRadius: 16, padding: 20, gap: 8, alignItems: 'center',
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 3,
   },
-  needHelpTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 13, color: Colors.black, textAlign: 'center' },
+  needHelpTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 13, color: Colors.black, textAlign: 'center' },
   needHelpRow:   { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  needHelpNumber: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.link },
+  needHelpNumber: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.link },
 })

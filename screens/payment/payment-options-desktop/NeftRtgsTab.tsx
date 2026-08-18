@@ -8,6 +8,7 @@ import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, Vi
 import CdnSvg from '../../../components/cdn-svg/CdnSvg'
 import { Colors } from '../../../constants/colors'
 import { getPayAtBankList, type PayAtBankItem } from '../../../service/paymentService'
+import { Fonts, SemanticFontsEnglish } from '../../../src/theme/fonts'
 
 export default function NeftRtgsTab() {
   const [banks, setBanks]       = useState<PayAtBankItem[]>([])
@@ -96,9 +97,9 @@ function DetailRow({ label, value }: { label: string; value: string }) {
 
 const s = StyleSheet.create({
   wrap: { gap: 16 },
-  title: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black },
-  note: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary, lineHeight: 20 },
-  link: { color: Colors.link, fontFamily: 'Poppins-Medium' },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black },
+  note: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary, lineHeight: 20 },
+  link: { color: Colors.link, fontFamily: SemanticFontsEnglish.buttonEnglishMedium },
 
   tilesRow: { flexDirection: 'row', gap: 27, flexWrap: 'wrap' },
   tileWrap: { width: 58, alignItems: 'center', gap: 6 },
@@ -107,16 +108,16 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center',
   },
   tileSelected: { borderColor: 'rgba(181, 0, 51, 0.40)', backgroundColor: 'rgba(181, 0, 51, 0.02)' },
-  tileLabel: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black, textAlign: 'center' },
+  tileLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black, textAlign: 'center' },
 
   detailCard: {
     backgroundColor: Colors.white, borderRadius: 12, padding: 16, gap: 12,
     borderWidth: 1, borderColor: Colors.borderSubtle,
   },
   detailRow: { flexDirection: 'row' },
-  detailLabel: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, width: 150 },
-  detailColon: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, width: 12 },
-  detailValue: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.black, flexShrink: 1 },
+  detailLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, width: 150 },
+  detailColon: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, width: 12 },
+  detailValue: { fontFamily: Fonts.poppinsMedium, fontSize: 14, color: Colors.black, flexShrink: 1 },
 
-  footnote: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary, lineHeight: 20, marginTop: 4 },
+  footnote: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary, lineHeight: 20, marginTop: 4 },
 })

@@ -34,6 +34,7 @@ import { fetchCustomerCare } from '../../service/homeService'
 import { setFilterEventType } from '../../service/filterService'
 import { openMembershipTab } from '../../service/paymentService'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CALL_ICON = CDN_SVG + 'revamp/call-blue.svg'
 const CHEVRON_DOWN = CDN_REACT + '/chevron-down-row-icon.svg'
@@ -177,7 +178,7 @@ export default function HelpCenterDesktopScreen({ navigation }: Props) {
 
 const s = StyleSheet.create({
   header: { width: 810, marginBottom: 24 },
-  title: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black },
 
   card: {
     width: 810, backgroundColor: Colors.white, borderRadius: 16,
@@ -186,12 +187,12 @@ const s = StyleSheet.create({
   loaderWrap: { paddingVertical: 24, alignItems: 'center' },
 
   section: { gap: 16 },
-  sectionTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black },
+  sectionTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black },
   rows: {},
 
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 16, gap: 12 },
   rowPressed: { opacity: 0.6 },
-  rowTitle: { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
+  rowTitle: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
   rowDivider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.borderSubtle },
 
   contactBox: {
@@ -199,7 +200,7 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.borderSubtle, borderRadius: 8,
     paddingHorizontal: 20, paddingVertical: 16,
   },
-  contactText: { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
+  contactText: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
   contactPhoneRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  contactPhone: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.link },
+  contactPhone: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.link },
 })

@@ -19,6 +19,7 @@ import { Image } from 'expo-image'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { LANG_LABELS } from '../../components/matches-header/MatchesHeader'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import type { CompatibilityItem } from './StarMatchingScreen'
 
@@ -233,19 +234,19 @@ const ds = StyleSheet.create({
     paddingHorizontal: 32, paddingVertical: 14,
     backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle,
   },
-  logo: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.primary },
+  logo: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.primary },
   langBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 8,
   },
-  langText: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textDark },
+  langText: { fontFamily: Fonts.poppinsRegular, fontSize: 13, color: Colors.textDark },
   langChevron: { fontSize: 10, color: Colors.textSecondary },
 
   scroll: { flex: 1 },
   content: { maxWidth: 1200, width: '100%', alignSelf: 'center', paddingHorizontal: 32, paddingVertical: 24 },
 
   backRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 16 },
-  backText: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.black },
+  backText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black },
 
   card: {
     backgroundColor: Colors.white, borderRadius: 16,
@@ -258,7 +259,7 @@ const ds = StyleSheet.create({
   photo: { width: PHOTO_SIZE, height: PHOTO_SIZE, borderRadius: 12, backgroundColor: Colors.divider },
   centerCol: { flex: 1, alignItems: 'center', paddingTop: PHOTO_SIZE / 2 - 40 },
 
-  ratioText: { fontFamily: 'Poppins-Bold', fontSize: 32, color: Colors.black },
+  ratioText: { fontFamily: SemanticFontsEnglish.headingEnglishBold, fontSize: 32, color: Colors.black },
   starsRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 12 },
   starIcon: { width: 28, height: 28, marginRight: 3 },
   progressTrack: {
@@ -266,44 +267,44 @@ const ds = StyleSheet.create({
     marginTop: 12, overflow: 'hidden',
   },
   progressFill: { height: 10, borderRadius: 20, backgroundColor: Colors.starMatchYes },
-  starMatchingLine: { fontFamily: 'Poppins-Medium', fontSize: 16, color: '#334155', marginTop: 16 },
+  starMatchingLine: { fontFamily: Fonts.poppinsMedium, fontSize: 16, color: '#334155', marginTop: 16 },
   starMatchingValue: { color: Colors.starMatchYes },
 
   namesRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 },
   nameCol: { width: PHOTO_SIZE },
   nameColRight: { alignItems: 'flex-start' },
-  profileName: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.black },
-  profileMeta: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textSecondary, marginTop: 4 },
+  profileName: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black },
+  profileMeta: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary, marginTop: 4 },
 
   divider: { height: 1, backgroundColor: Colors.divider, marginTop: 24 },
 
-  sectionHeader: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black, marginTop: 24 },
+  sectionHeader: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black, marginTop: 24 },
   compatGrid: { flexDirection: 'row', marginTop: 16, gap: 48 },
   compatColumn: { flex: 1 },
   compatRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16,
   },
-  compatKey: { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 15, color: '#555555', paddingRight: 12 },
+  compatKey: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 15, color: '#555555', paddingRight: 12 },
   compatValueCol: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   compatIcon: { width: 16, height: 16 },
-  compatYes: { fontFamily: 'Poppins-Medium', fontSize: 15, color: Colors.starMatchYes },
-  compatNo: { fontFamily: 'Poppins-Medium', fontSize: 15, color: Colors.starMatchNo },
+  compatYes: { fontFamily: Fonts.poppinsMedium, fontSize: 15, color: Colors.starMatchYes },
+  compatNo: { fontFamily: Fonts.poppinsMedium, fontSize: 15, color: Colors.starMatchNo },
 
   detailBtn: {
     backgroundColor: Colors.primary, borderRadius: 10, height: 48, paddingHorizontal: 32,
     alignItems: 'center', justifyContent: 'center', marginTop: 32, alignSelf: 'center',
   },
-  detailBtnText: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.white },
+  detailBtnText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.white },
 
   noteBar: { backgroundColor: Colors.starMatchNoteBg, paddingVertical: 16, paddingHorizontal: 40 },
-  noteText: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.starMatchNoteText, lineHeight: 18 },
-  noteLabel: { fontFamily: 'Poppins-SemiBold' },
+  noteText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.starMatchNoteText, lineHeight: 18 },
+  noteLabel: { fontFamily: Fonts.poppinsSemiBold },
 
   // Detail-view fallback (no Figma frame yet) — one card per item, spaced
   // like the summary card's own vertical rhythm.
   detailCard: { padding: 32, marginTop: 16 },
   detailItemHeader: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
-  detailKey: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.textDark },
-  detailBody: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textDark, lineHeight: 20, marginTop: 12 },
-  detailResult: { fontFamily: 'Poppins-Regular', fontSize: 16, color: Colors.textDark, lineHeight: 22, marginTop: 12 },
+  detailKey: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textDark },
+  detailBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textDark, lineHeight: 20, marginTop: 12 },
+  detailResult: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 16, color: Colors.textDark, lineHeight: 22, marginTop: 12 },
 })

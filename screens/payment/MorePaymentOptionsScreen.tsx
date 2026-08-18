@@ -18,6 +18,7 @@ import { Colors } from '../../constants/colors'
 import { CDN, CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import LinkCTA from '../../components/link-cta/LinkCTA'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import {
   checkQrPaymentOutcome, getPaymentConfig, getQRPaymentData, getRechargeHelpline, getUpiAppList,
   handlePaymentSuccess, recordPaymentFailure, type PaymentMethodItem, type QRPaymentData,
@@ -208,7 +209,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white,
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
-  headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, marginLeft: 16, flex: 1 },
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, marginLeft: 16, flex: 1 },
 
   content: { padding: 16 },
 
@@ -225,7 +226,7 @@ const s = StyleSheet.create({
   iconBox: {
     width: 32, height: 32, alignItems: 'center', justifyContent: 'center',
   },
-  rowLabel: { fontFamily: 'Poppins-Regular', fontSize: 16, color: Colors.black },
+  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 16, color: Colors.black },
 
   helpline: { marginTop: 32 },
 
@@ -234,11 +235,11 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.borderSubtle,
   },
   qrTitle: {
-    fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, textAlign: 'center',
+    fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, textAlign: 'center',
   },
   qrImageWrap: { padding: 8, backgroundColor: Colors.white, borderRadius: 8 },
   qrNote: {
-    fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary,
     textAlign: 'center', lineHeight: 20,
   },
   whatsappBtn: {
@@ -246,5 +247,5 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.borderNeutral, borderRadius: 24,
     paddingVertical: 10, paddingHorizontal: 20,
   },
-  whatsappLabel: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.black },
+  whatsappLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.black },
 })

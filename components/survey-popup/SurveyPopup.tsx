@@ -3,6 +3,7 @@
 import { Linking, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { submitSurvey, type SurveyPopupData } from '../../service/surveyService'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export default function SurveyPopup({
   visible, data, onClose,
@@ -66,14 +67,14 @@ const s = StyleSheet.create({
     color:    Colors.textMedium,
   },
   title: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   17,
     color:      Colors.textDark,
     textAlign:  'center',
     marginTop:  8,
   },
   subtitle: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.subheadingEnglishRegular,
     fontSize:   13,
     color:      Colors.textSecondary,
     textAlign:  'center',
@@ -88,7 +89,7 @@ const s = StyleSheet.create({
     marginTop:         8,
   },
   ctaText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   14,
     color:      Colors.white,
   },

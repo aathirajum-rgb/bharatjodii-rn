@@ -16,6 +16,7 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import FloatingLabelInput from '../../components/input/FloatingLabelInput'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import { submitDoorstepCollection, type SelectedPackage } from '../../service/paymentService'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
@@ -113,10 +114,10 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white,
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
-  headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, flex: 1 },
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, flex: 1 },
 
   content: { flex: 1, padding: 16 },
-  note: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary, lineHeight: 20, marginBottom: 20 },
+  note: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary, lineHeight: 20, marginBottom: 20 },
   field: { marginBottom: 8 },
 
   footer: { paddingHorizontal: 16, paddingTop: 12 },

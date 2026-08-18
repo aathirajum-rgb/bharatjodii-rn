@@ -18,6 +18,7 @@ import type {
 } from 'react-native-webview/lib/WebViewTypes'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import { SemanticFontsEnglish } from '../../src/theme/fonts'
 import {
   getHostedCheckoutRequest, handlePaymentSuccess, recordPaymentFailure,
   type SelectedPackage,
@@ -196,5 +197,5 @@ const s = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
     alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.white, gap: 12,
   },
-  loadingText: { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary },
+  loadingText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary },
 })

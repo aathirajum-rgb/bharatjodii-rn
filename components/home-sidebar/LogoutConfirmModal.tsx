@@ -16,6 +16,7 @@ import { Modal, Pressable, StyleSheet, Text } from 'react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { ICON } from '../../screens/menu/MenuScreen'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export interface LogoutConfirmModalProps {
   visible: boolean
@@ -55,17 +56,17 @@ const s = StyleSheet.create({
     width: 360, backgroundColor: Colors.white, borderRadius: 24,
     padding: 24, gap: 16, alignItems: 'flex-start',
   },
-  title: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.black },
-  message: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, lineHeight: 20, marginTop: -8 },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black },
+  message: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, lineHeight: 20, marginTop: -8 },
 
   btnPrimary: {
     width: '100%', height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center', marginTop: 16,
   },
-  btnPrimaryLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.white },
+  btnPrimaryLabel: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.white },
   btnSecondary: {
     width: '100%', height: 44, borderRadius: 8, borderWidth: 1, borderColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
   },
-  btnSecondaryLabel: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.primaryDark },
+  btnSecondaryLabel: { fontFamily: Fonts.poppinsRegular, fontSize: 14, color: Colors.primaryDark },
 })

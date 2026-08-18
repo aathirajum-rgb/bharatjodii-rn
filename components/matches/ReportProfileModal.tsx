@@ -20,6 +20,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import { fetchReportReasons, submitReport, type ReportReason } from '../../service/reportProfileService'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const BACK_ICON_URI = CDN_SVG + 'arrow-back-activity.svg'
 // Angular: bottom-sheet.component.html:21 — same success animation used for
@@ -199,7 +200,7 @@ const m = StyleSheet.create({
   },
   // Angular: .report-profile-heading { font-family: heading-02-english-Medium;
   // font-size:16px; color:#333333 } — Medium weight, not SemiBold.
-  headerTitle: { fontFamily: 'Poppins-Medium', fontSize: 16, color: '#333333' },
+  headerTitle: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, color: '#333333' },
   // Angular: .report-profile-name { color: #de2a68 } — the reported person's
   // name is colored differently from the rest of the "Report X" title.
   headerTitleName: { color: '#de2a68' },
@@ -211,7 +212,7 @@ const m = StyleSheet.create({
   // Angular: .heading3-semibold-16.color-1f1e1b, classes "mt-32 mb-24" — a
   // real heading (SemiBold 16px), not the small Regular-13px caption this
   // previously used.
-  subtitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: '#1f1e1b', marginTop: 32, marginBottom: 24 },
+  subtitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: '#1f1e1b', marginTop: 32, marginBottom: 24 },
   // Angular: report-profile.component.html:37 — `.report-profile-reason`
   // (border:1px solid #545454; border-radius:8px; background:#FFF) + "mt-16"
   // applied to EACH reason individually (inside the *ngFor), not one shared
@@ -224,10 +225,10 @@ const m = StyleSheet.create({
     paddingVertical: 12, paddingHorizontal: 16, marginTop: 16,
   },
   reasonCardDisabled: { opacity: 0.6 },
-  reasonTitle: { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, paddingRight: 12 },
+  reasonTitle: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, paddingRight: 12 },
   reasonTitleDisabled: { color: Colors.textSecondary },
   // Angular: .text-disabled { color: #ef4444 }
-  alreadyReported: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#ef4444' },
+  alreadyReported: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#ef4444' },
   // Unselected border a bit more visible than the near-invisible Colors.divider
   // (#f0f0f0) — matches the real screenshot's clearly-visible thin gray ring.
   radioOuter: {
@@ -253,7 +254,7 @@ const m = StyleSheet.create({
   // Colors.primaryLight — this app's existing "disabled button bg" token,
   // reused here instead of a one-off gray.
   submitBtnDisabled: { backgroundColor: Colors.primaryLight },
-  submitBtnText: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.white },
+  submitBtnText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.white },
 
   // Angular: ion-backdrop (showBackdrop:true) behind the bottomsheet-revamp-popup.
   successOverlay: {
@@ -272,7 +273,7 @@ const m = StyleSheet.create({
   successLottieWrap: { width: 100, height: 100, alignSelf: 'flex-start', marginBottom: 16 },
   successLottie: { width: 100, height: 100 },
   // Angular: heading2-semibold-18 color-1f1e1b
-  successTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: '#1f1e1b', marginBottom: 12 },
+  successTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: '#1f1e1b', marginBottom: 12 },
   // Angular: body2-regular-14 color-1f1e1b, pr-32 mt-12
-  successContent: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#1f1e1b', lineHeight: 20, marginBottom: 24 },
+  successContent: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#1f1e1b', lineHeight: 20, marginBottom: 24 },
 })

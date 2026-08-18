@@ -15,6 +15,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN, CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
@@ -542,7 +543,7 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   backBtn:     { padding: 4, marginRight: 16 },
-  headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, flex: 1 },
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, flex: 1 },
 
   content: { padding: 16, gap: 24 },
 
@@ -566,9 +567,9 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
   },
   planNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
-  planName:     { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
-  planDuration: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textSecondary, marginRight: 4 },
-  planPrice:    { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#4C4C4C' },
+  planName:     { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  planDuration: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textSecondary, marginRight: 4 },
+  planPrice:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#4C4C4C' },
 
   discountRow: {
     flexDirection:  'row',
@@ -576,22 +577,22 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop:      8,
   },
-  discountLabel: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black },
-  discountValue: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.discountGreen },
+  discountLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
+  discountValue: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.discountGreen },
 
   divider: { height: 1, backgroundColor: '#F1F5F9', borderRadius: 8, marginVertical: 16 },
 
   totalRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  totalLabel:  { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
+  totalLabel:  { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
   totalValues: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   strikeThrough: {
     fontSize: 12, color: Colors.borderNeutral, textDecorationLine: 'line-through',
   },
-  finalTotal: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: '#1F1E1B' },
+  finalTotal: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: '#1F1E1B' },
 
   // ── Sections / cards ─────────────────────────────────────────────────────
   section:      { gap: 16 },
-  sectionLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
+  sectionLabel: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
   card: {
     backgroundColor: Colors.white,
     borderRadius:    16,
@@ -615,7 +616,7 @@ const s = StyleSheet.create({
     width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: Colors.borderSubtle,
     backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center',
   },
-  rowLabel: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
+  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
 
   radioTouch: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   radioCircle: {
@@ -640,5 +641,5 @@ const s = StyleSheet.create({
   // CheckboxGroup.tsx's established filled-checked style.
   checkboxChecked: { backgroundColor: Colors.primaryDark, borderColor: Colors.primaryDark },
   tick: { fontSize: 11, color: Colors.white, fontWeight: '700', lineHeight: 12 },
-  renewLabel: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black },
+  renewLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
 })

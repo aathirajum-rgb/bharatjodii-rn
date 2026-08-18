@@ -13,6 +13,7 @@
 // MultiSelectPicker/SearchablePicker "Apply" semantics.
 import { Modal, Pressable, StyleSheet, Text, View, Switch } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export interface PreferenceFieldModalProps {
   visible:           boolean
@@ -94,7 +95,7 @@ const s = StyleSheet.create({
 
   title: {
     alignSelf: 'stretch', textAlign: 'center',
-    fontFamily: 'Poppins-SemiBold', fontSize: 18, lineHeight: 24, color: Colors.black,
+    fontFamily: Fonts.poppinsSemiBold, fontSize: 18, lineHeight: 24, color: Colors.black,
   },
   // zIndex here (not just on DesktopSelectField's own internal wrapperOpen)
   // is what actually lets an open dropdown escape ABOVE this View's own
@@ -109,18 +110,18 @@ const s = StyleSheet.create({
     borderRadius: 8, padding: 12,
   },
   strictTextCol: { flex: 1, gap: 4 },
-  strictTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 14, lineHeight: 20, color: Colors.black },
-  strictDesc:  { fontFamily: 'Poppins-Regular', fontSize: 12, lineHeight: 16, color: Colors.black },
+  strictTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, lineHeight: 20, color: Colors.black },
+  strictDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 16, color: Colors.black },
 
   footer: {
     alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 26,
   },
   matchesCol: { gap: 4 },
-  matchesLabel: { fontFamily: 'Poppins-Regular', fontSize: 12, lineHeight: 20, color: Colors.black },
-  matchesCount: { fontFamily: 'Poppins-SemiBold', fontSize: 14, lineHeight: 20, color: Colors.black },
+  matchesLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 20, color: Colors.black },
+  matchesCount: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, lineHeight: 20, color: Colors.black },
   applyBtn: {
     flex: 1, height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
   },
-  applyText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.white },
+  applyText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.white },
 })

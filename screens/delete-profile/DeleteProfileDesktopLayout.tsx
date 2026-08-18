@@ -10,6 +10,7 @@ import DesktopPageShell from '../../components/desktop-page-shell/DesktopPageShe
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export interface DeleteProfileDesktopLayoutProps {
   navigation: any
@@ -125,14 +126,14 @@ const PRIMARY = '#b50033'
 const s = StyleSheet.create({
   header: { width: 810, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 },
   backArrow: { fontSize: 22, color: Colors.black },
-  title: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black },
 
   card: {
     width: 810, backgroundColor: Colors.white, borderRadius: 24, padding: 40,
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 8,
     elevation: 4,
   },
-  cardTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.black, marginBottom: 24 },
+  cardTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black, marginBottom: 24 },
 
   rowsWrap: { gap: 12 },
   row: {
@@ -140,8 +141,8 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', paddingLeft: 16, paddingRight: 4, gap: 16,
   },
   rowSelected: { borderColor: PRIMARY, backgroundColor: 'rgba(181,0,51,0.02)' },
-  rowLabel: { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
-  rowLabelSelected: { fontFamily: 'Poppins-Medium' },
+  rowLabel: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  rowLabelSelected: { fontFamily: Fonts.poppinsMedium },
   radio: {
     width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: '#8a8a8a',
     alignItems: 'center', justifyContent: 'center', marginRight: 10,
@@ -150,10 +151,10 @@ const s = StyleSheet.create({
   radioDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: PRIMARY },
 
   concernSection: { marginTop: 24 },
-  concernTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.black, marginBottom: 12 },
+  concernTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black, marginBottom: 12 },
   concernInput: {
     minHeight: 120, borderRadius: 8, borderWidth: 1, borderColor: '#e6e6e6',
-    paddingHorizontal: 16, paddingVertical: 12, fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black,
+    paddingHorizontal: 16, paddingVertical: 12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black,
     backgroundColor: Colors.white,
   },
 
@@ -170,14 +171,14 @@ const s = StyleSheet.create({
   offerClose: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   offerCloseX: { fontSize: 16, color: Colors.black },
   offerTitle: {
-    alignSelf: 'stretch', fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black,
+    alignSelf: 'stretch', fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black,
   },
   offerBody: {
-    alignSelf: 'stretch', fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 20, color: '#333333', marginBottom: 8,
+    alignSelf: 'stretch', fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 20, color: '#333333', marginBottom: 8,
   },
   offerDeleteBtn: {
     alignSelf: 'stretch', height: 48, borderRadius: 8, borderWidth: 1, borderColor: '#545454',
     alignItems: 'center', justifyContent: 'center',
   },
-  offerDeleteText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#545454' },
+  offerDeleteText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#545454' },
 })

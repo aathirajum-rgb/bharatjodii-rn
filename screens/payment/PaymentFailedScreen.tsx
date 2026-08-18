@@ -19,6 +19,7 @@ import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import PlainRetryFailureSheet from '../../components/payment/PlainRetryFailureSheet'
 import AutoRenewalFailureSheet from '../../components/payment/AutoRenewalFailureSheet'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import {
   checkPaymentStatus, getPaymentConfig, getPaymentFailedContext, getPaymentFailedDetail,
   handlePaymentSuccess, type PaymentFailedDetail, type PaymentMethodItem, type SelectedPackage,
@@ -231,16 +232,16 @@ const s = StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.white, padding: 32, gap: 12,
   },
-  title:    { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.black, textAlign: 'center' },
-  subtitle: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  title:    { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black, textAlign: 'center' },
+  subtitle: { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
 
   sheetLoading: { paddingVertical: 40, alignItems: 'center' },
   cooldown: {
-    fontFamily: 'Poppins-Medium', fontSize: 13, color: Colors.primaryDark,
+    fontFamily: Fonts.poppinsMedium, fontSize: 13, color: Colors.primaryDark,
     textAlign: 'center', marginBottom: 12,
   },
   reason: {
-    fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textTertiary,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textTertiary,
     textAlign: 'center', marginTop: 8,
   },
 })

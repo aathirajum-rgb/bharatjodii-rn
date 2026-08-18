@@ -22,6 +22,7 @@ import SelectableProfileTile from './SelectableProfileTile'
 import BulkLikeSentSheet from './BulkLikeSentSheet'
 import { sendBulkLikes } from '../../service/profileService'
 import { Colors } from '../../constants/colors'
+import { Fonts } from '../../src/theme/fonts'
 
 export default function BulkLikeModal({
   visible, candidates, showPhotoPromo, onClose, onSent, onSentNeedsPhoto,
@@ -154,7 +155,7 @@ const s = StyleSheet.create({
   },
   title: {
     flex:       1,
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   18,
     lineHeight: 24,
     color:      Colors.textPrimary,
@@ -182,7 +183,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primaryLight,
   },
   sendBtnText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   15,
     color:      Colors.white,
   },

@@ -9,6 +9,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import ProfilePhoto from '../profile-photo/ProfilePhoto'
 import BasicInfoLine from './BasicInfoLine'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // Shared with SelectableProfileCardDesktop.tsx, which renders the "|"
 // separators dimmed and so needs the raw parts rather than a joined string.
@@ -72,12 +73,12 @@ const s = StyleSheet.create({
   },
   info: { flex: 1, paddingRight: 24 },
   name: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   16,
     color:      Colors.black,
   },
   basicLine: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   12,
     lineHeight: 16,
     color:      Colors.black,

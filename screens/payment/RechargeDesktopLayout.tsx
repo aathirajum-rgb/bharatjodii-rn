@@ -20,6 +20,7 @@ import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import MatchesDesktopNav from '../../components/matches-header/MatchesDesktopNav'
 import { PlanCard } from './RechargeScreen'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN_SVG } from '../../constants/cdn'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import type { MembershipPlansData } from '../../service/paymentService'
@@ -182,16 +183,16 @@ const s = StyleSheet.create({
   main:        { flex: 1 },
   mainContent: { gap: 20, paddingBottom: 40 },
 
-  pageTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.black, marginBottom: 4 },
+  pageTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black, marginBottom: 4 },
 
   offerBanner: {
     borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16,
     backgroundColor: Colors.membershipCardBg, alignItems: 'center',
   },
-  offerBannerText: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#7A1739', textAlign: 'center', lineHeight: 16 },
+  offerBannerText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#7A1739', textAlign: 'center', lineHeight: 16 },
 
   viewAllRow:  { alignItems: 'center', paddingVertical: 4 },
-  viewAllText: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.textSecondary, textDecorationLine: 'underline' },
+  viewAllText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.textSecondary, textDecorationLine: 'underline' },
 
   sidebar: { width: 352, gap: 16, alignSelf: 'flex-start' },
 
@@ -200,25 +201,25 @@ const s = StyleSheet.create({
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.12, shadowRadius: 8, elevation: 3,
   },
   summaryTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  summaryPlanName:  { flex: 1, fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
-  summaryPlanPrice: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
+  summaryPlanName:  { flex: 1, fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  summaryPlanPrice: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
 
   discountRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 },
-  discountLabel: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
-  discountValue: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.discountGreen },
+  discountLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  discountValue: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.discountGreen },
 
   summaryDivider: { height: 1, backgroundColor: Colors.divider, marginVertical: 16 },
 
   totalRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  totalLabel: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.black },
-  totalValue: { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.black },
+  totalLabel: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  totalValue: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black },
 
   needHelpRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  needHelpText:   { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.black },
-  needHelpNumber: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.link, marginLeft: 4 },
+  needHelpText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
+  needHelpNumber: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.link, marginLeft: 4 },
 
   sheetInner:       { maxHeight: '100%' },
-  sheetTitle:       { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, textAlign: 'center', marginBottom: 16 },
+  sheetTitle:       { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, textAlign: 'center', marginBottom: 16 },
   sheetList:        { maxHeight: 480 },
   sheetListContent: { gap: 20, paddingBottom: 8 },
 })

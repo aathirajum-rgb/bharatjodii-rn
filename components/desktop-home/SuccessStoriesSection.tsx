@@ -6,6 +6,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { SectionHeader } from './DesktopHomeShared'
 import { Colors } from '../../constants/colors'
 import type { SwiperItem } from '../swiper-card/SwiperCard'
+import { SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CARD_W = 260
 const CARD_H = 352
@@ -71,7 +72,7 @@ const s = StyleSheet.create({
   },
 
   header:   { gap: 4 },
-  subtitle: { fontFamily: 'Poppins-Regular', fontSize: 16, lineHeight: 20, color: Colors.black, paddingHorizontal: 12 },
+  subtitle: { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: 16, lineHeight: 20, color: Colors.black, paddingHorizontal: 12 },
 
   row: { flexDirection: 'row', gap: 20, alignItems: 'flex-start' },
   card: {
@@ -88,9 +89,9 @@ const s = StyleSheet.create({
   },
   photo: { width: CARD_W, height: PHOTO_H },
   body:  { padding: 16, gap: 4 },
-  name:     { fontFamily: 'Poppins-Medium', fontSize: 16, color: Colors.black },
-  location: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
-  date:     { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#545454', marginTop: 8 },
+  name:     { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, color: Colors.black },
+  location: { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: 14, color: Colors.black },
+  date:     { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#545454', marginTop: 8 },
 
   seeAllCard: {
     width:           CARD_W,
@@ -107,6 +108,6 @@ const s = StyleSheet.create({
     borderWidth: 3, borderColor: Colors.white,
   },
   seeAllRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  seeAllText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.link },
-  seeAllChevron: { fontFamily: 'Poppins-Regular', fontSize: 16, color: Colors.link },
+  seeAllText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.link },
+  seeAllChevron: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 16, color: Colors.link },
 })

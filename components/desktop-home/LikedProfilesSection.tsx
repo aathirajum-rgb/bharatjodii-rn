@@ -7,6 +7,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { CarouselSection, PhotoOverlayCard, useOppGenderAvatarUrl } from './DesktopHomeShared'
 import type { LikedTab } from '../../screens/home/homeGating'
 import type { SwiperItem } from '../swiper-card/SwiperCard'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CARD_W = 276
 const PHOTO_SIZE = 260
@@ -131,8 +132,8 @@ const s = StyleSheet.create({
     justifyContent:    'center',
   },
   tabPillActive: { backgroundColor: '#ffffff' },
-  tabText:       { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#000000' },
-  tabTextActive: { fontFamily: 'Poppins-Medium', color: '#8b4800' },
+  tabText:       { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#000000' },
+  tabTextActive: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, color: '#8b4800' },
 
   card: {
     width:           CARD_W,
@@ -147,8 +148,8 @@ const s = StyleSheet.create({
   },
   photoInset: { padding: 8 },
   body: { paddingHorizontal: 16, paddingBottom: 16, gap: 8 },
-  name: { fontFamily: 'Poppins-SemiBold', fontSize: 16, lineHeight: 20, color: '#000000' },
-  meta: { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 20, color: '#000000' },
+  name: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, lineHeight: 20, color: '#000000' },
+  meta: { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: 14, lineHeight: 20, color: '#000000' },
   datePill: {
     alignSelf:                'flex-start',
     borderTopLeftRadius:      24,
@@ -159,5 +160,5 @@ const s = StyleSheet.create({
     paddingHorizontal:        10,
     justifyContent:           'center',
   },
-  dateText: { fontFamily: 'Poppins-Regular', fontSize: 12, lineHeight: 20, color: '#000000' },
+  dateText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 20, color: '#000000' },
 })

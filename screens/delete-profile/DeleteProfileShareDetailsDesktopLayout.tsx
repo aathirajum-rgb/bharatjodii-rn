@@ -15,6 +15,7 @@ import DesktopSelectField from '../../components/desktop-select-field/DesktopSel
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { MONTHS, MONTHS_OPTIONS, buildMarriageYears, type DateChip } from './DeleteProfileShareDetailsScreen'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 
@@ -158,7 +159,7 @@ export default function DeleteProfileShareDetailsDesktopLayout({
 const s = StyleSheet.create({
   header: { width: 810, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24 },
   backArrow: { fontSize: 22, color: Colors.black },
-  title: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black },
 
   card: {
     width: 810, backgroundColor: Colors.white, borderRadius: 24, padding: 40,
@@ -171,23 +172,23 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', minHeight: 155, marginBottom: 24, borderTopLeftRadius: 24, borderTopRightRadius: 24,
   },
   bannerText: { flex: 1 },
-  bannerLine: { fontFamily: 'Poppins-Regular', fontSize: 16, lineHeight: 24, color: Colors.black },
-  bannerHighlight: { fontFamily: 'Poppins-SemiBold', fontSize: 16, lineHeight: 24, color: '#c9050b' },
+  bannerLine: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 16, lineHeight: 24, color: Colors.black },
+  bannerHighlight: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, lineHeight: 24, color: '#c9050b' },
 
   inputWrap: {
     height: 48, borderRadius: 8, borderWidth: 1, borderColor: '#b0b0b0',
     paddingHorizontal: 16, backgroundColor: Colors.white, justifyContent: 'center', width: 400,
   },
   inputWrapError: { borderColor: '#de2a68' },
-  textInput: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, padding: 0, margin: 0 },
-  nameError: { fontFamily: 'Poppins-Regular', fontSize: 12, color: '#de2a68', marginTop: 4 },
+  textInput: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, padding: 0, margin: 0 },
+  nameError: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#de2a68', marginTop: 4 },
 
   chipRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
   chip: { height: 40, paddingHorizontal: 16, borderRadius: 20, borderWidth: 1, alignItems: 'center', justifyContent: 'center' },
   chipUnselected: { borderColor: '#b0b0b0', backgroundColor: 'rgba(255,255,255,0.2)' },
   chipSelected: { borderColor: 'rgba(181,0,51,0.4)', backgroundColor: 'rgba(181,0,51,0.02)' },
-  chipLabel: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
-  chipLabelSelected: { fontFamily: 'Poppins-SemiBold', color: '#b50033' },
+  chipLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  chipLabelSelected: { fontFamily: Fonts.poppinsSemiBold, color: '#b50033' },
 
   dateFieldsRow: { flexDirection: 'row', gap: 12, marginTop: 20, width: 400 },
   dateField: { flex: 1 },

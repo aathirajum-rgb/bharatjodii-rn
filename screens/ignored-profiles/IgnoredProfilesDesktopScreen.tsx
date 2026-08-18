@@ -44,6 +44,7 @@ import { StorageKeys } from '../../constants/storage.keys'
 import { Colors } from '../../constants/colors'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // Figma nodes 659:15243 (don't-show empty)/659:13163 (blocked empty) — same
 // cloud backdrop behind a tab-specific circular icon (person+X vs person+block).
@@ -381,7 +382,7 @@ export default function IgnoredProfilesDesktopScreen({ navigation }: Props) {
 
 const s = StyleSheet.create({
   header: { width: 810, marginBottom: 24 },
-  title: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black },
 
   tabRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
   chip: {
@@ -389,7 +390,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderColor: Colors.inputBorder,
   },
   chipActive: { backgroundColor: Colors.chipSurfaceSelected, borderColor: Colors.chipBorderActive },
-  chipLabel: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
+  chipLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
 
   list: { width: 810 },
   listContent: { paddingBottom: 32 },
@@ -402,7 +403,7 @@ const s = StyleSheet.create({
   emptyIllustration: { width: 180, height: 180, position: 'relative' },
   emptyCloud: { position: 'absolute', top: 12, left: 90, marginLeft: -97.5 },
   emptyIcon: { position: 'absolute', top: 90, left: 54 },
-  emptyText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, textAlign: 'center' },
+  emptyText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, textAlign: 'center' },
 
   menuDropdown: { top: 32, right: 0 },
 })

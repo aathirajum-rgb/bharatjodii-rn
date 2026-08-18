@@ -21,6 +21,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_REACT, CDN_REVAMP } from '../../constants/cdn'
 import { StorageKeys } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { openMembershipTab } from '../../service/paymentService'
 import { apiCall } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
@@ -188,8 +189,8 @@ const CARD_W = 260
 const s = StyleSheet.create({
   header: { width: 810, marginBottom: 24, position: 'relative' },
   flourish: { position: 'absolute', top: -40, right: -20, opacity: 0.5 },
-  title: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black },
-  subtitle: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, marginTop: 8 },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black },
+  subtitle: { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: 14, color: Colors.black, marginTop: 8 },
 
   list: { width: 810 },
   listContent: { paddingBottom: 32 },
@@ -198,12 +199,12 @@ const s = StyleSheet.create({
   loadingWrap: { width: 810, alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
   footerLoader: { marginVertical: 16 },
   emptyBox: { alignItems: 'center', justifyContent: 'center', paddingTop: 80 },
-  emptyText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, textAlign: 'center' },
+  emptyText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, textAlign: 'center' },
 
   card: { width: CARD_W, backgroundColor: Colors.white, borderRadius: 16, overflow: 'hidden' },
   cardPhoto: { width: CARD_W, height: CARD_W },
   cardInfo: { padding: 16 },
-  cardName: { fontFamily: 'Poppins-Medium', fontSize: 16, color: Colors.black },
-  cardLocation: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, marginTop: 4 },
-  cardDate: { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textSecondary, marginTop: 20 },
+  cardName: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, color: Colors.black },
+  cardLocation: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, marginTop: 4 },
+  cardDate: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textSecondary, marginTop: 20 },
 })

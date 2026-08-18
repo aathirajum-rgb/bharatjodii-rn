@@ -42,6 +42,7 @@ import { StorageKeys } from '../../constants/storage.keys'
 import { APP_VERSION } from '../../constants/appVersion'
 import { EnvConfig } from '../../constants/env'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import HomeDesktopLayout from './HomeDesktopLayout'
 import HeroBanner, { type HeroBannerContent } from './HeroBanner'
@@ -1797,7 +1798,7 @@ const s = StyleSheet.create({
   divider: { height: 8, backgroundColor: '#F5F5F5' },
   hList:   { paddingHorizontal: 16 },
 
-  sectionTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: Colors.textPrimary, paddingHorizontal: 16, marginBottom: 12 },
+  sectionTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 15, color: Colors.textPrimary, paddingHorizontal: 16, marginBottom: 12 },
   // Angular: complete-profile.component.html's outer grid is pl-24 pr-0
   // (not the generic 16px every other section header uses), header color is
   // the specific .color-1f1e1b (not textPrimary), and the cards-wrapping row
@@ -1819,19 +1820,19 @@ const s = StyleSheet.create({
   },
   cpInfo:    { flex: 1, gap: 8 },
   // Angular: .body1-medium-14 { font-family: var(--english-medium-poppins) }
-  cpTitle:   { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.black },
+  cpTitle:   { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 14, color: Colors.black },
   cpCtaRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  cpCtaText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#29339B' },
+  cpCtaText: { fontFamily: Fonts.poppinsRegular, fontSize: 14, color: '#29339B' },
 
   // Liked profiles tabs
   tabRow:             { flexDirection: 'row', marginHorizontal: 16, marginBottom: 12, backgroundColor: '#F5F5F5', borderRadius: 8, padding: 3 },
   tabPill:            { flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 6 },
   tabPillActive:      { backgroundColor: Colors.white, shadowColor: Colors.shadow, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
-  tabPillText:        { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textSecondary },
-  tabPillTextActive:  { fontFamily: 'Poppins-SemiBold', fontSize: 12, color: Colors.textPrimary },
+  tabPillText:        { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textSecondary },
+  tabPillTextActive:  { fontFamily: Fonts.poppinsSemiBold, fontSize: 12, color: Colors.textPrimary },
   // Angular: .body2-regular-14 line-height-24, ml-24 mr-24 mb-32 pt-8 — shown
   // instead of the tab row when only one of likedYou/likedByMe has data.
-  onlyOneLikedText:   { fontFamily: 'Poppins-Regular', fontSize: 14, lineHeight: 24, color: Colors.textPrimary, paddingHorizontal: 16, marginBottom: 12 },
+  onlyOneLikedText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 24, color: Colors.textPrimary, paddingHorizontal: 16, marginBottom: 12 },
 
   // Explore categories
   // Angular: .discover-new-bg — 12px radius, 1px #E6E6E6 border, compact
@@ -1846,8 +1847,8 @@ const s = StyleSheet.create({
   // right, where the chevron sits, not a flat 8px on every side.
   catTile:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#E6E6E6', paddingTop: 8, paddingRight: 4, paddingBottom: 8, paddingLeft: 8, minHeight: 64 },
   catIconWrap:  { width: 32, height: 32, marginRight: 8, alignItems: 'center', justifyContent: 'center' },
-  catLabel:     { flex: 1, fontFamily: 'Poppins-Medium', fontSize: 12, color: Colors.textPrimary, lineHeight: 16 },
-  catChevron:   { color: '#29339B', fontFamily: 'Poppins-SemiBold' },
+  catLabel:     { flex: 1, fontFamily: Fonts.poppinsMedium, fontSize: 12, color: Colors.textPrimary, lineHeight: 16 },
+  catChevron:   { color: '#29339B', fontFamily: Fonts.poppinsSemiBold },
 
   // Angular: .success-story-section { background: #FEF2F6 }
   successStorySection: { backgroundColor: '#FEF2F6' },
@@ -1867,27 +1868,27 @@ const s = StyleSheet.create({
   // Angular: .negative-mt-18 pulls this block up to overlap the heart
   // animation above it.
   storyHeader:    { paddingHorizontal: 24, marginTop: -18, marginBottom: 12 },
-  storyTitle:     { fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.white },
+  storyTitle:     { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.white },
   // Angular: .body2-regular-14.black-color.line-height-20
-  storySubtitle:  { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, marginTop: 8, lineHeight: 20 },
+  storySubtitle:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, marginTop: 8, lineHeight: 20 },
 
   // Self-help videos
   videoCard:     { borderRadius: 10, overflow: 'hidden', position: 'relative', backgroundColor: Colors.white },
   videoThumbImg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   playBtn:       { position: 'absolute', top: '50%', left: '50%', width: 40, height: 40, marginLeft: -20, marginTop: -20, alignItems: 'center', justifyContent: 'center' },
   videoCaptionScrim: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 10, paddingTop: 24, backgroundColor: 'rgba(0,0,0,0.45)' },
-  videoTitle:    { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.white, lineHeight: 16 },
+  videoTitle:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.white, lineHeight: 16 },
 
   // Help section
   // Angular: FAQ_DETAILS.BANNER — title/body/link-CTA on a gradient card with
   // a decorative image, not two call/whatsapp buttons.
   helpWrap:      { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, borderRadius: 12, padding: 16, gap: 12 },
   helpTextCol:   { flex: 1 },
-  helpTitle:     { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.textPrimary, marginBottom: 6 },
-  helpSub:       { fontFamily: 'Poppins-Regular', fontSize: 13, color: Colors.textSecondary, marginBottom: 10, lineHeight: 20 },
+  helpTitle:     { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.textPrimary, marginBottom: 6 },
+  helpSub:       { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary, marginBottom: 10, lineHeight: 20 },
   helpCta:       { flexDirection: 'row', alignItems: 'center' },
-  helpCtaText:   { fontFamily: 'Poppins-Medium', fontSize: 13, color: '#29339B' },
-  helpCtaChevron: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#29339B', marginLeft: 4 },
+  helpCtaText:   { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 13, color: '#29339B' },
+  helpCtaChevron: { fontFamily: Fonts.poppinsSemiBold, fontSize: 15, color: '#29339B', marginLeft: 4 },
 
   // Self-help video modal
   videoModal:      { flex: 1, backgroundColor: '#000' },

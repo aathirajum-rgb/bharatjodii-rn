@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
+import { SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CDN = CDN_SVG
 
@@ -134,7 +135,7 @@ const f = StyleSheet.create({
     backgroundColor: Colors.chipSurfaceSelected,
   },
   chipText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     lineHeight: 20,
     color:      '#000000',

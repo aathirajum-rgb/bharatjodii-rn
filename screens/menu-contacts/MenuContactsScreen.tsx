@@ -56,6 +56,7 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { getMembershipTierTheme } from './membershipTierTheme'
 import MenuContactsDesktopLayout from './MenuContactsDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ICONS = {
   back:      CDN_REACT + '/menu_back_arrow.svg',
@@ -554,7 +555,7 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  headerTitle: { flex: 1, fontSize: 16, fontFamily: 'Poppins-Medium', color: '#333333', marginLeft: 6, marginRight: 16 },
+  headerTitle: { flex: 1, fontSize: 16, fontFamily: SemanticFontsEnglish.headingEnglishMedium, color: '#333333', marginLeft: 6, marginRight: 16 },
 
   loaderContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   emptyText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
@@ -575,11 +576,11 @@ const s = StyleSheet.create({
   statusBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
   statusBadgeActive: { backgroundColor: '#10B981' },
   statusBadgeWarn: { backgroundColor: '#C70038' },
-  statusBadgeText: { fontSize: 11, fontFamily: 'Poppins-Medium', color: Colors.white },
+  statusBadgeText: { fontSize: 11, fontFamily: Fonts.poppinsMedium, color: Colors.white },
   statusBadgeTextActive: {},
   statusBadgeTextWarn: {},
 
-  planTitle: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B' },
+  planTitle: { fontSize: 16, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
   planDuration: { fontSize: 13, color: '#4C4C4C', marginTop: 2 },
 
   crownBadge: {
@@ -593,26 +594,26 @@ const s = StyleSheet.create({
     padding: 16, borderTopWidth: 1, borderTopColor: Colors.borderSubtle,
   },
   renewTextCol: { flex: 1 },
-  renewLabel: { fontSize: 14, fontFamily: 'Poppins-Medium', color: '#1F1E1B' },
+  renewLabel: { fontSize: 14, fontFamily: Fonts.poppinsMedium, color: '#1F1E1B' },
   renewSub: { fontSize: 12, color: '#545454', marginTop: 2 },
 
   refundNote: { paddingHorizontal: 16, paddingBottom: 12 },
   refundNoteText: { fontSize: 12, color: '#1F1E1B', lineHeight: 18 },
-  refundLink: { color: Colors.link, fontFamily: 'Poppins-SemiBold', textDecorationLine: 'underline' },
+  refundLink: { color: Colors.link, fontFamily: Fonts.poppinsSemiBold, textDecorationLine: 'underline' },
 
   renewPlanBtn: { marginHorizontal: 16, marginBottom: 16 },
 
   footerStrip: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 },
   expiryText: { fontSize: 12, color: '#1F1E1B' },
 
-  sectionTitle: { fontSize: 15, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B', padding: 16, paddingBottom: 12 },
+  sectionTitle: { fontSize: 15, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B', padding: 16, paddingBottom: 12 },
 
   emiStepper: { gap: 12, paddingHorizontal: 16, marginBottom: 12 },
   emiStep: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   emiKey: { flex: 1, fontSize: 13, color: Colors.textSecondary },
-  emiValue: { fontSize: 13, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B' },
+  emiValue: { fontSize: 13, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
 
-  paymentContent: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B', paddingHorizontal: 16 },
+  paymentContent: { fontSize: 14, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B', paddingHorizontal: 16 },
   paymentContent2: { fontSize: 12, color: Colors.textSecondary, marginTop: 4, paddingHorizontal: 16, paddingBottom: 16 },
 
   usageRow: {
@@ -620,9 +621,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.borderSubtle,
   },
   usageTextCol: { flex: 1 },
-  usageTitle: { flex: 1, fontSize: 14, fontFamily: 'Poppins-Medium', color: '#1F1E1B' },
+  usageTitle: { flex: 1, fontSize: 14, fontFamily: Fonts.poppinsMedium, color: '#1F1E1B' },
   usageSub: { fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
-  usageBalance: { fontSize: 16, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B' },
+  usageBalance: { fontSize: 16, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
   usageBalanceWarn: { color: Colors.inputError },
   infoBtn: { paddingLeft: 4 },
 
@@ -631,5 +632,5 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.borderSubtle,
   },
   txnRightCol: { alignItems: 'flex-end' },
-  txnAmount: { fontSize: 14, fontFamily: 'Poppins-SemiBold', color: '#1F1E1B' },
+  txnAmount: { fontSize: 14, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
 })

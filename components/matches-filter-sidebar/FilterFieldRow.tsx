@@ -3,6 +3,7 @@
 // small active dot next to the label when the field differs from its default.
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 type Props = {
   label:   string
@@ -44,12 +45,12 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   label: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   13,
     color:      Colors.textSecondary,
   },
   value: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     color:      Colors.textDark,
     marginTop:  2,

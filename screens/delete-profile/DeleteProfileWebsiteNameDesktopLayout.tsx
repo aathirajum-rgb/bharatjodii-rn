@@ -11,6 +11,7 @@ import DesktopPageShell from '../../components/desktop-page-shell/DesktopPageShe
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export interface DeleteProfileWebsiteNameDesktopLayoutProps {
   navigation: any
@@ -72,12 +73,12 @@ const s = StyleSheet.create({
   },
   closeBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   closeX: { fontSize: 16, color: Colors.black },
-  title: { alignSelf: 'stretch', fontFamily: 'Poppins-SemiBold', fontSize: 18, color: Colors.black },
+  title: { alignSelf: 'stretch', fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black },
   inputWrap: {
     alignSelf: 'stretch', height: 48, borderRadius: 8, borderWidth: 1, borderColor: '#b0b0b0',
     paddingHorizontal: 16, justifyContent: 'center', backgroundColor: Colors.white,
   },
-  input: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black, padding: 0, margin: 0 },
+  input: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, padding: 0, margin: 0 },
   submitBtnLoading: {
     alignSelf: 'stretch', height: 44, borderRadius: 8, backgroundColor: '#b50033',
     alignItems: 'center', justifyContent: 'center',

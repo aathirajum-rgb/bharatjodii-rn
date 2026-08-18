@@ -15,6 +15,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const SCREEN_H = Dimensions.get('window').height
 
@@ -436,14 +437,14 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   title: {
-    fontFamily:   'Poppins-SemiBold',
+    fontFamily:   Fonts.poppinsSemiBold,
     fontSize:     18,
     color:        '#1f1e1b',
     textAlign:    'center',
     marginBottom: 8,
   },
   content: {
-    fontFamily:   'Poppins-Regular',
+    fontFamily:   SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:     14,
     color:        '#1f1e1b',
     textAlign:    'center',
@@ -468,7 +469,7 @@ const styles = StyleSheet.create({
   },
   benefitText: {
     flex:       1,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      '#1f1e1b',
     lineHeight: 20,

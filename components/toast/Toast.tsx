@@ -15,6 +15,7 @@ import { Animated, Pressable, StyleSheet, Text } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export interface ToastRequest {
   message:  string
@@ -104,13 +105,13 @@ const s = StyleSheet.create({
   },
   text: {
     flexShrink: 1,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   13,
     fontWeight: '500',
     color:      Colors.white,
   },
   undoText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   13,
     fontWeight: '500',
     color:      Colors.white,

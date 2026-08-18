@@ -63,13 +63,43 @@ export function CdnSvgBackground({
   }
 
   return (
-    <View style={style} onLayout={handleLayout}>
+    // overflow: 'hidden' clips whatever the "slice"/"cover" scaling below
+    // pushes past the container box — background-size:cover crops, it
+    // doesn't letterbox, and without this the overflow would just spill out.
+    <View style={[style, { overflow: 'hidden' }]} onLayout={handleLayout}>
       {!!size && (
         Platform.OS === 'web'
-          // react-native-web's <Image> compiles to a plain <img> tag — no
-          // CORS-blocked fetch, and resizeMode="cover" matches background-size:cover.
-          ? <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-          : <SvgUri uri={uri} width={size.width} height={size.height} style={StyleSheet.absoluteFill} />
+          // Angular: background: url(...); background-repeat: no-repeat;
+          // background-size: cover — a real CSS background, with NO
+          // background-position override (so it defaults to the browser's
+          // native top-left anchor). RN's <Image resizeMode="cover"> compiles
+          // (in react-native-web) to that same backgroundImage/backgroundSize
+          // CSS under the hood, but it also force-sets background-position:
+          // center — which this SVG's Angular original never had, so the
+          // crop was centered instead of top-left-anchored ("not aligned
+          // good"). Setting backgroundImage directly here matches Angular's
+          // CSS exactly instead of going through Image's own opinionated
+          // resizeMode mapping. (`as any` — backgroundImage/backgroundSize/
+          // backgroundRepeat are react-native-web-only style keys, not in
+          // React Native's own ViewStyle type.)
+          ? <View style={[StyleSheet.absoluteFill, {
+              backgroundImage:  `url(${uri})`,
+              backgroundSize:   'cover',
+              backgroundRepeat: 'no-repeat',
+            } as any]} />
+          // "xMidYMid slice" is the SVG spec's own equivalent of CSS
+          // background-size:cover (scale to fill, crop overflow, centered) —
+          // react-native-svg's default ("meet") is closer to contain/
+          // letterbox, and would leave gaps instead of covering.
+          : (
+            <SvgUri
+              uri={uri}
+              width={size.width}
+              height={size.height}
+              preserveAspectRatio="xMidYMid slice"
+              style={StyleSheet.absoluteFill}
+            />
+          )
       )}
       {children}
     </View>

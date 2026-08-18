@@ -20,6 +20,7 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import FloatingLabelInput, { validateName } from '../../components/input/FloatingLabelInput'
 import LinkCTA from '../../components/link-cta/LinkCTA'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
+import { Fonts } from '../../src/theme/fonts'
 import {
   getFinalAmount, getRechargeHelpline, getRetryRemainingMs, type SelectedPackage,
 } from '../../service/paymentService'
@@ -229,10 +230,10 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white,
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
-  headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, marginLeft: 16, flex: 1 },
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, marginLeft: 16, flex: 1 },
 
   content:  { padding: 16, gap: 8 },
-  subtitle: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.textSecondary, marginBottom: 8 },
+  subtitle: { fontFamily: Fonts.poppinsMedium, fontSize: 14, color: Colors.textSecondary, marginBottom: 8 },
 
   field:    { marginBottom: 8 },
   row:      { flexDirection: 'row', gap: 12 },

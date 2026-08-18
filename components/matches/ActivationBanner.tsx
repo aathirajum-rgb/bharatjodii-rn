@@ -11,6 +11,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CDN = CDN_SVG
 const ALERT_CIRCLE_URI = CDN + 'revamp/alert-circle.svg'
@@ -68,14 +69,14 @@ const rich = StyleSheet.create({
   },
   left: { gap: 16, flexShrink: 1 },
   title: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   24,
     lineHeight: 32,
     color:      Colors.black,
   },
   checklist: { gap: 8 },
   checkText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      Colors.black,
   },
@@ -90,7 +91,7 @@ const rich = StyleSheet.create({
     alignSelf:         'flex-start',
   },
   ctaText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   14,
     color:      Colors.white,
   },

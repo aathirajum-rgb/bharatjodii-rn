@@ -11,6 +11,7 @@ import ProfilePhoto from '../profile-photo/ProfilePhoto'
 import { VERIFIED_TAG_URI } from '../matches/matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 
 const CDN = CDN_SVG
@@ -141,25 +142,25 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   name: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize: 15,
     color: Colors.textPrimary,
     flexShrink: 1,
   },
   detail: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize: 12,
     color: Colors.textSecondary,
     lineHeight: 17,
   },
   link: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize: 13,
     color: Colors.primary,
     marginTop: 2,
   },
   deletedText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize: 12,
     color: Colors.textSecondary,
     marginTop: 4,
@@ -172,7 +173,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
   },
   noteText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize: 12,
     color: '#571B00',
     flexShrink: 1,

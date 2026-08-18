@@ -23,6 +23,7 @@ import type { MatchProfile } from '../../types/interfaces/matches.interface'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CONTENT_W  = 1088
 const STRIP_SIZE = 160
@@ -272,7 +273,7 @@ const s = StyleSheet.create({
   closeIcon: { fontSize: 14, fontWeight: '700', color: Colors.textDark },
 
   title: {
-    fontFamily: 'Poppins-SemiBold', fontSize: 18, color: '#1f1e1b', marginBottom: 32,
+    fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: '#1f1e1b', marginBottom: 32,
   },
 
   // Explicit heights on both the wrapper AND the ScrollView itself — a
@@ -323,16 +324,16 @@ const s = StyleSheet.create({
   details: { flex: 1, justifyContent: 'center', gap: 24, paddingVertical: 30 },
 
   nameBlock: { gap: 8 },
-  name: { fontFamily: 'Poppins-SemiBold', fontSize: 26, color: Colors.black },
-  jodiId: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
+  name: { fontFamily: Fonts.poppinsSemiBold, fontSize: 26, color: Colors.black },
+  jodiId: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
 
   infoLine: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
   infoItem: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  infoText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
+  infoText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
   infoPipe: { fontSize: 12, color: 'rgba(0,0,0,0.4)' },
 
   viewProfileRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  viewProfileText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.link },
+  viewProfileText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.link },
   viewProfileArrow: { width: 18, height: 15 },
 
   actionsRow: { flexDirection: 'row', gap: 16 },
@@ -340,13 +341,13 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
     height: 44, width: 158, borderRadius: 8, borderWidth: 1, borderColor: '#545454',
   },
-  secondaryBtnText: { fontFamily: 'Poppins-Regular', fontSize: 14, color: '#545454' },
+  secondaryBtnText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#545454' },
   primaryBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
     height: 44, minWidth: 228, borderRadius: 8, paddingHorizontal: 24,
     backgroundColor: Colors.primaryDark,
   },
-  primaryBtnText: { fontFamily: 'Poppins-SemiBold', fontSize: 14, color: Colors.white },
+  primaryBtnText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.white },
 
   endCard: {
     width: CONTENT_W, minHeight: 368, borderRadius: 24,

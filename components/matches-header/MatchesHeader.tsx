@@ -8,6 +8,7 @@ import FacetFilterModal from './FacetFilterModal'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import type { ExploreFacet } from '../../service/homeService'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CDN = CDN_SVG
 
@@ -223,7 +224,7 @@ const s = StyleSheet.create({
   },
   // Figma: #000000
   ppText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      '#000000',
   },
@@ -232,13 +233,13 @@ const s = StyleSheet.create({
     alignItems:    'center',
   },
   ppEditText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      Colors.link,
   },
   // Figma: Poppins-SemiBold 18 #000000
   title: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   18,
     lineHeight: 24,
     color:      '#000000',
@@ -261,7 +262,7 @@ const s = StyleSheet.create({
     paddingVertical:   4,
   },
   langText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   12,
     color:      '#000000',
   },
@@ -288,7 +289,7 @@ const s = StyleSheet.create({
   },
   facetChipDisabled: { opacity: 0.4 },
   facetChipText: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   12,
     color:      '#4c4c4c',
   },

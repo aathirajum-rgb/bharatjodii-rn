@@ -8,6 +8,7 @@ import DesktopPageShell from '../../components/desktop-page-shell/DesktopPageShe
 import FloatingLabelInput from '../../components/input/FloatingLabelInput'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
+import { Fonts } from '../../src/theme/fonts'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 
 export interface SearchByIdDesktopLayoutProps {
@@ -61,13 +62,13 @@ export default function SearchByIdDesktopLayout({
 
 const s = StyleSheet.create({
   main: { width: 700 },
-  pageTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 20, color: Colors.textDark, marginBottom: 16 },
+  pageTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.textDark, marginBottom: 16 },
 
   card: {
     backgroundColor: Colors.surface, borderRadius: 12, borderWidth: 1, borderColor: Colors.borderSubtle,
     padding: 24,
   },
-  heading: { fontFamily: 'Poppins-SemiBold', fontSize: 15, color: Colors.textDark, marginBottom: 16 },
+  heading: { fontFamily: Fonts.poppinsSemiBold, fontSize: 15, color: Colors.textDark, marginBottom: 16 },
 
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 16 },
   input: { flex: 1, marginBottom: 0 },

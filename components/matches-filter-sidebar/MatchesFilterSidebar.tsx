@@ -15,6 +15,7 @@ import FilterFieldRow from './FilterFieldRow'
 import CheckboxGroup from '../checkbox/CheckboxGroup'
 import { useFilterDisplayValues, type FilterFieldKey } from '../../hooks/useFilterDisplayValues'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // Same field SET and ORDER as SearchScreen.tsx's own `rows` (the mobile "Edit
 // preferences" screen, itself matching Angular) — this previously dropped
@@ -136,12 +137,12 @@ const s = StyleSheet.create({
     borderBottomColor: Colors.borderSubtle,
   },
   title: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   16,
     color:      Colors.textDark,
   },
   reset: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   13,
     color:      Colors.link,
   },
@@ -161,7 +162,7 @@ const s = StyleSheet.create({
     gap:            12,
   },
   matchCount: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   14,
     color:      Colors.textDark,
   },
@@ -179,7 +180,7 @@ const s = StyleSheet.create({
     justifyContent:    'center',
   },
   resetBtnText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   12,
     color:      Colors.primaryDark,
   },
@@ -192,7 +193,7 @@ const s = StyleSheet.create({
     justifyContent:  'center',
   },
   applyBtnText: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   12,
     color:      Colors.white,
   },

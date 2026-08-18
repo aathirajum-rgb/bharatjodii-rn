@@ -23,6 +23,7 @@ import DesktopPageShell from '../../components/desktop-page-shell/DesktopPageShe
 import LogoutConfirmModal from '../../components/home-sidebar/LogoutConfirmModal'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN_SVG } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
@@ -147,7 +148,7 @@ const s = StyleSheet.create({
   mobileCard: { backgroundColor: Colors.white, marginTop: 8 },
 
   desktopHeader: { width: 810, marginBottom: 24 },
-  desktopTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 22, color: Colors.black },
+  desktopTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black },
   desktopCard: {
     width: 810, backgroundColor: Colors.white, borderRadius: 24, overflow: 'hidden',
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 8,
@@ -159,6 +160,6 @@ const s = StyleSheet.create({
   },
   rowPressed: { backgroundColor: Colors.surfaceInput },
   rowIconWrap: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
-  rowTitle: { flex: 1, fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
+  rowTitle: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
   rowDivider: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.borderSubtle, marginHorizontal: 24 },
 })

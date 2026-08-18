@@ -8,6 +8,7 @@
 import { Pressable, StyleSheet, Text } from 'react-native'
 import { Colors } from '../../constants/colors'
 import CdnSvg from '../cdn-svg/CdnSvg'
+import { SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export default function PhotoPromoSticky({
   content, imageUrl, onPress,
@@ -39,7 +40,7 @@ const s = StyleSheet.create({
   icon: { marginRight: 4 },
   text: {
     flex:       1,
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium,
     fontSize:   12,
     color:      Colors.textPrimary,
     lineHeight: 16,

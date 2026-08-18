@@ -13,6 +13,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import ProfileCard, { PHOTO_HEIGHT, type CardSection, type CardVariant } from '../profile-card/ProfileCard'
+import { Fonts } from '../../src/theme/fonts'
 
 // Angular: core/config/button.config.ts's SEE_ALL — textColor: 'linkColor'
 // (--ion-color-link-color: #29339B), iconType: 'forward-icon-link' — a plain
@@ -345,7 +346,7 @@ const styles = StyleSheet.create({
   },
   // Angular: .heading2-semibold-18 { font-family: var(--english-semibold-poppins) }
   headerTitle: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   18,
     color:      Colors.textPrimary,
     flexShrink: 1,

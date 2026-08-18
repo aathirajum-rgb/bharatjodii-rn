@@ -14,6 +14,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN, CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
@@ -388,12 +389,12 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white,
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
-  headerTitle: { fontFamily: 'Poppins-SemiBold', fontSize: 16, color: Colors.black, marginLeft: 16, flex: 1 },
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, marginLeft: 16, flex: 1 },
 
   content:  { padding: 16 },
-  subtitle: { fontFamily: 'Poppins-Medium', fontSize: 14, color: Colors.textSecondary, marginBottom: 16 },
+  subtitle: { fontFamily: Fonts.poppinsMedium, fontSize: 14, color: Colors.textSecondary, marginBottom: 16 },
   field:    { marginBottom: 8 },
-  note:     { fontFamily: 'Poppins-Regular', fontSize: 12, color: Colors.textTertiary },
+  note:     { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textTertiary },
   submitBtn: { alignSelf: 'flex-start', marginTop: 12 },
   squareBtn: { borderRadius: 4 },
   helpLink:  { marginTop: 24 },
@@ -408,7 +409,7 @@ const s = StyleSheet.create({
   },
   appRowLast: { borderBottomWidth: 0 },
   appRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 16, flexShrink: 1 },
-  appLabel:   { fontFamily: 'Poppins-Regular', fontSize: 14, color: Colors.black },
+  appLabel:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
 
   radioCircle: {
     width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.borderNeutral,

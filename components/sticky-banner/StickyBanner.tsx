@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // Angular: matches.page.ts:2317 / home-banner.component.ts:108 / recharge.page.ts:739 —
 // the real PAYMENTFAILEDCONTENT string from the content API uses this literal token.
@@ -65,7 +66,7 @@ const s = StyleSheet.create({
   },
   text: {
     flex:       1,
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium,
     fontSize:   12,
     color:      Colors.white,
   },
@@ -76,7 +77,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
   },
   ctaText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   12,
     color:      Colors.primaryDeep,
   },

@@ -8,6 +8,7 @@ import {
 } from 'react-native'
 import { submitRating } from '../../service/appRatingService'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const DEFAULT_PLAYSTORE_URL = 'https://play.google.com/store/apps/details?id=jodii.app'
 
@@ -136,13 +137,13 @@ const s = StyleSheet.create({
     gap:               16,
   },
   title: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   17,
     color:      Colors.textDark,
     textAlign:  'center',
   },
   note: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   13,
     color:      Colors.textSecondary,
     textAlign:  'center',
@@ -170,12 +171,12 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primaryLight,
   },
   primaryBtnText: {
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   14,
     color:      Colors.white,
   },
   link: {
-    fontFamily: 'Poppins-Medium',
+    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   13,
     color:      Colors.textSecondary,
   },
@@ -186,7 +187,7 @@ const s = StyleSheet.create({
     borderColor:       Colors.borderSoft,
     borderRadius:      8,
     padding:           12,
-    fontFamily:        'Poppins-Regular',
+    fontFamily:        SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:          13,
     color:             Colors.textDark,
     textAlignVertical: 'top',

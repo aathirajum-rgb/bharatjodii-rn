@@ -13,6 +13,7 @@ import ButtonRevamp from '../button-revamp/ButtonRevamp'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN } from '../../constants/cdn'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ICON_ALERT = CDN + 'assets/images/svg/alert-circle.svg'
 
@@ -48,19 +49,19 @@ const s = StyleSheet.create({
   container: { width: '100%' },
   icon:      { marginBottom: 24 },
   title: {
-    fontFamily:   'Poppins-SemiBold',
+    fontFamily:   Fonts.poppinsSemiBold,
     fontSize:     18,
     color:        Colors.black,
     lineHeight:   24,
     marginBottom: 8,
   },
   subtitle: {
-    fontFamily: 'Poppins-Regular',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      Colors.black,
     lineHeight: 20,
     marginBottom: 32,
   },
-  bold: { fontFamily: 'Poppins-SemiBold' },
+  bold: { fontFamily: Fonts.poppinsSemiBold },
   okBtn: {},
 })

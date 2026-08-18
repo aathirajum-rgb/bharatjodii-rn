@@ -18,6 +18,7 @@ import {
   fetchReligionOptions, fetchSubcasteOptions, getNextPageAfterCaste, getRegValues, loadAndStoreStatesForMotherTongue,
   prefetchCasteForReligion, setRegValues, submitFullRegistration,
 } from '../../service/registrationService'
+import { Fonts } from '../../src/theme/fonts'
 
 const MONTHS: SelectOption[] = [
   { key: '1', label: 'January' }, { key: '2', label: 'February' }, { key: '3', label: 'March' },
@@ -288,7 +289,7 @@ export default function PersonalReligiousDesktopStep({ navigation }: Props) {
 }
 
 const st = StyleSheet.create({
-  subLabel: { fontFamily: 'Poppins-Medium', fontWeight: '500', fontSize: 14, color: '#000000' },
+  subLabel: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 14, color: '#000000' },
   // zIndex here is required for the same reason as DesktopSelectField's own
   // wrapperOpen: this row is an extra stacking level between each date field
   // and the fields below it (Height, Marital Status), so a date dropdown's
