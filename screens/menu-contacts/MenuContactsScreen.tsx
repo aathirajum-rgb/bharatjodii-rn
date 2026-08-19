@@ -150,8 +150,11 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
 
   const tierTheme = getMembershipTierTheme(membership?.packagetype)
 
+  // Angular: menu-contacts.page.ts, JODII-499 "the chats left row of the usage
+  // details is shown again" — this used to filter it out (JODII-383), which
+  // JODII-499 reverted as part of the message relaunch. No filter here anymore.
   const usageRows: UsageRow[] = Array.isArray(membership?.CONACTDETAILS)
-    ? membership.CONACTDETAILS.filter((row: UsageRow) => row.type !== 'chat')
+    ? membership.CONACTDETAILS
     : []
 
   const missingBenefits: MissingBenefit[] = Array.isArray(membership?.benefits) ? membership.benefits : []
@@ -167,10 +170,14 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
     return Number.isFinite(warn) && balance <= warn
   }
 
-  function handleAttentionPress(index: number) {
+  // Angular: presentPopover() — the chat row gets its own attention copy
+  // (MEMBERSHIP_CHAT); keyed off the row's actual type now that the chat row
+  // is no longer filtered out, rather than a hardcoded index that only ever
+  // matched by accident.
+  function handleAttentionPress(row: UsageRow) {
     setAttentionInfo({
       title: t('GENERAL.ATTENTION', 'Attention!'),
-      content: index === 1
+      content: row.type === 'chat'
         ? t('GENERAL.MEMBERSHIP_CHAT', 'Jodii chat messages sent to members who have deleted their profiles afterwards are also included in this count')
         : t('GENERAL.MEMBERSHIP_ATTENTION', 'Phone numbers viewed of members who have deleted their profiles afterwards are also included in this count'),
     })
@@ -472,7 +479,7 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
                       {row.balance ?? row.value ?? 0}{row.total != null ? `/${row.total}` : ''}
                     </Text>
                     {warning && (
-                      <Pressable onPress={() => handleAttentionPress(idx)} hitSlop={8} style={s.infoBtn}>
+                      <Pressable onPress={() => handleAttentionPress(row)} hitSlop={8} style={s.infoBtn}>
                         <CdnSvg uri={ICONS.info} width={16} height={16} />
                       </Pressable>
                     )}

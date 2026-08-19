@@ -73,7 +73,7 @@ export interface MenuContactsDesktopLayoutProps {
   onToggleAutoRenew: (next: boolean) => void
   onRequestRefund:   () => void
   onGoToRecharge:    () => void
-  onAttentionPress:  (index: number) => void
+  onAttentionPress:  (row: UsageRow) => void
   rowIsWarning:      (row: UsageRow) => boolean
 
   langCode:         string
@@ -216,7 +216,7 @@ export default function MenuContactsDesktopLayout({
                                 </View>
                                 <UsageValue row={row} warn={warning} />
                                 {warning && (
-                                  <Pressable onPress={() => onAttentionPress(idx)} hitSlop={8}>
+                                  <Pressable onPress={() => onAttentionPress(row)} hitSlop={8}>
                                     <CdnSvg uri={ICON_INFO} width={16} height={16} />
                                   </Pressable>
                                 )}

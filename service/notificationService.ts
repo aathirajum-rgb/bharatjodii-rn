@@ -17,15 +17,26 @@
 //
 // expo-notifications remote push was removed from Expo Go in SDK 53, and
 // @react-native-firebase/*/@notifee don't work in Expo Go at all — every
-// function here is a no-op when running inside Expo Go.
+// function here is a no-op when running inside Expo Go. They're also a no-op
+// on web: @react-native-firebase/messaging is native-only (no web shim), and
+// this app never calls the web Firebase SDK's own firebase.initializeApp(),
+// so getMessaging() there always throws "No Firebase App '[DEFAULT]' has
+// been created".
 import Constants, { ExecutionEnvironment } from 'expo-constants'
-import { Linking } from 'react-native'
+import { Linking, Platform } from 'react-native'
 import { getItem, setItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { resetTo, waitForNavigationReady } from '../utils/navigationRef'
 import { ENavigation } from '../types/enums/navigation.enum'
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+
+// @react-native-firebase/messaging is a native-only module — there's no web
+// shim, and nothing in this app ever calls the web Firebase SDK's own
+// firebase.initializeApp(), so getMessaging() on web always throws "No
+// Firebase App '[DEFAULT]' has been created". Every function below that
+// touches it must skip on web the same way it already skips in Expo Go.
+const supportsFirebaseMessaging = !isExpoGo && Platform.OS !== 'web'
 
 // ─── Legacy push payload shape ─────────────────────────────────────────────────
 // Legacy: FirebaseInstantMessagingService.onMessageReceived() reads ONE data
@@ -122,6 +133,8 @@ export async function requestPermissionAndGetToken(): Promise<string | null> {
 
   await setItem('NALLOW', '1')
 
+  if (!supportsFirebaseMessaging) return null
+
   try {
     const { getMessaging, getToken, onTokenRefresh } = await import('@react-native-firebase/messaging')
     const messaging = getMessaging()
@@ -144,7 +157,7 @@ export async function requestPermissionAndGetToken(): Promise<string | null> {
 // module-load time (not from a React component) to survive the headless
 // invocation when the app is killed on Android.
 export function registerBackgroundHandler(): void {
-  if (isExpoGo) return
+  if (!supportsFirebaseMessaging) return
 
   import('@react-native-firebase/messaging').then(({ getMessaging, setBackgroundMessageHandler }) => {
     setBackgroundMessageHandler(getMessaging(), async remoteMessage => {
@@ -213,13 +226,13 @@ export async function scheduleLocalNotification(msgData: any): Promise<void> {
 }
 
 // ─── Foreground + tap-entry-point setup ───────────────────────────────────────
-// Call once at app startup (in App.tsx). No-op in Expo Go.
+// Call once at app startup (in App.tsx). No-op in Expo Go and on web.
 
 export function setupNotificationHandlers(
   _onNotificationReceived?: (notification: any) => void,
   _onNotificationResponse?: (response: any) => void,
 ): () => void {
-  if (isExpoGo) return () => {}
+  if (!supportsFirebaseMessaging) return () => {}
 
   // expo-notifications: local (chat) notification display only — remote push
   // foreground/tap handling below is owned by @react-native-firebase/messaging.

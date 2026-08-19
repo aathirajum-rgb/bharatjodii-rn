@@ -1,30 +1,46 @@
-// Desktop/laptop layout for "Contacted profiles" — Figma "Jodii Desktop —
-// Registration": node 693:54/693:7575 (list, tab 1/2 active), 693:3927
-// (paywall — free user, tab 1 only), 693:5139/693:6357 (paid-empty, tab 1/2).
-// Mirrors ActivityDesktopLayout.tsx's structure (title + pill tabs fixed
-// above a full-width FlatList, MatchesDesktopNav at top, centered content column).
+// Desktop/laptop layout for the Messages screen. Outer "All Messages" /
+// "Phone number views" tabs added per the Message Relaunch Figma (mobile-only
+// reference; this desktop styling is this file's own approximation, same as
+// before). "Phone number views" — Figma "Jodii Desktop — Registration":
+// node 693:54/693:7575 (list, tab 1/2 active), 693:3927 (paywall — free user,
+// tab 1 only), 693:5139/693:6357 (paid-empty, tab 1/2). Mirrors
+// ActivityDesktopLayout.tsx's structure (title + pill tabs fixed above a
+// full-width FlatList, MatchesDesktopNav at top, centered content column).
+// Phoneviews rows use the same ConversationRow as "All Messages" — both tabs
+// are fed by the same socket RECORDLIST shape now (TAPTYPE 6/7 vs 5).
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import MatchesDesktopNav from '../../components/matches-header/MatchesDesktopNav'
-import ContactedProfileCardDesktop from '../../components/messagerList/ContactedProfileCardDesktop'
+import MessageSectionTabs, { type MessageSectionTabItem } from '../../components/messages/MessageSectionTabs'
+import AllMessagesEmptyState from '../../components/messages/AllMessagesEmptyState'
+import ConversationRow from '../../components/messages/ConversationRow'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import type { MatchProfile } from '../../types/interfaces/matches.interface'
+import type { ChatListItem } from '../../types/interfaces/chatList.interface'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
-import type { MessageTab, TabData } from './MessagerListScreen'
+import type { MessageTab, MessageSection, TabData } from './MessagerListScreen'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CDN = CDN_SVG
 
 export interface MessagerListDesktopLayoutProps {
   navigation:      any
+  activeSection:    MessageSection
+  sectionItems:     MessageSectionTabItem[]
+  onSwitchSection:  (key: MessageSection) => void
+  isFree:           boolean
+  onAllMessagesCta: () => void
+  conversations:             ChatListItem[]
+  conversationsLoaded:       boolean
+  conversationsLoadingMore:  boolean
+  onConversationPress:       (item: ChatListItem) => void
+  onConversationsEndReached: () => void
   activeTab:       MessageTab
   tabLabel:        (tab: MessageTab) => string
   tabUnreadCount:  (tab: MessageTab) => number
   current:         TabData
-  initialLoad:     boolean
   showPaywall:     boolean
   emptyHeading:    string
   emptySubtext:    string
@@ -33,38 +49,22 @@ export interface MessagerListDesktopLayoutProps {
 
   onSwitchTab:     (tab: MessageTab) => void
   onLoadMore:      () => void
-  onPress:         (p: MatchProfile) => void
-  onDeletedPress:  () => void
+  onPress:         (item: ChatListItem) => void
   onEmptyAction:   () => void
   onLanguagePress: () => void
   onTabPress:      (tab: FooterTab) => void
-  // JODII-499: the "photo protected" nudge card's WhatsApp button — owned by
-  // the parent screen (like onPress/onDeletedPress above) so it can run the
-  // full communicationBtnOnClick() dispatch and render whatever sheet/modal
-  // the result calls for. Previously this component called the dispatcher
-  // itself and discarded the result, so the button did nothing visible at all.
-  onWhatsApp:      (p: MatchProfile) => void
 
-  children?: ReactNode  // Toast/sheets rendered by MessagerListScreen.tsx, shown on top of this layout
+  children?: ReactNode  // Toast rendered by MessagerListScreen.tsx, shown on top of this layout
 }
 
 export default function MessagerListDesktopLayout({
-  activeTab, tabLabel, tabUnreadCount, current, initialLoad, showPaywall,
+  activeSection, sectionItems, onSwitchSection, isFree, onAllMessagesCta,
+  conversations, conversationsLoaded, conversationsLoadingMore, onConversationPress, onConversationsEndReached,
+  activeTab, tabLabel, tabUnreadCount, current, showPaywall,
   emptyHeading, emptySubtext, emptyButtonText, langCode,
-  onSwitchTab, onLoadMore, onPress, onDeletedPress, onEmptyAction, onLanguagePress, onTabPress, onWhatsApp, children,
+  onSwitchTab, onLoadMore, onPress, onEmptyAction, onLanguagePress, onTabPress, children,
 }: MessagerListDesktopLayoutProps) {
   const { t } = useTranslation()
-
-  function renderItem({ item }: { item: MatchProfile }) {
-    return (
-      <ContactedProfileCardDesktop
-        profile={item}
-        onPress={() => onPress(item)}
-        onDeletedPress={onDeletedPress}
-        onWhatsApp={() => onWhatsApp(item)}
-      />
-    )
-  }
 
   function renderEmptyOrPaywall() {
     return (
@@ -89,48 +89,77 @@ export default function MessagerListDesktopLayout({
 
       <View style={ds.headerWrap}>
         <Text style={ds.title}>{t('MESSAGES.MESSAGE_HEADER')}</Text>
-
-        <View style={ds.tabRow}>
-          {(['whoseviewednumber', 'whoviewednumber'] as MessageTab[]).map(tab => {
-            const isActive = activeTab === tab
-            const unread = tabUnreadCount(tab)
-            return (
-              <Pressable
-                key={tab}
-                style={[ds.chip, isActive && ds.chipActive]}
-                onPress={() => onSwitchTab(tab)}
-              >
-                <Text style={ds.chipLabel}>{tabLabel(tab)}</Text>
-                {unread > 0 && (
-                  <View style={ds.unreadBadge}>
-                    <Text style={ds.unreadBadgeText}>{unread}</Text>
-                  </View>
-                )}
-              </Pressable>
-            )
-          })}
-        </View>
       </View>
 
-      {initialLoad ? (
-        <View style={ds.loadingWrap}>
-          <ActivityIndicator size="large" color={Colors.primary} />
-        </View>
-      ) : showPaywall ? (
-        renderEmptyOrPaywall()
+      <View style={ds.sectionTabsWrap}>
+        <MessageSectionTabs sections={sectionItems} active={activeSection} onChange={key => onSwitchSection(key as MessageSection)} />
+      </View>
+
+      {activeSection === 'messages' ? (
+        !conversationsLoaded ? (
+          <View style={ds.loadingWrap}>
+            <ActivityIndicator size="large" color={Colors.primary} />
+          </View>
+        ) : conversations.length === 0 ? (
+          <AllMessagesEmptyState variant={isFree ? 'paywall' : 'empty'} onCtaPress={onAllMessagesCta} iconSize={180} />
+        ) : (
+          <FlatList
+            style={ds.list}
+            data={conversations}
+            keyExtractor={item => item.matriId}
+            renderItem={({ item }) => <ConversationRow item={item} onPress={onConversationPress} />}
+            ItemSeparatorComponent={() => <View style={ds.rowGap} />}
+            onEndReached={onConversationsEndReached}
+            onEndReachedThreshold={0.5}
+            ListFooterComponent={conversationsLoadingMore ? <ActivityIndicator size="small" color={Colors.primary} style={ds.footerLoader} /> : null}
+            contentContainerStyle={ds.listContent}
+          />
+        )
       ) : (
-        <FlatList
-          style={ds.list}
-          data={current.profiles}
-          keyExtractor={item => item.profileId}
-          renderItem={renderItem}
-          ItemSeparatorComponent={() => <View style={ds.rowGap} />}
-          onEndReached={onLoadMore}
-          onEndReachedThreshold={0.5}
-          ListFooterComponent={current.loadingMore ? <ActivityIndicator size="small" color={Colors.primary} style={ds.footerLoader} /> : null}
-          ListEmptyComponent={current.loaded ? renderEmptyOrPaywall() : null}
-          contentContainerStyle={ds.listContent}
-        />
+        <>
+          <View style={ds.headerWrap}>
+            <View style={ds.tabRow}>
+              {(['whoseviewednumber', 'whoviewednumber'] as MessageTab[]).map(tab => {
+                const isActive = activeTab === tab
+                const unread = tabUnreadCount(tab)
+                return (
+                  <Pressable
+                    key={tab}
+                    style={[ds.chip, isActive && ds.chipActive]}
+                    onPress={() => onSwitchTab(tab)}
+                  >
+                    <Text style={ds.chipLabel}>{tabLabel(tab)}</Text>
+                    {unread > 0 && (
+                      <View style={ds.unreadBadge}>
+                        <Text style={ds.unreadBadgeText}>{unread}</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                )
+              })}
+            </View>
+          </View>
+
+          {!current.loaded ? (
+            <View style={ds.loadingWrap}>
+              <ActivityIndicator size="large" color={Colors.primary} />
+            </View>
+          ) : current.items.length === 0 ? (
+            renderEmptyOrPaywall()
+          ) : (
+            <FlatList
+              style={ds.list}
+              data={current.items}
+              keyExtractor={item => item.matriId}
+              renderItem={({ item }) => <ConversationRow item={item} onPress={onPress} />}
+              ItemSeparatorComponent={() => <View style={ds.rowGap} />}
+              onEndReached={onLoadMore}
+              onEndReachedThreshold={0.5}
+              ListFooterComponent={current.loadingMore ? <ActivityIndicator size="small" color={Colors.primary} style={ds.footerLoader} /> : null}
+              contentContainerStyle={ds.listContent}
+            />
+          )}
+        </>
       )}
 
       {children}
@@ -141,6 +170,7 @@ export default function MessagerListDesktopLayout({
 const ds = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
   headerWrap: { width: '100%', maxWidth: 1000, alignSelf: 'center', paddingHorizontal: 32, paddingTop: 24 },
+  sectionTabsWrap: { width: '100%', maxWidth: 1000, alignSelf: 'center', paddingHorizontal: 32, marginTop: 16 },
   list: { flex: 1, width: '100%' },
   title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, letterSpacing: 0.6, color: Colors.textDark },
 

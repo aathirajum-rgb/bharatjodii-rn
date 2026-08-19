@@ -530,7 +530,7 @@ export default function ActivityScreen({ navigation }: Props) {
         <Text style={styles.bannerTitle}>{bannerTitle()}</Text>
         <Text style={styles.bannerSub}>{t('VERIFY_ID_DOC.BECOMEPAIDMEMBER')}</Text>
         <Pressable style={styles.bannerBtn} onPress={() => navigation.navigate('recharge')}>
-          <Text style={styles.bannerBtnLabel}>{t('VERIFY_ID_DOC.BECOME_PAID')}</Text>
+          <Text style={styles.bannerBtnLabel}>{t('GENERAL.BECOME_PAID')}</Text>
         </Pressable>
       </View>
     )

@@ -1,40 +1,38 @@
-// "Contacted profiles" screen — Angular: messager-list.component.ts/.html
-// (route `/messager-list`). Two tabs: mobile numbers viewed by you
-// (`whoseviewednumber`) and members who viewed your number
-// (`whoviewednumber`). Architecture mirrors ActivityScreen.tsx (the closest
-// existing analog — tab state machine, pagination, notification badges,
-// viewed-tab persistence) but with a plain view-only row card instead of
-// MatchCard, since Angular's own `app-list-view-card` has no swipe/like/skip
-// actions — just "View full profile".
+// Messages screen — Angular: messager-list.component.ts/.html (route
+// `/messager-list`). Message Relaunch Figma: two outer tabs, "All Messages"
+// and "Phone number views" — both now fed live over the socket (RESPMYCHAT,
+// TAPTYPE 5/6/7) exactly like Angular does, using the same ConversationRow
+// for every row regardless of tab (matching Angular's own single shared row
+// template — the phoneviews "viewed your mobile number" caption is just
+// another msgType (11/12/13) in the same RECORDLIST shape as a real message).
+// Phone-view tabs previously fetched via REST (activityService.ts); switched
+// to the socket to get real OnlineNow/TimeStamp data the new row design needs.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ActivityIndicator, FlatList, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
-import BottomSheet from '../../components/bottom-sheet/BottomSheet'
-import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
-import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
-import ContactedProfileCard from '../../components/messagerList/ContactedProfileCard'
+import MessageSectionTabs from '../../components/messages/MessageSectionTabs'
+import AllMessagesEmptyState from '../../components/messages/AllMessagesEmptyState'
+import ConversationRow from '../../components/messages/ConversationRow'
 import MessagerListDesktopLayout from './MessagerListDesktopLayout'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
-import { useContactGating } from '../../hooks/useContactGating'
-import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
-import { matchProfileAdapter } from '../../adapters/matches.adapter'
-import { fetchActivityListingPage } from '../../service/activityService'
+import { adaptChatListRecord, dedupeChatList } from '../../adapters/chatList.adapter'
 import { redirectToViewProfile } from '../../service/buttonService'
-import { communicationBtnOnClick, shouldSkipPhoneConfirm } from '../../service/communicationService'
 import { openMembershipTab, paymentTrack } from '../../service/paymentService'
 import { fetchNotifCount } from '../../service/homeService'
 import { getSessionValue } from '../../service/registrationService'
 import { logEvent, logScreen } from '../../service/analyticsService'
 import { getItem, getJson, setJson } from '../../service/storageService'
+import { socketConnection, emitChatList, onChatList, onLoginConfirmation } from '../../service/socketService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
+import { EnvConfig } from '../../constants/env'
 import i18n from '../../i18n'
-import type { MatchProfile } from '../../types/interfaces/matches.interface'
+import type { ChatListItem, ChatListResponse } from '../../types/interfaces/chatList.interface'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -42,8 +40,13 @@ import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 type Props = { navigation: any; route?: any }
 export type MessageTab = 'whoseviewednumber' | 'whoviewednumber'
 
+// Angular: messager-list.component.ts's `messageSections` — the outer
+// "All Messages" / "Phone number views" switch (Figma node 56:4094).
+// "messages" (All Messages) defaults active, matching Figma.
+export type MessageSection = 'messages' | 'phoneviews'
+
 export interface TabData {
-  profiles:    MatchProfile[]
+  items:       ChatListItem[]
   total:       number
   hasMore:     boolean
   loadingMore: boolean
@@ -52,8 +55,13 @@ export interface TabData {
 }
 
 const LIMIT = 20
-const INITIAL_TAB_DATA: TabData = { profiles: [], total: 0, hasMore: true, loadingMore: false, start: 0, loaded: false }
+const INITIAL_TAB_DATA: TabData = { items: [], total: 0, hasMore: true, loadingMore: false, start: 0, loaded: false }
 const CDN = CDN_SVG
+
+// Angular: message.config.ts's messageList tabValues — the socket-side TAPTYPE
+// identifying which list a RESPMYCHAT response belongs to.
+const CONVERSATION_TAB_VALUE = 5
+const TAB_VALUES: Record<MessageTab, number> = { whoseviewednumber: 6, whoviewednumber: 7 }
 
 // ─── MessagerListScreen ─────────────────────────────────────────────────────
 
@@ -61,11 +69,9 @@ export default function MessagerListScreen({ navigation }: Props) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const isDesktop = useIsDesktopWeb()
-  const gating = useContactGating()
-  const phoneInfo = usePhoneInfoSheet()
 
+  const [activeSection, setActiveSection] = useState<MessageSection>('messages')
   const [activeTab,   setActiveTab]   = useState<MessageTab>('whoseviewednumber')
-  const [initialLoad, setInitialLoad] = useState(true)
   const [ownEntryType, setOwnEntryType] = useState('')
   const [tabData, setTabData] = useState<Record<MessageTab, TabData>>({
     whoseviewednumber: { ...INITIAL_TAB_DATA },
@@ -74,83 +80,19 @@ export default function MessagerListScreen({ navigation }: Props) {
 
   const userIdRef = useRef('')
 
+  // ── "All Messages" conversation list — Angular: chatListArr/loadChatListData().
+  const [conversations, setConversations] = useState<ChatListItem[]>([])
+  const [conversationsLoaded, setConversationsLoaded] = useState(false)
+  const [conversationsLoadingMore, setConversationsLoadingMore] = useState(false)
+  const [conversationsHasMore, setConversationsHasMore] = useState(true)
+  const conversationStartRef = useRef(0)
+
   const [newCounts, setNewCounts] = useState<Record<MessageTab, number>>({ whoseviewednumber: 0, whoviewednumber: 0 })
   const [viewedTabs, setViewedTabs] = useState<Record<string, boolean>>({})
   const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
 
-  // JODII-499: "photo protected" nudge card's WhatsApp button (desktop only —
-  // see MessagerListDesktopLayout.tsx/ContactedProfileCardDesktop.tsx) — same
-  // confirm → communicationBtnOnClick → result dispatch every other screen's
-  // Call/WhatsApp button already uses (ActivityScreen.tsx/ViewLaterScreen.tsx/
-  // IgnoredProfilesDesktopScreen.tsx). Previously this button called the
-  // dispatcher and threw the result away, so it did nothing visible at all.
-  const [contactConfirm, setContactConfirm] = useState<{ profile: MatchProfile; action: 'call' | 'whatsapp' } | null>(null)
-  const [contactDetails, setContactDetails] = useState<{
-    name: string; mobile?: string | undefined; dialNumber?: string | undefined; whatsappNumber?: string | undefined
-    showCounter?: boolean | undefined; viewedCount?: string | undefined; totalCount?: string | undefined
-    idVerified?: boolean | undefined
-  } | null>(null)
-  const [whatsappPaywallProfile, setWhatsappPaywallProfile] = useState<MatchProfile | null>(null)
-
   function showToast(message: string) {
     setToastRequest({ message, key: Date.now() })
-  }
-
-  function confirmThenContact(profile: MatchProfile, action: 'call' | 'whatsapp') {
-    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, gating.indNumbersLeft, gating.ownEntryType)) {
-      handleContactConfirmYes({ profile, action })
-    } else {
-      setContactConfirm({ profile, action })
-    }
-  }
-
-  function getContactConfirmContent(): string {
-    if (!contactConfirm) return ''
-    const question = t('VIEWPROFILE.VIEWPHONECONFIRM')
-      .replace('#HISHER#', t(`PRONOUN.${gating.oppGender}.hisher`))
-      .replace('#HIMHER#', t(`PRONOUN.${gating.oppGender}.himher`))
-    const quota = t('VIEWPROFILE.VIEWPHONEDETAIL')
-      .replace('#VAR#', gating.contactQuota.viewed)
-      .replace('#VAR1#', gating.contactQuota.left)
-      .replace('#VAR2#', gating.contactQuota.expiry)
-    return `${question}\n\n${quota}`
-  }
-
-  function handleContactConfirmClose() {
-    setContactConfirm(null)
-  }
-
-  async function handleContactConfirmYes(override?: { profile: MatchProfile; action: 'call' | 'whatsapp' }) {
-    const pending = override ?? contactConfirm
-    if (!pending) return
-    const { profile, action } = pending
-    setContactConfirm(null)
-    try {
-      const result = await communicationBtnOnClick('messagerlist', action, { MATRIID: profile.profileId })
-      if (result.type === 'show_contact') {
-        setContactDetails({
-          name: profile.name, mobile: result.mobile, dialNumber: result.dialNumber, whatsappNumber: result.whatsappNumber,
-          showCounter: result.showCounter, viewedCount: result.viewedCount, totalCount: result.totalCount,
-          idVerified: profile.isIdVerified,
-        })
-      } else if (result.type === 'payment_promo') {
-        if (action === 'whatsapp') setWhatsappPaywallProfile(profile)
-        else navigation.navigate('recharge')
-      } else if (result.type === 'error') {
-        showToast(result.message)
-      } else {
-        await phoneInfo.handleResult(result)
-      }
-    } catch { /* silent — matches this app's established convention */ }
-  }
-
-  function handleContactDetailsClose() { setContactDetails(null) }
-  function handleContactDetailsCall() {
-    if (contactDetails?.dialNumber) Linking.openURL(`tel:${contactDetails.dialNumber}`)
-  }
-  function handleContactDetailsWhatsApp() {
-    const num = contactDetails?.whatsappNumber?.replace(/\D/g, '')
-    if (num) Linking.openURL(`https://wa.me/${num}`)
   }
 
   // ── Data helpers ─────────────────────────────────────────────────────────────
@@ -159,34 +101,13 @@ export default function MessagerListScreen({ navigation }: Props) {
     setTabData(prev => ({ ...prev, [tab]: { ...prev[tab], ...patch } }))
   }
 
-  // ── API ──────────────────────────────────────────────────────────────────────
-
-  async function loadTab(tab: MessageTab, start: number, isFirst: boolean) {
+  // Angular: switchTab()'s emitChatList(tabNo, startLimit, limit) — requests a page
+  // of a phoneviews tab over the socket; the response lands in the onChatList
+  // listener below, routed by TAPTYPE.
+  function requestTab(tab: MessageTab, start: number, isFirst: boolean) {
     if (isFirst) updateTab(tab, { loaded: false })
     else         updateTab(tab, { loadingMore: true })
-
-    try {
-      const result = await fetchActivityListingPage(tab, userIdRef.current, start, LIMIT)
-      const adapted = result.items.map(matchProfileAdapter.adapt)
-      const hasMore = result.items.length >= LIMIT
-
-      setTabData(prev => {
-        const existing = prev[tab]
-        return {
-          ...prev,
-          [tab]: {
-            profiles:    isFirst ? adapted : [...existing.profiles, ...adapted],
-            total:       isFirst ? result.totalCount : existing.total,
-            hasMore,
-            loadingMore: false,
-            start:       start + LIMIT,
-            loaded:      true,
-          },
-        }
-      })
-    } catch {
-      updateTab(tab, { loaded: true, loadingMore: false })
-    }
+    emitChatList(TAB_VALUES[tab], start, LIMIT)
   }
 
   // Angular: activity.config.ts's ViewedActivitytList — shared across
@@ -207,7 +128,7 @@ export default function MessagerListScreen({ navigation }: Props) {
       getSessionValue('ENTRYTYPE'),
       getJson<Record<string, boolean>>('VIEWEDACTIVITYLIST'),
       fetchNotifCount().catch(() => ({ newCount: 0, comCount: [] })),
-    ]).then(async ([id, entryType, viewed, notif]) => {
+    ]).then(([id, entryType, viewed, notif]) => {
       userIdRef.current = id ?? ''
       setOwnEntryType(entryType ?? '')
       setViewedTabs(viewed ?? {})
@@ -219,48 +140,122 @@ export default function MessagerListScreen({ navigation }: Props) {
         whoviewednumber:   Number(whoViewedEntry?.newcount ?? 0),
       })
 
-      await Promise.all([
-        loadTab('whoseviewednumber', 0, true),
-        loadTab('whoviewednumber', 0, true),
-      ])
-      setInitialLoad(false)
       markTabViewed('whoseviewednumber')
     })
   }, [])
 
-  // Angular: changeLanguage() — re-fetch so translated content refreshes.
-  const mountedLangRef = useRef(i18n.language)
+  // Angular: ionViewWillEnter() — socketConnection() then, 100ms later,
+  // chatLoginEmit() + loadChatListData() (listener attached before the list is
+  // requested, so a fast response isn't missed) + emitChatList for every tab.
+  // socketConnection() here already waits for that login step internally.
   useEffect(() => {
-    if (i18n.language === mountedLangRef.current) return
-    mountedLangRef.current = i18n.language
-    loadTab('whoseviewednumber', 0, true)
-    loadTab('whoviewednumber', 0, true)
-  }, [i18n.language])
+    let cancelled = false
+    let chatListReceived = false
+    let retried = false
+
+    const unsubscribe = onChatList((data: ChatListResponse) => {
+      if (cancelled || !data) return
+      const records = data.RECORDLIST ?? []
+      const adapted = records.map(r => adaptChatListRecord(r, userIdRef.current))
+
+      if (data.TAPTYPE === CONVERSATION_TAB_VALUE) {
+        chatListReceived = true
+        setConversations(prev => {
+          const merged = conversationStartRef.current === 0 ? adapted : dedupeChatList([...prev, ...adapted])
+          return [...merged].sort((a, b) => b.timestamp - a.timestamp)
+        })
+        conversationStartRef.current += LIMIT
+        setConversationsHasMore(records.length >= LIMIT)
+        setConversationsLoaded(true)
+        setConversationsLoadingMore(false)
+        return
+      }
+
+      const tab = (Object.keys(TAB_VALUES) as MessageTab[]).find(key => TAB_VALUES[key] === data.TAPTYPE)
+      if (!tab) return
+      setTabData(prev => {
+        const existing = prev[tab]
+        const merged = existing.start === 0 ? adapted : dedupeChatList([...existing.items, ...adapted])
+        return {
+          ...prev,
+          [tab]: {
+            items:       merged,
+            total:       data.TOTALREC ?? existing.total,
+            hasMore:     records.length >= LIMIT,
+            loadingMore: false,
+            start:       existing.start + LIMIT,
+            loaded:      true,
+          },
+        }
+      })
+    })
+
+    // Angular: getRESPLOGIN() subscription in loadChatListData() — the list request can
+    // still reach the server before Login is fully processed and get dropped, so once
+    // login is confirmed, give the conversation list one 2s grace period and re-ask
+    // exactly once if it hasn't shown up yet (matches Angular's own guard, which is
+    // conversation-tab-specific).
+    const unsubscribeLogin = onLoginConfirmation(() => {
+      if (retried) return
+      retried = true
+      setTimeout(() => {
+        if (cancelled || chatListReceived) return
+        emitChatList(CONVERSATION_TAB_VALUE, 0, LIMIT)
+      }, 2000)
+    })
+
+    socketConnection(EnvConfig.notify).then(() => {
+      if (cancelled) return
+      emitChatList(CONVERSATION_TAB_VALUE, 0, LIMIT)
+      emitChatList(TAB_VALUES.whoseviewednumber, 0, LIMIT)
+      emitChatList(TAB_VALUES.whoviewednumber, 0, LIMIT)
+    })
+
+    return () => {
+      cancelled = true
+      unsubscribe()
+      unsubscribeLogin()
+    }
+  }, [])
+
+  const handleConversationsEndReached = useCallback(() => {
+    if (conversationsLoadingMore || !conversationsHasMore || !conversationsLoaded) return
+    setConversationsLoadingMore(true)
+    emitChatList(CONVERSATION_TAB_VALUE, conversationStartRef.current, LIMIT)
+  }, [conversationsLoadingMore, conversationsHasMore, conversationsLoaded])
+
+  // Angular: navigateToPage() — reported/deleted rows show a toast instead of
+  // opening the chat. A one-to-one chat screen doesn't exist in this app yet
+  // (later phase), so a live row also surfaces a toast rather than a broken
+  // navigate() call.
+  function handleConversationPress(item: ChatListItem) {
+    if (item.isReported) { showToast(t('MESSAGES.REPORTED_PROFILE')); return }
+    if (item.isDeleted) { showToast(t('LIKE_LIST.DELETED_PROFILE_TXT')); return }
+    showToast(t('GENERAL.COMING_SOON', 'This conversation will open soon'))
+  }
 
   function switchTab(tab: MessageTab) {
     if (tab === activeTab) return
     setActiveTab(tab)
     logEvent({ category: 'messagerlist', action: 'tab_click', label: tab })
     markTabViewed(tab)
-    if (!tabData[tab].loaded) loadTab(tab, 0, true)
+    if (!tabData[tab].loaded) requestTab(tab, 0, true)
   }
 
   const handleEndReached = useCallback(() => {
     const d = tabData[activeTab]
-    if (!d.loadingMore && d.hasMore && d.loaded) loadTab(activeTab, d.start, false)
+    if (!d.loadingMore && d.hasMore && d.loaded) requestTab(activeTab, d.start, false)
   }, [tabData, activeTab])
 
   // ── Row actions ────────────────────────────────────────────────────────────
-  // Angular: clickOnViewProfile() — deleted profiles show a toast instead of
-  // navigating; live profiles go to ViewProfileScreen with prev/next context.
-
-  function handlePress(profile: MatchProfile) {
-    const ids = tabData[activeTab].profiles.map(p => p.profileId)
-    redirectToViewProfile('', profile.profileId, 'messagerlist', ids)
-  }
-
-  function handleDeletedPress() {
-    showToast(t('LIKE_LIST.DELETED_PROFILE_TXT'))
+  // Angular: navigateToPage() — reported/deleted rows show a toast; live rows
+  // go to ViewProfileScreen with prev/next context (this app has no one-to-one
+  // chat screen yet, unlike Angular's own '/messages' target for these rows).
+  function handlePhoneViewPress(item: ChatListItem) {
+    if (item.isReported) { showToast(t('MESSAGES.REPORTED_PROFILE')); return }
+    if (item.isDeleted)  { showToast(t('LIKE_LIST.DELETED_PROFILE_TXT')); return }
+    const ids = tabData[activeTab].items.map(i => i.matriId)
+    redirectToViewProfile('', item.matriId, 'messagerlist', ids)
   }
 
   // ── Footer nav ────────────────────────────────────────────────────────────────
@@ -309,7 +304,7 @@ export default function MessagerListScreen({ navigation }: Props) {
   }
 
   function emptyButtonText(): string {
-    return showPaywall ? t('VERIFY_ID_DOC.BECOME_PAID') : t('STAR_RATING.GOTOMATCHES')
+    return showPaywall ? t('GENERAL.BECOME_PAID') : t('STAR_RATING.GOTOMATCHES')
   }
 
   function handleEmptyAction() {
@@ -317,17 +312,37 @@ export default function MessagerListScreen({ navigation }: Props) {
     else navigation.navigate('Matches')
   }
 
+  // Angular: emptyCtaAction() free-member branch — goToPaidMembership().
+  function handleAllMessagesCta() {
+    paymentTrack('32')
+    navigation.navigate('recharge')
+  }
+
+  const sectionItems = [
+    { key: 'messages',   label: t('MESSAGES.CONVERSATION_TITLE') },
+    { key: 'phoneviews', label: t('MESSAGES.VIEWED_NUMBERS') },
+  ]
+
   // ── Desktop ────────────────────────────────────────────────────────────────────
 
   if (isDesktop) {
     return (
       <MessagerListDesktopLayout
         navigation={navigation}
+        activeSection={activeSection}
+        sectionItems={sectionItems}
+        onSwitchSection={setActiveSection}
+        isFree={isFree}
+        onAllMessagesCta={handleAllMessagesCta}
+        conversations={conversations}
+        conversationsLoaded={conversationsLoaded}
+        conversationsLoadingMore={conversationsLoadingMore}
+        onConversationPress={handleConversationPress}
+        onConversationsEndReached={handleConversationsEndReached}
         activeTab={activeTab}
         tabLabel={tabLabel}
         tabUnreadCount={tabUnreadCount}
         current={current}
-        initialLoad={initialLoad}
         showPaywall={showPaywall}
         emptyHeading={emptyHeading()}
         emptySubtext={emptySubtext()}
@@ -335,67 +350,17 @@ export default function MessagerListScreen({ navigation }: Props) {
         langCode={i18n.language}
         onSwitchTab={switchTab}
         onLoadMore={handleEndReached}
-        onPress={handlePress}
-        onDeletedPress={handleDeletedPress}
+        onPress={handlePhoneViewPress}
         onEmptyAction={handleEmptyAction}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
         onTabPress={handleTabPress}
-        onWhatsApp={(p) => confirmThenContact(p, 'whatsapp')}
       >
-        <BottomSheet
-          visible={!!contactConfirm}
-          type="viewPhoneConfirm"
-          data={{ content: getContactConfirmContent(), ctaLabel: t('ACCOUNT.YES', 'Yes') }}
-          onClose={handleContactConfirmClose}
-          onPrimaryPress={handleContactConfirmYes}
-        />
-        {contactDetails && (
-          <ContactDetailsSheet
-            visible
-            name={contactDetails.name}
-            mobile={contactDetails.mobile}
-            whatsappNumber={contactDetails.whatsappNumber}
-            showCounter={contactDetails.showCounter}
-            viewedCount={contactDetails.viewedCount}
-            totalCount={contactDetails.totalCount}
-            showNotVerifiedNote={!contactDetails.idVerified && gating.loginGender === 'F'}
-            onClose={handleContactDetailsClose}
-            onCall={handleContactDetailsCall}
-            onWhatsApp={handleContactDetailsWhatsApp}
-          />
-        )}
-        <WhatsAppPaywallModal
-          visible={!!whatsappPaywallProfile}
-          profile={whatsappPaywallProfile}
-          oppGender={gating.oppGender}
-          onClose={() => setWhatsappPaywallProfile(null)}
-          onPayNow={() => { setWhatsappPaywallProfile(null); navigation.navigate('recharge') }}
-        />
-        <BottomSheet
-          visible={!!phoneInfo.sheet}
-          type="phonePrivacyInfo"
-          data={phoneInfo.getData(t)}
-          onClose={phoneInfo.close}
-          onPrimaryPress={() => phoneInfo.primaryPress(navigation)}
-          onSecondaryPress={() => phoneInfo.secondaryPress(navigation)}
-          onLinkPress={phoneInfo.close}
-        />
         <Toast request={toastRequest} />
       </MessagerListDesktopLayout>
     )
   }
 
   // ── Render helpers (mobile) ────────────────────────────────────────────────────
-
-  function renderItem({ item }: { item: MatchProfile }) {
-    return (
-      <ContactedProfileCard
-        profile={item}
-        onPress={() => handlePress(item)}
-        onDeletedPress={handleDeletedPress}
-      />
-    )
-  }
 
   function renderFooter() {
     if (!current.loadingMore) return null
@@ -407,7 +372,6 @@ export default function MessagerListScreen({ navigation }: Props) {
   }
 
   function renderEmpty() {
-    if (!current.loaded) return null
     return (
       <View style={styles.emptyState}>
         <CdnSvg
@@ -434,62 +398,88 @@ export default function MessagerListScreen({ navigation }: Props) {
         <Text style={styles.headerTitle}>{t('MESSAGES.MESSAGE_HEADER')}</Text>
       </View>
 
-      {/* ── Tab chips ── */}
-      {/* Angular: these two labels ("Phone numbers viewed by you" / "Who viewed
-          your phone number") are long enough to overflow the screen width — needs
-          its own horizontal ScrollView (matches ActivityScreen.tsx) so the chip
-          row scrolls independently instead of the overflow bleeding into a
-          page-wide horizontal scroll that drags the header/list/footer with it. */}
-      <View style={styles.tabBarWrap}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
-          {(['whoseviewednumber', 'whoviewednumber'] as MessageTab[]).map(tab => {
-            const isActive = activeTab === tab
-            const unread = tabUnreadCount(tab)
-            return (
-              <Pressable
-                key={tab}
-                style={[styles.chip, isActive && styles.chipActive]}
-                onPress={() => switchTab(tab)}
-              >
-                <Text style={[styles.chipLabel, isActive && styles.chipLabelActive]}>{tabLabel(tab)}</Text>
-                {unread > 0 && (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadBadgeText}>{unread}</Text>
-                  </View>
-                )}
-              </Pressable>
-            )
-          })}
-        </ScrollView>
-      </View>
+      {/* ── Outer section switch: All Messages / Phone number views ── */}
+      <MessageSectionTabs sections={sectionItems} active={activeSection} onChange={key => setActiveSection(key as MessageSection)} />
 
-      {/* ── Content ── */}
-      <View style={styles.flex1}>
-        {initialLoad ? (
+      {activeSection === 'messages' ? (
+        !conversationsLoaded ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator size="large" color={Colors.primary} />
           </View>
+        ) : conversations.length === 0 ? (
+          <AllMessagesEmptyState variant={isFree ? 'paywall' : 'empty'} onCtaPress={handleAllMessagesCta} />
         ) : (
           <FlatList
-            data={current.profiles}
-            keyExtractor={item => item.profileId}
-            renderItem={renderItem}
-            ItemSeparatorComponent={() => <View style={styles.rowGap} />}
-            ListEmptyComponent={renderEmpty}
-            ListFooterComponent={renderFooter}
-            onEndReached={handleEndReached}
+            data={conversations}
+            keyExtractor={item => item.matriId}
+            renderItem={({ item }) => <ConversationRow item={item} onPress={handleConversationPress} />}
+            ItemSeparatorComponent={() => <View style={styles.conversationSeparator} />}
+            onEndReached={handleConversationsEndReached}
             onEndReachedThreshold={0.4}
-            contentContainerStyle={styles.listContent}
+            ListFooterComponent={conversationsLoadingMore ? (
+              <View style={styles.footerLoader}><ActivityIndicator size="small" color={Colors.primary} /></View>
+            ) : null}
+            contentContainerStyle={styles.conversationListContent}
             showsVerticalScrollIndicator={false}
-            initialNumToRender={4}
-            maxToRenderPerBatch={4}
-            windowSize={7}
-            removeClippedSubviews
           />
-        )}
-      </View>
+        )
+      ) : (
+        <>
+          {/* ── Tab chips ── */}
+          {/* Angular: these two labels ("Phone numbers viewed by you" / "Who viewed
+              your phone number") are long enough to overflow the screen width — needs
+              its own horizontal ScrollView (matches ActivityScreen.tsx) so the chip
+              row scrolls independently instead of the overflow bleeding into a
+              page-wide horizontal scroll that drags the header/list/footer with it. */}
+          <View style={styles.tabBarWrap}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
+              {(['whoseviewednumber', 'whoviewednumber'] as MessageTab[]).map(tab => {
+                const isActive = activeTab === tab
+                const unread = tabUnreadCount(tab)
+                return (
+                  <Pressable
+                    key={tab}
+                    style={[styles.chip, isActive && styles.chipActive]}
+                    onPress={() => switchTab(tab)}
+                  >
+                    <Text style={[styles.chipLabel, isActive && styles.chipLabelActive]}>{tabLabel(tab)}</Text>
+                    {unread > 0 && (
+                      <View style={styles.unreadBadge}>
+                        <Text style={styles.unreadBadgeText}>{unread}</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                )
+              })}
+            </ScrollView>
+          </View>
 
-      {/* ── Footer — tab 4 ("Contacted profiles") is this screen ── */}
+          {/* ── Content ── */}
+          <View style={styles.flex1}>
+            {!current.loaded ? (
+              <View style={styles.loadingWrap}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+              </View>
+            ) : current.items.length === 0 ? (
+              renderEmpty()
+            ) : (
+              <FlatList
+                data={current.items}
+                keyExtractor={item => item.matriId}
+                renderItem={({ item }) => <ConversationRow item={item} onPress={handlePhoneViewPress} />}
+                ItemSeparatorComponent={() => <View style={styles.conversationSeparator} />}
+                ListFooterComponent={renderFooter}
+                onEndReached={handleEndReached}
+                onEndReachedThreshold={0.4}
+                contentContainerStyle={styles.conversationListContent}
+                showsVerticalScrollIndicator={false}
+              />
+            )}
+          </View>
+        </>
+      )}
+
+      {/* ── Footer — tab 4 ("Messages") is this screen ── */}
       <AppFooter activeTab={4} onTabPress={handleTabPress} />
 
       <Toast request={toastRequest} bottomOffset={56 + 16} />
@@ -529,8 +519,8 @@ const styles = StyleSheet.create({
   },
   unreadBadgeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 11, color: Colors.white },
 
-  listContent: { flexGrow: 1, padding: 16 },
-  rowGap: { height: 16 },
+  conversationListContent: { flexGrow: 1, paddingHorizontal: 16, paddingVertical: 8 },
+  conversationSeparator: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.divider, marginLeft: 64 },
   footerLoader: { paddingVertical: 20, alignItems: 'center' },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyState: {

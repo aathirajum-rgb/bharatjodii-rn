@@ -9,12 +9,13 @@ import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // Tab IDs match Figma bottom nav order exactly:
-//   0 = Home  1 = Matches  2 = Likes  4 = Contacted profiles  3 = Membership
-// (Kept numeric IDs consistent with Angular mapping.) Tab 4's label
-// (GENERAL.ICON_5 = "Contacted profiles") and icon (a call/phone glyph) always
-// pointed at this screen — it was temporarily wired to navigate('Search') as a
-// placeholder before MessagerListScreen existed. Fixed to navigate('MessagerList')
-// everywhere this switch appears (see handleTabPress in each screen).
+//   0 = Home  1 = Matches  2 = Likes  4 = Messages  3 = Membership
+// (Kept numeric IDs consistent with Angular mapping.) Tab 4 (GENERAL.ICON_5 =
+// "Messages") navigates to MessagerListScreen everywhere this switch appears
+// (see handleTabPress in each screen) — that screen now hosts both the real
+// chat inbox ("All Messages") and the phone-number-views feature ("Phone
+// number views") as its own two top-level tabs, per the Message Relaunch
+// Figma.
 
 export type FooterTab = 0 | 1 | 2 | 3 | 4
 
@@ -38,19 +39,19 @@ export interface AppFooterProps {
 const CDN = CDN_SVG + 'bottom-nav/'
 
 // [inactive, active] icon pairs — Figma bottom nav node 8379:10131
-// Tab order: Home · Matches · Likes · Search · Membership
+// Tab order: Home · Matches · Likes · Messages · Membership
 // Exported so other nav surfaces (e.g. MatchesDesktopNav) reuse the same icon
-// set instead of re-listing overlapping CDN paths.
+// set instead of re-listing overlapping CDN paths. Tab 4's pair lives directly
+// under assets/images/svg/ (not the bottom-nav/ subfolder the other four use).
 export const TAB_ICONS: Record<FooterTab, [string, string]> = {
   0: [CDN + 'home-deactive.svg',       CDN + 'home-active.svg'],
   1: [CDN + 'matches-deactive.svg',    CDN + 'matches-active.svg'],
   2: [CDN + 'like.svg',                CDN + 'like-active.svg'],
-  4: [CDN + 'call.svg',                 CDN + 'call-active.svg'],
+  4: [CDN_SVG + 'message-matches.svg', CDN_SVG + 'message-matches_active.svg'],
   3: [CDN + 'membership-deactive.svg', CDN + 'membership-active.svg'],
 }
 
-// Angular: footer.component.ts maps these from res['GENERAL'] as ICON_0/1/3/5/6
-// (ICON_2/ICON_4 belong to the old Messages=5 tab this port replaced with tab 4).
+// Angular: footer.component.ts maps these from res['GENERAL'] as ICON_0/1/3/5/6.
 // Two-word labels wrap to 2 lines in the tab bar by design — numberOfLines={2} on
 // the Text below handles that; no forced '\n' since Tamil/other-language word
 // lengths don't line up with the English break point.
@@ -79,12 +80,13 @@ function CountBadge({ count }: { count: number }) {
 
 // ─── AppFooter ────────────────────────────────────────────────────────────────
 // Matches Figma node 8379:10131 — bottom nav with 5 tabs.
-// Tabs: Home · Matches · Likes (with badge) · Search · Membership (with upgrade tag)
+// Tabs: Home · Matches · Likes (with badge) · Messages (with badge) · Membership (with upgrade tag)
 
 export default function AppFooter({
   activeTab,
   exploreCount,
   likesCount,
+  chatCount,
   upgradeTag,
   showMembershipDot = false,
   onTabPress,
@@ -97,13 +99,13 @@ export default function AppFooter({
       <View style={styles.tabBar}>
         {TAB_ORDER.map(tab => {
           const isActive = activeTab === tab
-          const [inactiveIcon, activeIcon] = TAB_ICONS[tab]
           const label = t(TAB_LABEL_KEYS[tab])
 
           // Count badge per tab (matches Figma: Likes shows 99+)
           let badgeCount: number | undefined
           if (tab === 0 && exploreCount && exploreCount > 0) badgeCount = exploreCount
           if (tab === 2 && likesCount  && likesCount  > 0)  badgeCount = likesCount
+          if (tab === 4 && chatCount   && chatCount   > 0)  badgeCount = chatCount
 
           return (
             <Pressable
@@ -129,12 +131,12 @@ export default function AppFooter({
               {/* ── Icon area ── */}
               <View style={styles.iconWrap}>
                 <CdnSvg
-                  uri={isActive ? activeIcon : inactiveIcon}
+                  uri={isActive ? TAB_ICONS[tab][1] : TAB_ICONS[tab][0]}
                   width={24}
                   height={tab === 3 && !upgradeTag ? 28 : 24}
                 />
 
-                {/* Count badge (Home / Likes) */}
+                {/* Count badge (Home / Likes / Messages) */}
                 {badgeCount !== undefined && <CountBadge count={badgeCount} />}
 
                 {/* Membership expiry red dot */}

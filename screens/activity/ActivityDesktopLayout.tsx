@@ -140,7 +140,7 @@ export default function ActivityDesktopLayout({
               <Text style={ds.bannerSub}>{t('VERIFY_ID_DOC.BECOMEPAIDMEMBER')}</Text>
             </View>
             <Pressable style={ds.bannerBtn} onPress={onGetPaidMembership}>
-              <Text style={ds.bannerBtnLabel}>{t('VERIFY_ID_DOC.BECOME_PAID')}</Text>
+              <Text style={ds.bannerBtnLabel}>{t('GENERAL.BECOME_PAID')}</Text>
             </Pressable>
           </View>
         )}
