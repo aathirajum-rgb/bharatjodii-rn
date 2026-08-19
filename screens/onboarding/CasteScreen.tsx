@@ -21,9 +21,12 @@ import {
   setRegValue,
   getRegValue,
   submitFullRegistration,
+  resolvePostInsertAction,
 } from '../../service/registrationService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
+import { resetTo } from '../../utils/navigationRef'
+import { ENavigation } from '../../types/enums/navigation.enum'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 
@@ -175,9 +178,16 @@ export default function CasteScreen({ navigation }: Props) {
 
       if (nextPage === '20') {
         // Final step (no gothra) — send full registration payload to get MATRIID
-        const { matriId } = await submitFullRegistration()
-        if (matriId) {
-          setSuccessVisible(true)
+        const res = await submitFullRegistration()
+        if (res.matriId) {
+          // Angular: callInsertApiAndHandleValidation() — the insert response's
+          // AIVALIDATIONTYPE decides between the success sheet, the confirm
+          // form, and the "profile under review" wait state.
+          const action = await resolvePostInsertAction(res.aiValidationType, res.violationFields)
+          if (action === 'success') setSuccessVisible(true)
+          else resetTo(ENavigation.VALIDATION, action === 'underReview'
+            ? { mode: 'underReview' }
+            : { mode: 'confirm', violationFields: res.violationFields ?? [] })
         }
         // else: API cancelled or error — stay on screen so user can retry
       } else {

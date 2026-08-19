@@ -17,6 +17,7 @@ import AppHeader from '../../components/app-header/AppHeader'
 import OTPSuccessSheet from '../../components/bottom-sheet/OTPSuccessSheet'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
+import { Fonts } from '../../src/theme/fonts'
 import { parseAndStoreWebViewURL, resendOTP, verifyOTP } from '../../service/registrationService'
 import { getItem, setItem } from '../../service/storageService'
 import { StorageKeys } from '../../constants/storage.keys'
@@ -28,6 +29,10 @@ import { CDN_REG } from '../../constants/cdn'
 const OTP_LENGTH  = 4
 const TIMER_START = 59  // matches Angular resendotpTimer = 59
 const CDN         = CDN_REG
+
+// Removes the browser's default black focus outline on web — TextInput renders
+// as <input> there, and the outline would sit on top of our custom borderColor.
+const webOutlineReset = { outlineStyle: 'none', outlineWidth: 0 } as any
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -47,6 +52,8 @@ export default function OTPScreen({ navigation, route }: Props) {
   const { loginUpdate } = useAuth()
 
   const [otpValues,    setOtpValues]    = useState<string[]>(Array(OTP_LENGTH).fill(''))
+  const [focusedIndex, setFocusedIndex] = useState<number | null>(null)
+  const [visited,      setVisited]      = useState<boolean[]>(Array(OTP_LENGTH).fill(false))
   const [error,        setError]        = useState('')
   const [seconds,      setSeconds]      = useState(TIMER_START)
   const [loading,      setLoading]      = useState(false)
@@ -62,14 +69,20 @@ export default function OTPScreen({ navigation, route }: Props) {
 
   const inputRefs     = useRef<Array<TextInput | null>>(Array(OTP_LENGTH).fill(null))
 
-  // Auto-focus first box once the push transition finishes — matches Angular
-  // ionViewDidEnter setFocusOnOtpPage. Waiting for 'transitionEnd' (rather than a
-  // fixed setTimeout) avoids a KeyboardAvoidingView('height') quirk on Android:
-  // if the keyboard opens while the screen is still mid-transition, its very
-  // first resize computation runs before the view's layout has settled and gets
-  // silently dropped — the CTA then stays hidden behind the keyboard until the
-  // next focus change.
+  // Auto-focus first box once the page settles — matches Angular ionViewDidEnter's
+  // setFocusOnOtpPage (fixed 500ms setTimeout). On native we still prefer waiting
+  // for 'transitionEnd' over a fixed timeout, since it avoids a KeyboardAvoidingView
+  // ('height') quirk on Android: if the keyboard opens while the screen is still
+  // mid-transition, its very first resize computation runs before the view's layout
+  // has settled and gets silently dropped — the CTA then stays hidden behind the
+  // keyboard until the next focus change. But React Navigation's web renderer has no
+  // real animated screen transition, so 'transitionEnd' doesn't reliably fire there —
+  // matching Angular's own fixed-delay approach for web keeps autofocus working.
   useEffect(() => {
+    if (Platform.OS === 'web') {
+      const id = setTimeout(() => inputRefs.current[0]?.focus(), 500)
+      return () => clearTimeout(id)
+    }
     const sub = navigation.addListener('transitionEnd', () => {
       inputRefs.current[0]?.focus()
     })
@@ -284,19 +297,31 @@ export default function OTPScreen({ navigation, route }: Props) {
                 ref={r => { inputRefs.current[i] = r }}
                 style={[
                   styles.otpBox,
-                  otpValues[i] ? styles.otpBoxFilled : styles.otpBoxEmpty,
-                  !!error      ? styles.otpBoxError  : null,
+                  // Priority: focused → blue; else filled → grey; else visited+empty → red; else default grey
+                  focusedIndex === i
+                    ? styles.otpBoxFocused
+                    : otpValues[i]
+                      ? styles.otpBoxFilled
+                      : visited[i]
+                        ? styles.otpBoxError
+                        : styles.otpBoxEmpty,
+                  webOutlineReset,
                 ]}
                 value={otpValues[i]}
                 onChangeText={text => handleChange(text, i)}
                 onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, i)}
+                onFocus={() => {
+                  setFocusedIndex(i)
+                  setVisited(v => v.map((val, idx) => idx === i ? true : val))
+                }}
+                onBlur={() => setFocusedIndex(cur => cur === i ? null : cur)}
                 keyboardType="number-pad"
                 maxLength={2}         // 2 to allow paste detection; trimmed in handleChange
                 returnKeyType={i === OTP_LENGTH - 1 ? 'done' : 'next'}
                 onSubmitEditing={i === OTP_LENGTH - 1 ? handleVerify : undefined}
                 selectTextOnFocus
-                // @ts-ignore — suppress web focus ring
-                outlineStyle="none"
+                cursorColor={Colors.textPrimary}
+                selectionColor={Colors.textPrimary}
               />
             ))}
           </View>
@@ -377,6 +402,7 @@ const styles = StyleSheet.create({
 
   // Title — "Enter OTP" (Figma: Poppins SemiBold 22px)
   title: {
+    fontFamily:   Fonts.poppinsSemiBold,
     fontSize:     22,
     fontWeight:   '600',
     color:        Colors.textPrimary,
@@ -390,6 +416,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   subtitleText: {
+    fontFamily: Fonts.poppinsRegular,
     fontSize:   14,
     color:      Colors.textPrimary,
     lineHeight: 20,
@@ -400,6 +427,7 @@ const styles = StyleSheet.create({
     gap:           6,
   },
   phoneNumber: {
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   14,
     fontWeight: '600',
     color:      Colors.textPrimary,
@@ -415,6 +443,7 @@ const styles = StyleSheet.create({
     height: 14,
   },
   editText: {
+    fontFamily: Fonts.poppinsRegular,
     fontSize:   14,
     color:      Colors.link,    // #29339B — matches Figma "Edit" blue
     lineHeight: 20,
@@ -431,6 +460,7 @@ const styles = StyleSheet.create({
     height:             56,
     borderWidth:        1,
     borderRadius:       8,
+    fontFamily:         Fonts.poppinsSemiBold,
     fontSize:           22,
     fontWeight:         '600',
     color:              Colors.textPrimary,
@@ -446,12 +476,16 @@ const styles = StyleSheet.create({
   otpBoxFilled: {
     borderColor: Colors.inputBorder,
   },
+  otpBoxFocused: {
+    borderColor: Colors.inputFocus,
+  },
   otpBoxError: {
     borderColor: Colors.inputError,
   },
 
   // Error — "Please enter a valid OTP" in #DE2A68
   errorText: {
+    fontFamily: Fonts.poppinsRegular,
     marginTop:  4,
     marginLeft: 4,
     fontSize:   12,
@@ -464,11 +498,13 @@ const styles = StyleSheet.create({
     marginTop: 16,
   },
   resendText: {
+    fontFamily: Fonts.poppinsRegular,
     fontSize:   14,
     color:      Colors.textPrimary,
     lineHeight: 20,
   },
   resendLink: {
+    fontFamily: Fonts.poppinsMedium,
     fontWeight: '500',
     color:      Colors.link,     // #29339B — Figma "Resend" blue
   },

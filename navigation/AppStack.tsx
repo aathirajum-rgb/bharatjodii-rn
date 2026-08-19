@@ -210,7 +210,10 @@ export type AppStackParamList = {
   BlockerPage: undefined
   // Angular: components/validation — webview.page.ts's page_id "61" (AI profile
   // validation confirm2 screen)
-  Validation: undefined
+  // mode/violationFields are set when entered straight from the registration
+  // insert response (Angular: callInsertApiAndHandleValidation); absent when
+  // reached via the case-61 deep link, which reads stored VIOLATIONFIELDS.
+  Validation: { mode?: 'confirm' | 'underReview'; violationFields?: string[] } | undefined
   // Angular: pages/verify-id — STUB (see screens/verify/VerifyIdScreen.tsx),
   // real govt-ID verification flow not ported yet.
   'verify-id': undefined

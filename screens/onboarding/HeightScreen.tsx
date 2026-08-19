@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
   Animated,
+  Dimensions,
   Modal,
   Platform,
   Pressable,
@@ -11,6 +12,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
@@ -24,15 +26,25 @@ import {
   getRegValue,
   setRegValues,
 } from '../../service/registrationService'
-import { CDN_REG } from '../../constants/cdn'
-import { PROFILE_POSSESSIVE, PICKER_PANEL_WIDTH } from '../../constants/registration.constants'
+import { CDN_REG, CDN_SVG } from '../../constants/cdn'
+import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { Fonts } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON  = CDN_REG + 'son-height.svg'
 const FOOTER_H       = 140
+// Same OR-divider image assets as DOBScreen (revamp/or-left-side.svg,
+// revamp/or-right-side.svg) — HeightScreen previously drew plain colored
+// lines instead of reusing this design.
+const CDN_OR_LEFT  = CDN_SVG + 'revamp/or-left-side.svg'
+const CDN_OR_RIGHT = CDN_SVG + 'revamp/or-right-side.svg'
+// Angular's right-side-panel.component.scss .right-popup { width: 86.7% } —
+// this screen's panel uses that exact value, not the shared 85% most other
+// onboarding pickers use (PICKER_PANEL_WIDTH in registration.constants.ts).
+const HEIGHT_PANEL_WIDTH = Dimensions.get('window').width * 0.867
 
 // HEIGHTCATEGORY keys are 101-104 per Angular form-fields logic
 const FALLBACK_CATEGORIES: Category[] = [
@@ -54,18 +66,25 @@ type Props = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Angular API labels contain HTML: "Below average <span ...>(Shorter than 5'3 ft)</span>"
-// This strips all tags and returns the plain main text and the span content as subtitle.
-function parseHtmlLabel(raw: string): { label: string; subtitle: string } {
-  const spanMatch = raw.match(/<span[^>]*>([\s\S]*?)<\/span>/i)
-  const subtitle  = spanMatch
-    ? spanMatch[1].replace(/<[^>]+>/g, '').trim()
-    : ''
-  const label = raw
-    .replace(/<span[^>]*>[\s\S]*?<\/span>/gi, '')
-    .replace(/<[^>]+>/g, '')
-    .trim()
-  return { label, subtitle }
+// The live category API returns the subtitle as an inline HTML tag inside the
+// main label — e.g. `Below average <div class="height-revamp-text-small mt-4
+// opacity-6" slot="end"> Shorter than 5 feet 3 Inches</div>` — rendered as real
+// HTML by Angular's [innerHTML] binding. Extract that inner tag's text as the
+// subtitle and strip all tags from the rest to get the plain label. Falls back
+// to '~'-delimited splitting (GetArrayListfrmObjwithTilde, common-funtions.ts:
+// 145-150) when the value has no HTML tags at all.
+function parseCategoryLabel(raw: string): { label: string; subtitle: string } {
+  const tagMatch = raw.match(/<([a-zA-Z]+)[^>]*>([\s\S]*?)<\/\1>/)
+  if (tagMatch) {
+    const subtitle = tagMatch[2].replace(/<[^>]+>/g, '').trim()
+    const label = raw
+      .slice(0, tagMatch.index)
+      .replace(/<[^>]+>/g, '')
+      .trim()
+    return { label, subtitle }
+  }
+  const [label = '', subtitle = ''] = raw.split('~')
+  return { label: label.trim(), subtitle: subtitle.trim() }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -81,9 +100,17 @@ export default function HeightScreen({ navigation }: Props) {
   const [selectedHeight,   setSelectedHeight]    = useState<Option | null>(null)
   const [createdBy,        setCreatedBy]         = useState('4')
   const [submitting,       setSubmitting]        = useState(false)
-  const [panelVisible,     setPanelVisible]      = useState(false)
+  // Keeps the Modal mounted through the closing animation — same
+  // ageModalMounted/showAgeSheet split DOBScreen's age sheet uses, so the
+  // panel actually slides out instead of the Modal unmounting it instantly.
+  const [panelMounted,     setPanelMounted]      = useState(false)
 
   const slideAnim = useRef(new Animated.Value(0)).current
+  // Same animated-scrim pattern as DOBScreen's age sheet / BottomSheet.tsx —
+  // the dim behind the panel fades in/out alongside the slide, instead of a
+  // static Pressable whose opaque background can flash/clip against the
+  // Modal's own web-polyfill container while the panel is still mid-transform.
+  const scrimAnim = useRef(new Animated.Value(0)).current
 
   useEffect(() => {
     Promise.all([
@@ -99,10 +126,10 @@ export default function HeightScreen({ navigation }: Props) {
         fetchHeightCategoryOptions(g2),
         fetchExactHeightGrouped(g2),
       ]).then(([rawCats, groups]) => {
-        // Parse HTML from category labels — API returns Angular-flavoured HTML strings
+        // Split each category's label into its main text + subtitle
         const cats: Category[] = rawCats.length
           ? rawCats.map((opt: Option) => {
-              const { label, subtitle } = parseHtmlLabel(opt.label)
+              const { label, subtitle } = parseCategoryLabel(opt.label)
               return { key: opt.key, label, subtitle }
             })
           : FALLBACK_CATEGORIES
@@ -124,16 +151,20 @@ export default function HeightScreen({ navigation }: Props) {
   // ─── Panel open/close ─────────────────────────────────────────────────────
 
   function openPanel() {
-    setPanelVisible(true)
-    Animated.timing(slideAnim, {
-      toValue: 1, duration: 280, useNativeDriver: true,
-    }).start()
+    setPanelMounted(true)
+    Animated.parallel([
+      Animated.timing(slideAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
+      Animated.timing(scrimAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+    ]).start()
   }
 
   function closePanel() {
-    Animated.timing(slideAnim, {
-      toValue: 0, duration: 230, useNativeDriver: true,
-    }).start(() => setPanelVisible(false))
+    Animated.parallel([
+      Animated.timing(slideAnim, { toValue: 0, duration: 230, useNativeDriver: true }),
+      Animated.timing(scrimAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
+    ]).start(({ finished }) => {
+      if (finished) setPanelMounted(false)
+    })
   }
 
   // ─── Selection ────────────────────────────────────────────────────────────
@@ -151,10 +182,21 @@ export default function HeightScreen({ navigation }: Props) {
 
   // ─── Derived ──────────────────────────────────────────────────────────────
 
-  const possessive = PROFILE_POSSESSIVE[createdBy] ?? 'their'
   const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
   const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
   const title = t('REGISTRATION.HEIGHT', 'What is your #PROFILETYPE# height?')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace('  ', ' ')
+    .trim()
+  // Angular: REGISTRATION.HEIGHTLINKTXT ("I know my #PROFILETYPE# exact height")
+  // — the "select exact height" field's placeholder text.
+  const linkText = t('REGISTRATION.HEIGHTLINKTXT', 'I know my #PROFILETYPE# exact height')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace('  ', ' ')
+    .trim()
+  // Angular: REGISTRATION.EXACTHEIGHT ("Select your #PROFILETYPE# height")
+  // — the right-side panel's header title.
+  const panelTitleText = t('REGISTRATION.EXACTHEIGHT', 'Select your #PROFILETYPE# height')
     .replace('#PROFILETYPE#', translatedProfileType)
     .replace('  ', ' ')
     .trim()
@@ -163,7 +205,7 @@ export default function HeightScreen({ navigation }: Props) {
   // Panel slides in from the right
   const panelTranslateX = slideAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [PICKER_PANEL_WIDTH, 0],
+    outputRange: [HEIGHT_PANEL_WIDTH, 0],
   })
 
   // ─── Submit ───────────────────────────────────────────────────────────────
@@ -246,44 +288,77 @@ export default function HeightScreen({ navigation }: Props) {
               )
             })}
 
-            {/* OR divider */}
+            {/* OR divider — same left/right fade image design as DOBScreen,
+                instead of the plain colored lines this screen drew before. */}
             <View style={styles.orRow}>
-              <View style={styles.orLine} />
+              <Image source={{ uri: CDN_OR_LEFT }} style={styles.orLine} contentFit="contain" />
               <Text style={styles.orText}>OR</Text>
-              <View style={styles.orLine} />
+              <Image source={{ uri: CDN_OR_RIGHT }} style={styles.orLine} contentFit="contain" />
             </View>
 
-            {/* "Select exact height" field */}
-            <Pressable
-              style={[styles.exactField, !!selectedHeight && styles.exactFieldActive]}
-              onPress={openPanel}
-              accessibilityRole="button"
-            >
-              <Text
-                style={[styles.exactFieldText, !!selectedHeight && styles.exactFieldTextActive]}
-                numberOfLines={1}
+            {/* "Select exact height" field — Angular: REGISTRATION.HEIGHTLINKTXT
+                ("I know my #PROFILETYPE# exact height"), not a hardcoded
+                "Select ... exact height". Once an exact height is chosen, a
+                floating "Height" label (REGISTRATION.HEIGHTLABEL) appears above
+                the border, same pattern as the floating field labels on
+                DOBScreen/NameScreen — Angular only shows this label when the
+                stored value is an exact height, not a category (101-104). */}
+            <View style={styles.exactFieldWrapper}>
+              {!!selectedHeight && (
+                <View style={styles.exactFieldLabel} pointerEvents="none">
+                  <Text style={styles.exactFieldLabelText}>
+                    {t('REGISTRATION.HEIGHTLABEL', 'Height')}
+                  </Text>
+                </View>
+              )}
+              <Pressable
+                style={styles.exactField}
+                onPress={openPanel}
+                accessibilityRole="button"
               >
-                {selectedHeight ? selectedHeight.label : `Select ${possessive} exact height`}
-              </Text>
-              <Text style={styles.exactFieldArrow}>›</Text>
-            </Pressable>
+                <Text style={styles.exactFieldText} numberOfLines={1}>
+                  {selectedHeight
+                    ? selectedHeight.label
+                    : linkText}
+                </Text>
+                <Text style={styles.exactFieldArrow}>›</Text>
+              </Pressable>
+            </View>
           </>
         )}
       </ScrollView>
 
       {/* Sticky footer handled globally via useOnboardingFooter */}
 
-      {/* Exact height picker — right-side sliding panel */}
+      {/* Exact height picker — right-side sliding panel. Same animated-scrim
+          pattern as DOBScreen's age bottom sheet: the Modal stays mounted
+          through the close animation (panelMounted, not panelVisible), and
+          the dim behind the panel fades via an Animated.View rather than a
+          static Pressable, which is what caused the panel to feel abrupt and
+          leave a stray dim rectangle when closing on web. */}
       <Modal
         transparent
-        visible={panelVisible}
+        visible={panelMounted}
         animationType="none"
         onRequestClose={closePanel}
         statusBarTranslucent
       >
         <View style={styles.panelContainer}>
-          {/* Backdrop (left of panel) — tap to close */}
-          <Pressable style={styles.backdrop} onPress={closePanel} />
+          {/* Animated scrim — pointer-events none so it doesn't block the
+              TouchableWithoutFeedback below. Angular's right-side panel uses
+              a fully transparent ion-backdrop (global.scss:3791-3795), so this
+              stays subtle rather than a dark dim. */}
+          <Animated.View
+            style={[
+              StyleSheet.absoluteFill,
+              { backgroundColor: Colors.black, opacity: scrimAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.15] }) },
+            ]}
+            pointerEvents="none"
+          />
+
+          <TouchableWithoutFeedback onPress={closePanel}>
+            <View style={StyleSheet.absoluteFill} />
+          </TouchableWithoutFeedback>
 
           {/* Panel slides in from the right */}
           <Animated.View
@@ -295,9 +370,9 @@ export default function HeightScreen({ navigation }: Props) {
               },
             ]}
           >
-            {/* Panel header */}
+            {/* Panel header — Angular: REGISTRATION.EXACTHEIGHT */}
             <View style={styles.panelHeader}>
-              <Text style={styles.panelTitle}>Select {possessive} height</Text>
+              <Text style={styles.panelTitle}>{panelTitleText}</Text>
               <TouchableOpacity onPress={closePanel} hitSlop={8}>
                 <Text style={styles.panelCloseTxt}>✕</Text>
               </TouchableOpacity>
@@ -327,14 +402,12 @@ export default function HeightScreen({ navigation }: Props) {
                       accessibilityRole="menuitem"
                       accessibilityState={{ selected: isSelected }}
                     >
+                      {/* Angular hides the radio control in this list entirely
+                          (.exact-height ion-item ion-radio { display: none })
+                          — selection is shown only via the row's background tint. */}
                       <Text style={[styles.heightItemText, isSelected && styles.heightItemTextSelected]}>
                         {item.label}
                       </Text>
-                      {isSelected && (
-                        <View style={[styles.radio, styles.radioSelected]}>
-                          <Text style={styles.radioTick}>✓</Text>
-                        </View>
-                      )}
                     </Pressable>
                   )
                 }}
@@ -373,7 +446,9 @@ const styles = StyleSheet.create({
 
   rowLabels: { flex: 1 },
 
+  // Angular: body1-medium-14 (radio.component.html, TYPE=type-2) — Poppins-Medium
   rowLabel: {
+    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     fontWeight: '400',
     color:      Colors.textPrimary,
@@ -382,7 +457,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
+  // Angular: body2-regular-14 (radio.component.html) — Poppins-Regular
   rowSubtitle: {
+    fontFamily: Fonts.poppinsRegular,
     fontSize:   14,
     fontWeight: '400',
     color:      'rgba(0,0,0,0.6)',
@@ -413,25 +490,48 @@ const styles = StyleSheet.create({
     lineHeight: 12,
   },
 
-  // OR divider
+  // OR divider — same left/right fade image assets + text style as DOBScreen
   orRow: {
     flexDirection: 'row',
     alignItems:    'center',
     marginTop:     20,
     marginBottom:  16,
-    gap:           8,
   },
   orLine: {
-    flex:            1,
-    height:          1,
-    backgroundColor: '#e0e0e0',
+    flex:    1,
+    height:  8,
+    opacity: 1,
   },
+  // Angular: body2-regular-14 (registration-revamp.component.html:64) — Poppins-Regular
   orText: {
-    fontSize: 14,
-    color:    'rgba(0,0,0,0.5)',
+    fontFamily:       Fonts.poppinsRegular,
+    fontSize:         14,
+    color:            'rgba(0,0,0,0.5)',
+    marginHorizontal: 16,
   },
 
-  // "Select exact height" outlined field
+  // "Select exact height" outlined field + floating "Height" label —
+  // Angular only shows the floating label once an exact height (not a
+  // category) is stored (enablePlaceHolder(), registration-revamp.component.ts:2743-2751).
+  exactFieldWrapper: {
+    position:  'relative',
+    marginTop: 8,
+  },
+  exactFieldLabel: {
+    position:          'absolute',
+    top:               -8,
+    left:              12,
+    backgroundColor:   Colors.surface,
+    paddingHorizontal: 4,
+    zIndex:            10,
+  },
+  // Angular: body3-regular-12 (registration-revamp.component.html:54-55) — Poppins-Regular
+  exactFieldLabelText: {
+    fontFamily: Fonts.poppinsRegular,
+    fontSize:   12,
+    fontWeight: '400',
+    color:      Colors.textPrimary,
+  },
   exactField: {
     flexDirection:   'row',
     alignItems:      'center',
@@ -443,15 +543,14 @@ const styles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
-  exactFieldActive: {},
+  // Angular: body2-regular-14, static weight — never bolds on selection
+  // (registration-revamp.component.html:51-52) — Poppins-Regular
   exactFieldText: {
+    fontFamily: Fonts.poppinsRegular,
     flex:       1,
     fontSize:   14,
     fontWeight: '400',
     color:      Colors.textPrimary,
-  },
-  exactFieldTextActive: {
-    fontWeight: '500',
   },
   exactFieldArrow: {
     fontSize:   22,
@@ -459,18 +558,14 @@ const styles = StyleSheet.create({
     lineHeight: 26,
   },
 
-  // Right-side sliding panel (85 % of screen width)
+  // Right-side sliding panel (Angular right-side-panel.component.scss: width 86.7%)
   panelContainer: {
     flex:           1,
     flexDirection:  'row',
     justifyContent: 'flex-end',
   },
-  backdrop: {
-    flex:            1,
-    backgroundColor: Colors.scrimMedium,
-  },
   panel: {
-    width:           PICKER_PANEL_WIDTH,
+    width:           HEIGHT_PANEL_WIDTH,
     backgroundColor: Colors.surface,
     elevation:       8,
     shadowColor:     Colors.shadow,
@@ -486,7 +581,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderSubtle,
   },
+  // Angular: heading4-medium-16 (right-side-panel.component.html:12) — Poppins-Medium
   panelTitle: {
+    fontFamily: Fonts.poppinsMedium,
     flex:       1,
     fontSize:   16,
     fontWeight: '600',
@@ -506,20 +603,19 @@ const styles = StyleSheet.create({
     color:    Colors.scrimLight,
   },
 
-  // Section header inside SectionList (Short / Average Height / Tall)
+  // Section header inside SectionList (e.g. Below Average / Average / Above Average / Tall)
+  // Angular: heading4-medium-16, class "height-heading", background #F0F0F0
+  // (right-side-panel.component.html:33-35, .scss:54-57) — Poppins-Medium
   sectionHeader: {
     paddingHorizontal: 20,
     paddingVertical:   8,
-    backgroundColor:   Colors.surfaceAlt,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.borderSubtle,
+    backgroundColor:   '#F0F0F0',
   },
   sectionHeaderText: {
-    fontSize:   12,
-    fontWeight: '600',
-    color:      'rgba(0,0,0,0.5)',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
+    fontFamily: Fonts.poppinsMedium,
+    fontSize:   16,
+    fontWeight: '500',
+    color:      Colors.textPrimary,
   },
 
   // Height list items (inside panel)
@@ -529,12 +625,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     height:            52,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.surfaceDim,
+    borderBottomColor: '#E6E6E6',
   },
+  // Angular: right-side-panel.component.html:39 applies 'filter-selected-bg'
+  // on the selected row for the HEIGHT page — #FBF2F5, distinct from the
+  // category list's selected bg (Colors.selectionBg / #FFF1F5).
   heightItemSelected: {
-    backgroundColor: Colors.selectionBg,
+    backgroundColor: '#FBF2F5',
   },
+  // Angular: body2-regular-14 (right-side-panel.component.html:41) — Poppins-Regular
   heightItemText: {
+    fontFamily: Fonts.poppinsRegular,
     flex:       1,
     fontSize:   14,
     fontWeight: '400',

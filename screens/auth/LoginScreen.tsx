@@ -17,6 +17,7 @@ import AppHeader from '../../components/app-header/AppHeader'
 import { CDN_REG, CDN_SVG } from '../../constants/cdn'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
+import { Fonts } from '../../src/theme/fonts'
 import { StorageKeys } from '../../constants/storage.keys'
 import { callPartialRegistrationAPI, login, setRegValues } from '../../service/registrationService'
 import { getItem, setItem } from '../../service/storageService'
@@ -141,15 +142,22 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
   const labelSize = labelAnim.interpolate({ inputRange: [0, 1], outputRange: [14, 11] })
   const hasError = !!error || showValidationError
 
+  // Border color: focused always wins (blue) regardless of value; unfocused
+  // falls back to red when empty, grey when filled — same state machine as
+  // NameScreen's Name input (Angular input-fields.component.scss precedence).
+  const borderColor = focused
+    ? Colors.inputFocus
+    : mobile.length === 0
+      ? Colors.inputError
+      : Colors.inputBorder
+
   const labelColor = labelAnim.interpolate({
     inputRange:  [0, 1],
     outputRange: [
       Colors.inputBorder,
-      hasError ? Colors.inputError : focused ? Colors.inputFocus : Colors.inputBorder,
+      borderColor,
     ],
   })
-
-  const borderColor = hasError ? Colors.inputError : focused ? Colors.inputFocus : Colors.inputBorder
 
   // Title from i18n — Angular stores it with <br /> tag (padded with stray spaces,
   // e.g. "Enter your <br /> mobile number"), so strip surrounding whitespace too —
@@ -317,6 +325,7 @@ const styles = StyleSheet.create({
 
   // Title — "Enter your\nmobile number" (Figma + Angular heading1-semibold-22: Poppins SemiBold 22px)
   title: {
+    fontFamily:   Fonts.poppinsSemiBold,
     fontSize:     22,
     fontWeight:   '600',
     color:        Colors.textPrimary,
@@ -354,6 +363,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   codeText: {
+    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     fontWeight: '500',
     color:      Colors.textPrimary,
@@ -366,6 +376,7 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex:            1,
+    fontFamily:      Fonts.poppinsRegular,
     fontSize:        14,
     color:           Colors.textPrimary,
     paddingVertical: 0,
@@ -395,16 +406,19 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.selectionBg,
   },
   dropText: {
-    fontSize: 14,
-    color:    Colors.textPrimary,
+    fontFamily: Fonts.poppinsRegular,
+    fontSize:   14,
+    color:      Colors.textPrimary,
   },
   dropTextActive: {
+    fontFamily: Fonts.poppinsSemiBold,
     color:      Colors.primaryDark,
     fontWeight: '600',
   },
 
   // ── Error ───────────────────────────────────────────────────────────────────
   errorText: {
+    fontFamily: Fonts.poppinsRegular,
     marginTop:  6,
     marginLeft: 4,
     fontSize:   12,

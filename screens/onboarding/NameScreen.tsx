@@ -12,9 +12,18 @@ import {
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
-import { callPartialRegistrationAPI, getRegValues, setRegValue } from '../../service/registrationService'
+import {
+  OTHER_GENDER_KEYS,
+  callPartialRegistrationAPI,
+  getRegValues,
+  isAiValidationEnabled,
+  parseNameValidationStrict,
+  setRegValue,
+  validateNameGender,
+} from '../../service/registrationService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
+import ConfirmNameGenderSheet from '../../components/bottom-sheet/ConfirmNameGenderSheet'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 
@@ -25,6 +34,10 @@ const CDN_ICON = CDN_REG + 'son-name.svg'
 // SELFGENDER → next page is GENDER (3); OTHERGENDER → skip to MARITALSTATUS (4)
 // Matches Angular getNextUrlForPage2(): SELFGENDER → /onboarding/3, OTHERGENDER → /onboarding/4
 const SELF_GENDER = ['1', '10', '11']
+
+// Removes the browser's default black focus outline on web — TextInput renders
+// as <input> there, and the outline would sit on top of our custom borderColor.
+const webOutlineReset = { outlineStyle: 'none', outlineWidth: 0 } as any
 
 // Emoji regex — matches Angular alphabetOnly() which strips emojis from name input
 const EMOJI_REGEX = /(?:[✀-➿]|(?:\ud83c[\udde6-\uddff]){2}|[\ud800-\udbff][\udc00-\udfff]|[#-9]️?⃣|㊙|㊗|〽|〰|Ⓜ|\ud83c[\udd70-\udd71]|\ud83c[\udd7e-\udd7f]|🆎|\ud83c[\udd91-\udd9a]|\ud83c[\udde6-\uddff]|\ud83c[\ude01-\ude02]|🈚|🈯|\ud83c[\ude32-\ude3a]|\ud83c[\ude50-\ude51]|‼|⁉|[▪-▫]|▶|◀|[◻-◾]|©|®|™|ℹ|🀄|[☀-⛿]|⬅|⬆|⬇|⬛|⬜|⭐|⭕|⌚|⌛|⌨|⏏|[⏩-⏳]|[⏸-⏺]|🃏|⤴|⤵|[←-⇿])/g
@@ -46,6 +59,10 @@ export default function NameScreen({ navigation }: Props) {
   const [createdBy,  setCreatedBy]  = useState<string>('1')
   const [error,      setError]      = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [isFocused,  setIsFocused]  = useState(false)
+
+  // AI name validation sheet — Angular: showOnboarding3EditSheet(hideGender=true)
+  const [sheetVisible, setSheetVisible] = useState(false)
 
   const inputRef = useRef<TextInput>(null)
 
@@ -91,7 +108,26 @@ export default function NameScreen({ navigation }: Props) {
 
   const isValid = name.trim().length >= 3
 
+  // Border color: focused always wins (blue) regardless of value; unfocused
+  // falls back to red when empty, grey when filled — matches Angular's
+  // input-fields.component.scss .item-has-focus (#4797D9) / .ion-invalid
+  // (#DE2A68) / default (#B0B0B0) precedence.
+  const borderColor = isFocused
+    ? Colors.inputFocus
+    : name.length === 0
+      ? Colors.inputError
+      : Colors.inputBorder
+
   // ── Submit ─────────────────────────────────────────────────────────────────
+
+  // Persist the name, then continue — SELFGENDER [1,10,11] → page 3 (GENDER),
+  // OTHERGENDER [4,5,8,9] → page 4 (MARITALSTATUS).
+  async function commitAndAdvance(finalName: string) {
+    await setRegValue('NAME', finalName)
+    const nextPage = SELF_GENDER.includes(createdBy) ? '3' : '4'
+    navigation.push('onboarding', { pageNo: nextPage })
+    callPartialRegistrationAPI()
+  }
 
   async function handleNext() {
     if (!isValid || submitting) return
@@ -106,18 +142,62 @@ export default function NameScreen({ navigation }: Props) {
 
     setSubmitting(true)
     try {
-      await setRegValue('NAME', trimmed)
-
-      // SELFGENDER [1,10,11] → page 3 (GENDER); OTHERGENDER [4,5,8,9] → page 4 (MARITALSTATUS)
-      const nextPage = SELF_GENDER.includes(createdBy) ? '3' : '4'
-      navigation.push('onboarding', { pageNo: nextPage })
-      callPartialRegistrationAPI()
+      // Angular: clickOnNext() case '2' — only other-created profiles
+      // (OTHERGENDER) run AI validation here, and only while AIVFLAG is on.
+      // Self-created profiles are validated on page 3 instead, once the user
+      // has actually picked a gender.
+      if (OTHER_GENDER_KEYS.includes(createdBy) && await isAiValidationEnabled()) {
+        const gender = (await getRegValues()).GENDER ?? ''
+        const res    = await validateNameGender(trimmed, gender)
+        const { isNameViolated, isGenderInvalid } = parseNameValidationStrict(res)
+        if (isNameViolated || isGenderInvalid) {
+          setName(trimmed)
+          setSheetVisible(true)
+          return
+        }
+      }
+      await commitAndAdvance(trimmed)
     } catch {
       setError(t('GENERAL.NOINTERNET', 'No internet connection'))
     } finally {
       setSubmitting(false)
     }
   }
+
+  // Angular: revalidateOnboarding3NameOnSubmit() — re-checks the corrected name;
+  // still invalid → the sheet stays open with the violation message.
+  async function handleSheetSubmit(editedName: string) {
+    if (submitting) return
+    setSubmitting(true)
+    try {
+      setName(editedName)
+      const gender = (await getRegValues()).GENDER ?? ''
+      const res    = await validateNameGender(editedName, gender)
+      const { isNameViolated } = parseNameValidationStrict(res)
+      if (isNameViolated) return
+      setSheetVisible(false)
+      await commitAndAdvance(editedName)
+    } catch {
+      // Network failure on re-validation shouldn't trap the user in the sheet.
+      setSheetVisible(false)
+      await commitAndAdvance(editedName)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // Angular: getOnboarding3Title() — REGISTRATION.CONFIRM_SHEET with #PROFILETYPE#
+  const sheetTitle = t('REGISTRATION.CONFIRM_SHEET', 'Please confirm your #PROFILETYPE# details below')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  // Angular: getOnboarding3NameLabel() — REGISTRATION.CREATED_NAME. The gender
+  // label is omitted entirely here (HIDE_GENDER on this page).
+  const sheetNameLabel = t('REGISTRATION.CREATED_NAME', '#PROFILETYPE# name')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace(/\s{2,}/g, ' ')
+    .trim()
 
   useOnboardingFooter({ nextDisabled: !isValid, nextLoading: submitting, onNext: handleNext }, [isValid, submitting])
 
@@ -150,9 +230,13 @@ export default function NameScreen({ navigation }: Props) {
           <View style={styles.inputOuter}>
             <TextInput
               ref={inputRef}
-              style={[styles.inputBox, error ? styles.inputBoxError : null]}
+              style={[styles.inputBox, { borderColor }, webOutlineReset]}
               value={name}
               onChangeText={handleChangeText}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              cursorColor={Colors.textPrimary}
+              selectionColor={Colors.textPrimary}
               autoCapitalize="words"
               autoCorrect={false}
               returnKeyType="done"
@@ -168,6 +252,20 @@ export default function NameScreen({ navigation }: Props) {
           {!!error && <Text style={os.errorText}>{error}</Text>}
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {/* AI name validation sheet — Angular: onboarding3EditSheet, gender hidden */}
+      <ConfirmNameGenderSheet
+        visible={sheetVisible}
+        title={sheetTitle}
+        name={name}
+        gender={null}
+        genderOptions={[]}
+        nameLabel={sheetNameLabel}
+        nameViolated
+        hideGender
+        submitting={submitting}
+        onSubmit={handleSheetSubmit}
+      />
     </View>
   )
 }
@@ -193,10 +291,6 @@ const styles = StyleSheet.create({
     fontWeight:        '500',
     color:             Colors.textPrimary,
   },
-  inputBoxError: {
-    borderColor: Colors.inputError,
-  },
-
   // Floating label chip — Angular .floating: top:-8, left:16, white bg
   labelWrap: {
     position:        'absolute',

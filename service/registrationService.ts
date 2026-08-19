@@ -208,10 +208,11 @@ export type GenderOption = {
   label: string      // display label in current language
   img: string        // unselected avatar URL  (API: IMG)
   imgActive: string  // selected avatar URL    (API: IMG-ACTIVE)
+  text: string       // helper subtext shown under the card once selected (API: TEXT)
 }
 
 // Fetches gender options for the given createdBy from the initialfetch API.
-// GENDERARRAY[createdBy] contains [{ key, value, IMG, IMG-ACTIVE }] per Angular.
+// GENDERARRAY[createdBy] contains [{ key, value, IMG, IMG-ACTIVE, TEXT }] per Angular.
 export async function fetchGenderOptions(createdBy: string): Promise<GenderOption[]> {
   const ccode    = await getItem(SK.User.COUNTRY_CODE) ?? '91'
   const lang     = await getItem(SK.Auth.LANG) ?? 'en'
@@ -220,16 +221,73 @@ export async function fetchGenderOptions(createdBy: string): Promise<GenderOptio
   const genderArray = res?.RESPONSE?.GENDERARRAY
   const list: any[] = genderArray?.[createdBy] ?? genderArray?.['1'] ?? []
   if (!Array.isArray(list)) return []
-  // Raw API field names: KEY, VALUE, IMG, IMG-ACTIVE
-  // (Angular mappingArray renames KEY→key, VALUE→value before using; IMG/IMG-ACTIVE stay unchanged)
+  // Raw API field names: KEY, VALUE, IMG, IMG-ACTIVE, TEXT
+  // (Angular mappingArray renames KEY→key, VALUE→value before using; IMG/IMG-ACTIVE/TEXT stay unchanged)
   return list
     .map((item: any) => ({
       key:       String(item['KEY'] ?? item['key'] ?? ''),
       label:     String(item['VALUE'] ?? item['value'] ?? ''),
       img:       item['IMG'] ?? '',
       imgActive: item['IMG-ACTIVE'] ?? '',
+      text:      item['TEXT'] ?? '',
     }))
     .filter(o => o.key !== '')
+}
+
+// ─── AI name/gender validation ────────────────────────────────────────────────
+// Angular: registration.service.ts's isAiValidationEnabled() / validateNameGender(),
+// driving the "Please confirm your details below" edit sheet on onboarding 2 & 3.
+
+// Angular: registration.config.ts's SELFGENDER / OTHERGENDER — which CREATEDBY
+// values ask for the profile-owner's own gender (page 3) vs. imply it (page 2).
+export const SELF_GENDER_KEYS  = ['1', '10', '11']
+export const OTHER_GENDER_KEYS = ['4', '5', '8', '9']
+
+export type NameGenderValidation = {
+  isNameViolated:  boolean
+  isGenderInvalid: boolean
+}
+
+// Angular: `localStorage.getItem('AIVFLAG') === '1'` — server-set feature flag,
+// stored here by storeWebURLData()'s SCALAR_KEYS list.
+export async function isAiValidationEnabled(): Promise<boolean> {
+  return String(await getSessionValue('AIVFLAG')) === '1'
+}
+
+// Angular: validateNameGender() — GET initialfetch?type=AIGENDERVALIDATION…
+// Female '0' is sent as 2 (the API's own encoding, not the app's GENDER value).
+export async function validateNameGender(name: string, gender: string): Promise<any> {
+  const genderVal = (gender === '0' ? 2 : Number(gender)) || 1
+  const deviceId  = await getItem('DEVICEID') ?? ''
+  const paramStr  = `type=AIGENDERVALIDATION&LANG=en&gender=${genderVal}`
+    + `&name=${encodeURIComponent(name)}&DEVICEID=${deviceId}`
+  return apiCall(Endpoints.registration.initialFetch, 'GET', paramStr)
+}
+
+// Angular: the page-3 validateNameGender() handler. `validation_status` sits
+// under NAME.response (falling back to NAME); gender_match and is_neutral are
+// siblings under NAMEGENDER.
+export function parseNameGenderValidation(res: any): NameGenderValidation {
+  const response       = res?.RESPONSE ?? res ?? {}
+  const nameValidation = response?.NAME?.response ?? response?.NAME ?? {}
+  const nameGender     = response?.NAMEGENDER ?? {}
+  return {
+    isNameViolated:  [0, 2, '0', '2'].includes(nameValidation?.validation_status),
+    isGenderInvalid: nameGender?.gender_match === false || nameGender?.is_neutral === true,
+  }
+}
+
+// Angular: validateOnboarding2Name() — same payload, but page 2 treats anything
+// other than validation_status == 1 as a violation (page 3 only flags 0 and 2),
+// and reads `response.response` before the NAME fallbacks.
+export function parseNameValidationStrict(res: any): NameGenderValidation {
+  const response       = res?.RESPONSE ?? res ?? {}
+  const nameValidation = response?.response ?? response?.NAME?.response ?? response?.NAME ?? {}
+  const nameGender     = response?.NAMEGENDER ?? {}
+  return {
+    isNameViolated:  nameValidation?.validation_status != 1,
+    isGenderInvalid: nameGender?.gender_match === false || nameGender?.is_neutral === true,
+  }
 }
 
 // Fetches marital status options from initialfetch API.
@@ -259,6 +317,22 @@ export const CHILDREN_OPTIONS: Array<{ key: string; label: string }> = [
   { key: '1', label: '1 child' }, { key: '2', label: '2 children' },
   { key: '3', label: '3 children' }, { key: '4', label: '4+ children' },
 ]
+
+// Fetches "number of children" options from initialfetch API — same
+// apiResponse["NOOFCHILDREN"] key Angular's registration.page.ts reads
+// (assignArrayData(): this.profileNumberofchild = apiResponse["NOOFCHILDREN"]).
+// Raw response is an object {"0":"None","1":"1",...} → converted to array.
+export async function fetchNoOfChildrenOptions(): Promise<Array<{ key: string; label: string }>> {
+  const ccode    = await getItem(SK.User.COUNTRY_CODE) ?? '91'
+  const lang     = await getItem(SK.Auth.LANG) ?? 'en'
+  const paramStr = `type=all&ccode=${ccode}&LANG=${lang}`
+  const res = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
+  const raw = res?.RESPONSE?.NOOFCHILDREN
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+  }
+  return []
+}
 
 // Reads REGISTRATIONARRAYS from cache (AsyncStorage) or fetches fresh from API and saves.
 // Angular stores the full initialfetch response under this key — mirrors that pattern.
@@ -764,16 +838,18 @@ export function isValidJobDetailFormat(value: string): boolean {
   return /^[\p{L}\p{M}\s.,]*$/u.test(value)
 }
 
-// Fetches height CATEGORY options (Below average / Average / Above average / Tall)
-// Angular: apiResponse["HEIGHTMALE"] / ["HEIGHTFEMALE"] — labels contain HTML (strips on return).
+// Fetches height CATEGORY options (Below average / Average / Above average / Tall).
+// Angular (registration-revamp.component.ts:948): REGARRAYTYPE = 'NEWHEIGHTMALE' /
+// 'NEWHEIGHTFEMALE', parsed via GetArrayListfrmObjwithTilde — each value is a
+// '~'-delimited "Label~Subtitle" string (common-funtions.ts:145-150), not HTML.
 export async function fetchHeightCategoryOptions(
   gender: string,
 ): Promise<Array<{ key: string; label: string }>> {
   const data = await getRegistrationArrays()
-  const raw  = gender === '0' ? data?.HEIGHTFEMALE : data?.HEIGHTMALE
+  const raw  = gender === '0' ? data?.NEWHEIGHTFEMALE : data?.NEWHEIGHTMALE
   const toEntry = (key: string, rawLabel: string) => ({
     key,
-    label: String(rawLabel),   // raw HTML — HeightScreen strips it for display
+    label: String(rawLabel),   // '~'-delimited "Label~Subtitle" — HeightScreen splits it for display
   })
   if (Array.isArray(raw)) {
     return raw
@@ -789,32 +865,26 @@ export async function fetchHeightCategoryOptions(
   return []
 }
 
-// Group display names for the exact height side panel — mirrors Angular's REG.SHORT / REG.MEDIUM / REG.TALL
-const HEIGHT_GROUP_LABELS: Record<string, string> = {
-  'Short':         'Short',
-  'Average Heigth': 'Average Height', // API typo preserved as key
-  'Tall':          'Tall',
-}
-
 export type HeightGroup = {
   title: string
   data:  Array<{ key: string; label: string }>
 }
 
-// Fetches exact heights grouped by Short / Average Heigth / Tall for the side panel SectionList.
-// Angular: apiResponse["HEIGHT"]["Male"] / ["Female"] — each group is a plain object {key: label}.
-// Angular uses `| keyvalue` pipe + isShowFt: true (label already includes ft/inch from API).
+// Fetches exact heights grouped for the side panel SectionList.
+// Angular (registration-revamp.component.ts:660-664): reads
+// registrationArray['NEWHEIGHT']['Male'|'Female'], grouped via FUNC.getArrayObj()
+// (common-funtions.ts:162-176) — each group's title comes from the parallel
+// registrationArray['NEWHEIGHT']['Content'] map keyed the same way, and each
+// group's values are a plain {key: label} object (label already includes ft/cm).
 export async function fetchExactHeightGrouped(gender: string): Promise<HeightGroup[]> {
   const data    = await getRegistrationArrays()
-  const grouped = gender === '0' ? data?.HEIGHT?.Female : data?.HEIGHT?.Male
+  const root    = data?.NEWHEIGHT
+  const grouped = gender === '0' ? root?.Female : root?.Male
+  const content = root?.Content
   if (!grouped || typeof grouped !== 'object') return []
 
-  const ORDER = ['Short', 'Average Heigth', 'Tall']
-  const keys  = [...ORDER, ...Object.keys(grouped).filter(k => !ORDER.includes(k))]
   const result: HeightGroup[] = []
-
-  keys.forEach(k => {
-    const group = grouped[k]
+  Object.entries(grouped).forEach(([groupKey, group]) => {
     if (!group || typeof group !== 'object') return
     const items: Array<{ key: string; label: string }> = []
     if (Array.isArray(group)) {
@@ -829,7 +899,7 @@ export async function fetchExactHeightGrouped(gender: string): Promise<HeightGro
       })
     }
     if (items.length) {
-      result.push({ title: HEIGHT_GROUP_LABELS[k] ?? k, data: items })
+      result.push({ title: String(content?.[groupKey] ?? groupKey), data: items })
     }
   })
   return result
@@ -969,6 +1039,23 @@ export async function fetchCities(stateId: string): Promise<Array<{ key: string;
   return items
 }
 
+// Angular: core/config/registration.config.ts's homeTownDomain — the mother
+// tongues for which a separate home town is asked. Used as the fallback when
+// REGISTRATIONARRAYS.NATIVEPLACEDOMAIN isn't present.
+const HOME_TOWN_DOMAIN = ['2', '14', '17', '41', '4', '51']
+
+// Angular: isHomeTownVisible() — (homeTownDomain || []).includes(motherTongueKey).
+// Used by the validation follow-up sheets to decide whether to ask
+// "Is your home town same as current location?" for the chosen mother tongue.
+export async function isHomeTownMotherTongue(motherTongueKey: string): Promise<boolean> {
+  if (!motherTongueKey) return false
+  const arrays = await getRegistrationArrays()
+  const domain: string[] = Array.isArray(arrays?.NATIVEPLACEDOMAIN) && arrays.NATIVEPLACEDOMAIN.length
+    ? arrays.NATIVEPLACEDOMAIN.map(String)
+    : HOME_TOWN_DOMAIN
+  return domain.includes(String(motherTongueKey))
+}
+
 // Determines which page follows page 9.
 // Angular getRedirectURL(): if countryCode==91 AND MOTHERTONGUE in NATIVEPLACEDOMAIN → page 44
 // else page 10 (Education). Default homePlaceDomain = ['2','14','17','41','4','51']
@@ -978,7 +1065,7 @@ export async function getNextPageAfterLocation(): Promise<string> {
   const mothertongue = String((await getRegValue('MOTHERTONGUE')) ?? '')
   const domain: string[] = Array.isArray(arrays?.NATIVEPLACEDOMAIN)
     ? arrays.NATIVEPLACEDOMAIN.map(String)
-    : ['2', '14', '17', '41', '4', '51']
+    : HOME_TOWN_DOMAIN
   const ccode = (await getItem(SK.User.COUNTRY_CODE)) ?? '91'
   if (ccode === '91' && mothertongue && domain.includes(mothertongue)) {
     return '46'  // page 46 = Yes/No "Is hometown same as current location?"
@@ -1334,7 +1421,14 @@ export async function callRegistrationAPI(params: Record<string, any>): Promise<
 // Angular param name mapping: QUALIFICATION→Education, MCODE→CountryCode, INCOMETYPE→IncomeCurrency.
 // NOTE: no ID in this payload — server creates the profile and returns MATRIID.
 
-export async function submitFullRegistration(): Promise<{ matriId?: string; responsecode?: string }> {
+export async function submitFullRegistration(): Promise<{
+  matriId?: string
+  responsecode?: string
+  /** Angular: RESPONSE.AIVALIDATIONTYPE — '1' proceed, '2' confirm sheet, '3' under review. */
+  aiValidationType?: string
+  /** Angular: RESPONSE.VIOLATIONFIELD — the fields the AI flagged. */
+  violationFields?: string[]
+}> {
   const rv       = await getRegValues()
   const lang     = (await getItem(SK.Auth.LANG))  ?? 'en'
   const cachedIp = await getItem('USERIP')
@@ -1386,8 +1480,17 @@ export async function submitFullRegistration(): Promise<{ matriId?: string; resp
   // Angular "registrationupdate" module → registration/insert/v1 (creates profile, returns MATRIID)
   const res = await apiCall(Endpoints.registration.insert, 'POST', params)
   const matriId = res?.MATRIID ?? res?.RESPONSE?.MATRIID
-  const result: { matriId?: string; responsecode?: string } = {
-    responsecode: String(res?.RESPONSECODE ?? ''),
+
+  // Angular: callInsertApiAndHandleValidation() reads AIVALIDATIONTYPE and
+  // VIOLATIONFIELD straight off the INSERT response — no separate
+  // aiprfvalidation call happens at this point in the flow.
+  const result: {
+    matriId?: string; responsecode?: string
+    aiValidationType?: string; violationFields?: string[]
+  } = {
+    responsecode:     String(res?.RESPONSECODE ?? ''),
+    aiValidationType: String(res?.RESPONSE?.AIVALIDATIONTYPE ?? '1'),
+    violationFields:  mapViolationFields(res?.RESPONSE?.VIOLATIONFIELD),
   }
   if (matriId) {
     result.matriId = String(matriId)
@@ -1652,4 +1755,34 @@ export const CONFIRM2_EDITABLE_VIOLATION_FIELDS = [
   'MARITALSTATUS', 'NOOFCHILDREN', 'DOB', 'MOTHERTONGUE', 'STATE', 'CITY',
   'QUALIFICATION', 'OCCUPATION', 'MONTHLYINCOME', 'RELIGION', 'CASTE', 'SUBCASTE', 'GOTHRA',
 ]
+
+// ─── Post-insert AI validation routing ────────────────────────────────────────
+// Angular: registration-revamp.component.ts's callInsertApiAndHandleValidation().
+// The insert response's AIVALIDATIONTYPE decides what the member sees next:
+//   '1' → nothing special, show the normal success sheet
+//   '2' → the confirm sheet listing the flagged fields (ValidationScreen)
+//   '3' → the "profile under review" screen, then complete
+// When AIVFLAG is off Angular skips the branching entirely and completes.
+// A type-'2' violation limited to NON-editable fields (e.g. NAME) would render
+// an empty confirm screen, so that case completes instead — Angular's
+// hasEditableConfirm2Fields() guard.
+
+export type PostInsertAction = 'success' | 'confirm' | 'underReview'
+
+export async function resolvePostInsertAction(
+  aiValidationType: string | undefined,
+  violationFields: string[] | undefined,
+): Promise<PostInsertAction> {
+  const type = String(aiValidationType ?? '1')
+
+  // Angular checks the flag FIRST: with AIVFLAG off, every type completes.
+  if (!(await isAiValidationEnabled())) return 'success'
+
+  if (type === '2') {
+    const hasEditable = (violationFields ?? []).some(f => CONFIRM2_EDITABLE_VIOLATION_FIELDS.includes(f))
+    return hasEditable ? 'confirm' : 'success'
+  }
+  if (type === '3') return 'underReview'
+  return 'success'
+}
 

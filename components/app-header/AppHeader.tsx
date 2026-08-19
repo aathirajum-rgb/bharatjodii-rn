@@ -7,16 +7,7 @@ import Badge from '../badge/Badge'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
 import { getOwnGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
-import i18n from '../../i18n'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
-
-// Angular: header.component.ts's langLableName = getSelectedKeyValue(langArrayList,
-// language) — the FULL language name, not an abbreviation (confirmed against a
-// live screenshot showing "English", not "Eng").
-const LANG_LABEL: Record<string, string> = {
-  en: 'English', tm: 'Tamil', tl: 'Telugu', ml: 'Malayalam', kn: 'Kannada',
-  hi: 'Hindi', bn: 'Bangla', mt: 'Marathi', or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,7 +41,7 @@ export interface AppHeaderProps {
   // Renders '×' instead of '‹' — for when this screen is presented as a modal
   // sheet (e.g. the mid-app language switcher) rather than pushed onto a stack.
   closeIcon?:         boolean | undefined
-  languageLabel?:     string  | undefined   // auto-computed from i18n.language if omitted
+  languageLabel?:     string  | undefined   // auto-computed from REGISTRATION.SELECTED_LANGUAGE if omitted
 
   // ── Callbacks ────────────────────────────────────────────────────────────
   onMenuPress?:        (() => void) | undefined
@@ -109,8 +100,9 @@ export default function AppHeader({
 }: AppHeaderProps) {
   const { t } = useTranslation()
 
-  // Resolve language label — use explicit prop, else auto-detect from i18n
-  const resolvedLangLabel = languageLabel ?? LANG_LABEL[i18n.language] ?? 'Eng'
+  // Resolve language label — use explicit prop, else the short label from
+  // locales/*.json's REGISTRATION.SELECTED_LANGUAGE (e.g. "Eng" for English)
+  const resolvedLangLabel = languageLabel ?? t('REGISTRATION.SELECTED_LANGUAGE')
 
   // Angular: header.component.ts's common.getAvatarImg() (called with no args,
   // i.e. isOppositeProfile=false) — the logged-in user's OWN avatar placeholder
@@ -253,7 +245,7 @@ export default function AppHeader({
           <Pressable style={styles.langBtn} onPress={onLanguagePress}>
             <CdnSvg uri={ICONS.lang} width={24} height={24} />
             <Text style={styles.langText}>{resolvedLangLabel}</Text>
-            <CdnSvg uri={ICONS.chevDown} width={24} height={24} />
+            <CdnSvg uri={ICONS.chevDown} width={16} height={16} />
           </Pressable>
         )}
       </View>

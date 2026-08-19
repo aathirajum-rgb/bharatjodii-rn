@@ -1,7 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  Animated,
+  Dimensions,
   FlatList,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -17,18 +20,41 @@ import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { callPartialRegistrationAPI, getRegValue, setRegValue, setRegValues } from '../../service/registrationService'
-import { CDN_REG } from '../../constants/cdn'
+import { CDN_REG, CDN_REVAMP, CDN_SVG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { Fonts } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'son-birth-date.svg'
+// Angular's revamp-img up/down arrow icons (registration-revamp.component.html) —
+// same pair used for all three Date/Month/Year fields, flipped by rotation below
+// rather than swapping images, so the direction change animates smoothly.
+const CDN_ARROW_DOWN = CDN_REVAMP + 'down-arrow.svg'
+// Angular's "Please enter age" link (button.config.ts's LINK_BTN) shows this same
+// static icon as its non-animated fallback — used here in place of the Lottie
+// forward-animation-link the live link button plays.
+const CDN_FORWARD_ICON = CDN_SVG + 'revamp/forward-icon-link.svg'
+// Angular's registration-modal-popup getCloseCTA() — the AGE sheet isn't in
+// the 'incomeSheet' branch, so it always gets this grey close icon.
+const CDN_CLOSE_ICON = CDN_REVAMP + 'close-icon-gray.svg'
+// Angular's OR divider (registration-revamp.component.html) flanks the "OR"
+// text with these two fading-line images instead of a plain solid bar.
+const CDN_OR_LEFT  = CDN_SVG + 'revamp/or-left-side.svg'
+const CDN_OR_RIGHT = CDN_SVG + 'revamp/or-right-side.svg'
+const SCREEN_H = Dimensions.get('window').height
 const ITEM_H        = 40   // Figma: each dropdown row is 40px tall
 const MAX_LIST_ITEMS = 7   // how many rows visible before scroll
+
+// Removes the browser's default black focus outline on web — TextInput renders
+// as <input> there, and the outline would sit on top of our custom borderColor.
+// Same fix as NameScreen.tsx.
+const webOutlineReset = { outlineStyle: 'none', outlineWidth: 0 } as any
 
 const AGE_SUBJECT: Record<string, string> = {
   '4': 'son', '5': 'daughter', '8': 'brother',
@@ -46,13 +72,27 @@ const MONTHS = [
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function buildYears(): { key: string; label: string }[] {
+// Angular's birthYear list (registration.page.ts's apiResponse["YEARS"]) is
+// ordered oldest-first (ascending) — the last entry is the current cutoff
+// year (`birthYear[birthYear.length - 1]`), not the first. The base list is
+// an 18-year floor, but registration.service.ts's c2UpdateDateLists() then
+// trims the last 4 entries for non-female profiles when the gap between now
+// and that floor year is under 21 — e.g. 2026 floor year 2008 (18y gap) gets
+// trimmed to 2004, since male/other's real minimum age is 21, not 18.
+function buildYears(gender: string): { key: string; label: string }[] {
   const max = new Date().getFullYear() - 18
   const min = max - 52
-  return Array.from({ length: max - min + 1 }, (_, i) => {
-    const y = String(max - i)
+  const years = Array.from({ length: max - min + 1 }, (_, i) => {
+    const y = String(min + i)
     return { key: y, label: y }
   })
+
+  if (gender !== '0') {
+    const lastYear = Number(years[years.length - 1]?.key)
+    const yearDif  = new Date().getFullYear() - lastYear
+    if (yearDif < 21) return years.slice(0, years.length - 4)
+  }
+  return years
 }
 
 function getDaysInMonth(month: string, year: string): { key: string; label: string }[] {
@@ -80,6 +120,57 @@ type FieldKey  = 'date' | 'month' | 'year'
 type DropdownPos = { top: number; left: number; width: number; fieldBottom: number }
 type Props     = { navigation: any; route: { params?: { pageNo?: string } } }
 
+// ─── Age badge ────────────────────────────────────────────────────────────────
+// Figma: border-width 1px 0px 1px 1px (no right edge), border-image-source
+// linear-gradient(90deg, rgba(181,0,51,0.1) -30.82%, #FFFFFF 83.06%), fill
+// linear-gradient(90deg, rgba(181,0,51,0) -13.43%, rgba(255,255,255,0.2) 50.2%).
+// Built as an outer gradient "border" layer with an inner gradient fill inset
+// by 1px on top/left/bottom (flush on the right, matching the 0px right border).
+const AGE_BADGE_BORDER_COLORS = ['rgba(181,0,51,0.1)', '#FFFFFF'] as const
+const AGE_BADGE_FILL_COLORS   = ['rgba(181,0,51,0.08)', 'rgba(255,255,255,0.2)'] as const
+const AGE_BADGE_LOCATIONS     = [0, 1] as const
+
+function AgeBadge({ children }: { children: React.ReactNode }) {
+  if (Platform.OS === 'web') {
+    return (
+      <View
+        style={[
+          styles.ageBadgeBorder,
+          { backgroundImage: `linear-gradient(90deg, ${AGE_BADGE_BORDER_COLORS[0]}, ${AGE_BADGE_BORDER_COLORS[1]})` } as any,
+        ]}
+      >
+        <View
+          style={[
+            styles.ageBadge,
+            { backgroundImage: `linear-gradient(90deg, ${AGE_BADGE_FILL_COLORS[0]}, ${AGE_BADGE_FILL_COLORS[1]})` } as any,
+          ]}
+        >
+          {children}
+        </View>
+      </View>
+    )
+  }
+  return (
+    <LinearGradient
+      colors={AGE_BADGE_BORDER_COLORS}
+      locations={AGE_BADGE_LOCATIONS}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.ageBadgeBorder}
+    >
+      <LinearGradient
+        colors={AGE_BADGE_FILL_COLORS}
+        locations={AGE_BADGE_LOCATIONS}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.ageBadge}
+      >
+        {children}
+      </LinearGradient>
+    </LinearGradient>
+  )
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function DOBScreen({ navigation }: Props) {
@@ -87,6 +178,7 @@ export default function DOBScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
 
   const [createdBy,    setCreatedBy]    = useState('1')
+  const [gender,       setGender]       = useState('1')
   const [submitting,   setSubmitting]   = useState(false)
 
   const [selDate,  setSelDate]  = useState('')
@@ -96,16 +188,76 @@ export default function DOBScreen({ navigation }: Props) {
   const [pickerField,  setPickerField]  = useState<FieldKey | null>(null)
   const [dropdownPos,  setDropdownPos]  = useState<DropdownPos>({ top: 0, left: 0, width: 94, fieldBottom: 0 })
 
-  const [showAgeSheet, setShowAgeSheet] = useState(false)
-  const [ageInput,     setAgeInput]     = useState('')
-  const [ageError,     setAgeError]     = useState('')
+  const [showAgeSheet,   setShowAgeSheet]   = useState(false)
+  // Keeps the Modal mounted through the closing animation — same as
+  // components/bottom-sheet/BottomSheet.tsx's modalVisible/visible split.
+  const [ageModalMounted, setAgeModalMounted] = useState(false)
+  const [ageInput,        setAgeInput]        = useState('')
+  const [ageError,        setAgeError]        = useState('')
+  const [ageInputFocused, setAgeInputFocused] = useState(false)
   const ageInputRef = useRef<TextInput>(null)
+
+  // Same border-color precedence as NameScreen.tsx (Angular's .mobile-number
+  // ion-item: focused blue always wins, then empty red, then filled grey).
+  const ageInputBorderColor = ageInputFocused
+    ? Colors.inputFocus
+    : ageInput.length === 0
+      ? Colors.inputError
+      : Colors.inputBorder
+
+  // Same animated-scrim pattern as components/bottom-sheet/BottomSheet.tsx —
+  // the dim backdrop fades in/out alongside the sheet's slide instead of
+  // Modal's own default (an instant, un-animated full-opacity overlay).
+  const ageSlideAnim = useRef(new Animated.Value(SCREEN_H)).current
+  const ageScrimAnim = useRef(new Animated.Value(0)).current
+
+  // "Please enter age" arrow — Angular plays a looping Lottie here
+  // (forward-animation-link, right-arrow-animation.json). A looping
+  // translateX bounce reproduces the same "nudging forward" motion
+  // without pulling in a Lottie player dependency.
+  const enterAgeArrowAnim = useRef(new Animated.Value(0)).current
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(enterAgeArrowAnim, { toValue: 4, duration: 450, useNativeDriver: true }),
+        Animated.timing(enterAgeArrowAnim, { toValue: 0, duration: 450, useNativeDriver: true }),
+      ]),
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [enterAgeArrowAnim])
+
+  useEffect(() => {
+    if (showAgeSheet) {
+      setAgeModalMounted(true)
+      Animated.parallel([
+        Animated.spring(ageSlideAnim, { toValue: 0, useNativeDriver: true, tension: 55, friction: 11 }),
+        Animated.timing(ageScrimAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      ]).start()
+    } else {
+      Animated.parallel([
+        Animated.timing(ageSlideAnim, { toValue: SCREEN_H, duration: 220, useNativeDriver: true }),
+        Animated.timing(ageScrimAnim, { toValue: 0, duration: 180, useNativeDriver: true }),
+      ]).start(({ finished }) => {
+        if (finished) setAgeModalMounted(false)
+      })
+    }
+  }, [showAgeSheet, ageSlideAnim, ageScrimAnim])
 
   const dateRef  = useRef<View>(null)
   const monthRef = useRef<View>(null)
   const yearRef  = useRef<View>(null)
+  const pickerListRef = useRef<FlatList<{ key: string; label: string }>>(null)
 
-  const YEARS = buildYears()
+  // Arrow rotation per field — 0 = pointing down (closed), 1 = pointing up (open).
+  // Same down-arrow.svg icon is reused for both states (Angular swaps the source
+  // image instead; rotating one icon animates the flip rather than popping between them).
+  const dateArrowAnim  = useRef(new Animated.Value(0)).current
+  const monthArrowAnim = useRef(new Animated.Value(0)).current
+  const yearArrowAnim  = useRef(new Animated.Value(0)).current
+
+  const YEARS = buildYears(gender)
 
   // ── Init ─────────────────────────────────────────────────────────────────
 
@@ -113,7 +265,8 @@ export default function DOBScreen({ navigation }: Props) {
     Promise.all([
       getRegValue('CREATEDBY'),
       getRegValue('DATEOFBIRTH'),
-    ]).then(([cb, dob]) => {
+      getRegValue('GENDER'),
+    ]).then(([cb, dob, g]) => {
       if (cb) setCreatedBy(cb)
       if (dob && dob !== '0000-00-00') {
         const p = dob.split('-')
@@ -123,6 +276,7 @@ export default function DOBScreen({ navigation }: Props) {
           setSelDate(String(Number(p[2])))
         }
       }
+      if (g) setGender(g)
     })
   }, [])
 
@@ -138,12 +292,27 @@ export default function DOBScreen({ navigation }: Props) {
     .replace('  ', ' ')
     .trim()
   const noRemText        = possessive
-    ? `If you don't remember your ${possessive}\ndate of birth,`
-    : "If you don't remember your\ndate of birth,"
+    ? `If you don't remember your ${possessive} date of birth,`
+    : "If you don't remember your date of birth,"
+
+  // Age sheet title — Angular: REGISTRATION.ENTERAGETITLE ("Enter your
+  // #PROFILETYPE# age"), same #PROFILETYPE# substitution as the page title above.
+  const ageSheetTitleText = t('REGISTRATION.ENTERAGETITLE', 'Enter your #PROFILETYPE# age')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace('  ', ' ')
+    .trim()
 
   const selMonthLabel    = MONTHS.find(m => m.key === selMonth)?.label ?? ''
   const isAllSelected    = !!(selDate && selMonth && selYear)
   const calculatedAge    = isAllSelected ? calculateAge(selYear, selMonth, selDate) : null
+
+  // Angular: registration-revamp.component.ts's setMinMaxAge() —
+  // GENDER=='0' (female) → minAge 18, everything else (male/other) → 21.
+  // maxAge is always 70. Same rule gates both the DOB fields (isDobAgeValid())
+  // and the "enter age" textbox sheet (registration-modal-popup's setMinMaxAge()).
+  const minAge = gender === '0' ? 18 : 21
+  const maxAge = 70
+  const isDobAgeValid = isAllSelected && calculatedAge !== null && calculatedAge >= minAge && calculatedAge <= maxAge
   // ── Picker helpers ────────────────────────────────────────────────────────
 
   function getOptions(field: FieldKey) {
@@ -164,6 +333,20 @@ export default function DOBScreen({ navigation }: Props) {
     return yearRef
   }
 
+  function animFor(field: FieldKey) {
+    if (field === 'date')  return dateArrowAnim
+    if (field === 'month') return monthArrowAnim
+    return yearArrowAnim
+  }
+
+  function rotateArrow(field: FieldKey, toOpen: boolean) {
+    Animated.timing(animFor(field), {
+      toValue:        toOpen ? 1 : 0,
+      duration:       180,
+      useNativeDriver: true,
+    }).start()
+  }
+
   function openPicker(field: FieldKey) {
     const ref = refFor(field)
     ref.current?.measureInWindow((x, y, w, h) => {
@@ -171,7 +354,36 @@ export default function DOBScreen({ navigation }: Props) {
       const dropW = field === 'month' ? Math.max(w, 130) : w
       setDropdownPos({ top: y, left: x, width: dropW, fieldBottom: y + h })
       setPickerField(field)
+      rotateArrow(field, true)
+
+      // Angular: registration.page.ts only auto-scrolls the Year list — and
+      // only when YEAR has no value yet — via a 700ms-delayed, 1000ms smooth
+      // scrollToPoint (never an instant jump). Same timing here, animated,
+      // so the list visibly glides from the top down to the recent-years end
+      // instead of opening pre-scrolled.
+      if (field === 'year' && !selYear) {
+        const years = getOptions('year')
+        setTimeout(() => {
+          pickerListRef.current?.scrollToIndex({
+            index:    years.length - 1,
+            animated: true,
+          })
+        }, 700)
+      }
     })
+  }
+
+  function closePicker() {
+    if (pickerField) rotateArrow(pickerField, false)
+    setPickerField(null)
+  }
+
+  // Dismiss the keyboard before starting the close animation — otherwise the
+  // keyboard's own dismiss animation competes with the sheet's slide-down,
+  // making the close look janky/inconsistent compared to how it opens.
+  function closeAgeSheet() {
+    Keyboard.dismiss()
+    setShowAgeSheet(false)
   }
 
   function handlePickerSelect(field: FieldKey, key: string) {
@@ -190,13 +402,13 @@ export default function DOBScreen({ navigation }: Props) {
         if (Number(selDate) > days.length) setSelDate('')
       }
     }
-    setPickerField(null)
+    closePicker()
   }
 
   // ── Submit (DOB path) ─────────────────────────────────────────────────────
 
   async function handleNext() {
-    if (!isAllSelected || submitting) return
+    if (!isDobAgeValid || submitting) return
     setSubmitting(true)
     try {
       const dob = `${selYear}-${selMonth.padStart(2, '0')}-${selDate.padStart(2, '0')}`
@@ -215,11 +427,11 @@ export default function DOBScreen({ navigation }: Props) {
   async function handleAgeSubmit() {
     const age    = ageInput.trim()
     const ageNum = Number(age)
-    if (!age || ageNum < 18 || ageNum > 70) {
-      setAgeError('Please enter a valid age (18–70)')
+    if (!age || ageNum < minAge || ageNum > maxAge) {
+      setAgeError(`Please enter a valid age (${minAge}–${maxAge})`)
       return
     }
-    setShowAgeSheet(false)
+    closeAgeSheet()
     setSubmitting(true)
     try {
       await setRegValue('AGE', age)
@@ -232,7 +444,7 @@ export default function DOBScreen({ navigation }: Props) {
     }
   }
 
-  useOnboardingFooter({ nextDisabled: !isAllSelected, nextLoading: submitting, onNext: handleNext }, [isAllSelected, submitting])
+  useOnboardingFooter({ nextDisabled: !isDobAgeValid, nextLoading: submitting, onNext: handleNext }, [isDobAgeValid, submitting])
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -241,6 +453,13 @@ export default function DOBScreen({ navigation }: Props) {
 
   // Dropdown list height capped at MAX_LIST_ITEMS rows
   const listH = Math.min(pickerOptions.length, MAX_LIST_ITEMS) * ITEM_H
+
+  // Only jump straight to a value when one is already selected (e.g. editing
+  // an existing DOB) — otherwise the list opens at the top. Angular does the
+  // same: registration.page.ts's scrollToPoint is only called when the field
+  // has no existing value yet.
+  const selectedIdx = pickerOptions.findIndex(o => o.key === currentVal)
+  const initialScrollIdx = Math.max(0, selectedIdx >= 0 ? selectedIdx - 2 : 0)
 
   // Dropdown position: start at fieldBottom (right below the field),
   // visually it looks like the field expanded downward.
@@ -275,6 +494,10 @@ export default function DOBScreen({ navigation }: Props) {
             ] as const
           ).map(({ field, ref, val, display, placeholder }) => {
             const isOpen = pickerField === field
+            const arrowRotate = animFor(field).interpolate({
+              inputRange:  [0, 1],
+              outputRange: ['0deg', '180deg'],
+            })
             return (
               <View
                 key={field}
@@ -300,47 +523,54 @@ export default function DOBScreen({ navigation }: Props) {
                   <Text style={[styles.fieldText, !val && styles.fieldPlaceholder]} numberOfLines={1}>
                     {val ? display : placeholder}
                   </Text>
-                  {/* Chevron flips when open */}
-                  <Text style={styles.chevron}>{isOpen ? '▴' : '▾'}</Text>
+                  {/* Same down-arrow icon for all 3 fields — rotates 180° when open,
+                      matching Angular's up/down swap (registration-revamp). */}
+                  <Animated.View style={{ transform: [{ rotate: arrowRotate }] }}>
+                    <Image source={{ uri: CDN_ARROW_DOWN }} style={styles.chevronIcon} contentFit="contain" />
+                  </Animated.View>
                 </Pressable>
               </View>
             )
           })}
         </View>
 
-        {/* Age badge — "Your son is 28 years old" (Angular .height-block: fading gradient fill) */}
+        {/* Age badge — "Your son is 28 years old" (Angular .height-block).
+            Figma has TWO gradients: a border-image (a pink→white hairline that fades
+            out toward the right) and a fill. RN has no `border-image` equivalent, so
+            this is built as two stacked layers: an outer gradient view acts as the
+            1px border, and an inner gradient view (inset by that 1px on the top/left/
+            bottom edges, and flush to the right where Figma's border-width is 0) is
+            the fill. Both gradients are near-transparent by design, so the fill layer
+            sits on an opaque white base — without it the badge has no background at
+            all and reads as a dark rectangle against the page. */}
         {isAllSelected && calculatedAge !== null && calculatedAge > 0 && (
-          <LinearGradient
-            colors={['rgba(181,0,51,0)', '#ffffff']}
-            locations={[0, 0.6]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.ageBadge}
-          >
+          <AgeBadge>
             <Text style={styles.ageBadgeText}>
               {ageSubject ? `Your ${ageSubject} is ` : 'You are '}
               <Text style={styles.ageBadgeYears}>{calculatedAge} years</Text>
               {' old'}
             </Text>
-          </LinearGradient>
+          </AgeBadge>
         )}
 
         {/* OR divider + "Please enter age" — hidden once all 3 date fields are filled */}
         {!isAllSelected && (
           <>
             <View style={styles.orRow}>
-              <View style={styles.orLine} />
+              <Image source={{ uri: CDN_OR_LEFT }} style={styles.orLine} contentFit="contain" />
               <Text style={styles.orText}>OR</Text>
-              <View style={styles.orLine} />
+              <Image source={{ uri: CDN_OR_RIGHT }} style={styles.orLine} contentFit="contain" />
             </View>
 
-            <Text style={styles.noRemText}>{noRemText}</Text>
+            <Text style={styles.noRemText} numberOfLines={1}>{noRemText}</Text>
             <Pressable
               style={styles.enterAgeRow}
               onPress={() => { setAgeInput(''); setAgeError(''); setShowAgeSheet(true) }}
             >
               <Text style={styles.enterAgeLink}>Please enter age</Text>
-              <Text style={styles.enterAgeCaret}> ›</Text>
+              <Animated.View style={{ transform: [{ translateX: enterAgeArrowAnim }] }}>
+                <CdnSvg uri={CDN_FORWARD_ICON} width={10} height={10} style={styles.enterAgeIcon} />
+              </Animated.View>
             </Pressable>
           </>
         )}
@@ -353,20 +583,21 @@ export default function DOBScreen({ navigation }: Props) {
         visible={pickerField !== null}
         transparent
         animationType="none"
-        onRequestClose={() => setPickerField(null)}
+        onRequestClose={closePicker}
       >
         {/* Full-screen tap-away closes the dropdown */}
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => setPickerField(null)} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={closePicker} />
 
         {/* Dropdown list — starts right below the field (fieldBottom) */}
         <View style={[styles.dropdown, dropStyle]}>
           <FlatList
+            ref={pickerListRef}
             data={pickerOptions}
             keyExtractor={item => item.key}
             style={{ maxHeight: listH }}
             showsVerticalScrollIndicator
             getItemLayout={(_, index) => ({ length: ITEM_H, offset: ITEM_H * index, index })}
-            initialScrollIndex={Math.max(0, pickerOptions.findIndex(o => o.key === currentVal) - 2)}
+            initialScrollIndex={initialScrollIdx}
             renderItem={({ item }) => {
               const isSel = item.key === currentVal
               return (
@@ -384,12 +615,15 @@ export default function DOBScreen({ navigation }: Props) {
         </View>
       </Modal>
 
-      {/* ── Age entry bottom sheet ── */}
+      {/* ── Age entry bottom sheet — animated scrim fade + slide, same pattern
+          as components/bottom-sheet/BottomSheet.tsx, instead of Modal's own
+          default (an instant, un-animated full-opacity overlay). ── */}
       <Modal
-        visible={showAgeSheet}
+        visible={ageModalMounted}
         transparent
-        animationType="slide"
-        onRequestClose={() => setShowAgeSheet(false)}
+        animationType="none"
+        onRequestClose={closeAgeSheet}
+        statusBarTranslucent
         // Focus once the slide-in animation has actually finished presenting —
         // matches the OTPScreen 'transitionEnd' fix. `autoFocus` on the input
         // instead fires the instant it mounts, racing the Modal's own opening
@@ -397,24 +631,55 @@ export default function DOBScreen({ navigation }: Props) {
         // has a settled layout to resize against, so the sheet never rises.
         onShow={() => ageInputRef.current?.focus()}
       >
-        <TouchableWithoutFeedback onPress={() => setShowAgeSheet(false)}>
-          <View style={styles.overlay} />
+        {/* Animated scrim — pointer-events none so it doesn't block the Pressable below.
+            Angular's registration-modal-popup uses Ionic's modal backdrop (default
+            --backdrop-opacity 0.4, up to 0.8 stacked) — 0.5 read as too light next
+            to it, so this now fades to the same darkness as Colors.scrimStrong. */}
+        <Animated.View
+          style={[
+            StyleSheet.absoluteFill,
+            { backgroundColor: Colors.black, opacity: ageScrimAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.7] }) },
+          ]}
+          pointerEvents="none"
+        />
+
+        <TouchableWithoutFeedback onPress={closeAgeSheet}>
+          <View style={StyleSheet.absoluteFill} />
         </TouchableWithoutFeedback>
 
         <KeyboardAvoidingView
-          style={[styles.ageSheet, { paddingBottom: insets.bottom + 20 }]}
+          style={[
+            styles.ageSheet,
+            { paddingBottom: insets.bottom + 20 },
+            { transform: [{ translateY: ageSlideAnim }] },
+          ]}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         >
-          <View style={styles.dragHandle} />
-          <Text style={styles.ageSheetTitle}>Enter age</Text>
+          {/* Angular: registration-modal-popup's close-icon-size, top-right of the
+              sheet, dismisses back to the DOB fields without saving an age. */}
+          <Pressable
+            style={styles.ageCloseBtn}
+            onPress={closeAgeSheet}
+            hitSlop={10}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
+            <CdnSvg uri={CDN_CLOSE_ICON} width={24} height={24} />
+          </Pressable>
+
+          <Text style={styles.ageSheetTitle}>{ageSheetTitleText}</Text>
 
           <View style={styles.ageInputOuter}>
             <TextInput
               ref={ageInputRef}
-              style={styles.ageInputBox}
+              style={[styles.ageInputBox, { borderColor: ageInputBorderColor }, webOutlineReset]}
               keyboardType="number-pad"
               value={ageInput}
               onChangeText={v => { setAgeInput(v.replace(/\D/g, '')); setAgeError('') }}
+              onFocus={() => setAgeInputFocused(true)}
+              onBlur={() => setAgeInputFocused(false)}
+              cursorColor={Colors.textPrimary}
+              selectionColor={Colors.textPrimary}
               maxLength={2}
               returnKeyType="done"
               onSubmitEditing={handleAgeSubmit}
@@ -432,7 +697,7 @@ export default function DOBScreen({ navigation }: Props) {
               variant="primary"
               size="standard"
               fullWidth
-              disabled={!ageInput}
+              disabled={!ageInput || Number(ageInput) < minAge || Number(ageInput) > maxAge}
               onPress={handleAgeSubmit}
             />
           </View>
@@ -481,6 +746,7 @@ const styles = StyleSheet.create({
     zIndex:            10,
   },
   fieldLabelText: {
+    fontFamily: Fonts.poppinsRegular,
     fontSize:   12,
     fontWeight: '400',
     color:      Colors.textSecondary,
@@ -494,39 +760,55 @@ const styles = StyleSheet.create({
   },
   fieldText: {
     flex:       1,
+    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     fontWeight: '500',
     color:      Colors.textPrimary,
   },
   fieldPlaceholder: {
+    fontFamily: Fonts.poppinsMedium,
     fontWeight: '500',
     color:      Colors.textPrimary,
   },
-  chevron: {
-    fontSize:   14,
-    color:      Colors.textSecondary,
-    lineHeight: 20,
+  chevronIcon: {
+    width:  16,
+    height: 16,
   },
   // ── Age badge ────────────────────────────────────────────────────────────────
 
-  // Angular .height-block: border-radius left-corners-only (8px 0 0 8px);
-  // fill is a fading gradient (rendered via LinearGradient at the call site).
-  ageBadge: {
-    marginTop:        12,
-    paddingHorizontal: 8,
-    paddingVertical:   4,
-    borderWidth:       1,
-    borderColor:       'rgba(181,0,51,0.1)',
+  // Angular .height-block: border-radius left-corners-only (8px 0 0 8px).
+  // Figma: border-image-source: linear-gradient(90deg, rgba(181,0,51,0.1)
+  // -30.82%, #FFFFFF 83.06%), border-width 1px 0px 1px 1px (no right edge),
+  // fill linear-gradient(90deg, rgba(181,0,51,0) -13.43%, rgba(255,255,255,0.2) 50.2%).
+  // RN has no border-image-gradient equivalent, so this outer view renders the
+  // border gradient and the inner `ageBadge` view (inset 1px top/left/bottom,
+  // 0 on the right) renders the fill gradient over it — the outer layer only
+  // shows through that 1px inset, reproducing the border-image effect.
+  ageBadgeBorder: {
+    marginTop:              12,
+    paddingTop:             1,
+    paddingBottom:          1,
+    paddingLeft:            1,
+    paddingRight:           0,
     borderTopLeftRadius:    8,
     borderBottomLeftRadius: 8,
-    alignSelf:         'flex-start',
+    alignSelf:              'flex-start',
+    overflow:               'hidden',
+  },
+  ageBadge: {
+    paddingHorizontal:      8,
+    paddingVertical:        4,
+    borderTopLeftRadius:    7,
+    borderBottomLeftRadius: 7,
   },
   ageBadgeText: {
+    fontFamily: Fonts.poppinsRegular,
     fontSize:   14,
     fontWeight: '400',
     color:      Colors.textPrimary,
   },
   ageBadgeYears: {
+    fontFamily: Fonts.poppinsSemiBold,
     fontWeight: '600',
   },
 
@@ -539,22 +821,26 @@ const styles = StyleSheet.create({
     marginBottom:  20,
   },
   orLine: {
-    flex:            1,
-    height:          1,
-    backgroundColor: Colors.textPrimary,
-    opacity:         0.2,
+    flex:   1,
+    height: 8,
+    opacity: 1,
   },
   orText: {
+    fontFamily:       Fonts.poppinsRegular,
     fontSize:         14,
     fontWeight:       '400',
     color:            Colors.textPrimary,
-    opacity:          0.5,
+    opacity:          1,
     marginHorizontal: 16,
   },
 
   // ── "Please enter age" ────────────────────────────────────────────────────────
+  // Angular's DOBREMINDER is a single continuous string (body2-regular-14,
+  // Poppins Regular) — no manual line break; it wraps only if the viewport is
+  // narrow. `numberOfLines` below keeps this to one line to match on mobile.
 
   noRemText: {
+    fontFamily:   Fonts.poppinsRegular,
     fontSize:     14,
     fontWeight:   '400',
     color:        Colors.textPrimary,
@@ -566,17 +852,15 @@ const styles = StyleSheet.create({
     alignItems:    'center',
   },
   enterAgeLink: {
+    fontFamily:         Fonts.poppinsRegular,
     fontSize:           14,
     fontWeight:         '400',
     color:              Colors.link,
     textDecorationLine: 'underline',
     lineHeight:         20,
   },
-  enterAgeCaret: {
-    fontSize:   16,
-    fontWeight: '600',
-    color:      Colors.link,
-    lineHeight: 20,
+  enterAgeIcon: {
+    marginLeft: 6,
   },
 
   // ── Inline dropdown (rendered inside Modal, positioned at field location) ──────
@@ -608,45 +892,45 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(181,0,51,0.05)',
   },
   dropdownItemText: {
+    fontFamily: Fonts.poppinsRegular,
     fontSize:   14,
     fontWeight: '400',
     color:      Colors.textPrimary,
   },
   dropdownItemTextSel: {
+    fontFamily: Fonts.poppinsSemiBold,
     fontWeight: '600',
     color:      Colors.primaryDark,
   },
 
   // ── Modal overlay ─────────────────────────────────────────────────────────────
 
-  overlay: {
-    flex:            1,
-    backgroundColor: Colors.scrimMedium,
-  },
-
   // ── Age entry bottom sheet ────────────────────────────────────────────────────
 
   ageSheet: {
+    position:             'absolute',
+    bottom:               0,
+    left:                 0,
+    right:                0,
     backgroundColor:      Colors.surface,
     borderTopLeftRadius:  20,
     borderTopRightRadius: 20,
     paddingHorizontal:    24,
     paddingTop:           20,
   },
-  dragHandle: {
-    width:           40,
-    height:          4,
-    borderRadius:    2,
-    backgroundColor: Colors.borderSoft,
-    alignSelf:       'center',
-    marginBottom:    12,
+  // Angular's registration-modal-popup close-icon-size sits at the top of the
+  // sheet content, right-aligned — no drag handle exists in that markup.
+  ageCloseBtn: {
+    alignSelf:    'flex-end',
+    marginBottom: 12,
   },
   ageSheetTitle: {
+    fontFamily:   Fonts.poppinsSemiBold,
     fontSize:     20,
     fontWeight:   '600',
     color:        Colors.textPrimary,
     marginBottom: 28,
-    marginTop:    8,
+    marginTop:    0,
   },
   ageInputOuter: {
     position:  'relative',
@@ -658,6 +942,7 @@ const styles = StyleSheet.create({
     borderColor:       Colors.inputBorder,
     borderRadius:      8,
     paddingHorizontal: 12,
+    fontFamily:        Fonts.poppinsMedium,
     fontSize:          14,
     fontWeight:        '500',
     color:             Colors.textPrimary,
@@ -670,11 +955,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   ageLabelText: {
+    fontFamily: Fonts.poppinsRegular,
     fontSize:   12,
     fontWeight: '400',
     color:      Colors.textSecondary,
   },
   ageError: {
+    fontFamily: Fonts.poppinsRegular,
     marginTop:  8,
     fontSize:   12,
     color:      Colors.inputError,

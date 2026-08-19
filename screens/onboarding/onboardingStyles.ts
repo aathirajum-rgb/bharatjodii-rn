@@ -1,5 +1,6 @@
 import { Platform, StyleSheet } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { Fonts } from '../../src/theme/fonts'
 
 // Shared layout styles used by every onboarding screen.
 // Import as `os` to keep usage terse: os.screen, os.footer, etc.
@@ -23,6 +24,7 @@ export const os = StyleSheet.create({
   },
 
   title: {
+    fontFamily:   Fonts.poppinsSemiBold,
     fontSize:     22,
     fontWeight:   '600',
     color:        Colors.textPrimary,

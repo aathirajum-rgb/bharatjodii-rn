@@ -237,6 +237,7 @@ const styles = StyleSheet.create({
     gap:  8,
   },
   nativeName: {
+    fontFamily: FontsByLanguage.en.semiBold,
     fontSize:   FontSizes.font16,
     fontWeight: '600',
     color:      Colors.textPrimary,

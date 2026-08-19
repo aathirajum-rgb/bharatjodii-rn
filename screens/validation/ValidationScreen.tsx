@@ -44,9 +44,11 @@ import {
   fetchStates, fetchCities, fetchQualificationOptions, fetchOccupationOptions,
   fetchMonthlyIncomeOptions, fetchReligionOptions, fetchCasteOptions,
   fetchSubcasteOptions, fetchGothraOptions, isGothraApplicableForCaste,
+  isHomeTownMotherTongue,
 } from '../../service/registrationService'
 import { resetTo } from '../../utils/navigationRef'
 import { ENavigation } from '../../types/enums/navigation.enum'
+import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
 import SelectField from '../../components/input/SelectField'
 import RegistrationSuccessSheet from '../../components/registration-success-sheet/RegistrationSuccessSheet'
@@ -56,6 +58,8 @@ import { CDN_SVG } from '../../constants/cdn'
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_ALERT_ICON = CDN_SVG + 'alert-circle.svg'
+// Angular: validation.component.html's profile_under_review illustration
+const CDN_UNDER_REVIEW_ICON = CDN_SVG + 'profile_under_review.svg'
 
 const MONTHS: PickerOption[] = [
   { key: '1', label: 'January' }, { key: '2', label: 'February' }, { key: '3', label: 'March' },
@@ -101,21 +105,39 @@ type ActiveField =
   | 'maritalStatus' | 'noOfChildren' | 'dobDate' | 'dobMonth' | 'dobYear'
   | 'motherTongue' | 'state' | 'city' | 'qualification' | 'occupation'
   | 'monthlyIncome' | 'religion' | 'caste' | 'subCaste' | 'gothra'
+  | 'homeState' | 'homeCity'
   | null
 
-type Props = { navigation: any }
+// Angular: callInsertApiAndHandleValidation() enters this screen straight
+// after registration insert, already knowing the outcome — 'underReview'
+// shows the wait state, 'confirm' shows the flagged-field form using the
+// violations from the insert response instead of re-reading storage.
+type Props = {
+  navigation: any
+  route?: { params?: { mode?: 'confirm' | 'underReview'; violationFields?: string[] } | undefined } | undefined
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function ValidationScreen({ navigation }: Props) {
+export default function ValidationScreen({ navigation, route }: Props) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
+
+  const entryMode = route?.params?.mode
+  // Joined to a primitive so load()'s dependency list can't churn on a new
+  // array identity between renders.
+  const entryViolationsKey = (route?.params?.violationFields ?? []).join(',')
 
   const [phase, setPhase] = useState<Phase>('loading')
   const [submitting, setSubmitting] = useState(false)
   const [violationFields, setViolationFields] = useState<string[]>([])
   const [gender, setGender] = useState('1')
   const [matriId, setMatriId] = useState('')
+  const [createdBy, setCreatedBy] = useState('1')
+  // Angular: getRegistrationConfirm2ComponentData()'s isSecondReview — on the
+  // re-shown popup (EDITCNT === 1) the title asks the member to confirm they
+  // want to proceed instead of the standard confirm wording.
+  const [isSecondReview, setIsSecondReview] = useState(false)
 
   // ── Field values ──────────────────────────────────────────────────────────
   const [maritalStatus, setMaritalStatus] = useState<PickerOption | null>(null)
@@ -135,6 +157,15 @@ export default function ValidationScreen({ navigation }: Props) {
   const [caste, setCaste]       = useState<PickerOption | null>(null)
   const [subCaste, setSubCaste] = useState<PickerOption | null>(null)
   const [gothra, setGothra]     = useState<PickerOption | null>(null)
+
+  // Home town cluster — Angular: the HOMETOWN yes/no pills plus the state/city
+  // rows revealed on "No". Only asked when the chosen mother tongue is in
+  // NATIVEPLACEDOMAIN (isHomeTownVisible()).
+  const [homeTownSame, setHomeTownSame]   = useState<'1' | '2' | null>(null)
+  const [homeTownAsk, setHomeTownAsk]     = useState(false)
+  const [homeState, setHomeState]         = useState<PickerOption | null>(null)
+  const [homeCity, setHomeCity]           = useState<PickerOption | null>(null)
+  const [homeCityOptions, setHomeCityOptions] = useState<PickerOption[]>([])
 
   const [original, setOriginal] = useState<Record<string, string>>({})
 
@@ -204,6 +235,17 @@ export default function ValidationScreen({ navigation }: Props) {
 
   const load = useCallback(async () => {
     setPhase('loading')
+
+    // Angular: showProfileUnderReviewModal() — entered straight from the insert
+    // response with AIVALIDATIONTYPE '3'. Nothing to load; the wait state shows
+    // for 3s, then the modal dismisses and handleRegistrationSuccess() runs —
+    // which here is the registration success sheet.
+    if (entryMode === 'underReview') {
+      setPhase('underReview')
+      setTimeout(() => { removeItem('VIOLATIONFIELDS'); setPhase('success') }, 3000)
+      return
+    }
+
     const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
     setMatriId(userId)
 
@@ -212,9 +254,12 @@ export default function ValidationScreen({ navigation }: Props) {
 
     // Angular: c2ViolationFields() reads the ALREADY-STORED 'VIOLATIONFIELDS'
     // (written by pageLandingService.ts before navigating here) on this
-    // initial load — it does not re-call the AI check itself.
-    const storedViolations = await getJson<any[]>('VIOLATIONFIELDS')
-    const violations = mapViolationFields(storedViolations)
+    // initial load — it does not re-call the AI check itself. When the screen
+    // is entered straight from the insert response, those fields are passed as
+    // a route param instead (already mapped) and take precedence.
+    const violations = entryViolationsKey
+      ? entryViolationsKey.split(',')
+      : mapViolationFields(await getJson<any[]>('VIOLATIONFIELDS'))
     if (violations.length && !hasEditableViolationFields(violations)) {
       // Only non-editable violations (e.g. NAME) — nothing to show, complete directly.
       setPhase('success')
@@ -224,6 +269,7 @@ export default function ValidationScreen({ navigation }: Props) {
 
     const rv = await getRegValues()
     const genderVal = rv.GENDER ?? '1'
+    setCreatedBy(rv.CREATEDBY ?? '1')
     setGender(genderVal)
 
     setOriginal({
@@ -279,9 +325,26 @@ export default function ValidationScreen({ navigation }: Props) {
     }
 
     setPhase('form')
-  }, [loadCasteChain])
+  }, [loadCasteChain, entryMode, entryViolationsKey])
 
   useEffect(() => { load() }, [load])
+
+  // Angular: isHomeTownVisible() — homeTownDomain.includes(motherTongueKey),
+  // re-evaluated whenever the mother tongue changes since picking e.g. Punjabi
+  // mid-flow starts requiring a home town. Angular's onMotherTongueSelect()
+  // also clears homeTownKey/showHomeStateCity when the new tongue is no longer
+  // eligible, so the same reset happens here.
+  useEffect(() => {
+    let cancelled = false
+    const mtKey = motherTongue?.key ?? ''
+    if (!mtKey) { setHomeTownAsk(false); return }
+    isHomeTownMotherTongue(mtKey).then(ask => {
+      if (cancelled) return
+      setHomeTownAsk(ask)
+      if (!ask) { setHomeTownSame(null); setHomeState(null); setHomeCity(null); setHomeCityOptions([]) }
+    })
+    return () => { cancelled = true }
+  }, [motherTongue])
 
   // ─── Cascading selection handlers ──────────────────────────────────────────
 
@@ -307,13 +370,34 @@ export default function ValidationScreen({ navigation }: Props) {
     await loadCasteChain(religion.key, motherTongue?.key ?? '', opt.key)
   }
 
+  // Angular: onHomeTownSelect() — "Yes" ('1') reuses the member's CURRENT
+  // state/city as the home town and hides the pickers; "No" ('2') clears them
+  // and reveals the state/city rows for a different home town.
+  function handleSelectHomeTown(key: '1' | '2') {
+    setHomeTownSame(key)
+    setHomeCity(null)
+    setHomeCityOptions([])
+    setHomeState(key === '1' ? (state ?? null) : null)
+  }
+
+  // Angular: openHomeStatePanel() — a changed home state clears the home city
+  // and refetches its list.
+  async function handleSelectHomeState(opt: PickerOption) {
+    setHomeState(opt); setHomeCity(null); setHomeCityOptions([]); setActiveField(null)
+    const list = await fetchCities(opt.key)
+    setHomeCityOptions(list)
+  }
+
   // ─── Validation ─────────────────────────────────────────────────────────────
 
   function isDobValid(): boolean {
     return !!(dobDate && dobMonth && dobYear)
   }
   function isAgeOutOfLimit(): boolean {
-    if (hasUserDob) return false
+    // Angular: returns false when the member already has a DOB, or when DOB
+    // isn't among the flagged fields — otherwise an empty ageValue would
+    // permanently disable Submit on a form that never asks for an age.
+    if (hasUserDob || !shouldShowField('DOB')) return false
     const minAge = gender === '0' ? 18 : 21
     const age = Number(ageValue)
     if (!ageValue || isNaN(age)) return true
@@ -422,6 +506,9 @@ export default function ValidationScreen({ navigation }: Props) {
           return
         }
         setViolationFields(freshViolations)
+        // Angular: isSecondReview — EDITCNT === 1 flips the title to
+        // MISSING_DETAILS_2 ("Are you sure you want to proceed…").
+        setIsSecondReview(editCnt === 1)
         // Fields stay populated with what the member just entered — Angular
         // rebuilds componentData from the fresh response but keeps the same
         // form values on screen for the member to adjust further.
@@ -467,6 +554,19 @@ export default function ValidationScreen({ navigation }: Props) {
       if (hasGothra && gothra && gothra.key !== original.GOTHRA) {
         changes.push({ field: 'GOTHRA', value: gothra.key, existingValue: original.GOTHRA })
       }
+
+      // Angular: callEditProfileUpdate() pushes only HOMECITY (never HOMESTATE
+      // on its own), carrying the state as "city~state". "Yes" reuses the
+      // member's current state/city as the home town.
+      if (homeTownAsk && homeTownSame) {
+        const hState = homeTownSame === '1' ? state?.key : homeState?.key
+        const hCity  = homeTownSame === '1' ? city?.key  : homeCity?.key
+        if (hState && hCity) {
+          await setRegValues({ HOMETOWN: homeTownSame, HOMESTATE: hState, HOMECITY: hCity })
+          changes.push({ field: 'HOMECITY', value: `${hCity}~${hState}` })
+        }
+      }
+
       if (changes.length) await submitFieldChanges(changes)
       setPhase('success')
     } finally {
@@ -474,10 +574,20 @@ export default function ValidationScreen({ navigation }: Props) {
     }
   }
 
+  // Angular: enableReligionDetailsCTA() — homeTownOk requires a Yes/No answer,
+  // and on "No" ('2') also both home state and home city.
+  function isHomeTownValid(): boolean {
+    if (!homeTownAsk) return true
+    if (!homeTownSame) return false
+    if (homeTownSame === '2') return !!homeState && !!homeCity
+    return true
+  }
+
   function isFollowUpValid(): boolean {
     if (phase === 'religionForm' && (!motherTongue || !caste)) return false
     if (hasSubcaste && !subCaste) return false
     if (hasGothra && !gothra) return false
+    if (!isHomeTownValid()) return false
     return true
   }
 
@@ -505,6 +615,8 @@ export default function ValidationScreen({ navigation }: Props) {
       case 'caste': return { title: isChristian ? t('REGISTRATION.DIVISIONLABEL', 'Division') : t('REGISTRATION.CASTELABEL', 'Caste'), options: casteOptions, selectedKey: caste?.key, onSelect: o => { handleSelectCaste(o) } }
       case 'subCaste': return { title: t('REGISTRATION.SUBCASTELABEL', 'Sub caste'), options: subCasteOptions, selectedKey: subCaste?.key, onSelect: o => { setSubCaste(o); setActiveField(null) } }
       case 'gothra': return { title: t('REGISTRATION.GOTHRAMLABEL', 'Gothram'), options: gothraOptions, selectedKey: gothra?.key, onSelect: o => { setGothra(o); setActiveField(null) } }
+      case 'homeState': return { title: t('REGISTRATION.STATELABEL', 'State'), options: stateOptions, selectedKey: homeState?.key, onSelect: o => { handleSelectHomeState(o) } }
+      case 'homeCity': return { title: t('REGISTRATION.CITYLABEL', 'City'), options: homeCityOptions, selectedKey: homeCity?.key, onSelect: o => { setHomeCity(o); setActiveField(null) } }
       default: return { title: '', options: [], onSelect: () => {} }
     }
   }
@@ -520,10 +632,13 @@ export default function ValidationScreen({ navigation }: Props) {
     )
   }
 
+  // Angular: validation.component.html's profile_under_review block — a
+  // 160x160 illustration over a white→#FCEAF0 vertical gradient, with the
+  // heading centred below it.
   if (phase === 'underReview') {
     return (
       <View style={[s.screen, s.underReview, { paddingTop: insets.top }]}>
-        <CdnSvg uri={CDN_ALERT_ICON} width={80} height={80} />
+        <CdnSvg uri={CDN_UNDER_REVIEW_ICON} width={160} height={160} style={s.underReviewImg} />
         <Text style={s.underReviewTitle}>{t('REGISTRATION.PROFILE_REVIEW', 'Your profile is under review')}</Text>
       </View>
     )
@@ -531,15 +646,47 @@ export default function ValidationScreen({ navigation }: Props) {
 
   const isFollowUp = phase === 'religionForm' || phase === 'dependentForm'
 
+  // Angular: replaceProfileType() — substitutes #PROFILETYPE# with the
+  // possessive for CREATEDBY, or '' for Myself ('1'), then collapses the gap.
+  function fillProfileType(key: string, fallback: string): string {
+    const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
+    const profileType   = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
+    return t(key, fallback)
+      .replace('#PROFILETYPE#', profileType)
+      .replace(/\s{2,}/g, ' ')
+      .trim()
+  }
+
+  // Angular: getOnboarding3Title() for the confirm screen (MISSING_DETAILS_2 on
+  // the second review), MISSING_DETAILS for the follow-up sheets.
+  const screenTitle = isFollowUp
+    ? t('REGISTRATION.MISSING_DETAILS', 'Please provide the below details')
+    : isSecondReview
+      ? t('REGISTRATION.MISSING_DETAILS_2', 'Are you sure you want to proceed with these details ?')
+      : fillProfileType('REGISTRATION.CONFIRM_SHEET', 'Please confirm your #PROFILETYPE# details below')
+
+  // Angular: updateAgeContent() + c2AgeTemplate() — the age statement under the
+  // DOB row. Myself ('1') uses AGESTATEMENTMYSELF ("You are 21 years old"),
+  // everyone else AGESTATEMENT with the possessive. Shown only once the DOB (or
+  // typed age) is valid. The locale strings wrap #AGE# in a <span> for the web's
+  // bold styling — stripped here since RN renders plain text.
+  const ageStatement = (() => {
+    if (!shouldShowField('DOB')) return ''
+    let age = ''
+    if (hasUserDob && isDobValid()) age = String(calculateAge(dobYear!.key, dobMonth!.key, dobDate!.key))
+    else if (!hasUserDob && ageValue && !isAgeOutOfLimit()) age = ageValue
+    if (!age) return ''
+    const template = createdBy === '1'
+      ? t('REGISTRATION.AGESTATEMENTMYSELF', 'You are #AGE# years old')
+      : fillProfileType('REGISTRATION.AGESTATEMENT', 'Your #PROFILETYPE# is #AGE# years old')
+    return template.replace('#AGE#', age).replace(/<[^>]+>/g, '').replace(/\s{2,}/g, ' ').trim()
+  })()
+
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <CdnSvg uri={CDN_ALERT_ICON} width={48} height={48} />
-        <Text style={s.title}>
-          {isFollowUp
-            ? t('REGISTRATION.MISSING_DETAILS', 'Please provide the below details')
-            : t('REGISTRATION.CONFIRM_SHEET', 'Please confirm your details below')}
-        </Text>
+        <Text style={s.title}>{screenTitle}</Text>
 
         {phase === 'form' && (
           <>
@@ -569,6 +716,10 @@ export default function ValidationScreen({ navigation }: Props) {
                 </View>
               )
             )}
+
+            {/* Angular: updateAgeContent() — mt-12 body2-regular-14 under the DOB row */}
+            {!!ageStatement && <Text style={s.ageStatement}>{ageStatement}</Text>}
+
             {shouldShowField('MOTHERTONGUE') && (
               <SelectField label={t('REGISTRATION.MOTHERTONGUELABEL', 'Mother tongue')} value={motherTongue?.label} placeholder={t('REGISTRATION.SELECTMOTHERTONGUE', 'Select mother tongue')} onPress={() => setActiveField('motherTongue')} />
             )}
@@ -625,6 +776,59 @@ export default function ValidationScreen({ navigation }: Props) {
             )}
           </>
         )}
+
+        {/* Home town cluster — Angular: the isHomeTownVisible() block, shown on
+            BOTH follow-up sheets (religion-details and dependent-only) when the
+            selected mother tongue is in NATIVEPLACEDOMAIN. */}
+        {isFollowUp && homeTownAsk && (
+          <>
+            <Text style={s.sectionLabel}>
+              {fillProfileType('REGISTRATION.HOME_TOWN_TXT',
+                'Is your #PROFILETYPE# home town same as current location?')}
+            </Text>
+
+            <View style={s.pillGroup}>
+              {([['1', t('GENERAL.YES', 'Yes')], ['2', t('GENERAL.NO', 'No')]] as const).map(([key, label]) => {
+                const isSel = homeTownSame === key
+                return (
+                  <Pressable
+                    key={key}
+                    style={[s.pill, isSel && s.pillSelected]}
+                    onPress={() => handleSelectHomeTown(key)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: isSel }}
+                    accessibilityLabel={label}
+                  >
+                    <View style={[s.pillRadio, isSel && s.pillRadioSelected]}>
+                      {isSel && <View style={s.pillTick} />}
+                    </View>
+                    <Text style={[s.pillText, isSel && s.pillTextSelected]}>{label}</Text>
+                  </Pressable>
+                )
+              })}
+            </View>
+
+            {/* Angular: showHomeStateCity — revealed only on "No" */}
+            {homeTownSame === '2' && (
+              <View style={s.homeLocationFields}>
+                <SelectField
+                  label={t('REGISTRATION.STATELABEL', 'State')}
+                  value={homeState?.label}
+                  placeholder={t('REGISTRATION.SELECTSTATE', 'Select state')}
+                  onPress={() => setActiveField('homeState')}
+                />
+                {(homeCityOptions.length > 0 || homeCity) && (
+                  <SelectField
+                    label={t('REGISTRATION.CITYLABEL', 'City')}
+                    value={homeCity?.label}
+                    placeholder={t('REGISTRATION.SELECTCITY', 'Select city')}
+                    onPress={() => setActiveField('homeCity')}
+                  />
+                )}
+              </View>
+            )}
+          </>
+        )}
       </ScrollView>
 
       <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
@@ -659,7 +863,44 @@ const s = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 
   content: { paddingHorizontal: 24, paddingTop: 24 },
-  title: { fontSize: 18, fontWeight: '600', color: '#1f1e1b', marginTop: 24, marginBottom: 24, lineHeight: 24 },
+  // Angular: icon has mb-24, title heading2-semibold-18 with mb-32
+  title: { fontSize: 18, fontWeight: '600', color: '#1f1e1b', marginTop: 24, marginBottom: 32, lineHeight: 24 },
+
+  // Angular: .font-14-semibold black-color, mt-32 above the home-town pills
+  sectionLabel: { marginTop: 8, marginBottom: 12, fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
+
+  // Angular: .gender-pill-group / .gender-pill — reused verbatim for the
+  // home-town Yes/No toggle in the same template.
+  pillGroup: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 16 },
+  pill: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    height: 40, borderWidth: 1, borderColor: Colors.borderNeutral, borderRadius: 28,
+    backgroundColor: Colors.white, paddingLeft: 8, paddingRight: 16,
+  },
+  pillSelected: {
+    borderRadius: 50, borderColor: 'rgba(181, 0, 51, 0.40)', backgroundColor: 'rgba(181, 0, 51, 0.02)',
+  },
+  pillRadio: {
+    width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: Colors.borderNeutral,
+    alignItems: 'center', justifyContent: 'center', marginRight: 8,
+  },
+  pillRadioSelected: { borderColor: Colors.primaryDark, backgroundColor: Colors.primaryDark },
+  // Angular ::after — a rotated ⌐ from two white borders forms the tick
+  pillTick: {
+    width: 8, height: 3, borderLeftWidth: 2, borderBottomWidth: 2,
+    borderLeftColor: Colors.white, borderBottomColor: Colors.white,
+    transform: [{ rotate: '-50deg' }], marginTop: -3,
+  },
+  pillText: { fontSize: 14, fontWeight: '400', lineHeight: 16, color: Colors.textPrimary },
+  pillTextSelected: { fontWeight: '500' },
+
+  homeLocationFields: { marginTop: 24 },
+
+  // Angular: mt-12 body2-regular-14 black-color under the DOB row
+  ageStatement: {
+    marginTop: 12, marginBottom: 12, fontSize: 14, lineHeight: 20,
+    color: Colors.textPrimary,
+  },
 
   dobRow: { flexDirection: 'row', gap: 8, marginBottom: 4 },
   dobCol: { flex: 3 },
@@ -683,6 +924,14 @@ const s = StyleSheet.create({
   submitBtnDisabled: { opacity: 0.5 },
   submitBtnText: { color: Colors.white, fontSize: 16, fontWeight: '600' },
 
-  underReview: { alignItems: 'center', justifyContent: 'center', gap: 16, paddingHorizontal: 32 },
+  // Angular: linear-gradient(180deg, #FFF 0%, #FCEAF0 100%) with 32px padding.
+  // RN has no CSS gradients; the flat tint is the closest single-colour stand-in
+  // without pulling in a gradient dependency for one screen.
+  underReview: {
+    alignItems: 'center', justifyContent: 'center', padding: 32,
+    backgroundColor: '#FCEAF0',
+  },
+  underReviewImg: { marginBottom: 24 },
+  // Angular heading2-semibold-18 color-1f1e1b, centred
   underReviewTitle: { fontSize: 18, fontWeight: '600', color: '#1f1e1b', textAlign: 'center' },
 })
