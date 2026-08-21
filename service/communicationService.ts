@@ -513,6 +513,24 @@ export async function unblockProfile(partnerId: string): Promise<boolean> {
   return res?.RESPONSECODE === '1' || res?.RESPONSECODE == 1
 }
 
+// ─── Block / Unblock (one-to-one chat overflow menu) ───────────────────────────
+// Angular: messages.component.ts's blockChatProfile()/unblockChatProfile() — kept
+// separate from unblockProfile() above rather than overloading it, since the chat
+// context's unblock call sends an extra &TYPE=1 the Ignored-Profiles flow doesn't,
+// and reusing/changing that shared function risked regressing its existing callers.
+
+export async function blockChatProfile(partnerId: string): Promise<boolean> {
+  const params = await getCommParams(partnerId, true)
+  const res = await apiCall(Endpoints.communication.blockProfile, 'POST', params)
+  return res?.RESPONSECODE === '1' || res?.RESPONSECODE == 1
+}
+
+export async function unblockChatProfile(partnerId: string): Promise<boolean> {
+  const params = (await getCommParams(partnerId)) + '&TYPE=1'
+  const res = await apiCall(Endpoints.communication.unblock, 'POST', params)
+  return res?.RESPONSECODE === '1' || res?.RESPONSECODE == 1
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 // Angular getApiParams(partnerId, 'communication'/'phoneviewed') → includes ENTRYTYPE

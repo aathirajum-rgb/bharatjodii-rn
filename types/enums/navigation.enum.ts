@@ -38,7 +38,6 @@ export enum ENavigation {
   ID_VERIFICATION = 'id-verification',
   USER_PREFERENCE = 'user-preference',
   REFERRAL = 'referral',
-  CHAT_ROOM = 'chat-room',
   EDIT_BREATHERS = 'editprofile-breathers',
   FILTER_PREFERENCE_DETAILS = 'filter-preference-details',
   PREFERENCE = 'preference',

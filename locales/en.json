@@ -479,7 +479,8 @@
        "UNBLOCK_CONTENT":"Once you unblock ##HIM_HER##, you both will be able to contact each other.",
        "UNBLOCK_DONT_SHOW":"Don't show me again",
        "UNBLOCK_CTA1":"Unblock",
-       "UNBLOCK_CTA2":"Cancel"
+       "UNBLOCK_CTA2":"Cancel",
+       "OPP_BLOCK_TEXT":"You cannot message this user"
     },
     "ACCOUNT":{
         "HEADER":"Manage account", 

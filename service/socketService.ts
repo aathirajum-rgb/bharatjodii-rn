@@ -182,10 +182,10 @@ async function _openConnection(notifyBaseUrl: string): Promise<void> {
       const msg = data?.MSG?.[0]
       if (!msg) return
       // Angular: !this.router.url.includes("/messages") — skip while the recipient
-      // is already looking at the one-to-one chat itself. No chat screen exists in
-      // this app yet, so ENavigation.CHAT_ROOM never matches and this is always true;
-      // this starts working the moment that screen is registered under that name.
-      const onChatScreen = navigationRef.getCurrentRoute()?.name === ENavigation.CHAT_ROOM
+      // is already looking at the one-to-one chat itself (ChatScreen.tsx, registered
+      // as ENavigation.CHAT_WINDOW — that screen's own onReceiver listener handles
+      // the "seen" tick for messages read while actually open).
+      const onChatScreen = navigationRef.getCurrentRoute()?.name === ENavigation.CHAT_WINDOW
       if (String(msg.ReceiverId) === _userId && Number(msg.RStatus) === 1 && !onChatScreen) {
         _handleReceiverMessage(msg)
       }

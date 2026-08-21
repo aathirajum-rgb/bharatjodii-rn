@@ -225,13 +225,17 @@ export default function MessagerListScreen({ navigation }: Props) {
   }, [conversationsLoadingMore, conversationsHasMore, conversationsLoaded])
 
   // Angular: navigateToPage() — reported/deleted rows show a toast instead of
-  // opening the chat. A one-to-one chat screen doesn't exist in this app yet
-  // (later phase), so a live row also surfaces a toast rather than a broken
-  // navigate() call.
+  // opening the chat; a live row opens ChatScreen.tsx (the '/messages' target).
   function handleConversationPress(item: ChatListItem) {
     if (item.isReported) { showToast(t('MESSAGES.REPORTED_PROFILE')); return }
     if (item.isDeleted) { showToast(t('LIKE_LIST.DELETED_PROFILE_TXT')); return }
-    showToast(t('GENERAL.COMING_SOON', 'This conversation will open soon'))
+    navigation.navigate('chat-window', {
+      partnerId: item.matriId,
+      partnerName: item.name,
+      partnerPhoto: item.photoUrl,
+      partnerOnline: item.isOnline,
+      ...(item.lastActive != null ? { partnerLastActive: item.lastActive } : {}),
+    })
   }
 
   function switchTab(tab: MessageTab) {

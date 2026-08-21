@@ -18,7 +18,7 @@ export function adaptChatListRecord(record: ChatListRecord, loginUserId: string)
   const kind = resolveKind(record.msgType)
   const isOwnMessage = String(record.SenderId) === String(loginUserId)
 
-  return {
+  const item: ChatListItem = {
     matriId:      record.MatriId,
     name:         record.Name ?? '',
     photoUrl:     record.Photourl ?? '',
@@ -33,6 +33,11 @@ export function adaptChatListRecord(record: ChatListRecord, loginUserId: string)
     isOwnMessage,
     readStatus:   Number(record.ReadStatus) || 0,
   }
+  // lastlogin is epoch SECONDS (confirmed against a real captured RESPMYCHAT
+  // payload — 10-digit values) — Date-friendly fields elsewhere in this app
+  // are epoch ms, so convert here rather than at every call site.
+  if (record.lastlogin) item.lastActive = Number(record.lastlogin) * 1000
+  return item
 }
 
 // Angular: dedupeChatList() — a repeated infinite-scroll page or a re-sent list

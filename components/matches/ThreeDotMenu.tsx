@@ -17,6 +17,9 @@ const REPORT_ICON_URI  = CDN_SVG + 'viewprofile/report-profile-img.svg'
 // Confirmed real asset (old Angular: assets/images/svg/unblock-jodii-chat-img.svg) —
 // no dedicated "unblock" icon existed anywhere else in this port's CDN usage yet.
 const UNBLOCK_ICON_URI = CDN_SVG + 'unblock-jodii-chat-img.svg'
+// Angular: button.component.html's blockProfileBtn case — confirmed real asset,
+// reused rather than a dedicated "block" icon (Angular's own menu item does this too).
+const BLOCK_ICON_URI   = CDN_SVG + 'revamp/close-icon.svg'
 
 export interface ThreeDotMenuProps {
   // Angular: report-remove-profile.component.ts's @Input IsShowRemoveProfile/
@@ -31,6 +34,10 @@ export interface ThreeDotMenuProps {
   // in practice (no caller passes both today).
   showUnblock?: boolean | undefined
   onUnblock?:   (() => void) | undefined
+  // ChatScreen.tsx's overflow menu — "Block profile", shown only when there's
+  // no existing block relationship (mutually exclusive with showUnblock there).
+  showBlock?: boolean | undefined
+  onBlock?:   (() => void) | undefined
   // Desktop cards anchor this button inline in the icon row (relatively
   // positioned wrapper), not floating over the whole card's photo like
   // mobile does — override top/right to anchor to that smaller wrapper.
@@ -38,7 +45,7 @@ export interface ThreeDotMenuProps {
 }
 
 export default function ThreeDotMenu({
-  showRemove, showReport, onRemove, onReport, showUnblock, onUnblock, positionStyle,
+  showRemove, showReport, onRemove, onReport, showUnblock, onUnblock, showBlock, onBlock, positionStyle,
 }: ThreeDotMenuProps) {
   const { t } = useTranslation()
   return (
@@ -47,6 +54,12 @@ export default function ThreeDotMenu({
         <Pressable style={s.item} onPress={onRemove}>
           <CdnSvg uri={REMOVE_ICON_URI} width={20} height={20} />
           <Text style={s.itemText}>{t('MATCHES.REMOVEPROFILE')}</Text>
+        </Pressable>
+      )}
+      {showBlock && (
+        <Pressable style={s.item} onPress={onBlock}>
+          <CdnSvg uri={BLOCK_ICON_URI} width={20} height={20} />
+          <Text style={s.itemText}>{t('MESSAGES.BLOCK_PROFILE', 'Block this profile')}</Text>
         </Pressable>
       )}
       {showReport && (

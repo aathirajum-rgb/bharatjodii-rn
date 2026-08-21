@@ -16,6 +16,7 @@ export interface ChatListRecord {
   OnlineNow:    number            // 0 | 1
   TimeStamp:    number | string
   Duration?:    string            // audio message duration caption
+  lastlogin?:   number            // epoch seconds — used for the chat header's "last active" text
 }
 
 // RESPMYCHAT payload — Angular: getChatList()'s `message` object
@@ -43,4 +44,5 @@ export interface ChatListItem {
   text:         string          // message text (kind='text') or audio duration (kind='audio')
   isOwnMessage: boolean         // SenderId === logged-in user — drives the read-tick icon
   readStatus:   number          // 1|2|3, only meaningful when isOwnMessage && kind==='text'
+  lastActive?:  number          // epoch ms — seeds the chat header before RESPBASIC confirms it
 }

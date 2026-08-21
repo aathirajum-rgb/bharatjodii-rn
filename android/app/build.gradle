@@ -140,6 +140,318 @@ android {
             buildConfigField "int", "APP_TYPE", "118"
             resValue "string", "app_name", "Malayalam Jodii"
         }
+        telugu {
+            dimension "appType"
+            applicationId('jodiiapp.android.telugu')
+            buildConfigField "int", "APP_TYPE", "117"
+            resValue "string", "app_name", "Telugu Jodii"
+        }
+        kannada {
+            dimension "appType"
+            applicationId('jodiiapp.android.kannada')
+            buildConfigField "int", "APP_TYPE", "119"
+            resValue "string", "app_name", "Kannada Jodii"
+        }
+        oriya {
+            dimension "appType"
+            applicationId('jodiiapp.android.oriya')
+            buildConfigField "int", "APP_TYPE", "120"
+            resValue "string", "app_name", "Oriya Jodii"
+        }
+        bengali {
+            dimension "appType"
+            applicationId('jodiiapp.android.bengali')
+            buildConfigField "int", "APP_TYPE", "121"
+            resValue "string", "app_name", "Bengali Jodii"
+        }
+        marathi {
+            dimension "appType"
+            applicationId('jodiiapp.android.marathi')
+            buildConfigField "int", "APP_TYPE", "122"
+            resValue "string", "app_name", "Marathi Jodii"
+        }
+        gujarati {
+            dimension "appType"
+            applicationId('jodiiapp.android.gujarati')
+            buildConfigField "int", "APP_TYPE", "123"
+            resValue "string", "app_name", "Gujarati Jodii"
+        }
+        hindi {
+            dimension "appType"
+            applicationId('jodiiapp.android.hindi')
+            buildConfigField "int", "APP_TYPE", "124"
+            resValue "string", "app_name", "Hindi Jodii"
+        }
+        punjabi {
+            dimension "appType"
+            applicationId('jodiiapp.android.punjabi')
+            buildConfigField "int", "APP_TYPE", "125"
+            resValue "string", "app_name", "Punjabi Jodii"
+        }
+        ninetysixkulimaratha {
+            dimension "appType"
+            applicationId('ninetysixkulimaratha.jodii.com')
+            buildConfigField "int", "APP_TYPE", "301"
+            resValue "string", "app_name", "Ninetysixkulimaratha Jodii"
+        }
+        ezhava {
+            dimension "appType"
+            applicationId('ezhava.jodii.com')
+            buildConfigField "int", "APP_TYPE", "302"
+            resValue "string", "app_name", "Ezhava Jodii"
+        }
+        nair {
+            dimension "appType"
+            applicationId('nair.jodii.com')
+            buildConfigField "int", "APP_TYPE", "303"
+            resValue "string", "app_name", "Nair Jodii"
+        }
+        kayastha {
+            dimension "appType"
+            applicationId('kayastha.jodii.com')
+            buildConfigField "int", "APP_TYPE", "304"
+            resValue "string", "app_name", "Kayastha Jodii"
+        }
+        lingayath {
+            dimension "appType"
+            applicationId('lingayath.jodii.com')
+            buildConfigField "int", "APP_TYPE", "305"
+            resValue "string", "app_name", "Lingayath Jodii"
+        }
+        khandayat {
+            dimension "appType"
+            applicationId('khandayat.jodii.com')
+            buildConfigField "int", "APP_TYPE", "306"
+            resValue "string", "app_name", "Khandayat Jodii"
+        }
+        sc {
+            dimension "appType"
+            applicationId('sc.jodii.com')
+            buildConfigField "int", "APP_TYPE", "307"
+            resValue "string", "app_name", "SC Jodii"
+        }
+        vokkaliga {
+            dimension "appType"
+            applicationId('vokkaliga.jodii.com')
+            buildConfigField "int", "APP_TYPE", "308"
+            resValue "string", "app_name", "Vokkaliga Jodii"
+        }
+        vishwakarma {
+            dimension "appType"
+            applicationId('vishwakarma.jodii.com')
+            buildConfigField "int", "APP_TYPE", "309"
+            resValue "string", "app_name", "Vishwakarma Jodii"
+        }
+        patel {
+            dimension "appType"
+            applicationId('patel.jodii.com')
+            buildConfigField "int", "APP_TYPE", "310"
+            resValue "string", "app_name", "Patel Jodii"
+        }
+        adidravidar {
+            dimension "appType"
+            applicationId('adidravidar.jodii.com')
+            buildConfigField "int", "APP_TYPE", "311"
+            resValue "string", "app_name", "Adidravidar Jodii"
+        }
+        teli {
+            dimension "appType"
+            applicationId('teli.jodii.com')
+            buildConfigField "int", "APP_TYPE", "312"
+            resValue "string", "app_name", "Teli Jodii"
+        }
+        vanniyar {
+            dimension "appType"
+            applicationId('vanniyar.jodii.com')
+            buildConfigField "int", "APP_TYPE", "313"
+            resValue "string", "app_name", "Vanniyar Jodii"
+        }
+        reddy {
+            dimension "appType"
+            applicationId('reddy.jodii.com')
+            buildConfigField "int", "APP_TYPE", "314"
+            resValue "string", "app_name", "Reddy Jodii"
+        }
+        kapu {
+            dimension "appType"
+            applicationId('kapu.jodii.com')
+            buildConfigField "int", "APP_TYPE", "315"
+            resValue "string", "app_name", "Kapu Jodii"
+        }
+        viswabrahmin {
+            dimension "appType"
+            applicationId('viswabrahmin.jodii.com')
+            buildConfigField "int", "APP_TYPE", "316"
+            resValue "string", "app_name", "Viswabrahmin Jodii"
+        }
+        thiyya {
+            dimension "appType"
+            applicationId('thiyya.jodii.com')
+            buildConfigField "int", "APP_TYPE", "317"
+            resValue "string", "app_name", "Thiyya Jodii"
+        }
+        kuruba {
+            dimension "appType"
+            applicationId('kuruba.jodii.com')
+            buildConfigField "int", "APP_TYPE", "318"
+            resValue "string", "app_name", "Kuruba Jodii"
+        }
+        gowda {
+            dimension "appType"
+            applicationId('gowda.jodii.com')
+            buildConfigField "int", "APP_TYPE", "319"
+            resValue "string", "app_name", "Gowda Jodii"
+        }
+        nadar {
+            dimension "appType"
+            applicationId('nadar.jodii.com')
+            buildConfigField "int", "APP_TYPE", "320"
+            resValue "string", "app_name", "Nadar Jodii"
+        }
+        aryavysya {
+            dimension "appType"
+            applicationId('aryavysya.jodii.com')
+            buildConfigField "int", "APP_TYPE", "321"
+            resValue "string", "app_name", "Aryavysya Jodii"
+        }
+        prajapati {
+            dimension "appType"
+            applicationId('prajapati.jodii.com')
+            buildConfigField "int", "APP_TYPE", "322"
+            resValue "string", "app_name", "Prajapati Jodii"
+        }
+        konguvellalar {
+            dimension "appType"
+            applicationId('konguvellalar.jodii.com')
+            buildConfigField "int", "APP_TYPE", "323"
+            resValue "string", "app_name", "Konguvellalar Jodii"
+        }
+        thevar {
+            dimension "appType"
+            applicationId('thevar.jodii.com')
+            buildConfigField "int", "APP_TYPE", "324"
+            resValue "string", "app_name", "Thevar Jodii"
+        }
+        kshatriya {
+            dimension "appType"
+            applicationId('kshatriya.jodii.com')
+            buildConfigField "int", "APP_TYPE", "325"
+            resValue "string", "app_name", "Kshatriya Jodii"
+        }
+        kamma {
+            dimension "appType"
+            applicationId('kamma.jodii.com')
+            buildConfigField "int", "APP_TYPE", "326"
+            resValue "string", "app_name", "Kamma Jodii"
+        }
+        rajput {
+            dimension "appType"
+            applicationId('rajput.jodii.com')
+            buildConfigField "int", "APP_TYPE", "327"
+            resValue "string", "app_name", "Rajput Jodii"
+        }
+        agarwal {
+            dimension "appType"
+            applicationId('agarwal.jodii.com')
+            buildConfigField "int", "APP_TYPE", "328"
+            resValue "string", "app_name", "Agarwal Jodii"
+        }
+        yadav {
+            dimension "appType"
+            applicationId('yadav.jodii.com')
+            buildConfigField "int", "APP_TYPE", "329"
+            resValue "string", "app_name", "Yadav Jodii"
+        }
+        mali {
+            dimension "appType"
+            applicationId('mali.jodii.com')
+            buildConfigField "int", "APP_TYPE", "330"
+            resValue "string", "app_name", "Mali Jodii"
+        }
+        st {
+            dimension "appType"
+            applicationId('st.jodii.com')
+            buildConfigField "int", "APP_TYPE", "331"
+            resValue "string", "app_name", "ST Jodii"
+        }
+        naidu {
+            dimension "appType"
+            applicationId('naidu.jodii.com')
+            buildConfigField "int", "APP_TYPE", "332"
+            resValue "string", "app_name", "Naidu Jodii"
+        }
+        mudaliyar {
+            dimension "appType"
+            applicationId('mudaliyar.jodii.com')
+            buildConfigField "int", "APP_TYPE", "333"
+            resValue "string", "app_name", "Mudaliyar Jodii"
+        }
+        chettiyar {
+            dimension "appType"
+            applicationId('chettiyar.jodii.com')
+            buildConfigField "int", "APP_TYPE", "334"
+            resValue "string", "app_name", "Chettiyar Jodii"
+        }
+        padmasali {
+            dimension "appType"
+            applicationId('padmasali.jodii.com')
+            buildConfigField "int", "APP_TYPE", "335"
+            resValue "string", "app_name", "Padmasali Jodii"
+        }
+        jat {
+            dimension "appType"
+            applicationId('jat.jodii.com')
+            buildConfigField "int", "APP_TYPE", "336"
+            resValue "string", "app_name", "Jat Jodii"
+        }
+        baniya {
+            dimension "appType"
+            applicationId('baniya.jodii.com')
+            buildConfigField "int", "APP_TYPE", "337"
+            resValue "string", "app_name", "Baniya Jodii"
+        }
+        pillai {
+            dimension "appType"
+            applicationId('pillai.jodii.com')
+            buildConfigField "int", "APP_TYPE", "338"
+            resValue "string", "app_name", "Pillai Jodii"
+        }
+        brahmin {
+            dimension "appType"
+            applicationId('brahmin.jodii.com')
+            buildConfigField "int", "APP_TYPE", "504"
+            resValue "string", "app_name", "Brahmin Jodii"
+        }
+        christian {
+            dimension "appType"
+            applicationId('christian.jodii.com')
+            buildConfigField "int", "APP_TYPE", "501"
+            resValue "string", "app_name", "Christian Jodii"
+        }
+        muslim {
+            dimension "appType"
+            applicationId('muslim.jodii.com')
+            buildConfigField "int", "APP_TYPE", "502"
+            resValue "string", "app_name", "Muslim Jodii"
+        }
+        divorcee {
+            dimension "appType"
+            applicationId('divorcee.jodii.com')
+            buildConfigField "int", "APP_TYPE", "503"
+            resValue "string", "app_name", "Divorcee Jodii"
+        }
+        jain {
+            dimension "appType"
+            applicationId('jain.jodii.com')
+            buildConfigField "int", "APP_TYPE", "505"
+            resValue "string", "app_name", "Jain Jodii"
+        }
+        sikh {
+            dimension "appType"
+            applicationId('sikh.jodii.com')
+            buildConfigField "int", "APP_TYPE", "506"
+            resValue "string", "app_name", "Sikh Jodii"
+        }
     }
 
     buildTypes {
@@ -240,3 +552,5 @@ dependencies {
         implementation jscFlavor
     }
 }
+
+apply plugin: 'com.google.gms.google-services'

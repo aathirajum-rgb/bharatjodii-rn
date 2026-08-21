@@ -71,6 +71,7 @@ import AddPhotoIntermediateScreen  from '../screens/addphoto-intermediate/AddPho
 import StarMatchingScreen          from '../screens/star-matching/StarMatchingScreen'
 import ActivityScreen               from '../screens/activity/ActivityScreen'
 import MessagerListScreen           from '../screens/messagerList/MessagerListScreen'
+import ChatScreen                   from '../screens/chat/ChatScreen'
 import LanguageSelectionScreen     from '../screens/LanguageSelectionScreen'
 import MenuScreen                  from '../screens/menu/MenuScreen'
 import BiodataScreen                from '../screens/menu/BiodataScreen'
@@ -137,6 +138,16 @@ export type AppStackParamList = {
   LanguageSelection: undefined
   Activity:          undefined
   MessagerList:      undefined
+  // partnerOnline/partnerLastActive are an immediate-render seed only — ChatScreen.tsx
+  // re-confirms both via its own BasicView/RESPBASIC round-trip on mount, matching
+  // Angular's own reliance on that socket call over trusting the caller's handoff.
+  'chat-window': {
+    partnerId:          string
+    partnerName?:       string
+    partnerPhoto?:      string
+    partnerOnline?:     boolean
+    partnerLastActive?: number
+  }
   Menu:              undefined
   Biodata:           undefined
   Settings:          undefined
@@ -546,6 +557,7 @@ export default function AppStack() {
       <Stack.Screen name="renewal" component={RenewalScreen} />
       <Stack.Screen name="Activity" component={ActivityScreen} />
       <Stack.Screen name="MessagerList" component={MessagerListScreen} />
+      <Stack.Screen name="chat-window" component={ChatScreen} />
       <Stack.Screen name="Menu" component={MenuScreen} />
       <Stack.Screen name="Biodata" component={BiodataScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />

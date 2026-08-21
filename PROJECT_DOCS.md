@@ -6,6 +6,7 @@
 - [Project Structure](#project-structure)
 - [How the Project Works](#how-the-project-works)
 - [App Brands / White-labeling](#app-brands--white-labeling)
+- [Config Plugins](#config-plugins)
 - [Navigation & Screens](#navigation--screens)
 - [State Management & API Layer](#state-management--api-layer)
 - [Environments](#environments)
@@ -26,10 +27,10 @@
 **Jodii** is a matrimony app, originally an Angular web app, now rebuilt as a cross-platform Expo/React Native app targeting Android, iOS, and Web from a single TypeScript codebase. It ships as **multiple white-label brands** (Jodii, Tamil Jodii, Malayalam Jodii, plus more language variants for the web marketing sites) from one codebase.
 
 - **Package name (npm):** `jodii`, version `1.0.0`
-- **Default bundle ID (iOS):** `com.jodii.app` (per-flavor IDs differ — see [App Brands](#app-brands--white-labeling))
+- **Default bundle ID (iOS):** `com.matrimony.jodii` (per-flavor IDs differ — see [App Brands](#app-brands--white-labeling))
 - **Default package name (Android):** `com.jodii.app` (per-flavor IDs differ)
 - **iOS Xcode project:** `ios/TamilJodii.xcodeproj` (name is a holdover from when this was originally the Tamil-only app — there is no `Jodii.xcworkspace`, only `ios/TamilJodii`/`ios/TamilJodii.xcodeproj` + generated `Pods`)
-- **Expo SDK:** `~56.0.9`
+- **Expo SDK:** `~57.0.13`
 - **React Native:** `0.85.3`
 - **React:** `19.2.3`
 
@@ -92,7 +93,7 @@ jodiireact/
 ├── utils/                      # navigationRef.ts, etc.
 ├── i18n/                       # i18next setup
 ├── locales/                    # 11 language JSON files
-├── plugins/                    # withAndroidFlavors.js — custom Expo config plugin for Gradle flavors
+├── plugins/                    # Custom Expo config plugins — see "Config Plugins" section below
 ├── scripts/                    # setup-env.js, deploy-ota.js, web-server.js, convert-pwa.js
 ├── assets/                     # Images, icons, splash screens
 ├── web/, web-redirect/, nginx/ # Static PWA output & multi-language marketing landing pages
@@ -124,21 +125,60 @@ jodiireact/
 
 ## App Brands / White-labeling
 
-The codebase ships three (and growing) app brands from `constants/flavorConfig.js`, selected via `APP_FLAVOR` at build time:
+The single source of truth for every brand/flavor is `constants/flavorConfig.js` — a flat object keyed by flavor name, selected via `APP_FLAVOR` at build time. As of 2026-08-21 it defines **55 flavors**: the 3 original ones plus 52 more ported from the old native Android project's `build.gradle.kts.jinja` (`productFlavors`, `dimension "app"`).
 
-| Flavor | App type | Package/Bundle ID | Scheme | Domain |
-|---|---|---|---|---|
-| `jodii` (default) | 115 | `com.jodii.app` / `jodii.app` | `jodii` | `jodii.app` |
-| `tamil` | 116 | `jodiiapp.android.tamil` | `tamilmatrimony` | `tamil.jodii.app` |
-| `malayalam` | 118 | `jodiiapp.android.malayalam` | `malayalammatrimony` | `malayalam.jodii.app` |
+| Group | Flavors |
+|---|---|
+| Original 3 (fully set up, real icons) | `jodii` (default, app type 115), `tamil` (116), `malayalam` (118) |
+| Language brands (ported 2026-08-21) | `telugu`, `kannada`, `oriya`, `bengali`, `marathi`, `gujarati`, `hindi`, `punjabi` |
+| Community/caste brands (ported 2026-08-21) | `ninetysixkulimaratha`, `ezhava`, `nair`, `kayastha`, `lingayath`, `khandayat`, `sc`, `vokkaliga`, `vishwakarma`, `patel`, `adidravidar`, `teli`, `vanniyar`, `reddy`, `kapu`, `viswabrahmin`, `thiyya`, `kuruba`, `gowda`, `nadar`, `aryavysya`, `prajapati`, `konguvellalar`, `thevar`, `kshatriya`, `kamma`, `rajput`, `agarwal`, `yadav`, `mali`, `st`, `naidu`, `mudaliyar`, `chettiyar`, `padmasali`, `jat`, `baniya`, `pillai` |
+| Religion/status brands (ported 2026-08-21) | `brahmin`, `christian`, `muslim`, `divorcee`, `jain`, `sikh` |
+
+Each entry has `appType`, `appName`, `applicationId`, `scheme`, `domain`, `welcomeText`, `icon`, `playStoreUrl` — see the file directly for exact values (keys use this project's shortened-name convention, e.g. `brahmin` not the native project's `brahminjodii`; `applicationId`/`appType` are copied verbatim from the native source).
+
+> **The 52 new flavors currently reuse the generic Jodii icon as a placeholder** (`icon: './assets/icon.png'`) — real per-flavor icons are a follow-up. Update the `icon` path in `flavorConfig.js` and re-run `npx expo prebuild --platform android` to regenerate that flavor's launcher icons once real assets are ready.
 
 This is implemented via:
-- `plugins/withAndroidFlavors.js` — custom Expo config plugin that sets up Gradle product flavors on Android.
+- `plugins/withAndroidFlavors.js` — custom Expo config plugin that injects the Gradle `productFlavors` block (one entry per `flavorConfig.js` key) and generates per-flavor launcher icons (all densities + adaptive-icon XML) at prebuild time.
 - `app.config.js` — sets bundle ID, scheme, deep-link domain, and `extra.appType`/`extra.appFlavor` per flavor.
-- Per-flavor EAS build profiles in `eas.json` (`jodii-preview`, `jodii-production`, `tamil-preview`, `tamil-production`, `malayalam-preview`, `malayalam-production`) that map to Gradle tasks like `:app:assembleJodiiRelease` / `:app:bundleTamilRelease`.
-- Matching npm scripts: `assemble:<flavor>[:env]`, `bundle:<flavor>[:env]`, `eas:<flavor>:apk|aab`, `build:web:<flavor>`, `serve:dev:<flavor>`.
+- Per-flavor EAS build profiles in `eas.json` (`jodii-preview`, `jodii-production`, `tamil-preview`, `tamil-production`, `malayalam-preview`, `malayalam-production` — **not yet added for the 52 new flavors**) that map to Gradle tasks like `:app:assembleJodiiRelease` / `:app:bundleTamilRelease`.
+- Matching npm scripts: `assemble:<flavor>[:env]`, `bundle:<flavor>[:env]`, `eas:<flavor>:apk|aab`, `build:web:<flavor>`, `serve:dev:<flavor>` (**only wired for jodii/tamil/malayalam** — the 52 new flavors must be built directly via Gradle, e.g. `./android/gradlew -p android assembleBrahminDebug`, until scripts/EAS profiles are added for them).
 
-Deep linking supports `https://jodii.app`, `https://tamil.jodii.app`, `https://malayalam.jodii.app`, plus each flavor's custom URL scheme (see `navigation/RootNavigation.tsx` `linking` config).
+Deep linking supports `https://jodii.app`, `https://tamil.jodii.app`, `https://malayalam.jodii.app`, plus each flavor's custom URL scheme (see `navigation/RootNavigation.tsx` `linking` config). Deep-link domains for the 52 new flavors are placeholder guesses (not verified against real DNS/App Links config).
+
+### Firebase project (all flavors share ONE project)
+
+All 55 flavors' Android/iOS apps are registered inside a **single** Firebase project: `jodii-app`. This was confirmed by cross-checking the old Angular app's `src/environments/environment*.ts` (`fireBaseObj` — every language entry across every env file uses the identical `projectId: "jodii-app"`) — a previous version of `constants/firebase.config.ts` incorrectly invented a separate project per language (`jodii-tamil`, `jodii-telugu`, ...) that doesn't exist anywhere in the real source; this was corrected 2026-08-21.
+
+Required local files (gitignored, never committed — must be supplied per machine):
+```
+firebase/google-services.<flavor>.json        # Android, one per flavor
+firebase/GoogleService-Info.<flavor>.plist    # iOS, one per flavor
+```
+`app.config.js` reads `./firebase/google-services.${flavor}.json` / `./firebase/GoogleService-Info.${flavor}.plist` for whichever flavor is active (`APP_FLAVOR` env var) — prebuild fails if the active flavor's file is missing.
+
+Get these from the Firebase Console (`jodii-app` project → Project Settings → Your apps) — or, for Android, from this internal CDN pattern (folder name = the *native* flavor name, e.g. `brahminjodii`, not this repo's shortened key):
+```
+https://stageimgs.bharatmatrimony.com/AndroidApks/JodiiPipeline/<native-flavor-name>/google-services.json
+```
+As of 2026-08-21, **19 of the 52 new flavors don't have a Firebase app registered yet** (404 on that CDN path): `ninetysixkulimaratha`, `nair`, `sc`, `vokkaliga`, `vishwakarma`, `patel`, `teli`, `vanniyar`, `reddy`, `viswabrahmin`, `thiyya`, `prajapati`, `thevar`, `rajput`, `yadav`, `st`, `naidu`, `padmasali`, `pillai`. These flavors' `google-services.json` step will fail at prebuild time until a Firebase Android app is created for them — this doesn't affect jodii/tamil/malayalam or the other 33.
+
+---
+
+## Config Plugins
+
+All Android/iOS native customizations this app needs beyond what Expo config supports live in `plugins/` and are wired into `app.config.js`'s `plugins` array. They all re-apply on every `expo prebuild` — this is what makes it safe to `--clean` regenerate `android/`/`ios/` without losing custom native code.
+
+| Plugin | Platform | What it does |
+|---|---|---|
+| `withAndroidFlavors.js` | Android | Injects the Gradle `productFlavors` block from `constants/flavorConfig.js`; generates per-flavor launcher icons at every density. |
+| `withAndroidBuildCustomizations.js` | Android | Other `android/app/build.gradle` tweaks (release keystore signing config, ML Kit barcode-scanning exclusion, etc. — see the file for the current list). |
+| `withFirebaseAndroid.js` | Android | Copies each flavor's `firebase/google-services.<flavor>.json` into `android/app/src/<flavor>/`, and re-applies the `google-services` Gradle plugin/classpath lines. Missing files are skipped with a warning, not a hard failure. |
+| `withFirebaseIOS.js` | iOS | Adds `$RNFirebaseDisableSPM = true` to `ios/Podfile` — without it, `react-native-firebase` resolves Firebase via Swift Package Manager, which collides with this project's static linkage and breaks `pod install` (`SPM + static linkage is not supported`). Added 2026-08-21. |
+| `withRazorpayAndroidBridge.js` | Android | Copies the hand-written `RazorpayBridgeModule.kt`/`RazorpayWebView.kt`/`RazorpayBridgePackage.kt` (source in `plugins/android-native-src/razorpay/`) into `android/app/src/main/java/jodii/app/`, registers the package in `MainApplication.kt`, adds the Gradle dependency and the `AndroidManifest.xml` activity/meta-data entries. |
+| `withPayUAndroidBridge.js` | Android | Same pattern as the Razorpay plugin, for `plugins/android-native-src/payu/`. |
+
+**Why this matters:** these plugins are the only reason `android/app/src/main/**` custom native code survives a prebuild. If a prebuild ever runs partway and fails (e.g. a missing `firebase/*.json` — see below), the files these plugins manage can end up deleted/reset in the working tree with no build error until something tries to use them later. If you ever see `MainApplication.kt` missing `RazorpayBridgePackage()`/`PayUBridgePackage()`, or `android/app/build.gradle` missing the `productFlavors` block or reset to a generic `applicationId` like `com.jodii`, that's this failure mode — re-running a *successful* `npx expo prebuild --platform android --clean` (with all required `firebase/*.json` files present) reapplies everything correctly in one pass.
 
 ---
 
@@ -189,7 +229,7 @@ Environment config lives in `constants/env/`:
 - **Onboarding/profile creation:** ~21-screen flow covering identity, demographics, location, education/occupation/income, religion/caste/gothra/star-raasi/dosham, family & property details, and photo upload. Driven by `service/registrationService.ts` and `constants/registration.constants.ts`.
 - **Auth/OTP login:** mobile + OTP based (`LoginScreen`, `OTPScreen`), with `service/encryptionService.ts` (crypto-js) encrypting payloads.
 - **Photo upload/gallery:** `AddPhotoScreen`, `GalleryScreen`, `components/profile-photo`, via `expo-image-picker`/`expo-camera`/`expo-media-library`.
-- **Chat/messaging:** `service/chatService.ts` + `service/socketService.ts` provide a full chat API (lists, messages, read status, deletion, search) — **no chat UI screen exists yet** (see [Known Gaps](#known-gaps)).
+- **Chat/messaging:** `screens/chat/ChatScreen.tsx` (added 2026-08-21) — one-to-one chat with text, read ticks, date grouping, block/report, message-quota gating (3-message first-reply limit + daily/weekly/monthly caps + paid-balance checks), image/video attachments (`components/chat/AttachmentPreviewModal.tsx`, `ChatMediaViewerModal.tsx`, `service/chatMediaService.ts`), and voice messages (press-and-hold recording via `expo-audio`, 1s minimum/3min cap, playback via `ChatBubble.tsx`'s `AudioBubble`). Backed by `service/socketService.ts` (socket.io, real-time) and `service/chatService.ts` (quota/balance checks). `screens/messagerList/MessagerListScreen.tsx` lists conversations (both "All Messages" and "Phone number views" tabs) and navigates into `ChatScreen`. Not yet built: pdf/document attachments.
 - **Payments/subscription:** `RechargeScreen`, `PaymentSuccessScreen`, `service/paymentService.ts` (ported from a 1112-line Angular service), `service/payWallService.ts`, Razorpay integration.
 - **Female-free promotions:** `service/femaleFreeService.ts` — gender-based free-access promo logic.
 - **Notifications:** `service/notificationService.ts` (Expo push; no-op in Expo Go) + socket-based in-app notifications.
@@ -203,7 +243,11 @@ Environment config lives in `constants/env/`:
 
 Call these out explicitly rather than assuming they're just "not found yet":
 
-- **No chat screen** — `chatService.ts`/`socketService.ts` are fully built but there's no UI consuming them yet.
+- **No pdf/document chat attachments** — image, video, and voice messages are built (see Chat/messaging above); pdf is not.
+- **19 of the 52 newly-added flavors have no Firebase app registered yet** — see [App Brands](#app-brands--white-labeling) for the exact list. Their `google-services.json` step will fail at prebuild time until Firebase apps are created for them.
+- **No EAS build profiles or npm build scripts for the 52 new flavors** — only jodii/tamil/malayalam have `eas.json` profiles and `assemble:*`/`bundle:*`/`eas:*` npm scripts. The new flavors build via raw Gradle tasks only (`./android/gradlew -p android assemble<Flavor>Debug`).
+- **The 52 new flavors' icons are placeholders** — all reuse the generic Jodii icon (`./assets/icon.png`) in `constants/flavorConfig.js`; real per-flavor icons haven't been supplied yet.
+- **`constants/firebase.config.ts`'s VAPID key is env-var-only with no fallback** (`EXPO_PUBLIC_FIREBASE_VAPID_KEY`, defaults to `''`) — unlike `apiKey`, the Angular source hardcodes this value directly (it's a public key, not a secret), so web push likely silently gets an empty VAPID key unless that env var happens to be set. Deliberately left as-is per explicit instruction (2026-08-21) — flagging here so it isn't mistaken for an oversight.
 - **No dedicated Settings/Profile-detail/Filter screens** despite `filterService.ts`/`profileService.ts` existing.
 - **No tests** — no Jest config, no `__tests__`, no testing-library.
 - **`store/` is unused** — empty except `.gitkeep`; don't assume Redux/Zustand exists.
@@ -316,6 +360,21 @@ npm run android
 
 ```bash
 npm run prebuild
+# equivalent to:
+npx expo prebuild --platform android          # incremental — applies config plugins to existing android/
+npx expo prebuild --platform android --clean  # full regen — wipes and rebuilds android/ from scratch
+```
+
+Requires all of the active flavor's `firebase/google-services.<flavor>.json` to exist first (see [App Brands](#app-brands--white-labeling)) — prebuild hard-fails without it. `android/local.properties` (your local Android SDK path, e.g. `sdk.dir=/Users/you/Library/Android/sdk`) and `firebase/` are both gitignored/machine-local and get wiped by `--clean` — recreate `local.properties` manually if `assemble*`/`bundle*` then fails with `SDK location not found`.
+
+**What's actually regenerated vs. hand-written:** `android/app/src/<flavor>/` (per-flavor launcher icons + the copied `google-services.json`) is 100% reproducible from `constants/flavorConfig.js` + `firebase/*.json` — for the 52 newly-added flavors these are gitignored (see `android/.gitignore`) rather than committed, since they're pure build output. `android/app/src/main/**` (custom native code, `MainApplication.kt`, manifest, build.gradle) is committed, but its Razorpay/PayU/Firebase/flavor-specific pieces are themselves reapplied by the [config plugins](#config-plugins) on every prebuild — see that section for the exact failure mode if a prebuild ever partially fails.
+
+### Building the 52 newly-added flavors (no npm script yet)
+
+```bash
+cd android
+./gradlew -p . assemble<Flavor>Debug      # e.g. assembleBrahminDebug, assembleTeluguDebug
+npx expo run:android --variant <flavor>Debug   # builds, installs, and launches in one step
 ```
 
 ### Local release builds via Gradle (per flavor/env)
@@ -332,17 +391,6 @@ npm run bundle:malayalam:prod
 (Same pattern for `:dev`, `:uat`, `:preprod` suffixes.) These invoke Gradle tasks like `:app:assembleJodiiRelease` directly via `./android/gradlew`.
 
 > Avoid `release:tamil:apk`/`release:tamil:aab` — they use Windows `set` syntax and are unmaintained on macOS/Linux.
-
-### Fix: Stale CMake cache after moving project folder
-
-If you get a `FileNotFoundException` for `.cxx` paths on Android build:
-
-```bash
-rm -rf node_modules/expo-modules-core/android/.cxx
-rm -rf android/build
-```
-
-Then rebuild.
 
 ---
 
@@ -455,12 +503,41 @@ Runs `scripts/deploy-ota.js`, which uploads the exported bundle via SFTP (`ssh2-
 
 ## Troubleshooting
 
-### Android: FileNotFoundException for `.cxx` path
-Happens when the project folder is moved or renamed. Fix:
-```bash
-rm -rf node_modules/expo-modules-core/android/.cxx
-rm -rf android/build
+### Renaming or moving the project folder
+
+Confirmed 2026-08-21 (this project's folder was renamed from a path containing a space, `Jodii update`, to `jodii_update`, to fix several of the issues below — **a space anywhere in the project's path breaks multiple tools' shell scripts**, not just the ones listed here, so avoid spaces in this project's path entirely). After any rename/move:
+
+1. **iOS**: stale absolute paths get baked into `ios/Pods/` by CocoaPods and don't self-heal — re-run `pod install`, then check for leftovers:
+   ```bash
+   grep -rl "<old-path>" ios/Pods
+   ```
+   If any hits, either `sed -i '' 's#<old-path>#<new-path>#g' <file>` them directly or delete `ios/Pods` and re-run `pod install`. Hit this exact issue with `HERMES_CLI_PATH` surviving in `Pods-TamilJodii.{debug,release}.xcconfig` and `Local Podspecs/hermes-engine.podspec.json` even after a fresh `pod install` — CocoaPods' Local Podspecs cache didn't auto-regenerate it.
+2. **Xcode itself must be fully quit and reopened** (Cmd+Q, not just close the window) from the new path — a long-running Xcode process keeps cached absolute paths for script-phase resolution (e.g. `hermesc`) even though a fresh `pod install`/terminal build already picked up the new path.
+3. **Android**: `android/build/generated/autolinking/autolinking.json` and `android/.gradle` are gitignored generated caches with the old path baked in — just delete them (`rm -rf android/build android/.gradle`), no need to fix in place.
+4. **`android/local.properties`** (gitignored, machine-local SDK path) doesn't get path-corrected automatically either — if it exists and points at a stale path, or was wiped by a `--clean` prebuild, recreate it: `echo "sdk.dir=$HOME/Library/Android/sdk" > android/local.properties`.
+5. **`FileNotFoundException` for `.cxx` paths** on Android build:
+   ```bash
+   rm -rf node_modules/expo-modules-core/android/.cxx
+   rm -rf android/build
+   ```
+
+### iOS build: Swift compiler errors on very new Xcode versions
+
+Two distinct Swift 6.x-toolchain incompatibilities hit on Xcode 26.2 (Swift 6.2.3), both confirmed as known upstream issues, not bugs in this project's code:
+
+- **`expo-modules-jsi`**: `type of expression is ambiguous without a type annotation` in `JavaScriptCodable+Date.swift`'s `dateFromMilliseconds()`, on the line using `abs()`. Worked around by hand-patching that one line in `node_modules/expo-modules-jsi/.../JavaScriptCodable+Date.swift` to avoid `abs()` entirely (`milliseconds >= -max && milliseconds <= max` instead of `abs(milliseconds) <= max`) — this patch does **not** survive `npm install`/`npm ci` since it's a raw `node_modules` edit, not a `patch-package` patch; re-apply if it resurfaces.
+- **`expo-modules-core`**: `sending 'emitter' risks causing data races` in `EventEmitter.swift`, confirmed as [expo/expo#47539](https://github.com/expo/expo/issues/47539) — only happens when the module is compiled from Swift source rather than using Expo's prebuilt binaries. Root cause here: `ios/Podfile.properties.json` had `"ios.buildReactNativeFromSource": "true"` (an incidental leftover from an old `expo prebuild` run, not a deliberate setting), which forces every Expo module to build from source. **Fix: remove that line** (or set it `"false"`) so `pod install` uses Expo's precompiled `.xcframework`s instead, sidestepping the bug entirely.
+
+### iOS `pod install`: SPM + static linkage conflict with react-native-firebase
+
 ```
+[!] [react-native-firebase] SPM + static linkage is not supported (target(s): Pods-TamilJodii).
+```
+Fixed by `plugins/withFirebaseIOS.js` (adds `$RNFirebaseDisableSPM = true` to `ios/Podfile`) — see [Config Plugins](#config-plugins). If you ever hand-edit `ios/Podfile` directly and lose this line, `pod install` will fail with the above until it's added back (must be before the `target` block).
+
+### macOS endpoint-security software (e.g. Digital Guardian) blocking builds
+
+If a build fails with `Operation not permitted` on a file that a plain shell `cp`/`md5`/`cat` can read fine (confirmed via `xattr -l <file>` showing `com.dgagent.*` extended attributes), that's a corporate DLP/endpoint-security agent (seen here: Digital Guardian, `/usr/local/dgagent/`) intercepting file reads from specific processes (Node, Java/Gradle both confirmed affected) — not a project bug. It resurfaces unpredictably on different files as a build touches more of `node_modules`/`~/.gradle` — there's no reliable per-file workaround. Ask IT to exclude the project folder, `~/.gradle`, `node_modules`, and/or the `node`/`java`/`xcodebuild` processes from the agent's policy.
 
 ### Android: `android/.kotlin/` showing up as untracked in `git status`
 This is Gradle's Kotlin compiler daemon cache, not currently in `.gitignore`. Safe to add `android/.kotlin/` to `.gitignore` and delete the local copy.
