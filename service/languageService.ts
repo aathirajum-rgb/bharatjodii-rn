@@ -6,13 +6,18 @@ import { apiCall } from './apiClient'
 import { Endpoints } from './api.endpoints'
 import { getItem, setItem, removeItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
+import { getRegistrationArrays } from './registrationService'
 
 // ─── Language selection ───────────────────────────────────────────────────────
 
+// Angular: language-change.service.ts's submitLanguage() (line 31-69). Note it
+// has NO "same language → bail out" guard — LANG and LANG_SELECTED are always
+// written, and the array lists are always force-refreshed, so a first-run
+// selection of the default language still persists and still populates.
 export async function submitLanguage(currentLang: string, selectedLang: string): Promise<any> {
-  if (currentLang === selectedLang) return
-
-  // Clear language-dependent cached data
+  // Angular: common.removeStorageBasedOnLanguageChangeEvent() — clears the
+  // language-dependent caches (REGISTRATIONARRAYS is not in that list; it gets
+  // overwritten by the forced re-fetch below instead).
   await Promise.all([
     removeItem('FILTERDATALIST'),
     removeItem(SK.App.PP_SET_DATA),
@@ -23,8 +28,15 @@ export async function submitLanguage(currentLang: string, selectedLang: string):
   await setItem(SK.Auth.LANG, selectedLang)
   await setItem('LANG_SELECTED', '1')
 
-  // Refresh dropdown lists for new language
-  return getDynamicPopulateArrayList(selectedLang)
+  // Angular: this.common.getDynamicPopulateArrayList(1) — the `1` is hitApi,
+  // i.e. force. It re-fetches `type=all&LANG=<new lang>` and overwrites
+  // REGISTRATIONARRAYS, which is what every registration option list
+  // (mother tongue, caste, height, DOB month names, home-town yes/no, …)
+  // reads from.
+  return Promise.all([
+    getRegistrationArrays(true),
+    getDynamicPopulateArrayList(selectedLang, true),
+  ])
 }
 
 // ─── Dynamic list fetch ───────────────────────────────────────────────────────

@@ -22,6 +22,8 @@ import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
 import { Fonts } from '../../src/theme/fonts'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -66,6 +68,7 @@ type Props = {
 
 export default function MaritalStatusScreen({ navigation }: Props) {
   const { t }  = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [options,         setOptions]         = useState<Option[]>([])
   const [childrenOptions, setChildrenOptions] = useState<Option[]>(FALLBACK_CHILDREN_OPTIONS)
@@ -75,7 +78,12 @@ export default function MaritalStatusScreen({ navigation }: Props) {
   const [createdBy,       setCreatedBy]       = useState('1')
   const [submitting,      setSubmitting]      = useState(false)
 
-  useEffect(() => {
+  // Extracted so a language change can re-run it — the option labels below are
+  // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
+  // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
+  // the stored KEY against the newly translated list. Re-reading storage here does
+  // the same, so the user's selection survives the switch.
+  function loadOptions() {
     getRegValues().then(({ CREATEDBY, GENDER, MARITALSTATUS, NOOFCHILDREN }) => {
       const cb2 = CREATEDBY ?? '1'
       const g2  = GENDER    ?? '1'
@@ -93,7 +101,11 @@ export default function MaritalStatusScreen({ navigation }: Props) {
         .then(list => { if (list.length) setChildrenOptions(list) })
         .catch(() => {})
     })
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  useLanguageReload(loadOptions)
 
   // Title: "Select your [possessive] marital status" — Angular: REGISTRATION.MARITALSTATUS
   const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
@@ -153,7 +165,7 @@ export default function MaritalStatusScreen({ navigation }: Props) {
         />
 
         {/* Title — Figma: 22px Poppins SemiBold */}
-        <Text style={os.title}>{title}</Text>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {/* Pill chip grid — TYPE=type-1, horizontal wrapping (same as CreatedByScreen) */}
         {fetching ? (
@@ -175,7 +187,7 @@ export default function MaritalStatusScreen({ navigation }: Props) {
                   <View style={[styles.chipIcon, isSelected && styles.chipIconSelected]}>
                     {isSelected && <Text style={styles.checkmark}>✓</Text>}
                   </View>
-                  <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}>
+                  <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected, { fontFamily: isSelected ? langFonts.medium : langFonts.regular }]}>
                     {opt.label}
                   </Text>
                 </Pressable>
@@ -188,7 +200,7 @@ export default function MaritalStatusScreen({ navigation }: Props) {
             only shown once a non-"Never Married" status is picked. */}
         {showChildren && (
           <>
-            <Text style={styles.childrenTitle}>{t('REGISTRATION.NOOFCHILD', 'Select number of children')}</Text>
+            <Text style={[styles.childrenTitle, { fontFamily: langFonts.medium }]}>{t('REGISTRATION.NOOFCHILD', 'Select number of children')}</Text>
             <View style={styles.chipGrid}>
               {childrenOptions.map(opt => {
                 const isSelected = noOfChildren === opt.key
@@ -204,7 +216,7 @@ export default function MaritalStatusScreen({ navigation }: Props) {
                     <View style={[styles.chipIcon, isSelected && styles.chipIconSelected]}>
                       {isSelected && <Text style={styles.checkmark}>✓</Text>}
                     </View>
-                    <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}>
+                    <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected, { fontFamily: isSelected ? langFonts.medium : langFonts.regular }]}>
                       {opt.label}
                     </Text>
                   </Pressable>
@@ -231,7 +243,6 @@ const styles = StyleSheet.create({
   // Sub-heading above the children chip grid — extra marginTop gives clear
   // separation from the marital-status options above it.
   childrenTitle: {
-    fontFamily:   Fonts.poppinsMedium,
     fontSize:     17.5,
     fontWeight:   '500',
     color:        Colors.textPrimary,
@@ -288,14 +299,12 @@ const styles = StyleSheet.create({
   },
 
   chipLabel: {
-    fontFamily: Fonts.poppinsRegular,
     fontSize:   14,
     fontWeight: '400',
     color:      Colors.textPrimary,
     lineHeight: 16,
   },
   chipLabelSelected: {
-    fontFamily: Fonts.poppinsMedium,
     fontWeight: '500',
   },
 })

@@ -22,6 +22,8 @@ import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -42,6 +44,7 @@ type Props = {
 
 export default function StarRaasiScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [raasiOptions, setRaasiOptions] = useState<Option[]>([])
   const [starOptions,  setStarOptions]  = useState<Option[]>([])
@@ -55,7 +58,12 @@ export default function StarRaasiScreen({ navigation }: Props) {
   const [createdBy,     setCreatedBy]     = useState('1')
   const [activePanel,   setActivePanel]   = useState<ActivePanel>(null)
 
-  useEffect(() => {
+  // Extracted so a language change can re-run it — the option labels below are
+  // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
+  // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
+  // the stored KEY against the newly translated list. Re-reading storage here does
+  // the same, so the user's selection survives the switch.
+  function loadOptions() {
     getRegValues().then((rv) => {
       if (rv.CREATEDBY) setCreatedBy(rv.CREATEDBY)
 
@@ -82,7 +90,11 @@ export default function StarRaasiScreen({ navigation }: Props) {
         .catch(() => {})
         .finally(() => setFetchingRaasi(false))
     })
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  useLanguageReload(loadOptions)
 
   async function selectRaasi(opt: Option) {
     setSelectedRaasi(opt)
@@ -147,7 +159,7 @@ export default function StarRaasiScreen({ navigation }: Props) {
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
-        <Text style={os.title}>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>
           {title}
         </Text>
 
@@ -158,7 +170,7 @@ export default function StarRaasiScreen({ navigation }: Props) {
             {/* ── Raasi field ──────────────────────────────────────────── */}
             <View style={styles.fieldWrapper}>
               <View style={styles.fieldLabelBadge}>
-                <Text style={styles.fieldLabelText}>{t('REGISTRATION.RAASI', 'Raasi')}</Text>
+                <Text style={[styles.fieldLabelText, { fontFamily: langFonts.regular }]}>{t('REGISTRATION.RAASI', 'Raasi')}</Text>
               </View>
               <Pressable
                 style={styles.selectField}
@@ -167,7 +179,7 @@ export default function StarRaasiScreen({ navigation }: Props) {
                 accessibilityLabel="Select raasi"
               >
                 <Text
-                  style={[styles.selectFieldText, !!selectedRaasi && styles.selectFieldTextActive]}
+                  style={[styles.selectFieldText, !!selectedRaasi && styles.selectFieldTextActive, { fontFamily: langFonts.regular }]}
                   numberOfLines={1}
                 >
                   {selectedRaasi ? selectedRaasi.label : t('REGISTRATION.SELECTRASSI', 'Select Raasi')}
@@ -183,7 +195,7 @@ export default function StarRaasiScreen({ navigation }: Props) {
               ) : (
                 <View style={[styles.fieldWrapper, styles.fieldGap]}>
                   <View style={styles.fieldLabelBadge}>
-                    <Text style={styles.fieldLabelText}>{t('REGISTRATION.STAR', 'Star')}</Text>
+                    <Text style={[styles.fieldLabelText, { fontFamily: langFonts.regular }]}>{t('REGISTRATION.STAR', 'Star')}</Text>
                   </View>
                   <Pressable
                     style={styles.selectField}
@@ -192,7 +204,7 @@ export default function StarRaasiScreen({ navigation }: Props) {
                     accessibilityLabel="Select star"
                   >
                     <Text
-                      style={[styles.selectFieldText, !!selectedStar && styles.selectFieldTextActive]}
+                      style={[styles.selectFieldText, !!selectedStar && styles.selectFieldTextActive, { fontFamily: langFonts.regular }]}
                       numberOfLines={1}
                     >
                       {selectedStar ? selectedStar.label : t('REGISTRATION.SELECTSTAR', 'Select Star')}

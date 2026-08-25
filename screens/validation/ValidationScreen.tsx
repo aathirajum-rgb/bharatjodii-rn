@@ -29,7 +29,7 @@
 // without collecting it — same class of gap as this file's own header comment
 // already documents for cases 35/40.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -42,7 +42,7 @@ import {
   fetchEditFormValuesForValidation, getRegValues, setRegValues,
   fetchMaritalStatusOptions, CHILDREN_OPTIONS, fetchMotherTongueOptions,
   fetchStates, fetchCities, fetchQualificationOptions, fetchOccupationOptions,
-  fetchMonthlyIncomeOptions, fetchReligionOptions, fetchCasteOptions,
+  fetchMonthlyIncomeOptions, fetchReligionOptions, fetchCasteOptions, prefetchCasteForReligion,
   fetchSubcasteOptions, fetchGothraOptions, isGothraApplicableForCaste,
   isHomeTownMotherTongue,
 } from '../../service/registrationService'
@@ -51,8 +51,10 @@ import { ENavigation } from '../../types/enums/navigation.enum'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
 import SelectField from '../../components/input/SelectField'
+import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import RegistrationSuccessSheet from '../../components/registration-success-sheet/RegistrationSuccessSheet'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { CDN_SVG } from '../../constants/cdn'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -112,14 +114,15 @@ type ActiveField =
 // after registration insert, already knowing the outcome — 'underReview'
 // shows the wait state, 'confirm' shows the flagged-field form using the
 // violations from the insert response instead of re-reading storage.
+// Every exit from this screen is a root replacement (Angular uses replaceUrl /
+// navigateRoot everywhere here), so it needs no `navigation` prop.
 type Props = {
-  navigation: any
   route?: { params?: { mode?: 'confirm' | 'underReview'; violationFields?: string[] } | undefined } | undefined
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function ValidationScreen({ navigation, route }: Props) {
+export default function ValidationScreen({ route }: Props) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
 
@@ -128,6 +131,7 @@ export default function ValidationScreen({ navigation, route }: Props) {
   // array identity between renders.
   const entryViolationsKey = (route?.params?.violationFields ?? []).join(',')
 
+  const langFonts = useLanguageFonts()
   const [phase, setPhase] = useState<Phase>('loading')
   const [submitting, setSubmitting] = useState(false)
   const [violationFields, setViolationFields] = useState<string[]>([])
@@ -168,6 +172,15 @@ export default function ValidationScreen({ navigation, route }: Props) {
   const [homeCityOptions, setHomeCityOptions] = useState<PickerOption[]>([])
 
   const [original, setOriginal] = useState<Record<string, string>>({})
+
+  // Angular: religionKeyBeforeConfirm / motherTongueKeyBeforeConfirm, captured
+  // ONCE behind `confirmBaselineCaptured` (validation.component.ts:125-129) and
+  // never rewritten — not even when round 2 rebuilds the form. It is the
+  // religion the member arrived with, so hasReligionOrMotherTongueChanged()
+  // still fires after a re-validation round. A ref (not state) because the
+  // comparison runs inside an async submit handler, where a state value read
+  // from the enclosing closure could be stale.
+  const confirmBaseline = useRef<{ RELIGION: string; MOTHERTONGUE: string } | null>(null)
 
   // ── Option lists ──────────────────────────────────────────────────────────
   const [maritalStatusOptions, setMaritalStatusOptions] = useState<PickerOption[]>([])
@@ -237,12 +250,19 @@ export default function ValidationScreen({ navigation, route }: Props) {
     setPhase('loading')
 
     // Angular: showProfileUnderReviewModal() — entered straight from the insert
-    // response with AIVALIDATIONTYPE '3'. Nothing to load; the wait state shows
-    // for 3s, then the modal dismisses and handleRegistrationSuccess() runs —
-    // which here is the registration success sheet.
+    // response with AIVALIDATIONTYPE '3'. Nothing to load: the wait state shows
+    // for 3s, then handleRegistrationSuccess(..., showSuccessPopup=FALSE) runs,
+    // whose else-branch redirects to /onboarding/20 (Add photo). The success
+    // popup is deliberately skipped — the profile is under review, not created
+    // cleanly, so it must NOT be announced as a success.
     if (entryMode === 'underReview') {
       setPhase('underReview')
-      setTimeout(() => { removeItem('VIOLATIONFIELDS'); setPhase('success') }, 3000)
+      setTimeout(() => {
+        removeItem('VIOLATIONFIELDS')
+        // resetTo, not push: Angular uses replaceUrl:true so the member cannot
+        // navigate back into the validation screen they were restricted out of.
+        resetTo(ENavigation.ONBOARDING, { pageNo: '20' })
+      }, 3000)
       return
     }
 
@@ -271,6 +291,14 @@ export default function ValidationScreen({ navigation, route }: Props) {
     const genderVal = rv.GENDER ?? '1'
     setCreatedBy(rv.CREATEDBY ?? '1')
     setGender(genderVal)
+
+    // Captured once per mount, before any edit — see confirmBaseline above.
+    if (!confirmBaseline.current) {
+      confirmBaseline.current = {
+        RELIGION:     info.religion ?? '',
+        MOTHERTONGUE: info.motherTongue ?? '',
+      }
+    }
 
     setOriginal({
       MARITALSTATUS: info.maritalStatus ?? '', NOOFCHILDREN: info.noOfChildren ?? '',
@@ -356,12 +384,21 @@ export default function ValidationScreen({ navigation, route }: Props) {
 
   async function handleSelectReligion(opt: PickerOption) {
     setReligion(opt); setActiveField(null)
+    // Angular: onReligionChange() clears the cached caste/subcaste/gothram
+    // arrays before refetching — REGISTRATIONARRAYS.CASTE is bootstrap data for
+    // the ORIGINAL religion, and fetchCasteOptions() serves it unconditionally
+    // when present. Without this clear, switching religion here (e.g. Muslim →
+    // Hindu) would silently keep showing the previous religion's caste list.
+    await prefetchCasteForReligion(opt.key, motherTongue?.key ?? '')
     await loadCasteChain(opt.key, motherTongue?.key ?? '')
   }
 
   async function handleSelectMotherTongue(opt: PickerOption) {
     setMotherTongue(opt); setActiveField(null)
-    if (religion) await loadCasteChain(religion.key, opt.key)
+    if (religion) {
+      await prefetchCasteForReligion(religion.key, opt.key)
+      await loadCasteChain(religion.key, opt.key)
+    }
   }
 
   async function handleSelectCaste(opt: PickerOption) {
@@ -478,8 +515,15 @@ export default function ValidationScreen({ navigation, route }: Props) {
     return changes
   }
 
+  // Angular: hasReligionOrMotherTongueChanged() (validation.component.ts:363-366)
+  // compares against the once-captured baseline, NOT against `original` — which
+  // is the per-round edit-diff baseline and would make a religion change look
+  // like "no change" on the second round.
   function religionOrMotherTongueChanged(): boolean {
-    return (religion?.key ?? '') !== (original.RELIGION ?? '') || (motherTongue?.key ?? '') !== (original.MOTHERTONGUE ?? '')
+    const base = confirmBaseline.current
+    if (!base) return false
+    return (religion?.key ?? '') !== (base.RELIGION ?? '')
+      || (motherTongue?.key ?? '') !== (base.MOTHERTONGUE ?? '')
   }
 
   function needsDependentFields(): boolean {
@@ -515,8 +559,14 @@ export default function ValidationScreen({ navigation, route }: Props) {
         return
       }
       if (aiValidationType === '3') {
+        // Angular: action='profile_under_review' then, after 2s,
+        // router.navigate(['/onboarding/20'], { replaceUrl: true }) — replace,
+        // not push, so the member can't go back into the review form.
         setPhase('underReview')
-        setTimeout(() => navigation.push('onboarding', { pageNo: '20' }), 2000)
+        setTimeout(() => {
+          removeItem('VIOLATIONFIELDS')
+          resetTo(ENavigation.ONBOARDING, { pageNo: '20' })
+        }, 2000)
         return
       }
       if (religionOrMotherTongueChanged()) {
@@ -591,9 +641,14 @@ export default function ValidationScreen({ navigation, route }: Props) {
     return true
   }
 
+  // Angular: the regSuccess sheet's onDidDismiss (bottom-sheet.service.ts) sets
+  // REGISTERURL='/onboarding/20' then navigateRoot(['/onboarding/20'],
+  // { replaceUrl: true, queryParams: { addphoto: '1' } }) — the member continues
+  // into Add photo, NOT straight to Matches. The addphoto flag is redundant here
+  // since page 20 IS the add-photo screen in this port.
   function handleSuccessContinue() {
     removeItem('VIOLATIONFIELDS')
-    resetTo(ENavigation.MATCHES)
+    resetTo(ENavigation.ONBOARDING, { pageNo: '20' })
   }
 
   // ─── Picker option resolver ─────────────────────────────────────────────────
@@ -639,7 +694,7 @@ export default function ValidationScreen({ navigation, route }: Props) {
     return (
       <View style={[s.screen, s.underReview, { paddingTop: insets.top }]}>
         <CdnSvg uri={CDN_UNDER_REVIEW_ICON} width={160} height={160} style={s.underReviewImg} />
-        <Text style={s.underReviewTitle}>{t('REGISTRATION.PROFILE_REVIEW', 'Your profile is under review')}</Text>
+        <Text style={[s.underReviewTitle, { fontFamily: langFonts.semiBold }]}>{t('REGISTRATION.PROFILE_REVIEW', 'Your profile is under review')}</Text>
       </View>
     )
   }
@@ -682,11 +737,109 @@ export default function ValidationScreen({ navigation, route }: Props) {
     return template.replace('#AGE#', age).replace(/<[^>]+>/g, '').replace(/\s{2,}/g, ' ').trim()
   })()
 
+  // Angular: mothertongue/caste/subcaste/gothra follow-up (religionDetailsSheet)
+  // and subcaste/gothra-only follow-up (dependentSheet) are both a modal bottom
+  // sheet layered OVER the confirm screen — registration-modal-popup.component.html's
+  // `btm-sheet-modal`/`ion-backdrop`, opened via bottomSheetService.showSuccessBtmSheetWithCB(),
+  // never a route/page swap. Rendered below as a BottomSheet, not inline in the
+  // main ScrollView.
+  const followUpContent = (
+    <>
+      <CdnSvg uri={CDN_ALERT_ICON} width={48} height={48} />
+      <Text style={[s.title, { fontFamily: langFonts.semiBold }]}>{screenTitle}</Text>
+
+      {phase === 'religionForm' && (
+        <>
+          <SelectField label={t('REGISTRATION.MOTHERTONGUELABEL', 'Mother tongue')} value={motherTongue?.label} placeholder={t('REGISTRATION.SELECTMOTHERTONGUE', 'Select mother tongue')} onPress={() => setActiveField('motherTongue')} />
+          <SelectField label={isChristian ? t('REGISTRATION.DIVISIONLABEL', 'Division') : t('REGISTRATION.CASTELABEL', 'Caste')} value={caste?.label} placeholder={isChristian ? t('REGISTRATION.SELECTDIVISION', 'Select division') : t('REGISTRATION.SELECTCASTE', 'Select caste')} onPress={() => setActiveField('caste')} />
+          {hasSubcaste && (
+            <SelectField label={t('REGISTRATION.SUBCASTELABEL', 'Sub caste')} value={subCaste?.label} placeholder={t('REGISTRATION.SELECTSUBCASTE', 'Select sub caste')} onPress={() => setActiveField('subCaste')} />
+          )}
+          {hasGothra && (
+            <SelectField label={t('REGISTRATION.GOTHRAMLABEL', 'Gothram')} value={gothra?.label} placeholder={t('REGISTRATION.SELECTGOTHRAM', 'Select gothram')} onPress={() => setActiveField('gothra')} />
+          )}
+        </>
+      )}
+
+      {phase === 'dependentForm' && (
+        <>
+          {hasSubcaste && (
+            <SelectField label={t('REGISTRATION.SUBCASTELABEL', 'Sub caste')} value={subCaste?.label} placeholder={t('REGISTRATION.SELECTSUBCASTE', 'Select sub caste')} onPress={() => setActiveField('subCaste')} />
+          )}
+          {hasGothra && (
+            <SelectField label={t('REGISTRATION.GOTHRAMLABEL', 'Gothram')} value={gothra?.label} placeholder={t('REGISTRATION.SELECTGOTHRAM', 'Select gothram')} onPress={() => setActiveField('gothra')} />
+          )}
+        </>
+      )}
+
+      {/* Home town cluster — Angular: the isHomeTownVisible() block, shown on
+          BOTH follow-up sheets (religion-details and dependent-only) when the
+          selected mother tongue is in NATIVEPLACEDOMAIN. */}
+      {homeTownAsk && (
+        <>
+          <Text style={[s.sectionLabel, { fontFamily: langFonts.semiBold }]}>
+            {fillProfileType('REGISTRATION.HOME_TOWN_TXT',
+              'Is your #PROFILETYPE# home town same as current location?')}
+          </Text>
+
+          <View style={s.pillGroup}>
+            {([['1', t('GENERAL.YES', 'Yes')], ['2', t('GENERAL.NO', 'No')]] as const).map(([key, label]) => {
+              const isSel = homeTownSame === key
+              return (
+                <Pressable
+                  key={key}
+                  style={[s.pill, isSel && s.pillSelected]}
+                  onPress={() => handleSelectHomeTown(key)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isSel }}
+                  accessibilityLabel={label}
+                >
+                  <View style={[s.pillRadio, isSel && s.pillRadioSelected]}>
+                    {isSel && <View style={s.pillTick} />}
+                  </View>
+                  <Text style={[s.pillText, isSel && s.pillTextSelected, { fontFamily: isSel ? langFonts.medium : langFonts.regular }]}>{label}</Text>
+                </Pressable>
+              )
+            })}
+          </View>
+
+          {/* Angular: showHomeStateCity — revealed only on "No" */}
+          {homeTownSame === '2' && (
+            <View style={s.homeLocationFields}>
+              <SelectField
+                label={t('REGISTRATION.STATELABEL', 'State')}
+                value={homeState?.label}
+                placeholder={t('REGISTRATION.SELECTSTATE', 'Select state')}
+                onPress={() => setActiveField('homeState')}
+              />
+              {(homeCityOptions.length > 0 || homeCity) && (
+                <SelectField
+                  label={t('REGISTRATION.CITYLABEL', 'City')}
+                  value={homeCity?.label}
+                  placeholder={t('REGISTRATION.SELECTCITY', 'Select city')}
+                  onPress={() => setActiveField('homeCity')}
+                />
+              )}
+            </View>
+          )}
+        </>
+      )}
+
+      <Pressable
+        style={[s.submitBtn, s.followUpSubmitBtn, (!isFollowUpValid() || submitting) && s.submitBtnDisabled]}
+        disabled={!isFollowUpValid() || submitting}
+        onPress={handleSubmitFollowUp}
+      >
+        {submitting ? <ActivityIndicator color={Colors.white} /> : <Text style={[s.submitBtnText, { fontFamily: langFonts.semiBold }]}>{t('GENERAL.SUBMIT', 'Submit')}</Text>}
+      </Pressable>
+    </>
+  )
+
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <CdnSvg uri={CDN_ALERT_ICON} width={48} height={48} />
-        <Text style={s.title}>{screenTitle}</Text>
+        <Text style={[s.title, { fontFamily: langFonts.semiBold }]}>{screenTitle}</Text>
 
         {phase === 'form' && (
           <>
@@ -705,9 +858,9 @@ export default function ValidationScreen({ navigation, route }: Props) {
                 </View>
               ) : (
                 <View style={s.ageInputWrap}>
-                  <Text style={s.ageLabel}>{t('REGISTRATION.AGE', 'Age')}</Text>
+                  <Text style={[s.ageLabel, { fontFamily: langFonts.regular }]}>{t('REGISTRATION.AGE', 'Age')}</Text>
                   <TextInput
-                    style={s.ageInput}
+                    style={[s.ageInput, { fontFamily: langFonts.medium }]}
                     value={ageValue}
                     onChangeText={v => setAgeValue(v.replace(/[^\d]/g, ''))}
                     keyboardType="number-pad"
@@ -718,7 +871,7 @@ export default function ValidationScreen({ navigation, route }: Props) {
             )}
 
             {/* Angular: updateAgeContent() — mt-12 body2-regular-14 under the DOB row */}
-            {!!ageStatement && <Text style={s.ageStatement}>{ageStatement}</Text>}
+            {!!ageStatement && <Text style={[s.ageStatement, { fontFamily: langFonts.regular }]}>{ageStatement}</Text>}
 
             {shouldShowField('MOTHERTONGUE') && (
               <SelectField label={t('REGISTRATION.MOTHERTONGUELABEL', 'Mother tongue')} value={motherTongue?.label} placeholder={t('REGISTRATION.SELECTMOTHERTONGUE', 'Select mother tongue')} onPress={() => setActiveField('motherTongue')} />
@@ -753,93 +906,31 @@ export default function ValidationScreen({ navigation, route }: Props) {
           </>
         )}
 
-        {phase === 'religionForm' && (
-          <>
-            <SelectField label={t('REGISTRATION.MOTHERTONGUELABEL', 'Mother tongue')} value={motherTongue?.label} placeholder={t('REGISTRATION.SELECTMOTHERTONGUE', 'Select mother tongue')} onPress={() => setActiveField('motherTongue')} />
-            <SelectField label={isChristian ? t('REGISTRATION.DIVISIONLABEL', 'Division') : t('REGISTRATION.CASTELABEL', 'Caste')} value={caste?.label} placeholder={isChristian ? t('REGISTRATION.SELECTDIVISION', 'Select division') : t('REGISTRATION.SELECTCASTE', 'Select caste')} onPress={() => setActiveField('caste')} />
-            {hasSubcaste && (
-              <SelectField label={t('REGISTRATION.SUBCASTELABEL', 'Sub caste')} value={subCaste?.label} placeholder={t('REGISTRATION.SELECTSUBCASTE', 'Select sub caste')} onPress={() => setActiveField('subCaste')} />
-            )}
-            {hasGothra && (
-              <SelectField label={t('REGISTRATION.GOTHRAMLABEL', 'Gothram')} value={gothra?.label} placeholder={t('REGISTRATION.SELECTGOTHRAM', 'Select gothram')} onPress={() => setActiveField('gothra')} />
-            )}
-          </>
-        )}
-
-        {phase === 'dependentForm' && (
-          <>
-            {hasSubcaste && (
-              <SelectField label={t('REGISTRATION.SUBCASTELABEL', 'Sub caste')} value={subCaste?.label} placeholder={t('REGISTRATION.SELECTSUBCASTE', 'Select sub caste')} onPress={() => setActiveField('subCaste')} />
-            )}
-            {hasGothra && (
-              <SelectField label={t('REGISTRATION.GOTHRAMLABEL', 'Gothram')} value={gothra?.label} placeholder={t('REGISTRATION.SELECTGOTHRAM', 'Select gothram')} onPress={() => setActiveField('gothra')} />
-            )}
-          </>
-        )}
-
-        {/* Home town cluster — Angular: the isHomeTownVisible() block, shown on
-            BOTH follow-up sheets (religion-details and dependent-only) when the
-            selected mother tongue is in NATIVEPLACEDOMAIN. */}
-        {isFollowUp && homeTownAsk && (
-          <>
-            <Text style={s.sectionLabel}>
-              {fillProfileType('REGISTRATION.HOME_TOWN_TXT',
-                'Is your #PROFILETYPE# home town same as current location?')}
-            </Text>
-
-            <View style={s.pillGroup}>
-              {([['1', t('GENERAL.YES', 'Yes')], ['2', t('GENERAL.NO', 'No')]] as const).map(([key, label]) => {
-                const isSel = homeTownSame === key
-                return (
-                  <Pressable
-                    key={key}
-                    style={[s.pill, isSel && s.pillSelected]}
-                    onPress={() => handleSelectHomeTown(key)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: isSel }}
-                    accessibilityLabel={label}
-                  >
-                    <View style={[s.pillRadio, isSel && s.pillRadioSelected]}>
-                      {isSel && <View style={s.pillTick} />}
-                    </View>
-                    <Text style={[s.pillText, isSel && s.pillTextSelected]}>{label}</Text>
-                  </Pressable>
-                )
-              })}
-            </View>
-
-            {/* Angular: showHomeStateCity — revealed only on "No" */}
-            {homeTownSame === '2' && (
-              <View style={s.homeLocationFields}>
-                <SelectField
-                  label={t('REGISTRATION.STATELABEL', 'State')}
-                  value={homeState?.label}
-                  placeholder={t('REGISTRATION.SELECTSTATE', 'Select state')}
-                  onPress={() => setActiveField('homeState')}
-                />
-                {(homeCityOptions.length > 0 || homeCity) && (
-                  <SelectField
-                    label={t('REGISTRATION.CITYLABEL', 'City')}
-                    value={homeCity?.label}
-                    placeholder={t('REGISTRATION.SELECTCITY', 'Select city')}
-                    onPress={() => setActiveField('homeCity')}
-                  />
-                )}
-              </View>
-            )}
-          </>
-        )}
       </ScrollView>
 
-      <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
-        <Pressable
-          style={[s.submitBtn, ((isFollowUp ? !isFollowUpValid() : !isFormValid()) || submitting) && s.submitBtnDisabled]}
-          disabled={(isFollowUp ? !isFollowUpValid() : !isFormValid()) || submitting}
-          onPress={isFollowUp ? handleSubmitFollowUp : handleSubmitForm}
-        >
-          {submitting ? <ActivityIndicator color={Colors.white} /> : <Text style={s.submitBtnText}>{t('GENERAL.SUBMIT', 'Submit')}</Text>}
-        </Pressable>
-      </View>
+      {/* Angular: the confirm form's own footer — the follow-up sheet has its
+          own submit button rendered inside the BottomSheet below instead, since
+          it's a separate modal layered on top rather than this screen's content. */}
+      {phase === 'form' && (
+        <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
+          <Pressable
+            style={[s.submitBtn, (!isFormValid() || submitting) && s.submitBtnDisabled]}
+            disabled={!isFormValid() || submitting}
+            onPress={handleSubmitForm}
+          >
+            {submitting ? <ActivityIndicator color={Colors.white} /> : <Text style={[s.submitBtnText, { fontFamily: langFonts.semiBold }]}>{t('GENERAL.SUBMIT', 'Submit')}</Text>}
+          </Pressable>
+        </View>
+      )}
+
+      {/* Angular: registration-modal-popup's religionDetailsSheet/dependentSheet
+          action — a non-dismissable modal sheet (Angular passes no close/backdrop-
+          dismiss here) layered over the confirm screen once it's been submitted. */}
+      <BottomSheet visible={isFollowUp} showClose={false} onClose={() => {}}>
+        <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={s.followUpScroll}>
+          {followUpContent}
+        </ScrollView>
+      </BottomSheet>
 
       <SearchablePicker
         visible={activeField !== null}
@@ -923,6 +1014,12 @@ const s = StyleSheet.create({
   },
   submitBtnDisabled: { opacity: 0.5 },
   submitBtnText: { color: Colors.white, fontSize: 16, fontWeight: '600' },
+
+  // Follow-up sheet (mother tongue/caste/subcaste/gothra) — BottomSheet caps
+  // its card at 95% of screen height, so the field list scrolls internally
+  // instead of pushing the submit button off-screen on short viewports.
+  followUpScroll:   { maxHeight: '100%' },
+  followUpSubmitBtn: { marginTop: 8 },
 
   // Angular: linear-gradient(180deg, #FFF 0%, #FCEAF0 100%) with 32px padding.
   // RN has no CSS gradients; the flat tint is the closest single-colour stand-in

@@ -14,6 +14,7 @@ import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 // Angular pageType 30 — HOROSTATE/HOROCITY + a read-only DOB confirmation.
@@ -44,6 +45,7 @@ type Props = {
 
 export default function HoroscopeBirthDetailsScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [createdBy,       setCreatedBy]       = useState('4')
   const [dobDisplay,       setDobDisplay]      = useState('')
@@ -166,7 +168,7 @@ export default function HoroscopeBirthDetailsScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
-        <Text style={os.title}>{title}</Text>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {fetchingStates ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -178,6 +180,7 @@ export default function HoroscopeBirthDetailsScreen({ navigation }: Props) {
               placeholder={t('REGISTRATION.SELECTSTATE', 'Select state')}
               onPress={() => openPanel('state')}
               hasValue={!!selectedState}
+              langFonts={langFonts}
             />
 
             <FloatField
@@ -191,6 +194,7 @@ export default function HoroscopeBirthDetailsScreen({ navigation }: Props) {
               hasValue={!!selectedCity}
               disabled={!selectedState || fetchingCities}
               loading={fetchingCities}
+              langFonts={langFonts}
             />
 
             {!!dobDisplay && (
@@ -202,8 +206,9 @@ export default function HoroscopeBirthDetailsScreen({ navigation }: Props) {
                   onPress={() => {}}
                   hasValue
                   disabled
+                  langFonts={langFonts}
                 />
-                <Text style={styles.dobHelperText}>{dobHelperText}</Text>
+                <Text style={[styles.dobHelperText, { fontFamily: langFonts.regular }]}>{dobHelperText}</Text>
               </View>
             )}
           </View>
@@ -238,9 +243,10 @@ type FloatFieldProps = {
   hasValue: boolean
   disabled?: boolean
   loading?: boolean
+  langFonts: ReturnType<typeof useLanguageFonts>
 }
 
-function FloatField({ label, value, placeholder, onPress, hasValue, disabled, loading }: FloatFieldProps) {
+function FloatField({ label, value, placeholder, onPress, hasValue, disabled, loading, langFonts }: FloatFieldProps) {
   return (
     <View style={floatStyles.wrapper}>
       <Pressable
@@ -250,7 +256,7 @@ function FloatField({ label, value, placeholder, onPress, hasValue, disabled, lo
         accessibilityLabel={label}
       >
         <Text
-          style={[floatStyles.value, !hasValue && floatStyles.placeholder]}
+          style={[floatStyles.value, !hasValue && floatStyles.placeholder, { fontFamily: hasValue ? langFonts.medium : langFonts.regular }]}
           numberOfLines={1}
         >
           {hasValue ? value : placeholder}
@@ -264,7 +270,7 @@ function FloatField({ label, value, placeholder, onPress, hasValue, disabled, lo
 
       {hasValue && (
         <View style={floatStyles.labelWrap}>
-          <Text style={floatStyles.labelText}>{label}</Text>
+          <Text style={[floatStyles.labelText, { fontFamily: langFonts.regular }]}>{label}</Text>
         </View>
       )}
     </View>

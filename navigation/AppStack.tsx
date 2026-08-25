@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useTranslation } from 'react-i18next'
 import AppHeader from '../components/app-header/AppHeader'
 import ButtonRevamp from '../components/button-revamp/ButtonRevamp'
 import { Colors } from '../constants/colors'
@@ -31,6 +32,8 @@ import ReligionScreen              from '../screens/onboarding/ReligionScreen'
 import CasteScreen                 from '../screens/onboarding/CasteScreen'
 import GothraScreen                from '../screens/onboarding/GothraScreen'
 import AddPhotoScreen              from '../screens/onboarding/AddPhotoScreen'
+import EducationDetailScreen       from '../screens/onboarding/EducationDetailScreen'
+import OccupationDetailScreen      from '../screens/onboarding/OccupationDetailScreen'
 import CustomGalleryScreen         from '../screens/onboarding/CustomGalleryScreen'
 import ManagePhotosScreen          from '../screens/onboarding/ManagePhotosScreen'
 import FamilyDetailsScreen         from '../screens/onboarding/FamilyDetailsScreen'
@@ -270,6 +273,10 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
   const pageNo = route.params?.pageNo ?? '1'
   const isDesktop = useIsDesktopWeb()
   const insets = useSafeAreaInsets()
+  // Footer CTA copy is owned by the shell, not the screens — screens only pass a
+  // nextLabel when they need a non-default word. useTranslation() re-renders this
+  // component on a language change, so the default labels below switch live.
+  const { t } = useTranslation()
 
   // Hooks below must run unconditionally on every render (React's rules of
   // hooks) — isDesktop can flip mid-session on an actual browser resize, not
@@ -334,6 +341,9 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
       case '14': return <CasteScreen            navigation={navigation} route={route} />
       case '16': return <GothraScreen           navigation={navigation} route={route} />
       case '20': return <AddPhotoScreen         navigation={navigation} route={route} />
+      // JODII-490 "few more details" chain: 20 -> [34] -> [35] -> 27, both conditional
+      case '34': return <EducationDetailScreen  navigation={navigation} route={route} />
+      case '35': return <OccupationDetailScreen navigation={navigation} route={route} />
       case '22': return <CustomGalleryScreen    navigation={navigation} route={route} />
       case '21': return <ManagePhotosScreen     navigation={navigation} route={route} />
       case '27': return <FamilyDetailsScreen         navigation={navigation} route={route} />
@@ -395,7 +405,7 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
         >
           {!footerState.nextHidden && (
             <ButtonRevamp
-              label={footerState.nextLabel ?? 'Next'}
+              label={footerState.nextLabel ?? t('REGISTRATION.NEXTCTA', 'Next')}
               variant="primary"
               size="standard"
               fullWidth
@@ -412,7 +422,7 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
               accessibilityRole="button"
             >
               <Text style={shell.skipText}>
-                {footerState.skipLabel ?? "I'll do this later"}
+                {footerState.skipLabel ?? t('REG.DO_LATER', "I'll do this later")}
               </Text>
               <Text style={shell.skipArrow}> ›</Text>
             </Pressable>

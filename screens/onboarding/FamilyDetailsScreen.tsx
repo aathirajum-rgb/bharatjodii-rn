@@ -20,6 +20,8 @@ import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -57,6 +59,7 @@ type Props = {
 
 export default function FamilyDetailsScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [brotherOptions, setBrotherOptions] = useState<Option[]>([])
   const [sisterOptions,  setSisterOptions]  = useState<Option[]>([])
@@ -67,7 +70,12 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
   const [createdBy,    setCreatedBy]    = useState('1')
   const [submitting,   setSubmitting]   = useState(false)
 
-  useEffect(() => {
+  // Extracted so a language change can re-run it — the option labels below are
+  // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
+  // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
+  // the stored KEY against the newly translated list. Re-reading storage here does
+  // the same, so the user's selection survives the switch.
+  function loadOptions() {
     Promise.all([
       getRegValue('CREATEDBY'),
       getRegValue('BROTHERS'),
@@ -88,7 +96,11 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
         })
         .finally(() => setFetching(false))
     })
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  useLanguageReload(loadOptions)
 
   const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
   const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
@@ -141,7 +153,7 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
           contentFit="contain"
         />
 
-        <Text style={os.title}>{title}</Text>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -164,7 +176,7 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
                     <View style={[styles.chipIcon, isSelected && styles.chipIconSelected]}>
                       {isSelected && <Text style={styles.checkmark}>✓</Text>}
                     </View>
-                    <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}>
+                    <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected, { fontFamily: langFonts.regular }]}>
                       {opt.label}
                     </Text>
                   </Pressable>
@@ -189,7 +201,7 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
                     <View style={[styles.chipIcon, isSelected && styles.chipIconSelected]}>
                       {isSelected && <Text style={styles.checkmark}>✓</Text>}
                     </View>
-                    <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}>
+                    <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected, { fontFamily: langFonts.regular }]}>
                       {opt.label}
                     </Text>
                   </Pressable>

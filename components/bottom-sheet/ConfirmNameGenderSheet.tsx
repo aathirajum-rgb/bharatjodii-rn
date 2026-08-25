@@ -7,6 +7,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { Fonts } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import type { GenderOption } from '../../service/registrationService'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -15,8 +16,9 @@ export interface ConfirmNameGenderSheetProps {
   visible:      boolean
   title:        string
   name:         string
-  gender:       string | null
-  genderOptions: GenderOption[]
+  // Both omitted on the name-only sheet (hideGender) — nothing reads them there.
+  gender?:       string | null | undefined
+  genderOptions?: GenderOption[] | undefined
   /** Angular: componentData.NAME_LABEL — "Name" / "Relative's name". */
   nameLabel:    string
   /** Angular: componentData.GENDER_LABEL — "Gender" / "Friend's gender". */
@@ -53,8 +55,8 @@ export default function ConfirmNameGenderSheet({
   visible,
   title,
   name,
-  gender,
-  genderOptions,
+  gender = null,
+  genderOptions = [],
   nameLabel,
   genderLabel,
   nameViolated,
@@ -63,13 +65,16 @@ export default function ConfirmNameGenderSheet({
   onSubmit,
 }: ConfirmNameGenderSheetProps) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
-  const [nameValue,   setNameValue]   = useState(name)
-  const [genderValue, setGenderValue] = useState(gender ?? '')
+  // Seeded by the effect below, not here: this component stays mounted while the
+  // sheet is closed, so the initial props are always stale by the time it opens.
+  const [nameValue,   setNameValue]   = useState('')
+  const [genderValue, setGenderValue] = useState('')
   const [isFocused,   setIsFocused]   = useState(false)
   // Angular: onNameInputChange() clears the violation flag as soon as the user
   // edits, so the red border doesn't persist while they're fixing it.
-  const [showViolation, setShowViolation] = useState(nameViolated)
+  const [showViolation, setShowViolation] = useState(false)
 
   // Re-seed whenever the sheet is (re)opened — a failed re-validation reopens it
   // with the values the user just submitted, not the originals.
@@ -78,7 +83,6 @@ export default function ConfirmNameGenderSheet({
     setNameValue(name)
     setGenderValue(gender ?? '')
     setShowViolation(nameViolated)
-    setIsFocused(false)
   }, [visible, name, gender, nameViolated])
 
   // Angular: componentData.GENDER_TEXT = selectedGender?.TEXT — the helper line
@@ -89,14 +93,13 @@ export default function ConfirmNameGenderSheet({
   const isValid = /^[\p{L}\p{M}\s]{2,}$/u.test(nameValue.trim())
     && (hideGender || !!genderValue)
 
-  // Same 4-state border rule as the onboarding Name field.
+  // Same border rule as the onboarding Name field: focus wins, then red for a
+  // flagged or empty name, else the default grey.
   const borderColor = isFocused
     ? Colors.inputFocus
-    : showViolation
+    : (showViolation || nameValue.length === 0)
       ? Colors.inputError
-      : nameValue.length === 0
-        ? Colors.inputError
-        : Colors.inputBorder
+      : Colors.inputBorder
 
   return (
     <BottomSheet visible={visible} showClose={false}>
@@ -104,7 +107,7 @@ export default function ConfirmNameGenderSheet({
         {/* Angular: componentData.IMG — .top-left-modal-img, 48x48, mb-24 */}
         <CdnSvg uri={ALERT_ICON} width={48} height={48} style={styles.alertIcon} />
 
-        <Text style={styles.title}>{title}</Text>
+        <Text style={[styles.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {/* Name field — Angular: ion-input bound to nameValue, .name-violation on error */}
         <View style={styles.inputOuter}>
@@ -122,13 +125,13 @@ export default function ConfirmNameGenderSheet({
           />
           {/* Angular: .floating bound to componentData.NAME_LABEL */}
           <View style={styles.labelWrap} pointerEvents="none">
-            <Text style={styles.labelText}>{capitalizeFirst(nameLabel)}</Text>
+            <Text style={[styles.labelText, { fontFamily: langFonts.regular }]}>{capitalizeFirst(nameLabel)}</Text>
           </View>
         </View>
 
         {/* Angular: REGISTRATION.VIOLATED_NAME under the input */}
         {showViolation && (
-          <Text style={styles.violationText}>
+          <Text style={[styles.violationText, { fontFamily: langFonts.regular }]}>
             {t('REGISTRATION.VIOLATED_NAME', 'Please enter a valid name')}
           </Text>
         )}
@@ -138,7 +141,7 @@ export default function ConfirmNameGenderSheet({
           <>
             {/* Angular: font-14-semibold black-color, mt-24 */}
             {!!genderLabel && (
-              <Text style={styles.genderLabel}>{capitalizeFirst(genderLabel)}</Text>
+              <Text style={[styles.genderLabel, { fontFamily: langFonts.semiBold }]}>{capitalizeFirst(genderLabel)}</Text>
             )}
 
             {/* Angular: .gender-pill-group — inline pills, not the full-width
@@ -161,7 +164,7 @@ export default function ConfirmNameGenderSheet({
                       <View style={[styles.pillRadio, isSelected && styles.pillRadioSelected]}>
                         {isSelected && <View style={styles.pillTick} />}
                       </View>
-                      <Text style={[styles.pillText, isSelected && styles.pillTextSelected]}>
+                      <Text style={[styles.pillText, isSelected && styles.pillTextSelected, { fontFamily: isSelected ? langFonts.medium : langFonts.regular }]}>
                         {opt.label}
                       </Text>
                     </Pressable>
@@ -171,7 +174,7 @@ export default function ConfirmNameGenderSheet({
             )}
 
             {/* Angular: componentData.GENDER_TEXT — the selected option's TEXT */}
-            {!!selectedText && <Text style={styles.genderText}>{selectedText}</Text>}
+            {!!selectedText && <Text style={[styles.genderText, { fontFamily: langFonts.medium }]}>{selectedText}</Text>}
           </>
         )}
 
@@ -202,7 +205,6 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   title: {
-    fontFamily:   Fonts.poppinsSemiBold,
     fontSize:     18,
     color:        Colors.textPrimary,
     lineHeight:   24,
@@ -233,13 +235,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   labelText: {
-    fontFamily: Fonts.poppinsRegular,
     fontSize:   12,
     fontWeight: '400',
     color:      Colors.textPrimary,
   },
   violationText: {
-    fontFamily: Fonts.poppinsRegular,
     marginTop:  8,
     fontSize:   12,
     color:      Colors.inputError,
@@ -249,7 +249,6 @@ const styles = StyleSheet.create({
   // Section heading above the pills — Angular: font-14-semibold black-color, mt-24
   genderLabel: {
     marginTop:  24,
-    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   14,
     fontWeight: '600',
     color:      Colors.textPrimary,
@@ -314,21 +313,18 @@ const styles = StyleSheet.create({
 
   // Angular body2-regular-14 line-height-16, switching to Medium once selected
   pillText: {
-    fontFamily: Fonts.poppinsRegular,
     fontSize:   14,
     fontWeight: '400',
     lineHeight: 16,
     color:      Colors.textPrimary,
   },
   pillTextSelected: {
-    fontFamily: Fonts.poppinsMedium,
     fontWeight: '500',
   },
 
   // Helper line under the pills — Angular body1-medium-14-all black-color, mt-8
   genderText: {
     marginTop:  8,
-    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     fontWeight: '500',
     lineHeight: 20,

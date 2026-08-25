@@ -25,9 +25,10 @@ import {
 } from '../../service/registrationService'
 import { CDN_SVG, CDN_REVAMP } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
-import { Fonts } from '../../src/theme/fonts'
 import ConfirmNameGenderSheet from '../../components/bottom-sheet/ConfirmNameGenderSheet'
 import { os } from './onboardingStyles'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -63,6 +64,7 @@ type Props = {
 
 export default function GenderScreen({ navigation }: Props) {
   const { t }  = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [options,    setOptions]    = useState<GenderOption[]>([])
   const [fetching,   setFetching]   = useState(true)
@@ -77,7 +79,12 @@ export default function GenderScreen({ navigation }: Props) {
   const [nameViolated,  setNameViolated]  = useState(false)
 
   // Load stored name + prior selection (back navigation), fetch gender options from API
-  useEffect(() => {
+  // Extracted so a language change can re-run it — the option labels below are
+  // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
+  // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
+  // the stored KEY against the newly translated list. Re-reading storage here does
+  // the same, so the user's selection survives the switch.
+  function loadOptions() {
     getRegValues().then(({ NAME, GENDER, CREATEDBY }) => {
       if (NAME)      setName(NAME)
       if (GENDER)    setSelected(GENDER)
@@ -88,7 +95,11 @@ export default function GenderScreen({ navigation }: Props) {
         .catch(() => setOptions(FALLBACK_OPTIONS))
         .finally(() => setFetching(false))
     })
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  useLanguageReload(loadOptions)
 
   // Title: "Select the gender of [Name]" — Angular: REGISTRATION.GENDER = "Select the gender of #NAME#"
   const genderKey = t('REGISTRATION.GENDER', 'Select the gender of #NAME#')
@@ -190,7 +201,7 @@ export default function GenderScreen({ navigation }: Props) {
         />
 
         {/* Title — "Select the gender of Ranganathan" (Figma: 22px SemiBold) */}
-        <Text style={os.title}>{title}</Text>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {/* Gender cards — Figma node 3-336: 1px #b0b0b0 border, 16px radius, gap:32 */}
         {fetching ? (
@@ -216,7 +227,7 @@ export default function GenderScreen({ navigation }: Props) {
                     />
 
                     {/* Label — Figma: 14px Medium, stretches between avatar and radio */}
-                    <Text style={[styles.cardLabel, isSelected && styles.cardLabelSelected]}>
+                    <Text style={[styles.cardLabel, isSelected && styles.cardLabelSelected, { fontFamily: langFonts.medium }]}>
                       {opt.label}
                     </Text>
 
@@ -229,7 +240,7 @@ export default function GenderScreen({ navigation }: Props) {
                   {/* Helper subtext under the selected card — API: option.TEXT
                       (Angular: radio.component.html's *ngIf="selectedValue == option.key" div) */}
                   {isSelected && !!opt.text && (
-                    <Text style={styles.helperText}>{opt.text}</Text>
+                    <Text style={[styles.helperText, { fontFamily: langFonts.medium }]}>{opt.text}</Text>
                   )}
                 </View>
               )
@@ -307,7 +318,6 @@ const styles = StyleSheet.create({
   // Helper subtext under the selected card — Angular: body1-medium-14 black-color
   helperText: {
     marginTop:  8,
-    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     fontWeight: '500',
     lineHeight: 20,

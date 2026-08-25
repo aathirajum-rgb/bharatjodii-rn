@@ -1,9 +1,7 @@
 import { Image } from 'expo-image'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
-  Animated,
-  Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,7 +14,8 @@ import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { getRegValue } from '../../service/registrationService'
 import { CDN_SVG } from '../../constants/cdn'
 import { os } from './onboardingStyles'
-import { SemanticFontsEnglish } from '../../src/theme/fonts'
+import { getFewMoreDetailsNextPage } from './fewMoreDetailsFlow'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -34,27 +33,21 @@ type Props = {
 
 export default function AddPhotoScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [gender,    setGender]    = useState('1')
   const [createdBy, setCreatedBy] = useState('4')
-  const [skipSheetVisible, setSkipSheetVisible] = useState(false)
 
-  const slideAnim = useRef(new Animated.Value(300)).current
-
-  function openSkipSheet() {
-    setSkipSheetVisible(true)
-    Animated.spring(slideAnim, {
-      toValue: 0, useNativeDriver: true, bounciness: 0, speed: 20,
-    }).start()
-  }
-
-  function closeSkipSheet(thenNavigate = false) {
-    Animated.timing(slideAnim, {
-      toValue: 300, duration: 220, useNativeDriver: true,
-    }).start(() => {
-      setSkipSheetVisible(false)
-      if (thenNavigate) navigation.push('onboarding', { pageNo: '27' })
-    })
+  // Angular: add-photo.component.ts's skip() — for the onboarding fromPage it
+  // just emits straight to onboardingSkip(), no confirmation dialog; that only
+  // exists for this same component's OTHER entry point (opened from a
+  // notification banner), not here.
+  function handleSkip() {
+    // Angular: getFewMoreDetailsNext('20') — the JODII-490 chain routes to
+    // 34 (education detail) or 35 (occupation detail) when eligible, else 27.
+    getFewMoreDetailsNextPage('20').then(next =>
+      navigation.push('onboarding', { pageNo: next }))
   }
 
   useEffect(() => {
@@ -105,86 +98,56 @@ export default function AddPhotoScreen({ navigation }: Props) {
           </Pressable>
         </View>
 
-        {/* Title */}
-        <Text style={styles.title}>Add your photo{'\n'}to continue</Text>
+        {/* Title — Angular: add-photo.component.html's bindTitle() default for
+            the onboarding fromPage ("Add your photo <br> to continue"); this
+            is server-driven dynamic content in Angular, not a static locale
+            key, so the English copy is kept verbatim here. */}
+        <Text style={[styles.title, { fontFamily: langFonts.semiBold }]}>Add your photo{'\n'}to continue</Text>
 
-        {/* Benefits card */}
+        {/* Benefits card — Angular: add-photo.component.html's promotype==='1'
+            block (SUBHEADER + BODY.CONTENT1/CONTENT2), also dynamic content;
+            same default copy kept, "shortlist" not "like" per Angular's own
+            template default. */}
         <View style={styles.card}>
-          <Text style={styles.cardIntro}>Only if you add photo:</Text>
+          <Text style={[styles.cardIntro, { fontFamily: langFonts.regular }]}>Only if you add photo:</Text>
 
           <View style={styles.bulletRow}>
             <View style={styles.bullet} />
-            <Text style={styles.bulletText}>You will be able to like matches</Text>
+            <Text style={[styles.bulletText, { fontFamily: langFonts.medium }]}>You will be able to shortlist matches</Text>
           </View>
 
           <View style={styles.bulletRow}>
             <View style={styles.bullet} />
-            <Text style={styles.bulletText}>Your profile will be visible to matches</Text>
+            <Text style={[styles.bulletText, { fontFamily: langFonts.medium }]}>Your profile will be visible to matches</Text>
           </View>
 
-          {/* Add photo button inside card */}
+          {/* Add photo button inside card — Angular: registration.config.ts
+              page 20's CTA key, REGISTRATION.ADDPHOTOCTA. */}
           <Pressable
             style={styles.addBtn}
             onPress={openGallery}
             accessibilityRole="button"
           >
-            <Text style={styles.addBtnLabel}>Add photo now</Text>
+            <Text style={[styles.addBtnLabel, { fontFamily: langFonts.semiBold }]}>
+              {t('REGISTRATION.ADDPHOTOCTA', 'Add photo')}
+            </Text>
           </Pressable>
         </View>
 
       </ScrollView>
 
-      {/* "I'll do this later" pinned at bottom */}
+      {/* "I'll do this later" pinned at bottom — Angular: skips immediately,
+          no confirmation dialog, for the onboarding entry point. */}
       <Pressable
         style={[styles.laterRow, { paddingBottom: insets.bottom > 0 ? insets.bottom : 16 }]}
-        onPress={openSkipSheet}
+        onPress={handleSkip}
         hitSlop={12}
       >
-        <Text style={styles.laterText}>I'll do this later</Text>
+        <Text style={[styles.laterText, { fontFamily: langFonts.regular }]}>
+          {t('REGISTRATION.IWILLDOTHISLATER', "I'll do this later")}
+        </Text>
         <Text style={styles.laterChevron}>›</Text>
       </Pressable>
-
-      {/* Skip-confirm bottom sheet */}
-      <Modal
-        transparent
-        visible={skipSheetVisible}
-        animationType="none"
-        onRequestClose={() => closeSkipSheet(false)}
-        statusBarTranslucent
-      >
-        <Pressable style={styles.sheetOverlay} onPress={() => closeSkipSheet(false)}>
-          <Animated.View
-            style={[
-              styles.sheet,
-              { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 16 : 24,
-                transform: [{ translateY: slideAnim }] },
-            ]}
-          >
-            <View style={styles.warnIconCircle}>
-              <Text style={styles.warnIconText}>!</Text>
-            </View>
-
-            <Text style={styles.sheetTitle}>
-              Without adding photo you will not be able to like matches or get responses.
-            </Text>
-            <Text style={styles.sheetSub}>Do you want to add photo?</Text>
-
-            <Pressable
-              style={styles.sheetBtnOutline}
-              onPress={() => closeSkipSheet(true)}
-            >
-              <Text style={styles.sheetBtnOutlineLabel}>I'll do this later</Text>
-            </Pressable>
-
-            <Pressable
-              style={styles.sheetBtnSolid}
-              onPress={() => { closeSkipSheet(false); openGallery() }}
-            >
-              <Text style={styles.sheetBtnSolidLabel}>Yes, add photo</Text>
-            </Pressable>
-          </Animated.View>
-        </Pressable>
-      </Modal>
     </View>
   )
 }
@@ -208,6 +171,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems:      'center',
     justifyContent:  'center',
+  
   },
   silhouette: {
     width:  '100%',
@@ -221,6 +185,7 @@ const styles = StyleSheet.create({
     lineHeight:    32,
     textAlign:     'center',
     marginBottom:  24,
+    
   },
 
   card: {
@@ -237,6 +202,7 @@ const styles = StyleSheet.create({
     shadowOffset:      { width: 0, height: 2 },
     shadowRadius:      8,
     elevation:         3,
+    
   },
   cardIntro: {
     fontSize:   13,
@@ -290,79 +256,11 @@ const styles = StyleSheet.create({
   },
   laterText: {
     fontSize:   14,
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     color:      '#333333',
   },
   laterChevron: {
     fontSize:   18,
     color:      '#333333',
     lineHeight: 22,
-  },
-
-  sheetOverlay: {
-    flex:            1,
-    backgroundColor: Colors.scrim,
-    justifyContent:  'flex-end',
-  },
-  sheet: {
-    backgroundColor:      Colors.surface,
-    borderTopLeftRadius:  24,
-    borderTopRightRadius: 24,
-    paddingHorizontal:    24,
-    paddingTop:           28,
-    gap:                  16,
-  },
-  warnIconCircle: {
-    alignSelf:       'flex-start',
-    width:           40,
-    height:          40,
-    borderRadius:    20,
-    backgroundColor: Colors.primary,
-    alignItems:      'center',
-    justifyContent:  'center',
-    marginBottom:    4,
-  },
-  warnIconText: {
-    color:      Colors.white,
-    fontSize:   20,
-    fontWeight: '700',
-    lineHeight: 24,
-  },
-  sheetTitle: {
-    fontSize:   18,
-    fontWeight: '700',
-    color:      Colors.textPrimary,
-    lineHeight: 26,
-  },
-  sheetSub: {
-    fontSize:   14,
-    fontWeight: '400',
-    color:      Colors.textSecondary,
-    lineHeight: 20,
-  },
-  sheetBtnOutline: {
-    height:          52,
-    borderRadius:    8,
-    borderWidth:     1.5,
-    borderColor:     Colors.primaryDark,
-    alignItems:      'center',
-    justifyContent:  'center',
-  },
-  sheetBtnOutlineLabel: {
-    fontSize:   16,
-    fontWeight: '600',
-    color:      Colors.primaryDark,
-  },
-  sheetBtnSolid: {
-    height:          52,
-    borderRadius:    8,
-    backgroundColor: Colors.primaryDark,
-    alignItems:      'center',
-    justifyContent:  'center',
-  },
-  sheetBtnSolidLabel: {
-    fontSize:   16,
-    fontWeight: '600',
-    color:      Colors.white,
   },
 })

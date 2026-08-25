@@ -22,6 +22,7 @@ import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -41,6 +42,7 @@ type Props = {
 
 export default function HomeTownLocationScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [createdBy,         setCreatedBy]         = useState('4')
   const [selectedHomeState, setSelectedHomeState]  = useState<Option | null>(null)
@@ -143,7 +145,7 @@ export default function HomeTownLocationScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
-        <Text style={os.title}>{title}</Text>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {loadingStates ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -155,6 +157,7 @@ export default function HomeTownLocationScreen({ navigation }: Props) {
               placeholder={t('REGISTRATION.SELECTSTATE', 'Select state')}
               onPress={() => openPanel('state')}
               hasValue={!!selectedHomeState}
+              langFonts={langFonts}
             />
 
             <FloatField
@@ -170,6 +173,7 @@ export default function HomeTownLocationScreen({ navigation }: Props) {
               hasValue={!!selectedHomeCity}
               disabled={!selectedHomeState || loadingCities}
               loading={loadingCities}
+              langFonts={langFonts}
             />
           </View>
         )}
@@ -202,9 +206,10 @@ type FloatFieldProps = {
   hasValue: boolean
   disabled?: boolean
   loading?: boolean
+  langFonts: ReturnType<typeof useLanguageFonts>
 }
 
-function FloatField({ label, value, placeholder, onPress, hasValue, disabled, loading }: FloatFieldProps) {
+function FloatField({ label, value, placeholder, onPress, hasValue, disabled, loading, langFonts }: FloatFieldProps) {
   return (
     <View style={floatStyles.wrapper}>
       <Pressable
@@ -218,6 +223,7 @@ function FloatField({ label, value, placeholder, onPress, hasValue, disabled, lo
             floatStyles.value,
             !hasValue && floatStyles.placeholder,
             disabled && floatStyles.disabledText,
+            { fontFamily: hasValue ? langFonts.medium : langFonts.regular },
           ]}
           numberOfLines={1}
         >
@@ -231,7 +237,7 @@ function FloatField({ label, value, placeholder, onPress, hasValue, disabled, lo
       </Pressable>
       {hasValue && (
         <View style={floatStyles.labelWrap}>
-          <Text style={floatStyles.labelText}>{label}</Text>
+          <Text style={[floatStyles.labelText, { fontFamily: langFonts.regular }]}>{label}</Text>
         </View>
       )}
     </View>

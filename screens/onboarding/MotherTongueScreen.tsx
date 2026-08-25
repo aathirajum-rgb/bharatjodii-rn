@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
+import { SvgXml } from 'react-native-svg'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
 import {
@@ -22,14 +23,24 @@ import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { stripAndDecodeHtml } from '../../utils/htmlEntities'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'mother-tongue.svg'
+// Angular's dropdown-field arrow is Ionic's "chevron-forward-outline" icon —
+// not a CDN-hosted image but a bundled Ionicons SVG (node_modules/ionicons/
+// dist/svg/chevron-forward-outline.svg), colored via its "black-color" CSS
+// class. Inlined here verbatim (stroke swapped from currentColor to a fixed
+// black, since SvgXml doesn't inherit CSS color) for a pixel-exact match.
+const CHEVRON_FORWARD_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M184 112l144 144-144 144"/></svg>`
 
-function stripHtml(raw: string): string {
-  return raw.replace(/<[^>]+>/g, '').trim()
-}
+// Labels from registrationService are already tag-stripped and entity-decoded by
+// its label() helper; kept as a thin alias to the shared util so this stays
+// correct for any raw string and never silently reintroduces &#x....; codes.
+const stripHtml = stripAndDecodeHtml
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +55,7 @@ type Props = {
 
 export default function MotherTongueScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [allOptions,   setAllOptions]   = useState<Option[]>([])
   const [fetching,     setFetching]     = useState(true)
@@ -52,7 +64,12 @@ export default function MotherTongueScreen({ navigation }: Props) {
   const [submitting,   setSubmitting]   = useState(false)
   const [panelVisible, setPanelVisible] = useState(false)
 
-  useEffect(() => {
+  // Extracted so a language change can re-run it — the option labels below are
+  // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
+  // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
+  // the stored KEY against the newly translated list. Re-reading storage here does
+  // the same, so the user's selection survives the switch.
+  function loadOptions() {
     Promise.all([
       getRegValue('CREATEDBY'),
       getRegValue('MOTHERTONGUE'),
@@ -71,7 +88,11 @@ export default function MotherTongueScreen({ navigation }: Props) {
         .catch(() => {})
         .finally(() => setFetching(false))
     })
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  useLanguageReload(loadOptions)
 
   const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
   const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
@@ -79,6 +100,12 @@ export default function MotherTongueScreen({ navigation }: Props) {
     .replace('#PROFILETYPE#', translatedProfileType)
     .replace('  ', ' ')
     .trim()
+  // Angular: registration.config.ts page 39 LISTDATA — PLACEHOLDERTXT:
+  // REGISTRATION.SELECTMOTHERTONGUE, LABEL: REGISTRATION.MOTHERTONGUELABEL,
+  // SEARCHBARTXT: REGISTRATION.SEARCHMOTHERTONGUE.
+  const placeholderText = t('REGISTRATION.SELECTMOTHERTONGUE', 'Select mother tongue')
+  const fieldLabelText  = t('REGISTRATION.MOTHERTONGUELABEL', 'Mother tongue')
+  const searchPlaceholderText = t('REGISTRATION.SEARCHMOTHERTONGUE', 'Search mother tongue')
 
   async function handleNext() {
     if (!selected || submitting) return
@@ -112,32 +139,44 @@ export default function MotherTongueScreen({ navigation }: Props) {
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
-        <Text style={os.title}>{title}</Text>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
         ) : (
-          <Pressable
-            style={[styles.selectField, !!selected && styles.selectFieldActive]}
-            onPress={() => setPanelVisible(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Select mother tongue"
-          >
-            <Text
-              style={[styles.selectFieldText, !!selected && styles.selectFieldTextActive]}
-              numberOfLines={1}
+          // Floating "Mother tongue" label — always shown above the field,
+          // with or without a selection (unlike Height's floating label,
+          // which is conditional on a value being present).
+          <View style={styles.selectFieldWrapper}>
+            <View style={styles.selectFieldLabel} pointerEvents="none">
+              <Text style={[styles.selectFieldLabelText, { fontFamily: langFonts.regular }]}>{fieldLabelText}</Text>
+            </View>
+            <Pressable
+              style={styles.selectField}
+              onPress={() => setPanelVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Select mother tongue"
             >
-              {selected ? selected.label : 'Select mother tongue'}
-            </Text>
-            <Text style={styles.selectFieldArrow}>›</Text>
-          </Pressable>
+              <Text
+                style={[
+                  styles.selectFieldText,
+                  !!selected && styles.selectFieldTextActive,
+                  { fontFamily: selected ? langFonts.medium : langFonts.regular },
+                ]}
+                numberOfLines={1}
+              >
+                {selected ? selected.label : placeholderText}
+              </Text>
+              <SvgXml xml={CHEVRON_FORWARD_XML} width={24} height={24} />
+            </Pressable>
+          </View>
         )}
       </ScrollView>
 
       <SearchablePicker
         visible={panelVisible}
-        title="Select language"
-        placeholder="Search language..."
+        title={title}
+        placeholder={searchPlaceholderText}
         options={allOptions}
         selectedKey={selected?.key ?? null}
         onSelect={(opt) => setSelected(opt)}
@@ -152,6 +191,24 @@ export default function MotherTongueScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   loader: { marginTop: 48 },
 
+  selectFieldWrapper: {
+    position:  'relative',
+    marginTop: 8,
+  },
+  selectFieldLabel: {
+    position:          'absolute',
+    top:               -8,
+    left:              12,
+    backgroundColor:   Colors.surface,
+    paddingHorizontal: 4,
+    zIndex:            10,
+  },
+  // Angular: body3-regular-12 (registration-revamp.component.html:217) — Poppins-Regular
+  selectFieldLabelText: {
+    fontSize:   12,
+    fontWeight: '400',
+    color:      Colors.textPrimary,
+  },
   selectField: {
     flexDirection:   'row',
     alignItems:      'center',
@@ -163,19 +220,16 @@ const styles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
-  selectFieldActive: {},
+  // Angular: body2-regular-14 while showing the placeholder — Poppins-Regular
   selectFieldText: {
     flex:       1,
     fontSize:   14,
     fontWeight: '400',
     color:      Colors.textPrimary,
   },
+  // Angular: body1-medium-14 once a value is selected (registration-revamp.
+  // component.html:211) — Poppins-Medium
   selectFieldTextActive: {
     fontWeight: '500',
-  },
-  selectFieldArrow: {
-    fontSize:   22,
-    color:      Colors.textPrimary,
-    lineHeight: 26,
   },
 })

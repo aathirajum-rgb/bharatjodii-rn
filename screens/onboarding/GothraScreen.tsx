@@ -25,6 +25,8 @@ import { resetTo } from '../../utils/navigationRef'
 import { ENavigation } from '../../types/enums/navigation.enum'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -44,6 +46,7 @@ type Props = {
 
 export default function GothraScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [allOptions,    setAllOptions]    = useState<Option[]>([])
   const [fetching,      setFetching]      = useState(true)
@@ -53,7 +56,12 @@ export default function GothraScreen({ navigation }: Props) {
   const [panelVisible,   setPanelVisible]   = useState(false)
   const [successVisible, setSuccessVisible] = useState(false)
 
-  useEffect(() => {
+  // Extracted so a language change can re-run it — the option labels below are
+  // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
+  // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
+  // the stored KEY against the newly translated list. Re-reading storage here does
+  // the same, so the user's selection survives the switch.
+  function loadOptions() {
     Promise.all([
       getRegValue('CREATEDBY'),
       getRegValue('GOTHRA'),
@@ -71,7 +79,11 @@ export default function GothraScreen({ navigation }: Props) {
         .catch(() => {})
         .finally(() => setFetching(false))
     })
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  useLanguageReload(loadOptions)
 
   // ─── Derived ──────────────────────────────────────────────────────────────
 
@@ -126,7 +138,7 @@ export default function GothraScreen({ navigation }: Props) {
           contentFit="contain"
         />
 
-        <Text style={os.title}>{title}</Text>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -135,7 +147,7 @@ export default function GothraScreen({ navigation }: Props) {
             {/* Matches Religion/Caste: label only shows once a value is selected */}
             {!!selected && (
               <View style={styles.fieldLabelBadge}>
-                <Text style={styles.fieldLabelText}>Gothram</Text>
+                <Text style={[styles.fieldLabelText, { fontFamily: langFonts.regular }]}>{t('REGISTRATION.GOTHRAMLABEL', 'Gothram')}</Text>
               </View>
             )}
             <Pressable
@@ -145,7 +157,11 @@ export default function GothraScreen({ navigation }: Props) {
               accessibilityLabel="Select gothram"
             >
               <Text
-                style={[styles.selectFieldText, !!selected && styles.selectFieldTextActive]}
+                style={[
+                  styles.selectFieldText,
+                  !!selected && styles.selectFieldTextActive,
+                  selected ? { fontFamily: langFonts.medium } : null,
+                ]}
                 numberOfLines={1}
               >
                 {selected ? selected.label : 'Select Gothram'}

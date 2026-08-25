@@ -23,6 +23,10 @@ export const os = StyleSheet.create({
     marginBottom: 24,
   },
 
+  // Poppins fallback for screens that don't override fontFamily inline.
+  // Screens rendering server-translated text should override this per-render
+  // via useLanguageFonts() (e.g. { fontFamily: langFonts.semiBold }) so
+  // non-English languages get their matching NotoSans script instead.
   title: {
     fontFamily:   Fonts.poppinsSemiBold,
     fontSize:     22,

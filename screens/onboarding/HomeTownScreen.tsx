@@ -11,6 +11,8 @@ import { Image } from 'expo-image'
 import { Colors } from '../../constants/colors'
 import {
   callPartialRegistrationAPI,
+  checkIsNRIUser,
+  fetchHomeTownOptions,
   getRegValues,
   setRegValues,
 } from '../../service/registrationService'
@@ -18,6 +20,8 @@ import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -36,22 +40,46 @@ type Props = {
 
 export default function HomeTownScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [createdBy,       setCreatedBy]       = useState('4')
   const [homeTownSame,    setHomeTownSame]    = useState<YesNo>(null)
   const [currentStateKey, setCurrentStateKey] = useState('')
   const [currentCityKey,  setCurrentCityKey]  = useState('')
   const [submitting,      setSubmitting]      = useState(false)
+  // Angular: getArrayList('HOMETOWN', 'HOMETOWN', '46') reads the Yes/No
+  // labels out of registrationArray['HOMETOWN'] (the localised API response),
+  // not the static GENERAL.YES/GENERAL.NO keys.
+  const [yesLabel, setYesLabel] = useState<string | null>(null)
+  const [noLabel,  setNoLabel]  = useState<string | null>(null)
 
+  // Angular: updateHomeTownYes() — for an NRI user (checkIsNRIUser(), keyed
+  // off COUNTRYCODE != '91') HOMESTATE/HOMECITY are seeded from
+  // NATIVESTATE/NATIVECITY instead of STATE/CITY.
   useEffect(() => {
-    getRegValues().then(rv => {
+    getRegValues().then(async rv => {
       if (rv.CREATEDBY) setCreatedBy(rv.CREATEDBY)
-      setCurrentStateKey(rv.STATE ?? '')
-      setCurrentCityKey(rv.CITY ?? '')
+      const nri = await checkIsNRIUser(rv.COUNTRYCODE ?? '')
+      setCurrentStateKey(nri ? (rv.NATIVESTATE ?? '') : (rv.STATE ?? ''))
+      setCurrentCityKey(nri ? (rv.NATIVECITY ?? '') : (rv.CITY ?? ''))
       if (rv.HOMETOWN === '1') setHomeTownSame('yes')
       else if (rv.HOMETOWN === '2') setHomeTownSame('no')
     })
   }, [])
+
+  function loadHomeTownOptions() {
+    return fetchHomeTownOptions().then(list => {
+      setYesLabel(list.find(o => o.key === '1')?.label ?? null)
+      setNoLabel(list.find(o => o.key === '2')?.label ?? null)
+    }).catch(() => {})
+  }
+
+  useEffect(() => { loadHomeTownOptions() }, [])
+
+  // Re-fetch the Yes/No labels when the app language changes while this
+  // screen is mounted (e.g. switched via the mid-app language selector) —
+  // same pattern as EatingHabitScreen.tsx/DoshamScreen.tsx/etc.
+  useLanguageReload(loadHomeTownOptions)
 
   async function handleNext() {
     if (!homeTownSame || submitting) return
@@ -74,7 +102,11 @@ export default function HomeTownScreen({ navigation }: Props) {
 
   const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
   const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
-  const title = t('REGISTRATION.HOMETOWN', 'Select your #PROFILETYPE# hometown')
+  // Angular: registration.config.ts page 46 — TITLE: "REGISTRATION.HOME_TOWN_TXT"
+  // ("Is your #PROFILETYPE# home town same as current location?"), not
+  // REGISTRATION.HOMETOWN (that key is page 44's "Select your ... hometown"
+  // state/city dropdown title).
+  const title = t('REGISTRATION.HOME_TOWN_TXT', 'Is your #PROFILETYPE# home town same as current location?')
     .replace('#PROFILETYPE#', translatedProfileType)
     .replace('  ', ' ')
     .trim()
@@ -94,7 +126,7 @@ export default function HomeTownScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
-        <Text style={[os.title, { marginBottom: 32 }]}>{title}</Text>
+        <Text style={[os.title, { marginBottom: 32, fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         <View style={styles.yesNoRow}>
           <Pressable
@@ -106,8 +138,8 @@ export default function HomeTownScreen({ navigation }: Props) {
             <View style={[styles.chipRadio, homeTownSame === 'yes' && styles.chipRadioSelected]}>
               {homeTownSame === 'yes' && <Text style={styles.chipRadioTick}>✓</Text>}
             </View>
-            <Text style={[styles.yesNoLabel, homeTownSame === 'yes' && styles.yesNoLabelSelected]}>
-              {t('GENERAL.YES', 'Yes')}
+            <Text style={[styles.yesNoLabel, homeTownSame === 'yes' && styles.yesNoLabelSelected, { fontFamily: homeTownSame === 'yes' ? langFonts.medium : langFonts.regular }]}>
+              {yesLabel ?? t('GENERAL.YES', 'Yes')}
             </Text>
           </Pressable>
 
@@ -120,8 +152,8 @@ export default function HomeTownScreen({ navigation }: Props) {
             <View style={[styles.chipRadio, homeTownSame === 'no' && styles.chipRadioSelected]}>
               {homeTownSame === 'no' && <Text style={styles.chipRadioTick}>✓</Text>}
             </View>
-            <Text style={[styles.yesNoLabel, homeTownSame === 'no' && styles.yesNoLabelSelected]}>
-              {t('GENERAL.NO', 'No')}
+            <Text style={[styles.yesNoLabel, homeTownSame === 'no' && styles.yesNoLabelSelected, { fontFamily: homeTownSame === 'no' ? langFonts.medium : langFonts.regular }]}>
+              {noLabel ?? t('GENERAL.NO', 'No')}
             </Text>
           </Pressable>
         </View>

@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
+import { SvgXml } from 'react-native-svg'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
 import {
@@ -22,10 +23,15 @@ import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'religion-updated.svg'
+// Angular's dropdown-field arrow is Ionic's "chevron-forward-outline" icon —
+// same one MotherTongueScreen/HeightScreen inline, for a pixel-exact match.
+const CHEVRON_FORWARD_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M184 112l144 144-144 144"/></svg>`
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -40,6 +46,7 @@ type Props = {
 
 export default function ReligionScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [allOptions,   setAllOptions]   = useState<Option[]>([])
   const [fetching,     setFetching]     = useState(true)
@@ -49,7 +56,12 @@ export default function ReligionScreen({ navigation }: Props) {
   const [submitting,   setSubmitting]   = useState(false)
   const [panelVisible, setPanelVisible] = useState(false)
 
-  useEffect(() => {
+  // Extracted so a language change can re-run it — the option labels below are
+  // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
+  // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
+  // the stored KEY against the newly translated list. Re-reading storage here does
+  // the same, so the user's selection survives the switch.
+  function loadOptions() {
     getRegValues().then(rv => {
       if (rv.CREATEDBY)    setCreatedBy(rv.CREATEDBY)
       if (rv.MOTHERTONGUE) setMothertongue(rv.MOTHERTONGUE)
@@ -65,7 +77,11 @@ export default function ReligionScreen({ navigation }: Props) {
         .catch(() => {})
         .finally(() => setFetching(false))
     })
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  useLanguageReload(loadOptions)
 
   const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
   const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
@@ -73,6 +89,10 @@ export default function ReligionScreen({ navigation }: Props) {
     .replace('#PROFILETYPE#', translatedProfileType)
     .replace('  ', ' ')
     .trim()
+  // Angular: registration.config.ts page 13 LISTDATA — LABEL: RELIGIONLABEL,
+  // PLACEHOLDERTXT: SELECTRELIGION, ISSHOWSEARCHBAR: false.
+  const fieldLabelText  = t('REGISTRATION.RELIGIONLABEL', 'Religion')
+  const placeholderText = t('REGISTRATION.SELECTRELIGION', 'Select religion')
 
   async function handleNext() {
     if (!selected || submitting) return
@@ -105,7 +125,7 @@ export default function ReligionScreen({ navigation }: Props) {
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
-        <Text style={os.title}>{title}</Text>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -114,7 +134,7 @@ export default function ReligionScreen({ navigation }: Props) {
             {/* Angular only shows this label once a value is selected */}
             {!!selected && (
               <View style={styles.fieldLabelBadge}>
-                <Text style={styles.fieldLabelText}>Religion</Text>
+                <Text style={[styles.fieldLabelText, { fontFamily: langFonts.regular }]}>{fieldLabelText}</Text>
               </View>
             )}
             <Pressable
@@ -124,12 +144,16 @@ export default function ReligionScreen({ navigation }: Props) {
               accessibilityLabel="Select religion"
             >
               <Text
-                style={[styles.selectFieldText, !!selected && styles.selectFieldTextActive]}
+                style={[
+                  styles.selectFieldText,
+                  !!selected && styles.selectFieldTextActive,
+                  { fontFamily: selected ? langFonts.medium : langFonts.regular },
+                ]}
                 numberOfLines={1}
               >
-                {selected ? selected.label : 'Select religion'}
+                {selected ? selected.label : placeholderText}
               </Text>
-              <Text style={styles.selectFieldArrow}>›</Text>
+              <SvgXml xml={CHEVRON_FORWARD_XML} width={24} height={24} />
             </Pressable>
           </View>
         )}
@@ -137,8 +161,9 @@ export default function ReligionScreen({ navigation }: Props) {
 
       <SearchablePicker
         visible={panelVisible}
-        title="Select religion"
-        placeholder="Search religion..."
+        title={placeholderText}
+        placeholder=""
+        hideSearch
         options={allOptions}
         selectedKey={selected?.key ?? null}
         onSelect={(opt) => {
@@ -195,10 +220,5 @@ const styles = StyleSheet.create({
   },
   selectFieldTextActive: {
     fontWeight: '500',
-  },
-  selectFieldArrow: {
-    fontSize:   22,
-    color:      Colors.textPrimary,
-    lineHeight: 26,
   },
 })

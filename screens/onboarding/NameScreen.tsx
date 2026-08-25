@@ -26,6 +26,7 @@ import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import ConfirmNameGenderSheet from '../../components/bottom-sheet/ConfirmNameGenderSheet'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -54,6 +55,7 @@ type Props = {
 export default function NameScreen({ navigation }: Props) {
   const { t }  = useTranslation()
   const insets = useSafeAreaInsets()
+  const langFonts = useLanguageFonts()
 
   const [name,       setName]       = useState('')
   const [createdBy,  setCreatedBy]  = useState<string>('1')
@@ -224,7 +226,7 @@ export default function NameScreen({ navigation }: Props) {
           />
 
           {/* Dynamic title — "Enter your name" / "Enter your son's name" etc. */}
-          <Text style={os.title}>{title}</Text>
+          <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
           {/* Outlined name input — Figma: 48px height, 8px radius, #b0b0b0 border */}
           <View style={styles.inputOuter}>
@@ -244,7 +246,7 @@ export default function NameScreen({ navigation }: Props) {
             />
             {/* Floating label overlapping top border — Figma: top:-8 left:12, white bg, 12px Regular */}
             <View style={styles.labelWrap} pointerEvents="none">
-              <Text style={styles.labelText}>{t('REGISTRATION.NAMETXT', 'Name')}</Text>
+              <Text style={[styles.labelText, { fontFamily: langFonts.regular }]}>{t('REGISTRATION.NAMETXT', 'Name')}</Text>
             </View>
           </View>
 
@@ -258,8 +260,6 @@ export default function NameScreen({ navigation }: Props) {
         visible={sheetVisible}
         title={sheetTitle}
         name={name}
-        gender={null}
-        genderOptions={[]}
         nameLabel={sheetNameLabel}
         nameViolated
         hideGender

@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
+import { SvgXml } from 'react-native-svg'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
@@ -25,22 +26,19 @@ import {
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
 import { CDN_REG } from '../../constants/cdn'
+import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON  = CDN_REG + 'location.svg'
 const INDIA_COUNTRY  = '98'
 
-const LOCATION_TITLES: Record<string, string> = {
-  '4':  'Select where your son lives',
-  '5':  'Select where your daughter lives',
-  '8':  'Select where your brother lives',
-  '9':  'Select where your sister lives',
-  '10': 'Select where your friend lives',
-  '11': 'Select where your relative lives',
-}
+// Angular's dropdown-field arrow is Ionic's "chevron-forward-outline" icon —
+// same one HeightScreen/MotherTongueScreen use for their "select ..." fields.
+const CHEVRON_FORWARD_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M184 112l144 144-144 144"/></svg>`
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +54,7 @@ type Props = {
 
 export default function LocationScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   // ─── Core state ─────────────────────────────────────────────────────────────
   const [createdBy,      setCreatedBy]      = useState('4')
@@ -208,7 +207,17 @@ export default function LocationScreen({ navigation }: Props) {
 
   // ─── Derived ──────────────────────────────────────────────────────────────────
 
-  const title = LOCATION_TITLES[createdBy] ?? `Select where they live`
+  // Angular (registration-revamp.component.ts case '9'): Myself profiles get
+  // REGISTRATION.LOCATIONMYSELF ("Where do you live?"); every other createdBy
+  // gets REGISTRATION.LOCATION ("Where does your #PROFILETYPE# live?").
+  const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
+  const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
+  const title = createdBy === '1'
+    ? t('REGISTRATION.LOCATIONMYSELF', 'Where do you live?')
+    : t('REGISTRATION.LOCATION', 'Where does your #PROFILETYPE# live?')
+        .replace('#PROFILETYPE#', translatedProfileType)
+        .replace('  ', ' ')
+        .trim()
   const isIndianFlow = countryCode === '91'
   const countryLabel = isIndianFlow ? 'India' : 'Other'
   // Angular isLocationValid(): NRI only requires Country+State (city is hidden for NRI on this step)
@@ -252,7 +261,7 @@ export default function LocationScreen({ navigation }: Props) {
         keyboardShouldPersistTaps="handled"
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
-        <Text style={os.title}>{title}</Text>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {loadingStates ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -269,6 +278,7 @@ export default function LocationScreen({ navigation }: Props) {
                   onPress={() => {}}
                   hasValue
                   disabled
+                  langFonts={langFonts}
                 />
 
                 {/* State field */}
@@ -278,21 +288,28 @@ export default function LocationScreen({ navigation }: Props) {
                   placeholder="Select state"
                   onPress={() => openPanel('state')}
                   hasValue={!!selectedState}
+                  langFonts={langFonts}
                 />
 
-                {/* District / City field */}
-                <FloatField
-                  label="District"
-                  value={selectedCity?.label ?? ''}
-                  placeholder={loadingCities ? 'Loading cities…' : 'Select district'}
-                  onPress={() => {
-                    if (!selectedState || loadingCities) return
-                    openPanel('city')
-                  }}
-                  hasValue={!!selectedCity}
-                  disabled={!selectedState || loadingCities}
-                  loading={loadingCities}
-                />
+                {/* District / City field — Angular (updateCountryList() →
+                    updateShowThisFieldAdvanced): SHOWTHISFIELD for CITY on this
+                    page is IsValidParamWithoutZero(STATE), i.e. not rendered at
+                    all until a state is picked, not just disabled. */}
+                {!!selectedState && (
+                  <FloatField
+                    label="District"
+                    value={selectedCity?.label ?? ''}
+                    placeholder={loadingCities ? 'Loading cities…' : 'Select district'}
+                    onPress={() => {
+                      if (loadingCities) return
+                      openPanel('city')
+                    }}
+                    hasValue={!!selectedCity}
+                    disabled={loadingCities}
+                    loading={loadingCities}
+                    langFonts={langFonts}
+                  />
+                )}
               </>
             ) : (
               <>
@@ -304,6 +321,7 @@ export default function LocationScreen({ navigation }: Props) {
                   placeholder="Select country"
                   onPress={() => openPanel('country')}
                   hasValue={!!selectedCountry}
+                  langFonts={langFonts}
                 />
 
                 <FloatField
@@ -316,6 +334,7 @@ export default function LocationScreen({ navigation }: Props) {
                   }}
                   hasValue={!!selectedState}
                   disabled={!selectedCountry}
+                  langFonts={langFonts}
                 />
               </>
             )}
@@ -357,26 +376,31 @@ type FloatFieldProps = {
   hasValue: boolean
   disabled?: boolean
   loading?: boolean
+  langFonts: ReturnType<typeof useLanguageFonts>
 }
 
-function FloatField({ label, value, placeholder, onPress, hasValue, disabled, loading }: FloatFieldProps) {
+function FloatField({ label, value, placeholder, onPress, hasValue, disabled, loading, langFonts }: FloatFieldProps) {
   return (
-    <View style={floatStyles.wrapper}>
+    // Angular: registration-revamp.component.scss's .disabled-state —
+    // opacity: 40%, pointer-events: none — applied to the WHOLE field block
+    // (border, text, chevron, floating label together), not just the text.
+    <View style={[floatStyles.wrapper, disabled && floatStyles.wrapperDisabled]}>
       <Pressable
         style={[
           floatStyles.field,
           hasValue && floatStyles.fieldActive,
-          disabled && floatStyles.fieldDisabled,
         ]}
         onPress={disabled ? undefined : onPress}
+        disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={label}
+        accessibilityState={{ disabled: !!disabled }}
       >
         <Text
           style={[
             floatStyles.value,
             !hasValue && floatStyles.placeholder,
-            disabled && floatStyles.disabledText,
+            { fontFamily: hasValue ? langFonts.medium : langFonts.regular },
           ]}
           numberOfLines={1}
         >
@@ -385,14 +409,14 @@ function FloatField({ label, value, placeholder, onPress, hasValue, disabled, lo
         {loading ? (
           <ActivityIndicator size={16} color={Colors.textSecondary} style={{ marginRight: 4 }} />
         ) : (
-          <Text style={[floatStyles.arrow, disabled && floatStyles.disabledText]}>›</Text>
+          <SvgXml xml={CHEVRON_FORWARD_XML} width={24} height={24} />
         )}
       </Pressable>
 
       {/* Floating label — appears only when field has a value */}
       {hasValue && (
         <View style={floatStyles.labelWrap}>
-          <Text style={floatStyles.labelText}>{label}</Text>
+          <Text style={[floatStyles.labelText, { fontFamily: langFonts.regular }]}>{label}</Text>
         </View>
       )}
     </View>
@@ -418,6 +442,12 @@ const floatStyles = StyleSheet.create({
   wrapper: {
     position: 'relative',
   },
+  // Angular: .disabled-state { opacity: 40%; pointer-events: none } — the
+  // non-interactive Country field dims as a whole block (border + text +
+  // chevron + floating label together), not just its text color.
+  wrapperDisabled: {
+    opacity: 0.4,
+  },
 
   field: {
     flexDirection:   'row',
@@ -431,9 +461,6 @@ const floatStyles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   fieldActive: { borderColor: Colors.inputBorder },
-  // Figma renders the fixed/non-interactive Country field identically to an
-  // active field — same border, solid black text, no graying-out.
-  fieldDisabled: {},
 
   value: {
     flex:       1,
@@ -444,13 +471,6 @@ const floatStyles = StyleSheet.create({
   placeholder: {
     fontWeight: '400',
     color:      Colors.textPrimary,
-  },
-  disabledText: {},
-
-  arrow: {
-    fontSize:   22,
-    color:      Colors.textPrimary,
-    lineHeight: 26,
   },
 
   // Floating label — absolutely positioned to overlap the top border

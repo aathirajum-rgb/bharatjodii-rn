@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
+import { useTranslation } from 'react-i18next'
 import OnboardingDesktopLayout from './OnboardingDesktopLayout'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
@@ -31,6 +32,7 @@ type Photo = { PHOTOID: string; PHOTOURL: string; PHOTOTHUMB?: string; MAINPHOTO
 type Props = { navigation: any }
 
 export default function PhotoUploadDesktopStep({ navigation }: Props) {
+  const { t } = useTranslation()
   const [gender, setGender] = useState('1')
   const [createdBy, setCreatedBy] = useState('1')
   const [photos, setPhotos] = useState<Photo[]>([])
@@ -120,7 +122,7 @@ export default function PhotoUploadDesktopStep({ navigation }: Props) {
     <OnboardingDesktopLayout
       onBack={handleBack}
       onNext={hasPhotos ? goNextStep : openFilePicker}
-      nextLabel={hasPhotos ? 'Continue' : 'Add photo'}
+      nextLabel={hasPhotos ? t('REGISTRATION.CONTINUE', 'Continue') : t('REGISTRATION.ADDPHOTOCTA', 'Add photo')}
       nextDisabled={loading || uploading}
       nextLoading={uploading}
     >

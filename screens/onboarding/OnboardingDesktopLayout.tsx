@@ -11,6 +11,7 @@
 
 import type { ReactNode } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
@@ -27,8 +28,12 @@ interface Props {
 }
 
 export default function OnboardingDesktopLayout({
-  children, onBack, onNext, nextLabel = 'Next', nextDisabled, nextLoading,
+  children, onBack, onNext, nextLabel, nextDisabled, nextLoading,
 }: Props) {
+  const { t } = useTranslation()
+  // Default resolved here rather than as a parameter default so it re-translates
+  // on a language change (a param default would bake in the mount-time string).
+  const ctaLabel = nextLabel ?? t('REGISTRATION.NEXTCTA', 'Next')
   return (
     <View style={s.screen}>
       <View style={s.topBar}>
@@ -56,7 +61,7 @@ export default function OnboardingDesktopLayout({
 
           <View style={s.footer}>
             <ButtonRevamp
-              label={nextLabel}
+              label={ctaLabel}
               variant="primary"
               size="large"
               fullWidth

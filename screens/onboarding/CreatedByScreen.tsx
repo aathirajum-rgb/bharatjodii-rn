@@ -14,6 +14,8 @@ import { fetchProfileCreatedByOptions, getRegValue, setRegValues } from '../../s
 import { CDN_REG } from '../../constants/cdn'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -47,6 +49,7 @@ type Props = {
 
 export default function CreatedByScreen({ navigation }: Props) {
   const { t }  = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [options,    setOptions]    = useState<Option[]>([])
   const [selected,   setSelected]   = useState<string | null>(null)
@@ -58,13 +61,20 @@ export default function CreatedByScreen({ navigation }: Props) {
     getRegValue('CREATEDBY').then(v => { if (v) setSelected(v) })
   }, [])
 
-  // Fetch PROFILECREATEDBY from API; use fallback on failure
-  useEffect(() => {
-    fetchProfileCreatedByOptions()
+  // Fetch PROFILECREATEDBY from API; use fallback on failure.
+  // Labels are server-translated, so this must re-run on a language change —
+  // see useLanguageReload below (Angular: handleLanguageChange()).
+  function loadOptions() {
+    return fetchProfileCreatedByOptions()
       .then(list => setOptions(list.length ? list : FALLBACK_OPTIONS))
       .catch(() => setOptions(FALLBACK_OPTIONS))
       .finally(() => setFetching(false))
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  // Re-fetch in the new language; `selected` is a KEY so the user's choice survives.
+  useLanguageReload(loadOptions)
 
   async function handleNext() {
     if (!selected || submitting) return
@@ -105,7 +115,7 @@ export default function CreatedByScreen({ navigation }: Props) {
         />
 
         {/* Title — i18n: REGISTRATION.CREATEDBY */}
-        <Text style={os.title}>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>
           {t('REGISTRATION.CREATEDBY', 'Creating profile for')}
         </Text>
 
@@ -134,7 +144,7 @@ export default function CreatedByScreen({ navigation }: Props) {
                     {isSelected && <Text style={styles.checkmark}>✓</Text>}
                   </View>
 
-                  <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}>
+                  <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected, { fontFamily: isSelected ? langFonts.medium : langFonts.regular }]}>
                     {opt.label}
                   </Text>
                 </Pressable>

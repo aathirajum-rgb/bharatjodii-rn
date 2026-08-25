@@ -19,6 +19,8 @@ import {
 import { CDN_REG } from '../../constants/cdn'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -44,13 +46,19 @@ type Props = {
 
 export default function PropertyDetailsScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [options,      setOptions]      = useState<Option[]>([])
   const [fetching,     setFetching]     = useState(true)
   const [selected,     setSelected]     = useState<Set<string>>(new Set())
   const [submitting,   setSubmitting]   = useState(false)
 
-  useEffect(() => {
+  // Extracted so a language change can re-run it — the option labels below are
+  // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
+  // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
+  // the stored KEY against the newly translated list. Re-reading storage here does
+  // the same, so the user's selection survives the switch.
+  function loadOptions() {
     getRegValues().then((regVals) => {
       const existing = regVals.PROPERTIES
       if (existing) {
@@ -65,7 +73,11 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
         .catch(() => setOptions(FALLBACK_OPTIONS))
         .finally(() => setFetching(false))
     })
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  useLanguageReload(loadOptions)
 
   function toggleOption(key: string) {
     setSelected(prev => {
@@ -144,7 +156,7 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
                   accessibilityState={{ checked: isChecked }}
                   accessibilityLabel={opt.label}
                 >
-                  <Text style={[styles.rowLabel, isChecked && styles.rowLabelSelected]}>
+                  <Text style={[styles.rowLabel, isChecked && styles.rowLabelSelected, { fontFamily: langFonts.regular }]}>
                     {opt.label}
                   </Text>
                   <View style={[styles.checkbox, isChecked && styles.checkboxSelected]}>

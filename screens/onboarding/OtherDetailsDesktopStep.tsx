@@ -26,6 +26,7 @@ import {
 } from '../../service/registrationService'
 import { refreshSession } from '../../service/homeService'
 import { setItem } from '../../service/storageService'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
 
 const FALLBACK_BROTHERS: SelectOption[] = [
   { key: '1', label: '1' }, { key: '2', label: '2' }, { key: '3', label: '3' },
@@ -58,7 +59,12 @@ export default function OtherDetailsDesktopStep({ navigation }: Props) {
   const [doshamOptions, setDoshamOptions] = useState<SelectOption[]>([])
   const [dosham, setDosham] = useState<Set<string>>(new Set())
 
-  useEffect(() => {
+  // Extracted so a language change can re-run it — the option labels below are
+  // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
+  // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
+  // the stored KEY against the newly translated list. Re-reading storage here does
+  // the same, so the user's selection survives the switch.
+  function loadOptions() {
     getRegValues().then(async rv => {
       if (rv.BROTHERS) setBrothers(rv.BROTHERS)
       if (rv.SISTERS) setSisters(rv.SISTERS)
@@ -77,7 +83,11 @@ export default function OtherDetailsDesktopStep({ navigation }: Props) {
       setPropertyOptions(props.length ? props : FALLBACK_PROPERTIES)
       setDoshamOptions(doshamRes.doshamHash)
     })
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  useLanguageReload(loadOptions)
 
   function toggleProperty(key: string) {
     setProperties(prev => {

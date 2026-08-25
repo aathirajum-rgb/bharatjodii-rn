@@ -54,7 +54,7 @@ export const Colors = {
 
   // ── Selection / form states ──────────────────────────────────────────────────
   selectionBg:     '#FFF1F5',              // checked row bg (checkbox / radio list)
-  radioCheckedBg:  'rgba(181, 0, 51, 0.02)', // checked pill bg (nearly transparent)
+  radioCheckedBg:  'rgba(181, 0, 51, 0.05)', // checked row bg — Angular: right-side-panel.component.scss .item-radio-checked
 
   // ── Chip states ─────────────────────────────────────────────────────────────
   chipBorderActive:    'rgba(181, 0, 51, 0.40)',    // selected / checked border

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
@@ -29,6 +29,8 @@ import { resetTo } from '../../utils/navigationRef'
 import { ENavigation } from '../../types/enums/navigation.enum'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -49,6 +51,7 @@ type Props = {
 
 export default function CasteScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   // Options
   const [casteOptions,    setCasteOptions]    = useState<Option[]>([])
@@ -75,7 +78,12 @@ export default function CasteScreen({ navigation }: Props) {
 
   // ─── Init ────────────────────────────────────────────────────────────────
 
-  useEffect(() => {
+  // Extracted so a language change can re-run it — the option labels below are
+  // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
+  // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
+  // the stored KEY against the newly translated list. Re-reading storage here does
+  // the same, so the user's selection survives the switch.
+  function loadOptions() {
     Promise.all([
       getRegValue('CREATEDBY'),
       getRegValues(),
@@ -105,7 +113,11 @@ export default function CasteScreen({ navigation }: Props) {
         setFetchingCaste(false)
       }
     })
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  useLanguageReload(loadOptions)
 
   // ─── Subcaste loader ──────────────────────────────────────────────────────
 
@@ -152,6 +164,16 @@ export default function CasteScreen({ navigation }: Props) {
 
   // ─── Derived ──────────────────────────────────────────────────────────────
 
+  // Angular sorts the caste list alphabetically by label (form-fields.component.ts,
+  // the `data.field == 'CASTE'` block). The API's own object order is NOT used.
+  // Angular additionally floats the selected caste to the top; we intentionally
+  // skip that pass so the list keeps a stable alphabetical order.
+  const orderedCasteOptions = useMemo(() => {
+    const items = [...casteOptions]
+    items.sort((a, b) => (a.label < b.label ? -1 : a.label > b.label ? 1 : 0))
+    return items
+  }, [casteOptions])
+
   const isChristian = religion === '2'
   const noun        = isChristian ? 'division' : 'caste'
   const nounCap     = isChristian ? 'Division'  : 'Caste'
@@ -162,6 +184,13 @@ export default function CasteScreen({ navigation }: Props) {
     .replace('#PROFILETYPE#', translatedProfileType)
     .replace('  ', ' ')
     .trim()
+
+  const casteLabelText     = t('REGISTRATION.CASTELABEL', 'Caste')
+  const selectCasteText    = t('REGISTRATION.SELECTCASTE', 'Select caste')
+  const searchCasteText    = t('REGISTRATION.SEARCHCASTE', 'Search caste')
+  const subcasteLabelText  = t('REGISTRATION.SUBCASTELABEL', 'SubCaste')
+  const selectSubcasteText = t('REGISTRATION.SELECTSUBCASTE', 'Select subcaste')
+  const searchSubcasteText = t('REGISTRATION.SEARCHSUBCASTE', 'Search subcaste')
 
   // ─── Submit ───────────────────────────────────────────────────────────────
 
@@ -220,7 +249,7 @@ export default function CasteScreen({ navigation }: Props) {
           contentFit="contain"
         />
 
-        <Text style={os.title}>{title}</Text>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {fetchingCaste ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -229,22 +258,25 @@ export default function CasteScreen({ navigation }: Props) {
             {/* ── Caste / Division select field ──────────────────────── */}
             <View style={styles.fieldWrapper}>
               <View style={styles.fieldLabelBadge}>
-                <Text style={styles.fieldLabelText}>{nounCap}</Text>
+                <Text style={[styles.fieldLabelText, { fontFamily: langFonts.regular }]}>
+                  {isChristian ? nounCap : casteLabelText}
+                </Text>
               </View>
               <Pressable
                 style={styles.selectField}
                 onPress={() => setActivePanel('caste')}
                 accessibilityRole="button"
-                accessibilityLabel={`Select ${noun}`}
+                accessibilityLabel={isChristian ? `Select ${noun}` : selectCasteText}
               >
                 <Text
                   style={[
                     styles.selectFieldText,
                     !!selectedCaste && styles.selectFieldTextActive,
+                    { fontFamily: selectedCaste ? langFonts.medium : langFonts.regular },
                   ]}
                   numberOfLines={1}
                 >
-                  {selectedCaste ? selectedCaste.label : `Select ${noun}`}
+                  {selectedCaste ? selectedCaste.label : (isChristian ? `Select ${noun}` : selectCasteText)}
                 </Text>
                 <Text style={styles.selectFieldArrow}>›</Text>
               </Pressable>
@@ -261,8 +293,8 @@ export default function CasteScreen({ navigation }: Props) {
               ) : hasSubcaste ? (
                 <View style={[styles.fieldWrapper, styles.fieldWrapperGap]}>
                   <View style={styles.fieldLabelBadge}>
-                    <Text style={styles.fieldLabelText}>
-                      Sub caste{' '}
+                    <Text style={[styles.fieldLabelText, { fontFamily: langFonts.regular }]}>
+                      {subcasteLabelText}{' '}
                       <Text style={styles.fieldLabelOptional}>(Optional)</Text>
                     </Text>
                   </View>
@@ -270,16 +302,17 @@ export default function CasteScreen({ navigation }: Props) {
                     style={styles.selectField}
                     onPress={() => setActivePanel('subcaste')}
                     accessibilityRole="button"
-                    accessibilityLabel="Select sub caste"
+                    accessibilityLabel={selectSubcasteText}
                   >
                     <Text
                       style={[
                         styles.selectFieldText,
                         !!selectedSubcaste && styles.selectFieldTextActive,
+                        { fontFamily: selectedSubcaste ? langFonts.medium : langFonts.regular },
                       ]}
                       numberOfLines={1}
                     >
-                      {selectedSubcaste ? selectedSubcaste.label : 'Select sub caste'}
+                      {selectedSubcaste ? selectedSubcaste.label : selectSubcasteText}
                     </Text>
                     <Text style={styles.selectFieldArrow}>›</Text>
                   </Pressable>
@@ -295,9 +328,9 @@ export default function CasteScreen({ navigation }: Props) {
       {/* Single picker — renders caste/division or subcaste list based on activePanel */}
       <SearchablePicker
         visible={activePanel !== null}
-        title={activePanel === 'caste' ? `Select ${noun}` : 'Select sub caste'}
-        placeholder={activePanel === 'caste' ? `Search ${noun}...` : 'Search sub caste...'}
-        options={activePanel === 'caste' ? casteOptions : subcasteOptions}
+        title={activePanel === 'caste' ? (isChristian ? `Select ${noun}` : selectCasteText) : selectSubcasteText}
+        placeholder={activePanel === 'caste' ? (isChristian ? `Search ${noun}` : searchCasteText) : searchSubcasteText}
+        options={activePanel === 'caste' ? orderedCasteOptions : subcasteOptions}
         selectedKey={activePanel === 'caste' ? selectedCaste?.key ?? null : selectedSubcaste?.key ?? null}
         onSelect={activePanel === 'caste' ? selectCaste : selectSubcaste}
         onClose={() => setActivePanel(null)}

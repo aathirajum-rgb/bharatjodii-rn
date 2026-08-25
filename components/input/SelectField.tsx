@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // A read-only, tap-to-open counterpart to FloatingLabelInput — same visual
 // language (bordered box, label riding above the border) but the box is a
@@ -21,12 +22,15 @@ export interface SelectFieldProps {
 }
 
 export default function SelectField({ label, value, placeholder, onPress, locked }: SelectFieldProps) {
+  // Labels/values here are server-translated, so the family must follow the
+  // active language (Poppins for English, the matching NotoSans script otherwise).
+  const langFonts = useLanguageFonts()
   return (
     <Pressable style={[styles.container, locked && styles.containerLocked]} onPress={onPress} accessibilityRole="button">
       <View style={styles.labelWrap}>
-        <Text style={styles.label}>{label}</Text>
+        <Text style={[styles.label, { fontFamily: langFonts.regular }]}>{label}</Text>
       </View>
-      <Text style={[styles.value, !value && styles.placeholder, locked && styles.valueLocked]} numberOfLines={1}>
+      <Text style={[styles.value, !value && styles.placeholder, locked && styles.valueLocked, { fontFamily: value ? langFonts.medium : langFonts.regular }]} numberOfLines={1}>
         {value || placeholder || ''}
       </Text>
       <Text style={[styles.arrow, locked && styles.valueLocked]}>{'›'}</Text>

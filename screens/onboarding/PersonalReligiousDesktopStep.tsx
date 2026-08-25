@@ -19,6 +19,8 @@ import {
   prefetchCasteForReligion, setRegValues, submitFullRegistration,
 } from '../../service/registrationService'
 import { Fonts } from '../../src/theme/fonts'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import { stripAndDecodeHtml } from '../../utils/htmlEntities'
 
 const MONTHS: SelectOption[] = [
   { key: '1', label: 'January' }, { key: '2', label: 'February' }, { key: '3', label: 'March' },
@@ -40,9 +42,10 @@ function buildDays(month: string, year: string): SelectOption[] {
   const count = new Date(y, m, 0).getDate()
   return Array.from({ length: count }, (_, i) => ({ key: String(i + 1), label: String(i + 1).padStart(2, '0') }))
 }
-function stripHtml(raw: string): string {
-  return raw.replace(/<[^>]+>/g, '').trim()
-}
+// Labels from registrationService are already tag-stripped and entity-decoded by
+// its label() helper; kept as a thin alias to the shared util so this stays
+// correct for any raw string and never silently reintroduces &#x....; codes.
+const stripHtml = stripAndDecodeHtml
 const YEARS = buildYears()
 
 type Props = { navigation: any }
@@ -78,7 +81,12 @@ export default function PersonalReligiousDesktopStep({ navigation }: Props) {
   const [gothra, setGothra] = useState<string | null>(null)
 
   // ── Init: restore whatever's already saved (matches every mobile screen's own effect) ──
-  useEffect(() => {
+  // Extracted so a language change can re-run it — the option labels below are
+  // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
+  // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
+  // the stored KEY against the newly translated list. Re-reading storage here does
+  // the same, so the user's selection survives the switch.
+  function loadOptions() {
     getRegValues().then(async rv => {
       const cb = rv.CREATEDBY ?? '1'
       if (rv.GENDER) setGender(rv.GENDER)
@@ -124,7 +132,11 @@ export default function PersonalReligiousDesktopStep({ navigation }: Props) {
         }
       }
     })
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  useLanguageReload(loadOptions)
 
   // ── Religion change → reload caste list, clear downstream selections ──
   async function handleSelectReligion(opt: SelectOption) {

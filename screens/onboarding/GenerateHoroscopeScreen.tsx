@@ -23,7 +23,7 @@ type Props = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function GenerateHoroscopeScreen({ navigation }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
 
   const [createdBy, setCreatedBy] = useState('4')
 
@@ -62,7 +62,9 @@ export default function GenerateHoroscopeScreen({ navigation }: Props) {
     showSkip:  true,
     skipLabel: t('REG.DO_LATER', "I'll do this later"),
     onSkip:    handleSkip,
-  }, [])
+    // i18n.language: both labels are translated, so re-push footer state on a
+    // language change — otherwise the CTA keeps the wording from mount time.
+  }, [i18n.language])
 
   // ─── Render ───────────────────────────────────────────────────────────────
 

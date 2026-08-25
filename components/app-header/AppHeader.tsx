@@ -2,12 +2,23 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
+import { SvgXml } from 'react-native-svg'
 import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
 import Badge from '../badge/Badge'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
+import { CDN_SVG } from '../../constants/cdn'
 import { getOwnGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+
+// Angular's header back-button and language-pill dropdown both use Ionic's
+// bundled "chevron-back-outline" / "chevron-down-outline" icons (ion-icon
+// name=...), not a CDN-hosted image — the CDN_REACT + 'arrowleft.svg' /
+// 'chevronleft.svg' paths this file used before don't exist on the CDN at all
+// (404 on both). Inlined verbatim as SVG XML, same convention as HeightScreen.
+// tsx's CHEVRON_FORWARD_XML, mirrored/rotated for the back and down directions.
+const CHEVRON_BACK_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M328 112L184 256l144 144"/></svg>`
+const CHEVRON_DOWN_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M112 184l144 144 144-144"/></svg>`
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -59,13 +70,11 @@ export interface AppHeaderProps {
 const CDN = CDN_SVG
 
 const ICONS = {
-  lang:      CDN + 'revamp/lang-change-img.svg',
-  chevDown:  CDN_REACT + '/chevronleft.svg',
-  fwdLink:   CDN + 'revamp/forward-icon-link.svg',
-  arrowLeft: CDN_REACT + '/arrowleft.svg',
-  close:     CDN + 'revamp/close-icon.svg',
+  lang:     CDN + 'revamp/lang-change-img.svg',
+  fwdLink:  CDN + 'revamp/forward-icon-link.svg',
+  close:    CDN + 'revamp/close-icon.svg',
   // Angular: header.component.html's hamburger — assets/images/svg/revamp/menu-home.svg
-  menuHome:  CDN + 'revamp/menu-home.svg',
+  menuHome: CDN + 'revamp/menu-home.svg',
 }
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -99,6 +108,7 @@ export default function AppHeader({
   style,
 }: AppHeaderProps) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   // Resolve language label — use explicit prop, else the short label from
   // locales/*.json's REGISTRATION.SELECTED_LANGUAGE (e.g. "Eng" for English)
@@ -143,8 +153,8 @@ export default function AppHeader({
           {/* Language selector pill — always visible, auto-detects language */}
           <Pressable style={styles.h1LangBtn} onPress={onLanguagePress}>
             <CdnSvg uri={ICONS.lang} width={20} height={20} />
-            <Text style={styles.h1LangText}>{resolvedLangLabel}</Text>
-            <CdnSvg uri={ICONS.chevDown} width={24} height={24} />
+            <Text style={[styles.h1LangText, { fontFamily: langFonts.medium }]}>{resolvedLangLabel}</Text>
+            <SvgXml xml={CHEVRON_DOWN_XML} width={24} height={24} />
           </Pressable>
 
           {/* Angular: home.config.ts's homeToolBar — discover-matches (search)
@@ -220,7 +230,7 @@ export default function AppHeader({
         <View style={styles.titleRow}>
           {showBackIcon && (
             <Pressable style={styles.backBtn} onPress={onBackPress}>
-              <CdnSvg uri={ICONS.arrowLeft} width={24} height={24} />
+              <SvgXml xml={CHEVRON_BACK_XML} width={24} height={24} />
             </Pressable>
           )}
           <Text style={styles.titleText} numberOfLines={1}>{title ?? ''}</Text>
@@ -235,7 +245,9 @@ export default function AppHeader({
       <View style={styles.authRow}>
         {showBackBtn && (
           <Pressable style={styles.backBtn} onPress={onBackPress}>
-            <CdnSvg uri={closeIcon ? ICONS.close : ICONS.arrowLeft} width={24} height={24} />
+            {closeIcon
+              ? <CdnSvg uri={ICONS.close} width={24} height={24} />
+              : <SvgXml xml={CHEVRON_BACK_XML} width={24} height={24} />}
           </Pressable>
         )}
 
@@ -244,8 +256,8 @@ export default function AppHeader({
         {onLanguagePress && (
           <Pressable style={styles.langBtn} onPress={onLanguagePress}>
             <CdnSvg uri={ICONS.lang} width={24} height={24} />
-            <Text style={styles.langText}>{resolvedLangLabel}</Text>
-            <CdnSvg uri={ICONS.chevDown} width={16} height={16} />
+            <Text style={[styles.langText, { fontFamily: langFonts.medium }]}>{resolvedLangLabel}</Text>
+            <SvgXml xml={CHEVRON_DOWN_XML} width={16} height={16} />
           </Pressable>
         )}
       </View>

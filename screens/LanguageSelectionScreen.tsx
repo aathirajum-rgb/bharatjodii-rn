@@ -61,10 +61,14 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
     if (!selected || submitting) return;
     setSubmitting(true);
     const current = await getCurrentLanguage();
-    await Promise.all([
-      i18n.changeLanguage(selected),
-      submitLanguage(current, selected),
-    ]);
+    // Order matters: submitLanguage() writes SK.Auth.LANG and clears the
+    // language-scoped REGISTRATIONARRAYS/DOMAINLANG caches. i18n.changeLanguage()
+    // must run AFTER that, because its 'languageChanged' event is what makes
+    // screens re-fetch their server-translated option lists (useLanguageReload).
+    // Running both in parallel raced: a listener could re-fetch and re-cache
+    // using the OLD language before the new one was persisted.
+    await submitLanguage(current, selected);
+    await i18n.changeLanguage(selected);
     if (navigation?.canGoBack()) {
       navigation.goBack();
     } else {

@@ -22,11 +22,22 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
-import { callPartialRegistrationAPI, getRegValue, setRegValue, setRegValues } from '../../service/registrationService'
+import {
+  callPartialRegistrationAPI,
+  fetchDateOptions,
+  fetchMonthOptions,
+  fetchYearOptions,
+  getRegValue,
+  setRegValue,
+  setRegValues,
+} from '../../service/registrationService'
 import { CDN_REG, CDN_REVAMP, CDN_SVG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { stripAndDecodeHtml as stripHtml } from '../../utils/htmlEntities'
 import { Fonts } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -56,12 +67,12 @@ const MAX_LIST_ITEMS = 7   // how many rows visible before scroll
 // Same fix as NameScreen.tsx.
 const webOutlineReset = { outlineStyle: 'none', outlineWidth: 0 } as any
 
-const AGE_SUBJECT: Record<string, string> = {
-  '4': 'son', '5': 'daughter', '8': 'brother',
-  '9': 'sister', '10': 'friend', '11': 'relative',
-}
-
-const MONTHS = [
+// Fallback only — Angular sources month names from the server (registrationArray
+// ['MONTH'], server-translated) via fetchMonthOptions() below, not a static list.
+// This English list is what's shown until that loads, and what's used if the API
+// key is ever missing, so the picker is never empty. This was the screen's ONLY
+// list before, which is why month names never switched language.
+const MONTH_FALLBACK = [
   { key: '1',  label: 'January'   }, { key: '2',  label: 'February'  },
   { key: '3',  label: 'March'     }, { key: '4',  label: 'April'     },
   { key: '5',  label: 'May'       }, { key: '6',  label: 'June'      },
@@ -117,7 +128,7 @@ function calculateAge(year: string, month: string, date: string): number {
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type FieldKey  = 'date' | 'month' | 'year'
-type DropdownPos = { top: number; left: number; width: number; fieldBottom: number }
+type DropdownPos = { top: number; left: number; width: number; fieldBottom: number; openUp: boolean; fieldTop: number }
 type Props     = { navigation: any; route: { params?: { pageNo?: string } } }
 
 // ─── Age badge ────────────────────────────────────────────────────────────────
@@ -176,6 +187,7 @@ function AgeBadge({ children }: { children: React.ReactNode }) {
 export default function DOBScreen({ navigation }: Props) {
   const { t }  = useTranslation()
   const insets = useSafeAreaInsets()
+  const langFonts = useLanguageFonts()
 
   const [createdBy,    setCreatedBy]    = useState('1')
   const [gender,       setGender]       = useState('1')
@@ -185,8 +197,15 @@ export default function DOBScreen({ navigation }: Props) {
   const [selMonth, setSelMonth] = useState('')
   const [selYear,  setSelYear]  = useState('')
 
+  const [months, setMonths] = useState(MONTH_FALLBACK)
+  // API-sourced DATE/YEARS lists — null until fetched, so getOptions() can
+  // fall back to the client-generated buildYears()/getDaysInMonth() (which
+  // are correct in shape but never localise, same MONTH_FALLBACK reasoning).
+  const [apiYears, setApiYears] = useState<{ key: string; label: string }[] | null>(null)
+  const [apiDates, setApiDates] = useState<{ key: string; label: string }[] | null>(null)
+
   const [pickerField,  setPickerField]  = useState<FieldKey | null>(null)
-  const [dropdownPos,  setDropdownPos]  = useState<DropdownPos>({ top: 0, left: 0, width: 94, fieldBottom: 0 })
+  const [dropdownPos,  setDropdownPos]  = useState<DropdownPos>({ top: 0, left: 0, width: 94, fieldBottom: 0, openUp: false, fieldTop: 0 })
 
   const [showAgeSheet,   setShowAgeSheet]   = useState(false)
   // Keeps the Modal mounted through the closing animation — same as
@@ -257,7 +276,7 @@ export default function DOBScreen({ navigation }: Props) {
   const monthArrowAnim = useRef(new Animated.Value(0)).current
   const yearArrowAnim  = useRef(new Animated.Value(0)).current
 
-  const YEARS = buildYears(gender)
+  const YEARS = apiYears ?? buildYears(gender)
 
   // ── Init ─────────────────────────────────────────────────────────────────
 
@@ -280,20 +299,62 @@ export default function DOBScreen({ navigation }: Props) {
     })
   }, [])
 
+  // Server-translated month names — see MONTH_FALLBACK above for why this
+  // exists. Re-runs on a language change (useLanguageReload) so the picker
+  // re-labels instead of staying frozen in whatever language it first loaded.
+  function loadMonths() {
+    fetchMonthOptions()
+      .then(list => { if (list.length) setMonths(list) })
+      .catch(() => {})
+  }
+
+  useEffect(() => { loadMonths() }, [])
+
+  useLanguageReload(loadMonths)
+
+  // Server-translated birth-year list — same MONTH_FALLBACK reasoning, plus
+  // Angular's GENDER=='1' 4-entry trim (see fetchYearOptions doc comment).
+  // Re-fetches whenever GENDER changes (the trim depends on it) and on a
+  // live language change.
+  function loadYears() {
+    fetchYearOptions(gender)
+      .then(list => { setApiYears(list.length ? list : null) })
+      .catch(() => {})
+  }
+
+  useEffect(() => { loadYears() }, [gender])
+
+  useLanguageReload(loadYears)
+
+  // Server-translated day-of-month list, filtered to the selected month/year —
+  // same MONTH_FALLBACK reasoning. Re-fetches on month/year change (Angular's
+  // updateDateList() re-derives this on every change too) and on language change.
+  function loadDates() {
+    fetchDateOptions(selMonth, selYear)
+      .then(list => { setApiDates(list.length ? list : null) })
+      .catch(() => {})
+  }
+
+  useEffect(() => { loadDates() }, [selMonth, selYear])
+
+  useLanguageReload(loadDates)
+
   // ── Computed ─────────────────────────────────────────────────────────────
 
   const possessive       = PROFILE_POSSESSIVE[createdBy]
-  const ageSubject       = AGE_SUBJECT[createdBy]
-  
+
   const possessiveKey = possessive?.toUpperCase()
   const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
   const title = t('REGISTRATION.DATEOFBIRTH', 'Select your #PROFILETYPE# date of birth')
     .replace('#PROFILETYPE#', translatedProfileType)
     .replace('  ', ' ')
     .trim()
-  const noRemText        = possessive
-    ? `If you don't remember your ${possessive} date of birth,`
-    : "If you don't remember your date of birth,"
+  // Angular: REGISTRATION.DOBREMINDER ("If you don't remember your
+  // #PROFILETYPE# date of birth")
+  const noRemText = t('REGISTRATION.DOBREMINDER', "If you don't remember your #PROFILETYPE# date of birth")
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace('  ', ' ')
+    .trim()
 
   // Age sheet title — Angular: REGISTRATION.ENTERAGETITLE ("Enter your
   // #PROFILETYPE# age"), same #PROFILETYPE# substitution as the page title above.
@@ -301,8 +362,21 @@ export default function DOBScreen({ navigation }: Props) {
     .replace('#PROFILETYPE#', translatedProfileType)
     .replace('  ', ' ')
     .trim()
+  // Angular: REGISTRATION.ENTERAGE ("Please enter age") — the "Please enter
+  // age" link shown once all 3 date fields are cleared/unfilled.
+  const enterAgeLinkText = t('REGISTRATION.ENTERAGE', 'Please enter age')
+  // Angular: REGISTRATION.AGE ("Age") — floating label above the age input.
+  const ageLabelText = t('REGISTRATION.AGE', 'Age')
+  // Angular: shared GENERAL.OR key — the divider between the date picker and
+  // the "enter age" fallback link.
+  const orDividerText = t('GENERAL.OR', 'OR')
+  // Angular: REGISTRATION.DATE / .MONTH / .YEAR — the three dropdown placeholders,
+  // previously hardcoded English literals in the fields array below.
+  const datePlaceholder  = t('REGISTRATION.DATE',  'Date')
+  const monthPlaceholder = t('REGISTRATION.MONTH', 'Month')
+  const yearPlaceholder  = t('REGISTRATION.YEAR',  'Year')
 
-  const selMonthLabel    = MONTHS.find(m => m.key === selMonth)?.label ?? ''
+  const selMonthLabel    = months.find(m => m.key === selMonth)?.label ?? ''
   const isAllSelected    = !!(selDate && selMonth && selYear)
   const calculatedAge    = isAllSelected ? calculateAge(selYear, selMonth, selDate) : null
 
@@ -313,12 +387,35 @@ export default function DOBScreen({ navigation }: Props) {
   const minAge = gender === '0' ? 18 : 21
   const maxAge = 70
   const isDobAgeValid = isAllSelected && calculatedAge !== null && calculatedAge >= minAge && calculatedAge <= maxAge
+
+  // Angular: updateAgeContent() — createdBy === '1' (Myself) uses
+  // AGESTATEMENTMYSELF, everyone else uses AGESTATEMENT with #PROFILETYPE#
+  // substituted, then #AGE# is replaced with the computed age. Both keys are
+  // fully translated (see locales/*.json), unlike the previous hardcoded
+  // "Your {ageSubject} is N years old" / "You are N years old" literals.
+  //
+  // The <span> that bolds the number wraps different text per language (English:
+  // "#AGE# years"; Tamil: just "#AGE#" — "years/age" sits outside it there), so
+  // this can't split on the <span> tags and assume "years" is always inside.
+  // Strip all markup first, THEN split the plain string on #AGE# — whatever
+  // words end up on each side are exactly what that language's template put there.
+  const ageStatementTemplate = createdBy === '1'
+    ? t('REGISTRATION.AGESTATEMENTMYSELF', "You are #AGE# years old")
+    : t('REGISTRATION.AGESTATEMENT', "Your #PROFILETYPE# is #AGE# years old")
+        .replace('#PROFILETYPE#', translatedProfileType).replace('  ', ' ')
+  const ageStatementPlain = stripHtml(ageStatementTemplate)
+  const [ageStatementBeforeRaw, ageStatementAfterRaw] = ageStatementPlain.includes('#AGE#')
+    ? ageStatementPlain.split('#AGE#')
+    : [ageStatementPlain, '']
+  const ageStatementBefore = ageStatementBeforeRaw.trim() + ' '
+  const ageStatementAfter  = ' ' + ageStatementAfterRaw.trim()
+  const ageStatementYears  = String(calculatedAge ?? '')
   // ── Picker helpers ────────────────────────────────────────────────────────
 
   function getOptions(field: FieldKey) {
-    if (field === 'month') return MONTHS
+    if (field === 'month') return months
     if (field === 'year')  return YEARS
-    return getDaysInMonth(selMonth, selYear)
+    return apiDates ?? getDaysInMonth(selMonth, selYear)
   }
 
   function getCurrentVal(field: FieldKey) {
@@ -352,7 +449,15 @@ export default function DOBScreen({ navigation }: Props) {
     ref.current?.measureInWindow((x, y, w, h) => {
       // For month dropdown, use a minimum width so full month names fit
       const dropW = field === 'month' ? Math.max(w, 130) : w
-      setDropdownPos({ top: y, left: x, width: dropW, fieldBottom: y + h })
+
+      // Flip the dropdown above the field when there isn't enough room below —
+      // e.g. the Year field can sit low enough on screen that a full-height
+      // list opening downward would run off the bottom edge and be unreachable.
+      const listHeight  = Math.min(getOptions(field).length, MAX_LIST_ITEMS) * ITEM_H
+      const spaceBelow  = SCREEN_H - (y + h)
+      const openUp      = spaceBelow < listHeight && y > listHeight
+
+      setDropdownPos({ top: y, left: x, width: dropW, fieldBottom: y + h, openUp, fieldTop: y })
       setPickerField(field)
       rotateArrow(field, true)
 
@@ -364,8 +469,14 @@ export default function DOBScreen({ navigation }: Props) {
       if (field === 'year' && !selYear) {
         const years = getOptions('year')
         setTimeout(() => {
-          pickerListRef.current?.scrollToIndex({
-            index:    years.length - 1,
+          // scrollToOffset (not scrollToIndex) — with ~53 rows, jumping via
+          // index instead of a raw pixel offset relies on the FlatList's
+          // virtualization having already measured/rendered that far ahead,
+          // which it hasn't 700ms after just mounting. That mismatch is what
+          // left the list scrolled to the right place but with blank/invisible
+          // rows — an offset-based scroll has no such dependency.
+          pickerListRef.current?.scrollToOffset({
+            offset:   (years.length - 1) * ITEM_H,
             animated: true,
           })
         }, 700)
@@ -461,14 +572,24 @@ export default function DOBScreen({ navigation }: Props) {
   const selectedIdx = pickerOptions.findIndex(o => o.key === currentVal)
   const initialScrollIdx = Math.max(0, selectedIdx >= 0 ? selectedIdx - 2 : 0)
 
-  // Dropdown position: start at fieldBottom (right below the field),
-  // visually it looks like the field expanded downward.
-  const dropStyle = {
-    position: 'absolute' as const,
-    top:   dropdownPos.fieldBottom,
-    left:  dropdownPos.left,
-    width: dropdownPos.width,
-  }
+  // Dropdown position: normally starts at fieldBottom (right below the field),
+  // so it looks like the field expanded downward. When openPicker() detected
+  // not enough room below (e.g. the Year field sitting low on screen), it's
+  // anchored above the field instead, growing upward, so the list stays fully
+  // visible and reachable either way.
+  const dropStyle = dropdownPos.openUp
+    ? {
+        position: 'absolute' as const,
+        bottom: SCREEN_H - dropdownPos.fieldTop,
+        left:   dropdownPos.left,
+        width:  dropdownPos.width,
+      }
+    : {
+        position: 'absolute' as const,
+        top:   dropdownPos.fieldBottom,
+        left:  dropdownPos.left,
+        width: dropdownPos.width,
+      }
 
   return (
     <View style={os.flex1}>
@@ -482,15 +603,15 @@ export default function DOBScreen({ navigation }: Props) {
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
         {/* Title */}
-        <Text style={os.title}>{title}</Text>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {/* Three dropdown trigger fields */}
         <View style={styles.fieldsRow}>
           {(
             [
-              { field: 'date'  as FieldKey, ref: dateRef,  val: selDate,  display: selDate ? selDate.padStart(2, '0') : '',  placeholder: 'Date'  },
-              { field: 'month' as FieldKey, ref: monthRef, val: selMonth, display: selMonthLabel,                            placeholder: 'Month' },
-              { field: 'year'  as FieldKey, ref: yearRef,  val: selYear,  display: selYear,                                  placeholder: 'Year'  },
+              { field: 'date'  as FieldKey, ref: dateRef,  val: selDate,  display: selDate ? selDate.padStart(2, '0') : '',  placeholder: datePlaceholder  },
+              { field: 'month' as FieldKey, ref: monthRef, val: selMonth, display: selMonthLabel,                            placeholder: monthPlaceholder },
+              { field: 'year'  as FieldKey, ref: yearRef,  val: selYear,  display: selYear,                                  placeholder: yearPlaceholder  },
             ] as const
           ).map(({ field, ref, val, display, placeholder }) => {
             const isOpen = pickerField === field
@@ -510,7 +631,7 @@ export default function DOBScreen({ navigation }: Props) {
                 {/* Floating label — only when value is set */}
                 {!!val && (
                   <View style={styles.fieldLabel} pointerEvents="none">
-                    <Text style={styles.fieldLabelText}>{placeholder}</Text>
+                    <Text style={[styles.fieldLabelText, { fontFamily: langFonts.regular }]}>{placeholder}</Text>
                   </View>
                 )}
 
@@ -520,7 +641,7 @@ export default function DOBScreen({ navigation }: Props) {
                   accessibilityRole="button"
                   accessibilityLabel={`Select ${placeholder}`}
                 >
-                  <Text style={[styles.fieldText, !val && styles.fieldPlaceholder]} numberOfLines={1}>
+                  <Text style={[styles.fieldText, !val && styles.fieldPlaceholder, { fontFamily: langFonts.medium }]} numberOfLines={1}>
                     {val ? display : placeholder}
                   </Text>
                   {/* Same down-arrow icon for all 3 fields — rotates 180° when open,
@@ -545,10 +666,9 @@ export default function DOBScreen({ navigation }: Props) {
             all and reads as a dark rectangle against the page. */}
         {isAllSelected && calculatedAge !== null && calculatedAge > 0 && (
           <AgeBadge>
-            <Text style={styles.ageBadgeText}>
-              {ageSubject ? `Your ${ageSubject} is ` : 'You are '}
-              <Text style={styles.ageBadgeYears}>{calculatedAge} years</Text>
-              {' old'}
+            <Text style={[styles.ageBadgeText, { fontFamily: langFonts.regular }]}>{ageStatementBefore}
+              <Text style={[styles.ageBadgeYears, { fontFamily: langFonts.semiBold }]}>{ageStatementYears}</Text>
+              {ageStatementAfter}
             </Text>
           </AgeBadge>
         )}
@@ -558,16 +678,16 @@ export default function DOBScreen({ navigation }: Props) {
           <>
             <View style={styles.orRow}>
               <Image source={{ uri: CDN_OR_LEFT }} style={styles.orLine} contentFit="contain" />
-              <Text style={styles.orText}>OR</Text>
+              <Text style={[styles.orText, { fontFamily: langFonts.regular }]}>{orDividerText}</Text>
               <Image source={{ uri: CDN_OR_RIGHT }} style={styles.orLine} contentFit="contain" />
             </View>
 
-            <Text style={styles.noRemText} numberOfLines={1}>{noRemText}</Text>
+            <Text style={[styles.noRemText, { fontFamily: langFonts.regular }]} numberOfLines={1}>{noRemText}</Text>
             <Pressable
               style={styles.enterAgeRow}
               onPress={() => { setAgeInput(''); setAgeError(''); setShowAgeSheet(true) }}
             >
-              <Text style={styles.enterAgeLink}>Please enter age</Text>
+              <Text style={[styles.enterAgeLink, { fontFamily: langFonts.regular }]}>{enterAgeLinkText}</Text>
               <Animated.View style={{ transform: [{ translateX: enterAgeArrowAnim }] }}>
                 <CdnSvg uri={CDN_FORWARD_ICON} width={10} height={10} style={styles.enterAgeIcon} />
               </Animated.View>
@@ -588,8 +708,9 @@ export default function DOBScreen({ navigation }: Props) {
         {/* Full-screen tap-away closes the dropdown */}
         <Pressable style={StyleSheet.absoluteFill} onPress={closePicker} />
 
-        {/* Dropdown list — starts right below the field (fieldBottom) */}
-        <View style={[styles.dropdown, dropStyle]}>
+        {/* Dropdown list — below the field normally, or above it when flipped
+            (dropdownPos.openUp) because there wasn't room underneath. */}
+        <View style={[styles.dropdown, dropdownPos.openUp && styles.dropdownUp, dropStyle]}>
           <FlatList
             ref={pickerListRef}
             data={pickerOptions}
@@ -598,6 +719,14 @@ export default function DOBScreen({ navigation }: Props) {
             showsVerticalScrollIndicator
             getItemLayout={(_, index) => ({ length: ITEM_H, offset: ITEM_H * index, index })}
             initialScrollIndex={initialScrollIdx}
+            // Year has ~53 rows — the most of the three fields — and is the
+            // only one that gets auto-scrolled to its far end after opening
+            // (see openPicker's setTimeout above). Virtualization only renders
+            // rows near the initial scroll position, so that later jump could
+            // land on rows that were never mounted, showing as blank. Rendering
+            // the full list upfront (cheap at this size) removes that gap.
+            initialNumToRender={pickerOptions.length}
+            removeClippedSubviews={false}
             renderItem={({ item }) => {
               const isSel = item.key === currentVal
               return (
@@ -605,7 +734,7 @@ export default function DOBScreen({ navigation }: Props) {
                   style={[styles.dropdownItem, isSel && styles.dropdownItemSel]}
                   onPress={() => pickerField && handlePickerSelect(pickerField, item.key)}
                 >
-                  <Text style={[styles.dropdownItemText, isSel && styles.dropdownItemTextSel]}>
+                  <Text style={[styles.dropdownItemText, isSel && styles.dropdownItemTextSel, { fontFamily: isSel ? langFonts.semiBold : langFonts.regular }]}>
                     {item.label}
                   </Text>
                 </Pressable>
@@ -638,7 +767,7 @@ export default function DOBScreen({ navigation }: Props) {
         <Animated.View
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: Colors.black, opacity: ageScrimAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.7] }) },
+            { backgroundColor: Colors.black, opacity: ageScrimAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }) },
           ]}
           pointerEvents="none"
         />
@@ -667,7 +796,7 @@ export default function DOBScreen({ navigation }: Props) {
             <CdnSvg uri={CDN_CLOSE_ICON} width={24} height={24} />
           </Pressable>
 
-          <Text style={styles.ageSheetTitle}>{ageSheetTitleText}</Text>
+          <Text style={[styles.ageSheetTitle, { fontFamily: langFonts.semiBold }]}>{ageSheetTitleText}</Text>
 
           <View style={styles.ageInputOuter}>
             <TextInput
@@ -685,7 +814,7 @@ export default function DOBScreen({ navigation }: Props) {
               onSubmitEditing={handleAgeSubmit}
             />
             <View style={styles.ageLabelWrap} pointerEvents="none">
-              <Text style={styles.ageLabelText}>Age</Text>
+              <Text style={[styles.ageLabelText, { fontFamily: langFonts.regular }]}>{ageLabelText}</Text>
             </View>
           </View>
 
@@ -746,7 +875,6 @@ const styles = StyleSheet.create({
     zIndex:            10,
   },
   fieldLabelText: {
-    fontFamily: Fonts.poppinsRegular,
     fontSize:   12,
     fontWeight: '400',
     color:      Colors.textSecondary,
@@ -760,13 +888,11 @@ const styles = StyleSheet.create({
   },
   fieldText: {
     flex:       1,
-    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     fontWeight: '500',
     color:      Colors.textPrimary,
   },
   fieldPlaceholder: {
-    fontFamily: Fonts.poppinsMedium,
     fontWeight: '500',
     color:      Colors.textPrimary,
   },
@@ -802,13 +928,11 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 7,
   },
   ageBadgeText: {
-    fontFamily: Fonts.poppinsRegular,
     fontSize:   14,
     fontWeight: '400',
     color:      Colors.textPrimary,
   },
   ageBadgeYears: {
-    fontFamily: Fonts.poppinsSemiBold,
     fontWeight: '600',
   },
 
@@ -826,7 +950,6 @@ const styles = StyleSheet.create({
     opacity: 1,
   },
   orText: {
-    fontFamily:       Fonts.poppinsRegular,
     fontSize:         14,
     fontWeight:       '400',
     color:            Colors.textPrimary,
@@ -840,7 +963,6 @@ const styles = StyleSheet.create({
   // narrow. `numberOfLines` below keeps this to one line to match on mobile.
 
   noRemText: {
-    fontFamily:   Fonts.poppinsRegular,
     fontSize:     14,
     fontWeight:   '400',
     color:        Colors.textPrimary,
@@ -852,7 +974,6 @@ const styles = StyleSheet.create({
     alignItems:    'center',
   },
   enterAgeLink: {
-    fontFamily:         Fonts.poppinsRegular,
     fontSize:           14,
     fontWeight:         '400',
     color:              Colors.link,
@@ -883,6 +1004,17 @@ const styles = StyleSheet.create({
       android: { elevation: 6 },
     }),
   },
+  // Flipped variant when the dropdown opens above the field instead of below
+  // (see dropdownPos.openUp) — the rounded/borderless edge swaps to the top,
+  // since that's now the edge touching the field.
+  dropdownUp: {
+    borderTopWidth:          1,
+    borderBottomWidth:       0,
+    borderTopLeftRadius:     8,
+    borderTopRightRadius:    8,
+    borderBottomLeftRadius:  0,
+    borderBottomRightRadius: 0,
+  },
   dropdownItem: {
     height:            ITEM_H,
     justifyContent:    'center',
@@ -892,13 +1024,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(181,0,51,0.05)',
   },
   dropdownItemText: {
-    fontFamily: Fonts.poppinsRegular,
     fontSize:   14,
     fontWeight: '400',
     color:      Colors.textPrimary,
   },
   dropdownItemTextSel: {
-    fontFamily: Fonts.poppinsSemiBold,
     fontWeight: '600',
     color:      Colors.primaryDark,
   },
@@ -925,7 +1055,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   ageSheetTitle: {
-    fontFamily:   Fonts.poppinsSemiBold,
     fontSize:     20,
     fontWeight:   '600',
     color:        Colors.textPrimary,
@@ -955,7 +1084,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   ageLabelText: {
-    fontFamily: Fonts.poppinsRegular,
     fontSize:   12,
     fontWeight: '400',
     color:      Colors.textSecondary,

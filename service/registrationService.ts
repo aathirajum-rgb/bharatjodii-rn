@@ -12,6 +12,16 @@ import { navigate } from '../utils/navigationRef'
 import { ENavigation } from '../types/enums/navigation.enum'
 import { setAppsFlyerUserId } from './analyticsService'
 import { fetchEditProfileInfo, type EditProfileInfo } from './editProfileService'
+import { stripAndDecodeHtml, decodeEntities } from '../utils/htmlEntities'
+
+// The registrationform/v1 (initialfetch) API returns vernacular option labels as
+// HTML numeric character references — Tamil "Myself" arrives as the literal text
+// "&#x0B8E;&#x0BA9;&#x0B95;&#x0BCD;&#x0B95;&#x0BBE;&#x0B95;", not as UTF-8. Angular decodes these in
+// common.ts's decodeEntities() (div.innerHTML → textContent); RN has no DOM, so
+// utils/htmlEntities.ts does it in pure JS. Every VALUE read off this API must go
+// through label() or the raw entity codes render on screen.
+// Some labels (e.g. MOTHERTONGUES) additionally carry HTML tags, which this strips.
+const label = (v: unknown): string => stripAndDecodeHtml(String(v ?? ''))
 
 // ─── Registration value store ─────────────────────────────────────────────────
 // Single AsyncStorage object for all onboarding field values.
@@ -198,7 +208,7 @@ export async function fetchProfileCreatedByOptions(): Promise<Array<{ key: strin
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
     return (Object.entries(raw) as [string, string][])
       .filter(([key]) => key !== '2')   // exclude 'Parents' — not in revamp UI
-      .map(([key, label]) => ({ key, label }))
+      .map(([key, value]) => ({ key, label: label(value) }))
   }
   return []
 }
@@ -226,10 +236,12 @@ export async function fetchGenderOptions(createdBy: string): Promise<GenderOptio
   return list
     .map((item: any) => ({
       key:       String(item['KEY'] ?? item['key'] ?? ''),
-      label:     String(item['VALUE'] ?? item['value'] ?? ''),
+      label:     label(item['VALUE'] ?? item['value'] ?? ''),
       img:       item['IMG'] ?? '',
       imgActive: item['IMG-ACTIVE'] ?? '',
-      text:      item['TEXT'] ?? '',
+      // TEXT is display copy too (helper subtext under the selected card), so it
+      // needs the same entity decoding as VALUE — IMG/IMG-ACTIVE are URLs, not copy.
+      text:      label(item['TEXT'] ?? ''),
     }))
     .filter(o => o.key !== '')
 }
@@ -249,9 +261,20 @@ export type NameGenderValidation = {
 }
 
 // Angular: `localStorage.getItem('AIVFLAG') === '1'` — server-set feature flag,
-// stored here by storeWebURLData()'s SCALAR_KEYS list.
+// stored by storeWebURLData()'s SCALAR_KEYS list from the WEBVIEWURL payload.
+//
+// AIVFLAG only arrives with that login payload, which lands at OTP-verify or at
+// handleRegistrationSuccess(). During a FRESH registration it is therefore still
+// absent on onboarding pages 2-3, so a strict `=== '1'` test skips the name/
+// gender check for exactly the users it is meant to screen.
+//
+// So: an explicit value from the server always wins ('0' disables, keeping the
+// backend kill-switch intact), and only a genuinely ABSENT flag falls back to
+// enabled. Once the session carries AIVFLAG this behaves identically to Angular.
 export async function isAiValidationEnabled(): Promise<boolean> {
-  return String(await getSessionValue('AIVFLAG')) === '1'
+  const raw = await getSessionValue('AIVFLAG')
+  const isAbsent = raw === null || raw === undefined || String(raw).trim() === ''
+  return isAbsent ? true : String(raw) === '1'
 }
 
 // Angular: validateNameGender() — GET initialfetch?type=AIGENDERVALIDATION…
@@ -304,7 +327,7 @@ export async function fetchMaritalStatusOptions(
     ? res?.RESPONSE?.MARITALSTATUSFEMALE
     : res?.RESPONSE?.MARITALSTATUSMALE
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
   }
   return []
 }
@@ -329,25 +352,136 @@ export async function fetchNoOfChildrenOptions(): Promise<Array<{ key: string; l
   const res = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
   const raw = res?.RESPONSE?.NOOFCHILDREN
   if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
-    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
   }
   return []
 }
 
 // Reads REGISTRATIONARRAYS from cache (AsyncStorage) or fetches fresh from API and saves.
 // Angular stores the full initialfetch response under this key — mirrors that pattern.
-export async function getRegistrationArrays(): Promise<Record<string, any>> {
-  const cached = await getItem('REGISTRATIONARRAYS')
-  if (cached) {
+// Cache is scoped to the language it was fetched with (REGISTRATIONARRAYS_LANG) so a
+// language switch (submitLanguage() in languageService.ts) re-fetches with the new LANG
+// instead of silently serving the previous language's data.
+export async function getRegistrationArrays(force = false): Promise<Record<string, any>> {
+  const lang        = (await getItem(SK.Auth.LANG)) ?? 'en'
+  const cachedLang   = await getItem('REGISTRATIONARRAYS_LANG')
+  const cached       = await getItem('REGISTRATIONARRAYS')
+  // Angular: common.ts's getDynamicPopulateArrayList(hitApi) — hitApi=1 skips
+  // the cache entirely and overwrites REGISTRATIONARRAYS with fresh data.
+  if (!force && cached && cachedLang === lang) {
     try { return JSON.parse(cached) } catch {}
   }
   const ccode    = await getItem(SK.User.COUNTRY_CODE) ?? '91'
-  const lang     = await getItem(SK.Auth.LANG) ?? 'en'
   const paramStr = `type=all&ccode=${ccode}&LANG=${lang}`
   const res = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
   const data = res?.RESPONSE ?? {}
-  if (res?.RESPONSE) await setItem('REGISTRATIONARRAYS', JSON.stringify(res.RESPONSE))
+  if (res?.RESPONSE) {
+    await setItem('REGISTRATIONARRAYS', JSON.stringify(res.RESPONSE))
+    await setItem('REGISTRATIONARRAYS_LANG', lang)
+  }
   return data
+}
+
+// Fetches month names from the MONTH key in registrationArrays (server-translated —
+// Angular: registration-revamp.component.ts's monthList = FUNC.GetArrayListfrmObj
+// (registrationArray['MONTH']), a plain {key: value} object, unsorted). DOBScreen
+// previously used a static English MONTHS constant, which is why month names
+// never switched language. Falls back to that same static list if the API key is
+// ever missing, so the picker is never empty.
+export async function fetchMonthOptions(): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const raw  = data?.MONTH
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
+  }
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => ({
+      key:   String(item.KEY ?? item.key ?? ''),
+      label: label(item.VALUE ?? item.value ?? ''),
+    }))
+  }
+  return []
+}
+
+function dateOrYearToList(raw: any): Array<{ key: string; label: string }> {
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    // Falls back to the key itself when the value doesn't decode to a usable
+    // label (e.g. it's a nested object rather than the flat {key: value} this
+    // branch assumes) — years/dates are plain digits, so the key is always a
+    // valid label on its own rather than leaving the row blank.
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) || key }))
+  }
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item: any) => {
+        // Confirmed against the live registrationform/v1 API: YEARS arrives as
+        // a flat array of raw numbers (e.g. [1956, 1957, ..., 2008]), not
+        // objects — so this must be checked before the KEY/VALUE object shape
+        // below, otherwise every entry (a bare number has no .KEY/.VALUE)
+        // silently resolves to key/label '', rendering as blank, unselectable
+        // dropdown rows that all match the empty currentVal and look
+        // permanently "selected".
+        if (typeof item === 'number' || typeof item === 'string') {
+          const key = String(item)
+          return { key, label: key }
+        }
+        // Same {KEY, VALUE} shape as most other option lists in this file, but
+        // falls back through the other prefixed key names this API uses
+        // elsewhere (MKEY, CKEY, OCCKEY, EDUKEY, ...) in case DATE or some
+        // other caller ever arrives under one of those instead of plain KEY.
+        const key = String(item.KEY ?? item.key ?? item.YKEY ?? item.DKEY ?? item.YEARKEY ?? item.DATEKEY ?? '')
+        const lbl = label(item.VALUE ?? item.value ?? item.LABEL ?? item.label ?? '')
+        return { key, label: lbl || key }
+      })
+      .filter(o => o.key !== '')
+  }
+  return []
+}
+
+// Fetches the day-of-month list from the DATE key in registrationArrays, then
+// filters it to the days that exist in the given month/year — same as Angular's
+// updateDateList() (registration-revamp.component.ts:861-891), which re-derives
+// dateList from registrationArray['DATE'] filtered by daysInMonth on every
+// month/year change, rather than generating a fresh 1..31 range client-side.
+export async function fetchDateOptions(
+  month?: string,
+  year?: string,
+): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const full = dateOrYearToList(data?.DATE)
+  if (full.length === 0) return full
+
+  const m = Number(month)
+  if (!m) return full
+
+  let daysInMonth = 31
+  if ([4, 6, 9, 11].includes(m)) {
+    daysInMonth = 30
+  } else if (m === 2) {
+    const y = Number(year)
+    daysInMonth = y && ((y % 4 === 0 && y % 100 !== 0) || y % 400 === 0) ? 29 : 28
+  }
+
+  return full.filter(o => Number(o.key) <= daysInMonth)
+}
+
+// Fetches the birth-year list from the YEARS key in registrationArrays.
+// Angular: registration-revamp.component.ts's updateDateLists() (line 844-856)
+// — yearList = GetArrayListfrmObj(registrationArray['YEARS']), ordered
+// oldest-first, then for GENDER=='1' (male) trims the last 4 entries if the
+// gap between now and the newest year is under 21 (male/other minimum age is
+// 21, the list's floor is 18).
+export async function fetchYearOptions(gender: string): Promise<Array<{ key: string; label: string }>> {
+  const data  = await getRegistrationArrays()
+  const years = dateOrYearToList(data?.YEARS)
+  if (years.length === 0) return years
+
+  if (gender === '1') {
+    const newestYear = Number(years[years.length - 1]?.key)
+    const yearDif    = new Date().getFullYear() - newestYear
+    if (yearDif < 21 && years.length > 4) return years.slice(0, years.length - 4)
+  }
+  return years
 }
 
 // Fetches mother tongue options from MOTHERTONGUES key in registrationArrays.
@@ -360,12 +494,12 @@ export async function fetchMotherTongueOptions(): Promise<Array<{ key: string; l
     return raw
       .map((item: any) => ({
         key:   String(item.MKEY  ?? item.KEY   ?? item.key   ?? ''),
-        label: String(item.VALUE ?? item.value ?? ''),
+        label: label(item.VALUE ?? item.value ?? ''),
       }))
       .filter(o => o.key !== '')
   }
   if (raw && typeof raw === 'object') {
-    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
   }
   return []
 }
@@ -378,11 +512,32 @@ export async function fetchEatingHabitOptions(): Promise<Array<{ key: string; la
   if (Array.isArray(raw)) {
     return raw.map((item: any) => ({
       key:   String(item.KEY   ?? item.key   ?? ''),
-      label: String(item.VALUE ?? item.value ?? ''),
+      label: label(item.VALUE ?? item.value ?? ''),
     })).filter(o => o.key !== '')
   }
   if (raw && typeof raw === 'object') {
-    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
+  }
+  return []
+}
+
+// Fetches the "Is your hometown same as current location?" Yes/No labels
+// from the HOMETOWN key in registrationArrays — Angular:
+// getArrayList('HOMETOWN', 'HOMETOWN', '46') falls through to
+// GetArrayListfrmObj(registrationArray['HOMETOWN']), i.e. the API's own
+// {"1":"Yes","2":"No"}-shaped object, not the static GENERAL.YES/GENERAL.NO
+// i18n keys (registration-revamp.component.ts:1679).
+export async function fetchHomeTownOptions(): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const raw  = data?.HOMETOWN
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => ({
+      key:   String(item.KEY   ?? item.key   ?? ''),
+      label: label(item.VALUE ?? item.value ?? ''),
+    })).filter(o => o.key !== '')
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
   }
   return []
 }
@@ -397,11 +552,11 @@ export async function fetchDrinkingHabitOptions(): Promise<Array<{ key: string; 
   if (Array.isArray(raw)) {
     return raw.map((item: any) => ({
       key:   String(item.KEY   ?? item.key   ?? ''),
-      label: String(item.VALUE ?? item.value ?? ''),
+      label: label(item.VALUE ?? item.value ?? ''),
     })).filter(o => o.key !== '')
   }
   if (raw && typeof raw === 'object') {
-    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
   }
   return []
 }
@@ -412,11 +567,11 @@ export async function fetchSmokingHabitOptions(): Promise<Array<{ key: string; l
   if (Array.isArray(raw)) {
     return raw.map((item: any) => ({
       key:   String(item.KEY   ?? item.key   ?? ''),
-      label: String(item.VALUE ?? item.value ?? ''),
+      label: label(item.VALUE ?? item.value ?? ''),
     })).filter(o => o.key !== '')
   }
   if (raw && typeof raw === 'object') {
-    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
   }
   return []
 }
@@ -438,13 +593,13 @@ export async function fetchGothraOptions(caste?: string): Promise<Array<{ key: s
     if (Array.isArray(raw)) {
       return raw.map((item: any) => ({
         key:   String(item.KEY ?? item.key ?? ''),
-        label: String(item.VALUE ?? item.value ?? ''),
+        label: label(item.VALUE ?? item.value ?? ''),
       })).filter((o: { key: string }) => o.key !== '' && o.key !== '998')
     }
     if (typeof raw === 'object') {
       return Object.entries(raw)
         .filter(([key]) => key !== '998')
-        .map(([key, value]) => ({ key, label: String(value) }))
+        .map(([key, value]) => ({ key, label: label(value) }))
     }
     return []
   }
@@ -525,11 +680,11 @@ export async function fetchCasteOptions(
     if (Array.isArray(raw)) {
       return raw.map((item: any) => ({
         key:   String(item.KEY ?? item.key ?? ''),
-        label: String(item.VALUE ?? item.value ?? ''),
+        label: label(item.VALUE ?? item.value ?? ''),
       })).filter((o: { key: string }) => o.key !== '')
     }
     if (raw && typeof raw === 'object') {
-      return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+      return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
     }
     return []
   }
@@ -568,11 +723,11 @@ export async function fetchSubcasteOptions(
     if (Array.isArray(r)) {
       return r.map((item: any) => ({
         key:   String(item.KEY ?? item.key ?? ''),
-        label: String(item.VALUE ?? item.value ?? ''),
+        label: label(item.VALUE ?? item.value ?? ''),
       })).filter((o: { key: string }) => o.key !== '')
     }
     if (r && typeof r === 'object') {
-      return Object.entries(r).map(([key, value]) => ({ key, label: String(value) }))
+      return Object.entries(r).map(([key, value]) => ({ key, label: label(value) }))
     }
     return []
   }
@@ -602,11 +757,11 @@ export async function fetchReligionOptions(): Promise<Array<{ key: string; label
   if (Array.isArray(raw)) {
     return raw.map((item: any) => ({
       key:   String(item.KEY   ?? item.key   ?? ''),
-      label: String(item.VALUE ?? item.value ?? ''),
+      label: label(item.VALUE ?? item.value ?? ''),
     })).filter(o => o.key !== '')
   }
   if (raw && typeof raw === 'object') {
-    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
   }
   return []
 }
@@ -619,11 +774,11 @@ export async function fetchPhysicalStatusOptions(): Promise<Array<{ key: string;
   if (Array.isArray(raw)) {
     return raw.map((item: any) => ({
       key:   String(item.KEY   ?? item.key   ?? ''),
-      label: String(item.VALUE ?? item.value ?? ''),
+      label: label(item.VALUE ?? item.value ?? ''),
     })).filter(o => o.key !== '')
   }
   if (raw && typeof raw === 'object') {
-    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
   }
   return []
 }
@@ -636,11 +791,11 @@ export async function fetchDivisionOptions(): Promise<Array<{ key: string; label
   if (Array.isArray(raw)) {
     return raw.map((item: any) => ({
       key:   String(item.KEY   ?? item.key   ?? ''),
-      label: String(item.VALUE ?? item.value ?? ''),
+      label: label(item.VALUE ?? item.value ?? ''),
     })).filter(o => o.key !== '')
   }
   if (raw && typeof raw === 'object') {
-    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
   }
   return []
 }
@@ -653,11 +808,11 @@ export async function fetchMonthlyIncomeOptions(): Promise<Array<{ key: string; 
   if (Array.isArray(raw)) {
     return raw.map((item: any) => ({
       key:   String(item.CKEY  ?? item.key   ?? ''),
-      label: String(item.VALUE ?? item.value ?? ''),
+      label: label(item.VALUE ?? item.value ?? ''),
     })).filter(o => o.key !== '')
   }
   if (raw && typeof raw === 'object') {
-    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
   }
   return []
 }
@@ -675,11 +830,11 @@ export async function fetchNriIncomeData(country: string): Promise<{
     if (Array.isArray(raw)) {
       return raw.map((item: any) => ({
         key:   String(item.CKEY  ?? item.key   ?? ''),
-        label: String(item.VALUE ?? item.value ?? ''),
+        label: label(item.VALUE ?? item.value ?? ''),
       })).filter((o: { key: string }) => o.key !== '')
     }
     if (raw && typeof raw === 'object') {
-      return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+      return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
     }
     return []
   }
@@ -720,11 +875,11 @@ export async function fetchOccupationOptions(): Promise<Array<{ key: string; lab
   if (Array.isArray(raw)) {
     return raw.map((item: any) => ({
       key:   String(item.OCCKEY ?? item.key   ?? ''),
-      label: String(item.VALUE  ?? item.value ?? ''),
+      label: label(item.VALUE  ?? item.value ?? ''),
     })).filter(o => o.key !== '')
   }
   if (raw && typeof raw === 'object') {
-    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
   }
   return []
 }
@@ -737,11 +892,11 @@ export async function fetchQualificationOptions(): Promise<Array<{ key: string; 
   if (Array.isArray(raw)) {
     return raw.map((item: any) => ({
       key:   String(item.EDUKEY ?? item.key   ?? ''),
-      label: String(item.VALUE  ?? item.value ?? ''),
+      label: label(item.VALUE  ?? item.value ?? ''),
     })).filter(o => o.key !== '')
   }
   if (raw && typeof raw === 'object') {
-    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
   }
   return []
 }
@@ -798,7 +953,7 @@ export async function fetchEducationGroupOptions(
   const commonMap = flatten(raw['COMMON'])
 
   const toOptions = (obj: Record<string, string>) =>
-    Object.entries(obj).map(([key, label]) => ({ key, label: String(label) }))
+    Object.entries(obj).map(([key, value]) => ({ key, label: label(value) }))
 
   return [...toOptions(groupMap), ...toOptions(commonMap)].filter(o => o.key !== '')
 }
@@ -839,9 +994,12 @@ export function isValidJobDetailFormat(value: string): boolean {
 }
 
 // Fetches height CATEGORY options (Below average / Average / Above average / Tall).
-// Angular (registration-revamp.component.ts:948): REGARRAYTYPE = 'NEWHEIGHTMALE' /
-// 'NEWHEIGHTFEMALE', parsed via GetArrayListfrmObjwithTilde — each value is a
-// '~'-delimited "Label~Subtitle" string (common-funtions.ts:145-150), not HTML.
+// The live API's VALUE actually carries the subtitle wrapped in an HTML tag —
+// e.g. `Below average <div class="height-revamp-text-small mt-4 opacity-6"
+// slot="end"> Shorter than 5 feet 3 Inches</div>` — which HeightScreen's
+// parseCategoryLabel() splits on. Decode entities only (not stripAndDecodeHtml's
+// label()) so that tag survives for parseCategoryLabel to find; stripping it
+// here would collapse label+subtitle into one plain-text line with no split.
 export async function fetchHeightCategoryOptions(
   gender: string,
 ): Promise<Array<{ key: string; label: string }>> {
@@ -849,7 +1007,7 @@ export async function fetchHeightCategoryOptions(
   const raw  = gender === '0' ? data?.NEWHEIGHTFEMALE : data?.NEWHEIGHTMALE
   const toEntry = (key: string, rawLabel: string) => ({
     key,
-    label: String(rawLabel),   // '~'-delimited "Label~Subtitle" — HeightScreen splits it for display
+    label: decodeEntities(rawLabel),
   })
   if (Array.isArray(raw)) {
     return raw
@@ -889,17 +1047,16 @@ export async function fetchExactHeightGrouped(gender: string): Promise<HeightGro
     const items: Array<{ key: string; label: string }> = []
     if (Array.isArray(group)) {
       group.forEach((item: any) => {
-        const key   = String(item.KEY   ?? item.key   ?? '')
-        const label = String(item.VALUE ?? item.value ?? '')
-        if (key) items.push({ key, label })
+        const key = String(item.KEY ?? item.key ?? '')
+        if (key) items.push({ key, label: label(item.VALUE ?? item.value) })
       })
     } else {
       Object.entries(group).forEach(([key, value]) => {
-        if (key) items.push({ key, label: String(value) })
+        if (key) items.push({ key, label: label(value) })
       })
     }
     if (items.length) {
-      result.push({ title: String(content?.[groupKey] ?? groupKey), data: items })
+      result.push({ title: label(content?.[groupKey] ?? groupKey), data: items })
     }
   })
   return result
@@ -943,7 +1100,7 @@ export async function fetchStates(): Promise<Array<{ key: string; label: string 
 
   if (Array.isArray(stateObj) && stateObj.length > 0) {
     items = stateObj
-      .map((s: any) => ({ key: String(s.STATEID ?? s.key ?? ''), label: String(s.STATE ?? s.value ?? '') }))
+      .map((s: any) => ({ key: String(s.STATEID ?? s.key ?? ''), label: label(s.STATE ?? s.value ?? '') }))
       .filter(o => o.key !== '')
   }
 
@@ -952,10 +1109,10 @@ export async function fetchStates(): Promise<Array<{ key: string; label: string 
     const stateRaw = arrays?.STATE
     if (Array.isArray(stateRaw) && stateRaw.length > 0) {
       items = stateRaw
-        .map((s: any) => ({ key: String(s.STATEID ?? ''), label: String(s.STATE ?? '') }))
+        .map((s: any) => ({ key: String(s.STATEID ?? ''), label: label(s.STATE ?? '') }))
         .filter(o => o.key !== '')
     } else if (stateRaw && typeof stateRaw === 'object') {
-      items = Object.entries(stateRaw).map(([key, value]) => ({ key, label: String(value) }))
+      items = Object.entries(stateRaw).map(([key, value]) => ({ key, label: label(value) }))
     }
   }
 
@@ -966,9 +1123,9 @@ export async function fetchStates(): Promise<Array<{ key: string; label: string 
     const rawArr = res?.RESPONSE?.STATEOBJ
     const rawObj = res?.RESPONSE?.STATE?.[0]
     if (Array.isArray(rawArr) && rawArr.length > 0) {
-      items = rawArr.map((s: any) => ({ key: String(s.STATEID ?? ''), label: String(s.STATE ?? '') })).filter(o => o.key !== '')
+      items = rawArr.map((s: any) => ({ key: String(s.STATEID ?? ''), label: label(s.STATE ?? '') })).filter(o => o.key !== '')
     } else if (rawObj && typeof rawObj === 'object') {
-      items = Object.entries(rawObj).map(([key, value]) => ({ key, label: String(value) }))
+      items = Object.entries(rawObj).map(([key, value]) => ({ key, label: label(value) }))
     }
   }
 
@@ -985,7 +1142,7 @@ export async function fetchCountries(): Promise<Array<{ key: string; label: stri
 
   if (Array.isArray(raw) && raw.length > 0) {
     items = raw
-      .map((c: any) => ({ key: String(c.COUNTRYID ?? c.key ?? ''), label: String(c.COUNTRY ?? c.value ?? '') }))
+      .map((c: any) => ({ key: String(c.COUNTRYID ?? c.key ?? ''), label: label(c.COUNTRY ?? c.value ?? '') }))
       .filter(o => o.key !== '')
   }
 
@@ -1005,9 +1162,9 @@ export async function fetchNriStates(countryId: string): Promise<Array<{ key: st
   let items: Array<{ key: string; label: string }> = []
 
   if (Array.isArray(rawArr) && rawArr.length > 0) {
-    items = rawArr.map((s: any) => ({ key: String(s.STATEID ?? ''), label: String(s.STATE ?? '') })).filter(o => o.key !== '')
+    items = rawArr.map((s: any) => ({ key: String(s.STATEID ?? ''), label: label(s.STATE ?? '') })).filter(o => o.key !== '')
   } else if (rawObj && typeof rawObj === 'object') {
-    items = Object.entries(rawObj).map(([key, value]) => ({ key, label: String(value) }))
+    items = Object.entries(rawObj).map(([key, value]) => ({ key, label: label(value) }))
   }
 
   return items.sort((a, b) => a.label.localeCompare(b.label))
@@ -1029,11 +1186,11 @@ export async function fetchCities(stateId: string): Promise<Array<{ key: string;
     items = rawArr
       .map((c: any) => ({
         key:   String(c.key   ?? c.CITYID ?? c.cityid ?? ''),
-        label: String(c.value ?? c.CITY   ?? c.city   ?? ''),
+        label: label(c.value ?? c.CITY   ?? c.city   ?? ''),
       }))
       .filter(o => o.key !== '')
   } else if (rawObj && typeof rawObj === 'object') {
-    items = Object.entries(rawObj).map(([key, value]) => ({ key, label: String(value) }))
+    items = Object.entries(rawObj).map(([key, value]) => ({ key, label: label(value) }))
   }
 
   return items
@@ -1173,12 +1330,12 @@ function objToOptions(raw: any): Array<{ key: string; label: string }> {
     return raw
       .map(item => ({
         key:   String(item.KEY   ?? item.key   ?? item.CKEY ?? ''),
-        label: String(item.VALUE ?? item.value ?? item.LABEL ?? item.label ?? ''),
+        label: label(item.VALUE ?? item.value ?? item.LABEL ?? item.label ?? ''),
       }))
       .filter(o => o.key)
   }
   if (typeof raw === 'object') {
-    return Object.entries(raw).map(([key, value]) => ({ key, label: String(value) }))
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
   }
   return []
 }
@@ -1342,7 +1499,7 @@ export async function fetchHoroCities(stateId: string): Promise<HoroCity[]> {
 
   const items: HoroCity[] = raw.map((c: any, i: number) => ({
     key:       String(i),
-    label:     String(c.DISTRICT ?? ''),
+    label:     label(c.DISTRICT ?? ''),
     latitude:  String(c.LATITUDE ?? ''),
     longitude: String(c.LONGITUDE ?? ''),
     timezone:  String(c.TIMEZONE ?? ''),

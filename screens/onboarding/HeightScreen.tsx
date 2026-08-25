@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
+import { SvgXml } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import {
@@ -30,7 +31,9 @@ import { CDN_REG, CDN_SVG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
-import { Fonts } from '../../src/theme/fonts'
+import { Fonts, FontsByLanguage } from '../../src/theme/fonts'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import i18n from '../../i18n'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -45,6 +48,14 @@ const CDN_OR_RIGHT = CDN_SVG + 'revamp/or-right-side.svg'
 // this screen's panel uses that exact value, not the shared 85% most other
 // onboarding pickers use (PICKER_PANEL_WIDTH in registration.constants.ts).
 const HEIGHT_PANEL_WIDTH = Dimensions.get('window').width * 0.867
+
+// Angular's dropdown-field arrow is Ionic's "chevron-forward-outline" icon —
+// not a CDN-hosted image but a bundled Ionicons SVG (node_modules/ionicons/
+// dist/svg/chevron-forward-outline.svg), colored via its "black-color" CSS
+// class. Inlined here verbatim (stroke swapped from currentColor to a fixed
+// black, since SvgXml doesn't inherit CSS color) for a pixel-exact match —
+// same icon used on MotherTongueScreen's "select mother tongue" field.
+const CHEVRON_FORWARD_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M184 112l144 144-144 144"/></svg>`
 
 // HEIGHTCATEGORY keys are 101-104 per Angular form-fields logic
 const FALLBACK_CATEGORIES: Category[] = [
@@ -112,7 +123,12 @@ export default function HeightScreen({ navigation }: Props) {
   // Modal's own web-polyfill container while the panel is still mid-transform.
   const scrimAnim = useRef(new Animated.Value(0)).current
 
-  useEffect(() => {
+  // Extracted so a language change can re-run it — the option labels below are
+  // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
+  // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
+  // the stored KEY against the newly translated list. Re-reading storage here does
+  // the same, so the user's selection survives the switch.
+  function loadOptions() {
     Promise.all([
       getRegValue('CREATEDBY'),
       getRegValue('GENDER'),
@@ -146,7 +162,11 @@ export default function HeightScreen({ navigation }: Props) {
         setCategories(FALLBACK_CATEGORIES)
       }).finally(() => setFetching(false))
     })
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  useLanguageReload(loadOptions)
 
   // ─── Panel open/close ─────────────────────────────────────────────────────
 
@@ -200,7 +220,20 @@ export default function HeightScreen({ navigation }: Props) {
     .replace('#PROFILETYPE#', translatedProfileType)
     .replace('  ', ' ')
     .trim()
+  // Angular: GENERAL.OR (registration-revamp.component.html:64/324)
+  const orText = t('GENERAL.OR', 'OR')
+  // Angular's right-side-panel shows a spinner (app-loader), not text, while
+  // DATALIST.length == 0 — but SearchablePicker.tsx uses the app's real
+  // SEARCH.SEARCH_NO_RESULTS copy for this same "nothing to show" case, so
+  // this panel matches that established i18n string instead of a hardcoded one.
+  const noHeightsText = t('SEARCH.SEARCH_NO_RESULTS', 'No results found. Try again')
   const hasSelection = selectedCategory !== null || selectedHeight !== null
+
+  // Poppins for English, the matching NotoSans script for every other
+  // language (e.g. NotoSansTelugu for Telugu) — same per-language family
+  // lookup LanguageSelectionScreen uses, applied here since these category
+  // labels are server-translated and can be in any supported language.
+  const langFonts = FontsByLanguage[i18n.language] ?? FontsByLanguage.en
 
   // Panel slides in from the right
   const panelTranslateX = slideAnim.interpolate({
@@ -253,49 +286,6 @@ export default function HeightScreen({ navigation }: Props) {
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
         ) : (
           <>
-            {/* Category radio rows */}
-            {categories.map((cat, idx) => {
-              const isSelected = selectedCategory === cat.key
-              const isLast     = idx === categories.length - 1
-              return (
-                <Pressable
-                  key={cat.key}
-                  style={[
-                    styles.row,
-                    !isLast && styles.rowBorder,
-                    isSelected && styles.rowSelected,
-                  ]}
-                  onPress={() => selectCategory(cat.key)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: isSelected }}
-                  accessibilityLabel={cat.label}
-                >
-                  <View style={styles.rowLabels}>
-                    <Text style={[styles.rowLabel, isSelected && styles.rowLabelSelected]}>
-                      {cat.label}
-                    </Text>
-                    {!!cat.subtitle && (
-                      <Text style={[styles.rowSubtitle, isSelected && styles.rowSubtitleSelected]}>
-                        {cat.subtitle}
-                      </Text>
-                    )}
-                  </View>
-
-                  <View style={[styles.radio, isSelected && styles.radioSelected]}>
-                    {isSelected && <Text style={styles.radioTick}>✓</Text>}
-                  </View>
-                </Pressable>
-              )
-            })}
-
-            {/* OR divider — same left/right fade image design as DOBScreen,
-                instead of the plain colored lines this screen drew before. */}
-            <View style={styles.orRow}>
-              <Image source={{ uri: CDN_OR_LEFT }} style={styles.orLine} contentFit="contain" />
-              <Text style={styles.orText}>OR</Text>
-              <Image source={{ uri: CDN_OR_RIGHT }} style={styles.orLine} contentFit="contain" />
-            </View>
-
             {/* "Select exact height" field — Angular: REGISTRATION.HEIGHTLINKTXT
                 ("I know my #PROFILETYPE# exact height"), not a hardcoded
                 "Select ... exact height". Once an exact height is chosen, a
@@ -321,9 +311,52 @@ export default function HeightScreen({ navigation }: Props) {
                     ? selectedHeight.label
                     : linkText}
                 </Text>
-                <Text style={styles.exactFieldArrow}>›</Text>
+                <SvgXml xml={CHEVRON_FORWARD_XML} width={24} height={24} />
               </Pressable>
             </View>
+
+            {/* OR divider — same left/right fade image design as DOBScreen,
+                instead of the plain colored lines this screen drew before. */}
+            <View style={styles.orRow}>
+              <Image source={{ uri: CDN_OR_LEFT }} style={styles.orLine} contentFit="contain" />
+              <Text style={styles.orText}>{orText}</Text>
+              <Image source={{ uri: CDN_OR_RIGHT }} style={styles.orLine} contentFit="contain" />
+            </View>
+
+            {/* Category radio rows */}
+            {categories.map((cat, idx) => {
+              const isSelected = selectedCategory === cat.key
+              const isLast     = idx === categories.length - 1
+              return (
+                <Pressable
+                  key={cat.key}
+                  style={[
+                    styles.row,
+                    !isLast && styles.rowBorder,
+                    isSelected && styles.rowSelected,
+                  ]}
+                  onPress={() => selectCategory(cat.key)}
+                  accessibilityRole="radio"
+                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={cat.label}
+                >
+                  <View style={styles.rowLabels}>
+                    <Text style={[styles.rowLabel, { fontFamily: langFonts.medium }]}>
+                      {cat.label}
+                    </Text>
+                    {!!cat.subtitle && (
+                      <Text style={[styles.rowSubtitle, { fontFamily: langFonts.regular }]}>
+                        {cat.subtitle}
+                      </Text>
+                    )}
+                  </View>
+
+                  <View style={[styles.radio, isSelected && styles.radioSelected]}>
+                    {isSelected && <View style={styles.radioDot} />}
+                  </View>
+                </Pressable>
+              )
+            })}
           </>
         )}
       </ScrollView>
@@ -345,13 +378,11 @@ export default function HeightScreen({ navigation }: Props) {
       >
         <View style={styles.panelContainer}>
           {/* Animated scrim — pointer-events none so it doesn't block the
-              TouchableWithoutFeedback below. Angular's right-side panel uses
-              a fully transparent ion-backdrop (global.scss:3791-3795), so this
-              stays subtle rather than a dark dim. */}
+              TouchableWithoutFeedback below. */}
           <Animated.View
             style={[
               StyleSheet.absoluteFill,
-              { backgroundColor: Colors.black, opacity: scrimAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.15] }) },
+              { backgroundColor: Colors.black, opacity: scrimAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }) },
             ]}
             pointerEvents="none"
           />
@@ -380,7 +411,7 @@ export default function HeightScreen({ navigation }: Props) {
 
             {heightGroups.length === 0 ? (
               <View style={styles.panelEmpty}>
-                <Text style={styles.panelEmptyText}>No heights available</Text>
+                <Text style={styles.panelEmptyText}>{noHeightsText}</Text>
               </View>
             ) : (
               <SectionList
@@ -446,48 +477,43 @@ const styles = StyleSheet.create({
 
   rowLabels: { flex: 1 },
 
-  // Angular: body1-medium-14 (radio.component.html, TYPE=type-2) — Poppins-Medium
+  // Angular: body1-medium-14 (radio.component.html, TYPE=type-2) — weight stays
+  // constant on selection (only the row background + radio dot change); the
+  // fontFamily itself is set inline per the app's current language.
   rowLabel: {
-    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
-    fontWeight: '400',
+    fontWeight: '500',
     color:      Colors.textPrimary,
   },
-  rowLabelSelected: {
-    fontWeight: '500',
-  },
 
-  // Angular: body2-regular-14 (radio.component.html) — Poppins-Regular
+  // Angular: body2-regular-14 (radio.component.html)
   rowSubtitle: {
-    fontFamily: Fonts.poppinsRegular,
-    fontSize:   14,
+    fontSize:   13,
     fontWeight: '400',
     color:      'rgba(0,0,0,0.6)',
     marginTop:  2,
   },
-  rowSubtitleSelected: {
-    fontWeight: '500',
-  },
 
-  // Radio — 20×20, 1px border (Figma: border-[#545454])
+  // Radio — 22×22 unfilled ring; selection shows as a filled pink dot inside,
+  // not a checkmark, matching Angular's ion-radio control (radio.component.html).
   radio: {
-    width:           20,
-    height:          20,
-    borderRadius:    10,
-    borderWidth:     1,
-    borderColor:     '#545454',
+    width:           22,
+    height:          22,
+    borderRadius:    11,
+    borderWidth:     1.5,
+    borderColor:     '#8A8A8A',
     alignItems:      'center',
     justifyContent:  'center',
   },
   radioSelected: {
     borderColor:     Colors.primaryDark,
-    backgroundColor: Colors.primaryDark,
+    backgroundColor: Colors.surface,
   },
-  radioTick: {
-    color:      Colors.surface,
-    fontSize:   10,
-    fontWeight: '700',
-    lineHeight: 12,
+  radioDot: {
+    width:           12,
+    height:          12,
+    borderRadius:    6,
+    backgroundColor: Colors.primaryDark,
   },
 
   // OR divider — same left/right fade image assets + text style as DOBScreen
@@ -500,13 +526,13 @@ const styles = StyleSheet.create({
   orLine: {
     flex:    1,
     height:  8,
-    opacity: 1,
+    opacity: 20,
   },
   // Angular: body2-regular-14 (registration-revamp.component.html:64) — Poppins-Regular
   orText: {
     fontFamily:       Fonts.poppinsRegular,
     fontSize:         14,
-    color:            'rgba(0,0,0,0.5)',
+    color:            Colors.textPrimary,
     marginHorizontal: 16,
   },
 
@@ -552,11 +578,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color:      Colors.textPrimary,
   },
-  exactFieldArrow: {
-    fontSize:   22,
-    color:      Colors.textPrimary,
-    lineHeight: 26,
-  },
 
   // Right-side sliding panel (Angular right-side-panel.component.scss: width 86.7%)
   panelContainer: {
@@ -572,6 +593,10 @@ const styles = StyleSheet.create({
     shadowOpacity:   0.2,
     shadowOffset:    { width: -2, height: 0 },
     shadowRadius:    8,
+    // Clips header/section/list text to the panel's bounds — without this,
+    // the sliding transform could let text render a hair past the left edge
+    // mid-animation instead of staying flush inside the sheet.
+    overflow:        'hidden',
   },
   panelHeader: {
     flexDirection:     'row',

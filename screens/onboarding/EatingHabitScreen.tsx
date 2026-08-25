@@ -20,6 +20,9 @@ import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
+import { Fonts } from '../../src/theme/fonts'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -44,6 +47,7 @@ type Props = {
 
 export default function EatingHabitScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [options,    setOptions]    = useState<Option[]>([])
   const [fetching,   setFetching]   = useState(true)
@@ -51,7 +55,12 @@ export default function EatingHabitScreen({ navigation }: Props) {
   const [createdBy,  setCreatedBy]  = useState('4')
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => {
+  // Extracted so a language change can re-run it — the option labels below are
+  // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
+  // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
+  // the stored KEY against the newly translated list. Re-reading storage here does
+  // the same, so the user's selection survives the switch.
+  function loadOptions() {
     Promise.all([
       getRegValue('CREATEDBY'),
       getRegValue('EATING'),
@@ -64,7 +73,11 @@ export default function EatingHabitScreen({ navigation }: Props) {
         .catch(() => setOptions(FALLBACK_OPTIONS))
         .finally(() => setFetching(false))
     })
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  useLanguageReload(loadOptions)
 
   const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
   const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
@@ -103,7 +116,7 @@ export default function EatingHabitScreen({ navigation }: Props) {
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
-        <Text style={os.title}>{title}</Text>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -123,7 +136,7 @@ export default function EatingHabitScreen({ navigation }: Props) {
                   <View style={[styles.chipIcon, isSelected && styles.chipIconSelected]}>
                     {isSelected && <Text style={styles.checkmark}>✓</Text>}
                   </View>
-                  <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected]}>
+                  <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected, { fontFamily: langFonts.regular }]}>
                     {opt.label}
                   </Text>
                 </Pressable>
@@ -179,12 +192,14 @@ const styles = StyleSheet.create({
   },
 
   checkmark: {
+    fontFamily: Fonts.poppinsBold,
     color:      Colors.surface,
     fontSize:   11,
     fontWeight: '700',
     lineHeight: 13,
   },
 
+  // Angular: body2-regular-14 (radio.component.html:13, TYPE=type-1) — Poppins-Regular
   chipLabel: {
     fontSize:   14,
     fontWeight: '400',

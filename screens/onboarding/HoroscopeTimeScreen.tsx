@@ -16,6 +16,7 @@ import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 // Angular pageType 31 — birth-time picker. Figma shows a scrolling wheel with
@@ -42,6 +43,7 @@ type Props = {
 
 export default function HoroscopeTimeScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [createdBy,  setCreatedBy]  = useState('4')
   const [selHour,    setSelHour]    = useState('')
@@ -179,7 +181,7 @@ export default function HoroscopeTimeScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
-        <Text style={os.title}>{title}</Text>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         <View style={styles.fieldsRow}>
           {(
@@ -192,7 +194,7 @@ export default function HoroscopeTimeScreen({ navigation }: Props) {
             const isOpen = pickerField === field
             return (
               <View key={field} style={styles.fieldWrapper}>
-                {!!label && <Text style={styles.fieldLabel}>{label}</Text>}
+                {!!label && <Text style={[styles.fieldLabel, { fontFamily: langFonts.medium }]}>{label}</Text>}
                 <View
                   ref={ref as any}
                   style={[styles.field, isOpen && styles.fieldOpen]}

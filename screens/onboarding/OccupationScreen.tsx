@@ -9,27 +9,29 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
+import { SvgXml } from 'react-native-svg'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
-import FloatingLabelInput from '../../components/input/FloatingLabelInput'
 import { Colors } from '../../constants/colors'
 import {
   callPartialRegistrationAPI,
   fetchOccupationOptions,
   getRegValues,
-  isJobDetailEligible,
-  isValidJobDetailFormat,
   setRegValue,
   getRegValue,
-  updateFewMoreDetail,
 } from '../../service/registrationService'
 import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'occupation.svg'
+// Angular's dropdown-field arrow is Ionic's "chevron-forward-outline" icon —
+// same one MotherTongueScreen/HeightScreen inline, for a pixel-exact match.
+const CHEVRON_FORWARD_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M184 112l144 144-144 144"/></svg>`
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -44,6 +46,7 @@ type Props = {
 
 export default function OccupationScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [allOptions,   setAllOptions]   = useState<Option[]>([])
   const [fetching,     setFetching]     = useState(true)
@@ -53,19 +56,19 @@ export default function OccupationScreen({ navigation }: Props) {
   const [submitting,   setSubmitting]   = useState(false)
   const [panelVisible, setPanelVisible] = useState(false)
 
-  // ── Job Detail (JODII-490) — dependent optional free-text field, hidden
-  // when occupation is "Not working" (isJobDetailEligible). ────────────────
-  const [jobDetail, setJobDetail] = useState('')
-
-  useEffect(() => {
+  // Extracted so a language change can re-run it — the option labels below are
+  // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
+  // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
+  // the stored KEY against the newly translated list. Re-reading storage here does
+  // the same, so the user's selection survives the switch.
+  function loadOptions() {
     Promise.all([
       getRegValue('CREATEDBY'),
       getRegValues(),
     ]).then(([cb, rv]) => {
-      const { GENDER: gnd, OCCUPATION: savedOcc, JOBDETAIL: savedJobDetail } = rv as Record<string, string>
+      const { GENDER: gnd, OCCUPATION: savedOcc } = rv as Record<string, string>
       if (cb)  setCreatedBy(cb)
       if (gnd) setGender(gnd)
-      if (savedJobDetail) setJobDetail(savedJobDetail)
 
       fetchOccupationOptions()
         .then(list => {
@@ -78,7 +81,11 @@ export default function OccupationScreen({ navigation }: Props) {
         .catch(() => {})
         .finally(() => setFetching(false))
     })
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  useLanguageReload(loadOptions)
 
   const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
   const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
@@ -88,29 +95,16 @@ export default function OccupationScreen({ navigation }: Props) {
     .trim()
   const nextPage   = gender === '1' ? '12' : '13'
 
-  const jobDetailEligible = isJobDetailEligible(selected?.key ?? '')
-  const jobDetailValid    = isValidJobDetailFormat(jobDetail)
+  // Angular: registration.config.ts LISTDATA — ISLABEL/LABEL: OCCUPATIONLABEL,
+  // PLACEHOLDERTXT: SELECTOCCUPATION, ISSHOWSEARCHBAR: false.
+  const fieldLabelText = t('REGISTRATION.OCCUPATIONLABEL', 'Occupation')
+  const placeholderText = t('REGISTRATION.SELECTOCCUPATION', 'Select occupation')
 
   async function handleNext() {
     if (!selected || submitting) return
     setSubmitting(true)
     try {
       await setRegValue('OCCUPATION', selected.key)
-
-      // Job Detail is optional and never blocks Next (same convention as
-      // CasteScreen's Subcaste) — an invalid-format value is simply not
-      // persisted rather than blocking the user. Fire-and-forget save +
-      // silent retroactive clear on server rejection mirrors Angular's
-      // current (2026-08-14) onboarding behavior — see
-      // updateFewMoreDetail()'s header comment.
-      const jobDetailValue = jobDetailEligible && jobDetailValid ? jobDetail.trim() : ''
-      await setRegValue('JOBDETAIL', jobDetailValue)
-      if (jobDetailEligible) {
-        updateFewMoreDetail('OCCDETAILS', jobDetailValue).then(({ valid }) => {
-          if (!valid) setRegValue('JOBDETAIL', '')
-        }).catch(() => {})
-      }
-
       navigation.push('onboarding', { pageNo: nextPage })
       callPartialRegistrationAPI()
     } catch {
@@ -137,50 +131,52 @@ export default function OccupationScreen({ navigation }: Props) {
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
-        <Text style={os.title}>{title}</Text>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
         ) : (
-          <Pressable
-            style={[styles.selectField, !!selected && styles.selectFieldActive]}
-            onPress={() => setPanelVisible(true)}
-            accessibilityRole="button"
-            accessibilityLabel="Select occupation"
-          >
-            <Text
-              style={[styles.selectFieldText, !!selected && styles.selectFieldTextActive]}
-              numberOfLines={1}
+          // Angular: registration-revamp.component.ts's enablePlaceHolder() —
+          // the floating "Occupation" label only appears once a value is
+          // selected, same conditional pattern as HeightScreen's exact-height field.
+          <View style={styles.selectFieldWrapper}>
+            {!!selected && (
+              <View style={styles.selectFieldLabel} pointerEvents="none">
+                <Text style={[styles.selectFieldLabelText, { fontFamily: langFonts.regular }]}>
+                  {fieldLabelText}
+                </Text>
+              </View>
+            )}
+            <Pressable
+              style={styles.selectField}
+              onPress={() => setPanelVisible(true)}
+              accessibilityRole="button"
+              accessibilityLabel="Select occupation"
             >
-              {selected ? selected.label : 'Select occupation'}
-            </Text>
-            <Text style={styles.selectFieldArrow}>›</Text>
-          </Pressable>
-        )}
-
-        {/* ── Job Detail (JODII-490) — optional, hidden when "Not working" ── */}
-        {!fetching && jobDetailEligible && (
-          <FloatingLabelInput
-            label={t('REGISTRATION.JOBDETAIL', 'Job details')}
-            value={jobDetail}
-            onChangeText={setJobDetail}
-            errorMessage={jobDetail && !jobDetailValid ? t('REGISTRATION.OCCUPATION_TXT', 'Please provide a valid occupation') : undefined}
-            maxLength={60}
-            style={styles.jobDetailInput}
-          />
+              <Text
+                style={[
+                  styles.selectFieldText,
+                  !!selected && styles.selectFieldTextActive,
+                  { fontFamily: selected ? langFonts.medium : langFonts.regular },
+                ]}
+                numberOfLines={1}
+              >
+                {selected ? selected.label : placeholderText}
+              </Text>
+              <SvgXml xml={CHEVRON_FORWARD_XML} width={24} height={24} />
+            </Pressable>
+          </View>
         )}
       </ScrollView>
 
       <SearchablePicker
         visible={panelVisible}
-        title="Select occupation"
-        placeholder="Search occupation..."
+        title={placeholderText}
+        placeholder=""
+        hideSearch
         options={allOptions}
         selectedKey={selected?.key ?? null}
-        onSelect={(opt) => {
-          setSelected(opt)
-          if (opt.key !== selected?.key && !isJobDetailEligible(opt.key)) setJobDetail('')
-        }}
+        onSelect={(opt) => setSelected(opt)}
         onClose={() => setPanelVisible(false)}
       />
     </View>
@@ -192,6 +188,23 @@ export default function OccupationScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   loader: { marginTop: 48 },
 
+  selectFieldWrapper: {
+    position:  'relative',
+    marginTop: 8,
+  },
+  selectFieldLabel: {
+    position:          'absolute',
+    top:               -8,
+    left:              12,
+    backgroundColor:   Colors.surface,
+    paddingHorizontal: 4,
+    zIndex:            10,
+  },
+  selectFieldLabelText: {
+    fontSize:   12,
+    fontWeight: '400',
+    color:      Colors.textPrimary,
+  },
   selectField: {
     flexDirection:   'row',
     alignItems:      'center',
@@ -203,7 +216,6 @@ const styles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
-  selectFieldActive: {},
   selectFieldText: {
     flex:       1,
     fontSize:   14,
@@ -212,13 +224,5 @@ const styles = StyleSheet.create({
   },
   selectFieldTextActive: {
     fontWeight: '500',
-  },
-  selectFieldArrow: {
-    fontSize:   22,
-    color:      Colors.textPrimary,
-    lineHeight: 26,
-  },
-  jobDetailInput: {
-    marginTop: 32,
   },
 })

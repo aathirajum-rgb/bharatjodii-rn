@@ -14,6 +14,7 @@
 import { useEffect, useState } from 'react'
 import OnboardingDesktopLayout, { DesktopSectionTitle } from './OnboardingDesktopLayout'
 import DesktopSelectField, { type SelectOption } from '../../components/desktop-select-field/DesktopSelectField'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
 import {
   callPartialRegistrationAPI, fetchCities, fetchEatingHabitOptions, fetchMonthlyIncomeOptions,
   fetchOccupationOptions, fetchQualificationOptions, fetchStates, getRegValues, setRegValues,
@@ -44,7 +45,12 @@ export default function EducationLocationDesktopStep({ navigation }: Props) {
   const [eatingOptions, setEatingOptions] = useState<SelectOption[]>([])
   const [eating, setEating] = useState<string | null>(null)
 
-  useEffect(() => {
+  // Extracted so a language change can re-run it — the option labels below are
+  // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
+  // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
+  // the stored KEY against the newly translated list. Re-reading storage here does
+  // the same, so the user's selection survives the switch.
+  function loadOptions() {
     getRegValues().then(async rv => {
       if (rv.QUALIFICATION) setQualification(rv.QUALIFICATION)
       if (rv.OCCUPATION) setOccupation(rv.OCCUPATION)
@@ -71,7 +77,11 @@ export default function EducationLocationDesktopStep({ navigation }: Props) {
         try { setCityOptions(await fetchCities(rv.STATE)) } finally { setFetchingCities(false) }
       }
     })
-  }, [])
+  }
+
+  useEffect(() => { loadOptions() }, [])
+
+  useLanguageReload(loadOptions)
 
   async function handleSelectState(opt: SelectOption) {
     setState(opt.key)

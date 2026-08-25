@@ -4,7 +4,7 @@ const stg: IEnvConfig = {
   env:        'stg',
   production: false,
   release:    '138',
-  api:        'https://stgoapi.jodii.app/',
+ api:        'https://stgoapi.jodii.app/',
   payment:    'https://stgoapi.jodii.app/',
   paymentNg:  'https://stgng.jodii.app/',
   notify:     'https://stgmc.jodii.app/',

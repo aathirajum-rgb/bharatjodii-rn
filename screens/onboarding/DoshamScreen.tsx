@@ -22,6 +22,8 @@ import { CDN_REG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
+import { useLanguageReload } from '../../hooks/useLanguageReload'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -40,6 +42,7 @@ type Props = {
 
 export default function DoshamScreen({ navigation }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   // null = step 1 (yes/no not answered); true = step 2 (yes); false = submitted no
   const [hasDosham,    setHasDosham]    = useState<boolean | null>(null)
@@ -62,8 +65,7 @@ export default function DoshamScreen({ navigation }: Props) {
     })
   }, [])
 
-  async function handleYes() {
-    setHasDosham(true)
+  async function loadDoshamTypes() {
     setFetching(true)
     try {
       const { doshamHash } = await fetchDoshamOptions(star, raasi, motherTongue)
@@ -74,6 +76,16 @@ export default function DoshamScreen({ navigation }: Props) {
       setFetching(false)
     }
   }
+
+  async function handleYes() {
+    setHasDosham(true)
+    await loadDoshamTypes()
+  }
+
+  // Unlike the other onboarding screens this list is fetched on demand (the "Yes"
+  // branch), not on mount — so only re-fetch when it is actually on screen.
+  // Selection is held as KEYs in `selectedKeys`, so it survives the re-label.
+  useLanguageReload(() => { if (hasDosham) loadDoshamTypes() })
 
   async function handleNo() {
     if (submitting) return
@@ -150,7 +162,7 @@ export default function DoshamScreen({ navigation }: Props) {
       >
         <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
 
-        <Text style={os.title}>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>
           {title}
         </Text>
 
@@ -198,7 +210,7 @@ export default function DoshamScreen({ navigation }: Props) {
         {/* ── Step 2: Dosham type multi-select ── */}
         {hasDosham === true && (
           <>
-            <Text style={styles.subTitle}>
+            <Text style={[styles.subTitle, { fontFamily: langFonts.regular }]}>
               {t('DOSHAM_SUBCONTENT', 'You can choose one or more dosham')}
             </Text>
 
@@ -216,7 +228,7 @@ export default function DoshamScreen({ navigation }: Props) {
                       accessibilityRole="checkbox"
                       accessibilityState={{ checked }}
                     >
-                      <Text style={[styles.checkLabel, checked && styles.checkLabelActive]}>
+                      <Text style={[styles.checkLabel, checked && styles.checkLabelActive, { fontFamily: langFonts.regular }]}>
                         {opt.label}
                       </Text>
                       <View style={[styles.checkbox, checked && styles.checkboxChecked]}>

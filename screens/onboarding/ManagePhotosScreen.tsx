@@ -11,9 +11,11 @@ import {
   View,
 } from 'react-native'
 import Svg, { Path, Polyline, Rect, Line } from 'react-native-svg'
+import { useTranslation } from 'react-i18next'
 import { Colors } from '../../constants/colors'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
+import { getFewMoreDetailsNextPage } from './fewMoreDetailsFlow'
 import { Endpoints } from '../../service/api.endpoints'
 import { apiCall } from '../../service/apiClient'
 import { StorageKeys as SK } from '../../constants/storage.keys'
@@ -126,6 +128,7 @@ function InfoIcon() {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ManagePhotosScreen({ navigation, route }: Props) {
+  const { t, i18n } = useTranslation()
   const pendingUri  = (route.params as any)?.pendingUri as string | undefined
   const standalone  = !!(route.params as any)?.standalone
 
@@ -134,13 +137,21 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
   const [createdBy, setCreatedBy] = useState('1')
 
   useOnboardingFooter({
-    nextLabel:    'Confirm',
+    nextLabel:    t('REGISTRATION.CONFIRM', 'Confirm'),
     nextDisabled: false,
     // Angular: editform/20 (help-center.component.ts PageNavigation 'Add Photo')
     // returns to frm_page on save — standalone entry mirrors that instead of
     // always continuing the signup wizard to page 27.
-    onNext:       () => standalone ? navigation.goBack() : navigation.push('onboarding', { pageNo: '27' }),
-  }, [navigation, standalone])
+    // Angular: uploadPhotoSuccess() routes through getFewMoreDetailsNext('20'),
+    // so a completed photo upload enters the same conditional 34/35 chain.
+    onNext:       () => {
+      if (standalone) { navigation.goBack(); return }
+      getFewMoreDetailsNextPage('20').then(next =>
+        navigation.push('onboarding', { pageNo: next }))
+    },
+    // i18n.language: nextLabel is translated, so the footer state must be
+    // re-pushed when the language changes or the button keeps the old wording.
+  }, [navigation, standalone, i18n.language])
 
   useEffect(() => {
     getRegValue('CREATEDBY').then(v => { if (v) setCreatedBy(v) })
