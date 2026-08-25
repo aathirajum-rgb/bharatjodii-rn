@@ -5,6 +5,7 @@ import { useCallback } from 'react'
 import { ActivityIndicator, View } from 'react-native'
 import FLAVORS from '../constants/flavorConfig'
 import { useAuth } from '../contexts/AuthContext'
+import type { ProfileDeactivateInfo } from '../components/auth/ProfileDeactivatedModal'
 import { refreshSession } from '../service/homeService'
 import { getItem, setItem } from '../service/storageService'
 import { navigationRef } from '../utils/navigationRef'
@@ -51,23 +52,30 @@ const linking = {
 // Fires on EVERY screen navigation. Calls refreshSession() only if ≥1 hour has
 // passed since the last autologin — same condition as Angular's _diffHours >= 1.
 
-async function guardCheck(isAuthenticated: boolean) {
+async function guardCheck(
+  isAuthenticated: boolean,
+  handleDeactivation: (info: ProfileDeactivateInfo) => Promise<void>,
+) {
   if (!isAuthenticated) return
   const lastAt    = await getItem('LASTAPPLOGINAT')
   const diffHours = lastAt ? Math.abs(Date.now() - Date.parse(lastAt)) / 3600000 : 999
   if (diffHours >= 1) {
-    await refreshSession()
+    const { deactivateInfo } = await refreshSession()
+    if (deactivateInfo) {
+      await handleDeactivation(deactivateInfo)
+      return   // session already cleared — don't stamp a fresh LASTAPPLOGINAT
+    }
     await setItem('LASTAPPLOGINAT', new Date().toISOString())
   }
 }
 
 export default function RootNavigation() {
-  const { isAuthenticated, loading } = useAuth()
+  const { isAuthenticated, loading, handleDeactivation } = useAuth()
 
   // onStateChange fires on every screen navigation — equivalent to canActivate
   const handleStateChange = useCallback(() => {
-    guardCheck(isAuthenticated)
-  }, [isAuthenticated])
+    guardCheck(isAuthenticated, handleDeactivation)
+  }, [isAuthenticated, handleDeactivation])
 
   // Blank while we check AsyncStorage — prevents a flash of the wrong stack
   if (loading) {

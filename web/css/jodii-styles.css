@@ -8182,6 +8182,16 @@ a:hover {
     font-size: 0.875rem;
     min-height: 2.5rem;
     min-width: 100px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+.login-btn:hover {
+    color: #B50033;
+    background: #FFF2F6;
 }
 
 /* Logo */
