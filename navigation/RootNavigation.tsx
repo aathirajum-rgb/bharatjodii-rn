@@ -1,7 +1,9 @@
 import { NavigationContainer } from '@react-navigation/native'
+import Constants from 'expo-constants'
 import * as Linking from 'expo-linking'
 import { useCallback } from 'react'
 import { ActivityIndicator, View } from 'react-native'
+import FLAVORS from '../constants/flavorConfig'
 import { useAuth } from '../contexts/AuthContext'
 import { refreshSession } from '../service/homeService'
 import { getItem, setItem } from '../service/storageService'
@@ -10,9 +12,16 @@ import AppStack from './AppStack'
 import AuthStack from './AuthStack'
 
 // ─── Deep-link config ─────────────────────────────────────────────────────────
+// Each build only declares an App Links / Associated Domains intent filter for
+// its OWN flavor's domain (app.config.js: `f.domain`) — so only that domain can
+// ever arrive here verified. Resolving it from flavorConfig via the current
+// build's `appFlavor` (also injected by app.config.js) covers all 55 flavors
+// instead of a fixed 3-domain list that only worked for jodii/tamil/malayalam.
 
 function getLinkingPrefixes() {
-  const base = ['https://jodii.app', 'https://tamil.jodii.app', 'https://malayalam.jodii.app']
+  const appFlavor = Constants.expoConfig?.extra?.appFlavor ?? 'jodii'
+  const domain    = (FLAVORS as Record<string, { domain: string }>)[appFlavor]?.domain ?? FLAVORS.jodii.domain
+  const base = [`https://${domain}`]
   try { base.unshift(Linking.createURL('/')) } catch {}
   return base
 }

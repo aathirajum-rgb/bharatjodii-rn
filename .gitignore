@@ -28,6 +28,10 @@ envs/.env.*
 android/app/google-services.json
 ios/GoogleService-Info.plist
 
+# Release signing keystore — real production key, never commit
+android/app/*.keystore
+android/app/*.jks
+
 # Playwright MCP debug logs/snapshots — not project source
 .playwright-mcp/
 

@@ -1,7 +1,7 @@
 import axios, { AxiosRequestConfig } from 'axios'
 import { getItem, setItem, getMultiple, setMultiple, removeMultiple } from './storageService'
 import { StorageKeys } from '../constants/storage.keys'
-import { AUTH_ONLY_ENDPOINTS, APPTYPE_ONLY_ENDPOINTS, MEDIA_ENDPOINTS } from './api.endpoints'
+import { AUTH_ONLY_ENDPOINTS, APPTYPE_ONLY_ENDPOINTS, MEDIA_ENDPOINTS, Endpoints } from './api.endpoints'
 
 // ─────────────────────────────────────────────────────────────
 //  LOGOUT CALLBACK
@@ -43,15 +43,22 @@ async function buildCommonParams(url: string): Promise<string> {
   const token = atn     ?? ''
   const rToken= rtn     ?? ''
 
-  const isApptypeOnly = APPTYPE_ONLY_ENDPOINTS.includes(url)
-  const isAuthOnly    = AUTH_ONLY_ENDPOINTS.includes(url)
-  const isRegInsert   = url.includes('registration/insert')
+  const isApptypeOnly   = APPTYPE_ONLY_ENDPOINTS.includes(url)
+  const isAuthOnly      = AUTH_ONLY_ENDPOINTS.includes(url)
+  const isRegInsert     = url.includes('registration/insert')
+  const isSwitchLanguage = url === Endpoints.auth.switchLanguage
 
-  // Angular httpservice matches:
-  //   initialfetch → &APPTYPE only (LANG already in params, no ATN/RTN)
-  //   login/otp    → &APPTYPE&LANG (no ATN/RTN)
-  //   everything else → &APPTYPE&LANG&ATN&RTN
+  // Angular httpservice.service.ts:237-244 matches:
+  //   initialfetch      → &APPTYPE only (LANG already in params, no ATN/RTN)
+  //   switchlanguage    → &APPTYPE&ATN&RTN (LANG already in params — this
+  //                        endpoint's own caller always sends its own LANG;
+  //                        appending it again here double-sends the param,
+  //                        which the server has been observed to reject with
+  //                        a generic "technical difficulties" ERRCODE 1)
+  //   login/otp         → &APPTYPE&LANG (no ATN/RTN)
+  //   everything else   → &APPTYPE&LANG&ATN&RTN
   if (isApptypeOnly || isRegInsert) return `&APPTYPE=${type}`
+  if (isSwitchLanguage)             return `&APPTYPE=${type}&ATN=${token}&RTN=${rToken}`
   if (isAuthOnly)                   return `&APPTYPE=${type}&LANG=${l}`
   return `&APPTYPE=${type}&LANG=${l}&ATN=${token}&RTN=${rToken}`
 }

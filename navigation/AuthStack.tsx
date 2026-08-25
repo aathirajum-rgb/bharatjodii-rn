@@ -1,4 +1,5 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import ExternalPageScreen from '../screens/external-page/ExternalPageScreen'
 import LanguageSelectionScreen from '../screens/LanguageSelectionScreen'
 import LoginScreen from '../screens/auth/LoginScreen'
 import OTPScreen from '../screens/auth/OTPScreen'
@@ -11,6 +12,7 @@ export type AuthStackParamList = {
   LanguageSelection: undefined
   login:             undefined
   otp:               { mobile: string; countryCode: string; matriId: string }
+  ExternalPage:      { url: string; title: string }
 }
 
 // ─── Stack ────────────────────────────────────────────────────────────────────
@@ -38,6 +40,7 @@ export default function AuthStack() {
 
       <Stack.Screen name="login" component={LoginScreen} />
       <Stack.Screen name="otp"   component={OTPScreen} />
+      <Stack.Screen name="ExternalPage" component={ExternalPageScreen} />
 
     </Stack.Navigator>
   )

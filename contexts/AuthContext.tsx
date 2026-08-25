@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
+import { Platform } from 'react-native'
 import { getItem } from '../service/storageService'
 import { StorageKeys } from '../constants/storage.keys'
 import { registerLogoutCallback } from '../service/apiClient'
@@ -6,8 +7,10 @@ import { getSessionValue } from '../service/registrationService'
 import { loadDrProfiles } from '../service/drService'
 import { refreshSession } from '../service/homeService'
 import { handlePageLanding } from '../service/pageLandingService'
-import { waitForNavigationReady } from '../utils/navigationRef'
+import { waitForNavigationReady, resetTo } from '../utils/navigationRef'
 import { requestPermissionAndGetToken } from '../service/notificationService'
+import { getInitialWebviewHandoff, applyWebviewHandoff } from '../service/webviewHandoffService'
+import { ENavigation } from '../types/enums/navigation.enum'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -56,6 +59,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logoutRef = useRef<() => void>(() => {})
 
   async function checkAuth() {
+    // Native-app / deep-link handoff — #/webview/:type/:param/:page_id/:token
+    // (or the 5-segment buildparam.REGISTER=='1' fresh-registration variant).
+    // Checked first, before the normal stored-token path: a fresh browser tab
+    // arriving this way has nothing in storage yet for the check below to find.
+    if (Platform.OS === 'web') {
+      const handoff = getInitialWebviewHandoff()
+      if (handoff) {
+        try {
+          window.history.replaceState(null, '', window.location.pathname + window.location.search)
+        } catch {}
+        const result = await applyWebviewHandoff(handoff)
+        if (result) {
+          const isNewUser = handoff.buildparam?.REGISTER === '1'
+          const initialRoute = await resolveInitialRoute(isNewUser)
+          setState({ isAuthenticated: true, userId: result.userId, loading: false, isNewUser, initialRoute })
+          requestPermissionAndGetToken()
+          const ready = await waitForNavigationReady()
+          if (ready) {
+            if (isNewUser) {
+              // Fresh-registration handoff — same as loginUpdate's own
+              // goToOnboarding path, this bypasses handlePageLanding's
+              // REGISTERURL-resume dispatch entirely: OnboardingRouter's own
+              // mount effect (AppStack.tsx) would otherwise immediately
+              // overwrite REGISTERURL back to its default pageNo ('1') before
+              // handlePageLanding gets a chance to read the '2' we just seeded.
+              resetTo(ENavigation.ONBOARDING, { pageNo: '2' })
+            } else {
+              await handlePageLanding(result.pageId, result.userId)
+            }
+          }
+          return
+        }
+        // No usable user resolved (malformed/partial handoff) — fall through
+        // to the normal stored-token check below instead of stranding the user.
+      }
+    }
+
     const [token, userId] = await Promise.all([
       getItem(StorageKeys.Auth.TOKEN),
       getItem(StorageKeys.Auth.USER_ID),

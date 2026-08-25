@@ -43,7 +43,7 @@ const FLAVORS = {
     scheme: 'telugujodii',
     domain: 'telugu.jodii.app',
     welcomeText: 'Welcome to Telugu Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/telugu_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.telugu',
   },
   kannada: {
@@ -53,7 +53,7 @@ const FLAVORS = {
     scheme: 'kannadajodii',
     domain: 'kannada.jodii.app',
     welcomeText: 'Welcome to Kannada Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/kannada_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.kannada',
   },
   oriya: {
@@ -63,7 +63,7 @@ const FLAVORS = {
     scheme: 'oriyajodii',
     domain: 'oriya.jodii.app',
     welcomeText: 'Welcome to Oriya Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/oriya_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.oriya',
   },
   bengali: {
@@ -73,7 +73,7 @@ const FLAVORS = {
     scheme: 'bengalijodii',
     domain: 'bengali.jodii.app',
     welcomeText: 'Welcome to Bengali Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/bengali_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.bengali',
   },
   marathi: {
@@ -83,7 +83,7 @@ const FLAVORS = {
     scheme: 'marathijodii',
     domain: 'marathi.jodii.app',
     welcomeText: 'Welcome to Marathi Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/marathi_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.marathi',
   },
   gujarati: {
@@ -93,7 +93,7 @@ const FLAVORS = {
     scheme: 'gujarathijodii',
     domain: 'gujarati.jodii.app',
     welcomeText: 'Welcome to Gujarati Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/gujarati_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.gujarati',
   },
   hindi: {
@@ -103,7 +103,7 @@ const FLAVORS = {
     scheme: 'hindijodii',
     domain: 'hindi.jodii.app',
     welcomeText: 'Welcome to Hindi Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/hindi_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.hindi',
   },
   punjabi: {
@@ -113,7 +113,7 @@ const FLAVORS = {
     scheme: 'punjabijodii',
     domain: 'punjabi.jodii.app',
     welcomeText: 'Welcome to Punjabi Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/punjabi_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.punjabi',
   },
   ninetysixkulimaratha: {
@@ -123,7 +123,7 @@ const FLAVORS = {
     scheme: 'ninetysixkulimaratha',
     domain: 'ninetysixkulimaratha.jodii.com',
     welcomeText: 'Welcome to Ninetysixkulimaratha Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/ninetysixkulimaratha_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=ninetysixkulimaratha.jodii.com',
   },
   ezhava: {
@@ -133,7 +133,7 @@ const FLAVORS = {
     scheme: 'ezhavajodii',
     domain: 'ezhava.jodii.com',
     welcomeText: 'Welcome to Ezhava Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/ezhava_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=ezhava.jodii.com',
   },
   nair: {
@@ -143,7 +143,7 @@ const FLAVORS = {
     scheme: 'nairjodii',
     domain: 'nair.jodii.com',
     welcomeText: 'Welcome to Nair Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/nair_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=nair.jodii.com',
   },
   kayastha: {
@@ -153,7 +153,7 @@ const FLAVORS = {
     scheme: 'kayasthajodii',
     domain: 'kayastha.jodii.com',
     welcomeText: 'Welcome to Kayastha Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/kayastha_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=kayastha.jodii.com',
   },
   lingayath: {
@@ -163,7 +163,7 @@ const FLAVORS = {
     scheme: 'lingayathjodii',
     domain: 'lingayath.jodii.com',
     welcomeText: 'Welcome to Lingayath Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/lingayath_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=lingayath.jodii.com',
   },
   khandayat: {
@@ -173,7 +173,7 @@ const FLAVORS = {
     scheme: 'khandayatjodii',
     domain: 'khandayat.jodii.com',
     welcomeText: 'Welcome to Khandayat Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/khandayat_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=khandayat.jodii.com',
   },
   sc: {
@@ -183,7 +183,7 @@ const FLAVORS = {
     scheme: 'scjodii',
     domain: 'sc.jodii.com',
     welcomeText: 'Welcome to SC Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/sc_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=sc.jodii.com',
   },
   vokkaliga: {
@@ -193,7 +193,7 @@ const FLAVORS = {
     scheme: 'vokkaligajodii',
     domain: 'vokkaliga.jodii.com',
     welcomeText: 'Welcome to Vokkaliga Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/vokkaliga_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=vokkaliga.jodii.com',
   },
   vishwakarma: {
@@ -203,7 +203,7 @@ const FLAVORS = {
     scheme: 'vishwakarmajodii',
     domain: 'vishwakarma.jodii.com',
     welcomeText: 'Welcome to Vishwakarma Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/vishwakarma_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=vishwakarma.jodii.com',
   },
   patel: {
@@ -213,7 +213,7 @@ const FLAVORS = {
     scheme: 'pateljodii',
     domain: 'patel.jodii.com',
     welcomeText: 'Welcome to Patel Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/patel_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=patel.jodii.com',
   },
   adidravidar: {
@@ -223,7 +223,7 @@ const FLAVORS = {
     scheme: 'adidravidarjodii',
     domain: 'adidravidar.jodii.com',
     welcomeText: 'Welcome to Adidravidar Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/adidravidar_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=adidravidar.jodii.com',
   },
   teli: {
@@ -233,7 +233,7 @@ const FLAVORS = {
     scheme: 'telijodii',
     domain: 'teli.jodii.com',
     welcomeText: 'Welcome to Teli Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/teli_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=teli.jodii.com',
   },
   vanniyar: {
@@ -243,7 +243,7 @@ const FLAVORS = {
     scheme: 'vanniyarjodii',
     domain: 'vanniyar.jodii.com',
     welcomeText: 'Welcome to Vanniyar Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/vanniyar_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=vanniyar.jodii.com',
   },
   reddy: {
@@ -253,7 +253,7 @@ const FLAVORS = {
     scheme: 'reddyjodii',
     domain: 'reddy.jodii.com',
     welcomeText: 'Welcome to Reddy Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/reddy_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=reddy.jodii.com',
   },
   kapu: {
@@ -263,7 +263,7 @@ const FLAVORS = {
     scheme: 'kapujodii',
     domain: 'kapu.jodii.com',
     welcomeText: 'Welcome to Kapu Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/kapu_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=kapu.jodii.com',
   },
   viswabrahmin: {
@@ -273,7 +273,7 @@ const FLAVORS = {
     scheme: 'viswabrahminjodii',
     domain: 'viswabrahmin.jodii.com',
     welcomeText: 'Welcome to Viswabrahmin Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/viswabrahmin_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=viswabrahmin.jodii.com',
   },
   thiyya: {
@@ -283,7 +283,7 @@ const FLAVORS = {
     scheme: 'thiyyajodii',
     domain: 'thiyya.jodii.com',
     welcomeText: 'Welcome to Thiyya Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/thiyya_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=thiyya.jodii.com',
   },
   kuruba: {
@@ -293,7 +293,7 @@ const FLAVORS = {
     scheme: 'kurubajodii',
     domain: 'kuruba.jodii.com',
     welcomeText: 'Welcome to Kuruba Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/kuruba_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=kuruba.jodii.com',
   },
   gowda: {
@@ -303,7 +303,7 @@ const FLAVORS = {
     scheme: 'gowdajodii',
     domain: 'gowda.jodii.com',
     welcomeText: 'Welcome to Gowda Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/gowda_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=gowda.jodii.com',
   },
   nadar: {
@@ -313,7 +313,7 @@ const FLAVORS = {
     scheme: 'nadarjodii',
     domain: 'nadar.jodii.com',
     welcomeText: 'Welcome to Nadar Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/nadar_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=nadar.jodii.com',
   },
   aryavysya: {
@@ -323,7 +323,7 @@ const FLAVORS = {
     scheme: 'aryavysyajodii',
     domain: 'aryavysya.jodii.com',
     welcomeText: 'Welcome to Aryavysya Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/aryavysya_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=aryavysya.jodii.com',
   },
   prajapati: {
@@ -333,7 +333,7 @@ const FLAVORS = {
     scheme: 'prajapatijodii',
     domain: 'prajapati.jodii.com',
     welcomeText: 'Welcome to Prajapati Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/prajapati_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=prajapati.jodii.com',
   },
   konguvellalar: {
@@ -343,7 +343,7 @@ const FLAVORS = {
     scheme: 'konguvellalarjodii',
     domain: 'konguvellalar.jodii.com',
     welcomeText: 'Welcome to Konguvellalar Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/konguvellalar_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=konguvellalar.jodii.com',
   },
   thevar: {
@@ -353,7 +353,7 @@ const FLAVORS = {
     scheme: 'thevarjodii',
     domain: 'thevar.jodii.com',
     welcomeText: 'Welcome to Thevar Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/thevar_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=thevar.jodii.com',
   },
   kshatriya: {
@@ -363,7 +363,7 @@ const FLAVORS = {
     scheme: 'kshatriyajodii',
     domain: 'kshatriya.jodii.com',
     welcomeText: 'Welcome to Kshatriya Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/kshatriya_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=kshatriya.jodii.com',
   },
   kamma: {
@@ -373,7 +373,7 @@ const FLAVORS = {
     scheme: 'kammajodii',
     domain: 'kamma.jodii.com',
     welcomeText: 'Welcome to Kamma Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/kamma_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=kamma.jodii.com',
   },
   rajput: {
@@ -383,7 +383,7 @@ const FLAVORS = {
     scheme: 'rajputjodii',
     domain: 'rajput.jodii.com',
     welcomeText: 'Welcome to Rajput Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/rajput_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=rajput.jodii.com',
   },
   agarwal: {
@@ -393,7 +393,7 @@ const FLAVORS = {
     scheme: 'agarwaljodii',
     domain: 'agarwal.jodii.com',
     welcomeText: 'Welcome to Agarwal Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/agarwal_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=agarwal.jodii.com',
   },
   yadav: {
@@ -403,7 +403,7 @@ const FLAVORS = {
     scheme: 'yadavjodii',
     domain: 'yadav.jodii.com',
     welcomeText: 'Welcome to Yadav Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/yadav_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=yadav.jodii.com',
   },
   mali: {
@@ -413,7 +413,7 @@ const FLAVORS = {
     scheme: 'malijodii',
     domain: 'mali.jodii.com',
     welcomeText: 'Welcome to Mali Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/mali_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=mali.jodii.com',
   },
   st: {
@@ -423,7 +423,7 @@ const FLAVORS = {
     scheme: 'stjodii',
     domain: 'st.jodii.com',
     welcomeText: 'Welcome to ST Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/st_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=st.jodii.com',
   },
   naidu: {
@@ -433,7 +433,7 @@ const FLAVORS = {
     scheme: 'naidujodii',
     domain: 'naidu.jodii.com',
     welcomeText: 'Welcome to Naidu Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/naidu_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=naidu.jodii.com',
   },
   mudaliyar: {
@@ -443,7 +443,7 @@ const FLAVORS = {
     scheme: 'mudaliyarjodii',
     domain: 'mudaliyar.jodii.com',
     welcomeText: 'Welcome to Mudaliyar Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/mudaliyar_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=mudaliyar.jodii.com',
   },
   chettiyar: {
@@ -453,7 +453,7 @@ const FLAVORS = {
     scheme: 'chettiyarjodii',
     domain: 'chettiyar.jodii.com',
     welcomeText: 'Welcome to Chettiyar Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/chettiyar_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=chettiyar.jodii.com',
   },
   padmasali: {
@@ -463,7 +463,7 @@ const FLAVORS = {
     scheme: 'padmasalijodii',
     domain: 'padmasali.jodii.com',
     welcomeText: 'Welcome to Padmasali Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/padmasali_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=padmasali.jodii.com',
   },
   jat: {
@@ -473,7 +473,7 @@ const FLAVORS = {
     scheme: 'jatjodii',
     domain: 'jat.jodii.com',
     welcomeText: 'Welcome to Jat Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/jat_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jat.jodii.com',
   },
   baniya: {
@@ -483,7 +483,7 @@ const FLAVORS = {
     scheme: 'baniyajodii',
     domain: 'baniya.jodii.com',
     welcomeText: 'Welcome to Baniya Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/baniya_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=baniya.jodii.com',
   },
   pillai: {
@@ -493,7 +493,7 @@ const FLAVORS = {
     scheme: 'pillaijodii',
     domain: 'pillai.jodii.com',
     welcomeText: 'Welcome to Pillai Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/pillai_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=pillai.jodii.com',
   },
   brahmin: {
@@ -503,7 +503,7 @@ const FLAVORS = {
     scheme: 'brahminjodii',
     domain: 'brahmin.jodii.com',
     welcomeText: 'Welcome to Brahmin Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/brahmin_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=brahmin.jodii.com',
   },
   christian: {
@@ -513,7 +513,7 @@ const FLAVORS = {
     scheme: 'christianjodii',
     domain: 'christian.jodii.com',
     welcomeText: 'Welcome to Christian Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/christian_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=christian.jodii.com',
   },
   muslim: {
@@ -523,7 +523,7 @@ const FLAVORS = {
     scheme: 'muslimjodii',
     domain: 'muslim.jodii.com',
     welcomeText: 'Welcome to Muslim Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/muslim_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=muslim.jodii.com',
   },
   divorcee: {
@@ -533,7 +533,7 @@ const FLAVORS = {
     scheme: 'divorceejodii',
     domain: 'divorcee.jodii.com',
     welcomeText: 'Welcome to Divorcee Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/divorcee_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=divorcee.jodii.com',
   },
   jain: {
@@ -543,7 +543,7 @@ const FLAVORS = {
     scheme: 'jainjodii',
     domain: 'jain.jodii.com',
     welcomeText: 'Welcome to Jain Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/jain_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jain.jodii.com',
   },
   sikh: {
@@ -553,7 +553,7 @@ const FLAVORS = {
     scheme: 'sikhjodii',
     domain: 'sikh.jodii.com',
     welcomeText: 'Welcome to Sikh Jodii',
-    icon: './assets/icon.png',
+    icon: './assets/icons/logos/sikh_jodii.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=sikh.jodii.com',
   },
 };

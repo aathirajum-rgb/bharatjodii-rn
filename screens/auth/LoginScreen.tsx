@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import { isAvailableAsync, showPhoneNumberHintAsync } from 'expo-phone-number-hint'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import AppHeader from '../../components/app-header/AppHeader'
@@ -37,6 +38,10 @@ const COUNTRIES = [
 
 type Country = (typeof COUNTRIES)[number]
 
+// Same URLs MenuScreen links to (Angular/Android: terms.html / privacy-policy.html)
+const PRIVACY_POLICY_URL   = 'https://www.jodii.com/privacy-policy.html'
+const TERMS_CONDITIONS_URL = 'https://www.jodii.com/terms.html'
+
 // Angular signin.page.ts validateMobileNumber() — exact regex match
 function isValidMobile(mobile: string, country: Country): boolean {
   if (mobile.length < country.minLen || mobile.length > country.maxLen) return false
@@ -60,6 +65,9 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
 
   const inputRef  = useRef<TextInput>(null)
   const labelAnim = useRef(new Animated.Value(0)).current
+  // Guards against re-showing the picker on every re-focus — matches Android's
+  // LoginActivity.kt `phoneHint` boolean (requestPhoneNoHint() only fires once).
+  const phoneHintRequested = useRef(false)
 
   // Restore previously used country code
   useEffect(() => {
@@ -83,6 +91,27 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
       useNativeDriver: false,
     }).start()
   }, [focused, mobile])
+
+  // Google Phone Number Hint (Android only, no-op elsewhere) — matches
+  // Android's LoginActivity.kt requestPhoneNoHint(), fired once on the mobile
+  // field's first focus. Strips the currently-selected country's dial code
+  // from the returned number the same way Android's regex did for India.
+  async function requestPhoneHint() {
+    if (phoneHintRequested.current) return
+    phoneHintRequested.current = true
+    try {
+      if (!(await isAvailableAsync())) return
+      const result = await showPhoneNumberHintAsync()
+      if (result.canceled) return
+      const digitsOnly = result.hint.number.replace(/\D/g, '')
+      const stripped = digitsOnly.startsWith(country.code)
+        ? digitsOnly.slice(country.code.length)
+        : digitsOnly
+      setMobile(stripped.slice(0, country.maxLen))
+    } catch {
+      // non-fatal — user can just type their number
+    }
+  }
 
   const valid = isValidMobile(mobile, country)
   // Show validation error only after user has left the field (touched), not while typing
@@ -235,7 +264,7 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
                 style={[styles.textInput, webReset]}
                 value={mobile}
                 onChangeText={handleMobileChange}
-                onFocus={() => { setFocused(true); setDropOpen(false) }}
+                onFocus={() => { setFocused(true); setDropOpen(false); requestPhoneHint() }}
                 onBlur={() => { setFocused(false); setTouched(true) }}
                 keyboardType="number-pad"
                 placeholder={focused ? t('LOGIN_PAGE.ENT_MOBILE') : ''}
@@ -279,6 +308,24 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
               {error || t('LOGIN_PAGE.VALID_MOBILENO')}
             </Text>
           )}
+
+          {/* Terms/Privacy consent notice — Android: registration_frm_txt_click_accept_condition */}
+          <Text style={styles.consentText}>
+            {t('LOGIN_PAGE.AGREE_PREFIX')}
+            <Text
+              style={styles.consentLink}
+              onPress={() => navigation.navigate('ExternalPage', { url: TERMS_CONDITIONS_URL, title: t('ACCOUNT.TERMS_CONDITIONS') })}
+            >
+              {t('LOGIN_PAGE.AGREE_TERMS')}
+            </Text>
+            {t('LOGIN_PAGE.AGREE_AND')}
+            <Text
+              style={styles.consentLink}
+              onPress={() => navigation.navigate('ExternalPage', { url: PRIVACY_POLICY_URL, title: t('ACCOUNT.PRIVACY_POLICY') })}
+            >
+              {t('LOGIN_PAGE.AGREE_PRIVACY')}
+            </Text>
+          </Text>
         </ScrollView>
 
         {/* Sticky "Get OTP" CTA — rises above keyboard via KeyboardAvoidingView */}
@@ -423,6 +470,21 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontSize:   12,
     color:      Colors.inputError,
+  },
+
+  // ── Terms/Privacy consent notice ───────────────────────────────────────────
+  consentText: {
+    fontFamily: Fonts.poppinsRegular,
+    fontSize:   12,
+    color:      Colors.textSecondary,
+    marginTop:  16,
+    lineHeight: 18,
+  },
+  consentLink: {
+    fontFamily:      Fonts.poppinsMedium,
+    fontWeight:      '500',
+    color:           Colors.textPrimary,
+    textDecorationLine: 'underline',
   },
 
   // ── Footer CTA ──────────────────────────────────────────────────────────────

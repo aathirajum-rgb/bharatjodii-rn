@@ -1,7 +1,69 @@
 // Analytics service — replaces Angular's Firebase web SDK + appNativeEvent bridge.
-// In RN we are the native app, so the WebView→Native bridge (appNativeEvent) is gone.
-// Firebase: stub until @react-native-firebase/analytics is installed.
-// AppsFlyer: stub until react-native-appsflyer is installed.
+//
+// Angular's AnalyticsService.analyticsTrackCall() only relayed events through
+// the native WebView bridge (triggerAppNativeEvent/appNativeEvent) when running
+// *inside* the old hybrid app on a newer app version; otherwise (PWA/web, or an
+// older app version) it called Firebase's web SDK directly — see
+// `/Users/navaneethemahavishnu/Documents/Jodi angular/nbpwa/src/app/services/analytics.service.ts`.
+// This RN app IS the native layer now, so there's no bridge to relay through —
+// we always take the "call Firebase directly" branch, just with the native
+// @react-native-firebase/analytics SDK instead of the web one.
+//
+// AppsFlyer mirrors the Android native app's NBAppApplication.appsFlyerCheck()
+// (devKey, INR currency, IMEI/AndroidID collection off, "h0rB" invite OneLink,
+// setCustomerUserId) — see the Android source for the exact reference. The
+// conversion-data/deep-link listeners it also wired are deliberately NOT ported
+// here: nothing downstream in this RN app consumes that attribution data yet
+// (unlike Android's HomeScreenActivity, which fed it to the webview), so wiring
+// the listeners now would just be dead data with nowhere to flow.
+import Constants, { ExecutionEnvironment } from 'expo-constants'
+import { Platform } from 'react-native'
+import { getItem } from './storageService'
+import { StorageKeys as SK } from '../constants/storage.keys'
+
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient
+
+// Both SDKs are native-only (no web shim, no Expo Go support) — same guard
+// pattern as notificationService.ts's supportsFirebaseMessaging.
+const supportsNativeSDKs = !isExpoGo && Platform.OS !== 'web'
+
+// Untyped (`any`) on purpose: react-native-appsflyer's index.d.ts transitively
+// imports its PurchaseConnector model types, which don't compile under this
+// project's `exactOptionalPropertyTypes: true` (a pre-existing issue in the
+// package's own types, unrelated to anything used here — we never touch
+// PurchaseConnector). Statically importing its types at all pulls that whole
+// graph in, so both SDKs are loaded via plain `require()` and kept untyped.
+let firebaseAnalyticsModule: any = null
+let appsFlyerModule: any = null
+let appsFlyerInitialized = false
+
+// @react-native-firebase/analytics uses the modular API (getAnalytics/logEvent/
+// logScreenView as free functions taking an Analytics instance) — same style
+// as notificationService.ts's getMessaging()/getToken(), not a callable default.
+function getFirebaseAnalytics() {
+  if (!supportsNativeSDKs) return null
+  if (!firebaseAnalyticsModule) {
+    // Lazy require — native module, must never be touched in Expo Go/web.
+    firebaseAnalyticsModule = require('@react-native-firebase/analytics')
+  }
+  return firebaseAnalyticsModule.getAnalytics()
+}
+
+function getAppsFlyer(): any {
+  if (!supportsNativeSDKs) return null
+  if (!appsFlyerModule) {
+    appsFlyerModule = require('react-native-appsflyer').default
+  }
+  return appsFlyerModule
+}
+
+// Firebase event/screen names must be letters/digits/underscores only, start
+// with a letter, ≤40 chars — mirrors Android AnalyticsManager.kt's regex strip
+// of spaces/dashes/dots from the category string used as the event name.
+function sanitizeEventName(raw: string): string {
+  const cleaned = raw.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 40)
+  return /^[a-zA-Z]/.test(cleaned) ? cleaned : `e_${cleaned}`.slice(0, 40)
+}
 
 export interface IAnalyticsEvent {
   category: string
@@ -9,17 +71,24 @@ export interface IAnalyticsEvent {
   label?: string
 }
 
-// ─── Firebase stubs ───────────────────────────────────────────────────────────
-// TODO: replace bodies with @react-native-firebase/analytics calls once installed
+// ─── Firebase ─────────────────────────────────────────────────────────────────
 
 function _logFirebaseEvent(name: string, params?: Record<string, any>): void {
   if (__DEV__) console.log('[GA Event]', name, params)
-  // analytics().logEvent(name, params)
+  const analytics = getFirebaseAnalytics()
+  if (!analytics || !name) return
+  firebaseAnalyticsModule.logEvent(analytics, sanitizeEventName(name), params).catch(() => {
+    // non-fatal — analytics failures must never affect the calling flow
+  })
 }
 
 function _logFirebaseScreen(screenName: string): void {
   if (__DEV__) console.log('[GA Screen]', screenName)
-  // analytics().logScreenView({ screen_name: screenName, screen_class: screenName })
+  const analytics = getFirebaseAnalytics()
+  if (!analytics || !screenName) return
+  firebaseAnalyticsModule
+    .logScreenView(analytics, { screen_name: screenName, screen_class: screenName })
+    .catch(() => {})
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -39,12 +108,53 @@ export function logAppsFlyer(
   const params: Record<string, any> = {}
   values.forEach(({ key, value }) => { params[key] = value })
   if (__DEV__) console.log('[AppsFlyer]', eventName, params)
-  // appsFlyer.logEvent(eventName, params)
+  const appsFlyer = getAppsFlyer()
+  if (!appsFlyer || !appsFlyerInitialized || !eventName) return
+  appsFlyer.logEvent(eventName, params).catch(() => {})
 }
 
 export function setAppsFlyerUserId(matriId: string): void {
   if (__DEV__) console.log('[AppsFlyer User]', matriId)
-  // appsFlyer.setAppUserId(matriId)
+  const appsFlyer = getAppsFlyer()
+  if (!appsFlyer || !appsFlyerInitialized || !matriId) return
+  appsFlyer.setCustomerUserId(matriId)
+}
+
+// ─── One-time startup init (App.tsx) ──────────────────────────────────────────
+// Firebase Analytics needs no explicit init — @react-native-firebase/app auto-
+// initializes from the per-flavor google-services.json already in place.
+// AppsFlyer does need one, matching Android's Application.onCreate() timing.
+export async function initAnalytics(): Promise<void> {
+  const appsFlyer = getAppsFlyer()
+  if (!appsFlyer) return
+
+  // No devKey configured yet (envs/.env.template's EXPO_PUBLIC_APPSFLYER_DEV_KEY
+  // is blank by default) — skip quietly rather than initSdk() with a bad key.
+  const devKey = process.env.EXPO_PUBLIC_APPSFLYER_DEV_KEY
+  if (!devKey) {
+    if (__DEV__) console.log('[AppsFlyer] no devKey configured, skipping init')
+    return
+  }
+
+  try {
+    await appsFlyer.initSdk({
+      devKey,
+      isDebug: __DEV__,
+      onInstallConversionDataListener: false,
+      onDeepLinkListener: false,
+    })
+    appsFlyerInitialized = true
+
+    appsFlyer.setCurrencyCode('INR')
+    appsFlyer.setCollectIMEI(false)
+    appsFlyer.setCollectAndroidID(false)
+    appsFlyer.setAppInviteOneLinkID('h0rB')
+
+    const matriId = (await getItem(SK.Auth.USER_ID)) || (await getItem('DEVICEID')) || ''
+    if (matriId) appsFlyer.setCustomerUserId(matriId)
+  } catch {
+    // non-fatal — app must work fine with analytics unavailable
+  }
 }
 
 // ─── Unified event dispatcher ─────────────────────────────────────────────────

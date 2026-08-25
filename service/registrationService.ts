@@ -6,7 +6,7 @@
 
 import { apiCall, fetchUserIp } from './apiClient'
 import { Endpoints } from './api.endpoints'
-import { getItem, setItem } from './storageService'
+import { getItem, setItem, removeMultiple } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { navigate } from '../utils/navigationRef'
 import { ENavigation } from '../types/enums/navigation.enum'
@@ -50,6 +50,13 @@ export async function setRegValues(updates: Record<string, string>): Promise<voi
   const rv = await getRegValues()
   Object.assign(rv, updates)
   await setItem(REG_STORE_KEY, JSON.stringify(rv))
+}
+
+// Angular: deleteAllLocalStorage() + removeLocalStorageValue(REGVALUES) — used
+// when a fresh-registration deep link (webview handoff buildparam.REGISTER=='1')
+// needs to discard any abandoned draft before seeding a new one.
+export async function resetRegValues(): Promise<void> {
+  await removeMultiple([REG_STORE_KEY, 'REGISTERURL'])
 }
 
 // ─── User session store ───────────────────────────────────────────────────────

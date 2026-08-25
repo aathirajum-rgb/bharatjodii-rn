@@ -3,11 +3,12 @@
 // "Download your biodata" row. Shows the logged-in user's own profile as a
 // downloadable/shareable biodata, skinned by 5 swipeable color templates.
 
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import {
   ActivityIndicator, Alert, Dimensions, Linking, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { Image } from 'expo-image'
+import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { runOnJS } from 'react-native-reanimated'
@@ -65,9 +66,10 @@ export default function BiodataScreen({ navigation }: Props) {
   const [showSwipeTip, setShowSwipeTip]   = useState(false)
   const [downloading, setDownloading]     = useState(false)
 
-  useEffect(() => { load() }, [])
-
-  async function load() {
+  // Refetches on focus (not just mount) so returning from the standalone
+  // Manage Photos flow (see handleAddPhoto/handleEditPhoto below) shows the
+  // photo change immediately — same pattern as EditProfileScreen.tsx.
+  const load = useCallback(async () => {
     setLoading(true)
     const [id, occCode, data, savedThemeId, viewedSwipe] = await Promise.all([
       getItem(SK.Auth.USER_ID),
@@ -91,7 +93,9 @@ export default function BiodataScreen({ navigation }: Props) {
       if (!viewedSwipe && data.BIODATATHEME.length > 1) setShowSwipeTip(true)
     }
     setLoading(false)
-  }
+  }, [])
+
+  useFocusEffect(useCallback(() => { load() }, [load]))
 
   function handleBack() {
     if (navigation.canGoBack()) navigation.goBack()
@@ -132,6 +136,14 @@ export default function BiodataScreen({ navigation }: Props) {
 
   function stub(label: string) {
     Alert.alert(label, 'Coming soon')
+  }
+
+  // Add/Edit photo — same standalone Manage Photos entry point HelpCenterScreen
+  // and HomeScreen already use elsewhere (ManagePhotosScreen → CustomGalleryScreen,
+  // both Expo-based: expo-media-library/expo-image-picker). `standalone: true`
+  // means Confirm/Back returns here instead of continuing the signup wizard.
+  function handleAddPhoto() {
+    navigation.navigate('onboarding', { pageNo: '21', standalone: true })
   }
 
   async function handleDownload() {
@@ -236,12 +248,12 @@ export default function BiodataScreen({ navigation }: Props) {
                 <View style={s.photoPlaceholder} />
               )}
               {!photoAvailable && photoCount === 0 && (
-                <Pressable style={s.photoActionBtn} onPress={() => stub('Add photo')}>
+                <Pressable style={s.photoActionBtn} onPress={handleAddPhoto}>
                   <Text style={s.photoActionText}>{t('BIO_DATA.ADD_YOUR_PHOTO')}</Text>
                 </Pressable>
               )}
               {photoAvailable && (
-                <Pressable style={s.photoEditBtn} onPress={() => stub('Edit photo')}>
+                <Pressable style={s.photoEditBtn} onPress={handleAddPhoto}>
                   <CdnSvg uri={ICON_EDIT_PHOTO} width={20} height={20} />
                 </Pressable>
               )}

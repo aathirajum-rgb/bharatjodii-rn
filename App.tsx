@@ -11,8 +11,10 @@ import { APP_VERSION } from './constants/appVersion'
 import { StorageKeys } from './constants/storage.keys'
 import { AuthProvider } from './contexts/AuthContext'
 import { useOTAUpdate } from './hooks/useOTAUpdate'
+import { useNativeAppUpdate } from './hooks/useNativeAppUpdate'
 import RootNavigation from './navigation/RootNavigation'
 import { setupNotificationHandlers } from './service/notificationService'
+import { initAnalytics } from './service/analyticsService'
 import { getItem, setItem } from './service/storageService'
 import { loadFonts } from './src/config/fonts'
 
@@ -46,6 +48,35 @@ async function makeDeviceId(): Promise<string> {
   return makeRandomDeviceId()
 }
 
+// Legacy: the old native Android app constructed this string itself (Java
+// Build.* fields) and injected it into the WebView's localStorage — see
+// registerFieldsFromNative() in the Angular shell's index.html. Nothing in
+// this RN port ever built a replacement, so DEVICEDETAIL has been sent blank
+// on every API call since the rewrite — confirmed as the cause of a backend
+// SQL error ("Unknown column 'undefined'") on login/switchlanguage/v1, whose
+// server-side code apparently parses individual fields out of this string.
+// Format matches the legacy shape exactly: `{KEY=value, KEY=value, ...}`
+// (not JSON — no quotes), so the backend's existing parser keeps working.
+// WEBVERSION/WEBVIEWVERSION/WEBPACKAGE/OP_NAME are WebView/carrier-specific
+// fields with no native-app equivalent and are intentionally omitted rather
+// than faked.
+async function buildDeviceDetail(deviceId: string): Promise<string> {
+  const Device = await import('expo-device')
+  const Application = await import('expo-application')
+
+  const fields: Record<string, string> = {
+    DEVICEID: deviceId,
+    DEVICE: Device.designName ?? '',
+    MODEL: Device.modelName ?? '',
+    RELEASE: Device.osVersion ?? '',
+    BRAND: Device.brand ?? '',
+    APP_VERSION_NAME: Application.nativeApplicationVersion ?? APP_VERSION,
+    APP_VERSION: String(Application.nativeBuildVersion ?? ''),
+  }
+
+  return `{${Object.entries(fields).map(([k, v]) => `${k}=${v}`).join(', ')}}`
+}
+
 // Mirrors what the old native app injected into the WebView URL on launch.
 // Must run before any API call so buildCommonParams reads correct values.
 // Returns the resolved language so the caller can kick off font loading —
@@ -61,6 +92,12 @@ async function initializeAppConfig(): Promise<string> {
   if (!deviceId) {
     deviceId = await makeDeviceId()
     await setItem('DEVICEID', deviceId)
+  }
+
+  // Populate once; APP_VERSION_NAME/APP_VERSION inside it are static per
+  // install anyway, so there's nothing to refresh on later launches.
+  if (!(await getItem('DEVICEDETAIL'))) {
+    await setItem('DEVICEDETAIL', await buildDeviceDetail(deviceId))
   }
 
   await Promise.all([
@@ -81,12 +118,19 @@ async function initializeAppConfig(): Promise<string> {
 
 export default function App() {
   useOTAUpdate()
+  useNativeAppUpdate()
   const [appReady, setAppReady] = useState(false)
   const [fontsReady, setFontsReady] = useState(false)
 
   useEffect(() => {
     const cleanup = setupNotificationHandlers()
     return cleanup
+  }, [])
+
+  // Fire-and-forget, non-blocking — mirrors Android's Application.onCreate()
+  // timing without gating splash/appReady on it (analytics must never delay launch).
+  useEffect(() => {
+    initAnalytics()
   }, [])
 
   useEffect(() => {

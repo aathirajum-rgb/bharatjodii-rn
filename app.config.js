@@ -114,5 +114,13 @@ module.exports = ({ config }) => ({
     // wiring. Its Android mods also run (harmless, see withFirebaseAndroid.js).
     '@react-native-firebase/app',
     ['expo-camera', { barcodeScannerEnabled: false }],
+    // Default options only (no purchase connector, no backup-rules override) —
+    // both are documented no-ops on Android with these defaults. Its iOS half
+    // (AppDelegate deep-link injection) is a known no-op on Swift AppDelegates
+    // (Expo SDK 52+/RN 0.76+ default, which this project uses) — harmless here
+    // since analyticsService.ts deliberately doesn't wire AppsFlyer deep-link/
+    // conversion-data listeners (Android-only scope, see useNativeAppUpdate.ts
+    // for the same iOS-deferral reasoning).
+    'react-native-appsflyer',
   ],
 });

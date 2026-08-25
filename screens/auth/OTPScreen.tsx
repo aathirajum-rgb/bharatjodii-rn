@@ -11,6 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native'
+import { useSMSRetriever } from '@ebrimasamba/react-native-sms-retriever'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import AppHeader from '../../components/app-header/AppHeader'
@@ -69,6 +70,20 @@ export default function OTPScreen({ navigation, route }: Props) {
 
   const inputRefs     = useRef<Array<TextInput | null>>(Array(OTP_LENGTH).fill(null))
 
+  // SMS Retriever auto-fill — Android only, no READ_SMS permission (matches
+  // Android's SMSReceiver.kt); the hook itself handles init/start/cleanup and
+  // is a safe no-op on iOS/web. handleVerify is a hoisted function declaration
+  // (defined further down), so referencing it here is safe.
+  const { appHash } = useSMSRetriever({
+    onSuccess: otp => {
+      const digits = otp.replace(/\D/g, '').slice(0, OTP_LENGTH)
+      if (digits.length !== OTP_LENGTH) return
+      setOtpValues(digits.split(''))
+      setError('')
+      handleVerify(digits)
+    },
+  })
+
   // Auto-focus first box once the page settles — matches Angular ionViewDidEnter's
   // setFocusOnOtpPage (fixed 500ms setTimeout). On native we still prefer waiting
   // for 'transitionEnd' over a fixed timeout, since it avoids a KeyboardAvoidingView
@@ -95,6 +110,15 @@ export default function OTPScreen({ navigation, route }: Props) {
     const id = setInterval(() => setSeconds(s => s - 1), 1000)
     return () => clearInterval(id)
   }, [seconds])
+
+  // Log the app hash once available (dev only) — the backend's OTP SMS must
+  // end with this exact hash for the OS-level SMS Retriever broadcast to ever
+  // fire; without it nothing is broken on our end, it's just a backend/SMS-
+  // template dependency outside this app's code. No-op on iOS/web (appHash
+  // stays '').
+  useEffect(() => {
+    if (__DEV__ && appHash) console.log('[SMS Retriever] app hash for SMS template:', appHash)
+  }, [appHash])
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -163,13 +187,20 @@ export default function OTPScreen({ navigation, route }: Props) {
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  async function handleVerify() {
-    if (!isValid || loading) return
+  // otpOverride: used by the SMS-retriever auto-fill effect, which calls this
+  // right after setOtpValues() in the same tick — state wouldn't have flushed
+  // yet, so it passes the freshly-extracted digits directly instead of relying
+  // on `otpValues`/`isValid` (matches Android's otpAutoFill() auto-submitting
+  // immediately once the SMS-derived digits are in place).
+  async function handleVerify(otpOverride?: string) {
+    const otp   = otpOverride ?? otpValues.join('')
+    const valid = otpOverride ? new RegExp(`^[0-9]{${OTP_LENGTH}}$`).test(otpOverride) : isValid
+    if (!valid || loading) return
     setLoading(true)
     setError('')
     try {
       const nallow = await getItem('NALLOW') ?? '0'
-      const res    = await verifyOTP('otp', { ...(await buildParams(otpValues.join(''))), NALLOW: nallow })
+      const res    = await verifyOTP('otp', { ...(await buildParams(otp)), NALLOW: nallow })
       if (res?.RESPONSECODE == 1) {
         // Store tokens — wrapped so a storage failure doesn't block the success UI.
         // ATN/RTN are at root of response; WEBVIEWURL carries profile data only.
@@ -318,7 +349,7 @@ export default function OTPScreen({ navigation, route }: Props) {
                 keyboardType="number-pad"
                 maxLength={2}         // 2 to allow paste detection; trimmed in handleChange
                 returnKeyType={i === OTP_LENGTH - 1 ? 'done' : 'next'}
-                onSubmitEditing={i === OTP_LENGTH - 1 ? handleVerify : undefined}
+                onSubmitEditing={i === OTP_LENGTH - 1 ? () => handleVerify() : undefined}
                 selectTextOnFocus
                 cursorColor={Colors.textPrimary}
                 selectionColor={Colors.textPrimary}
@@ -363,7 +394,7 @@ export default function OTPScreen({ navigation, route }: Props) {
             fullWidth
             disabled={!isValid}
             loading={loading}
-            onPress={handleVerify}
+            onPress={() => handleVerify()}
           />
         </View>
       </KeyboardAvoidingView>

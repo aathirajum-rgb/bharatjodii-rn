@@ -18,17 +18,34 @@ import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem, setItem } from '../../service/storageService'
 import { os } from './onboardingStyles'
 
+const MAX_PHOTOS = 10
+
 type Props = { navigation: any; route: any }
 
-export default function CustomGalleryScreen({ navigation }: Props) {
+export default function CustomGalleryScreen({ navigation, route }: Props) {
+  const existingCount = (route?.params?.existingCount as number | undefined) ?? 0
+  const remaining     = Math.max(0, MAX_PHOTOS - existingCount)
+
   const [uploading, setUploading] = useState(false)
   const inputRef   = useRef<HTMLInputElement | null>(null)
 
   useOnboardingFooter({ nextHidden: true, showSkip: false, onNext: () => {} }, [])
 
   async function handleFiles(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? [])
+    let files = Array.from(e.target.files ?? [])
     if (!files.length) return
+
+    // Native (CustomGalleryScreen.tsx) caps selection at MAX_PHOTOS total via
+    // its own grid toggleSelect(); the browser's file dialog has no such
+    // incremental cap, so enforce it here after the fact instead.
+    if (files.length > remaining) {
+      Alert.alert(
+        'Photo limit reached',
+        `You can add up to ${remaining} more photo${remaining !== 1 ? 's' : ''}. Only the first ${remaining} selected will be uploaded.`,
+      )
+      files = files.slice(0, remaining)
+    }
+    if (!files.length) { e.target.value = ''; return }
 
     setUploading(true)
     try {
@@ -54,6 +71,7 @@ export default function CustomGalleryScreen({ navigation }: Props) {
       Alert.alert('Error', 'Upload failed. Please try again.')
     } finally {
       setUploading(false)
+      e.target.value = ''
     }
   }
 
@@ -61,7 +79,11 @@ export default function CustomGalleryScreen({ navigation }: Props) {
     <View style={os.flex1}>
       <View style={styles.center}>
         <Text style={styles.title}>Add your photo</Text>
-        <Text style={styles.subtitle}>Select up to 10 photos from your device</Text>
+        <Text style={styles.subtitle}>
+          {remaining > 0
+            ? `Select up to ${remaining} more photo${remaining !== 1 ? 's' : ''} from your device`
+            : `You've reached the ${MAX_PHOTOS}-photo limit`}
+        </Text>
 
         {/* Hidden native file input — 1×1/opacity:0, NOT display:none, since
             Safari silently blocks a programmatic .click() on a display:none
@@ -76,9 +98,9 @@ export default function CustomGalleryScreen({ navigation }: Props) {
         />
 
         <Pressable
-          style={[styles.btn, uploading && styles.btnDisabled]}
+          style={[styles.btn, (uploading || remaining === 0) && styles.btnDisabled]}
           onPress={() => inputRef.current?.click()}
-          disabled={uploading}
+          disabled={uploading || remaining === 0}
         >
           {uploading
             ? <ActivityIndicator color="#fff" size="small" />
