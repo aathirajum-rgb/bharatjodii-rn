@@ -99,6 +99,11 @@ export default function ChatScreen({ navigation, route }: Props) {
   const [partnerPhoto, setPartnerPhoto] = useState(String(route.params?.partnerPhoto ?? ''))
   const [partnerOnline, setPartnerOnline] = useState(Boolean(route.params?.partnerOnline))
   const [partnerLastActive, setPartnerLastActive] = useState<number | null>(route.params?.partnerLastActive ?? null)
+  // Angular: oppositeIdDetails.Reported (JODII-453 fix) — the row's own Reported
+  // flag carried through nav params, not refreshed from BasicView. A reported
+  // chat is read only: it opens like any other, but the footer swaps to a
+  // read-only note in place of the input.
+  const reported = Boolean(route.params?.partnerReported)
 
   const ownIdRef = useRef('')
   const [messages, setMessages] = useState<ChatMessageItem[]>([])
@@ -608,7 +613,7 @@ export default function ChatScreen({ navigation, route }: Props) {
         {menuOpen && (
           <ThreeDotMenu
             positionStyle={styles.menuPosition}
-            showBlock={blockedState === 'none'}
+            showBlock={blockedState === 'none' && !reported}
             onBlock={handleMenuBlock}
             showUnblock={blockedState === 'by_me'}
             onUnblock={handleMenuUnblock}
@@ -657,7 +662,14 @@ export default function ChatScreen({ navigation, route }: Props) {
         )}
 
         {/* ── Input / blocked / limit-exceeded banner ── */}
-        {blockedState === 'by_them' ? (
+        {reported ? (
+          // Angular: isChatReported() (JODII-453 fix) — a reported chat can be
+          // read but not answered, this note takes priority over the block/
+          // limit banners below since none of those reasons matter once reported.
+          <View style={[styles.blockedBanner, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+            <Text style={styles.blockedText}>{t('MESSAGES.REPORTED_PROFILE')}</Text>
+          </View>
+        ) : blockedState === 'by_them' ? (
           <View style={[styles.blockedBanner, { paddingBottom: Math.max(insets.bottom, 20) }]}>
             <Text style={styles.blockedText}>{t('PRIVACY.OPP_BLOCK_TEXT')}</Text>
           </View>

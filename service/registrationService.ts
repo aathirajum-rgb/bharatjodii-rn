@@ -1367,6 +1367,11 @@ export async function storeWebURLData(data: Record<string, any>): Promise<void> 
     // (pageLandingService.ts). Also missing from this list until now, for the
     // same reason HOROSCOPEAVAILABLE was — never read back anywhere before.
     'FAMILYPROPERTY', 'BROTHERS', 'SISTERS', 'RAASI', 'STAR', 'DOSHAM',
+    // Angular: shared/config.ts's localvalueArr — WAPHOTOFLAG gates the
+    // WhatsApp photo-request nudge (common-funtions.ts's whatsAppPhotoFlag()),
+    // also missing from this list until now — without it, Home's photo-request
+    // overlay had no server-driven eligibility signal to read at all.
+    'WAPHOTOFLAG',
   ]
   SCALAR_KEYS.forEach(k => { if (data[k] !== undefined) session[k] = String(data[k]) })
 

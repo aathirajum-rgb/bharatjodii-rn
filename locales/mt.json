@@ -1584,6 +1584,9 @@
 
      },
      "GENERAL":{
+        "EXIT_CONFIRM_TITLE":"तुम्हाला बाहेर पडायचे आहे का?",
+        "EXIT_YES":"होय",
+        "EXIT_NO":"नाही",
         "PROFILEDELETED":"हे प्रोफाइल हटवले आहे किंवा सध्या अनुपलब्ध आहे",
         "PROFILEDELETED_HV":"प्रोफाइल हटवले",
         "NOINTERNET":"कृपया इंटरनेट कनेक्शन तपासा",

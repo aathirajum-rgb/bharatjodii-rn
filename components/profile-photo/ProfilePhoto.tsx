@@ -94,8 +94,6 @@ const ICONS = {
   shortlistOn:    CDN_SVG + 'shortlist/shortlisted-white-updated.svg',
   closeWhite:     CDN + 'close-white.svg',
   camera:         CDN + 'camera-upload.svg',    // upload CTA icon
-  addPhoto:       CDN + 'add-photo-icon.svg',
-  lockPhoto:      CDN + 'lock-photo.svg',
 }
 
 // ─── Border radius per variant (mirrors Angular CSS) ─────────────────────────
@@ -142,46 +140,6 @@ function NewlyJoinedBadge() {
   )
 }
 
-// ─── PhotoRequest overlay sub-component ──────────────────────────────────────
-
-interface PhotoRequestProps {
-  type:       'addPhoto' | 'requestSent' | 'viewPhoto'
-  onPress?:   (() => void) | undefined
-}
-
-function PhotoRequestOverlay({ type, onPress }: PhotoRequestProps) {
-  const isRequestSent = type === 'requestSent'
-
-  const icon   = type === 'viewPhoto' ? ICONS.lockPhoto : ICONS.addPhoto
-  const title  = isRequestSent
-    ? 'Request Sent'
-    : type === 'viewPhoto'
-    ? 'View Hidden Photo'
-    : 'Add Photo'
-  const desc   = isRequestSent
-    ? 'Waiting for the member to add their photo'
-    : type === 'viewPhoto'
-    ? 'Request to view this member\'s hidden photo'
-    : 'No photo uploaded yet. Request them to add one.'
-  const btnLabel = isRequestSent ? 'Sent ✓' : 'Send Request'
-
-  return (
-    <View style={styles.requestOverlay}>
-      <CdnSvg uri={icon} width={48} height={48} style={styles.requestIcon} />
-      <Text style={styles.requestTitle}>{title}</Text>
-      <Text style={styles.requestDesc}>{desc}</Text>
-      {!isRequestSent && (
-        <Pressable
-          style={({ pressed }) => [styles.requestBtn, pressed && styles.requestBtnPressed]}
-          onPress={onPress}
-        >
-          <Text style={styles.requestBtnText}>{btnLabel}</Text>
-        </Pressable>
-      )}
-    </View>
-  )
-}
-
 // ─── ProfilePhoto ─────────────────────────────────────────────────────────────
 
 export default function ProfilePhoto({
@@ -190,7 +148,6 @@ export default function ProfilePhoto({
   height,
   isPhotoAvailable  = true,
   isPhotoProtect    = false,
-  isViewPhotoRequest = false,
   showReqPhotoElement = true,
   isOwnPhoto = false,
   isNewlyJoined = false,
@@ -206,7 +163,6 @@ export default function ProfilePhoto({
   onPress,
   onShortlistPress,
   onDontShowPress,
-  onViewPhotoRequest,
   onThreeDotPress,
   onImageLoad,
   onWhatsApp,
@@ -430,9 +386,8 @@ export default function ProfilePhoto({
           there's no "request sent" alternate state here, tapping WhatsApp
           just opens WhatsApp directly). ── */}
       {showAddRequest && (
-        // Angular: photoOverlay has no dim scrim of its own — only the blurred
-        // photo behind and the dark floating card itself, unlike requestWrap's
-        // shared 0.45-black tint (which would double-darken this specific case).
+        // Angular: photoOverlay has no dim scrim of its own — only the
+        // blurred photo behind and the dark floating card itself.
         <View style={styles.whatsappOverlayWrap}>
           <View style={styles.whatsappOverlayCard}>
             <Text style={styles.whatsappOverlayText}>
@@ -443,13 +398,19 @@ export default function ProfilePhoto({
         </View>
       )}
 
-      {/* ── View-hidden-photo request overlay ── */}
+      {/* ── Protected/hidden-photo overlay — Angular: getWhatsAppViewHiddenPhotoRequest()
+          routes through the SAME WhatsApp click handler as the no-photo case
+          above (whatsAppPhotoRequestBtnClickOn(), communication.service.ts:
+          202-254) — there's no separate persisted "request sent" state for
+          this variant, unlike the add-photo case's ADDPHOTOREQUEST flag. ── */}
       {showViewRequest && (
-        <View style={styles.requestWrap}>
-          <PhotoRequestOverlay
-            type={isViewPhotoRequest ? 'requestSent' : 'viewPhoto'}
-            onPress={onViewPhotoRequest}
-          />
+        <View style={styles.whatsappOverlayWrap}>
+          <View style={styles.whatsappOverlayCard}>
+            <Text style={styles.whatsappOverlayText}>
+              {t('GENERAL.REQUEST_HIDDEN_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGenderCode}.hisher`))}
+            </Text>
+            <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={() => onWhatsApp?.()} />
+          </View>
         </View>
       )}
 
@@ -615,56 +576,6 @@ const styles = StyleSheet.create({
     color:      Colors.white,
     textAlign:  'center',
     lineHeight: 18,
-  },
-
-  // ── Photo request overlay ───────────────────────────────────────────────────
-  requestWrap: {
-    ...StyleSheet.absoluteFill,
-    alignItems:     'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    padding: 16,
-  },
-  requestOverlay: {
-    alignItems:        'center',
-    backgroundColor:   'rgba(255,255,255,0.12)',
-    borderRadius:      16,
-    padding:           20,
-    width:             '100%',
-    maxWidth:          220,
-  },
-  requestIcon: {
-    width:        48,
-    height:       48,
-    marginBottom: 10,
-  },
-  requestTitle: {
-    color:        Colors.white,
-    fontSize:     14,
-    fontWeight:   '700',
-    textAlign:    'center',
-    marginBottom:  4,
-  },
-  requestDesc: {
-    color:        'rgba(255,255,255,0.8)',
-    fontSize:     12,
-    textAlign:    'center',
-    lineHeight:   16,
-    marginBottom: 14,
-  },
-  requestBtn: {
-    backgroundColor:   Colors.primary,
-    borderRadius:      50,
-    paddingVertical:   10,
-    paddingHorizontal: 20,
-  },
-  requestBtnPressed: {
-    opacity: 0.82,
-  },
-  requestBtnText: {
-    color:      Colors.white,
-    fontSize:   13,
-    fontWeight: '600',
   },
 
   // ── Own-photo upload overlay ────────────────────────────────────────────────

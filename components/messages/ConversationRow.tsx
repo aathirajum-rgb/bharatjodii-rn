@@ -28,7 +28,10 @@ function ReadTickIcon({ item }: { item: ChatListItem }) {
 
 function LastMessageLine({ item }: { item: ChatListItem }) {
   const { t } = useTranslation()
-  const greyed = item.isReported || item.isDeleted
+  // Angular: messager-list.component.html (JODII-453 fix) — a reported chat is
+  // opened and read like any other one now, so its row keeps its normal last-
+  // message preview and unread badge; only a deleted profile is greyed out.
+  const greyed = item.isDeleted
 
   if (item.kind === 'viewed_number') {
     return (
@@ -80,7 +83,7 @@ interface Props {
 
 export default function ConversationRow({ item, onPress }: Props) {
   const { t } = useTranslation()
-  const greyed = item.isReported || item.isDeleted
+  const greyed = item.isDeleted
   const showUnread = item.unreadCount > 0 && !greyed
   const timeLabel = item.timestamp ? formatChatTime(item.timestamp, t('MESSAGES.YESTERDAY')) : ''
 
@@ -101,9 +104,7 @@ export default function ConversationRow({ item, onPress }: Props) {
 
       <View style={styles.info}>
         <Text style={[styles.name, greyed && styles.nameGreyed]} numberOfLines={1}>{item.name}</Text>
-        {item.isReported ? (
-          <Text style={styles.msgTextGreyed} numberOfLines={1}>{t('MESSAGES.REPORTED_PROFILE')}</Text>
-        ) : item.isDeleted ? (
+        {item.isDeleted ? (
           <Text style={styles.msgTextGreyed} numberOfLines={1}>{t('LIKE_LIST.DELETED_PROFILE_TXT')}</Text>
         ) : (
           <LastMessageLine item={item} />
