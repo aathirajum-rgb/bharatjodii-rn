@@ -5,6 +5,7 @@ import { Endpoints } from './api.endpoints'
 import { StorageKeys } from '../constants/storage.keys'
 import i18n from '../i18n'
 import type { SwiperItem } from '../components/swiper-card/SwiperCard'
+import type { ProfileDeactivateInfo } from '../components/auth/ProfileDeactivatedModal'
 import { stripAgeUnit, pickListingPhoto } from '../adapters/profileListing.adapter'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -201,6 +202,11 @@ export interface RefreshSessionResult {
   // Existing callers here all fire-and-forget (`await refreshSession()`, result
   // unused), so widening this from a plain boolean is safe.
   pageId?: string | undefined
+  // Android: SplashScreenActivity's autologin handler — RESPONSECODE==2 &&
+  // ERRCODE==1 && PROFILEDEACTIVATESTATUS=="1" calls logoutViewModel() and
+  // shows this same popup on the resulting Login screen. Set only in that
+  // exact case; callers should force-logout and surface it.
+  deactivateInfo?: ProfileDeactivateInfo | undefined
 }
 
 export async function refreshSession(): Promise<RefreshSessionResult> {
@@ -251,6 +257,19 @@ export async function refreshSession(): Promise<RefreshSessionResult> {
   }
 
   if (result?.ERRCODE == 1 && result?.RESPONSECODE == 2) {
+    if (result?.RESPONSE?.PROFILEDEACTIVATESTATUS == '1') {
+      return {
+        success: false,
+        deactivateInfo: {
+          title:          result.RESPONSE?.MSGERR?.TITLE ?? '',
+          body:           result.RESPONSE?.MSGERR?.BODY ?? '',
+          cta:            result.RESPONSE?.MSGERR?.CTA ?? '',
+          wcta:           result.RESPONSE?.MSGERR?.WCTA ?? '',
+          callingNumber:  result.RESPONSE?.CALLINGNUMBER ?? '',
+          whatsappNumber: result.RESPONSE?.CONTACTWTNUMBER ?? '',
+        },
+      }
+    }
     // Both tokens dead — callers should redirect to login
     return { success: false }
   }

@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native'
 import { isAvailableAsync, showPhoneNumberHintAsync } from 'expo-phone-number-hint'
+import ProfileDeactivatedModal, { type ProfileDeactivateInfo } from '../../components/auth/ProfileDeactivatedModal'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import AppHeader from '../../components/app-header/AppHeader'
@@ -62,6 +63,7 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
   const [touched,  setTouched]  = useState(false)
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
+  const [deactivateInfo, setDeactivateInfo] = useState<ProfileDeactivateInfo | null>(null)
 
   const inputRef  = useRef<TextInput>(null)
   const labelAnim = useRef(new Animated.Value(0)).current
@@ -146,6 +148,18 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
           mobile,
           countryCode: country.code,
           matriId: String(res?.RESPONSE?.MATRIID ?? ''),
+        })
+        // Android checks this deactivation case (RESPONSECODE==2 && ERRCODE==1)
+        // BEFORE the new-user/WEBVIEWURL branch below — same precedence here,
+        // since a deactivated response could otherwise be misread as new-user.
+      } else if (res?.RESPONSECODE == '2' && res?.ERRCODE == '1' && res?.RESPONSE?.PROFILEDEACTIVATESTATUS == '1') {
+        setDeactivateInfo({
+          title:          res.RESPONSE?.MSGERR?.TITLE ?? '',
+          body:           res.RESPONSE?.MSGERR?.BODY ?? '',
+          cta:            res.RESPONSE?.MSGERR?.CTA ?? '',
+          wcta:           res.RESPONSE?.MSGERR?.WCTA ?? '',
+          callingNumber:  res.RESPONSE?.CALLINGNUMBER ?? '',
+          whatsappNumber: res.RESPONSE?.CONTACTWTNUMBER ?? '',
         })
       } else if (res?.ERRCODE == '1' && res?.RESPONSECODE == '2' && res?.RESPONSE?.WEBVIEWURL) {
         // New user — save mobile, fire partial registration, then go to OTP for phone verification
@@ -341,6 +355,12 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
           />
         </View>
       </KeyboardAvoidingView>
+
+      <ProfileDeactivatedModal
+        visible={!!deactivateInfo}
+        info={deactivateInfo}
+        onClose={() => setDeactivateInfo(null)}
+      />
     </View>
   )
 }

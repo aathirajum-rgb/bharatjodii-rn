@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { Platform } from 'react-native'
 import { getItem } from '../service/storageService'
 import { StorageKeys } from '../constants/storage.keys'
-import { registerLogoutCallback } from '../service/apiClient'
+import { registerLogoutCallback, clearSession } from '../service/apiClient'
 import { getSessionValue } from '../service/registrationService'
 import { loadDrProfiles } from '../service/drService'
 import { refreshSession } from '../service/homeService'
@@ -10,7 +10,9 @@ import { handlePageLanding } from '../service/pageLandingService'
 import { waitForNavigationReady, resetTo } from '../utils/navigationRef'
 import { requestPermissionAndGetToken } from '../service/notificationService'
 import { getInitialWebviewHandoff, applyWebviewHandoff } from '../service/webviewHandoffService'
+import { disconnectSocket } from '../service/socketService'
 import { ENavigation } from '../types/enums/navigation.enum'
+import ProfileDeactivatedModal, { type ProfileDeactivateInfo } from '../components/auth/ProfileDeactivatedModal'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -38,6 +40,12 @@ async function resolveInitialRoute(goToOnboarding: boolean): Promise<InitialRout
 interface AuthContextValue extends AuthState {
   loginUpdate: (userId: string, goToOnboarding?: boolean, pageId?: string) => Promise<void>
   logoutUpdate: () => void
+  // Android: SplashScreenActivity's autologin — deactivation discovered while
+  // already "logged in" (session refresh, not the login-submit screen) forces
+  // a logout and surfaces this same popup on top of whatever screen the user
+  // was on. Exposed so RootNavigation's periodic guardCheck() can report it
+  // too, not just this file's own checkAuth().
+  handleDeactivation: (info: ProfileDeactivateInfo) => Promise<void>
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -57,6 +65,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Stable ref so registerLogoutCallback never captures a stale closure
   const logoutRef = useRef<() => void>(() => {})
+  const [deactivateInfo, setDeactivateInfo] = useState<ProfileDeactivateInfo | null>(null)
+
+  async function handleDeactivation(info: ProfileDeactivateInfo): Promise<void> {
+    disconnectSocket()
+    await clearSession()   // triggers the registered logout callback (logoutUpdate)
+    setDeactivateInfo(info)
+  }
 
   async function checkAuth() {
     // Native-app / deep-link handoff — #/webview/:type/:param/:page_id/:token
@@ -124,8 +139,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       const ready = await waitForNavigationReady()
       if (ready) {
-        const { pageId } = await refreshSession()
-        await handlePageLanding(pageId, userId)
+        const { pageId, deactivateInfo: deactivated } = await refreshSession()
+        if (deactivated) {
+          await handleDeactivation(deactivated)
+        } else {
+          await handlePageLanding(pageId, userId)
+        }
       }
     }
   }
@@ -178,8 +197,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <AuthContext.Provider value={{ ...state, loginUpdate, logoutUpdate }}>
+    <AuthContext.Provider value={{ ...state, loginUpdate, logoutUpdate, handleDeactivation }}>
       {children}
+      {/* Rendered above whatever screen is mounted (Auth or App stack) so a
+          deactivation discovered mid-session — not just at login-submit — is
+          never silently swallowed. */}
+      <ProfileDeactivatedModal
+        visible={!!deactivateInfo}
+        info={deactivateInfo}
+        onClose={() => setDeactivateInfo(null)}
+      />
     </AuthContext.Provider>
   )
 }
