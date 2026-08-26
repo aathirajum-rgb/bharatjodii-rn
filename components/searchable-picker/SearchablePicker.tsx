@@ -30,11 +30,20 @@ const webOutlineReset = { outlineStyle: 'none', outlineWidth: 0 } as any
 
 export type PickerOption = { key: string; label: string }
 
+// Angular: right-side-panel.component.html's *ngIf="ISGROUPED" branch (JODII-490
+// education detail) — a bold EDUCATIONCATEGORY title over each group of options,
+// instead of one flat list. `title: null` renders no heading for that group
+// (Angular: *ngIf="group?.title").
+export type PickerSection = { title: string | null; options: PickerOption[] }
+
 type Props = {
   visible:      boolean
   title:        string
   placeholder:  string
-  options:      PickerOption[]
+  // Either a flat list (options) or grouped sections (groups) — exactly one
+  // should be passed. Search filters within each group's options either way.
+  options?:     PickerOption[]
+  groups?:      PickerSection[]
   selectedKey:  string | null | undefined
   onSelect:     (opt: PickerOption) => void
   onClose:      () => void
@@ -43,8 +52,14 @@ type Props = {
   hideSearch?:  boolean
 }
 
+// Flattened row type FlatList renders — either a section header or an option,
+// discriminated by `type`. Lets one FlatList render both flat and grouped data.
+type Row =
+  | { type: 'header'; key: string; title: string }
+  | { type: 'option'; key: string; option: PickerOption }
+
 export default function SearchablePicker({
-  visible, title, placeholder, options, selectedKey, onSelect, onClose, hideSearch,
+  visible, title, placeholder, options, groups, selectedKey, onSelect, onClose, hideSearch,
 }: Props) {
   const { t }     = useTranslation()
   const insets    = useSafeAreaInsets()
@@ -92,11 +107,27 @@ export default function SearchablePicker({
     handleClose()
   }
 
-  const filtered = useMemo(() => {
+  // Builds the flat row list FlatList renders. Grouped mode: a 'header' row
+  // (skipped when a group's title is null, matching Angular's
+  // *ngIf="group?.title") followed by that group's filtered 'option' rows —
+  // a group with zero matches after filtering contributes no header either.
+  const rows: Row[] = useMemo(() => {
     const q = search.trim().toLowerCase()
-    if (!q) return options
-    return options.filter(o => o.label.toLowerCase().includes(q))
-  }, [options, search])
+    const matches = (o: PickerOption) => !q || o.label.toLowerCase().includes(q)
+
+    if (groups) {
+      const out: Row[] = []
+      groups.forEach((group, gi) => {
+        const opts = group.options.filter(matches)
+        if (opts.length === 0) return
+        if (group.title) out.push({ type: 'header', key: `h-${gi}`, title: group.title })
+        opts.forEach(o => out.push({ type: 'option', key: o.key, option: o }))
+      })
+      return out
+    }
+
+    return (options ?? []).filter(matches).map(o => ({ type: 'option', key: o.key, option: o }))
+  }, [options, groups, search])
 
   return (
     <Modal
@@ -163,7 +194,7 @@ export default function SearchablePicker({
             </View>
           )}
 
-          {filtered.length === 0 ? (
+          {rows.length === 0 ? (
             <View style={styles.emptyBox}>
               {/* Angular: SEARCH.SEARCH_NO_RESULTS */}
               <Text style={[styles.emptyText, { fontFamily: langFonts.regular }]}>
@@ -172,14 +203,30 @@ export default function SearchablePicker({
             </View>
           ) : (
             <FlatList
-              data={filtered}
-              keyExtractor={(item) => item.key}
-              getItemLayout={(_, index) => ({
+              data={rows}
+              keyExtractor={(row) => row.key}
+              // Header rows are a different height than option rows, so a
+              // fixed-height getItemLayout only holds up in flat (ungrouped) mode.
+              getItemLayout={groups ? undefined : (_, index) => ({
                 length: PICKER_ITEM_HEIGHT, offset: PICKER_ITEM_HEIGHT * index, index,
               })}
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="handled"
-              renderItem={({ item }) => {
+              renderItem={({ item: row, index }) => {
+                if (row.type === 'header') {
+                  // Angular: .grouped-category-heading { margin-top: 24px },
+                  // .edu-detail-scroll .grouped-category-heading:first-child
+                  // { margin-top: 0 } — bold 14px title, no top gap for the
+                  // very first group.
+                  return (
+                    <View style={[styles.groupHeader, index === 0 && styles.groupHeaderFirst]}>
+                      <Text style={[styles.groupHeaderText, { fontFamily: langFonts.bold }]}>
+                        {row.title}
+                      </Text>
+                    </View>
+                  )
+                }
+                const item = row.option
                 const isSelected = item.key === selectedKey
                 return (
                   <Pressable
@@ -272,4 +319,15 @@ const styles = StyleSheet.create({
   itemSelected:     { backgroundColor: Colors.radioCheckedBg },
   // Angular: body2-regular-14 (right-side-panel.component.html:41) — Poppins-Regular
   itemText:         { flex: 1, fontSize: 14, fontWeight: '400', color: Colors.textPrimary },
+
+  // ── Grouped sections (education detail) ──────────────────────────────────
+  // Angular: .grouped-category-heading { margin-top: 24px } / :first-child
+  // { margin-top: 0 } / .edu-category-title { font-weight: 700; font-size: 14px }
+  groupHeader: {
+    paddingHorizontal: 20,
+    marginTop:         24,
+    paddingVertical:   8,
+  },
+  groupHeaderFirst: { marginTop: 0 },
+  groupHeaderText:  { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
 })

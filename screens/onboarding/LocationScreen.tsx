@@ -219,7 +219,12 @@ export default function LocationScreen({ navigation }: Props) {
         .replace('  ', ' ')
         .trim()
   const isIndianFlow = countryCode === '91'
-  const countryLabel = isIndianFlow ? 'India' : 'Other'
+  // Angular (getPlaceHolderContent/getMatchedItem): the country NAME itself is
+  // plain data out of the COUNTRYLIST API response, not an i18n key — "India"
+  // displays in English regardless of app language there too. Only the
+  // surrounding label/placeholder chrome ("Country", "Select country") is
+  // actually translated, which the label/placeholder props below handle.
+  const countryLabel = 'India'
   // Angular isLocationValid(): NRI only requires Country+State (city is hidden for NRI on this step)
   const canSubmit = isIndianFlow
     ? !!selectedState && !!selectedCity && !submitting
@@ -272,9 +277,9 @@ export default function LocationScreen({ navigation }: Props) {
               <>
                 {/* Country field — fixed "India" for Indian flow, not interactive */}
                 <FloatField
-                  label="Country"
+                  label={t('REGISTRATION.COUNTRYLABEL', 'Country')}
                   value={countryLabel}
-                  placeholder="Country"
+                  placeholder={t('REGISTRATION.COUNTRYLABEL', 'Country')}
                   onPress={() => {}}
                   hasValue
                   disabled
@@ -283,9 +288,9 @@ export default function LocationScreen({ navigation }: Props) {
 
                 {/* State field */}
                 <FloatField
-                  label="State"
+                  label={t('REGISTRATION.STATELABEL', 'State')}
                   value={selectedState?.label ?? ''}
-                  placeholder="Select state"
+                  placeholder={t('REGISTRATION.SELECTSTATE', 'Select state')}
                   onPress={() => openPanel('state')}
                   hasValue={!!selectedState}
                   langFonts={langFonts}
@@ -297,9 +302,11 @@ export default function LocationScreen({ navigation }: Props) {
                     all until a state is picked, not just disabled. */}
                 {!!selectedState && (
                   <FloatField
-                    label="District"
+                    label={t('REGISTRATION.CITYLABEL', 'District')}
                     value={selectedCity?.label ?? ''}
-                    placeholder={loadingCities ? 'Loading cities…' : 'Select district'}
+                    placeholder={loadingCities
+                      ? t('GENERAL.LOADING', 'Loading…')
+                      : t('REGISTRATION.SELECTCITY', 'Select district')}
                     onPress={() => {
                       if (loadingCities) return
                       openPanel('city')
@@ -316,18 +323,18 @@ export default function LocationScreen({ navigation }: Props) {
                 {/* NRI flow (Angular checkIsNRIUser()): real Country picker + State,
                     no District/City field on this step. */}
                 <FloatField
-                  label="Country"
+                  label={t('REGISTRATION.COUNTRYLABEL', 'Country')}
                   value={selectedCountry?.label ?? ''}
-                  placeholder="Select country"
+                  placeholder={t('REGISTRATION.SELECTCOUNTRY', 'Select country')}
                   onPress={() => openPanel('country')}
                   hasValue={!!selectedCountry}
                   langFonts={langFonts}
                 />
 
                 <FloatField
-                  label="State"
+                  label={t('REGISTRATION.STATELABEL', 'State')}
                   value={selectedState?.label ?? ''}
-                  placeholder="Select state"
+                  placeholder={t('REGISTRATION.SELECTSTATE', 'Select state')}
                   onPress={() => {
                     if (!selectedCountry) return
                     openPanel('state')
@@ -348,8 +355,16 @@ export default function LocationScreen({ navigation }: Props) {
       {/* Shared picker for Country + State + District */}
       <SearchablePicker
         visible={panelVisible}
-        title={panelKind === 'country' ? 'Select country' : panelKind === 'state' ? 'Select state' : 'Select district'}
-        placeholder={panelKind === 'country' ? 'Search country…' : panelKind === 'state' ? 'Search state…' : 'Search district…'}
+        title={
+          panelKind === 'country' ? t('REGISTRATION.SELECTCOUNTRY', 'Select country') :
+          panelKind === 'state'   ? t('REGISTRATION.SELECTSTATE', 'Select state') :
+                                     t('REGISTRATION.SELECTCITY', 'Select district')
+        }
+        placeholder={
+          panelKind === 'country' ? t('REGISTRATION.SEARCHCOUNTRY', 'Search country…') :
+          panelKind === 'state'   ? t('REGISTRATION.SEARCHSTATE', 'Search state…') :
+                                     t('REGISTRATION.SEARCHCITY', 'Search district…')
+        }
         options={panelKind === 'country' ? countries : panelKind === 'state' ? states : cities}
         selectedKey={
           panelKind === 'country' ? selectedCountry?.key ?? null :

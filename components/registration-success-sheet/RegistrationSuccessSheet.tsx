@@ -1,9 +1,11 @@
 import LottieView from 'lottie-react-native'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Animated, Dimensions, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_LOTTIE } from '../../constants/cdn'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -24,6 +26,8 @@ type Props = {
 
 export default function RegistrationSuccessSheet({ visible, onContinue }: Props) {
   const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   const [modalVisible, setModalVisible] = useState(false)
   const slideAnim = useRef(new Animated.Value(SCREEN_H)).current
   const scrimAnim = useRef(new Animated.Value(0)).current
@@ -100,11 +104,15 @@ export default function RegistrationSuccessSheet({ visible, onContinue }: Props)
         </View>
 
         {/* Title */}
-        <Text style={styles.title}>Profile Created Successfully!</Text>
+        <Text style={[styles.title, { fontFamily: langFonts.semiBold }]}>
+          {t('REGISTRATION.PROFILECREATEDTXT', 'Profile Created Successfully!')}
+        </Text>
 
         {/* Continue CTA */}
         <Pressable style={styles.ctaBtn} onPress={handleContinue}>
-          <Text style={styles.ctaLabel}>Continue</Text>
+          <Text style={[styles.ctaLabel, { fontFamily: langFonts.semiBold }]}>
+            {t('REGISTRATION.CONTINUE', 'Continue')}
+          </Text>
           <Text style={styles.ctaArrow}> ›</Text>
         </Pressable>
       </Animated.View>

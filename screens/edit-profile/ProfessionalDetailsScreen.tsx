@@ -20,7 +20,7 @@ import { CDN_REACT } from '../../constants/cdn'
 import { fetchEditProfileInfo, submitFieldChanges, type FieldChange } from '../../service/editProfileService'
 import {
   fetchQualificationOptions, fetchOccupationOptions, fetchMonthlyIncomeOptions,
-  fetchEducationGroupOptions, isEducationGroupEligible, isJobDetailEligible,
+  fetchEducationGroupOptionsFlat, isEducationGroupEligible, isJobDetailEligible,
   isValidJobDetailFormat, updateFewMoreDetail,
 } from '../../service/registrationService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
@@ -88,7 +88,7 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
     setIncome(incomeList.find(o => o.key === info.income) ?? null)
 
     if (isEducationGroupEligible(info.education ?? '')) {
-      const groupList = await fetchEducationGroupOptions(info.education ?? '')
+      const groupList = await fetchEducationGroupOptionsFlat(info.education ?? '')
       setEducationGroupOptions(groupList)
       setEducationGroup(groupList.find(o => o.key === info.educationGroup) ?? null)
     }
@@ -236,7 +236,7 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
           setActivePicker(null)
           if (!changed) return
           setEducationGroup(null)
-          setEducationGroupOptions(isEducationGroupEligible(opt.key) ? await fetchEducationGroupOptions(opt.key) : [])
+          setEducationGroupOptions(isEducationGroupEligible(opt.key) ? await fetchEducationGroupOptionsFlat(opt.key) : [])
         }}
         onClose={() => setActivePicker(null)}
       />

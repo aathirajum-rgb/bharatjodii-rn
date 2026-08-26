@@ -34,6 +34,7 @@ import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
 import { getFewMoreDetailsNextPage } from './fewMoreDetailsFlow'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -43,10 +44,16 @@ const CDN_PAGE_ICON = CDN_REG + 'occupation.svg'
 // as <input> there, and the outline would sit on top of our custom borderColor.
 const webOutlineReset = { outlineStyle: 'none', outlineWidth: 0 } as any
 
-// Angular's label strings embed a <span> for the "(Optional)" suffix styling;
-// RN renders plain text, so the markup is stripped.
-function stripTags(s: string) {
-  return s.replace(/<[^>]+>/g, '').replace(/\s{2,}/g, ' ').trim()
+// Angular's label strings embed a <span> for the "(Optional)" suffix styling —
+// "Job details <span class='body3-regular-12 color-808080'>(Optional)</span>"
+// — the primary-color part before the span, and the #808080-grey "(Optional)"
+// suffix from inside it. Same helper as EducationDetailScreen.tsx's own
+// splitOptionalLabel(), used to render the two segments as separate Text
+// nodes with different colors instead of flattening to plain text.
+function splitOptionalLabel(s: string): { primary: string; secondary: string | null } {
+  const match = s.match(/^(.*?)<span[^>]*>(.*?)<\/span>\s*$/)
+  if (!match) return { primary: s.trim(), secondary: null }
+  return { primary: match[1].trim(), secondary: match[2].trim() }
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -59,8 +66,9 @@ type Props = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function OccupationDetailScreen({ navigation }: Props) {
-  const { t }  = useTranslation()
+  const { t, i18n } = useTranslation()
   const insets = useSafeAreaInsets()
+  const langFonts = useLanguageFonts()
 
   const [value,      setValue]      = useState('')
   const [createdBy,  setCreatedBy]  = useState('1')
@@ -89,8 +97,16 @@ export default function OccupationDetailScreen({ navigation }: Props) {
         .replace(/\s{2,}/g, ' ')
         .trim()
 
-  // Optional field, so an empty value is valid — matches isValidJobDetailFormat().
-  const isValid = isValidJobDetailFormat(value)
+  // isValidJobDetailFormat() treats an empty value as valid (the field is
+  // optional overall — skippable via SHOWSKIPBTN) but that's a submission
+  // check, not a Next-button-enable check: Angular's shared form control
+  // also carries Validators.required, so typed text must actually satisfy
+  // the format AND reach the 3-char minimum (the real gate is the custom
+  // symbolsOnlyAllowDotComma validator, not the weaker Validators.minLength(2)
+  // also present on the control) before Next enables. An empty box still
+  // can't press Next — only Skip moves on without typing anything.
+  const trimmedValue = value.trim()
+  const isValid = trimmedValue.length >= 3 && isValidJobDetailFormat(value)
 
   const borderColor = isFocused
     ? Colors.inputFocus
@@ -106,6 +122,14 @@ export default function OccupationDetailScreen({ navigation }: Props) {
   async function handleNext() {
     if (submitting) return
     const trimmed = value.trim()
+
+    // Mirrors the Next button's disabled state (2-char minimum) — guards the
+    // keyboard's "done"/submit action, which can still fire on an empty box
+    // even while the footer's Next button is disabled. Silently no-ops
+    // instead of showing an error: an empty/too-short box isn't a format
+    // mistake, it just hasn't reached the enable threshold yet — Skip is the
+    // way to move on from here, not Next.
+    if (!isValid) return
 
     if (!isValidJobDetailFormat(value)) {
       setError(t('REG.ALPHABETONLY', 'Please enter valid characters'))
@@ -138,14 +162,23 @@ export default function OccupationDetailScreen({ navigation }: Props) {
     advance()
   }
 
+  // Angular: registration-revamp.component.html's skip CTA is
+  // *ngIf="SHOWSKIPBTN && !isInputFocused && (!showSkipBtn(regPageContent) || ...)",
+  // and showSkipBtn() just returns showNextCTA (true once the field is
+  // valid/Next is enabled) for every page except the '20'/'29' overrides.
+  // So the skip button is visible only while Next isn't enabled yet, and
+  // hides once the typed text becomes valid — page 35 isn't in the override
+  // list, so the general rule applies here too.
   useOnboardingFooter({
     nextDisabled: !isValid,
     nextLoading:  submitting,
     onNext:       handleNext,
-    showSkip:     true,
+    showSkip:     !isValid,
     skipLabel:    t('REGISTRATION.IWILLDOTHISLATER', "I'll do this later"),
     onSkip:       handleSkip,
-  }, [isValid, submitting])
+    // i18n.language: skipLabel is translated, so re-push footer state on a
+    // language change or it stays stuck on whatever language was active at mount.
+  }, [isValid, submitting, i18n.language])
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -163,12 +196,12 @@ export default function OccupationDetailScreen({ navigation }: Props) {
           showsVerticalScrollIndicator={false}
         >
           <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
-          <Text style={os.title}>{title}</Text>
+          <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
           <View style={styles.inputOuter}>
             <TextInput
               ref={inputRef}
-              style={[styles.inputBox, { borderColor }, webOutlineReset]}
+              style={[styles.inputBox, { borderColor, fontFamily: langFonts.medium }, webOutlineReset]}
               value={value}
               onChangeText={text => { setValue(text); if (error) setError('') }}
               onFocus={() => setIsFocused(true)}
@@ -182,15 +215,27 @@ export default function OccupationDetailScreen({ navigation }: Props) {
               returnKeyType="done"
               onSubmitEditing={handleNext}
             />
-            {/* Floating label chip — same treatment as NameScreen */}
-            <View style={styles.labelWrap} pointerEvents="none">
-              <Text style={styles.labelText}>
-                {stripTags(t('REGISTRATION.JOBDETAILLABEL', 'Job details (Optional)'))}
-              </Text>
-            </View>
+            {/* Floating label chip — same treatment as NameScreen. Angular:
+                JOBDETAILLABEL's <span class='body3-regular-12 color-808080'>
+                keeps "(Optional)" muted grey, not the label's primary color. */}
+            {(() => {
+              const { primary, secondary } = splitOptionalLabel(
+                t('REGISTRATION.JOBDETAILLABEL', "Job details <span class='body3-regular-12 color-808080'>(Optional)</span>"),
+              )
+              return (
+                <View style={styles.labelWrap} pointerEvents="none">
+                  <Text style={{ fontFamily: langFonts.regular }}>
+                    <Text style={styles.labelText}>{primary}</Text>
+                    {secondary != null && (
+                      <Text style={[styles.labelText, styles.labelTextSecondary]}> {secondary}</Text>
+                    )}
+                  </Text>
+                </View>
+              )
+            })()}
           </View>
 
-          {!!error && <Text style={os.errorText}>{error}</Text>}
+          {!!error && <Text style={[os.errorText, { fontFamily: langFonts.regular }]}>{error}</Text>}
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -226,5 +271,10 @@ const styles = StyleSheet.create({
     fontSize:   12,
     fontWeight: '400',
     color:      Colors.textPrimary,
+  },
+  // Angular: JOBDETAILLABEL's <span class='body3-regular-12 color-808080'> —
+  // the "(Optional)" suffix renders muted, not the label's primary color.
+  labelTextSecondary: {
+    color: Colors.textSecondary,
   },
 })

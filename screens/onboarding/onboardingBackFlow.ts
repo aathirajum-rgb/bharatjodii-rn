@@ -17,6 +17,7 @@
 import {
   getRegValue,
   isEducationGroupEligible,
+  isGothraApplicableForCaste,
   isJobDetailEligible,
 } from '../../service/registrationService'
 
@@ -39,7 +40,19 @@ const LANDING_BACK_PAGE: Record<string, string> = {
   '12': '11',
   '13': '12',
   '14': '13',
-  '16': '20',
+  // 14 (Caste) -> 16 (Gothra) -> 20 (AddPhoto) is the real forward path
+  // (CasteScreen.tsx's getNextPageAfterCaste), so Gothra backs to Caste. The
+  // Angular map's own '16': '20' points FORWARD — transcribed verbatim, it
+  // made back from Gothra advance to AddPhoto and then strand the user there.
+  '16': '14',
+  // Photo chain 20 -> 21 -> 22. Absent from Angular's own landingBackPage (its
+  // photo pages sit outside the registration wizard's back map), but reachable
+  // here with NO history beneath them — ValidationScreen.tsx and drService.ts
+  // both resetTo page 20 directly — which left the back button hidden and the
+  // user stranded. 20's own target is resolved conditionally below (14 or 16,
+  // depending on whether Gothra was shown), so it is intentionally not here.
+  '21': '20',
+  '22': '21',
   '27': '35',
   '28': '27',
   '29': '28',
@@ -76,6 +89,21 @@ export async function getOnboardingBackPage(pageNo: string): Promise<string | nu
   if (pageNo === '4') {
     const createdBy = String((await getRegValue('CREATEDBY')) ?? '')
     if (!SELF_GENDER.includes(createdBy)) return '2'
+  }
+
+  // Page 20 (AddPhoto) is entered from 14 (Caste) or 16 (Gothra) — GothraScreen
+  // is only shown when the selected caste calls for it, so back mirrors that
+  // same predicate rather than assuming a fixed step. Reachable with no history
+  // via ValidationScreen.tsx / drService.ts's resetTo, hence the need for it.
+  if (pageNo === '20') {
+    const caste = String((await getRegValue('CASTE')) ?? '')
+    // A failure here must not strand the user with a hidden back button —
+    // fall back to the unconditional predecessor.
+    try {
+      return (await isGothraApplicableForCaste(caste)) ? '16' : '14'
+    } catch {
+      return '14'
+    }
   }
 
   if (pageNo === '13') {

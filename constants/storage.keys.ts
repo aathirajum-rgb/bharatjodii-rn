@@ -103,6 +103,9 @@ export const StorageKeys = {
   App: {
     DYNAMIC: 'DYNAMIC',
     PP_SET_DATA: 'PPSETDATA',
+    // Angular: common.ts's callNative() gallery/storage permission popup
+    // escalation counter — see AddPhotoScreen.tsx's openGallery().
+    STG_PERMISSION_COUNT: 'STG_PERMISSION_COUNT',
     APP_VERSION: 'APPVERSION',
     ACTION_TYPE: 'ACTIONTYPE',
     SURVEY_POPUP: 'SURVEYPOPUP',

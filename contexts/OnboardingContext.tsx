@@ -3,17 +3,23 @@ import { createContext, MutableRefObject, useContext, useEffect } from 'react'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type FooterState = {
-  nextLabel?:    string
-  nextDisabled?: boolean
-  nextLoading?:  boolean
-  nextHidden?:   boolean   // hide Next entirely (e.g. DoshamScreen before selection)
-  showSkip?:     boolean
-  skipLabel?:    string
+  nextLabel?:    string | undefined
+  nextDisabled?: boolean | undefined
+  nextLoading?:  boolean | undefined
+  nextHidden?:   boolean | undefined   // hide Next entirely (e.g. custom-gallery screens with no CTA)
+  showSkip?:     boolean | undefined
+  skipLabel?:    string | undefined
+  // Angular: SHOWLINKBTN/LINKBTNTXT (button.config.ts's LINK_BTN) — an
+  // underlined link CTA rendered ABOVE the primary Next button, e.g. page 29's
+  // "Upload horoscope". Only GenerateHoroscopeScreen uses this today.
+  showLink?:     boolean | undefined
+  linkLabel?:    string | undefined
 }
 
 export type FooterHandlers = {
   onNext:  () => void
   onSkip?: () => void
+  onLink?: () => void
 }
 
 // ─── Context ──────────────────────────────────────────────────────────────────
@@ -52,10 +58,13 @@ export function useOnboardingFooter(
       nextHidden:   cfg.nextHidden,
       showSkip:     cfg.showSkip,
       skipLabel:    cfg.skipLabel,
+      showLink:     cfg.showLink,
+      linkLabel:    cfg.linkLabel,
     })
   }, deps)
 
   // Store handlers in ref — no re-render, no stale closure
   handlers.current.onNext = cfg.onNext
   if (cfg.onSkip !== undefined) handlers.current.onSkip = cfg.onSkip
+  if (cfg.onLink !== undefined) handlers.current.onLink = cfg.onLink
 }

@@ -17,6 +17,7 @@ import {
   submitPropertyDetails,
 } from '../../service/registrationService'
 import { CDN_REG } from '../../constants/cdn'
+import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
@@ -45,13 +46,14 @@ type Props = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function PropertyDetailsScreen({ navigation }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const langFonts = useLanguageFonts()
 
   const [options,      setOptions]      = useState<Option[]>([])
   const [fetching,     setFetching]     = useState(true)
   const [selected,     setSelected]     = useState<Set<string>>(new Set())
   const [submitting,   setSubmitting]   = useState(false)
+  const [createdBy,    setCreatedBy]    = useState('1')
 
   // Extracted so a language change can re-run it — the option labels below are
   // server-translated. Angular: handleLanguageChange() → runInitialDataPopulation()
@@ -60,6 +62,8 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
   // the same, so the user's selection survives the switch.
   function loadOptions() {
     getRegValues().then((regVals) => {
+      if (regVals.CREATEDBY) setCreatedBy(regVals.CREATEDBY)
+
       const existing = regVals.PROPERTIES
       if (existing) {
         const keys = Array.isArray(existing)
@@ -79,6 +83,16 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
 
   useLanguageReload(loadOptions)
 
+  // Angular: TITLE ADDPROPERTYDETAILS embeds #PROFILETYPE# (own/son's/daughter's
+  // etc.), same possessive-substitution pattern as FamilyDetailsScreen.tsx.
+  const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
+  const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
+  const title = t('REGISTRATION.ADDPROPERTYDETAILS', 'Add #PROFILETYPE# property details')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+  const subtitle = t('REGISTRATION.ADDPROPRTYSUBTITLE', 'You can add multiple properties from the below list')
+
   function toggleOption(key: string) {
     setSelected(prev => {
       const next = new Set(prev)
@@ -89,12 +103,15 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
   }
 
   async function handleNext() {
-    if (submitting) return
+    // Mirrors the Next button's own disabled state (see useOnboardingFooter
+    // below) — guards the same case the footer button already prevents, so
+    // this can never be reached with zero properties checked.
+    if (submitting || selected.size === 0) return
     setSubmitting(true)
     try {
       const keys = Array.from(selected)
       await setRegValue('PROPERTIES', keys as any)
-      if (keys.length > 0) await submitPropertyDetails(keys)
+      await submitPropertyDetails(keys)
       navigation.push('onboarding', { pageNo: '29' })
     } catch {
       // Allow retry
@@ -107,13 +124,27 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
     navigation.push('onboarding', { pageNo: '29' })
   }
 
+  // Angular: checkForUpdateCTA()'s general fallback — no ASSETS/FAMILYPROPERTY
+  // special case exists above it in that function, so showNextCTA for page 28
+  // is FUNC.IsValidParamWithoutZero(registrationValues['FAMILYPROPERTY']),
+  // i.e. Next only enables once at least one property is checked.
+  //
+  // Angular: registration-revamp.component.html's skip CTA is
+  // *ngIf="SHOWSKIPBTN && !isInputFocused && (!showSkipBtn(regPageContent) || ...)",
+  // and showSkipBtn() just returns showNextCTA (true once Next is enabled)
+  // for every page except the '20'/'29' overrides — page 28 isn't in that
+  // list, so skip is visible only until at least one property is checked,
+  // then hides. Same rule as pages 34/35.
   useOnboardingFooter({
+    nextDisabled: selected.size === 0,
     nextLoading: submitting,
     onNext: handleNext,
-    showSkip: true,
+    showSkip: selected.size === 0,
     skipLabel: t('REG.DO_LATER', "I'll do this later"),
     onSkip: handleSkip,
-  }, [submitting])
+    // i18n.language: skipLabel is translated, so re-push footer state on a
+    // language change or it stays stuck on whatever language was active at mount.
+  }, [submitting, selected, i18n.language])
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -130,10 +161,8 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
           contentFit="contain"
         />
 
-        <Text style={styles.title}>Add property details</Text>
-        <Text style={styles.subtitle}>
-          You can add multiple properties from the below list
-        </Text>
+        <Text style={[styles.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
+        <Text style={[styles.subtitle, { fontFamily: langFonts.regular }]}>{subtitle}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />

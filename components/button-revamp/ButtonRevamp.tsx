@@ -2,6 +2,7 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, type StyleProp, type Vi
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -149,6 +150,12 @@ export default function ButtonRevamp({
   const st = SIZE_TOKENS[size]
   const iconUrl = icon ? ICON_URLS[icon] : undefined
   const isLink = variant === 'link'
+  // Button labels are always server-translated text (CTA copy) — Poppins for
+  // English, the matching NotoSans script for every other language, same as
+  // every other piece of onboarding/registration text. This is read here
+  // (rather than requiring every one of this component's ~50 call sites to
+  // pass it) so no button in the app is silently stuck on the system font.
+  const langFonts = useLanguageFonts()
 
   return (
     <Pressable
@@ -190,6 +197,7 @@ export default function ButtonRevamp({
               {
                 fontSize:   st.fontSize,
                 fontWeight: st.fontWeight,
+                fontFamily: st.fontWeight === '600' ? langFonts.semiBold : st.fontWeight === '500' ? langFonts.medium : langFonts.regular,
                 color:      disabled ? Colors.textTertiary : vt.textColor,
               },
             ]}

@@ -4,9 +4,9 @@
 //   https://...#/login/<JSON_BASE64>/2
 // In RN we call this same API and parse the same payload — no WebView needed.
 
-import { apiCall, fetchUserIp } from './apiClient'
+import { apiCall, fetchUserIp, uploadFile } from './apiClient'
 import { Endpoints } from './api.endpoints'
-import { getItem, setItem, removeMultiple } from './storageService'
+import { getItem, setItem, removeMultiple,getJson } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { navigate } from '../utils/navigationRef'
 import { ENavigation } from '../types/enums/navigation.enum'
@@ -387,6 +387,63 @@ export async function getRegistrationArrays(force = false): Promise<Record<strin
     await setItem('REGISTRATIONARRAYS_LANG', lang)
   }
   return data
+}
+
+// Angular: common-funtions.ts's check_Paid_Verified_Nophoto() — gates which
+// registrationArrays bucket (PHOTOPUBLISHPAID vs PHOTOPUBLISHED) supplies the
+// Add Photo page's INTERMEDIATE content. ALL of entryType=='P', ekycStatus=='1',
+// gender=='M', PPSETDATA.PI_PHOTOSTATUS in ['P','N','R'], and PAYPFLAG=='1'
+// must hold for the paid bucket; otherwise the free bucket is used.
+async function isPaidVerifiedNophoto(): Promise<boolean> {
+  const [entryType, ekycStatus, gender, ppSet, paidFlag] = await Promise.all([
+    getSessionValue('ENTRYTYPE'),
+    getItem(SK.Verification.EKYC_STATUS),
+    getItem(SK.User.LOGIN_GENDER),
+    getJson<Record<string, any>>(SK.App.PP_SET_DATA),
+    getItem(SK.Payment.PAY_P_FLAG),
+  ])
+  const photoStatus = (ppSet as any)?.PI_PHOTOSTATUS ?? ''
+  return (
+    entryType === 'P' &&
+    ekycStatus === '1' &&
+    gender === 'M' &&
+    ['P', 'N', 'R'].includes(photoStatus) &&
+    paidFlag === '1'
+  )
+}
+
+// Fetches the Add Photo page's dynamic banner copy — Angular:
+// add-photo.component.ts's getLanguageContent() reads
+// registrationArray = check_Paid_Verified_Nophoto() ? hasArrayData.PHOTOPUBLISHPAID
+//                                                    : hasArrayData.PHOTOPUBLISHED
+// then add-photo.component.html's promotype==='1' block (the only variant used by
+// registration-revamp.component.html, which never binds [promotype]) reads
+// INTERMEDIATE.{SUBHEADER, BODY.CONTENT1, BODY.CONTENT2, CTA} off that object.
+// All values are server-translated text, so each is run through label() same as
+// every other registrationArrays field.
+export interface RegistrationIntermediateContent {
+  header:    string | null
+  subheader: string | null
+  content1:  string | null
+  content2:  string | null
+  cta:       string | null
+}
+
+export async function fetchAddPhotoIntermediateContent(): Promise<RegistrationIntermediateContent> {
+  const [data, isPaidBucket] = await Promise.all([getRegistrationArrays(), isPaidVerifiedNophoto()])
+  const bucket = isPaidBucket ? data?.PHOTOPUBLISHPAID : data?.PHOTOPUBLISHED
+  const intermediate = bucket?.INTERMEDIATE
+  return {
+    // Angular: add-photo.component.ts's bindTitle(INTERMEDIATE) — for the
+    // onboarding fromPage (the default branch, neither 'activity' nor
+    // 'messages') it returns INTERMEDIATE.HEADER, same server-translated
+    // bucket as the rest of this content, not an i18n key.
+    header:    intermediate?.HEADER              != null ? label(intermediate.HEADER)             : null,
+    subheader: intermediate?.SUBHEADER          != null ? label(intermediate.SUBHEADER)          : null,
+    content1:  intermediate?.BODY?.CONTENT1     != null ? label(intermediate.BODY.CONTENT1)      : null,
+    content2:  intermediate?.BODY?.CONTENT2     != null ? label(intermediate.BODY.CONTENT2)      : null,
+    cta:       intermediate?.CTA                != null ? label(intermediate.CTA)                : null,
+  }
 }
 
 // Fetches month names from the MONTH key in registrationArrays (server-translated —
@@ -928,41 +985,59 @@ export function isJobDetailEligible(occupation: string): boolean {
 }
 
 // Angular: registration-revamp.component.ts's buildEducationDetailGroups()/
-// normalizeEducationDetails() read REGISTRATIONARRAYS.EDUCATIONDETAILS — raw
-// { MASTER: {cat: {eduKey: label}}, BACHELOR: {...}, COMMON: {...} } — already
-// present in the same type=all bootstrap this file caches everywhere else, so
-// (unlike Subcaste) this needs no dedicated network call, just a flatten of
-// the cached array for the given qualification plus the always-appended
-// COMMON group. Angular also groups results by EDUCATIONCATEGORY for a
-// section-header UI; SearchablePicker has no section-header support, so this
-// returns one flat list — matches the ungrouped fallback Angular itself uses
-// when category data is unavailable.
+// common-funtions.ts's getArrayObj() read REGISTRATIONARRAYS.EDUCATIONDETAILS
+// — raw { MASTER: {catKey: {eduKey: label}}, BACHELOR: {...}, COMMON: {...} }
+// — plus REGISTRATIONARRAYS.EDUCATIONCATEGORY — { <qualification>: {catKey:
+// catTitle} } — both already present in the same type=all bootstrap this file
+// caches everywhere else, so (unlike Subcaste) this needs no dedicated network
+// call. Returns one section per EDUCATIONCATEGORY entry (e.g. "Engineering/
+// Computers", "Arts/Science/Commerce", "Management"), qualification-specific
+// group first then the always-appended COMMON group — same order as Angular's
+// [...getArrayObj(groupForQual), ...getArrayObj(commonGroup)].
+export type EducationGroupSection = {
+  title:   string | null
+  options: Array<{ key: string; label: string }>
+}
+
 export async function fetchEducationGroupOptions(
   qualification: string,
-): Promise<Array<{ key: string; label: string }>> {
+): Promise<EducationGroupSection[]> {
   const data = await getRegistrationArrays()
   const raw  = data?.EDUCATIONDETAILS
   if (!raw || typeof raw !== 'object') return []
 
-  const flatten = (grouped: any): Record<string, string> => {
-    if (!grouped || typeof grouped !== 'object') return {}
-    const isNested = Object.values(grouped).some(v => v && typeof v === 'object')
-    if (!isNested) return grouped as Record<string, string>
-    const flat: Record<string, string> = {}
-    Object.values(grouped).forEach((cat: any) => {
-      if (cat && typeof cat === 'object') Object.assign(flat, cat)
-    })
-    return flat
+  const categoryMap = data?.EDUCATIONCATEGORY?.[qualification] ?? {}
+
+  // Angular: getArrayObj(obj, contObj) — one section per top-level key of
+  // `obj` (a category key → its degree map), titled from contObj[catKey].
+  const toSections = (grouped: any): EducationGroupSection[] => {
+    if (!grouped || typeof grouped !== 'object') return []
+    return Object.entries(grouped)
+      .filter(([, degrees]) => degrees && typeof degrees === 'object')
+      .map(([catKey, degrees]) => ({
+        title:   categoryMap[catKey] != null ? label(categoryMap[catKey]) : null,
+        options: Object.entries(degrees as Record<string, string>)
+          .map(([key, value]) => ({ key, label: label(value) }))
+          .filter(o => o.key !== ''),
+      }))
   }
 
-  const groupKey  = qualification === '1' ? 'MASTER' : qualification === '2' ? 'BACHELOR' : null
-  const groupMap  = groupKey ? flatten(raw[groupKey]) : {}
-  const commonMap = flatten(raw['COMMON'])
+  const groupKey = qualification === '1' ? 'MASTER' : qualification === '2' ? 'BACHELOR' : null
+  const sections = [
+    ...(groupKey ? toSections(raw[groupKey]) : []),
+    ...toSections(raw['COMMON']),
+  ].filter(s => s.options.length > 0)
 
-  const toOptions = (obj: Record<string, string>) =>
-    Object.entries(obj).map(([key, value]) => ({ key, label: label(value) }))
+  return sections
+}
 
-  return [...toOptions(groupMap), ...toOptions(commonMap)].filter(o => o.key !== '')
+// Flat convenience wrapper over fetchEducationGroupOptions() — used wherever
+// a single flat list is enough (e.g. resolving a saved EDUGROUP key's label).
+export async function fetchEducationGroupOptionsFlat(
+  qualification: string,
+): Promise<Array<{ key: string; label: string }>> {
+  const sections = await fetchEducationGroupOptions(qualification)
+  return sections.flatMap(s => s.options)
 }
 
 // Saves or clears EDUGROUP/JOBDETAIL against the live profile.
@@ -990,9 +1065,17 @@ export async function updateFewMoreDetail(
 }
 
 // Job Detail free-text format check.
-// Angular: registration-functions.ts's symbolsOnlyAllowDotComma() plus the
-// form's Validators.pattern — letters/marks/spaces/./, only, no digits,
-// minimum 3 trimmed characters. Empty string is always valid (field is optional).
+// Angular: registration-revamp.component.ts's initializeForm() — the shared
+// 'name' FormControl (JOBDETAIL reuses TYPE=2's control) is built with
+// Validators.required + Validators.minLength(2) + a pattern, but Next is
+// actually gated by the extra custom validator symbolsOnlyAllowDotComma()
+// (registration-functions.ts), which returns an error until
+// control.value.trim().length >= 3 — a stricter floor than minLength(2), and
+// the one that wins. The <ion-input minlength="3"> HTML attribute matches
+// this real behavior. Empty string is always valid here since the RN screen
+// treats the field as optional (skippable via SHOWSKIPBTN, unlike Angular's
+// `required` which would otherwise block Next on an empty, untouched field
+// too).
 export function isValidJobDetailFormat(value: string): boolean {
   const trimmed = value.trim()
   if (trimmed === '') return true
@@ -1396,44 +1479,34 @@ export async function submitPropertyDetails(properties: string[]): Promise<void>
 }
 
 // ─── Horoscope (Star / Raasi / Dosham) ───────────────────────────────────────
-// Angular: registration/zodiacinfo/v1 — POST with ID&STAR&RAASI&DOSHAM
-// Empty values fetches dropdown options; filled values saves the data.
-// Stars filtered by raasi: registrationform/v1 — POST with type=stars&RAASIID=X&LANG=en
+// Angular (registration-revamp.component.ts's getRegistrationDynamicArray() →
+// common.ts's getDynamicPopulateArrayList()): BOTH RAASI and STAR come from
+// the SAME shared type=all/LANG=<lang> bootstrap cache as BOTHER/SISTER/ASSETS/
+// DOSHAM (registrationArray['RAASI'] / registrationArray['STAR'], read directly,
+// component.ts ~744) — NOT from a separate zodiacinfo or type=raasi/type=stars
+// call. Angular's STAR list is also never filtered by the selected raasi: the
+// one place a raasi-scoped `type=stars&RAASIID=` call exists (getStarDetail(),
+// component.ts:3932) always sends RAASIID blank (fetches the full unfiltered
+// list) and only runs once, after horoscope generation succeeds — not as part
+// of normal raasi→star selection. A previous version of this file called
+// zodiacinfo/v1 (blank STAR/RAASI/DOSHAM) for raasi and a raasi-filtered
+// `type=stars&RAASIID=X` call for star — both diverged from Angular's actual
+// source and behavior; fixed to mirror getRegistrationArrays()'s shared cache
+// exactly, same as fetchFamilyOptions/fetchPropertyOptions/fetchDoshamOptions.
 
 export async function fetchRaasiOptions(): Promise<Array<{ key: string; label: string }>> {
-  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-  const lang   = await getItem('LANG') ?? 'en'
-  const res    = await apiCall(
-    Endpoints.registration.updateReligious,
-    'POST',
-    `ID=${userId}&STAR=&RAASI=&DOSHAM=`,
-  )
-  if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0 && res?.RESPONSE?.RAASI) {
-    return objToOptions(res.RESPONSE.RAASI)
-  }
-  // Fallback: fetch from initialfetch endpoint
-  const res2 = await apiCall(
-    Endpoints.registration.initialFetch,
-    'POST',
-    `type=raasi&LANG=${lang}`,
-  )
-  if (res2?.RESPONSECODE == 1 && res2?.ERRCODE == 0 && res2?.RESPONSE) {
-    return objToOptions(res2.RESPONSE.RAASI ?? res2.RESPONSE)
-  }
-  return []
+  const data = await getRegistrationArrays()
+  return objToOptions(data?.RAASI)
 }
 
-export async function fetchStarOptions(raasiId: string): Promise<Array<{ key: string; label: string }>> {
-  const lang = await getItem('LANG') ?? 'en'
-  const res  = await apiCall(
-    Endpoints.registration.initialFetch,
-    'POST',
-    `type=stars&RAASIID=${raasiId}&LANG=${lang}`,
-  )
-  if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0 && res?.RESPONSE) {
-    return objToOptions(res.RESPONSE)
-  }
-  return []
+// `_raasiId` is accepted but intentionally unused — kept only so every
+// existing caller (Edit Profile screens, Search filters, StarRaasiScreen)
+// compiles unchanged. Angular never actually filters STAR by raasi (see
+// header comment above), so a raasi-scoped signature would misrepresent the
+// real behavior even though it's harmless to keep passing one in.
+export async function fetchStarOptions(_raasiId?: string): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  return objToOptions(data?.STAR)
 }
 
 // `star`/`raasi` params are kept only for signature compatibility with
@@ -1568,6 +1641,28 @@ export async function generateHoroscope(params: GenerateHoroscopeParams): Promis
     await setItem(SK.Profile.HOROSCOPE_AVAILABLE, '1')
   }
 
+  return ok
+}
+
+// Angular: Filehandler.openFilePicker('uploadhoroscope', matriId, 'UPLOADPHOTO',
+// 'image/*', false) → httpservice.uploadData(), a plain multipart POST to
+// nbphoto/uploadhoroscope.php (ID + UPLOADPHOTO). On success, uploadHoroSuccess()
+// (registration-revamp.component.ts) sets HOROSCOPEAVAILABLE=1 and moves on —
+// mirrored here by flipping the same SK.Profile.HOROSCOPE_AVAILABLE flag
+// generateHoroscope() already reads/writes, rather than a second unused key.
+export async function uploadHoroscopeFile(fileUri: string): Promise<boolean> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const filename = fileUri.split('/').pop() ?? 'horoscope.jpg'
+  const ext      = filename.split('.').pop()?.toLowerCase() ?? 'jpg'
+  const mimeType = ext === 'png' ? 'image/png' : ext === 'pdf' ? 'application/pdf' : 'image/jpeg'
+
+  const formData = new FormData()
+  formData.append('ID', userId)
+  formData.append('UPLOADPHOTO', { uri: fileUri, name: filename, type: mimeType } as any)
+
+  const res = await uploadFile(Endpoints.media.uploadHoroscope, formData)
+  const ok  = res?.RESPONSECODE == 1 || res?.RESPONSECODE == '1'
+  if (ok) await setItem(SK.Profile.HOROSCOPE_AVAILABLE, '1')
   return ok
 }
 
