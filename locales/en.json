@@ -1617,6 +1617,9 @@
         
      },
      "GENERAL":{
+        "EXIT_CONFIRM_TITLE":"Do you want to exit?",
+        "EXIT_YES":"Yes",
+        "EXIT_NO":"No",
         "PROFILEDELETED":"This profile is deleted or currently unavailable",
         "PROFILEDELETED_HV":"Profile deleted",
         "NOINTERNET":"Please check internet connection",

@@ -164,7 +164,7 @@ export default function GothraScreen({ navigation }: Props) {
                 ]}
                 numberOfLines={1}
               >
-                {selected ? selected.label : 'Select Gothram'}
+                {selected ? selected.label : t('REGISTRATION.SELECTGOTHRAM', 'Select gothram')}
               </Text>
               <Text style={styles.selectFieldArrow}>›</Text>
             </Pressable>
@@ -185,8 +185,8 @@ export default function GothraScreen({ navigation }: Props) {
       {/* Gothram picker */}
       <SearchablePicker
         visible={panelVisible}
-        title="Select gothram"
-        placeholder="Search gothram..."
+        title={t('REGISTRATION.SELECTGOTHRAM', 'Select gothram')}
+        placeholder={t('REGISTRATION.SEARCHGOTHRAM', 'Search gothram')}
         options={allOptions}
         selectedKey={selected?.key ?? null}
         onSelect={(opt) => setSelected(opt)}

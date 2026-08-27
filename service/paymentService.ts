@@ -606,7 +606,7 @@ export interface MembershipPlan {
   paidamt:        string   // pre-formatted final amount to charge
   discountamount?: string | undefined // pre-formatted, e.g. "₹850"
   discounttitle?: string | undefined  // pre-formatted "Save ₹850" from API (trimmed of surrounding whitespace)
-  benefits:       MembershipBenefit[] // [0] = Call/WhatsApp matches, [1] = additional matches who liked you
+  benefits:       MembershipBenefit[] // [0] = Call/WhatsApp matches, [1] = Message matches, [2] = horoscope access
   tag?:           string | undefined  // '1' = most-sold badge
   splprodflag?:   string | undefined  // '1' = "only for you" badge
   pkgcost?:       string | undefined

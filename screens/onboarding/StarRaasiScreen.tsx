@@ -53,7 +53,6 @@ export default function StarRaasiScreen({ navigation }: Props) {
   const [selectedStar,  setSelectedStar]  = useState<Option | null>(null)
 
   const [fetchingRaasi, setFetchingRaasi] = useState(true)
-  const [fetchingStar,  setFetchingStar]  = useState(false)
   const [submitting,    setSubmitting]    = useState(false)
   const [createdBy,     setCreatedBy]     = useState('1')
   const [activePanel,   setActivePanel]   = useState<ActivePanel>(null)
@@ -63,28 +62,27 @@ export default function StarRaasiScreen({ navigation }: Props) {
   // → getRegistrationDynamicArray(true, 1), then assignRegistrationData() re-resolves
   // the stored KEY against the newly translated list. Re-reading storage here does
   // the same, so the user's selection survives the switch.
+  //
+  // Both RAASI and STAR come from the SAME shared bootstrap cache (see
+  // fetchRaasiOptions/fetchStarOptions) — fetched together here, matching
+  // Angular where neither list depends on the other (STAR is never filtered
+  // by the selected raasi in Angular).
   function loadOptions() {
     getRegValues().then((rv) => {
       if (rv.CREATEDBY) setCreatedBy(rv.CREATEDBY)
 
-      fetchRaasiOptions()
-        .then(list => {
-          setRaasiOptions(list)
-          if (rv.RAASI && list.length) {
-            const found = list.find(o => o.key === rv.RAASI)
-            if (found) {
-              setSelectedRaasi(found)
-              // Restore star selection for the saved raasi
-              fetchStarOptions(rv.RAASI)
-                .then(stars => {
-                  setStarOptions(stars)
-                  if (rv.STAR && stars.length) {
-                    const foundStar = stars.find(o => o.key === rv.STAR)
-                    if (foundStar) setSelectedStar(foundStar)
-                  }
-                })
-                .catch(() => {})
-            }
+      Promise.all([fetchRaasiOptions(), fetchStarOptions()])
+        .then(([raasiList, starList]) => {
+          setRaasiOptions(raasiList)
+          setStarOptions(starList)
+
+          if (rv.RAASI && raasiList.length) {
+            const found = raasiList.find(o => o.key === rv.RAASI)
+            if (found) setSelectedRaasi(found)
+          }
+          if (rv.STAR && starList.length) {
+            const foundStar = starList.find(o => o.key === rv.STAR)
+            if (foundStar) setSelectedStar(foundStar)
           }
         })
         .catch(() => {})
@@ -96,19 +94,13 @@ export default function StarRaasiScreen({ navigation }: Props) {
 
   useLanguageReload(loadOptions)
 
-  async function selectRaasi(opt: Option) {
+  function selectRaasi(opt: Option) {
+    // Angular: resetValuesIfNeeded() clears STAR when RAASI changes — the star
+    // list itself doesn't change (it's the same shared unfiltered list), but a
+    // previously-picked star may no longer be the user's intent once they've
+    // changed their raasi, so the selection is cleared, not the list.
     setSelectedRaasi(opt)
     setSelectedStar(null)
-    setStarOptions([])
-    setFetchingStar(true)
-    try {
-      const stars = await fetchStarOptions(opt.key)
-      setStarOptions(stars)
-    } catch {
-      // user can retry by reopening star picker
-    } finally {
-      setFetchingStar(false)
-    }
   }
 
   async function handleNext() {
@@ -125,26 +117,23 @@ export default function StarRaasiScreen({ navigation }: Props) {
     }
   }
 
-  function handleSkip() {
-    navigation.push('onboarding', { pageNo: '32' })
-  }
-
   const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
   const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
   const title = t('REGISTRATION.STARRASSI', 'Select your #PROFILETYPE# rassi & star')
     .replace('#PROFILETYPE#', translatedProfileType)
     .replace('  ', ' ')
     .trim()
-  const canNext    = !!selectedRaasi && !!selectedStar
+  const canNext = !!selectedRaasi && !!selectedStar
 
+  // Angular: the Next button is ALWAYS rendered on this page, just
+  // [isDisabled]="!showNextCTA" — disabled (not hidden) until both RAASI and
+  // STAR are valid (isStarRassiValueValid()). "I'll do this later" removed
+  // entirely on this screen per product direction (Angular does show it,
+  // toggling off once Next enables, but this port omits it regardless).
   useOnboardingFooter({
-    nextHidden: !canNext,
     nextDisabled: !canNext,
-    nextLoading: submitting,
-    onNext: handleNext,
-    showSkip: !canNext,
-    skipLabel: t('REG.DO_LATER', "I'll do this later"),
-    onSkip: handleSkip,
+    nextLoading:  submitting,
+    onNext:       handleNext,
   }, [canNext, submitting])
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -188,31 +177,30 @@ export default function StarRaasiScreen({ navigation }: Props) {
               </Pressable>
             </View>
 
-            {/* ── Star field — only after raasi is selected ─────────── */}
+            {/* ── Star field — only after raasi is selected. The star list itself
+                is already loaded alongside raasi's (it's the same shared,
+                unfiltered list Angular uses — see fetchStarOptions), so no
+                separate per-selection fetch/loading state is needed here. ── */}
             {selectedRaasi && (
-              fetchingStar ? (
-                <ActivityIndicator color={Colors.primary} size="small" style={styles.starLoader} />
-              ) : (
-                <View style={[styles.fieldWrapper, styles.fieldGap]}>
-                  <View style={styles.fieldLabelBadge}>
-                    <Text style={[styles.fieldLabelText, { fontFamily: langFonts.regular }]}>{t('REGISTRATION.STAR', 'Star')}</Text>
-                  </View>
-                  <Pressable
-                    style={styles.selectField}
-                    onPress={() => setActivePanel('star')}
-                    accessibilityRole="button"
-                    accessibilityLabel="Select star"
-                  >
-                    <Text
-                      style={[styles.selectFieldText, !!selectedStar && styles.selectFieldTextActive, { fontFamily: langFonts.regular }]}
-                      numberOfLines={1}
-                    >
-                      {selectedStar ? selectedStar.label : t('REGISTRATION.SELECTSTAR', 'Select Star')}
-                    </Text>
-                    <Text style={styles.selectFieldArrow}>›</Text>
-                  </Pressable>
+              <View style={[styles.fieldWrapper, styles.fieldGap]}>
+                <View style={styles.fieldLabelBadge}>
+                  <Text style={[styles.fieldLabelText, { fontFamily: langFonts.regular }]}>{t('REGISTRATION.STAR', 'Star')}</Text>
                 </View>
-              )
+                <Pressable
+                  style={styles.selectField}
+                  onPress={() => setActivePanel('star')}
+                  accessibilityRole="button"
+                  accessibilityLabel="Select star"
+                >
+                  <Text
+                    style={[styles.selectFieldText, !!selectedStar && styles.selectFieldTextActive, { fontFamily: langFonts.regular }]}
+                    numberOfLines={1}
+                  >
+                    {selectedStar ? selectedStar.label : t('REGISTRATION.SELECTSTAR', 'Select Star')}
+                  </Text>
+                  <Text style={styles.selectFieldArrow}>›</Text>
+                </Pressable>
+              </View>
             )}
           </View>
         )}
@@ -220,7 +208,8 @@ export default function StarRaasiScreen({ navigation }: Props) {
 
       {/* Sticky footer handled globally via useOnboardingFooter */}
 
-      {/* Raasi picker */}
+      {/* Raasi picker — Angular's page-26 config (registration.config.ts,
+          LISTDATA[0]) has ISSHOWSEARCHBAR: false for RAASI, so no search box. */}
       <SearchablePicker
         visible={activePanel === 'raasi'}
         title={t('REGISTRATION.RAASI', 'Select Raasi')}
@@ -229,9 +218,10 @@ export default function StarRaasiScreen({ navigation }: Props) {
         selectedKey={selectedRaasi?.key ?? null}
         onSelect={opt => { selectRaasi(opt); setActivePanel(null) }}
         onClose={() => setActivePanel(null)}
+        hideSearch
       />
 
-      {/* Star picker */}
+      {/* Star picker — same config, LISTDATA[1]: ISSHOWSEARCHBAR: false for STAR. */}
       <SearchablePicker
         visible={activePanel === 'star'}
         title={t('REGISTRATION.STAR', 'Select Star')}
@@ -240,6 +230,7 @@ export default function StarRaasiScreen({ navigation }: Props) {
         selectedKey={selectedStar?.key ?? null}
         onSelect={opt => { setSelectedStar(opt); setActivePanel(null) }}
         onClose={() => setActivePanel(null)}
+        hideSearch
       />
     </View>
   )
@@ -248,8 +239,7 @@ export default function StarRaasiScreen({ navigation }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  loader:     { marginTop: 48 },
-  starLoader: { marginTop: 20, alignSelf: 'flex-start' },
+  loader: { marginTop: 48 },
 
   fields: { gap: 0 },
 

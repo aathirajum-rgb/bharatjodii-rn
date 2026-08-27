@@ -31,9 +31,8 @@ import { CDN_REG, CDN_SVG } from '../../constants/cdn'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
-import { Fonts, FontsByLanguage } from '../../src/theme/fonts'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
-import i18n from '../../i18n'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -230,10 +229,10 @@ export default function HeightScreen({ navigation }: Props) {
   const hasSelection = selectedCategory !== null || selectedHeight !== null
 
   // Poppins for English, the matching NotoSans script for every other
-  // language (e.g. NotoSansTelugu for Telugu) — same per-language family
-  // lookup LanguageSelectionScreen uses, applied here since these category
-  // labels are server-translated and can be in any supported language.
-  const langFonts = FontsByLanguage[i18n.language] ?? FontsByLanguage.en
+  // language (e.g. NotoSansTelugu for Telugu) — every Text below that renders
+  // translated/server-provided content uses this instead of a hardcoded
+  // Fonts.poppins* family, so it switches scripts along with the app language.
+  const langFonts = useLanguageFonts()
 
   // Panel slides in from the right
   const panelTranslateX = slideAnim.interpolate({
@@ -280,7 +279,7 @@ export default function HeightScreen({ navigation }: Props) {
           contentFit="contain"
         />
 
-        <Text style={os.title}>{title}</Text>
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {fetching ? (
           <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
@@ -296,7 +295,7 @@ export default function HeightScreen({ navigation }: Props) {
             <View style={styles.exactFieldWrapper}>
               {!!selectedHeight && (
                 <View style={styles.exactFieldLabel} pointerEvents="none">
-                  <Text style={styles.exactFieldLabelText}>
+                  <Text style={[styles.exactFieldLabelText, { fontFamily: langFonts.regular }]}>
                     {t('REGISTRATION.HEIGHTLABEL', 'Height')}
                   </Text>
                 </View>
@@ -306,7 +305,7 @@ export default function HeightScreen({ navigation }: Props) {
                 onPress={openPanel}
                 accessibilityRole="button"
               >
-                <Text style={styles.exactFieldText} numberOfLines={1}>
+                <Text style={[styles.exactFieldText, { fontFamily: langFonts.regular }]} numberOfLines={1}>
                   {selectedHeight
                     ? selectedHeight.label
                     : linkText}
@@ -319,7 +318,7 @@ export default function HeightScreen({ navigation }: Props) {
                 instead of the plain colored lines this screen drew before. */}
             <View style={styles.orRow}>
               <Image source={{ uri: CDN_OR_LEFT }} style={styles.orLine} contentFit="contain" />
-              <Text style={styles.orText}>{orText}</Text>
+              <Text style={[styles.orText, { fontFamily: langFonts.regular }]}>{orText}</Text>
               <Image source={{ uri: CDN_OR_RIGHT }} style={styles.orLine} contentFit="contain" />
             </View>
 
@@ -403,7 +402,7 @@ export default function HeightScreen({ navigation }: Props) {
           >
             {/* Panel header — Angular: REGISTRATION.EXACTHEIGHT */}
             <View style={styles.panelHeader}>
-              <Text style={styles.panelTitle}>{panelTitleText}</Text>
+              <Text style={[styles.panelTitle, { fontFamily: langFonts.medium }]}>{panelTitleText}</Text>
               <TouchableOpacity onPress={closePanel} hitSlop={8}>
                 <Text style={styles.panelCloseTxt}>✕</Text>
               </TouchableOpacity>
@@ -421,7 +420,7 @@ export default function HeightScreen({ navigation }: Props) {
                 stickySectionHeadersEnabled={false}
                 renderSectionHeader={({ section }) => (
                   <View style={styles.sectionHeader}>
-                    <Text style={styles.sectionHeaderText}>{section.title}</Text>
+                    <Text style={[styles.sectionHeaderText, { fontFamily: langFonts.medium }]}>{section.title}</Text>
                   </View>
                 )}
                 renderItem={({ item }: { item: Option }) => {
@@ -436,7 +435,7 @@ export default function HeightScreen({ navigation }: Props) {
                       {/* Angular hides the radio control in this list entirely
                           (.exact-height ion-item ion-radio { display: none })
                           — selection is shown only via the row's background tint. */}
-                      <Text style={[styles.heightItemText, isSelected && styles.heightItemTextSelected]}>
+                      <Text style={[styles.heightItemText, { fontFamily: langFonts.regular }, isSelected && styles.heightItemTextSelected]}>
                         {item.label}
                       </Text>
                     </Pressable>
@@ -528,9 +527,9 @@ const styles = StyleSheet.create({
     height:  8,
     opacity: 20,
   },
-  // Angular: body2-regular-14 (registration-revamp.component.html:64) — Poppins-Regular
+  // Angular: body2-regular-14 (registration-revamp.component.html:64) —
+  // fontFamily applied inline via langFonts (server-translated OR text)
   orText: {
-    fontFamily:       Fonts.poppinsRegular,
     fontSize:         14,
     color:            Colors.textPrimary,
     marginHorizontal: 16,
@@ -551,9 +550,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     zIndex:            10,
   },
-  // Angular: body3-regular-12 (registration-revamp.component.html:54-55) — Poppins-Regular
+  // Angular: body3-regular-12 (registration-revamp.component.html:54-55) —
+  // fontFamily applied inline via langFonts (translated "Height" label)
   exactFieldLabelText: {
-    fontFamily: Fonts.poppinsRegular,
     fontSize:   12,
     fontWeight: '400',
     color:      Colors.textPrimary,
@@ -570,9 +569,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   // Angular: body2-regular-14, static weight — never bolds on selection
-  // (registration-revamp.component.html:51-52) — Poppins-Regular
+  // (registration-revamp.component.html:51-52) — fontFamily applied inline
+  // via langFonts (selected height label / server-translated link text)
   exactFieldText: {
-    fontFamily: Fonts.poppinsRegular,
     flex:       1,
     fontSize:   14,
     fontWeight: '400',
@@ -606,9 +605,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderSubtle,
   },
-  // Angular: heading4-medium-16 (right-side-panel.component.html:12) — Poppins-Medium
+  // Angular: heading4-medium-16 (right-side-panel.component.html:12) —
+  // fontFamily applied inline via langFonts (translated panel title)
   panelTitle: {
-    fontFamily: Fonts.poppinsMedium,
     flex:       1,
     fontSize:   16,
     fontWeight: '600',
@@ -630,14 +629,14 @@ const styles = StyleSheet.create({
 
   // Section header inside SectionList (e.g. Below Average / Average / Above Average / Tall)
   // Angular: heading4-medium-16, class "height-heading", background #F0F0F0
-  // (right-side-panel.component.html:33-35, .scss:54-57) — Poppins-Medium
+  // (right-side-panel.component.html:33-35, .scss:54-57) — fontFamily applied
+  // inline via langFonts (server-translated group title)
   sectionHeader: {
     paddingHorizontal: 20,
     paddingVertical:   8,
     backgroundColor:   '#F0F0F0',
   },
   sectionHeaderText: {
-    fontFamily: Fonts.poppinsMedium,
     fontSize:   16,
     fontWeight: '500',
     color:      Colors.textPrimary,
@@ -658,9 +657,9 @@ const styles = StyleSheet.create({
   heightItemSelected: {
     backgroundColor: '#FBF2F5',
   },
-  // Angular: body2-regular-14 (right-side-panel.component.html:41) — Poppins-Regular
+  // Angular: body2-regular-14 (right-side-panel.component.html:41) —
+  // fontFamily applied inline via langFonts (server-translated height label)
   heightItemText: {
-    fontFamily: Fonts.poppinsRegular,
     flex:       1,
     fontSize:   14,
     fontWeight: '400',

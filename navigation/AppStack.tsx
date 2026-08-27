@@ -1,16 +1,27 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Animated, KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import AppHeader from '../components/app-header/AppHeader'
 import ButtonRevamp from '../components/button-revamp/ButtonRevamp'
+import CdnSvg from '../components/cdn-svg/CdnSvg'
 import { Colors } from '../constants/colors'
+import { CDN_SVG } from '../constants/cdn'
 import { StorageKeys } from '../constants/storage.keys'
 import { OnboardingCtx, FooterState, FooterHandlers } from '../contexts/OnboardingContext'
 import { getItem, setItem } from '../service/storageService'
+import { getOnboardingBackPage } from '../screens/onboarding/onboardingBackFlow'
 import { useAuth } from '../contexts/AuthContext'
 import { useIsDesktopWeb } from '../hooks/useIsDesktopWeb'
+import { useLanguageFonts } from '../hooks/useLanguageFonts'
+
+// Angular's LINK_BTN (button.config.ts) plays a looping Lottie
+// (forward-animation-link, right-arrow-animation.json/.gif) next to the link
+// text. Same static-icon + looping-translateX-bounce substitute already used
+// by DOBScreen.tsx's "Please enter age" link, reused here for every screen's
+// footer link button instead of pulling in a GIF/Lottie player dependency.
+const CDN_FORWARD_ICON = CDN_SVG + 'revamp/forward-icon-link.svg'
 import ComponentShowcaseScreen    from '../screens/dev/ComponentShowcaseScreen'
 import HomeScreen                  from '../screens/home/HomeScreen'
 import GalleryScreen               from '../screens/GalleryScreen'
@@ -277,6 +288,7 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
   // nextLabel when they need a non-default word. useTranslation() re-renders this
   // component on a language change, so the default labels below switch live.
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   // Hooks below must run unconditionally on every render (React's rules of
   // hooks) — isDesktop can flip mid-session on an actual browser resize, not
@@ -291,6 +303,20 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
   })
   const [customerCare, setCustomerCare] = useState('')
   const handlers = useRef<FooterHandlers>({ onNext: () => {} })
+
+  // Angular: LINK_BTN's forward-animation-link — a looping nudge-forward
+  // bounce on the link CTA's arrow icon (e.g. page 29's "Upload horoscope").
+  const linkArrowAnim = useRef(new Animated.Value(0)).current
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(linkArrowAnim, { toValue: 4, duration: 450, useNativeDriver: true }),
+        Animated.timing(linkArrowAnim, { toValue: 0, duration: 450, useNativeDriver: true }),
+      ]),
+    )
+    loop.start()
+    return () => loop.stop()
+  }, [linkArrowAnim])
 
   // Load customer care number once at mount
   useEffect(() => {
@@ -318,6 +344,42 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
   const setFooterState = useCallback((s: FooterState) => {
     setFooterStateRaw(s)
   }, [])
+
+  // ── Back navigation ───────────────────────────────────────────────────────
+  // Normally the forward path push()es each step, so goBack() retraces the real
+  // route taken. But when onboarding is entered DIRECTLY with nothing beneath
+  // it — a REGISTERURL resume on cold start, pageLandingService's page_id '1'
+  // resetTo, ValidationScreen/drService's resetTo to page 20, or a dev-tool
+  // pinned reload — canGoBack() is false and the back button vanished
+  // entirely, stranding the user mid-wizard. onboardingBackFlow exists for
+  // exactly this case (Angular resolves onboarding back from a static map, not
+  // from history); it was written but never wired up.
+  const hasHistory = navigation.canGoBack()
+  // standalone = entered from OUTSIDE the wizard (Help Center / Biodata's "Add
+  // Photo" links, drService). Those exit via goBack() to their caller, so they
+  // must NOT fall back to the wizard's back map, which would walk them into
+  // onboarding steps they never came from.
+  const standalone = !!route.params?.standalone
+  const [mappedBack, setMappedBack] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (hasHistory || standalone) { setMappedBack(null); return }
+    let cancelled = false
+    getOnboardingBackPage(pageNo).then(target => {
+      if (!cancelled) setMappedBack(target)
+    })
+    return () => { cancelled = true }
+  }, [pageNo, hasHistory, standalone])
+
+  const canGoBack = hasHistory || mappedBack !== null
+
+  const handleBack = useCallback(() => {
+    if (hasHistory) { navigation.goBack(); return }
+    // Replace rather than push, so repeated back presses walk the map backwards
+    // instead of growing a forward-looking stack. Params are spread through — a
+    // bare { pageNo } would drop standalone/pendingUri/existingCount.
+    if (mappedBack) navigation.replace('onboarding', { ...route.params, pageNo: mappedBack })
+  }, [hasHistory, mappedBack, navigation, route.params])
 
   // ── Content router ────────────────────────────────────────────────────────
 
@@ -386,8 +448,8 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
         {/* Persistent header — never unmounts */}
         <AppHeader
           type="registration"
-          showBackBtn={navigation.canGoBack()}
-          onBackPress={() => navigation.goBack()}
+          showBackBtn={canGoBack}
+          onBackPress={handleBack}
           onLanguagePress={() => navigation.navigate('LanguageSelection')}
         />
 
@@ -403,6 +465,24 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
             { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
           ]}
         >
+          {/* Angular: SHOWLINKBTN — an underlined link CTA rendered ABOVE the
+              primary Next button (registration-revamp.component.html's
+              otp-cta block), centered specifically on page 29. */}
+          {footerState.showLink && (
+            <Pressable
+              style={shell.linkRow}
+              onPress={() => handlers.current.onLink?.()}
+              accessibilityRole="button"
+            >
+              <Text style={[shell.linkText, { fontFamily: langFonts.medium }]}>
+                {footerState.linkLabel}
+              </Text>
+              <Animated.View style={{ transform: [{ translateX: linkArrowAnim }] }}>
+                <CdnSvg uri={CDN_FORWARD_ICON} width={10} height={10} style={shell.linkIcon} />
+              </Animated.View>
+            </Pressable>
+          )}
+
           {!footerState.nextHidden && (
             <ButtonRevamp
               label={footerState.nextLabel ?? t('REGISTRATION.NEXTCTA', 'Next')}
@@ -421,7 +501,7 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
               onPress={() => handlers.current.onSkip?.()}
               accessibilityRole="button"
             >
-              <Text style={shell.skipText}>
+              <Text style={[shell.skipText, { fontFamily: langFonts.medium }]}>
                 {footerState.skipLabel ?? t('REG.DO_LATER', "I'll do this later")}
               </Text>
               <Text style={shell.skipArrow}> ›</Text>
@@ -461,6 +541,22 @@ const shell = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop:        20,
     backgroundColor:   Colors.surface,
+  },
+  linkRow: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    justifyContent:  'center',
+    gap:             4,
+    marginBottom:    12,
+  },
+  linkText: {
+    fontSize:           14,
+    fontWeight:         '500',
+    color:              Colors.link,
+    textDecorationLine: 'underline',
+  },
+  linkIcon: {
+    marginLeft: 2,
   },
   skipRow: {
     flexDirection:   'row',

@@ -329,7 +329,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
       info.homeState ? fetchCities(info.homeState) : Promise.resolve([]),
       info.religion ? fetchCasteOptions(info.religion, info.motherTongue ?? '') : Promise.resolve([]),
       info.raasi ? fetchStarOptions(info.raasi) : Promise.resolve([]),
-      (info.education && isEducationGroupEligible(info.education)) ? fetchEducationGroupOptions(info.education) : Promise.resolve([]),
+      (info.education && isEducationGroupEligible(info.education)) ? fetchEducationGroupOptionsFlat(info.education) : Promise.resolve([]),
     ])
     setCityOptions(cityList)
     setHomeCityOptions(homeCityList)
@@ -387,7 +387,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     setEducation(opt)
     if (opt.key === education?.key) return
     setEducationGroup(null)
-    setEducationGroupOptions(isEducationGroupEligible(opt.key) ? await fetchEducationGroupOptions(opt.key) : [])
+    setEducationGroupOptions(isEducationGroupEligible(opt.key) ? await fetchEducationGroupOptionsFlat(opt.key) : [])
   }
 
   function handleSelectOccupation(opt: Opt) {

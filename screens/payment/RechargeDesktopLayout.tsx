@@ -13,7 +13,7 @@
 // BottomSheet component unchanged — Figma didn't show a distinct desktop
 // treatment for it, and it already renders as a centered overlay.
 
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
@@ -135,8 +135,10 @@ export default function RechargeDesktopLayout({
             {!!data.helpline && (
               <View style={s.needHelpRow}>
                 <Text style={s.needHelpText}>Need help? </Text>
-                <CdnSvg uri={ICON_CALL} width={16} height={16} />
-                <Text style={s.needHelpNumber}>{data.helpline}</Text>
+                <Pressable style={s.needHelpContact} onPress={() => Linking.openURL(`tel:${data.helpline}`)} hitSlop={8}>
+                  <CdnSvg uri={ICON_CALL} width={16} height={16} />
+                  <Text style={s.needHelpNumber}>{data.helpline}</Text>
+                </Pressable>
               </View>
             )}
           </View>
@@ -214,9 +216,10 @@ const s = StyleSheet.create({
   totalLabel: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
   totalValue: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black },
 
-  needHelpRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  needHelpText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
-  needHelpNumber: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.link, marginLeft: 4 },
+  needHelpRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  needHelpText:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
+  needHelpContact: { flexDirection: 'row', alignItems: 'center' },
+  needHelpNumber:  { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.link, marginLeft: 4 },
 
   sheetInner:       { maxHeight: '100%' },
   sheetTitle:       { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, textAlign: 'center', marginBottom: 16 },

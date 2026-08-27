@@ -91,6 +91,13 @@ export function toProfile(p: Record<string, any>): SwiperItem {
     // Angular: IsPhotoAvailable checks PHOTOAVAILABLE == "Y", getPhotoProtect checks PHOTOPROTECTED == 'Y'
     isPhotoAvailable:    p['PHOTOAVAILABLE']  == 'Y',
     isPhotoProtect:      p['PHOTOPROTECTED']  == 'Y',
+    // Angular: common-funtions.ts's IsAddPhotoRequestSent(profile) reads
+    // ADDPHOTOREQUEST ('0'..'3'); '1'/'3' mean an add-photo WhatsApp request
+    // was already sent for this profile (showWhatsAppPhotoRequest() then
+    // hides the CTA). Session-level WAPHOTOFLAG eligibility (whether to show
+    // the nudge AT ALL) isn't a per-profile field, so it's applied separately —
+    // see homeGating.ts's applyWhatsAppPhotoRequestFlags().
+    isAddPhotoRequest:   ['1', '3'].includes(String(p['ADDPHOTOREQUEST'] ?? '0')),
     // Angular: common-funtions.ts's IsNewMember() — profileInfo.NEWUSER === "1",
     // NOT a field called ISNEWLYJOINED (that key doesn't exist on the API
     // response at all, so this always evaluated false).
