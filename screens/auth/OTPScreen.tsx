@@ -24,6 +24,7 @@ import { getItem, setItem } from '../../service/storageService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { useAuth } from '../../contexts/AuthContext'
 import { CDN_REG } from '../../constants/cdn'
+import { handleBack } from '../../utils/navigationRef'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -260,7 +261,7 @@ export default function OTPScreen({ navigation, route }: Props) {
 
   // Edit number → go back to LoginScreen — matches Angular redirectSignin()
   function handleEdit() {
-    navigation.goBack()
+    handleBack()
   }
 
   // Angular subtitle: 'LOGIN_PAGE.DIGITCODE' with ##NO## replaced by mobile

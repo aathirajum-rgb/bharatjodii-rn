@@ -36,7 +36,6 @@ import MatchesDesktopLayout from './MatchesDesktopLayout'
 import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import MembershipBanner from '../../components/matches/MembershipBanner'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
-import { useExitConfirm } from '../../hooks/useExitConfirm'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN_SVG } from '../../constants/cdn'
@@ -784,9 +783,10 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   const { t, i18n } = useTranslation()
   const isDesktop = useIsDesktopWeb()
 
-  // Android: HomeScreenActivity's ExitPopup — this is the app's root/landing
-  // screen, so back here should confirm exit instead of backgrounding silently.
-  useExitConfirm(navigation.canGoBack())
+  // Android: HomeScreenActivity's ExitPopup — now registered centrally in
+  // RootNavigation.tsx as handleBack()'s root fallback (fires whenever
+  // there's nothing left to pop back to, which in practice is only when the
+  // user is on this root/landing screen).
 
   // ── Explore-by-category mode (#6) ───────────────────────────────────────────
   // Angular: callMatchesApi() explorePage branch — set when navigated here from a

@@ -23,6 +23,7 @@ import {
   getHostedCheckoutRequest, handlePaymentSuccess, recordPaymentFailure,
   type SelectedPackage,
 } from '../../service/paymentService'
+import { handleBack } from '../../utils/navigationRef'
 
 // Defined before the hosted page's own <script> tags execute — matches
 // Android's addJavascriptInterface(new WebAppEvents(), "onWebAppsClick").
@@ -65,7 +66,7 @@ export default function HostedCheckoutWebViewScreen({ navigation, route }: Props
       if (cancelled) return
       if (!req) {
         Alert.alert('Error', 'Could not start payment. Please try again.')
-        navigation.goBack()
+        handleBack()
         return
       }
       setRequest(req)
@@ -79,7 +80,7 @@ export default function HostedCheckoutWebViewScreen({ navigation, route }: Props
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
       if (!settledRef.current) {
         settledRef.current = true
-        navigation.goBack()
+        handleBack()
       }
       return true
     })
@@ -120,7 +121,7 @@ export default function HostedCheckoutWebViewScreen({ navigation, route }: Props
       }
     } else if (data.event_name === 'PageClose') {
       settledRef.current = true
-      navigation.goBack()
+      handleBack()
     }
   }
 

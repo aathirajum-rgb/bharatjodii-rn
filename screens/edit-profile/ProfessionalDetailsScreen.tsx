@@ -28,13 +28,14 @@ import SelectField from '../../components/input/SelectField'
 import FloatingLabelInput from '../../components/input/FloatingLabelInput'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
 import FieldRestrictedSheet from '../../components/edit-profile/FieldRestrictedSheet'
+import { handleBack } from '../../utils/navigationRef'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
 type Props = { navigation: any }
 type Picker = 'education' | 'educationGroup' | 'occupation' | 'income' | null
 
-export default function ProfessionalDetailsScreen({ navigation }: Props) {
+export default function ProfessionalDetailsScreen({ navigation: _navigation }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
 
@@ -136,7 +137,7 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
 
     if (changes.length === 0 && !educationGroupChanged && !jobDetailChanged) {
       setSubmitting(false)
-      navigation.goBack()
+      handleBack()
       return
     }
 
@@ -169,7 +170,7 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
       )
       return
     }
-    navigation.goBack()
+    handleBack()
   }
 
   // Angular: showDisableToast() -> restrictPopup(), i.e. lowerpopup.component's
@@ -189,7 +190,7 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle} numberOfLines={1}>{t('EDITPROFILE.EDIT_PROFILE')}</Text>

@@ -10,6 +10,7 @@ import { CDN_SVG } from '../../constants/cdn'
 import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { handleBack } from '../../utils/navigationRef'
 
 // Angular's header back-button and language-pill dropdown both use Ionic's
 // bundled "chevron-back-outline" / "chevron-down-outline" icons (ion-icon
@@ -123,7 +124,12 @@ export default function AppHeader({
   onAvatarPress,
   onEditProfilePress,
   onToolbarItemPress,
-  onBackPress,
+  // Defaults to the centralized handleBack() (utils/navigationRef.ts) — the
+  // same function the Android hardware back button calls — so every screen
+  // using AppHeader gets identical back behavior for free. A screen only
+  // needs to pass its own onBackPress when it must do something BEFORE
+  // backing out (e.g. OnboardingRouter's static-map fallback below).
+  onBackPress = handleBack,
   onLanguagePress,
   style,
 }: AppHeaderProps) {

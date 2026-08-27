@@ -28,6 +28,7 @@ import { CDN_SVG } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
 import { openMembershipTab } from '../../service/paymentService'
+import { handleBack } from '../../utils/navigationRef'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { ICON, LogoutSheet, performLogout } from '../menu/MenuScreen'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
@@ -125,7 +126,7 @@ export default function SettingsScreen({ navigation }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON.back} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle} numberOfLines={1}>{t('MENU.SETTINGS')}</Text>

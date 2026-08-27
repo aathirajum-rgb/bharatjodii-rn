@@ -18,6 +18,7 @@ import { StorageKeys } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
 import { getSession } from '../../service/registrationService'
 import { clearSession } from '../../service/apiClient'
+import { handleBack } from '../../utils/navigationRef'
 import { disconnectSocket } from '../../service/socketService'
 import { logEvent, dispatchNativeEvent } from '../../service/analyticsService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
@@ -240,7 +241,7 @@ export default function MenuScreen({ navigation }: Props) {
       {/* ── Header back button ── */}
       <Pressable
         style={[s.backBtn, { marginTop: 8 }]}
-        onPress={() => navigation.goBack()}
+        onPress={() => handleBack()}
         accessibilityRole="button"
         accessibilityLabel="Back"
       >

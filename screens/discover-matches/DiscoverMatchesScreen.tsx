@@ -33,6 +33,7 @@ import { ExploreCategoriesSection } from '../home/HomeScreen'
 import { ENavigation } from '../../types/enums/navigation.enum'
 import { openMembershipTab } from '../../service/paymentService'
 import { setFilterEventType } from '../../service/filterService'
+import { handleBack } from '../../utils/navigationRef'
 import { SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
@@ -75,7 +76,7 @@ export default function DiscoverMatchesScreen({ navigation }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle} numberOfLines={1}>{t('HOME.EXPLORE_MATCHES_TXT', 'Discover matches')}</Text>

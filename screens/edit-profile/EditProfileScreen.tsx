@@ -60,6 +60,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import PhotoPrivacySheet from '../../components/photo-privacy/PhotoPrivacySheet'
 import FieldRestrictedSheet from '../../components/edit-profile/FieldRestrictedSheet'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import { handleBack } from '../../utils/navigationRef'
 import EditProfileDesktopScreen from './EditProfileDesktopScreen'
 
 const ICON_BACK  = CDN_REACT + '/menu_back_arrow.svg'
@@ -458,7 +459,7 @@ export default function EditProfileScreen({ navigation }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle} numberOfLines={1}>{t('EDITPROFILE.EDIT_PROFILE')}</Text>

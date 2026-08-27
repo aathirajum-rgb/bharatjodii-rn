@@ -12,6 +12,7 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { handleBack } from '../../utils/navigationRef'
 
 export interface DeleteProfileWebsiteNameDesktopLayoutProps {
   navigation: any
@@ -35,7 +36,7 @@ export default function DeleteProfileWebsiteNameDesktopLayout({
     <DesktopPageShell navigation={navigation} userName={userName} activeItem="settings" onTabPress={onTabPress}>
       <View style={s.main}>
         <View style={s.card}>
-          <Pressable style={s.closeBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Close" hitSlop={10}>
+          <Pressable style={s.closeBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Close" hitSlop={10}>
             <Text style={s.closeX}>✕</Text>
           </Pressable>
 

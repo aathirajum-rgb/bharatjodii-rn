@@ -14,6 +14,7 @@ import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import FloatingLabelInput from '../../components/input/FloatingLabelInput'
+import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import { submitDoorstepCollection, type SelectedPackage } from '../../service/paymentService'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
@@ -34,7 +35,7 @@ export default function DoorstepCollectionScreen({ navigation, route }: Props) {
   const isValid = addressLine1.trim().length > 0
 
   function handleBack() {
-    if (navigation.canGoBack()) navigation.goBack()
+    if (navigation.canGoBack()) handleRootBack()
     else navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
   }
 

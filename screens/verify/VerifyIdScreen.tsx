@@ -23,6 +23,7 @@ import {
 import * as ImagePicker from 'expo-image-picker'
 import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import RadioGroup, { type RadioOption } from '../../components/radio/RadioGroup'
@@ -353,7 +354,7 @@ export default function VerifyIdScreen({ navigation }: { navigation: any }) {
     if (step === 'text' || step === 'upload') {
       setStep('select')
     } else {
-      navigation.goBack()
+      handleRootBack()
     }
   }
 

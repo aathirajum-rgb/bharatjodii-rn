@@ -17,6 +17,7 @@ import ButtonRevamp from '../components/button-revamp/ButtonRevamp'
 import { Colors } from '../constants/colors'
 import type { FooterTab } from '../components/app-footer/AppFooter'
 import { Fonts, SemanticFontsEnglish } from '../src/theme/fonts'
+import { handleBack } from '../utils/navigationRef'
 
 type LangOption = { id: string; native: string; english: string }
 
@@ -43,7 +44,7 @@ export default function LanguageSelectionDesktopLayout({
       <View style={s.main}>
         <View style={s.titleRow}>
           <Text style={s.pageTitle}>{t('MENU.TTTLE_6')}</Text>
-          <Pressable onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8}>
+          <Pressable onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8}>
             <Text style={s.closeX}>✕</Text>
           </Pressable>
         </View>

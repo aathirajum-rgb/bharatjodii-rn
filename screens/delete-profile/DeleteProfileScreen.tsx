@@ -28,6 +28,7 @@ import { openMembershipTab } from '../../service/paymentService'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileDesktopLayout from './DeleteProfileDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { handleBack } from '../../utils/navigationRef'
 
 const SCREEN_H = Dimensions.get('window').height
 
@@ -337,7 +338,7 @@ export default function DeleteProfileScreen({ navigation }: Props) {
       <View style={s.header}>
         <Pressable
           style={s.backBtn}
-          onPress={() => navigation.goBack()}
+          onPress={() => handleBack()}
           accessibilityRole="button"
           accessibilityLabel="Back"
         >

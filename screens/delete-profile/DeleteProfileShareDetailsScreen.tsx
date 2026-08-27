@@ -26,6 +26,7 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileShareDetailsDesktopLayout from './DeleteProfileShareDetailsDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { handleBack } from '../../utils/navigationRef'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -332,7 +333,7 @@ export default function DeleteProfileShareDetailsScreen({ navigation, route }: P
       <View style={s.header}>
         <Pressable
           style={s.backBtn}
-          onPress={() => navigation.goBack()}
+          onPress={() => handleBack()}
           accessibilityRole="button"
           accessibilityLabel="Back"
         >

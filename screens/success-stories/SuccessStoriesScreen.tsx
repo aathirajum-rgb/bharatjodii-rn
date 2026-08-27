@@ -20,6 +20,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { getItem } from '../../service/storageService'
 import { apiCall } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
+import { handleBack } from '../../utils/navigationRef'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import SuccessStoriesDesktopScreen from './SuccessStoriesDesktopScreen'
 
@@ -269,7 +270,7 @@ export default function SuccessStoriesScreen({ navigation }: Props) {
       <View style={c.header}>
         <Pressable
           style={c.backBtn}
-          onPress={() => navigation.goBack()}
+          onPress={() => handleBack()}
           accessibilityRole="button"
           accessibilityLabel="Back"
         >

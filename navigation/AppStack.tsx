@@ -12,6 +12,7 @@ import { StorageKeys } from '../constants/storage.keys'
 import { OnboardingCtx, FooterState, FooterHandlers } from '../contexts/OnboardingContext'
 import { getItem, setItem } from '../service/storageService'
 import { getOnboardingBackPage } from '../screens/onboarding/onboardingBackFlow'
+import { handleBack as centralizedHandleBack } from '../utils/navigationRef'
 import { useAuth } from '../contexts/AuthContext'
 import { useIsDesktopWeb } from '../hooks/useIsDesktopWeb'
 import { useLanguageFonts } from '../hooks/useLanguageFonts'
@@ -374,10 +375,14 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
   const canGoBack = hasHistory || mappedBack !== null
 
   const handleBack = useCallback(() => {
-    if (hasHistory) { navigation.goBack(); return }
-    // Replace rather than push, so repeated back presses walk the map backwards
-    // instead of growing a forward-looking stack. Params are spread through — a
-    // bare { pageNo } would drop standalone/pendingUri/existingCount.
+    // hasHistory routes through the same centralized handleBack() the
+    // Android back button and every other custom back icon call, so this
+    // screen's back button can never diverge from the app-wide behavior.
+    if (hasHistory) { centralizedHandleBack(); return }
+    // No history beneath this step (see comment above) — replace rather than
+    // push, so repeated back presses walk the map backwards instead of
+    // growing a forward-looking stack. Params are spread through — a bare
+    // { pageNo } would drop standalone/pendingUri/existingCount.
     if (mappedBack) navigation.replace('onboarding', { ...route.params, pageNo: mappedBack })
   }, [hasHistory, mappedBack, navigation, route.params])
 
@@ -701,11 +706,12 @@ export default function AppStack() {
       />
 
       {/* Angular: opened as a modal overlay on the current page — never a full push.
-          LanguageSelectionScreen already self-dismisses via navigation.goBack() once
-          canGoBack() is true, so onSelect here is just the (unreachable) fallback. */}
+          LanguageSelectionScreen already self-dismisses via the centralized
+          handleBack() once canGoBack() is true, so onSelect here is just the
+          (unreachable) fallback. */}
       <Stack.Screen name="LanguageSelection" options={{ presentation: 'modal', animation: 'slide_from_bottom' }}>
         {({ navigation }) => (
-          <LanguageSelectionScreen navigation={navigation} onSelect={() => navigation.goBack()} presentedAsModal />
+          <LanguageSelectionScreen navigation={navigation} onSelect={() => centralizedHandleBack()} presentedAsModal />
         )}
       </Stack.Screen>
     </Stack.Navigator>

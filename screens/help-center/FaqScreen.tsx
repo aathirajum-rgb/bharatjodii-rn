@@ -27,6 +27,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import LinkCTA from '../../components/link-cta/LinkCTA'
 import { fetchFaqContent, stripHtml, type FaqType, type FaqContentItem } from '../../service/faqService'
 import { setFilterEventType } from '../../service/filterService'
+import { handleBack } from '../../utils/navigationRef'
 
 const R = CDN_REACT + '/'
 const ICON_BACK  = R + 'menu_back_arrow.svg'
@@ -111,7 +112,7 @@ export default function FaqScreen({ navigation, route }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle} numberOfLines={1}>{title}</Text>

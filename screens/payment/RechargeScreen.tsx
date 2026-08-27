@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
+import { handleBack } from '../../utils/navigationRef'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
@@ -110,7 +111,7 @@ export default function RechargeScreen({ navigation, route }: Props) {
   // closeIntermediatePage() has an equivalent fallback rather than assuming
   // a previous page always exists.
   function handleClose() {
-    if (navigation.canGoBack()) navigation.goBack()
+    if (navigation.canGoBack()) handleBack()
     else navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
   }
 

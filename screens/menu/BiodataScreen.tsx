@@ -19,6 +19,7 @@ import { StorageKeys as SK } from '../../constants/storage.keys'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { getItem, setItem } from '../../service/storageService'
+import { handleBack as goBackCentral } from '../../utils/navigationRef'
 import {
   getBiodataProfile, getFirstMissingBiodataField, showReligiousDetails, hasPropertyDetails,
   propertyContentText, resolveFamilyCountLabel, saveBiodataThemeId, getSavedBiodataThemeId,
@@ -98,7 +99,7 @@ export default function BiodataScreen({ navigation }: Props) {
   useFocusEffect(useCallback(() => { load() }, [load]))
 
   function handleBack() {
-    if (navigation.canGoBack()) navigation.goBack()
+    if (navigation.canGoBack()) goBackCentral()
     else navigation.reset({ index: 0, routes: [{ name: 'Menu' }] })
   }
 

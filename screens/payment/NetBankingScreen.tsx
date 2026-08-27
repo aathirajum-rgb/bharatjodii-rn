@@ -18,6 +18,7 @@ import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
+import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import { SemanticFontsEnglish } from '../../src/theme/fonts'
 import {
   getFinalAmount, getNetBankingList, getRetryRemainingMs,
@@ -61,7 +62,7 @@ export default function NetBankingScreen({ navigation, route }: Props) {
   const otherBanks    = banks.slice(POPULAR_COUNT)
 
   function handleBack() {
-    if (navigation.canGoBack()) navigation.goBack()
+    if (navigation.canGoBack()) handleRootBack()
     else navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
   }
 

@@ -35,6 +35,7 @@ import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { fetchViewLaterProfiles } from '../../service/viewLaterService'
 import { communicationBtnOnClick, shouldSkipPhoneConfirm } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
+import { handleBack } from '../../utils/navigationRef'
 import { getItem } from '../../service/storageService'
 import { openMembershipTab } from '../../service/paymentService'
 import { StorageKeys } from '../../constants/storage.keys'
@@ -256,7 +257,7 @@ export default function ViewLaterScreen({ navigation }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={CDN_REACT + '/menu_back_arrow.svg'} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle} numberOfLines={1}>{title}</Text>

@@ -19,6 +19,7 @@ import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN, CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import LinkCTA from '../../components/link-cta/LinkCTA'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
@@ -71,7 +72,7 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
   // screen (e.g. deep link) — goBack() would silently no-op then. Same fix
   // as RechargeScreen's close icon.
   function handleBack() {
-    if (navigation.canGoBack()) navigation.goBack()
+    if (navigation.canGoBack()) handleRootBack()
     else navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
   }
 

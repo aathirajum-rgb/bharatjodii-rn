@@ -25,6 +25,7 @@ import { openMembershipTab } from '../../service/paymentService'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileWebsiteNameDesktopLayout from './DeleteProfileWebsiteNameDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { handleBack } from '../../utils/navigationRef'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -143,7 +144,7 @@ export default function DeleteProfileWebsiteNameScreen({ navigation, route }: Pr
         <View style={s.header}>
           <Pressable
             style={s.backBtn}
-            onPress={() => navigation.goBack()}
+            onPress={() => handleBack()}
             accessibilityRole="button"
             accessibilityLabel="Back"
           >

@@ -23,6 +23,7 @@ import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
 import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { handleBack } from '../../utils/navigationRef'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
@@ -38,7 +39,7 @@ const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
 type Step = 'idle' | 'preview' | 'uploading' | 'failed'
 
-export default function SelfieVerificationScreen({ navigation }: { navigation: any }) {
+export default function SelfieVerificationScreen({ navigation: _navigation }: { navigation: any }) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
 
@@ -97,7 +98,7 @@ export default function SelfieVerificationScreen({ navigation }: { navigation: a
     const selfieAdded = String(res?.RESPONSE?.SELFIEADDED ?? '0')
 
     if (selfieAdded === '1') {
-      navigation.goBack()
+      handleBack()
     } else {
       setErrorMsg(String(res?.RESPONSE?.EKYCMSG ?? '').split('~')[0] || t('VERIFY_ID.SELFIE_VERIFY_TXT', 'Selfie verification unsuccessful'))
       setStep('failed')
@@ -107,7 +108,7 @@ export default function SelfieVerificationScreen({ navigation }: { navigation: a
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle} numberOfLines={1}>{t('VERIFY_ID.SELFIE_VERIFICATION', 'Selfie verification')}</Text>
@@ -149,7 +150,7 @@ export default function SelfieVerificationScreen({ navigation }: { navigation: a
             </View>
           )}
 
-          <Pressable style={[s.closeBtn, { top: insets.top + 8 }]} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Cancel">
+          <Pressable style={[s.closeBtn, { top: insets.top + 8 }]} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Cancel">
             <Text style={s.closeIcon}>{'✕'}</Text>
           </Pressable>
         </View>

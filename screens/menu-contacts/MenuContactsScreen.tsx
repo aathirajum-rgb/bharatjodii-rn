@@ -50,6 +50,7 @@ import { CDN, CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import { fetchContactDetails } from '../../service/communicationService'
 import { getJson } from '../../service/storageService'
 import { getPPSetData } from '../../service/profileService'
+import { handleBack } from '../../utils/navigationRef'
 import { getSessionValue } from '../../service/registrationService'
 import { updateAutoRenewal, requestAutopayRefund, stripHtml, parseAmount, formatAmount } from '../../service/paymentService'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
@@ -318,7 +319,7 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICONS.back} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle} numberOfLines={1}>{t('GENERAL.MEMBERSHIP_HEADER', 'My Membership')}</Text>
