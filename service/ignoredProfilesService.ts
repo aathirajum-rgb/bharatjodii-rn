@@ -52,8 +52,16 @@ async function fetchProfilesPage(endpoint: string, start: number, limit: number)
 
   if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0 && Array.isArray(res?.RESPONSE)) {
     return {
-      items:      res.RESPONSE.map(toIgnoredProfile),
-      totalCount: Number(res['TOTAL'] ?? 0),
+      items: res.RESPONSE.map(toIgnoredProfile),
+      // Same fallback chain homeService.ts's toListingResult() uses — and note
+      // fetchRichProfilesPage() below goes through that very function against
+      // THESE SAME endpoints. Reading only TOTAL here meant that whenever the
+      // listing answered with TOTALCOUNT/LISTCOUNT instead, mobile got
+      // totalCount: 0 while desktop got the real figure. A zero total silently
+      // disables pagination: the screen's loadMore() bails on
+      // `profiles.length >= totalCount`, which 0 makes permanently true, so the
+      // list stopped dead after the first page no matter how far you scrolled.
+      totalCount: Number(res['TOTAL'] ?? res['TOTALCOUNT'] ?? res['LISTCOUNT'] ?? 0),
     }
   }
   return { items: [], totalCount: 0 }

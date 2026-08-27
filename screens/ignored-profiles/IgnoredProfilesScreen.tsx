@@ -12,19 +12,26 @@
 //    current state), no exit animation.
 //  - Unblocking (blocked tab) happens inline here via the "Unblock" CTA, since
 //    there's no other screen surface for it yet.
-//  - Empty/loading states use a plain spinner + text instead of Angular's Lottie
-//    animations (no established pattern for remote-hosted Lottie JSON in RN yet).
+//  - Empty and loading states render Angular's own Lottie animations
+//    (profiles-you-removed.json / like-list-loding-screen.json) through the
+//    shared CdnLottie component, same as NotificationScreen's empty/loading
+//    states. NOTE CdnLottie.web.tsx renders an empty box by design — there is
+//    no web Lottie player wired up (see its header), so on mobile WEB the
+//    caption shows under a blank space rather than an animation. Native plays
+//    it. The infinite-scroll footer keeps a plain spinner, matching Angular's
+//    own <ion-infinite-scroll-content loadingSpinner="circular">.
 
 import { useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View,
 } from 'react-native'
+
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import { Colors } from '../../constants/colors'
-import { CDN_REACT } from '../../constants/cdn'
+import { CDN_LOTTIE, CDN_REACT, CDN_REACT_LOTTIE } from '../../constants/cdn'
 import { StorageKeys } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
 import {
@@ -33,12 +40,29 @@ import {
 import { unblockProfile } from '../../service/communicationService'
 import { handleBack } from '../../utils/navigationRef'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CdnLottie from '../../components/CdnLottie'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import IgnoredProfilesDesktopScreen from './IgnoredProfilesDesktopScreen'
 
 const DEFAULT_PHOTO_MALE   = CDN_REACT + '/ignore_profile_male.svg'
 const DEFAULT_PHOTO_FEMALE = CDN_REACT + '/ignore_profile_female.svg'
+
+// Angular: menu-profiles.page.html's two <lottie-player> blocks —
+//   empty   -> assets/jodii-lottie-files/profiles-you-removed.json
+//   loading -> assets/jodii-lottie-files/like-list-loding-screen.json
+//
+// The empty-state animation now comes from this app's OWN uploaded copy under
+// react/lottie-files (verified byte-identical to Angular's original).
+//
+// The loading one has NOT been uploaded there yet, so it still points at
+// Angular's jodii-lottie-files folder — move it over and switch the constant
+// when it is.
+const LOTTIE_EMPTY   = CDN_REACT_LOTTIE + 'deleted_profile_empty.json'
+const LOTTIE_LOADING = CDN_LOTTIE + 'like-list-loding-screen.json'
+// Source animation is a 512x512 square; 200 keeps it comfortably inside the
+// narrowest phone with the caption below it.
+const LOTTIE_SIZE = "380px"
 
 const LIMIT = 20
 
@@ -122,13 +146,28 @@ export default function IgnoredProfilesScreen({ navigation }: Props) {
   const tabRef      = useRef<Tab>('dontshow')
   const startRef    = useRef(0)
   const fetchingRef = useRef(false)
+  // Monotonic request id — see load(). Guards against a stale response from a
+  // superseded tab switch / re-focus overwriting the current tab's list.
+  const reqIdRef    = useRef(0)
   const avatarRef   = useRef(DEFAULT_PHOTO_FEMALE)   // opposite-gender fallback, like ActivityScreen
 
   const load = useCallback(async (reset: boolean) => {
-    if (fetchingRef.current) return
+    // A reset — tab switch or screen focus — must NEVER be dropped: it
+    // supersedes whatever is in flight. Previously the `fetchingRef` lock
+    // rejected it, and because that bail-out sat ABOVE the try/finally,
+    // setLoading(false) never ran. switchTab() had already cleared the list and
+    // set loading true, so tapping the other tab while the first fetch was
+    // still running left the screen stuck on the loading animation forever —
+    // and un-recoverable, since `if (tab === activeTab) return` makes a second
+    // tap on the same tab a no-op. Only an APPEND can be a redundant duplicate.
+    if (!reset && fetchingRef.current) return
     fetchingRef.current = true
     if (reset) startRef.current = 0
 
+    // Generation counter: only the newest request may commit results or clear
+    // the loading flags. Replaces the old `tab !== tabRef.current` check, which
+    // only caught tab switches and not a re-focus firing a second reset.
+    const reqId = ++reqIdRef.current
     const tab = tabRef.current
     const fetchPage: (start: number, limit: number) => Promise<IgnoredProfilesPage> =
       tab === 'dontshow' ? fetchIgnoredProfiles : fetchBlockedProfiles
@@ -138,16 +177,22 @@ export default function IgnoredProfilesScreen({ navigation }: Props) {
         reset ? getItem(StorageKeys.User.LOGIN_GENDER).then(g => g === '0') : Promise.resolve(null),
         fetchPage(startRef.current, LIMIT),
       ])
+      if (reqId !== reqIdRef.current) return   // superseded by a newer load
       if (female !== null) avatarRef.current = female ? DEFAULT_PHOTO_MALE : DEFAULT_PHOTO_FEMALE
-      if (tab !== tabRef.current) return   // tab switched again while this was in flight
 
       setProfiles(prev => (reset ? page.items : [...prev, ...page.items]))
       setTotalCount(page.totalCount)
-      startRef.current += LIMIT
+      // Advance by what actually arrived, not by a flat LIMIT — a short page
+      // would otherwise skip records on the next request.
+      startRef.current += page.items.length
     } finally {
-      fetchingRef.current = false
-      setLoading(false)
-      setLoadingMore(false)
+      // A superseded request must not clear the flags out from under the newer
+      // one that replaced it.
+      if (reqId === reqIdRef.current) {
+        fetchingRef.current = false
+        setLoading(false)
+        setLoadingMore(false)
+      }
     }
   }, [])
 
@@ -229,7 +274,12 @@ export default function IgnoredProfilesScreen({ navigation }: Props) {
           <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
             <CdnSvg uri={CDN_REACT + '/menu_back_arrow.svg'} width={24} height={24} />
           </Pressable>
-          <Text style={s.headerTitle} numberOfLines={1}>{t('MENU.IGNORED_PROFILES')}</Text>
+          {/* Angular: getTitle() returns PROFILES.DONT_SHOW ("Profiles marked
+              as Don't Show") for both tabs on this screen — only the separate
+              'viewinglater' tab, which isn't part of this screen, uses a
+              different key. MENU.IGNORED_PROFILES ("Ignored Profiles") is the
+              menu ROW's label, not the page title. */}
+          <Text style={s.headerTitle} numberOfLines={1}>{t('PROFILES.DONT_SHOW')}</Text>
         </View>
 
         <View style={s.tabsRow}>
@@ -247,11 +297,16 @@ export default function IgnoredProfilesScreen({ navigation }: Props) {
       </View>
 
       {loading ? (
+        // Angular: the !contentLoaded row with like-list-loding-screen.json.
         <View style={s.center}>
-          <ActivityIndicator color={Colors.primaryDark} size="large" />
+          <CdnLottie uri={LOTTIE_LOADING} width={LOTTIE_SIZE} height={LOTTIE_SIZE} />
         </View>
       ) : profiles.length === 0 ? (
+        // Angular: the no-content row — profiles-you-removed.json ABOVE the
+        // per-tab caption (NORESULT_1 / NORESULT_22), which carries `pt-48
+        // heading4-medium-16`, i.e. 48pt clear of the animation at 16px medium.
         <View style={s.center}>
+          <CdnLottie uri={LOTTIE_EMPTY} width={LOTTIE_SIZE} height={LOTTIE_SIZE} />
           <Text style={s.emptyText}>{emptyText}</Text>
         </View>
       ) : (
@@ -284,8 +339,13 @@ export default function IgnoredProfilesScreen({ navigation }: Props) {
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  emptyText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, marginBottom : 100 },
+  // Angular's caption is `pt-48 heading4-medium-16` — 48pt clear of the
+  // animation, 16px medium (not the 14px secondary-grey this had).
+  emptyText: {
+    fontSize: 16, fontWeight: '500', color: '#333333',
+    textAlign: 'center', lineHeight: 24, marginTop: 48,
+  },
 
   headerWrap: {
     backgroundColor: Colors.white,
@@ -295,14 +355,38 @@ const s = StyleSheet.create({
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
   headerTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
 
+  // Angular: menu-profiles.page.html's `.messages-top-block` row plus
+  // menu-profiles.page.scss:
+  //   .messages-top-block      { border-bottom: 1px solid #e2e8f0;
+  //                              margin-top: 12px; background-color: #fff }
+  //   .messages-top-block ion-col { padding-bottom: 8px !important }
+  //   .received-awaiting-active-border { border-bottom: 2px solid #B50033 }
+  // The two <ion-col>s are size="5.8" with offset="0.4" on the second, i.e. two
+  // equal ~48.3% halves that fill the row, each with its label CENTRED
+  // (justify-content-center / text-align-center).
+  //
+  // This port had content-width tabs left-aligned with gap 20, so the labels
+  // bunched at the left and the active underline only spanned the text rather
+  // than the tab.
   tabsRow: {
-    flexDirection: 'row', gap: 20, paddingHorizontal: 24,
-    borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle,
+    flexDirection: 'row', paddingHorizontal: 16, marginTop: 12,
+    backgroundColor: Colors.white,
+    // #e2e8f0 exactly — Colors.borderSubtle (#e6e6e6) is a warmer grey.
+    borderBottomWidth: 1, borderBottomColor: '#E2E8F0',
+    // Stands in for Angular's 0.4-of-12 column offset: at a 360pt screen the
+    // row's content is 328 wide, so that offset is ~11pt and each tab ~158.5 —
+    // flex: 1 either side of a 12pt gap gives 158. Visually identical.
+    gap: 12,
   },
-  tab: { paddingVertical: 8 },
-  tabActive: { borderBottomWidth: 1.5, borderBottomColor: Colors.primaryDark },
-  tabText: { fontSize: 14, color: Colors.black, letterSpacing: 0.42 },
-  tabTextActive: { color: Colors.primaryDark, fontWeight: '500' },
+  // flex: 1 => the two equal halves; the underline therefore spans the whole
+  // tab, which is what Angular puts the border on (the col, not the label).
+  tab: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingBottom: 8 },
+  tabActive: { borderBottomWidth: 2, borderBottomColor: '#B50033' },
+  // Inactive: body2-regular-14 + black. Active: body1-medium-14 + #B50033.
+  // Both line-height 18. Angular sets no letter-spacing — the 0.42 here was
+  // invented.
+  tabText: { fontSize: 14, fontWeight: '400', lineHeight: 18, color: Colors.black },
+  tabTextActive: { fontWeight: '500', color: '#B50033' },
 
   footerLoader: { paddingVertical: 24 },
 })
