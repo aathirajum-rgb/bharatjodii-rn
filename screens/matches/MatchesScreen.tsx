@@ -24,7 +24,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import MatchesHeader from '../../components/matches-header/MatchesHeader'
 import {
-  WhatsAppIcon, WhatsAppUnlockButton, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
+  WhatsAppIcon, WhatsAppUnlockButton, CallIcon, MessageIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   buildBasicViewParts, showLikeCTA, showAfterLikeCTA,
   getBlurPhotoUri, NEWLY_JOINED_STAR_URI, RIGHT_ARROW_ANIMATION_URI, ProfileBadge,
   PhotoSwiper,
@@ -60,6 +60,7 @@ import {
   communicationBtnOnClick,
   fetchContactDetails,
   shouldSkipPhoneConfirm,
+  getContactConfirmContent as getSharedContactConfirmContent,
 } from '../../service/communicationService'
 import { fetchBulkLikeMatches } from '../../service/profileService'
 import { redirectToViewProfile } from '../../service/buttonService'
@@ -121,7 +122,7 @@ function buildMergedList(
 // a card only re-renders when its own props actually change.
 export const MatchCard = memo(function MatchCard({
   profile, oppGender, ownEntryType, femaleFreeEligible, indNumbersLeft,
-  onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp,
+  onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp, onMessage,
   showLikedBadge,
 }: {
   profile:    MatchProfile
@@ -135,6 +136,9 @@ export const MatchCard = memo(function MatchCard({
   onViewLater:() => void
   onCall:     () => void
   onWhatsApp: () => void
+  // Optional — only the Matches list wires this up so far; Activity/ViewLater/
+  // DailyRecommendation (which also reuse this card) are untouched by this fix.
+  onMessage?: () => void
   // Angular's real gate is showLikedLbl (true for BOTH liked tabs on Activity,
   // regardless of the viewer's own likedStatus toward that profile) — the
   // COMTEXTDATE text itself already carries the correct direction/wording
@@ -292,8 +296,8 @@ export const MatchCard = memo(function MatchCard({
         </View>
       )}
 
-      {/* ── Name + Call icon + WhatsApp icon ───────────────────────────────── */}
-      {/* Angular: d-flex row: heading2-semibold-18 name + phone-icon + matches-whatsapp */}
+      {/* ── Name + Message icon + Call icon + WhatsApp icon ────────────────── */}
+      {/* Angular: d-flex row: heading2-semibold-18 name + phone-icon (message) + phone-icon (call) + matches-whatsapp */}
       <View style={c.nameRow}>
         {/* flexShrink (not flex:1) — the name sits at its own width so the icons land
             right next to it, not pushed to the far edge of the row. Still truncates
@@ -301,9 +305,14 @@ export const MatchCard = memo(function MatchCard({
         <Pressable style={{ flexShrink: 1 }} onPress={onPress}>
           <Text style={c.name} numberOfLines={1}>{profile.name}</Text>
         </Pressable>
-        {/* Figma: 24x24 circle, white fill, 1px #006c48 border, 20x20 icon centered inside */}
-        <Pressable style={[c.iconBtn, c.callIconCircle]} onPress={onCall} hitSlop={8}>
-          <CallIcon width={20} height={20} />
+        {/* Angular: .phone-icon — plain 24x24 image, no circle/border */}
+        {onMessage && (
+          <Pressable style={c.iconBtn} onPress={onMessage} hitSlop={8}>
+            <MessageIcon width={24} height={24} />
+          </Pressable>
+        )}
+        <Pressable style={c.iconBtn} onPress={onCall} hitSlop={8}>
+          <CallIcon width={24} height={24} />
         </Pressable>
         <Pressable style={c.iconBtn} onPress={onWhatsApp} hitSlop={8}>
           <WhatsAppIcon width={28} height={28} />
@@ -315,7 +324,7 @@ export const MatchCard = memo(function MatchCard({
           solid black segments, "|" separators alone drop to 20% opacity. */}
       <Pressable onPress={onPress}>
         <Text style={c.basicView} numberOfLines={4}>
-          {buildBasicViewParts(profile).map((part, i) => (
+          {buildBasicViewParts(profile, oppGender === 'M').map((part, i) => (
             <Text key={i}>
               {i > 0 && <Text style={c.basicViewSep}> | </Text>}
               {part}
@@ -482,9 +491,10 @@ const pcs = StyleSheet.create({
   title: {
     marginTop:  16,
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   18,
+    fontSize:   19,
     color:      '#000000',
     textAlign:  'center',
+    marginBottom: 24,
   },
   cta: {
     marginTop:      24,
@@ -894,12 +904,17 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     idVerified?: boolean | undefined
   } | null>(null)
   // Angular button.component.ts:551-579 — the CONFIRMATION popup's own quota
-  // footer line ("You have viewed contact numbers of #VAR# profiles. #VAR1#
-  // remaining till #VAR2#"), read purely from the local CONTACT_DETAIL cache
-  // (no API call) — #VAR#=phoneNumbersViewed, #VAR1#=phoneNumbersLeft,
-  // #VAR2#=expiryTextValue. Defaults to 0 until the first real reveal, same as
-  // Angular (nbcontacts's own response has no viewed-count field).
-  const [contactQuota, setContactQuota] = useState({ viewed: '0', left: '', expiry: '' })
+  // footer line, read purely from the local CONTACT_DETAIL cache (no API
+  // call). #VAR1#=phoneNumbersLeft, #VAR2#=expiryTextValue. #VAR# (phoneViewCnt)
+  // is NOT simply phoneNumbersViewed — when CONTACT_DETAIL has
+  // totalProfileCountData, Angular computes it as totalProfileCountData -
+  // phoneNumbersLeft instead, falling back to raw phoneNumbersViewed only
+  // when totalProfileCountData is absent. total is kept separately (not
+  // folded into `viewed`) because it also decides WHICH template string to
+  // use — see getContactConfirmContent(). Defaults to 0 until the first real
+  // reveal, same as Angular (nbcontacts's own response has no viewed-count
+  // field before that).
+  const [contactQuota, setContactQuota] = useState({ viewed: '0', left: '', expiry: '', total: '' })
 
   // The other phoneviewed/pre-flight scenarios (communicationService.ts's
   // showContactDetails + showCallOrWhatsApp's verify_id/female_free gates) —
@@ -935,6 +950,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   const [addPhotoPromoActive, setAddPhotoPromoActive] = useState(false)
   const [addHoroActive,       setAddHoroActive]       = useState(false)
   const [paidNoPhotoBanner,   setPaidNoPhotoBanner]   = useState<any>(null)   // reg.PHOTOPUBLISHPAID.Matches, or {} for the static ADDPROPERTYS fallback
+
   // Hero banner header (ListHeaderComponent) — extends the existing photo-promo
   // banner to Angular's other two variants. 'target' picks the onPress destination.
   const [heroBannerTarget, setHeroBannerTarget] = useState<'Gallery' | 'verifyid'>('Gallery')
@@ -991,12 +1007,6 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     //   }).start()
     // }
   }
-
-  // Merged list of profiles + inline banner slots (e.g. BANNERSLOT 1001 = membership promo)
-  const listData = useMemo<MatchListItem[]>(
-    () => buildMergedList(profiles, bannerSlots),
-    [profiles, bannerSlots]
-  )
 
   // apiStart tracks the cursor for pagination (how many profiles we've fetched from API)
   const apiStartRef = useRef(0)
@@ -1089,6 +1099,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
                 viewed: String(contactDetail?.phoneNumbersViewed ?? '0'),
                 left:   String(contactDetail?.phoneNumbersLeft ?? ''),
                 expiry: String(contactDetail?.expiryTextValue ?? ''),
+                total:  String(contactDetail?.totalProfileCountData ?? ''),
               })
 
               // BANNERSLOT 1011 — add-photo generic promo (#26)
@@ -1464,22 +1475,57 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     }
   }
 
+  // Angular: matches-card.component.html's message icon → clickingOnBtn(..., 'jodimessages', ...)
+  // → communication.service.ts's jodimessages branch — no confirm popup (unlike call/whatsapp),
+  // goes straight through gating: unverified paid male → verify_id, verified-no-photo → verify_id
+  // (photoUpload), free member → payment promo, else → straight into the chat window.
+  async function handleMessage(profile: MatchProfile) {
+    try {
+      const result = await communicationBtnOnClick('matches', 'jodimessages', { MATRIID: profile.profileId })
+      if (result.type === 'payment_promo') {
+        navigation.navigate('recharge')
+      } else if (result.type === 'verify_id') {
+        const arrays = await getRegistrationArrays()
+        const cfg = arrays?.PROFILEVERIFYPAID?.Shortlist ?? {}
+        let cta = String(cfg.CTA ?? 'OK')
+        if (cta.includes('##CSNUM##')) {
+          const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
+          cta = cta.replace(/##CSNUM##/g, callNum).replace('+91', '')
+        }
+        setPhoneInfoSheet({
+          kind:    'verify_id',
+          title:   String(cfg.TITLE ?? 'Verify your profile'),
+          content: String(cfg.CONTENT ?? 'Please complete ID verification to view phone numbers.'),
+          ctaLabel: cta,
+        })
+      } else if (result.type === 'female_free') {
+        const kindByAction: Record<string, PhoneInfoSheet['kind'] | undefined> = {
+          'femaleFree-PhotoAdd':     'female_free_photo_add',
+          'femaleFree-PhotoPending': 'female_free_photo_pending',
+          'femaleFree-PhotoFail':    'female_free_photo_fail',
+          'callVerification':        'female_free_call_verification',
+          'femaleFree-LimitOver':    'female_free_limit_over',
+        }
+        const kind = kindByAction[result.action]
+        if (kind) setPhoneInfoSheet({ kind } as PhoneInfoSheet)
+      } else if (result.type === 'error') {
+        showToast(result.message)
+      }
+      // result.type === 'api_success' — handleChat() already navigated to chat-window.
+    } catch (e) {
+      if (__DEV__) console.error('[Matches] message error:', e)
+    }
+  }
+
   function handleContactConfirmClose() {
     setContactConfirm(null)
   }
 
-  // Angular button.component.ts:551-583 — the confirmation popup's TostMsg is
-  // built from VIEWPHONECONFIRM (the question) + VIEWPHONEDETAIL (the quota
-  // footer) concatenated into ONE body, not two separate texts.
+  // Angular button.component.ts:524-583 — see communicationService.ts's
+  // getContactConfirmContent() for the full template-selection logic (shared
+  // by all 6 screens that show this popup, so it can't drift out of sync).
   function getContactConfirmContent(): string {
-    const question = t('VIEWPROFILE.VIEWPHONECONFIRM')
-      .replace('#HISHER#', t(`PRONOUN.${oppGender}.hisher`))
-      .replace('#HIMHER#', t(`PRONOUN.${oppGender}.himher`))
-    const quota = t('VIEWPROFILE.VIEWPHONEDETAIL')
-      .replace('#VAR#', contactQuota.viewed)
-      .replace('#VAR1#', contactQuota.left)
-      .replace('#VAR2#', contactQuota.expiry)
-    return `${question}\n\n${quota}`
+    return getSharedContactConfirmContent(t, oppGender, contactQuota)
   }
 
   function handlePhoneInfoClose() {
@@ -1649,6 +1695,10 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             ...prev,
             viewed: result.viewedCount ?? prev.viewed,
             left:   result.remainingCount ?? prev.left,
+            // Angular's phoneviewed response has no totalProfileCountData field
+            // (that only comes from nbcontacts) — `total` intentionally isn't
+            // touched here, same as Angular leaves CONTACT_DETAIL.totalProfileCountData
+            // untouched across a phoneviewed call.
           }))
         }
       } else if (result.type === 'payment_promo') {
@@ -2011,6 +2061,22 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     paidNoPhotoBanner, navigation, t,
   ])
 
+  // Merged list of profiles + inline banner slots (e.g. BANNERSLOT 1001 = membership
+  // promo). A banner whose data hasn't loaded yet (e.g. 1020's GAM gamParams still
+  // null) makes renderBannerItem return null for that row — but on react-native-web,
+  // a FlatList/VirtualizedList cell whose renderItem returns null still commits a
+  // real, non-zero-height row in the DOM instead of collapsing, showing up as a
+  // blank gap before whatever card follows it. Filtering those rows out here, using
+  // renderBannerItem itself (the actual single source of truth for what each slot
+  // renders) instead of a separately-duplicated condition list, keeps this from
+  // drifting out of sync with renderBannerItem's own per-slot conditions.
+  const listData = useMemo<MatchListItem[]>(
+    () => buildMergedList(profiles, bannerSlots).filter(
+      item => !isBanner(item) || renderBannerItem(item) !== null
+    ),
+    [profiles, bannerSlots, renderBannerItem]
+  )
+
   const renderItem: ListRenderItem<MatchListItem> = useCallback(({ item }) => {
     if (isBanner(item)) return renderBannerItem(item)
     return (
@@ -2026,12 +2092,13 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         onViewLater={() => handleViewLater(item)}
         onCall={() => handleCall(item)}
         onWhatsApp={() => handleWhatsApp(item)}
+        onMessage={() => handleMessage(item)}
       />
     )
   }, [
     renderBannerItem, oppGender, ownEntryType, femaleFreeEligible,
     indNumbersLeft, navigation, handleLike, handleDontShow, handleViewLater, handleCall,
-    handleWhatsApp, profileIds,
+    handleWhatsApp, handleMessage, profileIds,
   ])
 
   // ── Desktop web layout (Figma "Jodii Desktop") ──────────────────────────────
@@ -2058,6 +2125,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           onViewLater={handleViewLater}
           onCall={handleCall}
           onWhatsApp={handleWhatsApp}
+          onMessage={handleMessage}
           onEditPreferences={() => goToEditPreferences(navigation)}
           loadingMore={loadingMore}
           onLoadMore={loadMore}
@@ -2460,7 +2528,7 @@ const c = StyleSheet.create({
     borderWidth:       1,
     borderColor:       Colors.overlayBorder,
     alignItems:        'center',
-    width:             '80%',
+    width:             '70%',
     gap:               12,
   },
   overlayText: {
@@ -2534,17 +2602,6 @@ const c = StyleSheet.create({
   iconBtn:    { flexShrink: 0 },
   nameRowIcon:  { width: 24, height: 24 },
   nameRowIconWa:{ width: 28, height: 28 },
-  // Figma: 24x24 circle, white fill, 1px #006c48 border
-  callIconCircle: {
-    width:           24,
-    height:          24,
-    borderRadius:    12,
-    borderWidth:     1,
-    borderColor:     '#006c48',
-    backgroundColor: Colors.white,
-    alignItems:      'center',
-    justifyContent:  'center',
-  },
 
   // Angular: body2-regular-14 mt-2 pl-16 pr-16 bv-minht text-space
   // Figma: solid #000000; the "|" separators alone drop to 20% opacity

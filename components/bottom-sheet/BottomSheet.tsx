@@ -98,7 +98,7 @@ export interface BottomSheetProps {
 
 export default function BottomSheet({
   visible,
-  type: _type,
+  type,
   data,
   children,
   showClose: showCloseProp,
@@ -171,6 +171,21 @@ export default function BottomSheet({
   const hasLinkCta   = !!data?.linkCtaLabel
   const hasOr        = !!data?.orCtaText && hasLinkCta
 
+  // modalpopup.component.html:364-399 (action 'viewProfileContactNoConfirm') —
+  // this popup's layout genuinely differs from every other BottomSheet use:
+  // the title sits in the SAME row as an inline close-X (10.5/1.5 col split,
+  // left-aligned, not the generic centered title + separately-floating close
+  // circle every other sheet uses), and the quota line below the CTA is its
+  // own highlighted box (.viewed-contact-vp-revamp: #fcf4f5 bg, 12px padding),
+  // not a second paragraph of plain centered body text. The caller (all 8
+  // call sites, e.g. MatchesScreen's getContactConfirmContent()) still just
+  // passes one `content` string with the question and quota joined by
+  // '\n\n' — split back apart here so every call site stays untouched.
+  const isViewPhoneConfirm = type === 'viewPhoneConfirm'
+  const [phoneConfirmQuestion, phoneConfirmQuota] = isViewPhoneConfirm
+    ? (data?.content ?? '').split('\n\n')
+    : []
+
   // Close button — Angular: mobile's bottomsheet-cross floats ABOVE the sheet
   // (top:-48px, centered); desktop's sits INSIDE the card's own top-right
   // corner instead (same convention WhatsAppPaywallModal already uses) — no
@@ -181,7 +196,7 @@ export default function BottomSheet({
   // floated it absolutely over the top-right corner, which overlapped the
   // body text whenever a sheet had no title/image to naturally push content
   // down first (most of them — many BottomSheet uses are content-only).
-  const closeButton = showClose && (
+  const closeButton = showClose && !isViewPhoneConfirm && (
     <Pressable onPress={onClose} hitSlop={10} style={isDesktop ? styles.desktopCloseBtn : styles.closeBtn}>
       <View style={isDesktop ? styles.desktopCloseCircle : styles.closeCircle}>
         <Text style={styles.closeX}>✕</Text>
@@ -193,7 +208,39 @@ export default function BottomSheet({
     <>
       {closeButton}
 
-      {children ? children : (
+      {isViewPhoneConfirm ? (
+        <>
+          {/* modalpopup.component.html:369-377 — title row: question text (10.5
+              cols) + inline close-X (1.5 cols), left-aligned, NOT the generic
+              centered title + separately-floating close circle. */}
+          <View style={styles.phoneConfirmTitleRow}>
+            <Text style={styles.phoneConfirmTitle}>{phoneConfirmQuestion}</Text>
+            {showClose && (
+              <Pressable onPress={onClose} hitSlop={10} style={styles.phoneConfirmCloseBtn}>
+                <Text style={styles.phoneConfirmCloseX}>✕</Text>
+              </Pressable>
+            )}
+          </View>
+
+          {/* modalpopup.component.html:380-383 — full-width primary-cta-jodii button */}
+          {hasPrimary && (
+            <ButtonRevamp
+              label={data!.ctaLabel!}
+              variant="primary"
+              fullWidth
+              style={[styles.primaryBtn, { marginTop: 20, backgroundColor: Colors.primaryDark }]}
+              onPress={onPrimaryPress}
+            />
+          )}
+
+          {/* modalpopup.component.html:386-391 — .viewed-contact-vp-revamp: its
+              own highlighted box below the button, not a second paragraph of
+              plain centered body text. */}
+          {!!phoneConfirmQuota && (
+            <Text style={styles.phoneConfirmQuota}>{phoneConfirmQuota}</Text>
+          )}
+        </>
+      ) : children ? children : (
         <>
           {/* Top image — CdnSvg so CDN-hosted SVG icons (e.g. the "add your photo"
               alert icon) render correctly on native, not just web. Angular sets no
@@ -413,6 +460,7 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     position:  'absolute',
+    
     top:       -48,
     left:      0,
     right:     0,
@@ -431,6 +479,49 @@ const styles = StyleSheet.create({
     fontSize:   12,
     color:      Colors.textMedium,
     fontWeight: '600',
+  },
+  // viewPhoneConfirm — modalpopup.component.html:369-391 / global.scss's
+  // .viewprofile-popup-title (16px bold, #000) + .viewed-contact-vp-revamp
+  // (#fcf4f5 bg, 12px padding, 12px font). --ion-cust-padding (24px) drives
+  // the row's own top padding, matched here via title's marginTop.
+  phoneConfirmTitleRow: {
+    flexDirection: 'row',
+    alignItems:    'flex-start',
+    marginTop:     4,
+  },
+  phoneConfirmTitle: {
+    flex:       1,
+    fontFamily: Fonts.poppinsSemiBold,
+    fontSize:   16,
+    lineHeight: 22,
+    color:      '#000',
+    textAlign:  'left',
+  },
+  // 28x28 tap target — Angular's cross-img-vp-revamp is font-size-driven
+  // (6.67vmin, no fixed box), but every other BottomSheet close icon in this
+  // port uses a fixed 28x28 circle (closeCircle/desktopCloseCircle) — matched
+  // here for a consistent tap target instead of a bare, unsized glyph.
+  phoneConfirmCloseBtn: {
+    width:          28,
+    height:         28,
+    marginLeft:     8,
+    alignItems:     'center',
+    justifyContent: 'center',
+  },
+  phoneConfirmCloseX: {
+    fontSize:   16,
+    color:      '#000',
+    fontWeight: '600',
+  },
+  phoneConfirmQuota: {
+    fontFamily:      SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize:        12,
+    color:           '#000',
+    backgroundColor: '#fcf4f5',
+    padding:         12,
+    borderRadius:    8,
+    marginTop:       16,
+    marginBottom:    8,
   },
   sheetImage: {
     alignSelf:    'center',

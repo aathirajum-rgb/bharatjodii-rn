@@ -32,7 +32,7 @@ import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import { useContactGating } from '../../hooks/useContactGating'
 import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
 import { openMembershipTab, paymentTrack, getHeroBannerDetails, getMenuPromo, redirectToIntermediatePage } from '../../service/paymentService'
-import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm } from '../../service/communicationService'
+import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import { getItem, setItem, removeItem, getJson } from '../../service/storageService'
 import { getRegistrationArrays, getSessionValue } from '../../service/registrationService'
@@ -1238,14 +1238,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
   function getContactConfirmContent(): string {
     if (!contactConfirm) return ''
-    const question = t('VIEWPROFILE.VIEWPHONECONFIRM')
-      .replace('#HISHER#', t(`PRONOUN.${gating.oppGender}.hisher`))
-      .replace('#HIMHER#', t(`PRONOUN.${gating.oppGender}.himher`))
-    const quota = t('VIEWPROFILE.VIEWPHONEDETAIL')
-      .replace('#VAR#', gating.contactQuota.viewed)
-      .replace('#VAR1#', gating.contactQuota.left)
-      .replace('#VAR2#', gating.contactQuota.expiry)
-    return `${question}\n\n${quota}`
+    return getSharedContactConfirmContent(t, gating.oppGender, gating.contactQuota)
   }
 
   function handleContactConfirmClose() {

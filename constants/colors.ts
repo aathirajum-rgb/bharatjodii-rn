@@ -120,4 +120,9 @@ export const Colors = {
   starMatchNoteBg:   '#fef6db',   // footnote background
   starMatchNoteText: '#aa8606',   // footnote text
   starMatchPageBg:   '#dddddd',   // ion-content --background — gray page behind the white cards
+
+  // ── Verified-badge info popover (ViewProfileScreen) — exact hex from Angular's
+  // popover.component.scss .tooltip rule, not this app's general design tokens.
+  verifiedPopoverBg:     '#FEF6DB',
+  verifiedPopoverBorder: 'rgba(247,190,87,1)',
 }

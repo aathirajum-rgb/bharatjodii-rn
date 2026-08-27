@@ -262,16 +262,30 @@ export default function EditProfileAgeHeightScreen({ navigation }: Props) {
 
     const changes: FieldChange[] = []
 
+    // Angular (form-fields.component.ts's goToNext()) never gates these calls
+    // on "did the value change from the prefill" — EXISTINGVALUE is sent for
+    // backend audit only, the update call itself always fires. Matching that
+    // here matters specifically for Age: this screen is reached via the
+    // server's own "Age still incomplete" signal (page_id 47), so if the
+    // prefilled value happens to equal what the user re-confirms, skipping
+    // the call would leave the backend's flag never cleared and re-land the
+    // user right back on this screen on the next login.
     if (ageEditable) {
-      const ageValue = isDobComplete ? String(calculatedAge) : directAge
-      if (ageValue && ageValue !== original.age) {
-        changes.push({ field: 'AGE', value: ageValue, existingValue: original.age })
+      if (isDobComplete) {
+        // Angular fires BOTH calls for a completed DOB entry: TYPE=20 (DOB,
+        // tilde-joined YEAR~MONTH~DATE) then TYPE=3 (AGE, computed). Sending
+        // only AGE (as this screen used to) can leave the backend's
+        // DOB-specific completeness check unsatisfied.
+        changes.push({ field: 'DOB', value: `${selYear}~${selMonth}~${selDate}`, existingValue: original.age })
+        changes.push({ field: 'AGE', value: String(calculatedAge), existingValue: original.age })
+      } else if (directAge) {
+        changes.push({ field: 'AGE', value: directAge, existingValue: original.age })
       }
     }
 
-    if (selectedHeight && selectedHeight.key !== original.height) {
+    if (selectedHeight) {
       changes.push({ field: 'HEIGHT', value: selectedHeight.key, existingValue: original.height || original.heightCategory })
-    } else if (selectedCategory && selectedCategory !== original.heightCategory) {
+    } else if (selectedCategory) {
       changes.push({ field: 'HEIGHTCATEGORY', value: selectedCategory, existingValue: original.heightCategory || original.height })
     }
 

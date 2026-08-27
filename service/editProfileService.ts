@@ -39,6 +39,13 @@ export const FIELD_TYPE_CODE = {
   SISTERS:        '17',
   PROPERTIES:     '18',
   MOBILENO:       '19',
+  // Angular's form-fields.component.ts's DOB entry path (goToNext()) fires
+  // TWO calls when YEAR/MONTH/DATE are all set: TYPE=20 with the tilde-joined
+  // "YEAR~MONTH~DATE" triple, THEN a separate TYPE=3 (AGE) call with the
+  // client-computed age. Both must be sent — the backend's own
+  // Age-completeness check (the one that re-sends page_id 47 on login) may
+  // key off the DOB=20 record specifically, not just the derived AGE value.
+  DOB:            '20',
   // Missing from Angular's registration.page.ts's own editProfileUpdateObj
   // copy — but the actual submit path for these two fields is the shared
   // <app-form-fields> component, which has a SEPARATE, more complete copy

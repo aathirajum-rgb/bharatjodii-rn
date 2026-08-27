@@ -44,6 +44,7 @@ export interface MatchesDesktopLayoutProps {
   onViewLater:       (profile: MatchProfile) => void
   onCall:            (profile: MatchProfile) => void
   onWhatsApp:        (profile: MatchProfile) => void
+  onMessage:         (profile: MatchProfile) => void
 
   onEditPreferences?: () => void
   loadingMore:        boolean
@@ -60,7 +61,7 @@ export default function MatchesDesktopLayout({
   langCode, onTabPress, onLanguagePress,
   loading, totalCount, listData, renderBanner, oppGender,
   ownEntryType, femaleFreeEligible, indNumbersLeft,
-  onProfilePress, onLike, onDontShow, onViewLater, onCall, onWhatsApp,
+  onProfilePress, onLike, onDontShow, onViewLater, onCall, onWhatsApp, onMessage,
   onEditPreferences, loadingMore, onLoadMore,
   selectedChip, onChipSelect,
   addPhotoBannerMatches, onActivateProfile,
@@ -163,6 +164,7 @@ export default function MatchesDesktopLayout({
                     onViewLater={() => onViewLater(item)}
                     onCall={() => onCall(item)}
                     onWhatsApp={() => onWhatsApp(item)}
+                    onMessage={() => onMessage(item)}
                   />
                 )
               }}

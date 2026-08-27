@@ -17,13 +17,19 @@ export interface ContactGating {
   ownEntryType:       string
   femaleFreeEligible: boolean
   indNumbersLeft:     string
-  contactQuota:       { viewed: string; left: string; expiry: string }
+  // `total` = CONTACT_DETAIL.totalProfileCountData — kept separate from
+  // `viewed` (not folded together) because callers need it to pick WHICH
+  // quota-footer template Angular would show (button.component.ts's
+  // viewContactNoConfirmPopUp: VIEWPHONEDETAIL / _1 / _2), not just to fill
+  // in #VAR#. See MatchesScreen.tsx's getContactConfirmContent() for the
+  // exact selection logic this mirrors.
+  contactQuota:       { viewed: string; left: string; expiry: string; total: string }
   loaded:             boolean
 }
 
 const INITIAL: ContactGating = {
   oppGender: 'F', loginGender: 'F', ownEntryType: '', femaleFreeEligible: false,
-  indNumbersLeft: '0', contactQuota: { viewed: '0', left: '', expiry: '' }, loaded: false,
+  indNumbersLeft: '0', contactQuota: { viewed: '0', left: '', expiry: '', total: '' }, loaded: false,
 }
 
 export function useContactGating(): ContactGating {
@@ -57,6 +63,7 @@ export function useContactGating(): ContactGating {
           viewed: String(contactDetail?.phoneNumbersViewed ?? '0'),
           left:   String(contactDetail?.phoneNumbersLeft ?? ''),
           expiry: String(contactDetail?.expiryTextValue ?? ''),
+          total:  String(contactDetail?.totalProfileCountData ?? ''),
         },
         loaded: true,
       })

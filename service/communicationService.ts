@@ -100,6 +100,47 @@ export function shouldSkipPhoneConfirm(
   return false
 }
 
+// Angular button.component.ts:524-583 (viewContactNoConfirmPopUp) — the
+// confirmation popup's body is VIEWPHONECONFIRM (the question) + a quota
+// footer, concatenated into ONE string with a blank line between (BottomSheet
+// splits it back apart for the viewPhoneConfirm layout — see BottomSheet.tsx).
+// The quota footer isn't always the same template — Angular picks between
+// THREE, in this order (later checks win):
+//   - VIEWPHONEDETAIL         "You have viewed contact numbers of #VAR#
+//                              profiles. #VAR1# remaining till #VAR2#" (default)
+//   - VIEWPHONEDETAIL_1       "Contacts viewed #VAR#/#VAR1#" — when phoneViewCnt <= 1
+//   - VIEWPHONEDETAIL_2       same wording as VIEWPHONEDETAIL — when
+//                              phoneNumbersLeft == 1 (checked last, wins over _1 too)
+// phoneViewCnt itself is `totalProfileCountData - phoneNumbersLeft` when
+// CONTACT_DETAIL has totalProfileCountData, else the raw viewed count.
+// Extracted here (not left duplicated per-screen) since all 6 call sites
+// (Matches/Home/Activity/ViewProfile/IgnoredProfilesDesktop/ViewLater) need
+// the identical selection logic — `t` passed in like usePhoneInfoSheet's
+// getData(t), since this is a plain service file, not a hook/component.
+export function getContactConfirmContent(
+  t: any,
+  oppGender: 'M' | 'F',
+  quota: { viewed: string; left: string; expiry: string; total: string },
+): string {
+  const question = t('VIEWPROFILE.VIEWPHONECONFIRM')
+    .replace('#HISHER#', t(`PRONOUN.${oppGender}.hisher`))
+    .replace('#HIMHER#', t(`PRONOUN.${oppGender}.himher`))
+
+  const total = Number(quota.total || 0)
+  const left  = Number(quota.left || 0)
+  const phoneViewCnt = quota.total ? String(total - left) : quota.viewed
+
+  let template = t('VIEWPROFILE.VIEWPHONEDETAIL')
+  if (Number(phoneViewCnt) <= 1) template = t('VIEWPROFILE.VIEWPHONEDETAIL_1')
+  if (quota.left === '1') template = t('VIEWPROFILE.VIEWPHONEDETAIL_2')
+
+  const quotaText = template
+    .replace('#VAR#', phoneViewCnt)
+    .replace('#VAR1#', quota.left)
+    .replace('#VAR2#', quota.expiry)
+  return `${question}\n\n${quotaText}`
+}
+
 // ─── Main entry ───────────────────────────────────────────────────────────────
 
 export async function communicationBtnOnClick(
@@ -409,20 +450,34 @@ export async function fetchContactDetails(): Promise<void> {
 // ─── Chat ─────────────────────────────────────────────────────────────────────
 
 async function handleChat(fromPage: string, oppProfile: any): Promise<CommActionResult> {
-  const [entryType, ekycStatus, ppSetRaw] = await Promise.all([
+  // Angular communication.service.ts:117-131's real jodimessages branch, in its
+  // real order — check_Paid_NonVerifyIdUser() then check_Paid_Verified_Nophoto()
+  // then entryType=='F' then chat. Both check_Paid_* gates are scoped to PAID
+  // MALE users only (common-funtions.ts:382-386: entryType=='P' && gender=='M'
+  // && getPaidFlag()=='1') — they never fire for a free user or for a female
+  // user, unlike a previous version of this port which ran an unconditional
+  // photo-status check before entryType was even read, and which also read the
+  // ekyc flag off a key ('PI_EKYCSTATUS') nothing in this codebase ever writes
+  // (the real key, used everywhere else, is EKYCSTATUS) — so a paid member's
+  // eKYC always looked unverified here and could route to the wrong sheet.
+  const [entryType, ekycStatus, gender, paidFlag, ppSetRaw] = await Promise.all([
     getSessionValue('ENTRYTYPE'),
-    getItem('PI_EKYCSTATUS'),
+    getItem(SK.Verification.EKYC_STATUS),
+    getItem(SK.User.LOGIN_GENDER),
+    getItem(SK.Payment.PAY_P_FLAG),
     getJson<Record<string, any>>(SK.App.PP_SET_DATA),
   ])
 
   const photoStatus: string = (ppSetRaw as any)?.PI_PHOTOSTATUS ?? 'N'
+  const isPaidMale = entryType === 'P' && gender === 'M' && paidFlag === '1'
 
-  // Photo check for female users
-  if (photoStatus === 'N') {
-    return { type: 'female_free', action: 'femaleFree-PhotoAdd', profile: oppProfile }
+  // check_Paid_NonVerifyIdUser() — paid male, not yet eKYC-verified.
+  if (isPaidMale && ekycStatus !== '1') {
+    return { type: 'verify_id', fromPage, action: 'jodimessages' }
   }
 
-  if (ekycStatus !== '1') {
+  // check_Paid_Verified_Nophoto() — paid male, verified, no photo published yet.
+  if (isPaidMale && ekycStatus === '1' && ['P', 'N', 'R'].includes(photoStatus)) {
     return { type: 'verify_id', fromPage, action: 'jodimessages' }
   }
 

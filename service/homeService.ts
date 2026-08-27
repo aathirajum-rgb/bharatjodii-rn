@@ -148,8 +148,14 @@ export function toListingResult(res: Record<string, any>): ListingResult {
   const bannerSlots: Array<{ slot: string; insertAfter: number }> = []
 
   for (const p of all) {
-    // STATUS 997/999/1000 = loader / end-of-list / hidden placeholders
-    if (p['STATUS'] === '997' || p['STATUS'] === '999' || p['STATUS'] === '1000') continue
+    // STATUS 997/999/1000 = loader / end-of-list / hidden placeholders. Confirmed live
+    // (JODII debug) that the server sends this as a JSON NUMBER (999), not a string —
+    // a strict '===' string comparison here let the end-of-list sentinel fall through
+    // to toProfile(), producing a card with no MATRIID/name (icons only, tap fails with
+    // an empty matriId). Angular's own checks are loose (profile.STATUS == "999")
+    // everywhere in matches.page.ts, which is why this never surfaced there.
+    const status = String(p['STATUS'] ?? '')
+    if (status === '997' || status === '999' || status === '1000') continue
     if (p['BANNERSLOT']) {
       // Track banner position as "after N profile items"
       bannerSlots.push({ slot: String(p['BANNERSLOT']), insertAfter: items.length })

@@ -8,7 +8,7 @@
 // Call/WhatsApp = SvgUri (always calls the server, no caching), the rest = SvgXml
 // (bundled strings).
 
-import { useRef, useState } from 'react'
+import { forwardRef, useRef, useState } from 'react'
 import {
   Image as RNImage, Pressable, StyleSheet, Text, View,
 } from 'react-native'
@@ -16,6 +16,7 @@ import { Image } from 'expo-image'
 import Carousel, { type ICarouselInstance } from 'react-native-reanimated-carousel'
 import type { PanGesture } from 'react-native-gesture-handler'
 import { SvgXml } from 'react-native-svg'
+import Svg, { Path } from 'react-native-svg'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
@@ -125,6 +126,11 @@ export function CallIcon({ width = 24, height = 25 }: IconProps) {
   return <CdnSvg uri={CDN + 'revamp/call-revamp.svg'} width={width} height={height} />
 }
 
+// Angular: matches-card.component.html — message-matches.svg, sits before the call icon.
+export function MessageIcon({ width = 24, height = 25 }: IconProps) {
+  return <CdnSvg uri={CDN + 'message-matches.svg'} width={width} height={height} />
+}
+
 export function CloseIcon({ width = 25, height = 24 }: IconProps) {
   return <SvgXml xml={XML_CLOSE} width={width} height={height} />
 }
@@ -209,21 +215,24 @@ export function decodeHtmlEntities(input: string): string {
   })
 }
 
-// Angular: bindBasicView() — order: age | height | caste | education | occupation | location
+// Angular: bindBasicView() — order: age | height | caste | education | occupation | income | location.
+// income only shows when the logged-in viewer is female (FUNC.getLogInGender() == 'F');
+// callers pass oppGender === 'M' for that, since matches always show opposite-gender profiles.
 // (mirrors matches-card.component.ts bindBasicView exactly)
-export function buildBasicViewParts(p: MatchProfile): string[] {
+export function buildBasicViewParts(p: MatchProfile, loggedInFemale?: boolean): string[] {
   const parts: string[] = []
   if (p.age)        parts.push(`${p.age} yrs`)
   if (p.height)     parts.push(p.height)
   if (p.caste)      parts.push(p.caste)
   if (p.education)  parts.push(p.education)
   if (p.occupation) parts.push(p.occupation)
+  if (loggedInFemale && p.income) parts.push(p.income)
   if (p.location)   parts.push(p.location)   // location at END (Angular)
   return parts.map(decodeHtmlEntities)
 }
 
-export function buildBasicView(p: MatchProfile): string {
-  return buildBasicViewParts(p).join(' | ')
+export function buildBasicView(p: MatchProfile, loggedInFemale?: boolean): string {
+  return buildBasicViewParts(p, loggedInFemale).join(' | ')
 }
 
 // Angular: FUNC.showLikeCTA(likedStatus) — show Like/Don't Show/View Later when not yet liked/declined
@@ -326,9 +335,14 @@ export function showFreeBadge(ctx: AfterLikeCtx): boolean {
 
 // ─── Paid/Verified profile badge ────────────────────────────────────────────────
 // Angular: components/badge — icon overlapping the pill's rounded left cap
-// (left:-10px) + a translated text label on a 10%-opacity tinted pill
-// (paid-member-block color-006C48 / verified-member-block color-0069CA).
-
+// (left:-10px) + a translated text label, sat on a background IMAGE (not a flat
+// tinted rounded-rect): paid-member-bg.svg / verified-bg.svg — a 10%-opacity
+// fill shaped like a rounded-left pill with a chevron notch cut into the right
+// edge (badge.component.scss: background url(...) no-repeat, background-size:
+// 100% auto, so the image stretches to fit the text-sized pill). Reproduced
+// here as a stretchable inline SVG (preserveAspectRatio="none") behind the
+// content instead of a plain borderRadius pill.
+// paid-member-bg.svg viewBox 0 0 123 24; verified-bg.svg viewBox 0 0 86 24.
 export type ProfileBadgeVariant = 'paid' | 'verified'
 
 const BADGE_ICON: Record<ProfileBadgeVariant, string> = {
@@ -341,35 +355,84 @@ const BADGE_COLOR: Record<ProfileBadgeVariant, string> = {
   verified: '#0069CA',
 }
 
-export function ProfileBadge({ variant, text }: { variant: ProfileBadgeVariant; text: string }) {
-  const color = BADGE_COLOR[variant]
-  return (
-    <View style={[badgeStyles.pill, { backgroundColor: color + '1A' }]}>
-      <CdnSvg uri={BADGE_ICON[variant]} width={24} height={24} style={badgeStyles.icon} />
-      <Text style={[badgeStyles.text, { color }]} numberOfLines={1}>{text}</Text>
-    </View>
-  )
+// Notched-pill path, normalized to a 123×24 box (paid's native viewBox) — for
+// the narrower verified badge the same path is reused inside its own 86×24
+// viewBox and stretched via preserveAspectRatio="none", matching Angular's
+// own per-variant SVG + CSS-stretch approach closely enough at these sizes.
+const BADGE_BG_PATH: Record<ProfileBadgeVariant, { viewBox: string; d: string }> = {
+  paid: {
+    viewBox: '0 0 123 24',
+    d: 'M0 12C0 5.37258 5.37258 0 12 0H120.73C122.426 0 123.352 1.97771 122.266 3.28037L115 12L122.266 20.7196C123.352 22.0223 122.426 24 120.73 24H12C5.37259 24 0 18.6274 0 12Z',
+  },
+  verified: {
+    viewBox: '0 0 86 24',
+    d: 'M0 12C0 5.37258 5.37258 0 12 0H83.1191C84.7448 0 85.6913 1.83665 84.7479 3.16062L78.4493 12L84.7479 20.8394C85.6913 22.1634 84.7448 24 83.1191 24H12C5.37258 24 0 18.6274 0 12Z',
+  },
 }
+
+// Angular: badge.component.html's hasInfo span — a small info icon shown after
+// the badge text, only for badges that carry extra tap-for-detail content (e.g.
+// the Verified badge's "why verified" explainer). CDN URL confirmed live.
+const VERIFIED_INFO_ICON_URI = 'https://imgs.jodii.app/assets/images/svg/verified-info.svg'
+
+// forwardRef so callers can measure() the badge's real screen position and pass
+// it as Popover's `anchor` (see Popover.tsx's own doc comment on that prop) —
+// without this, Angular's presentPopover($event) anchors precisely under the
+// tapped badge, while the RN side had no way to do the same and fell back to
+// Popover's generic full-width centered position instead.
+export const ProfileBadge = forwardRef<View, {
+  variant: ProfileBadgeVariant; text: string; style?: object | undefined
+  // Angular: the (click) handler sits on the WHOLE app-badge host, not just the
+  // info icon (viewprofile.page.html:454-459) — so this fires on a tap anywhere
+  // on the badge, matching that, not just the icon glyph.
+  hasInfo?: boolean | undefined; onInfoPress?: (() => void) | undefined
+}>(function ProfileBadge({ variant, text, style, hasInfo, onInfoPress }, ref) {
+  const color = BADGE_COLOR[variant]
+  const bg = BADGE_BG_PATH[variant]
+  const Wrapper = hasInfo && onInfoPress ? Pressable : View
+  return (
+    <Wrapper ref={ref as any} style={[badgeStyles.pill, style]} {...(hasInfo && onInfoPress ? { onPress: onInfoPress } : {})}>
+      <Svg
+        style={StyleSheet.absoluteFill}
+        viewBox={bg.viewBox}
+        preserveAspectRatio="none"
+      >
+        <Path d={bg.d} fill={color} fillOpacity={0.1} />
+      </Svg>
+      <CdnSvg uri={BADGE_ICON[variant]} width={28} height={28} style={badgeStyles.icon} />
+      <Text style={[badgeStyles.text, { color }]} numberOfLines={1}>{text}</Text>
+      {hasInfo && (
+        <CdnSvg uri={VERIFIED_INFO_ICON_URI} width={14} height={14} style={badgeStyles.infoIcon} />
+      )}
+    </Wrapper>
+  )
+})
 
 const badgeStyles = StyleSheet.create({
   pill: {
     flexDirection:   'row',
     alignItems:      'center',
     alignSelf:       'flex-start',   // content-sized pill, NOT full-width (same fix as MatchesScreen.tsx's ctaBtn)
-    borderRadius:    12,
     paddingLeft:     20,
-    paddingRight:    16,
+    paddingRight:    30,
     paddingVertical: 4,
     minHeight:       24,
+
   },
   icon: {
     position: 'absolute',
-    left:     -10,
+    left:     -1,
     top:      0,
   },
   text: {
     fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium,
     fontSize:   12,
+    left: +8,
+  },
+  // Angular: badge.component.html's hasInfo span — class="ml-4" (4px left margin).
+  infoIcon: {
+    marginLeft: 4,
+    left: 6,
   },
 })
 

@@ -21,7 +21,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { LANG_LABELS } from '../../components/matches-header/MatchesHeader'
 import {
-  WhatsAppIcon, WhatsAppUnlockButton, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
+  WhatsAppIcon, WhatsAppUnlockButton, CallIcon, MessageIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   showLikeCTA, showAfterLikeCTA, disableDontShow, disableViewLater, HtmlText,
   getBlurPhotoUri, getAvatarFallbackUri, NEWLY_JOINED_STAR_URI, ProfileBadge, PhotoSwiper,
   getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showContactsLeftBanner, showFreeBadge,
@@ -35,6 +35,7 @@ import PhotoViewerModalDesktop from '../../components/matches/PhotoViewerModalDe
 import HoroscopeSvgViewerModal from '../../components/matches/HoroscopeSvgViewerModal'
 import ReportProfileModal from '../../components/matches/ReportProfileModal'
 import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
+import Popover, { type PopoverAnchor } from '../../components/popover/Popover'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import ViewProfileDesktopLayout from './ViewProfileDesktopLayout'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
@@ -45,7 +46,7 @@ import {
   type SimilarProfileCard, type StarMatchResult, type BiodataTheme,
 } from '../../service/viewProfileService'
 import { viewProfileAdapter } from '../../adapters/viewProfile.adapter'
-import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm } from '../../service/communicationService'
+import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import { getHeroBannerDetails } from '../../service/paymentService'
 import { fetchMenuPromo } from '../../service/homeService'
 import { getItem, getJson } from '../../service/storageService'
@@ -59,11 +60,28 @@ import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
 import i18n from '../../i18n'
 import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interface'
 
-// Angular's real back button is Ionic's bundled `icon="arrow-back"` (ships in the
-// app's own JS bundle, not a network fetch) — this app's own established equivalent
-// for that same "local back-arrow icon" slot is a CDN-hosted SVG fetched via
-// CdnSvg, already used this exact way by AppHeader.tsx (registration/login screens).
-const BACK_ICON_URI = CDN_REACT + '/arrowleft.svg'
+// Angular's real back button is Ionic's bundled `icon="arrow-back"` (MD variant —
+// a straight-shaft leftward arrow, ships in the app's own JS bundle, not a network
+// fetch), 24px, color #333. CDN_REACT + '/arrowleft.svg' 404s on the live CDN
+// (confirmed directly — same dead path AppHeader.tsx already found and worked
+// around); arrow-back-activity.svg is the app's other, WORKING straight-shaft
+// back-arrow asset (already used by ChatScreen.tsx/ReportProfileModal.tsx/
+// AttachmentPreviewModal.tsx), and visually the closer match to Angular's glyph
+// shape (a shaft + head, not a bare chevron) — used here instead.
+const BACK_ICON_URI = CDN_SVG + 'arrow-back-activity.svg'
+
+// Feature 2 prev/next-PROFILE nav arrows (below the photo, distinct from the
+// photo-swiper's own dots/gesture). Angular: viewprofile.page.html:1546-1563,
+// <img src="{{nbcommon.ImgDomain() + 'assets/images/svg/vp-revamp-left-arw.svg'}}">
+// / vp-revamp-right-arw.svg — same CDN_SVG base this app already uses for every
+// other viewprofile icon below. Live CDN asset (checked directly, newer than the
+// old Angular source file on disk) is a 60x76 canvas: a solid #333 rounded-pill
+// badge (~43px circle) with a soft drop-shadow and a thin white chevron stroke —
+// matches the current app screenshot's look. Rendered at 34x43 (same aspect) below.
+const PROFILE_NAV_LEFT_ARROW_URI  = CDN_SVG + 'vp-revamp-left-arw.svg'
+const PROFILE_NAV_RIGHT_ARROW_URI = CDN_SVG + 'vp-revamp-right-arw.svg'
+const PROFILE_NAV_ARROW_WIDTH  = 54
+const PROFILE_NAV_ARROW_HEIGHT = 69
 
 // Angular: viewprofile.page.html — one <img> per detail row, under assets/images/svg/
 // (most under a viewprofile/ subfolder, two — children/physical-status — are not).
@@ -110,6 +128,10 @@ export const HOME_PLACE_DOMAIN = ['2', '14', '17', '41', '4', '51']
 const SCREEN_WIDTH = Dimensions.get('window').width
 const PHOTO_HEIGHT = SCREEN_WIDTH
 const SCREEN_HEIGHT = Dimensions.get('window').height
+// s.headerBar's own non-safe-area height: paddingTop's fixed +8, tallest content
+// (headerBackBtn, 42px), paddingBottom 10 — mirrors that math so the fixed-position
+// prev/next-profile arrows below line up flush with the photo's bottom edge.
+const HEADER_FIXED_HEIGHT = 8 + 42 + 10
 
 // Feature 6 biodata theming — Angular: download-biodata.component.html:74-75's
 // negative-margin-top-*-biodata classes. Each template's photo/details card
@@ -184,7 +206,8 @@ function DetailRow({
 
 // Angular: app-swiper's similar-profiles card — when the profile has no photo, an
 // `app-photo-request` overlay shows GENERAL.REQUEST_ADD_PHOTO_WHATSAPP ("Contact and
-// Get #HER_HIS# Photos on WhatsApp") + a WhatsApp CTA on top of the blurred placeholder
+// Get #HER_HIS# Photos on WhatsApp") 
+// + a WhatsApp CTA on top of the blurred placeholder
 // (photo-new.component.html:76-93). No name/other text on the card itself.
 export function SimilarProfileCardItem({
   card, oppGender, t, onPress, size,
@@ -308,14 +331,53 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // phoneviewed branch (protected number, view limits, ID-verify gate,
   // female-free flow) instead of surfacing anything for them. ──
   const [contactConfirm, setContactConfirm] = useState<'call' | 'whatsapp' | null>(null)
+  // Angular: viewprofile.page.ts's presentPopover() — tapping the Verified badge's
+  // info icon (or anywhere on the badge, same as Angular) shows this small tooltip,
+  // anchored right under the tapped badge (Angular: popoverController.create({event})).
+  const [showVerifiedInfo, setShowVerifiedInfo] = useState(false)
+  const [verifiedInfoAnchor, setVerifiedInfoAnchor] = useState<PopoverAnchor | null>(null)
+  const verifiedBadgeRef = useRef<View>(null)
+  // Angular: presentPopover()'s own setTimeout(() => popover.dismiss(), 5000) —
+  // auto-closes 5s after opening, on top of the normal tap-outside dismiss.
+  useEffect(() => {
+    if (!showVerifiedInfo) return
+    const timer = setTimeout(() => setShowVerifiedInfo(false), 5000)
+    return () => clearTimeout(timer)
+  }, [showVerifiedInfo])
+
+  function handleVerifiedInfoPress() {
+    // react-native-web's measureInWindow can fail silently through a forwardRef
+    // chain (Pressable → View → host node) — either current is null, or the
+    // callback just never fires. Either way the tooltip must still open
+    // (Popover falls back to its own centered position without an anchor)
+    // rather than the tap doing nothing at all.
+    if (!verifiedBadgeRef.current) {
+      setVerifiedInfoAnchor(null)
+      setShowVerifiedInfo(true)
+      return
+    }
+    let opened = false
+    verifiedBadgeRef.current.measureInWindow((x, y, width, height) => {
+      opened = true
+      setVerifiedInfoAnchor({ x, y, width, height })
+      setShowVerifiedInfo(true)
+    })
+    setTimeout(() => {
+      if (!opened) {
+        setVerifiedInfoAnchor(null)
+        setShowVerifiedInfo(true)
+      }
+    }, 100)
+  }
   const [contactDetails, setContactDetails] = useState<{
     name: string; mobile?: string | undefined; dialNumber?: string | undefined; whatsappNumber?: string | undefined
     showCounter?: boolean | undefined; viewedCount?: string | undefined; totalCount?: string | undefined
   } | null>(null)
   // Angular button.component.ts:551-579 — the CONFIRMATION popup's own quota
-  // footer line ("You have viewed contact numbers of #VAR# profiles. #VAR1#
-  // remaining till #VAR2#"), read purely from the local CONTACT_DETAIL cache.
-  const [contactQuota, setContactQuota] = useState({ viewed: '0', left: '', expiry: '' })
+  // footer line, read purely from the local CONTACT_DETAIL cache. `total` =
+  // totalProfileCountData — see communicationService.ts's getContactConfirmContent()
+  // for why it's kept separate from `viewed` (decides which template to use).
+  const [contactQuota, setContactQuota] = useState({ viewed: '0', left: '', expiry: '', total: '' })
   // The other phoneviewed/pre-flight scenarios (communicationService.ts's
   // showContactDetails + showCallOrWhatsApp's verify_id/female_free gates) —
   // all mutually exclusive with each other and with contactDetails, so one slot works.
@@ -429,6 +491,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         viewed: String(contactDetail?.phoneNumbersViewed ?? '0'),
         left:   String(contactDetail?.phoneNumbersLeft ?? ''),
         expiry: String(contactDetail?.expiryTextValue ?? ''),
+        total:  String(contactDetail?.totalProfileCountData ?? ''),
       })
       setLoginHoroAvail(String(horoAvail ?? '0'))
       // Angular: viewprofile.page.ts:2695-2699 — showAddHoro, a per-VIEWER (not
@@ -694,23 +757,60 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     }
   }
 
+  // Angular: viewprofile.page.html:493-498 — msgImgCta, same clickingOnBtn(...,
+  // 'jodimessages') → communication.service.ts branch as MatchesScreen.tsx's
+  // handleMessage(). No confirm popup (unlike call/whatsapp) — goes straight
+  // through gating: unverified/no-photo paid male → verify_id, free member →
+  // payment promo, else → straight into the chat window.
+  async function handleMessage() {
+    if (!profile) return
+    try {
+      const result = await communicationBtnOnClick(fromPage, 'jodimessages', { MATRIID: profile.profileId })
+      if (result.type === 'payment_promo') {
+        navigation.navigate('recharge')
+      } else if (result.type === 'verify_id') {
+        const arrays = await getRegistrationArrays()
+        const cfg = arrays?.PROFILEVERIFYPAID?.Shortlist ?? {}
+        let cta = String(cfg.CTA ?? 'OK')
+        if (cta.includes('##CSNUM##')) {
+          const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
+          cta = cta.replace(/##CSNUM##/g, callNum).replace('+91', '')
+        }
+        setPhoneInfoSheet({
+          kind:     'verify_id',
+          title:    String(cfg.TITLE ?? 'Verify your profile'),
+          content:  String(cfg.CONTENT ?? 'Please complete ID verification to view phone numbers.'),
+          ctaLabel: cta,
+        })
+      } else if (result.type === 'female_free') {
+        const kindByAction: Record<string, PhoneInfoSheet['kind'] | undefined> = {
+          'femaleFree-PhotoAdd':     'female_free_photo_add',
+          'femaleFree-PhotoPending': 'female_free_photo_pending',
+          'femaleFree-PhotoFail':    'female_free_photo_fail',
+          'callVerification':        'female_free_call_verification',
+          'femaleFree-LimitOver':    'female_free_limit_over',
+        }
+        const kind = kindByAction[result.action]
+        if (kind) setPhoneInfoSheet({ kind } as PhoneInfoSheet)
+      }
+      // result.type === 'api_success' — communicationBtnOnClick's handleChat()
+      // already navigated to chat-window. result.type === 'error' — no toast
+      // infra on this screen; swallow, matching this file's existing error handling.
+    } catch (e) {
+      if (__DEV__) console.error('[ViewProfile] message error:', e)
+    }
+  }
+
   function handleContactConfirmClose() {
     setContactConfirm(null)
   }
 
-  // Angular button.component.ts:551-583 — the confirmation popup's TostMsg is
-  // built from VIEWPHONECONFIRM (the question) + VIEWPHONEDETAIL (the quota
-  // footer) concatenated into ONE body, not two separate texts.
+  // Angular button.component.ts:524-583 — see communicationService.ts's
+  // getContactConfirmContent() for the full template-selection logic (shared
+  // by all 6 screens that show this popup, so it can't drift out of sync).
   function getContactConfirmContent(): string {
     if (!profile) return ''
-    const question = t('VIEWPROFILE.VIEWPHONECONFIRM')
-      .replace('#HISHER#', t(`PRONOUN.${profile.gender}.hisher`))
-      .replace('#HIMHER#', t(`PRONOUN.${profile.gender}.himher`))
-    const quota = t('VIEWPROFILE.VIEWPHONEDETAIL')
-      .replace('#VAR#', contactQuota.viewed)
-      .replace('#VAR1#', contactQuota.left)
-      .replace('#VAR2#', contactQuota.expiry)
-    return `${question}\n\n${quota}`
+    return getSharedContactConfirmContent(t, profile.gender, contactQuota)
   }
 
   async function handleContactConfirmYes(override?: 'call' | 'whatsapp') {
@@ -1365,7 +1465,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           + a 3-dot report/don't-show menu. */}
       <View style={[s.headerBar, { paddingTop: insets.top + 8 }]}>
         <Pressable style={s.headerBackBtn} onPress={() => navigation.goBack()} hitSlop={8}>
-          <CdnSvg uri={BACK_ICON_URI} width={22} height={22} />
+          <CdnSvg uri={BACK_ICON_URI} width={24} height={48} />
         </Pressable>
 
         {scrolled && (
@@ -1387,7 +1487,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           onPress={() => navigation.navigate('LanguageSelection')}
           hitSlop={8}
         >
-          <CdnSvg uri={CDN_SVG + 'revamp/lang-change-img.svg'} width={18} height={18} />
+          <CdnSvg uri={CDN_SVG + 'revamp/lang-change-img.svg'} width={20} height={20} />
           <Text style={s.langPillText} numberOfLines={1}>
             {LANG_LABELS[i18n.language] ?? 'English'}
           </Text>
@@ -1547,16 +1647,6 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               </Pressable>
             </>
           )}
-          {hasPrevProfile && (
-            <Pressable style={[s.profileArrowBtn, s.profileArrowLeft]} onPress={goToPrev} hitSlop={8}>
-              <Text style={s.profileArrowText}>{'‹'}</Text>
-            </Pressable>
-          )}
-          {hasNextProfile && (
-            <Pressable style={[s.profileArrowBtn, s.profileArrowRight]} onPress={goToNext} hitSlop={8}>
-              <Text style={s.profileArrowText}>{'›'}</Text>
-            </Pressable>
-          )}
         </View>
 
         {/* ── Info card ──────────────────────────────────────────────────────── */}
@@ -1577,7 +1667,14 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           <View style={s.badgeRow}>
             {profile.isPaidMember && <ProfileBadge variant="paid" text={t('MENU.PAID_BADGE')} />}
             {profile.isIdVerified && loginGender === 'F' && (
-              <ProfileBadge variant="verified" text={t('MATCHES.VERIFIED_ID')} />
+              <ProfileBadge
+                ref={verifiedBadgeRef}
+                variant="verified"
+                text={t('MATCHES.VERIFIED_ID')}
+                style={s.verifiedBadgeSize}
+                hasInfo
+                onInfoPress={handleVerifiedInfoPress}
+              />
             )}
           </View>
 
@@ -1588,8 +1685,14 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               details — so it's been removed rather than kept as an extra copy). */}
           <View style={s.nameRow}>
             <Text style={s.name} numberOfLines={1}>{profile.name}</Text>
-            {!sameGender && (
+            {/* Confirmed live in the Angular app: the Message/Call/WhatsApp icons
+                are hidden for as long as the Verified badge's info tooltip is open
+                (the tooltip sits right below the badge, directly over this row). */}
+            {!sameGender && !showVerifiedInfo && (
               <View style={s.nameIconsRow}>
+                <Pressable style={s.nameIconBtn} onPress={handleMessage} hitSlop={8}>
+                  <MessageIcon width={24} height={24} />
+                </Pressable>
                 <Pressable style={s.nameIconBtn} onPress={handleCall} hitSlop={8}>
                   <CallIcon width={24} height={24} />
                 </Pressable>
@@ -1901,6 +2004,31 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         )}
       </ScrollView>
 
+      {/* Prev/next-PROFILE arrows — a screen-fixed overlay (sibling of the
+          ScrollView, not content inside it) so they stay put at a constant
+          screen position instead of scrolling away with the photo, per a
+          manual UI tweak. Positioned to land where they did as in-flow content
+          (insets.top + HEADER_FIXED_HEIGHT mirrors the header bar's own height
+          math; -35 is the same "moved up a bit" offset from before). */}
+      {hasPrevProfile && (
+        <Pressable
+          style={[s.profileNavBtn, s.profileNavLeft, { top: insets.top + HEADER_FIXED_HEIGHT + PHOTO_HEIGHT - 35 }]}
+          onPress={goToPrev}
+          hitSlop={8}
+        >
+          <CdnSvg uri={PROFILE_NAV_LEFT_ARROW_URI} width={PROFILE_NAV_ARROW_WIDTH} height={PROFILE_NAV_ARROW_HEIGHT} />
+        </Pressable>
+      )}
+      {hasNextProfile && (
+        <Pressable
+          style={[s.profileNavBtn, s.profileNavRight, { top: insets.top + HEADER_FIXED_HEIGHT + PHOTO_HEIGHT - 35 }]}
+          onPress={goToNext}
+          hitSlop={8}
+        >
+          <CdnSvg uri={PROFILE_NAV_RIGHT_ARROW_URI} width={PROFILE_NAV_ARROW_WIDTH} height={PROFILE_NAV_ARROW_HEIGHT} />
+        </Pressable>
+      )}
+
       {/* Floating top CTA — see topCtaVisible comment above for why this exists
           instead of rendering inline. */}
       {topCtaVisible && (
@@ -1959,6 +2087,18 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         onSecondaryPress={handlePhoneInfoSecondaryPress}
         onLinkPress={handlePhoneInfoClose}
       />
+      {/* Angular: viewprofile.page.ts's presentPopover() — Verified badge info tap.
+          content is API-supplied (PERSONALINFO.IDDET.BODY), no fallback text in
+          Angular either, so an empty/missing verifiedInfoText just shows an empty
+          tooltip rather than fabricating copy. Angular auto-dismisses after 5s;
+          this also allows a manual tap-outside close via Popover's own backdrop. */}
+      <Popover
+        visible={showVerifiedInfo}
+        type="verifiedPopup"
+        content={profile.verifiedInfoText}
+        anchor={verifiedInfoAnchor ?? undefined}
+        onClose={() => setShowVerifiedInfo(false)}
+      />
 
       <PhotoViewerModal
         visible={photoViewerOpen}
@@ -2005,11 +2145,15 @@ const s = StyleSheet.create({
   scrollView:    { flex: 1 },
   scrollContent: {},
 
-  // photoWrap is the positioning ancestor for the prev/next-profile arrows (see
-  // the JSX comment above) — sized only by photoBox (its one in-flow child);
-  // the arrows are absolutely positioned past that height on purpose, exactly
-  // like Angular's own `top: calc(100vw + 32px)` overlapping into the content below.
-  photoWrap: { position: 'relative' },
+  // photoWrap used to be the positioning ancestor for the prev/next-profile
+  // arrows too — they've since moved to a screen-fixed overlay (a ScrollView
+  // sibling, see the JSX render site) so they stay put while scrolling, per a
+  // manual UI tweak, instead of being absolutely positioned within this box.
+  // zIndex here still matters on web for other overlapping content (badges,
+  // coach mark): photoWrap and infoCard are siblings, and infoCard has no
+  // positioning of its own, so without this its opaque background would paint
+  // over anything overlapping past photoBox's height. Native isn't affected either way.
+  photoWrap: { position: 'relative', zIndex: 1 },
   // Flat, full-bleed square — Angular has no border-radius on this photo (unlike
   // the rounded Matches-card photo), confirmed against viewprofile.page.scss.
   photoBox: { width: SCREEN_WIDTH, height: PHOTO_HEIGHT, backgroundColor: Colors.divider },
@@ -2026,7 +2170,7 @@ const s = StyleSheet.create({
   // (100vw-tall) photo, not overlaid on it (confirmed: these are the prev/next-
   // PROFILE arrows, a separate sibling element from the photo swiper's own arrows).
   profileArrowBtn: {
-    position: 'absolute', top: PHOTO_HEIGHT + 32,
+    position: 'absolute', top: PHOTO_HEIGHT - 32,
     width: 32, height: 32, borderRadius: 16,
     backgroundColor: 'rgba(0,0,0,0.35)',
     alignItems: 'center', justifyContent: 'center',
@@ -2035,6 +2179,26 @@ const s = StyleSheet.create({
   profileArrowLeft:  { left: 8 },
   profileArrowRight: { right: 8 },
   profileArrowText: { color: Colors.white, fontSize: 20, lineHeight: 20 },
+  // Feature 2 prev/next-PROFILE arrows — Angular renders these as image assets,
+  // not a CSS circle: vp-revamp-left-arw.svg / vp-revamp-right-arw.svg, a dark
+  // (#333) half-pill flush against the screen edge with a white chevron baked
+  // into the graphic (viewprofile.page.scss:497-520, `margin-left/right: -26px`
+  // bleeds it off the edge). Kept as its own style (not reusing profileArrowBtn
+  // above, which is the unrelated own-profile theme-cycle control) so this one
+  // change doesn't affect that other feature.
+  // Moved up from the photo's bottom edge per a manual UI tweak (was PHOTO_HEIGHT,
+  // on top of the Angular-matched 32px-below placement). `top` is no longer set
+  // here — now a screen-fixed overlay (see the ScrollView-sibling render site),
+  // so its `top` is computed inline there (insets.top + HEADER_FIXED_HEIGHT +
+  // PHOTO_HEIGHT - 35) instead of being relative to photoWrap.
+  profileNavBtn: {
+    position: 'absolute',
+    width: PROFILE_NAV_ARROW_WIDTH, height: PROFILE_NAV_ARROW_HEIGHT,
+    alignItems: 'center', justifyContent: 'center',
+    zIndex: 2,
+  },
+  profileNavLeft:  { left: 0 },
+  profileNavRight: { right: 0 },
   // Feature 8 coach-mark — a dismiss-anywhere dark scrim over the photo, one
   // time ever, pointing at the tap-chevron affordance just below the photo.
   coachMarkOverlay: {
@@ -2046,7 +2210,7 @@ const s = StyleSheet.create({
   coachMarkCard: {
     backgroundColor: Colors.white, borderRadius: 12,
     paddingHorizontal: 20, paddingVertical: 16,
-    alignItems: 'center', gap: 12, maxWidth: '80%',
+    alignItems: 'center', gap: 12, maxWidth: '70%',
   },
   coachMarkText: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.black, textAlign: 'center',
@@ -2064,8 +2228,8 @@ const s = StyleSheet.create({
     alignItems: 'center', gap: 16,
   },
   overlayText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 12, color: Colors.white,
-    textAlign: 'center', lineHeight: 17,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 13, color: Colors.white,
+    textAlign: 'center', lineHeight: 17, width: '70%', alignSelf: 'center',
   },
 
   // Angular: .details-section { background:#fff } — plain white, flush against the
@@ -2073,10 +2237,22 @@ const s = StyleSheet.create({
   infoCard: {
     backgroundColor:   Colors.surface,
     paddingHorizontal: 24,
-    paddingTop:        16,
+    paddingTop:        24,
     paddingBottom:     8,
   },
-  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 10 },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 25 },
+  // Pinned to an exact 116x28 per a manual UI tweak — ProfileBadge is shared
+  // (also used by MatchesScreen etc.), so this overrides size only here via its
+  // optional `style` prop rather than changing the shared component's default.
+  // paddingVertical/minHeight: 0 zero out badgeStyles.pill's own paddingVertical:4
+  // + minHeight:24 (still merged in ahead of this). overflow: 'hidden' is the
+  // hard guarantee — badgeStyles.icon is a 24px-tall absolutely-positioned CdnSvg
+  // pinned at top:0 with no height clamp of its own, so without clipping it (and
+  // the text's own line-height) can still visually poke past an explicit 28px box.
+  verifiedBadgeSize: {
+    width: 116, height: 28, minHeight: 0, paddingVertical: 0,
+    justifyContent: 'center', overflow: 'hidden',
+  },
 
   nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   // Angular: heading1-semibold-22 black-color
@@ -2086,7 +2262,7 @@ const s = StyleSheet.create({
   likedMsg: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 12, color: Colors.likedStripText, marginTop: 6 },
 
   // Angular: viewprofile.page.html:469-489 — Call/WhatsApp icon buttons beside the name.
-  nameIconsRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  nameIconsRow: { flexDirection: 'row', alignItems: 'center', gap: 32 },
   nameIconBtn: { alignItems: 'center', justifyContent: 'center' },
 
   // Angular: .button-banner — regular inline content (NOT position:fixed/sticky —
@@ -2256,7 +2432,10 @@ const s = StyleSheet.create({
   missingBannerCta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   missingBannerCtaText: { fontFamily: Fonts.poppinsRegular, fontSize: 12, color: Colors.link },
 
-  headerBackBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  // Angular: ion-back-button .default-back — --icon-font-size: 24px. Pinned to
+  // an exact 48x48 per a manual UI tweak, then trimmed to 42x42 to bring the
+  // header bar's overall height down from ~66px to ~60px.
+  headerBackBtn: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   headerSpacer: { flex: 1 },
   // Angular: `.vp-profile-name` (global.scss:22188-22192) — font16 (~16px),
   // Poppins-Medium, `--gray-color1` (#1f1e1b) — not SemiBold/pure-black.
@@ -2264,14 +2443,16 @@ const s = StyleSheet.create({
   headerIconBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
   menuDots: { fontSize: 20, lineHeight: 20, color: '#333333', fontWeight: '700' },
 
+  // Angular: dropdown.component.scss .lang-selection — height: 2.15rem (~34px),
+  // border 1px #000, radius 8px. Pinned to an exact 108x38 per a manual UI tweak.
   langPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
     borderWidth: 1, borderColor: '#000000', borderRadius: 8,
-    paddingLeft: 8, paddingRight: 12, paddingVertical: 4,
-    backgroundColor: Colors.white, maxWidth: 120,
+    paddingHorizontal: 10,
+    backgroundColor: Colors.white, width: 108, height: 38,
   },
-  langPillCompact: { maxWidth: 84, paddingRight: 8 },
-  langPillText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 12, color: '#000000' },
+  langPillCompact: { width: 108 },
+  langPillText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 13, color: '#000000' },
 
   menuDropdown: {
     position: 'absolute', top: 34, right: 0, minWidth: 200,

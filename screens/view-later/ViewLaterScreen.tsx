@@ -33,7 +33,7 @@ import { useContactGating } from '../../hooks/useContactGating'
 import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { fetchViewLaterProfiles } from '../../service/viewLaterService'
-import { communicationBtnOnClick, shouldSkipPhoneConfirm } from '../../service/communicationService'
+import { communicationBtnOnClick, shouldSkipPhoneConfirm, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import { getItem } from '../../service/storageService'
 import { openMembershipTab } from '../../service/paymentService'
@@ -125,14 +125,7 @@ export default function ViewLaterScreen({ navigation }: Props) {
 
   function getContactConfirmContent(): string {
     if (!contactConfirm) return ''
-    const question = t('VIEWPROFILE.VIEWPHONECONFIRM')
-      .replace('#HISHER#', t(`PRONOUN.${gating.oppGender}.hisher`))
-      .replace('#HIMHER#', t(`PRONOUN.${gating.oppGender}.himher`))
-    const quota = t('VIEWPROFILE.VIEWPHONEDETAIL')
-      .replace('#VAR#', gating.contactQuota.viewed)
-      .replace('#VAR1#', gating.contactQuota.left)
-      .replace('#VAR2#', gating.contactQuota.expiry)
-    return `${question}\n\n${quota}`
+    return getSharedContactConfirmContent(t, gating.oppGender, gating.contactQuota)
   }
 
   function handleContactConfirmClose() {

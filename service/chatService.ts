@@ -48,6 +48,7 @@ export async function getChatCount(partnerId: string): Promise<ChatCountResult> 
 
   const loginId = (await getItem(SK.Auth.USER_ID)) ?? ''
   const params  = `ID=${loginId}&PARTNERID=${partnerId}&TYPE=1`
+  console.log('[chatService] getChatCount params', params)
   const result  = await apiCall(Endpoints.communication.chatCount, 'POST', params)
   console.log('[chatService] getChatCount raw response', result)
 

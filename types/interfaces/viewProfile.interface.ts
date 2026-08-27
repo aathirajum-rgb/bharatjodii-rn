@@ -53,4 +53,10 @@ export interface ViewProfileModel extends MatchProfile {
   hasStarMatchInputs: boolean   // both own + opposite RAASI & STAR present
 
   likedMsg?: string   // COMMINFO.LIKEDMSG — "Liked by you on ..." row text, when present
+
+  // Angular: viewprofile.page.ts's presentPopover() — the Verified badge's info-tap
+  // popover shows PERSONALINFO.IDDET.BODY, API-supplied text (e.g. "Verified via
+  // Call"), not a translation key. Only ever shown to a female viewer on a
+  // verified profile (see ViewProfileScreen.tsx's isIdVerified && loginGender==='F' gate).
+  verifiedInfoText?: string
 }
