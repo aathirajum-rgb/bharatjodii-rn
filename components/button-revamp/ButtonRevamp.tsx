@@ -38,6 +38,10 @@ export interface ButtonRevampProps {
 const CDN = CDN_SVG
 
 export const ICON_URLS: Record<string, string> = {
+  // Angular's download-biodata CTA glyph (download-biodata.component.html's
+  // Download Biodata button) — not part of the original $IconURLs map, added
+  // so BiodataScreen can use the standard leading-icon slot.
+  'download-biodata-white': CDN + 'download-biodata-white.svg',
   'like-img':             CDN + 'revamp/like-white-revamp.svg',
   'liked-img':            CDN + 'vp-liked-white.svg',
   'call-img':             CDN + 'revamp/call-icon.svg',

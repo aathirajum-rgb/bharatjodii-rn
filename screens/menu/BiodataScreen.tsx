@@ -5,7 +5,8 @@
 
 import { useCallback, useState } from 'react'
 import {
-  ActivityIndicator, Alert, Dimensions, Linking, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text,
+  useWindowDimensions, View,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { useFocusEffect } from '@react-navigation/native'
@@ -25,10 +26,9 @@ import {
   propertyContentText, resolveFamilyCountLabel, saveBiodataThemeId, getSavedBiodataThemeId,
   getBioDataDownloadLink, type BiodataProfile, type BiodataTheme,
 } from '../../service/biodataService'
+import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
-const SCREEN_WIDTH  = Dimensions.get('window').width
-const SCREEN_HEIGHT = Dimensions.get('window').height
 
 const ICON_BACK        = CDN_REACT + '/menu_back_arrow.svg'
 const ICON_CHEVRON     = CDN_REACT + '/menu_right_arrow.svg'
@@ -38,24 +38,91 @@ const ICON_JODII_LOGO  = CDN + 'assets/images/svg/biodata-jodii-logo.svg'
 const ICON_TOP_DECOR   = CDN + 'assets/images/svg/download-biodata-top.svg'
 const ICON_BOTTOM_DECOR = CDN + 'assets/images/svg/download-biodata-bottom.svg'
 const ICON_EDIT_PHOTO  = CDN + 'assets/images/svg/biodata-edit-icon.svg'
+// Angular .language-selection-biodata's background-image — the chevron inside
+// the language pill.
+const ICON_LANG_CHEVRON = CDN + 'assets/images/revamp-img/down-arrow.svg'
 const ICON_BACK_ARROW_THEME = CDN + 'assets/images/svg/biodata-back-arrow.svg'
 const ICON_NEXT_ARROW_THEME = CDN + 'assets/images/svg/biodata-next-arrow.svg'
 
-// Angular: negative-margin-top-*-biodata classes — each template's photo/
-// details card overlaps UP into the themed top image by a different amount.
-const BIODATA_THEME_OVERLAP_VH: Record<string, number> = { '1': 8, '2': 8, '3': 13, '4': 18, '5': 2 }
-function themeOverlapMargin(themeValue: string): number {
-  const vh = BIODATA_THEME_OVERLAP_VH[themeValue] ?? 0
-  return -Math.round(SCREEN_HEIGHT * (vh / 100))
-}
+// Angular's negative-margin-top-*-biodata classes are PER-TEMPLATE (-8vh /
+// -8vh / -13vh / -18vh / -2vh) because each theme's TOP_IMG is a plain
+// <ion-img> rendered at its own intrinsic aspect ratio — every template's
+// banner is a different height, and the margin cancels that difference so the
+// white block always lands in the same place.
+//
+// This port does NOT reproduce that: the banner is StyleSheet.absoluteFill with
+// contentFit 'cover' inside a fixed-height themedTop, so the top area is the
+// same height for EVERY theme. Keeping the per-theme margin therefore
+// compensated for a difference that no longer exists and instead jerked the
+// card 102-147px up or down as you switched templates (the swing grows with
+// screen height, since it was vh-based).
+//
+// One constant instead: the card sits flush under the themed top, identically
+// for all five themes and on every screen size.
+const CARD_TOP_OVERLAP = 0
 
 const VIEWED_SWIPE_KEY = 'VIEWEDSWIP'
+
+// Angular: the white card lives in a `pl-8 pr-8` row inside the themed column,
+// so exactly 8px of theme colour frames it on each side.
+const THEME_FRAME_PAD = 8
+
+
+// download-biodata-top.svg / -bottom.svg are both 344x84 — authored for exactly
+// this 344pt container (a 360pt frame less 8pt each side), not as generic
+// full-width strips. Each is the card's decorative END CAP: a white fill that
+// meets the card body, with the ornamental corner notches on the outer side.
+//
+// Geometry read off the assets rather than guessed:
+//  - The white FILL spans the FULL width (its left edge traces to x=0, easing
+//    to x=1.54 only at the very tip). So the card body must also be full
+//    FRAME_W — any inset leaves a step of theme colour at the join.
+//  - Each file also has <rect x="13" width="318" stroke="#fff"/>, which LOOKS
+//    like the card outline but is a white stroke over white fill: invisible.
+//    Treating it as the card edge (and insetting the body 13pt to match) is
+//    what left the top edge disconnected from the card beneath it.
+//  - In top.svg the white fill starts at y≈47.8 of 84, so its lower ~36pt is
+//    the card's top; in bottom.svg the fill ends at y≈36, so its upper ~36pt
+//    is the card's bottom. Both therefore butt directly onto the body.
+// Plain theme colour above the banner strip, before the card begins. A fixed
+// spacing value, so it does NOT scale with width.
+const BANNER_TOP_GAP = 20
+
+type BiodataMetrics = {
+  frameW: number   // themed frame's content width — the caps and card span this
+  decorH: number   // cap height at that width, held to the asset's 344:84 ratio
+}
+
+// Every horizontal dimension on this screen is derived here, per render, from
+// the LIVE viewport width.
+//
+// It used to come from a module-level `Dimensions.get('window').width`, captured
+// once at import. That froze the frame at whichever width the app happened to
+// start at, so the caps, the themed frame and the card all disagreed with the
+// real viewport after a rotation, on a foldable, or in a resized browser — and
+// the cap height had additionally been hand-pinned to literal 85/60pt, which
+// only matched a ~360pt screen and clipped or floated at any other size.
+function biodataMetrics(viewportWidth: number): BiodataMetrics {
+  const frameW = Math.max(0, viewportWidth - THEME_FRAME_PAD * 2)
+  return { frameW, decorH: Math.round(frameW * (84 / 344)) }
+}
+
+// Angular: `EDUCATION + (EDUCATIONDETAILS ? ', ' + EDUCATIONDETAILS : '')`,
+// and the identical shape for OCCUPATION/OCCUPATIONDETAILS.
+function joinDetail(base?: string, detail?: string): string | undefined {
+  if (!base) return undefined
+  return detail ? `${base}, ${detail}` : base
+}
 
 type Props = { navigation: any }
 
 export default function BiodataScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+  // Live viewport — recomputes on rotation, on a foldable unfolding, and on a
+  // mobile-web resize, so the frame and both caps always match the real width.
+  const { width: viewportWidth } = useWindowDimensions()
+  const m = biodataMetrics(viewportWidth)
 
   const [profile, setProfile]     = useState<BiodataProfile | null>(null)
   const [loading, setLoading]     = useState(true)
@@ -66,21 +133,33 @@ export default function BiodataScreen({ navigation }: Props) {
   const [sistersLabel, setSistersLabel]   = useState('')
   const [showSwipeTip, setShowSwipeTip]   = useState(false)
   const [downloading, setDownloading]     = useState(false)
+  // Angular: `userPhotoUrl = localStorage.getItem('PHOTOURL')` — a photo the
+  // member has already uploaded but which the server hasn't approved yet, so
+  // it isn't in PHOTOINFO.PHOTO. getPhotoUrl() still renders it (blurred) with
+  // an "under validation" pill. This port had no such state at all.
+  const [cachedPhotoUrl, setCachedPhotoUrl] = useState('')
+  // Angular's getPhotoUrl() default branch is common.getAvatarImg(false) — the
+  // member's OWN-gender silhouette, not a blank grey card.
+  const [genderAvatarUrl, setGenderAvatarUrl] = useState('')
 
   // Refetches on focus (not just mount) so returning from the standalone
   // Manage Photos flow (see handleAddPhoto/handleEditPhoto below) shows the
   // photo change immediately — same pattern as EditProfileScreen.tsx.
   const load = useCallback(async () => {
     setLoading(true)
-    const [id, occCode, data, savedThemeId, viewedSwipe] = await Promise.all([
+    const [id, occCode, data, savedThemeId, viewedSwipe, cachedPhoto, avatar] = await Promise.all([
       getItem(SK.Auth.USER_ID),
       getItem(SK.User.OCCUPATION),
       getBiodataProfile(),
       getSavedBiodataThemeId(),
       getItem(VIEWED_SWIPE_KEY),
+      getItem(SK.User.PHOTO_URL),
+      getOwnGenderAvatarUrl(),
     ])
     setMatriId(id ?? '')
     setOccupationCode(occCode ?? '0')
+    setCachedPhotoUrl(cachedPhoto ?? '')
+    setGenderAvatarUrl(avatar)
     setProfile(data)
     if (data) {
       const idx = data.BIODATATHEME.findIndex(th => th.value === savedThemeId)
@@ -135,10 +214,6 @@ export default function BiodataScreen({ navigation }: Props) {
     if (missingField) navigation.navigate(missingField.screen)
   }
 
-  function stub(label: string) {
-    Alert.alert(label, 'Coming soon')
-  }
-
   // Add/Edit photo — same standalone Manage Photos entry point HelpCenterScreen
   // and HomeScreen already use elsewhere (ManagePhotosScreen → CustomGalleryScreen,
   // both Expo-based: expo-media-library/expo-image-picker). `standalone: true`
@@ -189,9 +264,19 @@ export default function BiodataScreen({ navigation }: Props) {
   const photoAvailable = photo.PHOTOAVAILABLE === 'Y'
   const photoCount      = Number(photo.PHOTOCOUNT ?? 0)
   const photos: any[]   = Array.isArray(photo.PHOTO) ? photo.PHOTO : []
-  const photoUrl = photoAvailable && photos.length > 0
+
+  // Port of Angular's getPhotoUrl(), which this screen previously collapsed
+  // into "approved photo, else a blank grey card". Its real branches are:
+  //   PHOTOAVAILABLE 'Y' -> the LAST entry of PHOTOINFO.PHOTO
+  //   PHOTOAVAILABLE 'N' but a locally cached PHOTOURL -> that, pending review
+  //   otherwise           -> common.getAvatarImg(false), the own-gender avatar
+  const approvedPhoto = photoAvailable && photos.length > 0
     ? photos[photos.length - 1]?.IMAGE
     : undefined
+  // Angular: the same PHOTOAVAILABLE=='N' && PHOTOCOUNT==0 && userPhotoUrl!=''
+  // condition drives BOTH the blur and the "under validation" pill.
+  const photoUnderValidation = !photoAvailable && photoCount === 0 && !!cachedPhotoUrl
+  const photoUrl = approvedPhoto ?? (cachedPhotoUrl || genderAvatarUrl || undefined)
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
@@ -199,71 +284,121 @@ export default function BiodataScreen({ navigation }: Props) {
         <Pressable onPress={handleBack} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
-        <Pressable style={s.langPill} onPress={() => navigation.navigate('LanguageSelection')}>
-          <Text style={s.langPillText}>{t('BIO_DATA.SELECT_LANGUAGE')}</Text>
-        </Pressable>
+        {/* Angular's header row is `<ion-col size="2">` for the back arrow then
+            a flex col with `justify-content-center` holding TWO separate items:
+            the plain "Select language" LABEL, then (ml-8) a bordered <select>
+            whose only option is the CURRENT language name.
+            This port collapsed both into one right-aligned pill containing the
+            label — so the language itself was never shown and the group hugged
+            the right edge instead of sitting centred. */}
+        <View style={s.langGroup}>
+          <Text style={s.langLabel}>{t('BIO_DATA.SELECT_LANGUAGE')}</Text>
+          <Pressable style={s.langPill} onPress={() => navigation.navigate('LanguageSelection')}>
+            {/* Angular: {{userLanguage}} — ACCOUNT.SELECTED_LANGUAGE holds the
+                native name of the active locale in every locale file
+                ("English" / "தமிழ்" / "हिंदी" / ...). */}
+            <Text style={s.langPillText}>{t('ACCOUNT.SELECTED_LANGUAGE')}</Text>
+            <CdnSvg uri={ICON_LANG_CHEVRON} width={12} height={12} />
+          </Pressable>
+        </View>
+        {/* Balances the back arrow's column so the group above lands optically
+            centred rather than shifted right. */}
+        <View style={s.headerSpacer} />
       </View>
 
+      {/* Angular lays this out as TWO rows, not one: the alert icon and the
+          message share row 1, then "Add Now" sits on row 2 indented under the
+          message (offset="1" mt-6). Cramming all three onto one line squeezed
+          the message into a narrow column beside the pill. */}
       {missingField && (
         <View style={s.missingBanner}>
-          <CdnSvg uri={ICON_ALERT} width={20} height={20} />
-          <Text style={s.missingBannerText}>{t('BIO_DATA.MISSING_DETAILS_TXT')}</Text>
+          <View style={s.missingBannerRow}>
+            <CdnSvg uri={ICON_ALERT} width={20} height={20} />
+            <Text style={s.missingBannerText}>{t('BIO_DATA.MISSING_DETAILS_TXT')}</Text>
+          </View>
           <Pressable style={s.missingBannerCta} onPress={handleAddNow}>
-            <CdnSvg uri={ICON_ADD} width={14} height={14} />
+            <CdnSvg uri={ICON_ADD} width={16} height={16} />
             <Text style={s.missingBannerCtaText}>{t('BIO_DATA.ADD_NOW_TXT')}</Text>
           </Pressable>
         </View>
       )}
 
       <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+        {/* Angular's outer themed column:
+              <ion-col [ngStyle]="{'background-color': theme?.BGCOLOR}">
+            wraps the top image, the white card AND the bottom decoration — the
+            theme colour (#011443 navy / #EED872 / #014836 / #8C0133 / #DD6F11)
+            is meant to show as an 8px frame down both sides of the card and
+            behind the decorative top/bottom edges.
+            This port applied bgColor only to the top strip, so the card sat on
+            plain white: no visible theme, no card edge, and the white bottom
+            decoration was invisible white-on-white. */}
+        <View style={[s.themedFrame, { width: viewportWidth }, currentTheme && { backgroundColor: currentTheme.bgColor }]}>
         {/* ── Themed top + photo ──────────────────────────────────────────── */}
         <GestureDetector gesture={themeSwipeGesture}>
-          <View style={[s.themedTop, currentTheme && { backgroundColor: currentTheme.bgColor }]}>
+          <View style={[s.themedTop, { width: viewportWidth, marginHorizontal: -THEME_FRAME_PAD, height: m.decorH }]}>
             {currentTheme?.topImg ? (
               <Image source={{ uri: currentTheme.topImg }} style={StyleSheet.absoluteFill} contentFit="cover" pointerEvents="none" />
             ) : null}
 
-            {themes.length > 1 && (
-              <>
-                <Pressable style={[s.themeArrowBtn, s.themeArrowLeft]} onPress={() => cycleTheme(-1)} hitSlop={8}>
-                  <CdnSvg uri={ICON_BACK_ARROW_THEME} width={28} height={28} />
-                </Pressable>
-                <Pressable style={[s.themeArrowBtn, s.themeArrowRight]} onPress={() => cycleTheme(1)} hitSlop={8}>
-                  <CdnSvg uri={ICON_NEXT_ARROW_THEME} width={28} height={28} />
-                </Pressable>
-              </>
-            )}
+            {/* The decorative top edge sits ON the banner strip, not floating
+                below it — its transparent regions are what let the theme
+                pattern show through around the card's rounded corners. */}
+            <View style={s.topDecorWrap} pointerEvents="none">
+              <CdnSvg uri={ICON_TOP_DECOR} width={m.frameW} height={m.decorH} />
+            </View>
 
             <View style={s.jodiiLogoWrap} pointerEvents="none">
               <CdnSvg uri={ICON_JODII_LOGO} width={80} height={24} />
-            </View>
-
-            <View style={s.topDecorWrap} pointerEvents="none">
-              <CdnSvg uri={ICON_TOP_DECOR} width={SCREEN_WIDTH} height={140} />
-            </View>
-
-            <View style={[s.photoWrap, !photoUrl && s.photoWrapSquare]}>
-              {photoUrl ? (
-                <Image source={{ uri: photoUrl }} style={s.photo} contentFit="cover" />
-              ) : (
-                <View style={s.photoPlaceholder} />
-              )}
-              {!photoAvailable && photoCount === 0 && (
-                <Pressable style={s.photoActionBtn} onPress={handleAddPhoto}>
-                  <Text style={s.photoActionText}>{t('BIO_DATA.ADD_YOUR_PHOTO')}</Text>
-                </Pressable>
-              )}
-              {photoAvailable && (
-                <Pressable style={s.photoEditBtn} onPress={handleAddPhoto}>
-                  <CdnSvg uri={ICON_EDIT_PHOTO} width={20} height={20} />
-                </Pressable>
-              )}
             </View>
           </View>
         </GestureDetector>
 
         {/* ── Info card ─────────────────────────────────────────────────────── */}
-        <View style={[s.infoCard, currentTheme && { marginTop: themeOverlapMargin(currentTheme.value) }]}>
+        <View style={s.infoCard}>
+          {/* Angular puts the photo INSIDE the white card
+              (<ion-col class="white-background pl-12 pr-12"> → .download-
+              biodata-profile-image), as the card's first child — so it is inset
+              by the card's own 12px padding and wrapped in a 2px #fcd34d gold
+              frame. This port had it up in the banner area instead, which is why
+              it ran full-bleed, showed no gold border, and had its bottom edge
+              (and the "Add your photo" pill) cut off by the card below it. */}
+          <View style={s.photoFrame}>
+            {photoUrl ? (
+              <Image
+                source={{ uri: photoUrl }}
+                style={s.photo}
+                // Angular .profile-image-download-biodata-fit is object-fit:
+                // contain for BOTH states, so a real photo is never cropped.
+                contentFit="contain"
+                // Angular .biodata-profile-blur: filter: blur(20px), on the same
+                // "uploaded but not yet approved" condition.
+                blurRadius={photoUnderValidation ? 20 : 0}
+              />
+            ) : (
+              <View style={s.photoPlaceholder} />
+            )}
+            {/* Angular shows exactly ONE of these two pills: "Add your photo"
+                when there's nothing uploaded at all, "under validation" when
+                something was uploaded but hasn't been approved. The second
+                state was missing from this port entirely. */}
+            {!photoAvailable && photoCount === 0 && !cachedPhotoUrl && (
+              <Pressable style={s.photoActionBtn} onPress={handleAddPhoto}>
+                <Text style={s.photoActionText}>{t('BIO_DATA.ADD_YOUR_PHOTO')}</Text>
+              </Pressable>
+            )}
+            {photoUnderValidation && (
+              <View style={s.photoActionBtn}>
+                <Text style={s.photoActionText}>{t('BIO_DATA.UNDER_VALIDATION_TXT')}</Text>
+              </View>
+            )}
+            {photoAvailable && (
+              <Pressable style={s.photoEditBtn} onPress={handleAddPhoto}>
+                <CdnSvg uri={ICON_EDIT_PHOTO} width={20} height={20} />
+              </Pressable>
+            )}
+          </View>
+
           <Text style={s.name}>{personal.NAME}</Text>
           <Text style={s.matriId}>ID {personal.MATRIID}</Text>
 
@@ -278,9 +413,12 @@ export default function BiodataScreen({ navigation }: Props) {
             label={t('BIO_DATA.HOME_TOWN')}
             value={location.CITY && location.STATE ? `${location.CITY}, ${location.STATE}` : undefined}
           />
-          <FieldRow label={t('EDITPROFILE.EDUCATION')} value={professional.EDUCATION} />
+          {/* Angular appends the free-text sub-value to each, e.g.
+              "Bachelor's Degree, B.Sc Computer Science" — this port was
+              dropping EDUCATIONDETAILS/OCCUPATIONDETAILS entirely. */}
+          <FieldRow label={t('EDITPROFILE.EDUCATION')} value={joinDetail(professional.EDUCATION, professional.EDUCATIONDETAILS)} />
           {!!professional.EDUCATION && (
-            <FieldRow label={t('EDITPROFILE.OCCUPATION')} value={professional.OCCUPATION} />
+            <FieldRow label={t('EDITPROFILE.OCCUPATION')} value={joinDetail(professional.OCCUPATION, professional.OCCUPATIONDETAILS)} />
           )}
           {showIncomeRow && (
             <FieldRow
@@ -294,7 +432,14 @@ export default function BiodataScreen({ navigation }: Props) {
           {!!personal.MARITALSTATUS && (
             <FieldRow label={t('BIO_DATA.NO_OF_CHILDREN')} value={personal.NOOFCHILDREN} />
           )}
-          <FieldRow label={t('EDITPROFILE.PHYSICALSTATUS')} value={personal.PHYSICALSTATUS} />
+          {/* Angular offers an "Add Physical status" link here (edit page 40).
+              Without an addLabel this row silently vanished when unset. */}
+          <FieldRow
+            label={t('EDITPROFILE.PHYSICALSTATUS')}
+            value={personal.PHYSICALSTATUS}
+            addLabel={t('BIO_DATA.ADD_PHYSICAL_STATUS')}
+            onAddPress={() => navigation.navigate('EditProfileMarital')}
+          />
           <FieldRow
             label={t('EDITPROFILE.EATING')}
             value={habits.EATINGHABITS}
@@ -324,6 +469,10 @@ export default function BiodataScreen({ navigation }: Props) {
                   label={t('EDITPROFILE.GOTHRAM')}
                   value={religious.GOTHRAM}
                   addLabel={t('BIO_DATA.ADD_GOTHRAM_DETAILS')}
+                  // Angular navigates to edit page 16 here; without onAddPress
+                  // this rendered as dead, un-tappable text unlike every
+                  // sibling "Add ..." link in the section.
+                  onAddPress={() => navigation.navigate('EditProfileReligious')}
                 />
               )}
               <FieldRow
@@ -389,10 +538,13 @@ export default function BiodataScreen({ navigation }: Props) {
                 <View style={s.horoMissingBlock}>
                   <Text style={s.horoMissingHeader}>{t('BIO_DATA.HORO_HEADER')}</Text>
                   <Text style={s.horoMissingBody}>{t('BIO_DATA.HORO_BODY')}</Text>
+                  {/* Angular: goToEditScreen('22','add') — the add-horoscope
+                      form. This was a "Coming soon" stub even though the
+                      route exists and EditProfileScreen already links to it. */}
                   <ButtonRevamp
                     label={t('BIO_DATA.HORO_CTA')}
                     variant="primary"
-                    onPress={() => stub('Add horoscope')}
+                    onPress={() => navigation.navigate('EditProfileHoroscope')}
                     style={{ marginTop: 12 }}
                   />
                 </View>
@@ -410,22 +562,47 @@ export default function BiodataScreen({ navigation }: Props) {
           )}
         </View>
 
-        <View style={s.bottomDecorWrap} pointerEvents="none">
-          <CdnSvg uri={ICON_BOTTOM_DECOR} width={SCREEN_WIDTH} height={100} />
+        {/* Angular: the bottom decoration sits INSIDE the themed frame with
+            margin-top:-35px — it IS the white card's bottom edge (its corner
+            cut-outs are transparent, which is how the theme colour shows
+            through), not an overlay floating on the page. */}
+        <View style={[s.bottomDecorWrap, { width: m.frameW, height: m.decorH }]} pointerEvents="none">
+          <CdnSvg uri={ICON_BOTTOM_DECOR} width={m.frameW} height={m.decorH} />
+        </View>
         </View>
       </ScrollView>
 
       <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
+        {/* Angular's CTA carries a download glyph before the label
+            (download-biodata-white.svg); this port had label-only. */}
         <ButtonRevamp
           label={t('BIO_DATA.DOWNLOAD_BIODATA')}
           variant="primary"
           size="large"
           fullWidth
+          icon="download-biodata-white"
           loading={downloading}
           style={{ backgroundColor: Colors.primaryDark }}
           onPress={handleDownload}
         />
       </View>
+
+      {/* Angular .biodata-back-arrow-img / .biodata-next-arrow-img:
+            position: fixed; top: 50%; left|right: 0; z-index: 9999
+          — pinned to the VIEWPORT, so they stay reachable at mid-screen however
+          far the biodata is scrolled. Nesting them inside the top image (as
+          this port did) meant they scrolled away with it and were unreachable
+          for most of the page. */}
+      {themes.length > 1 && (
+        <>
+          <Pressable style={[s.themeArrowBtn, s.themeArrowLeft]} onPress={() => cycleTheme(-1)} hitSlop={12}>
+            <CdnSvg uri={ICON_BACK_ARROW_THEME} width={28} height={28} />
+          </Pressable>
+          <Pressable style={[s.themeArrowBtn, s.themeArrowRight]} onPress={() => cycleTheme(1)} hitSlop={12}>
+            <CdnSvg uri={ICON_NEXT_ARROW_THEME} width={28} height={28} />
+          </Pressable>
+        </>
+      )}
 
       {showSwipeTip && (
         <View style={s.swipeTipOverlay}>
@@ -480,48 +657,90 @@ const s = StyleSheet.create({
   centered: { alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
   errorText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center' },
 
+  // Angular: pt-16/pb-16 on the row rather than a fixed height, and no
+  // space-between — the arrow is its own column and the language group is
+  // centred in what remains (langGroup's flex: 1 + headerSpacer do that).
   header: {
-    height: 56, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, backgroundColor: Colors.white,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 16, backgroundColor: Colors.white,
   },
+  // Matches the back arrow's width so the centred group isn't biased right.
+  headerSpacer: { width: 24 },
+  langGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
+  langLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  // Angular .language-selection-biodata: border 1px solid #333333, radius 8,
+  // padding 4px 24px 4px 8px, white bg, 12px chevron at right 8px. That 24px
+  // right padding exists to clear the chevron, so it becomes a gap here.
   langPill: {
-    borderWidth: 1, borderColor: Colors.borderNeutral, borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 6,
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderWidth: 1, borderColor: '#333333', borderRadius: 8,
+    backgroundColor: Colors.white,
+    paddingHorizontal: 8, paddingVertical: 4,
   },
   langPillText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
 
   missingBanner: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
     backgroundColor: Colors.selectionBg, paddingHorizontal: 16, paddingVertical: 12,
   },
+  missingBannerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   missingBannerText: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#333333' },
-  missingBannerCta: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: Colors.primaryDark, borderRadius: 20, paddingHorizontal: 10, paddingVertical: 6 },
-  missingBannerCtaText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 10, color: Colors.white },
+  // alignSelf so the pill hugs its content instead of stretching the banner
+  // width; marginLeft aligns it under the message, past the alert icon
+  // (Angular's offset="1"). marginTop is its mt-6.
+  missingBannerCta: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    marginTop: 12,
+    backgroundColor: Colors.primaryDark, borderRadius: 8, height: 40,
+  },
+  missingBannerCtaText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 14, color: Colors.white },
 
+  // Angular's outer themed <ion-col> — carries theme.BGCOLOR behind the top
+  // image, the white card and the bottom decoration alike.
+  // width comes from the live viewport at the usage site — see biodataMetrics().
+  themedFrame: { paddingHorizontal: THEME_FRAME_PAD },
   themedTop: {
-    width: SCREEN_WIDTH, minHeight: 260, position: 'relative', overflow: 'hidden',
-    alignItems: 'center',
+    // width / marginHorizontal / height are supplied per render: the strip
+    // bleeds back out over the frame's 8pt padding (Angular's top image is a
+    // direct child of the themed column, outside the pl-8/pr-8 row) and is
+    // exactly as tall as the cap sitting on it. A literal 85 only matched a
+    // ~360pt screen — it is derived from the live width now.
+    position: 'relative', overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'flex-end', marginTop: BANNER_TOP_GAP
   },
+  // Screen-level overlay (see the render comment) — top 50%, flush to each
+  // edge, above the scroll content.
   themeArrowBtn: {
-    position: 'absolute', top: '40%', width: 40, height: 40,
-    alignItems: 'center', justifyContent: 'center', zIndex: 2,
+    position: 'absolute', top: '50%', width: 40, height: 40,
+    alignItems: 'center', justifyContent: 'center', zIndex: 20,
   },
-  themeArrowLeft: { left: 8 },
-  themeArrowRight: { right: 8 },
-  jodiiLogoWrap: { marginTop: 16, zIndex: 1 },
-  topDecorWrap: { position: 'absolute', top: 40, left: 0 },
+  themeArrowLeft: { left: 0 },
+  themeArrowRight: { right: 0 },
+  // The cap fills the banner strip exactly (both are DECOR_H tall) and its
+  // bottom edge is therefore flush with the card's top edge. `top: 40` left it
+  // hanging 40pt down inside an 84pt overflow:hidden box, so its lower half —
+  // the part that is the card's white top — was clipped away, which is what
+  // made the edge look detached from the card below.
+  topDecorWrap: { position: 'absolute', top: 0, left: 8, zIndex: 1 },
+  // Angular .biodata-jodii-logo: position absolute, top 25%. Sits above the cap.
+  jodiiLogoWrap: { position: 'absolute', top: '25%', zIndex: 2 },
 
-  photoWrap: {
-    marginTop: 40, width: 140, height: 140, borderRadius: 70, overflow: 'hidden',
-    backgroundColor: Colors.white, borderWidth: 4, borderColor: Colors.white,
-    position: 'relative', zIndex: 1,
-  },
-  // Figma (15156-14543): no-photo state is a big square card (312x312 on a
-  // 360-wide frame, 24px side margins), 20px corner radius — NOT the small
-  // circular avatar shown once a real photo exists.
-  photoWrapSquare: {
-    width: SCREEN_WIDTH - 48, height: SCREEN_WIDTH - 48, borderRadius: 20,
-    borderWidth: 0, backgroundColor: '#CFCFCF',
+  // Angular .download-biodata-profile-image:
+  //   height: 45vh; border: 2px solid #fcd34d; border-radius: 6px;
+  //   overflow: hidden; object-fit: contain
+  // It is the SAME frame in every state — Angular has no circular-avatar
+  // variant at all. The previous 140px white-ringed circle (with a separate
+  // full-bleed grey square for the empty state) came from Figma node
+  // 15156-14543, which disagrees with the shipped Angular UI; Angular is the
+  // reference for this screen, so the two states are unified here.
+  //
+  // Square rather than 45vh: a viewport-height-derived box changes shape per
+  // device, and the reference screenshot is square. Width is inherited from the
+  // card (stretch), so the 12px card padding provides the inset either side.
+  photoFrame: {
+    width: '100%', aspectRatio: 1, overflow: 'hidden',
+    borderWidth: 2, borderColor: '#FCD34D', borderRadius: 6,
+    backgroundColor: '#E6E6E6',
+    position: 'relative',
   },
   photo: { width: '100%', height: '100%' },
   photoPlaceholder: { width: '100%', height: '100%', backgroundColor: '#CFCFCF' },
@@ -530,18 +749,34 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4,
   },
   photoActionText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 10, color: '#333333' },
+  // Angular .biodata-profile-image-edit: `right: 10px; top: 10px;
+  // background-color: #745430; border-radius: 50%; opacity: 0.8` — a
+  // translucent brown disc in the TOP-right corner. This port had a white disc
+  // bottom-right.
   photoEditBtn: {
-    position: 'absolute', bottom: 4, right: 4, backgroundColor: Colors.white,
+    position: 'absolute', top: 10, right: 10, backgroundColor: '#745430', opacity: 0.8,
     borderRadius: 14, width: 28, height: 28, alignItems: 'center', justifyContent: 'center',
   },
 
   infoCard: {
-    backgroundColor: Colors.white, marginHorizontal: 8, borderRadius: 16,
-    paddingHorizontal: 16, paddingTop: 20, paddingBottom: 16,
-    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.06, shadowRadius: 8,
-    elevation: 3,
+    // Angular: .white-background with pl-12/pr-12 inside the themed pl-8/pr-8
+    // row — so no marginHorizontal of its own any more, the themed frame
+    // provides the 8px inset. No shadow either: the theme colour beside the
+    // card is what separates it, not a drop shadow.
+    backgroundColor: Colors.white,
+    marginTop: CARD_TOP_OVERLAP,
+    // Breathing room between the card's decorative top edge and the photo
+    // frame. Angular's white column is itself pt-0 — all of its clearance
+    // comes from the ~36pt white portion at the foot of the top cap — but with
+    // the cap scaled to this frame that alone reads as a tight seam, so the
+    // card contributes the rest. This is the single knob for that gap.
+    paddingHorizontal: 12, paddingTop: 0,
+    paddingBottom: 24,
   },
-  name: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: '#333333' },
+  // Angular: <ion-col class="padd0 mt-24"> around the name label — a 24pt gap
+  // between the photo frame and the name, which this port had at 0 so the name
+  // sat directly against the frame's bottom border.
+  name: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: '#333333', marginTop: 24 },
   matriId: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 12, color: '#333333', marginTop: 8 },
 
   sectionTitle: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: 14, color: '#333333', marginTop: 16, marginBottom: 8 },
@@ -556,19 +791,48 @@ const s = StyleSheet.create({
   horoCol: { flex: 1, alignItems: 'center' },
   horoLabel: { fontFamily: Fonts.poppinsSemiBold, fontSize: 10, color: '#D8AD6E', marginBottom: 8 },
   horoImg: { width: '100%', height: 100 },
-  // Figma (15156-14417): a dashed pink card, not a plain solid-red-border box.
+  // Angular .biodata-horoscope-block (+ .biodata-horoscope-block-border, which
+  // is applied only when HOROSCOPEAVAILABLE=='N', i.e. exactly this block):
+  //   background-color: #fffcf4; border-radius: 8px; padding-bottom: 16px;
+  //   border: 1px dashed #ffe17e;
+  // This port had a pink card with a hard red dashed border — the Figma node it
+  // cites disagrees with the shipped Angular styling, and Angular is the
+  // reference here.
   horoMissingBlock: {
-    marginTop: 8, padding: 16, borderRadius: 12, alignItems: 'center',
-    backgroundColor: Colors.selectionBg, borderWidth: 1, borderStyle: 'dashed', borderColor: '#EF4444',
+    marginTop: 8, padding: 16, borderRadius: 8, alignItems: 'center',
+    backgroundColor: '#FFFCF4', borderWidth: 1, borderStyle: 'dashed', borderColor: '#FFE17E',
   },
   horoMissingHeader: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: 16, color: '#EF4444', textAlign: 'center' },
   horoMissingBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#4C4C4C', textAlign: 'center', marginTop: 4 },
 
-  qrSection: { alignItems: 'center', marginTop: 24, gap: 16 },
-  qrImage: { width: 160, height: 160 },
+  // Angular .biodata-barcode-section: `border-top: 1px solid #a9907e;
+  // margin-top: 24px` — a hairline rule separating the QR block from the
+  // details above it. Missing entirely from this port.
+  qrSection: {
+    alignItems: 'center', marginTop: 24, paddingTop: 16, gap: 16,
+    borderTopWidth: 1, borderTopColor: '#A9907E',
+  },
+  // Angular .biodata-barcode: 10vh square with `border: 1px solid #e6ca64;
+  // border-radius: 8px; overflow: hidden`. The gold border was missing — this
+  // is the "border is not shown" case.
+  qrImage: {
+    width: 160, height: 160,
+    borderWidth: 1, borderColor: '#E6CA64', borderRadius: 8,
+  },
   qrCaption: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 12, color: '#1A1818', textAlign: 'center' },
 
-  bottomDecorWrap: { marginTop: -35, alignItems: 'center' },
+  // Butts straight onto the card — no overlap. The -35 that used to be here was
+  // sized for the old (wrongly 100pt-tall) slab and painted over the QR caption,
+  // the last element in the card.
+  // width / height come from the live viewport at the usage site. The literal
+  // 60 clipped the cap's upper region — which is the part that joins the card —
+  // and the SCREEN_WIDTH + marginHorizontal: -10 pair pushed the container 2pt
+  // past both screen edges while the SVG inside it stayed at frame width.
+  // Sized to the cap's own proportion instead, so it lines up at any width.
+  bottomDecorWrap: {
+    alignItems: 'center', justifyContent: 'flex-start',
+    marginTop: -1, position: 'relative', overflow: 'hidden',
+  },
 
   footer: { paddingHorizontal: 16, paddingTop: 12, backgroundColor: Colors.white },
 
