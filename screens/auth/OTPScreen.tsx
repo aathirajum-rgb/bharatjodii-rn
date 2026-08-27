@@ -348,6 +348,12 @@ export default function OTPScreen({ navigation, route }: Props) {
                 }}
                 onBlur={() => setFocusedIndex(cur => cur === i ? null : cur)}
                 keyboardType="number-pad"
+                // Cross-platform native OTP autofill hint — RN maps this to iOS
+                // textContentType="oneTimeCode" (QuickType bar) and Android
+                // autoComplete="sms-otp" (Autofill Framework). Independent of the
+                // SMS Retriever hook above: both funnel into handleChange's existing
+                // multi-digit paste branch, so no separate handling is needed.
+                autoComplete="one-time-code"
                 maxLength={2}         // 2 to allow paste detection; trimmed in handleChange
                 returnKeyType={i === OTP_LENGTH - 1 ? 'done' : 'next'}
                 onSubmitEditing={i === OTP_LENGTH - 1 ? () => handleVerify() : undefined}

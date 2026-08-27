@@ -20,7 +20,7 @@ type Props = {
   likedMe: SwiperItem[]
   likedMeTotal: number
   onCardPress: (item: SwiperItem) => void
-  onSeeAllPress: () => void
+  onSeeAllPress?: (() => void) | undefined
 }
 
 export default function LikedProfilesSection({
