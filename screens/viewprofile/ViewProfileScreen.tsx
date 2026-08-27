@@ -48,6 +48,7 @@ import {
 import { viewProfileAdapter } from '../../adapters/viewProfile.adapter'
 import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import { getHeroBannerDetails } from '../../service/paymentService'
+import { handleBack } from '../../utils/navigationRef'
 import { fetchMenuPromo } from '../../service/homeService'
 import { getItem, getJson } from '../../service/storageService'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
@@ -720,7 +721,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     if (!profile) return
     try {
       await communicationBtnOnClick(fromPage, 'skip', { MATRIID: profile.profileId })
-      navigation.goBack()
+      handleBack()
     } catch { /* ignore */ }
   }
 
@@ -728,7 +729,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     if (!profile) return
     try {
       await communicationBtnOnClick(fromPage, 'viewlater', { MATRIID: profile.profileId })
-      navigation.goBack()
+      handleBack()
     } catch { /* ignore */ }
   }
 
@@ -1189,7 +1190,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 
   function handleReportSubmitted() {
     setReportModalOpen(false)
-    navigation.goBack()
+    handleBack()
   }
 
   // ── Loading / not-found ───────────────────────────────────────────────────────
@@ -1209,7 +1210,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     return (
       <SafeAreaView style={s.loaderScreen}>
         <Text style={s.notFoundText}>{invalidMatriIdMessage}</Text>
-        <Pressable style={s.backBtnInline} onPress={() => navigation.goBack()}>
+        <Pressable style={s.backBtnInline} onPress={() => handleBack()}>
           <Text style={s.backBtnInlineText}>{'‹ Back'}</Text>
         </Pressable>
       </SafeAreaView>
@@ -1222,7 +1223,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     return (
       <SafeAreaView style={s.loaderScreen}>
         <Text style={s.notFoundText}>Unable to load this profile.</Text>
-        <Pressable style={s.backBtnInline} onPress={() => navigation.goBack()}>
+        <Pressable style={s.backBtnInline} onPress={() => handleBack()}>
           <Text style={s.backBtnInlineText}>{'‹ Back'}</Text>
         </Pressable>
         <ScrollView style={s.debugBox}>
@@ -1370,7 +1371,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           prevPreview={prevId ? neighborPreviews[prevId] : undefined}
           nextPreview={nextId ? neighborPreviews[nextId] : undefined}
           langCode={i18n.language}
-          onBack={() => navigation.goBack()}
+          onBack={() => handleBack()}
           onGoToPrev={goToPrev}
           onGoToNext={goToNext}
           onLanguagePress={() => navigation.navigate('LanguageSelection')}
@@ -1464,7 +1465,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           language pill. Once scrolled past the photo: back + Name + Call + language
           + a 3-dot report/don't-show menu. */}
       <View style={[s.headerBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable style={s.headerBackBtn} onPress={() => navigation.goBack()} hitSlop={8}>
+        <Pressable style={s.headerBackBtn} onPress={() => handleBack()} hitSlop={8}>
           <CdnSvg uri={BACK_ICON_URI} width={24} height={48} />
         </Pressable>
 

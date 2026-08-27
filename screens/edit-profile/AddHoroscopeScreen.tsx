@@ -38,6 +38,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import SelectField from '../../components/input/SelectField'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import { handleBack } from '../../utils/navigationRef'
 import AddHoroscopeDesktopScreen from './AddHoroscopeDesktopScreen'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
@@ -214,7 +215,7 @@ export default function AddHoroscopeScreen({ navigation }: Props) {
         Alert.alert('Something went wrong', 'Could not save horoscope details. Please try again.')
         return
       }
-      navigation.goBack()
+      handleBack()
     } catch {
       setSubmitting(false)
       Alert.alert('Something went wrong', 'Could not save horoscope details. Please try again.')
@@ -232,7 +233,7 @@ export default function AddHoroscopeScreen({ navigation }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle} numberOfLines={1}>{t('EDITPROFILE.HOROSCOPE')}</Text>

@@ -9,6 +9,7 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { handleBack } from '../../utils/navigationRef'
 
 export interface DeleteProfileHideDesktopLayoutProps {
   navigation: any
@@ -34,7 +35,7 @@ export default function DeleteProfileHideDesktopLayout({
   return (
     <DesktopPageShell navigation={navigation} userName={userName} activeItem="settings" onTabPress={onTabPress}>
       <View style={s.header}>
-        <Pressable onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}>
+        <Pressable onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}>
           <Text style={s.backArrow}>←</Text>
         </Pressable>
         <Text style={s.title}>{t('DELETE_PROFILE.HEADER')}</Text>

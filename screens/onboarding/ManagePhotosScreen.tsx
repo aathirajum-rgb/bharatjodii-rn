@@ -20,6 +20,7 @@ import { Endpoints } from '../../service/api.endpoints'
 import { apiCall } from '../../service/apiClient'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
+import { handleBack } from '../../utils/navigationRef'
 import { getRegValue } from '../../service/registrationService'
 import { deletePhoto, setMainPhoto } from '../../service/profileService'
 
@@ -145,7 +146,7 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
     // Angular: uploadPhotoSuccess() routes through getFewMoreDetailsNext('20'),
     // so a completed photo upload enters the same conditional 34/35 chain.
     onNext:       () => {
-      if (standalone) { navigation.goBack(); return }
+      if (standalone) { handleBack(); return }
       getFewMoreDetailsNextPage('20').then(next =>
         navigation.push('onboarding', { pageNo: next }))
     },

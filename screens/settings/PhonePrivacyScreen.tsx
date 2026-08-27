@@ -28,6 +28,7 @@ import { apiCall } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
 import { openMembershipTab } from '../../service/paymentService'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import { handleBack } from '../../utils/navigationRef'
 import { ICON } from '../menu/MenuScreen'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
@@ -99,7 +100,7 @@ export default function PhonePrivacyScreen({ navigation }: Props) {
 
   async function save(value: UiValue) {
     if (value === storedValue) {
-      navigation.goBack()
+      handleBack()
       return
     }
     setSaving(true)
@@ -109,7 +110,7 @@ export default function PhonePrivacyScreen({ navigation }: Props) {
       if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0) {
         await setItem(SK.Profile.MOBILE_PRIVACY, value)
         Alert.alert('', t('PRIVACY.SUCCESS_TOAST'))
-        navigation.goBack()
+        handleBack()
       } else {
         Alert.alert('', res?.RESPONSE?.MSG || 'Something went wrong. Please try again.')
       }
@@ -186,7 +187,7 @@ export default function PhonePrivacyScreen({ navigation }: Props) {
     return (
       <DesktopPageShell navigation={navigation} userName={userName} activeItem="settings" onTabPress={handleTabPress}>
         <View style={s.desktopHeader}>
-          <Pressable onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}>
+          <Pressable onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}>
             <Text style={s.desktopBackArrow}>←</Text>
           </Pressable>
           <Text style={s.desktopTitle}>{t('PRIVACY.PHONE_PRIVACY_HEADER')}</Text>
@@ -201,7 +202,7 @@ export default function PhonePrivacyScreen({ navigation }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON.back} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle} numberOfLines={1}>{t('PRIVACY.PHONE_PRIVACY_HEADER')}</Text>

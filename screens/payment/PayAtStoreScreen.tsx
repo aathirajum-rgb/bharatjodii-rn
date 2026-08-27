@@ -14,6 +14,7 @@ import { Colors } from '../../constants/colors'
 import { CDN, CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import {
   getPaymentCityList, getPaymentStateList, getPaymentStoreList,
   type PaymentCityItem, type PaymentStateItem, type PaymentStoreItem,
@@ -51,7 +52,7 @@ export default function PayAtStoreScreen({ navigation }: Props) {
   }, [])
 
   function handleBack() {
-    if (navigation.canGoBack()) navigation.goBack()
+    if (navigation.canGoBack()) handleRootBack()
     else navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
   }
 

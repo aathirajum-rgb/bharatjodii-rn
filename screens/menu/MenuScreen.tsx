@@ -18,9 +18,11 @@ import { StorageKeys } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
 import { getSession } from '../../service/registrationService'
 import { clearSession } from '../../service/apiClient'
+import { handleBack } from '../../utils/navigationRef'
 import { disconnectSocket } from '../../service/socketService'
 import { logEvent, dispatchNativeEvent } from '../../service/analyticsService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
@@ -34,7 +36,6 @@ const TERMS_CONDITIONS_URL = 'https://www.jodii.com/terms.html'
 
 export const ICON = {
   back:          R + 'menu_back_arrow.svg',
-  avatar:        R + 'menu_avatar.svg',
   verified:      R + 'menu_verified.svg',
   paidTag:       R + 'menu_paid_tag.svg',
   edit:          R + 'menu_edit_icon.svg',
@@ -180,6 +181,12 @@ export default function MenuScreen({ navigation }: Props) {
   const [userName,      setUserName]      = useState('')
   const [userId,        setUserId]        = useState('')
   const [photoUrl,      setPhotoUrl]      = useState('')
+  // No photo (or a photo whose URL fails to load) falls back to the member's
+  // OWN-gender silhouette — the same getOwnGenderAvatarUrl() placeholder the
+  // edit-profile photo grid uses, so the two screens agree. This replaced a
+  // single genderless menu_avatar.svg.
+  const [genderAvatarUrl, setGenderAvatarUrl] = useState('')
+  const [photoFailed,     setPhotoFailed]     = useState(false)
   const [entryType,     setEntryType]     = useState('')
   const [isVerified,    setIsVerified]    = useState(false)
   const [membershipExp, setMembershipExp] = useState('')
@@ -202,6 +209,10 @@ export default function MenuScreen({ navigation }: Props) {
       setAppVersion(ver ?? '')
       setIsVerified(ekyc === '1')
     })
+  }, [])
+
+  useEffect(() => {
+    getOwnGenderAvatarUrl().then(setGenderAvatarUrl)
   }, [])
 
   const isPaid = entryType !== '' && !['B', 'F'].includes(entryType)
@@ -230,7 +241,7 @@ export default function MenuScreen({ navigation }: Props) {
       {/* ── Header back button ── */}
       <Pressable
         style={[s.backBtn, { marginTop: 8 }]}
-        onPress={() => navigation.goBack()}
+        onPress={() => handleBack()}
         accessibilityRole="button"
         accessibilityLabel="Back"
       >
@@ -249,10 +260,18 @@ export default function MenuScreen({ navigation }: Props) {
             {/* Avatar with camera badge */}
             <View style={s.avatarContainer}>
               <View style={s.avatarWrap}>
-                {photoUrl ? (
-                  <Image source={{ uri: photoUrl }} style={s.avatar} contentFit="cover" />
+                {photoUrl && !photoFailed ? (
+                  <Image
+                    source={{ uri: photoUrl }}
+                    style={s.avatar}
+                    contentFit="cover"
+                    onError={() => setPhotoFailed(true)}
+                  />
                 ) : (
-                  <CdnSvg uri={ICON.avatar} width={70} height={70} />
+                  // Waits for genderAvatarUrl rather than rendering a
+                  // half-second wrong-gender guess — the circle just stays
+                  // empty for the one tick it takes to read login gender.
+                  !!genderAvatarUrl && <CdnSvg uri={genderAvatarUrl} width={70} height={70} />
                 )}
               </View>
               <View style={s.cameraBadge}>

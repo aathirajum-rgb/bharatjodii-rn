@@ -17,12 +17,13 @@ import { WebView } from 'react-native-webview'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import { handleBack } from '../../utils/navigationRef'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
 type Props = { navigation: any; route: { params: { url: string; title: string } } }
 
-export default function ExternalPageScreen({ navigation, route }: Props) {
+export default function ExternalPageScreen({ navigation: _navigation, route }: Props) {
   const { url, title } = route.params
   const insets = useSafeAreaInsets()
 
@@ -39,7 +40,7 @@ export default function ExternalPageScreen({ navigation, route }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle} numberOfLines={1}>{title}</Text>

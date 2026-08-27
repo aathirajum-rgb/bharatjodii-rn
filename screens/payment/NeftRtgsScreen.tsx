@@ -15,6 +15,7 @@ import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { getPayAtBankList, type PayAtBankItem } from '../../service/paymentService'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { handleBack as handleRootBack } from '../../utils/navigationRef'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
@@ -37,7 +38,7 @@ export default function NeftRtgsScreen({ navigation }: Props) {
   }, [])
 
   function handleBack() {
-    if (navigation.canGoBack()) navigation.goBack()
+    if (navigation.canGoBack()) handleRootBack()
     else navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
   }
 

@@ -139,9 +139,11 @@ export interface EditProfileInfo {
   mobileNo?:     string | undefined
   missedCallNo?: string | undefined
 
-  // One-time-edit lock flags — '1' means still editable, matching Angular's
-  // *EDIT flags. When false, the field must show a "contact support" message
-  // instead of navigating to its editor.
+  // One-time-edit lock flags, derived from the API's *EDIT flags (see
+  // isEditable() below — the raw flag is 1 once the field has been edited).
+  // When false, tapping the field must open FieldRestrictedSheet ("contact
+  // Customer Support") instead of navigating to its editor — the same seven
+  // fields Angular's showDisableToast() gates.
   nameEditable:          boolean
   ageEditable:           boolean
   casteEditable:         boolean
@@ -151,8 +153,14 @@ export interface EditProfileInfo {
   createdByEditable:     boolean
 }
 
-function toBool01(v: any): boolean {
-  return String(v ?? '1') !== '0'
+// Angular (edit-profile.page.ts getUserDetails): `if (parseInt(FLAG) == 1)
+// { xEditEnable = false }` — the flag means "this field has ALREADY been
+// edited once", so 1 = locked and anything else (including a missing flag)
+// leaves the field editable. An earlier version of this helper had it
+// backwards (`!== '0'`), which reported every already-locked field as still
+// editable and let the user walk into an editor the API would then reject.
+function isEditable(v: any): boolean {
+  return parseInt(String(v ?? ''), 10) !== 1
 }
 
 function parseDosham(raw: any): { dosham?: string; doshamType?: string[] } {
@@ -257,13 +265,13 @@ export async function fetchEditProfileInfo(): Promise<EditProfileInfo | null> {
     mobileNo:     r['MOBILENO'],
     missedCallNo: r['MISSEDCALLNO'],
 
-    nameEditable:         toBool01(r['NAMEEDIT']),
-    ageEditable:          toBool01(r['DOBEDIT']),
-    casteEditable:        toBool01(r['CASTEEDIT']),
-    incomeEditable:       toBool01(r['INCOMEEEDIT']),
-    motherTongueEditable: toBool01(r['MOTHERTONGUEEDIT']),
-    religionEditable:     toBool01(r['RELIGIONEDIT']),
-    createdByEditable:    toBool01(r['CREATEDBYEDIT']),
+    nameEditable:         isEditable(r['NAMEEDIT']),
+    ageEditable:          isEditable(r['DOBEDIT']),
+    casteEditable:        isEditable(r['CASTEEDIT']),
+    incomeEditable:       isEditable(r['INCOMEEEDIT']),
+    motherTongueEditable: isEditable(r['MOTHERTONGUEEDIT']),
+    religionEditable:     isEditable(r['RELIGIONEDIT']),
+    createdByEditable:    isEditable(r['CREATEDBYEDIT']),
   }
 }
 

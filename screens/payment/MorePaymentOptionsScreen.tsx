@@ -19,6 +19,7 @@ import { CDN, CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import LinkCTA from '../../components/link-cta/LinkCTA'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import {
   checkQrPaymentOutcome, getPaymentConfig, getQRPaymentData, getRechargeHelpline, getUpiAppList,
   handlePaymentSuccess, recordPaymentFailure, type PaymentMethodItem, type QRPaymentData,
@@ -123,7 +124,7 @@ export default function MorePaymentOptionsScreen({ navigation, route }: Props) {
   }
 
   function handleBack() {
-    if (navigation.canGoBack()) navigation.goBack()
+    if (navigation.canGoBack()) handleRootBack()
     else navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
   }
 

@@ -37,6 +37,7 @@ import {
   emitSendMessage, onSendResponse, emitMessageStatus, onReceiver,
 } from '../../service/socketService'
 import { blockChatProfile, unblockChatProfile } from '../../service/communicationService'
+import { handleBack } from '../../utils/navigationRef'
 import {
   getChatCount, consumeChatCount, checkChatLimit, fetchChatPaymentPromo,
   type ChatCountResult, type ChatPaymentPromo,
@@ -596,7 +597,7 @@ export default function ChatScreen({ navigation, route }: Props) {
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       {/* ── Header ── */}
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
+        <Pressable onPress={() => handleBack()} hitSlop={12} style={styles.backBtn}>
           <CdnSvg uri={BACK_ICON_URI} width={20} height={20} />
         </Pressable>
         <View style={styles.avatarWrap}>

@@ -31,6 +31,7 @@ import {
   fetchIgnoredProfiles, fetchBlockedProfiles, type IgnoredProfile, type IgnoredProfilesPage,
 } from '../../service/ignoredProfilesService'
 import { unblockProfile } from '../../service/communicationService'
+import { handleBack } from '../../utils/navigationRef'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
@@ -225,7 +226,7 @@ export default function IgnoredProfilesScreen({ navigation }: Props) {
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.headerWrap}>
         <View style={s.header}>
-          <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+          <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
             <CdnSvg uri={CDN_REACT + '/menu_back_arrow.svg'} width={24} height={24} />
           </Pressable>
           <Text style={s.headerTitle} numberOfLines={1}>{t('MENU.IGNORED_PROFILES')}</Text>

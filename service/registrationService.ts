@@ -1291,15 +1291,30 @@ export async function fetchCities(stateId: string): Promise<Array<{ key: string;
 // REGISTRATIONARRAYS.NATIVEPLACEDOMAIN isn't present.
 const HOME_TOWN_DOMAIN = ['2', '14', '17', '41', '4', '51']
 
-// Angular: isHomeTownVisible() — (homeTownDomain || []).includes(motherTongueKey).
-// Used by the validation follow-up sheets to decide whether to ask
-// "Is your home town same as current location?" for the chosen mother tongue.
-export async function isHomeTownMotherTongue(motherTongueKey: string): Promise<boolean> {
-  if (!motherTongueKey) return false
+// The resolved domain list. Angular reads it two ways that come to the same
+// thing — edit-profile.page.ts:389 `registrationArray['NATIVEPLACEDOMAIN'] ? …
+// : homePlaceDomain`, and registration.service.ts:734 which additionally
+// requires a non-empty array. The non-empty check is kept here so a server
+// sending `[]` falls back rather than hiding the field for everyone.
+//
+// Exported as a list, not just a predicate, because the screens where mother
+// tongue is editable have to re-evaluate visibility against the live selection
+// on every render — an async per-key check can't do that.
+export async function fetchHomeTownDomain(): Promise<string[]> {
   const arrays = await getRegistrationArrays()
-  const domain: string[] = Array.isArray(arrays?.NATIVEPLACEDOMAIN) && arrays.NATIVEPLACEDOMAIN.length
+  return Array.isArray(arrays?.NATIVEPLACEDOMAIN) && arrays.NATIVEPLACEDOMAIN.length
     ? arrays.NATIVEPLACEDOMAIN.map(String)
     : HOME_TOWN_DOMAIN
+}
+
+// Angular: isHomeTownVisible() — (homeTownDomain || []).includes(motherTongueKey).
+// Used by the validation follow-up sheets to decide whether to ask
+// "Is your home town same as current location?" for the chosen mother tongue,
+// and by edit-profile to decide whether the Native place / Hometown city
+// fields exist at all for this member.
+export async function isHomeTownMotherTongue(motherTongueKey: string): Promise<boolean> {
+  if (!motherTongueKey) return false
+  const domain = await fetchHomeTownDomain()
   return domain.includes(String(motherTongueKey))
 }
 

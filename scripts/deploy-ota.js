@@ -13,6 +13,11 @@
  *
  * Optional:
  *   CHANNEL_SUFFIX — defaults to "production"
+ *   FLAVOR         — which flavor(s) to publish the update to:
+ *                       unset            -> jodii,tamil,malayalam (default)
+ *                       "reddy"          -> just that one flavor
+ *                       "reddy,nair,sc"  -> comma-separated list of flavors
+ *                       "all"            -> every flavor in constants/flavorConfig.js
  */
 
 const { execSync } = require('child_process');
@@ -30,9 +35,23 @@ const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
-const ALL_FLAVORS = process.env.FLAVOR ? [process.env.FLAVOR] : ['jodii', 'tamil', 'malayalam'];
 const CHANNEL_SUFFIX = process.env.CHANNEL_SUFFIX || 'production';
 const FLAVOR_CONFIGS = require('../constants/flavorConfig');
+
+function resolveFlavors() {
+  if (!process.env.FLAVOR) return ['jodii', 'tamil', 'malayalam'];
+  if (process.env.FLAVOR === 'all') return Object.keys(FLAVOR_CONFIGS);
+
+  const flavors = process.env.FLAVOR.split(',').map(f => f.trim()).filter(Boolean);
+  const unknown = flavors.filter(f => !FLAVOR_CONFIGS[f]);
+  if (unknown.length) {
+    console.error(`Unknown flavor(s): ${unknown.join(', ')}\nKnown flavors: ${Object.keys(FLAVOR_CONFIGS).join(', ')}`);
+    process.exit(1);
+  }
+  return flavors;
+}
+
+const ALL_FLAVORS = resolveFlavors();
 const SFTP_HOST = process.env.SFTP_HOST;
 const SFTP_PORT = parseInt(process.env.SFTP_PORT || '22', 10);
 const SFTP_USER = process.env.SFTP_USER;
@@ -180,7 +199,7 @@ async function deploy() {
 
   await sftp.end();
   console.log(`\nDone! Update ID: ${updateId}`);
-  console.log('All 3 apps will get this update on next launch.\n');
+  console.log(`${ALL_FLAVORS.length} flavor(s) will get this update on next launch: ${ALL_FLAVORS.join(', ')}\n`);
 }
 
 function assetMime(ext) {

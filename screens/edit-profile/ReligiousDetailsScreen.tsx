@@ -31,18 +31,21 @@ import {
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import SelectField from '../../components/input/SelectField'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
+import FieldRestrictedSheet from '../../components/edit-profile/FieldRestrictedSheet'
+import { handleBack } from '../../utils/navigationRef'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
 type Props = { navigation: any }
 type Picker = 'religion' | 'caste' | 'gothram' | 'raasi' | 'star' | 'doshamYesNo' | 'doshamType' | null
 
-export default function ReligiousDetailsScreen({ navigation }: Props) {
+export default function ReligiousDetailsScreen({ navigation: _navigation }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
 
   const [loading, setLoading]       = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [restrictedVisible, setRestrictedVisible] = useState(false)
   const [motherTongue, setMotherTongue] = useState('')
 
   const [religion, setReligion]         = useState<PickerOption | null>(null)
@@ -227,7 +230,7 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
 
     if (changes.length === 0) {
       setSubmitting(false)
-      navigation.goBack()
+      handleBack()
       return
     }
 
@@ -241,11 +244,13 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
       )
       return
     }
-    navigation.goBack()
+    handleBack()
   }
 
+  // Angular: showDisableToast() -> restrictPopup(), i.e. lowerpopup.component's
+  // `action == 'editFieldRestrict'` popup — not a native OS alert.
   function showRestricted() {
-    Alert.alert(t('EDITPROFILE.RESTRICT_FIELD'), t('EDITPROFILE.RESTRICT_SUPPORT'))
+    setRestrictedVisible(true)
   }
 
   if (loading) {
@@ -259,7 +264,7 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle} numberOfLines={1}>{t('EDITPROFILE.EDIT_PROFILE')}</Text>
@@ -356,6 +361,7 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
         onSelect={opt => { setDoshamType(opt); setActivePicker(null) }}
         onClose={() => setActivePicker(null)}
       />
+      <FieldRestrictedSheet visible={restrictedVisible} onClose={() => setRestrictedVisible(false)} />
     </View>
   )
 }

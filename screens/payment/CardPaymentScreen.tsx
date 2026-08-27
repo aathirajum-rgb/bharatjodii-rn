@@ -18,6 +18,7 @@ import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import FloatingLabelInput, { validateName } from '../../components/input/FloatingLabelInput'
+import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import LinkCTA from '../../components/link-cta/LinkCTA'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
 import { Fonts } from '../../src/theme/fonts'
@@ -96,7 +97,7 @@ export default function CardPaymentScreen({ navigation, route }: Props) {
     !validateExpiry(expiry) && !validateCvv(cvv)
 
   function handleBack() {
-    if (navigation.canGoBack()) navigation.goBack()
+    if (navigation.canGoBack()) handleRootBack()
     else navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
   }
 

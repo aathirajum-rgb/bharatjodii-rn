@@ -16,6 +16,7 @@ import LanguageSelectionDesktopLayout from './LanguageSelectionDesktopLayout';
 import { getItem } from '../service/storageService';
 import { StorageKeys } from '../constants/storage.keys';
 import { openMembershipTab } from '../service/paymentService';
+import { handleBack } from '../utils/navigationRef';
 import { getRegistrationArrays } from '../service/registrationService';
 import type { FooterTab } from '../components/app-footer/AppFooter';
 
@@ -117,7 +118,7 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
     await submitLanguage(current, selected);
     await i18n.changeLanguage(selected);
     if (navigation?.canGoBack()) {
-      navigation.goBack();
+      handleBack();
     } else {
       onSelect(selected);
     }
@@ -161,7 +162,7 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
           type="registration"
           showBackBtn={navigation?.canGoBack() ?? false}
           closeIcon
-          onBackPress={() => navigation?.goBack()}
+          onBackPress={() => handleBack()}
         />
       )}
 
