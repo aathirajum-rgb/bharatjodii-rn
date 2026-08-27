@@ -12,12 +12,13 @@
 // locally require()'d assets from the original build of this screen was
 // never committed to git and got wiped from disk, breaking every screen
 // that referenced it. CDN URLs can't disappear from under us the same way.
+import { useEffect, useState } from 'react'
 import { Image } from 'expo-image'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
-import { ICON as MENU_ICON } from '../../screens/menu/MenuScreen'
+import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import { setFilterEventType } from '../../service/filterService'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
@@ -65,14 +66,29 @@ function SidebarRow({
 }
 
 export default function HomeSidebar({ navigation, userName, userId, photoUrl, activeItem }: HomeSidebarProps) {
+  // No photo (or a broken photo URL) falls back to the member's OWN-gender
+  // silhouette, same as MenuScreen and the edit-profile photo grid. This used
+  // MenuScreen's genderless menu_avatar.svg before.
+  const [genderAvatarUrl, setGenderAvatarUrl] = useState('')
+  const [photoFailed, setPhotoFailed] = useState(false)
+
+  useEffect(() => {
+    getOwnGenderAvatarUrl().then(setGenderAvatarUrl)
+  }, [])
+
   return (
     <View style={s.container}>
       {/* ── Profile summary ── */}
       <View style={s.avatarWrap}>
-        {photoUrl ? (
-          <Image source={{ uri: photoUrl }} style={s.avatar} contentFit="cover" />
+        {photoUrl && !photoFailed ? (
+          <Image
+            source={{ uri: photoUrl }}
+            style={s.avatar}
+            contentFit="cover"
+            onError={() => setPhotoFailed(true)}
+          />
         ) : (
-          <CdnSvg uri={MENU_ICON.avatar} width={100} height={100} />
+          !!genderAvatarUrl && <CdnSvg uri={genderAvatarUrl} width={100} height={100} />
         )}
       </View>
       <Text style={s.name} numberOfLines={1}>{userName}</Text>

@@ -27,6 +27,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import SelectField from '../../components/input/SelectField'
 import FloatingLabelInput from '../../components/input/FloatingLabelInput'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
+import FieldRestrictedSheet from '../../components/edit-profile/FieldRestrictedSheet'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
@@ -39,6 +40,7 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
 
   const [loading, setLoading]       = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [restrictedVisible, setRestrictedVisible] = useState(false)
 
   const [education, setEducation]   = useState<PickerOption | null>(null)
   const [educationGroup, setEducationGroup] = useState<PickerOption | null>(null)
@@ -170,8 +172,10 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
     navigation.goBack()
   }
 
+  // Angular: showDisableToast() -> restrictPopup(), i.e. lowerpopup.component's
+  // `action == 'editFieldRestrict'` popup — not a native OS alert.
   function showRestricted() {
-    Alert.alert(t('EDITPROFILE.RESTRICT_FIELD'), t('EDITPROFILE.RESTRICT_SUPPORT'))
+    setRestrictedVisible(true)
   }
 
   if (loading) {
@@ -275,6 +279,7 @@ export default function ProfessionalDetailsScreen({ navigation }: Props) {
         onSelect={opt => { setIncome(opt); setActivePicker(null) }}
         onClose={() => setActivePicker(null)}
       />
+      <FieldRestrictedSheet visible={restrictedVisible} onClose={() => setRestrictedVisible(false)} />
     </View>
   )
 }

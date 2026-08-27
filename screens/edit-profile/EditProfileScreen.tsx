@@ -17,14 +17,20 @@
 // navigation — matches Angular exactly (Profile created by's click handler is
 // commented out there too; Jodii ID and Mobile number never had one).
 //
-// Drinking/Smoking habits have no option-fetching function anywhere in this
-// app yet (only Eating habits does) — their raw stored value is shown as-is
-// rather than resolved to a label, since there's nothing to resolve against.
+// Every row resolves its stored code to a label through one of
+// registrationService's option fetchers, all of which read the cached
+// registrationform/v1 bootstrap response. Verified against a live staging
+// response that each list is actually present there (DRINKINGHABITS,
+// SMOKINGHABITS, EATINGHABITS, BOTHER, SISTER, ASSETS, ...) — so an unresolved
+// row means the member genuinely hasn't set the field, not a failed lookup.
+// That matters because FieldRow now turns any empty editable row into the
+// "Add details" + warning-triangle state.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text,
+  useWindowDimensions, View,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -48,31 +54,125 @@ import {
   fetchStarOptions, fetchMonthlyIncomeOptions, fetchPropertyOptions,
   fetchStates, fetchCities, fetchHeightCategoryOptions,
   fetchMaritalStatusOptions, fetchPhysicalStatusOptions, fetchProfileCreatedByOptions,
-  fetchFamilyOptions,
+  fetchFamilyOptions, isHomeTownMotherTongue,
 } from '../../service/registrationService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import PhotoPrivacySheet from '../../components/photo-privacy/PhotoPrivacySheet'
+import FieldRestrictedSheet from '../../components/edit-profile/FieldRestrictedSheet'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import EditProfileDesktopScreen from './EditProfileDesktopScreen'
 
 const ICON_BACK  = CDN_REACT + '/menu_back_arrow.svg'
 const ICON_ARROW = CDN_REACT + '/menu_right_arrow.svg'
 
+// Missing-field warning triangle, shown at the right edge of any row whose
+// value isn't set yet (Figma) — it replaces the grey chevron rather than
+// sitting next to it. Drawn at its own 18x17 intrinsic size: the asset is not
+// square, so forcing it into a square box would letterbox it smaller than the
+// design and leave uneven padding on one axis.
+// Leading icon on the "Photo privacy" link (Figma node 3366:13117 — a 32px
+// icon box, gap 4, then the underlined label).
+const ICON_PRIVACY = CDN_REACT + '/edit_privacy.svg'
+const PRIVACY_ICON_SIZE = 32
+
+const ICON_MISS_WARN = CDN_REACT + '/edit_miss_warn.svg'
+const MISS_WARN_W = 18
+const MISS_WARN_H = 17
+// The chevron that trails the "Add details" link text itself. Figma's Link CTA
+// uses the same 16px Icon-Backarrow as the row's own trailing chevron, not a
+// smaller one.
+const MISSING_CHEVRON = 16
+
+// Per-field leading icons (Figma node 2192-9135), served from the same
+// CDN_REACT folder as the nav chevrons. File names are the ones uploaded to the
+// server, verified reachable on the staging CDN.
+//
+// SIX ROWS HAVE NO ICON YET — Jodii ID, Profile created by, Marital status,
+// Children, Physical status and Mobile number. Nothing matching them exists in
+// the react/ folder (probed every plausible name), so those rows render an
+// empty icon slot: the space is still reserved via ROW_ICON so every label in
+// the section stays on the same left edge instead of some rows jumping inward.
+// Drop the files in and add them here — no other change needed.
+//
+// Not mapped: edit_vehicle.svg. This screen has exactly one "Properties owned"
+// row and property codes 5/6/7 (the vehicle ones) are deliberately excluded
+// from it — see the file header and splitProperties() in editProfileService.ts.
+// There's no "Own Vehicle" row to hang it on; if the Figma has one, that's a
+// separate change (the data is already parsed as `profile.vehicles`).
+const ROW_ICON = 24
+const R_ICON = {
+  name:           CDN_REACT + '/edit_name.svg',
+  age:            CDN_REACT + '/edit_age.svg',
+  height:         CDN_REACT + '/edit_height.svg',
+  motherTongue:   CDN_REACT + '/edit_mothertongue.svg',
+  location:       CDN_REACT + '/edit_location.svg',
+  hometown:       CDN_REACT + '/edit_hometown.svg',
+  education:      CDN_REACT + '/edit_education.svg',
+  occupation:     CDN_REACT + '/edit_occupation.svg',
+  income:         CDN_REACT + '/edit_monthlyincome.svg',
+  religion:       CDN_REACT + '/edit_religion.svg',
+  caste:          CDN_REACT + '/edit_caste.svg',
+  raasi:          CDN_REACT + '/edit_raasi.svg',
+  star:           CDN_REACT + '/edit_star.svg',
+  dosham:         CDN_REACT + '/edit_dosham.svg',
+  horoscope:      CDN_REACT + '/edit_horoscope.svg',
+  drinking:       CDN_REACT + '/edit_drinking_habits.svg',
+  smoking:        CDN_REACT + '/edit_smoking.svg',
+  eating:         CDN_REACT + '/edit_eating_habits.svg',
+  brothers:       CDN_REACT + '/edit_brother.svg',
+  sisters:        CDN_REACT + '/edit_sister.svg',
+  properties:     CDN_REACT + '/edit_property_owned.svg',
+} as const
+
 // Photo mosaic (Figma node 2192-9135) — 1 large tile (spans 2x2 of the small-
 // tile grid) + 5 small tiles: two stacked to its right, three in a row below.
 // Matches Angular's 6-slot photo grid exactly (slot 0 = main/profile photo).
-const MOSAIC_TILE = 98
-const MOSAIC_GAP  = 8
-const MOSAIC_MAIN = MOSAIC_TILE * 2 + MOSAIC_GAP // 204
+// The grid is RESPONSIVE: tile size is derived from the viewport, not fixed.
+// The design's 98px tile only fills the row on a 360pt-wide frame — hardcoding
+// it overflowed the 24pt content inset on a 320pt phone (312 of grid into 272
+// of space) and left dead space on a 390-430pt one.
+//
+// The gap stays fixed at 9. Spacing is not something that should scale with
+// the screen, and 9 is what the design's own numbers require: 360 - 48 inset
+// = 312 of content, 3 tiles of 98 = 294, leaving 18 for two gaps.
+const MOSAIC_GAP = 9
+// Ceiling so a tablet or a sub-1024 browser window (both of which still get
+// this mobile layout — see useIsDesktopWeb) doesn't produce absurd tiles: at
+// 1023pt wide an uncapped tile would be ~319pt. 130 is above what any phone
+// needs (it only binds past ~456pt of viewport, and the widest phones are
+// ~430), so every real handset still fills edge to edge and only genuine
+// tablets clamp — where the grid then sits left-aligned with the rows.
+const MOSAIC_TILE_MAX = 130
 const PHOTO_GRID_SLOTS = 6
 
-function photoSlotPosition(i: number): { left: number; top: number } {
+// Horizontal content inset. Shared with scrollContent's paddingHorizontal so
+// the two can't drift — the mosaic width is computed from it.
+const CONTENT_PAD = 24
+
+type MosaicMetrics = {
+  tile:   number  // small tile edge
+  main:   number  // main tile edge — spans 2 tile columns + 1 gap
+  size:   number  // overall grid edge (3 columns)
+  second: number  // offset of the 2nd track
+  third:  number  // offset of the 3rd track
+}
+
+function mosaicMetrics(viewportWidth: number): MosaicMetrics {
+  const available = Math.max(0, viewportWidth - CONTENT_PAD * 2)
+  const tile   = Math.min(MOSAIC_TILE_MAX, (available - MOSAIC_GAP * 2) / 3)
+  const main   = tile * 2 + MOSAIC_GAP
+  const second = tile + MOSAIC_GAP
+  const third  = main + MOSAIC_GAP
+  return { tile, main, size: third + tile, second, third }
+}
+
+function photoSlotPosition(i: number, m: MosaicMetrics): { left: number; top: number } {
   if (i === 0) return { left: 0, top: 0 }
-  if (i === 1) return { left: MOSAIC_MAIN + MOSAIC_GAP, top: 0 }
-  if (i === 2) return { left: MOSAIC_MAIN + MOSAIC_GAP, top: MOSAIC_TILE + MOSAIC_GAP }
-  if (i === 3) return { left: 0, top: MOSAIC_MAIN + MOSAIC_GAP }
-  if (i === 4) return { left: MOSAIC_TILE + MOSAIC_GAP, top: MOSAIC_MAIN + MOSAIC_GAP }
-  return { left: MOSAIC_MAIN + MOSAIC_GAP, top: MOSAIC_MAIN + MOSAIC_GAP }
+  if (i === 1) return { left: m.third,  top: 0 }
+  if (i === 2) return { left: m.third,  top: m.second }
+  if (i === 3) return { left: 0,        top: m.third }
+  if (i === 4) return { left: m.second, top: m.third }
+  return { left: m.third, top: m.third }
 }
 
 type Props = { navigation: any }
@@ -93,7 +193,7 @@ function labelsFor(list: Opt[], codes: string[] | undefined): string | undefined
 // ─── Row ──────────────────────────────────────────────────────────────────────
 
 function FieldRow({
-  label, value, missingText, onPress, showDivider, hideArrow,
+  label, value, missingText, onPress, showDivider, hideArrow, icon,
 }: {
   label: string
   value?: string | undefined
@@ -102,36 +202,69 @@ function FieldRow({
   showDivider?: boolean | undefined
   // Display-only rows (Jodii ID, Profile created by, Mobile number — none of
   // which Angular makes editable either) — no chevron, so the row doesn't
-  // look like a dead tap target.
+  // look like a dead tap target. Also opts the row out of the missing-value
+  // treatment below: a row you can't open must not invite you to fill it in.
   hideArrow?: boolean | undefined
+  // Leading field icon (see R_ICON). Omitted for the six rows whose icon isn't
+  // on the CDN yet — the slot is still laid out so labels stay aligned.
+  icon?: string | undefined
 }) {
-  const isMissing = !value && !!missingText
+  const { t } = useTranslation()
+
+  // ANY editable row with no value is a "missing" row — the Add-details link
+  // plus the warning triangle. This used to key off `!!missingText`, so only
+  // the 7 rows that happened to pass one got the treatment and the other 21
+  // (drinking, smoking, sisters, properties, …) silently fell through to a
+  // bare "—" placeholder, which appears nowhere in the design.
+  //
+  // `missingText` is now only for rows whose copy differs from the generic
+  // "Add details" — the per-field strings Angular already ships.
+  const isMissing = !value && !hideArrow
+  const missingLabel = missingText ?? t('EDITPROFILE.ADD_DETAILS_TXT')
   return (
     <>
       <Pressable style={({ pressed }) => [r.row, pressed && r.rowPressed]} onPress={onPress} accessibilityRole="button">
+        <View style={r.rowIcon}>
+          {!!icon && <CdnSvg uri={icon} width={ROW_ICON} height={ROW_ICON} />}
+        </View>
         <View style={r.rowText}>
           <Text style={r.rowLabel}>{label}</Text>
           {isMissing ? (
+            // Figma: the link text carries its own small trailing chevron, and
+            // the red warning triangle takes over the row's right edge (see
+            // below) — so no leading red "!" badge here any more.
             <View style={r.missingRow}>
-              <Text style={r.missingBang}>!</Text>
-              <Text style={r.missingText}>{missingText}</Text>
+              <Text style={r.missingText}>{missingLabel}</Text>
+              <CdnSvg uri={ICON_ARROW} width={MISSING_CHEVRON} height={MISSING_CHEVRON} />
             </View>
           ) : (
             <Text style={r.rowValue} numberOfLines={2}>{value ?? '—'}</Text>
           )}
         </View>
-        {!hideArrow && <CdnSvg uri={ICON_ARROW} width={16} height={16} />}
+        {/* Right edge: the warning triangle REPLACES the grey chevron while a
+            field is missing (Figma) — a missing row never shows both. */}
+        {isMissing
+          ? <CdnSvg uri={ICON_MISS_WARN} width={MISS_WARN_W} height={MISS_WARN_H} />
+          : !hideArrow && <CdnSvg uri={ICON_ARROW} width={16} height={16} />}
       </Pressable>
       {showDivider && <View style={r.rowDivider} />}
     </>
   )
 }
 
+// Figma's rows are an auto-layout list where the FIRST row has bottom padding
+// only and the LAST row has top padding only — every row in between gets both.
+// That's what makes the Basic details block measure exactly 312x440 in Figma
+// (60 + 80x4 + 60).
+//
+// Rather than thread first/last flags through ~28 call sites, every row keeps a
+// uniform paddingVertical: 20 and the list cancels the two outer ones with a
+// -20 margin. Net effect is identical and the rows stay interchangeable.
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <View style={s.section}>
       <Text style={s.sectionTitle}>{title}</Text>
-      <View>{children}</View>
+      <View style={s.sectionRows}>{children}</View>
     </View>
   )
 }
@@ -142,6 +275,12 @@ export default function EditProfileScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
   const isDesktop = useIsDesktopWeb()
+  // Photo grid geometry, recomputed whenever the viewport changes — rotation on
+  // native, window resize on mobile web. useWindowDimensions rather than an
+  // onLayout measurement so the grid is correctly sized on its very first
+  // paint instead of flashing at zero width and then snapping into place.
+  const { width: windowWidth } = useWindowDimensions()
+  const mosaic = mosaicMetrics(windowWidth)
 
   const [loading, setLoading]   = useState(true)
   const [profile, setProfile]   = useState<EditProfileInfo | null>(null)
@@ -149,7 +288,17 @@ export default function EditProfileScreen({ navigation }: Props) {
   const [labels,  setLabels]    = useState<Record<string, Opt[]>>({})
   const [ownId,   setOwnId]     = useState('')
   const [createdByLabel, setCreatedByLabel] = useState<string | undefined>(undefined)
+  // Angular: edit-profile.page.html's `homePlaceDomain.includes(MOTHERTONGUE)`
+  // guard around the Home Town row. Only a handful of mother tongues are asked
+  // for a separate native place at all — for everyone else the field must not
+  // exist, not merely sit empty (an empty row would now render as an
+  // "Add details" prompt for something we never ask about).
+  const [homeTownVisible, setHomeTownVisible] = useState(false)
   const [photoPrivacyVisible, setPhotoPrivacyVisible] = useState(false)
+  // Angular: edit-profile.page.ts's restrictPopup() — the "this field cannot
+  // be changed" popup, opened from showDisableToast() when a one-time-editable
+  // field has already been used up. See `restrictedNav` below.
+  const [fieldRestrictedVisible, setFieldRestrictedVisible] = useState(false)
   const [galleryVisible, setGalleryVisible] = useState(false)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const [genderAvatarUrl, setGenderAvatarUrl] = useState('')
@@ -244,6 +393,7 @@ export default function EditProfileScreen({ navigation }: Props) {
       brothers: familyOptions.brothers, sisters: familyOptions.sisters,
     })
     setCreatedByLabel(createdByList.find(o => o.key === info.createdBy)?.label)
+    setHomeTownVisible(await isHomeTownMotherTongue(info.motherTongue ?? ''))
     setLoading(false)
   }, [])
 
@@ -263,6 +413,17 @@ export default function EditProfileScreen({ navigation }: Props) {
 
   function openPreview() {
     navigation.navigate('viewProfile', { matriId: ownId, fromPage: 'menu' })
+  }
+
+  // Angular's edit-profile.page.html pattern for the seven one-time-editable
+  // fields: `(xEditEnable) ? goToEditScreen(n) : showDisableToast('x')`. The
+  // row stays tappable either way — the lock only changes what the tap does,
+  // so the member gets told why instead of finding a dead row.
+  function restrictedNav(editable: boolean, route: string) {
+    return () => {
+      if (editable) navigation.navigate(route)
+      else setFieldRestrictedVisible(true)
+    }
   }
 
   if (isDesktop) {
@@ -309,9 +470,11 @@ export default function EditProfileScreen({ navigation }: Props) {
         <View style={s.photoHeaderRow}>
           <Text style={s.sectionTitle}>{t('EDITPROFILE.PHOTOS')}</Text>
           <Pressable
+            style={s.photoPrivacyBtn}
             onPress={() => (photos.length > 0 ? setPhotoPrivacyVisible(true) : openGalleryPicker())}
             hitSlop={8}
           >
+            <CdnSvg uri={ICON_PRIVACY} width={PRIVACY_ICON_SIZE} height={PRIVACY_ICON_SIZE} />
             <Text style={s.photoPrivacyLink}>{t('EDITPROFILE.PHOTO_PRIVACY')}</Text>
           </Pressable>
         </View>
@@ -320,11 +483,11 @@ export default function EditProfileScreen({ navigation }: Props) {
             Angular's 6-slot photo grid), not a horizontal scroll of equal
             tiles. Main tile spans 2x2 of the small-tile grid; every empty
             slot (not just the last one) is its own add-photo trigger. */}
-        <View style={s.photoGrid}>
+        <View style={[s.photoGrid, { width: mosaic.size, height: mosaic.size }]}>
           {Array.from({ length: PHOTO_GRID_SLOTS }, (_, i) => {
             const photo = photos[i]
-            const pos = photoSlotPosition(i)
-            const size = i === 0 ? MOSAIC_MAIN : MOSAIC_TILE
+            const pos = photoSlotPosition(i, mosaic)
+            const size = i === 0 ? mosaic.main : mosaic.tile
             if (photo && !failedPhotos.has(i)) {
               return (
                 <Pressable key={i} style={[s.photoTile, i === 0 && s.photoTileMain, pos, { width: size, height: size }]} onPress={() => setViewerIndex(i)}>
@@ -364,13 +527,12 @@ export default function EditProfileScreen({ navigation }: Props) {
         <Section title={t('EDITPROFILE.BASIC_DETAILS')}>
           <FieldRow label={t('EDITPROFILE.JODIIID')} value={ownId} onPress={() => {}} hideArrow showDivider />
           <FieldRow label={t('EDITPROFILE.CREATEDFOR')} value={createdByLabel} onPress={() => {}} hideArrow showDivider />
-          <FieldRow label={t('EDITPROFILE.NAME')} value={profile.name} onPress={() => navigation.navigate('EditProfileBasic')} showDivider />
-          <FieldRow label={t('EDITPROFILE.AGE')} value={profile.age ? `${profile.age} years old` : undefined} onPress={() => navigation.navigate('EditProfileAgeHeight')} showDivider />
-          <FieldRow label={t('EDITPROFILE.HEIGHT')} value={heightLabel} onPress={() => navigation.navigate('EditProfileAgeHeight')} showDivider />
+          <FieldRow label={t('EDITPROFILE.NAME')} value={profile.name} onPress={restrictedNav(profile.nameEditable, 'EditProfileBasic')} icon={R_ICON.name} showDivider />
+          <FieldRow label={t('EDITPROFILE.AGE')} value={profile.age ? `${profile.age} years old` : undefined} onPress={restrictedNav(profile.ageEditable, 'EditProfileAgeHeight')} icon={R_ICON.age} showDivider />
+          <FieldRow label={t('EDITPROFILE.HEIGHT')} value={heightLabel} onPress={() => navigation.navigate('EditProfileAgeHeight')} icon={R_ICON.height} showDivider />
           <FieldRow
             label={t('EDITPROFILE.MARITALSTATUS')}
             value={labelFor(labels.maritalStatus ?? [], profile.maritalStatus)}
-            missingText={t('EDITPROFILE.ADD_DETAILS_TXT')}
             onPress={() => navigation.navigate('EditProfileMarital')}
             showDivider
           />
@@ -378,7 +540,6 @@ export default function EditProfileScreen({ navigation }: Props) {
             <FieldRow
               label={t('EDITPROFILE.CHILDREN')}
               value={labelFor(CHILDREN_OPTIONS, profile.noOfChildren)}
-              missingText={t('EDITPROFILE.ADD_DETAILS_TXT')}
               onPress={() => navigation.navigate('EditProfileMarital')}
               showDivider
             />
@@ -386,31 +547,33 @@ export default function EditProfileScreen({ navigation }: Props) {
           <FieldRow
             label={t('EDITPROFILE.PHYSICALSTATUS')}
             value={labelFor(labels.physicalStatus ?? [], profile.physicalStatus)}
-            missingText={t('EDITPROFILE.ADD_DETAILS_TXT')}
             onPress={() => navigation.navigate('EditProfileMarital')}
             showDivider
           />
-          <FieldRow label={t('EDITPROFILE.MOTHERTONGUE')} value={labelFor(labels.motherTongue ?? [], profile.motherTongue)} onPress={() => navigation.navigate('EditProfileBasic')} showDivider />
-          <FieldRow label={t('EDITPROFILE.CURRENT_LOCATION')} value={cityLabel} onPress={() => navigation.navigate('EditProfileBasic')} showDivider />
-          <FieldRow label={t('EDITPROFILE.NATIVE_PLACE')} value={homeCityLabel} onPress={() => navigation.navigate('EditProfileBasic')} showDivider />
+          <FieldRow label={t('EDITPROFILE.MOTHERTONGUE')} value={labelFor(labels.motherTongue ?? [], profile.motherTongue)} onPress={restrictedNav(profile.motherTongueEditable, 'EditProfileBasic')} icon={R_ICON.motherTongue} showDivider />
+          <FieldRow label={t('EDITPROFILE.CURRENT_LOCATION')} value={cityLabel} onPress={() => navigation.navigate('EditProfileBasic')} icon={R_ICON.location} showDivider />
+          {homeTownVisible && (
+            <FieldRow label={t('EDITPROFILE.NATIVE_PLACE')} value={homeCityLabel} onPress={() => navigation.navigate('EditProfileBasic')} icon={R_ICON.hometown} showDivider />
+          )}
           <FieldRow label={t('EDITPROFILE.MOBILENO')} value={profile.mobileNo} onPress={() => {}} hideArrow />
         </Section>
 
         {/* ── Professional details ── */}
         <Section title="Professional details">
-          <FieldRow label={t('EDITPROFILE.EDUCATION')} value={labelFor(labels.education ?? [], profile.education)} onPress={() => navigation.navigate('EditProfileProfessional')} showDivider />
-          <FieldRow label={t('EDITPROFILE.OCCUPATION')} value={labelFor(labels.occupation ?? [], profile.occupation)} onPress={() => navigation.navigate('EditProfileProfessional')} showDivider />
-          <FieldRow label={t('EDITPROFILE.INCOME')} value={labelFor(labels.income ?? [], profile.income) ?? profile.income} onPress={() => navigation.navigate('EditProfileProfessional')} />
+          <FieldRow label={t('EDITPROFILE.EDUCATION')} value={labelFor(labels.education ?? [], profile.education)} onPress={() => navigation.navigate('EditProfileProfessional')} icon={R_ICON.education} showDivider />
+          <FieldRow label={t('EDITPROFILE.OCCUPATION')} value={labelFor(labels.occupation ?? [], profile.occupation)} onPress={() => navigation.navigate('EditProfileProfessional')} icon={R_ICON.occupation} showDivider />
+          <FieldRow label={t('EDITPROFILE.INCOME')} value={labelFor(labels.income ?? [], profile.income) ?? profile.income} onPress={restrictedNav(profile.incomeEditable, 'EditProfileProfessional')} icon={R_ICON.income} />
         </Section>
 
         {/* ── Religious details ── */}
         <Section title={t('EDITPROFILE.RELIGIOUSDETAIL')}>
-          <FieldRow label={t('EDITPROFILE.RELIGION')} value={labelFor(labels.religion ?? [], profile.religion)} onPress={() => navigation.navigate('EditProfileReligious')} showDivider />
-          <FieldRow label={t('EDITPROFILE.CASTESUB')} value={labelFor(labels.caste ?? [], profile.caste)} onPress={() => navigation.navigate('EditProfileReligious')} showDivider />
+          <FieldRow label={t('EDITPROFILE.RELIGION')} value={labelFor(labels.religion ?? [], profile.religion)} onPress={restrictedNav(profile.religionEditable, 'EditProfileReligious')} icon={R_ICON.religion} showDivider />
+          <FieldRow label={t('EDITPROFILE.CASTESUB')} value={labelFor(labels.caste ?? [], profile.caste)} onPress={restrictedNav(profile.casteEditable, 'EditProfileReligious')} icon={R_ICON.caste} showDivider />
           <FieldRow
             label={t('EDITPROFILE.RAASI')}
             value={labelFor(labels.raasi ?? [], profile.raasi)}
             missingText={t('EDITPROFILE.ADDYOURRAASI')}
+            icon={R_ICON.raasi}
             onPress={() => navigation.navigate('EditProfileReligious')}
             showDivider
           />
@@ -418,6 +581,7 @@ export default function EditProfileScreen({ navigation }: Props) {
             label={t('EDITPROFILE.STAR')}
             value={labelFor(labels.star ?? [], profile.star)}
             missingText={t('EDITPROFILE.ADDYOURSTAR')}
+            icon={R_ICON.star}
             onPress={() => navigation.navigate('EditProfileReligious')}
             showDivider
           />
@@ -425,6 +589,7 @@ export default function EditProfileScreen({ navigation }: Props) {
             label={t('EDITPROFILE.DOSHAM')}
             value={profile.dosham === '1' ? 'Yes' : profile.dosham === '2' ? 'No' : undefined}
             missingText={t('EDITPROFILE.ADDYOURDOSHAM')}
+            icon={R_ICON.dosham}
             onPress={() => navigation.navigate('EditProfileReligious')}
             showDivider
           />
@@ -433,7 +598,7 @@ export default function EditProfileScreen({ navigation }: Props) {
             value={profile.horoscopeAvailable
               ? `${t('EDITPROFILE.ADDEDON')}${profile.horoInfo?.birthDay ? ` ${profile.horoInfo.birthDay}` : ''}`
               : undefined}
-            missingText={t('EDITPROFILE.ADDYOURHORO')}
+            icon={R_ICON.horoscope}
             onPress={() => !profile.horoscopeAvailable && navigation.navigate('EditProfileHoroscope')}
             hideArrow={!!profile.horoscopeAvailable}
           />
@@ -441,9 +606,9 @@ export default function EditProfileScreen({ navigation }: Props) {
 
         {/* ── Life style details ── */}
         <Section title="Life style details">
-          <FieldRow label={t('EDITPROFILE.DRINKING')} value={labelFor(labels.drinkingHabit ?? [], profile.drinkingHabits)} onPress={() => navigation.navigate('EditProfileLifestyle')} showDivider />
-          <FieldRow label="Smoking habits" value={labelFor(labels.smokingHabit ?? [], profile.smokingHabits)} onPress={() => navigation.navigate('EditProfileLifestyle')} showDivider />
-          <FieldRow label={t('EDITPROFILE.EATING')} value={labelFor(labels.eatingHabit ?? [], profile.eatingHabits)} onPress={() => navigation.navigate('EditProfileLifestyle')} />
+          <FieldRow label={t('EDITPROFILE.DRINKING')} value={labelFor(labels.drinkingHabit ?? [], profile.drinkingHabits)} onPress={() => navigation.navigate('EditProfileLifestyle')} icon={R_ICON.drinking} showDivider />
+          <FieldRow label="Smoking habits" value={labelFor(labels.smokingHabit ?? [], profile.smokingHabits)} onPress={() => navigation.navigate('EditProfileLifestyle')} icon={R_ICON.smoking} showDivider />
+          <FieldRow label={t('EDITPROFILE.EATING')} value={labelFor(labels.eatingHabit ?? [], profile.eatingHabits)} onPress={() => navigation.navigate('EditProfileLifestyle')} icon={R_ICON.eating} />
         </Section>
 
         {/* ── Family details ── */}
@@ -452,18 +617,20 @@ export default function EditProfileScreen({ navigation }: Props) {
             label={t('EDITPROFILE.BROTHERS')}
             value={labelFor(labels.brothers ?? [], profile.brothers)}
             onPress={() => navigation.navigate('EditProfileFamily')}
+            icon={R_ICON.brothers}
             showDivider
           />
           <FieldRow
             label={t('EDITPROFILE.SISTERS')}
             value={labelFor(labels.sisters ?? [], profile.sisters)}
             onPress={() => navigation.navigate('EditProfileFamily')}
+            icon={R_ICON.sisters}
           />
         </Section>
 
         {/* ── Property details ── */}
         <Section title="Property details">
-          <FieldRow label="Properties owned" value={propertiesLabel} onPress={() => navigation.navigate('EditProfileProperty')} />
+          <FieldRow label="Properties owned" value={propertiesLabel} onPress={() => navigation.navigate('EditProfileProperty')} icon={R_ICON.properties} />
         </Section>
 
       </ScrollView>
@@ -477,6 +644,11 @@ export default function EditProfileScreen({ navigation }: Props) {
       <PhotoPrivacySheet
         visible={photoPrivacyVisible}
         onClose={() => setPhotoPrivacyVisible(false)}
+      />
+
+      <FieldRestrictedSheet
+        visible={fieldRestrictedVisible}
+        onClose={() => setFieldRestrictedVisible(false)}
       />
 
       {/* Photo picker — embedded directly (no navigation to the onboarding
@@ -533,18 +705,19 @@ const s = StyleSheet.create({
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
   headerTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
 
-  scrollContent: { paddingHorizontal: 24, paddingTop: 24 },
+  scrollContent: { paddingHorizontal: CONTENT_PAD, paddingTop: 24 },
 
   photoHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  // Figma: icon + label on one centred row, 4px apart. Only the label is
+  // underlined — the icon must stay outside the <Text> or the underline runs
+  // beneath it too.
+  photoPrivacyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   photoPrivacyLink: { fontSize: 14, color: Colors.link, textDecorationLine: 'underline' },
 
-  // Fixed-size mosaic — width/height match the 3-col/3-row tile grid exactly
-  // (3 tiles + 2 gaps = 310), so absolutely-positioned children line up.
-  photoGrid: {
-    marginTop: 16,
-    width: MOSAIC_MAIN + MOSAIC_GAP + MOSAIC_TILE,
-    height: MOSAIC_MAIN + MOSAIC_GAP + MOSAIC_TILE,
-  },
+  // Square mosaic; its edge is supplied per-render from mosaicMetrics() so the
+  // 3 tiles + 2 gaps land flush with the rows and section titles below at any
+  // viewport width. Children are absolutely positioned within it.
+  photoGrid: { marginTop: 24 },
   photoTile: {
     position: 'absolute', borderRadius: 8, overflow: 'hidden', backgroundColor: Colors.surfaceDim,
   },
@@ -552,11 +725,18 @@ const s = StyleSheet.create({
   // small tiles are plain rounded photos.
   photoTileMain: { borderWidth: 2, borderColor: Colors.primaryDark },
   photoTileImg: { width: '100%', height: '100%' },
+  // Figma: 22px tall, pinned to the main tile's bottom-left corner. Width is
+  // left content-driven rather than Figma's fixed 100 — the label is localised,
+  // and a hard width would clip it in the longer languages.
   mainPhotoBadge: {
-    position: 'absolute', left: 0, bottom: 0, backgroundColor: Colors.primaryDark,
-    paddingHorizontal: 8, paddingVertical: 4, borderTopRightRadius: 16, borderBottomLeftRadius: 8,
+    position: 'absolute', left: 0, bottom: 0, height: 22, justifyContent: 'center',
+    backgroundColor: Colors.primaryDark,
+    paddingHorizontal: 8, borderTopRightRadius: 16, borderBottomLeftRadius: 8,
   },
-  mainPhotoBadgeText: { fontSize: 12, fontWeight: '500', color: Colors.white, textTransform: 'capitalize' },
+  mainPhotoBadgeText: {
+    fontSize: 12, lineHeight: 14, letterSpacing: 0.12,
+    fontWeight: '500', color: Colors.white, textTransform: 'capitalize',
+  },
 
   photoAddSlot: {
     position: 'absolute', borderRadius: 8, borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.borderSubtle,
@@ -565,8 +745,18 @@ const s = StyleSheet.create({
 
   photoHint: { fontSize: 12, color: '#585858', marginTop: 8 },
 
-  section: { marginTop: 24 },
-  sectionTitle: { fontSize: 20, fontWeight: '600', color: Colors.black },
+  // 44, not 24 — derived from the design's own absolute offsets: every section
+  // in the frame starts 44px after the previous one's last row ends (Basic 554,
+  // Professional 1082, Religious 1370, Life style 1898, Family 2186, Property
+  // 2394 all reconcile at 44). 24 was cramming the sections together.
+  section: { marginTop: 44 },
+  // Figma: h-[20px] block, then a 24px gap before the first row. lineHeight is
+  // the design's block height rather than its leading-16 — 16 on a 20px face
+  // clips descenders on Android, and 20 is what the layout maths uses anyway.
+  sectionTitle: { fontSize: 20, lineHeight: 20, fontWeight: '600', color: Colors.black, marginBottom: 24 },
+  // Cancels the first row's top padding and the last row's bottom padding —
+  // see the Section() comment.
+  sectionRows: { marginTop: -20, marginBottom: -20 },
 
   footer: {
     paddingHorizontal: 24, paddingTop: 12, backgroundColor: Colors.white,
@@ -577,17 +767,29 @@ const s = StyleSheet.create({
 })
 
 const r = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 20 },
+  // items-start, not center: in Figma the icon and the chevron both sit level
+  // with the LABEL line, not centred against the label+value pair. Centring
+  // pushed both of them ~4px down on every row in the screen.
+  row: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingVertical: 20 },
   rowPressed: { opacity: 0.6 },
+  // Fixed-size slot, rendered even when the row has no icon — an absent icon
+  // must not pull its label leftward out of line with the rest of the section.
+  rowIcon: { width: ROW_ICON, height: ROW_ICON, alignItems: 'center', justifyContent: 'center' },
+  // flex:1 resolves to Figma's fixed 248 text column: 312 content - 24 icon
+  // - 12 gap - 12 gap - 16 chevron = 248.
   rowText: { flex: 1, gap: 8 },
-  rowLabel: { fontSize: 14, color: Colors.black },
-  rowValue: { fontSize: 14, fontWeight: '500', color: Colors.black },
-  rowDivider: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(204,204,204,0.5)' },
+  // lineHeight 16 on both lines is what makes a row 40px of content (16+8+16)
+  // and therefore 80px overall — the figure the design's own offsets rely on.
+  rowLabel: { fontSize: 14, lineHeight: 16, color: Colors.black },
+  rowValue: { fontSize: 14, lineHeight: 16, fontWeight: '500', color: Colors.black },
+  // Figma draws a 1px rule; hairlineWidth renders 0.33-0.5px on most devices,
+  // which read as a washed-out gap rather than a divider.
+  rowDivider: { height: 1, backgroundColor: 'rgba(204,204,204,0.5)' },
 
-  missingRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  missingBang: {
-    width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.primaryDark, color: Colors.white,
-    fontSize: 11, fontWeight: '700', textAlign: 'center', lineHeight: 16, overflow: 'hidden',
-  },
-  missingText: { fontSize: 14, color: Colors.link },
+  // Figma's "Link CTA" component. alignSelf: 'flex-start' so the row hugs its
+  // text — without it the chevron is pushed out to the far right of the flexed
+  // text column instead of sitting directly after the label. Height matches a
+  // value line (16) so a missing row is exactly as tall as a filled one.
+  missingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
+  missingText: { fontSize: 14, lineHeight: 16, color: Colors.link },
 })

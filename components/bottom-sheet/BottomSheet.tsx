@@ -84,6 +84,11 @@ export interface BottomSheetProps {
   // slide-animation/close-button shell.
   children?: React.ReactNode | undefined
   showClose?: boolean | undefined  // only used with `children`; `data.showClose` is used otherwise
+  // Angular's modalCtrl.create({ backdropDismiss }) — a few popups (e.g. the
+  // edit-profile "field cannot be changed" one) are opened with it false, so a
+  // tap on the scrim must not dismiss them. Defaults to true, matching every
+  // other sheet in this app.
+  dismissOnBackdrop?: boolean | undefined
   style?: StyleProp<ViewStyle> | undefined
   onClose?: (() => void) | undefined
   onPrimaryPress?: (() => void) | undefined
@@ -102,6 +107,7 @@ export default function BottomSheet({
   data,
   children,
   showClose: showCloseProp,
+  dismissOnBackdrop = true,
   style,
   onClose,
   onPrimaryPress,
@@ -315,7 +321,7 @@ export default function BottomSheet({
         // the card and closes on background taps; the inner no-op Pressable
         // claims any tap landing on the card itself (including blank padding),
         // so it never bubbles up to the outer one.
-        <Pressable style={styles.desktopOverlay} onPress={onClose}>
+        <Pressable style={styles.desktopOverlay} onPress={dismissOnBackdrop ? onClose : undefined}>
           <Pressable onPress={() => {}}>
             <Animated.View
               style={[
@@ -330,8 +336,8 @@ export default function BottomSheet({
         </Pressable>
       ) : (
         <>
-          {/* Full-screen tap area to close */}
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+          {/* Full-screen tap area to close (skipped when backdrop dismissal is off) */}
+          {dismissOnBackdrop && <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />}
 
           {/* Sheet — rendered after Pressable so it sits on top and captures its own touches */}
           <Animated.View

@@ -31,6 +31,7 @@ import {
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import SelectField from '../../components/input/SelectField'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
+import FieldRestrictedSheet from '../../components/edit-profile/FieldRestrictedSheet'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
@@ -43,6 +44,7 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
 
   const [loading, setLoading]       = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [restrictedVisible, setRestrictedVisible] = useState(false)
   const [motherTongue, setMotherTongue] = useState('')
 
   const [religion, setReligion]         = useState<PickerOption | null>(null)
@@ -244,8 +246,10 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
     navigation.goBack()
   }
 
+  // Angular: showDisableToast() -> restrictPopup(), i.e. lowerpopup.component's
+  // `action == 'editFieldRestrict'` popup — not a native OS alert.
   function showRestricted() {
-    Alert.alert(t('EDITPROFILE.RESTRICT_FIELD'), t('EDITPROFILE.RESTRICT_SUPPORT'))
+    setRestrictedVisible(true)
   }
 
   if (loading) {
@@ -356,6 +360,7 @@ export default function ReligiousDetailsScreen({ navigation }: Props) {
         onSelect={opt => { setDoshamType(opt); setActivePicker(null) }}
         onClose={() => setActivePicker(null)}
       />
+      <FieldRestrictedSheet visible={restrictedVisible} onClose={() => setRestrictedVisible(false)} />
     </View>
   )
 }

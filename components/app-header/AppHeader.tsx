@@ -7,7 +7,7 @@ import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
 import Badge from '../badge/Badge'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import { getOwnGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
+import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
@@ -117,12 +117,28 @@ export default function AppHeader({
   // Angular: header.component.ts's common.getAvatarImg() (called with no args,
   // i.e. isOppositeProfile=false) — the logged-in user's OWN avatar placeholder
   // uses their OWN gender, unlike a profile card's opposite-gender placeholder.
-  const [ownAvatarFallback, setOwnAvatarFallback] = useState(FEMALE_AVATAR_URL)
+  //
+  // Seeded empty, NOT with FEMALE_AVATAR_URL: login gender comes from async
+  // storage, so a hardcoded seed showed every male user a female silhouette for
+  // the first frames of every Home load. An empty avatar slot for one tick
+  // beats rendering the wrong gender. Same guard MenuScreen/HomeSidebar use.
+  const [ownAvatarFallback, setOwnAvatarFallback] = useState('')
+  // A cached PHOTO_URL can outlive the photo itself (deleted server-side, CDN
+  // miss). Without this the header rendered a blank box instead of falling
+  // back, which looks identical to "no avatar at all".
+  const [photoFailed, setPhotoFailed] = useState(false)
+
   useEffect(() => {
     let cancelled = false
     getOwnGenderAvatarUrl().then(url => { if (!cancelled) setOwnAvatarFallback(url) })
     return () => { cancelled = true }
   }, [])
+
+  // Reset the failure latch when a new photo actually arrives, so a re-upload
+  // isn't permanently stuck on the placeholder for the life of the mount.
+  useEffect(() => { setPhotoFailed(false) }, [userImg])
+
+  const avatarUri = (userImg && !photoFailed) ? userImg : ownAvatarFallback
 
   // ── header1: home screen header (Figma node 15859:14389 top area) ───────────
   // Row 1 (app bar): hamburger | [flex] | language selector | toolbar icons
@@ -187,12 +203,20 @@ export default function AppHeader({
               guaranteed SVG like the fallback placeholder is, so this needs
               CdnImage's format detection, not a hardcoded CdnSvg. */}
           <Pressable style={styles.h1AvatarWrap} onPress={onAvatarPress}>
-            <CdnImage
-              uri={userImg ?? ownAvatarFallback}
-              width={48}
-              height={48}
-              style={styles.h1AvatarRadius}
-            />
+            {!!avatarUri && (
+              <CdnImage
+                uri={avatarUri}
+                width={48}
+                height={48}
+                style={styles.h1AvatarRadius}
+                // cover, not CdnImage's 'contain' default — a portrait photo
+                // letterboxed inside the 48px circle instead of filling it.
+                // Only affects the raster path; an SVG placeholder routes to
+                // CdnSvg, which sizes itself.
+                resizeMode="cover"
+                onError={() => setPhotoFailed(true)}
+              />
+            )}
           </Pressable>
 
           <Pressable style={styles.h1NameBlock} onPress={onEditProfilePress}>
