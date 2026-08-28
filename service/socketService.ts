@@ -69,8 +69,8 @@ async function _loadCache(): Promise<void> {
 // BEFORE the RESPMYCHAT push; ours was a bare "42[...]" and RESPMYCHAT never
 // arrived. The server's handler likely only completes/broadcasts once it has
 // somewhere to send that ack — every emit below now requests one, like Angular.
-function _ack(label: string) {
-  return (response: any) => console.log(`[socket] ack <- ${label}`, response)
+function _ack(_label: string) {
+  return () => {}
 }
 
 function _chatLoginEmit(): void {
@@ -113,7 +113,6 @@ function _messageTypeCaption(messageType: string): string {
 // itself (not left to whichever screen happens to be listening) so it always
 // fires, matching Angular's own placement in the service rather than a page.
 function _handleReceiverMessage(msg: any): void {
-  console.log('[socket] RESPRECEIVER — marking delivered + local notification for', msg?.SenderId)
   emitMessageStatus(msg.ReceiverId, msg.SenderId, msg.msgTime, msg.UTime, 2)
 
   const title = i18n.t('MESSAGES.NEW_MESSAGE').replace('#NAME#', msg?.Name ?? '')
@@ -138,7 +137,6 @@ let _loginWaiters: (() => void)[] = []
 // on). This re-runs on every 'connect', including an automatic reconnect after
 // a drop — the server has no memory of who this socket was before that.
 export async function socketConnection(notifyBaseUrl: string): Promise<void> {
-  console.log('[socket] socketConnection() called — connected:', _socket?.connected ?? false, 'loginEmitted:', _loginEmitted)
   if (_socket?.connected && _loginEmitted) return
   if (_connectPromise) return _connectPromise
 
@@ -169,15 +167,6 @@ async function _openConnection(notifyBaseUrl: string): Promise<void> {
     // still race an unattached listener.
     _flushPendingListeners()
 
-    // Debug: logs every event sent and every event the server sends back, so a
-    // silent/broken connection is visible in the console instead of just
-    // "nothing happened".
-    _socket.onAny((event, ...args) => {
-      console.log('[socket] <-', event, ...args)
-    })
-    _socket.onAnyOutgoing((event, ...args) => {
-      console.log('[socket] ->', event, ...args)
-    })
     _socket.on('RESPRECEIVER', (data: any) => {
       const msg = data?.MSG?.[0]
       if (!msg) return
@@ -191,12 +180,10 @@ async function _openConnection(notifyBaseUrl: string): Promise<void> {
       }
     })
     _socket.on('connect', () => {
-      console.log('[socket] connected', _socket!.id)
       _socket!.emit('openconnect', { userid: _userId, gender: _gender, appType: 115 })
       // JODII-499-equivalent grace period — the socket is usually still mid-handshake
       // on the server side right here, emitting Login immediately can lose the race.
       setTimeout(() => {
-        console.log('[socket] emitting login sequence (Login/InAppLogin/Receiver)')
         _chatLoginEmit()
         _notifyLoginEmit()
         _receiverEmit()
@@ -206,12 +193,8 @@ async function _openConnection(notifyBaseUrl: string): Promise<void> {
         waiters.forEach(resolve => resolve())
       }, 100)
     })
-    _socket.on('disconnect', (reason) => {
-      console.log('[socket] disconnected', reason)
+    _socket.on('disconnect', () => {
       _loginEmitted = false
-    })
-    _socket.on('connect_error', (err) => {
-      console.log('[socket] connect_error', err?.message ?? err)
     })
   }
 
@@ -241,16 +224,7 @@ export function isConnected(): boolean {
 // ─── Chat emitters ────────────────────────────────────────────────────────────
 
 export function emitChatList(tabType = 1, start = 0, end = 20, countFlag = 0): void {
-  if (!_socket) {
-    console.log('[socket] emitChatList() called before any socket exists — dropped', { tabType, start, end, countFlag })
-    return
-  }
-  if (!_socket.connected) {
-    // Not dropped — socket.io-client buffers this and flushes it once connected —
-    // but worth flagging since it means the caller emitted before awaiting
-    // socketConnection(), or is mid-reconnect.
-    console.log('[socket] emitChatList() called while disconnected — will be sent once reconnected', { tabType, start, end, countFlag })
-  }
+  if (!_socket) return
   // membershiptype was missing here — Angular's emitChatList() always sends it,
   // and the server may be silently dropping requests without it.
   _socket.emit('MyChatList', { uId: _userId, membershiptype: _entryType, gender: _gender, tapType: tabType, appType: _appType, lang: _lang, sLimit: start, eLimit: end, count: countFlag }, _ack('MyChatList'))

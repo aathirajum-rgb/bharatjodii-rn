@@ -101,7 +101,6 @@ export async function uploadChatAttachment(attachment: PickedChatAttachment): Pr
   } as any)
 
   const result = await uploadFile(Endpoints.media.chatAudioUpdate, formData)
-  console.log('[chatMediaService] uploadChatAttachment raw response', result)
 
   const ok = result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1
   if (!ok || !result?.AUDIOPATH) return null

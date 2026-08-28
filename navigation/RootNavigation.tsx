@@ -23,7 +23,7 @@ import AuthStack from './AuthStack'
 function getLinkingPrefixes() {
   const appFlavor = Constants.expoConfig?.extra?.appFlavor ?? 'jodii'
   const domain    = (FLAVORS as Record<string, { domain: string }>)[appFlavor]?.domain ?? FLAVORS.jodii.domain
-  const base = [`https://${domain}`]
+  const base = [`https://${domain}/jodii`]
   try { base.unshift(Linking.createURL('/')) } catch {}
   return base
 }

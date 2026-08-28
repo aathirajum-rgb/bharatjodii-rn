@@ -126,9 +126,6 @@ async function displayPushNotification(payload: PushNotificationPayload): Promis
 // push is being diagnosed there. Remove (or re-add a __DEV__ gate) once push
 // is confirmed working end-to-end on that build.
 function showDebugToast(message: string): void {
-  // eslint-disable-next-line no-console -- deliberate: Toasts render on-screen
-  // only, nothing readable in logcat otherwise.
-  console.log(`[PushDebug] ${message}`)
   if (Platform.OS !== 'android') return
   ToastAndroid.show(message, ToastAndroid.LONG)
 }
@@ -172,7 +169,6 @@ async function pushRegisterId(token: string): Promise<void> {
 
   try {
     const result = await apiCall(Endpoints.auth.switchLanguage, 'POST', params)
-    console.log('[PushDebug] registerId raw response:', JSON.stringify(result))
     showDebugToast(
       `Push: registerId pushed (ERRCODE=${result?.ERRCODE}, RESPONSECODE=${result?.RESPONSECODE}, ` +
       `MSG=${result?.MESSAGE ?? result?.ERRORMESSAGE ?? result?.RESPONSE?.MESSAGE ?? 'n/a'})`,

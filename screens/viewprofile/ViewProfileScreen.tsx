@@ -8,15 +8,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, Dimensions, FlatList, Linking, Platform, Alert, NativeSyntheticEvent,
-  NativeScrollEvent, Pressable, ScrollView, StyleSheet, Text, View, Image as RNImage,
+  ActivityIndicator, Dimensions, FlatList, Linking, Platform, Alert,
+  Pressable, ScrollView, StyleSheet, Text, View, Image as RNImage,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { StatusBar } from 'expo-status-bar'
 import * as WebBrowser from 'expo-web-browser'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
-import { runOnJS } from 'react-native-reanimated'
+import Animated, {
+  Easing, runOnJS, useAnimatedRef, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue,
+  withTiming,
+} from 'react-native-reanimated'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { LANG_LABELS } from '../../components/matches-header/MatchesHeader'
@@ -42,7 +45,7 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import {
   getViewProfile, markProfileViewed, getSimilarProfiles, viewHoroscope, getStarMatch,
   getBioDataLink, getEnlargedPhotos, getBiodataExtras, saveBiodataThemeId,
-  _debugLastViewProfileResult, _consumeInvalidMatriIdMessage,
+  _consumeInvalidMatriIdMessage,
   type SimilarProfileCard, type StarMatchResult, type BiodataTheme,
 } from '../../service/viewProfileService'
 import { viewProfileAdapter } from '../../adapters/viewProfile.adapter'
@@ -70,6 +73,19 @@ import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interf
 // AttachmentPreviewModal.tsx), and visually the closer match to Angular's glyph
 // shape (a shaft + head, not a bare chevron) — used here instead.
 const BACK_ICON_URI = CDN_SVG + 'arrow-back-activity.svg'
+
+// Angular: button-revamp.component.html:15-17 — the "View details"/link-style
+// button's forward arrow isn't a CSS animation, it's a pre-baked animated GIF
+// served straight off the CDN (no local keyframes to reproduce).
+const LINK_ARROW_GIF_URI = CDN_SVG + 'revamp/animation/right-arrow-animation.gif'
+
+// Angular: viewprofile.page.html:77-79 — the scrolled header's 3-dot button
+// (dot3-revamp.svg), and button.component.html:86's report-profile-img.svg
+// shown beside the single "Report this Profile" row it opens.
+// Exported so ViewProfileDesktopLayout's own 3-dot menu renders the identical
+// icons rather than keeping a second copy of these CDN paths.
+export const MENU_DOTS_URI           = CDN_SVG + 'dot3-revamp.svg'
+export const REPORT_PROFILE_ICON_URI = CDN_SVG + 'viewprofile/report-profile-img.svg'
 
 // Feature 2 prev/next-PROFILE nav arrows (below the photo, distinct from the
 // photo-swiper's own dots/gesture). Angular: viewprofile.page.html:1546-1563,
@@ -133,6 +149,14 @@ const SCREEN_HEIGHT = Dimensions.get('window').height
 // (headerBackBtn, 42px), paddingBottom 10 — mirrors that math so the fixed-position
 // prev/next-profile arrows below line up flush with the photo's bottom edge.
 const HEADER_FIXED_HEIGHT = 8 + 42 + 10
+
+// Floating top-CTA's own rendered height (Don't-show/View-later row 44 + 12 gap
+// + Like row 44, plus floatingCtaBar's own paddingTop:12) — used so the
+// visibility hand-off (floatingCtaAnimStyle) requires the real CTA to have
+// cleared the floating bar's own footprint, not just touched the bottom edge
+// (which would hide the floating bar while the real one is still covered by
+// it/below the fold — a gap with no CTA visible at all).
+const FLOATING_CTA_HEIGHT = 12 + 44 + 12 + 44
 
 // Feature 6 biodata theming — Angular: download-biodata.component.html:74-75's
 // negative-margin-top-*-biodata classes. Each template's photo/details card
@@ -225,46 +249,60 @@ export function SimilarProfileCardItem({
 }) {
   return (
     <Pressable style={[s.similarCard, size ? { width: size, height: size } : null]} onPress={onPress}>
-      {card.isPhotoAvailable && card.photoUri ? (
-        <>
-          <Image source={{ uri: card.photoUri }} style={s.similarCardImg} contentFit="cover" />
-          {/* Angular: app-profile-card caption — name, age, education over a bottom
-              gradient scrim, shown only for cards that actually have a photo
-              (confirmed against screenshot — no-photo/WhatsApp-request cards carry
-              no caption at all). */}
-          {!!card.name && (
-            <View style={s.similarCardCaption} pointerEvents="none">
-              <Text style={s.similarCardName} numberOfLines={1}>{card.name}</Text>
-              {(card.age || card.education) && (
-                <Text style={s.similarCardMeta} numberOfLines={1}>
-                  {[card.age && `${card.age} years`, card.education].filter(Boolean).join(', ')}
+      <View style={s.similarCardClip}>
+        {card.isPhotoAvailable && card.photoUri ? (
+          <>
+            <Image source={{ uri: card.photoUri }} style={s.similarCardImg} contentFit="cover" />
+            {/* Angular: app-profile-card caption — name, age, education over a bottom
+                gradient scrim, shown only for cards that actually have a photo
+                (confirmed against screenshot — no-photo/WhatsApp-request cards carry
+                no caption at all). */}
+            {!!card.name && (
+              <LinearGradient
+                colors={['rgba(0,0,0,0)', 'rgba(0,0,0,1)']}
+                style={s.similarCardCaption}
+                pointerEvents="none"
+              >
+                <Text style={s.similarCardName} numberOfLines={1}>{card.name}</Text>
+                {(card.age || card.education) && (
+                  <Text style={s.similarCardMeta} numberOfLines={2}>
+                    {[card.age && `${card.age} Yrs`, card.education].filter(Boolean).join(', ')}
+                  </Text>
+                )}
+              </LinearGradient>
+            )}
+          </>
+        ) : (
+          <>
+            <CdnSvg uri={getBlurPhotoUri(oppGender)} width="100%" height="100%" />
+            {/* Angular: app-photo-request — .request-photo-now-vp is a transparent,
+                full-bleed, flex-centered wrapper; the actual visible badge is the
+                SMALLER, inset .request-photo-vp nested inside it
+                (photo-request.component.scss:1-16). Porting the dark background onto
+                the full-bleed wrapper (as this did before) made the overlay cover the
+                whole card edge-to-edge instead of a compact centered badge. */}
+            <View style={s.similarCardOverlay}>
+              <View style={s.similarCardOverlayBadge}>
+                <Text style={s.similarCardOverlayText}>
+                  {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
                 </Text>
-              )}
+                {/* Angular: --ion-color-whatsapp-bg = linear-gradient(180deg, #4AC14B 0%,
+                    #06853A 100%) (theme/variables.scss:63, button-revamp.component.scss:264) —
+                    a gradient, not the flat WhatsApp-brand green (#25D366) this used before. */}
+                <LinearGradient
+                  colors={['#4AC14B', '#06853A']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 0, y: 1 }}
+                  style={s.similarCardWaBtn}
+                >
+                  <WhatsAppIcon width={16} height={16} />
+                  <Text style={s.similarCardWaBtnText}>{t('GENERAL.WHATSAPP')}</Text>
+                </LinearGradient>
+              </View>
             </View>
-          )}
-        </>
-      ) : (
-        <>
-          <CdnSvg uri={getBlurPhotoUri(oppGender)} width="100%" height="100%" />
-          <View style={s.similarCardOverlay}>
-            <Text style={s.similarCardOverlayText}>
-              {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
-            </Text>
-            {/* Angular: --ion-color-whatsapp-bg = linear-gradient(180deg, #4AC14B 0%,
-                #06853A 100%) (theme/variables.scss:63, button-revamp.component.scss:264) —
-                a gradient, not the flat WhatsApp-brand green (#25D366) this used before. */}
-            <LinearGradient
-              colors={['#4AC14B', '#06853A']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 0, y: 1 }}
-              style={s.similarCardWaBtn}
-            >
-              <WhatsAppIcon width={16} height={16} />
-              <Text style={s.similarCardWaBtnText}>{t('GENERAL.WHATSAPP')}</Text>
-            </LinearGradient>
-          </View>
-        </>
-      )}
+          </>
+        )}
+      </View>
     </Pressable>
   )
 }
@@ -426,19 +464,112 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   const [loginHoroAvail, setLoginHoroAvail] = useState('0')
   // Angular: showAddHoro — see the load effect's comment for what this gates.
   const [showAddHoro, setShowAddHoro] = useState(true)
+  // Moved above floatingCtaAnimStyle (which closes over it inside a worklet) —
+  // a worklet re-evaluates its captured closure at call time, so declaring
+  // insets AFTER this point threw "Cannot access 'insets' before initialization"
+  // on first render.
+  const insets = useSafeAreaInsets()
+  // Angular: prev/next-profile navigation is a full Ionic page transition
+  // (app/animations/page-transition.ts:40-71) — 400ms, cubic-bezier(0.4,0,0.2,1).
+  // Confirmed against Ionic's actual mechanics (not just the animation curve):
+  // navigateForward() mounts the INCOMING page and starts BOTH pages sliding
+  // simultaneously in one continuous motion — entering translateX 100%→0,
+  // leaving 0→-100% (or the mirror for 'back') — the incoming page is NOT
+  // pre-loaded/pre-rendered first; it slides in showing its own loading state
+  // if data isn't ready yet (viewprofile.page.html:128,1513 — content grid
+  // stays [hidden] until contentLoaded, a spinner shows in its place), and
+  // both page elements stay mounted for the full 400ms (only the old one is
+  // torn down afterward). 'forward' (next): new page in from the RIGHT, old
+  // out to the LEFT. 'back' (prev): new page in from the LEFT, old out to the
+  // RIGHT.
+  //
+  // RN has one component instance, not two mounted pages, so the earlier
+  // "slide fully out, THEN swap, THEN slide in" attempt was two sequential
+  // animations with a dead gap in between — visibly not smooth, and the swap
+  // itself raced React's re-render (stale content flash). The correct
+  // single-instance approximation of Ionic's actual behavior above is: swap
+  // matriId IMMEDIATELY (same as the incoming page mounting immediately,
+  // before its data is ready), snap position to the incoming edge in that same
+  // tick, then run ONE continuous slide from that edge to 0 — matching "swap
+  // happens immediately, animation is what's gradual," not "animation
+  // finishes, then swap."
+  const screenSlideX = useSharedValue(0)
+  const PAGE_TRANSITION_DURATION = 400
+  const pageTransitionEasing = Easing.bezier(0.4, 0, 0.2, 1)
+  const screenSlideStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: screenSlideX.value }],
+  }))
+  function animateProfileChange(direction: 'prev' | 'next', nextId: string) {
+    const outTo = direction === 'next' ? -SCREEN_WIDTH : SCREEN_WIDTH
+    screenSlideX.value = outTo
+    setMatriId(nextId)
+    screenSlideX.value = withTiming(0, { duration: PAGE_TRANSITION_DURATION, easing: pageTransitionEasing })
+  }
   // Angular: the top CTA row is `position: sticky; bottom: 0` (viewprofile.page.scss
   // .sticky-btm) — it rides along pinned to the screen bottom for as long as the
   // detail sections keep scrolling past underneath it, and only stops once the
   // SECOND (plain, non-sticky) CTA copy — right before Similar Profiles — reaches
-  // that same on-screen position naturally. RN has no bottom-sticky-until-displaced
-  // primitive, so this approximates it: render the top CTA as a floating bottom
-  // overlay until scroll reaches the second CTA's own measured position, then hide
-  // the overlay so the second (inline, already-visible) CTA takes over seamlessly.
-  const [scrollY, setScrollY] = useState(0)
-  const [viewportHeight, setViewportHeight] = useState(0)
-  const [cta2Y, setCta2Y] = useState<number | null>(null)
-  const [similarIndex, setSimilarIndex] = useState(0)
+  // that same on-screen position naturally. That hand-off is entirely native —
+  // the browser recalculates sticky position every compositor frame, no JS in
+  // the loop — which is why it feels perfectly continuous. RN's ScrollView has
+  // no position:sticky equivalent, and a JS-thread approach (measureInWindow's
+  // async bridge round-trip, or React state driving an Animated.timing fade)
+  // always lags a frame or more behind the actual scroll position, reading as
+  // a jump/snap instead of a continuous hand-off. Reanimated's worklet-based
+  // scroll handler below runs the visibility math on the UI thread, in the
+  // same frame as the scroll itself — the closest RN can get to Angular's own
+  // mechanism. cta2Y is the real (second, inline) CTA's content-space Y —
+  // refreshed occasionally (see refreshCta2Y), not a per-frame concern.
+  const cta2Y = useSharedValue<number | null>(null)
+  const scrollYShared = useSharedValue(0)
+  const viewportHeightShared = useSharedValue(0)
+  const cta2Ref = useRef<View>(null)
+  const scrollViewRef = useAnimatedRef<Animated.ScrollView>()
+  // JS-thread mirror of the worklet's visibility result — only needed for
+  // pointerEvents (which isn't animatable/UI-thread), so it doesn't need
+  // per-frame precision the way the visual opacity above does.
+  const [cta2Visible, setCta2Visible] = useState(false)
+  // Floating bar is visible (opacity 1) until the real CTA's top edge clears
+  // the floating bar's own footprint (FLOATING_CTA_HEIGHT + bottom inset) —
+  // same clearance logic as before, now evaluated synchronously every frame
+  // instead of async/debounced, so there's no lag-driven gap OR jump.
+  const floatingCtaAnimStyle = useAnimatedStyle(() => {
+    const y = cta2Y.value
+    if (y === null) return { opacity: 1 }
+    const clearance = FLOATING_CTA_HEIGHT + insets.bottom
+    const realCtaOnScreen = scrollYShared.value + viewportHeightShared.value - clearance > y
+    return { opacity: realCtaOnScreen ? 0 : 1 }
+  })
   const similarListRef = useRef<FlatList<SimilarProfileCard>>(null)
+  // Angular: Swiper.js's own default touch handling only ever tracks a SINGLE
+  // pointer for its swipe gesture — no explicit config for this anywhere in
+  // home.config.ts's `similarprofiles` swiper options, it's just Swiper's
+  // built-in behavior (confirmed: no multi-touch/pinch swipe support exists in
+  // the Angular reference at all). RN's FlatList/ScrollView has no such
+  // restriction by default, so a second finger landing mid-drag also drives
+  // the carousel.
+  //
+  // React's synthetic onTouchStart/scrollEnabled toggle (tried first) doesn't
+  // actually block this on web: react-native-web's horizontal scroll is a
+  // real browser `overflow-x` scroll container, and the browser's native
+  // touch-scroll gesture recognizer can already commit to scrolling within
+  // the same event before a React state update re-renders scrollEnabled=false
+  // — the async state change loses the race. A real, non-passive DOM
+  // `touchstart` listener calling preventDefault() the instant a 2nd finger
+  // lands runs synchronously ahead of the browser's own gesture recognition,
+  // which is the only way to actually cancel it.
+  useEffect(() => {
+    if (Platform.OS !== 'web') return
+    // react-native-web forwards this ref's underlying scroll node directly as
+    // a real DOM element (unlike native, where it's an internal component).
+    const node = similarListRef.current as unknown as HTMLElement | null
+    if (!node || typeof node.addEventListener !== 'function') return
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length > 1) e.preventDefault()
+    }
+    node.addEventListener('touchstart', onTouchStart, { passive: false })
+    return () => node.removeEventListener('touchstart', onTouchStart)
+  }, [])
   // Angular's albumView()/goToalbum() (viewprofile.page.ts:1318-1372) + the
   // pinch/pan HostListeners (:2359-2490) collapse into one full-screen modal here.
   const [photoViewerOpen, setPhotoViewerOpen] = useState(false)
@@ -591,7 +722,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         })
       } else {
         // JODII-499: surface the real "Invalid MatriID" message when that's
-        // confirmed the cause — the TEMP DEBUG fallback below still covers
+        // confirmed the cause — the generic fallback below still covers
         // every other failure shape.
         setInvalidMatriIdMessage(_consumeInvalidMatriIdMessage())
       }
@@ -669,8 +800,8 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     .activeOffsetX([-10, 10])
     .failOffsetY([-10, 10])
     .onEnd(e => {
-      if (e.translationX > 40) runOnJS(cycleTheme)(-1)
-      else if (e.translationX < -40) runOnJS(cycleTheme)(1)
+      if (e.translationX > 0) runOnJS(cycleTheme)(-1)
+      else if (e.translationX < -0) runOnJS(cycleTheme)(1)
     })
 
   function dismissCoachMark() {
@@ -678,33 +809,91 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     markCoachMarkShown().catch(() => {})
   }
 
-  const insets = useSafeAreaInsets()
-
-  // Feature 2 prev/next-profile navigation. Angular does this via a swipe
-  // gesture on the photo, but PhotoSwiper already owns a horizontal pan on
-  // that exact surface for browsing this profile's OWN photos — competing
-  // gestures there is a documented Angular bug class (swiping a photo card
-  // accidentally triggering profile navigation), so this uses tap chevrons
-  // instead, reusing PhotoSwiper's own dark-circle/white-chevron arrow style.
+  // Feature 2 prev/next-profile navigation. Angular's onGesture()/onMove()
+  // (viewprofile.page.ts:1166-1174, 998-1010) wires a GestureController pan
+  // across the ENTIRE ion-content — mouse-drag on web too, not touch-only —
+  // with only a 10px horizontal-delta threshold, excluding the photo swiper
+  // (`.disable-swipe`), pagination dots, and the caption/`.information-block`.
+  // PhotoSwiper already owns a horizontal pan on the photo surface for
+  // browsing this profile's OWN photos — competing gestures there is a
+  // documented Angular bug class (swiping a photo card accidentally
+  // triggering profile navigation), which is exactly why Angular itself
+  // excludes that surface too — so this mirrors that split: tap chevrons
+  // (PhotoSwiper's own dark-circle/white-chevron arrow style) over the photo,
+  // and detailSwipeGesture below covering everything from the info card down
+  // to the end of the scroll content (the actual area Angular's gesture is
+  // live over, once its own exclusions are accounted for).
   function goToPrev() {
     if (!hasPrevProfile) return
-    setMatriId(profileIds[profileIndex - 1])
+    animateProfileChange('prev', profileIds[profileIndex - 1]!)
   }
   function goToNext() {
     if (!hasNextProfile) return
-    setMatriId(profileIds[profileIndex + 1])
+    animateProfileChange('next', profileIds[profileIndex + 1]!)
   }
+  // activeOffsetX/failOffsetY: same 10px-ish claim pattern as themeSwipeGesture
+  // above, so this can't fight the vertical ScrollView it sits inside. Angular:
+  // deltaX>0 (drag right) → prev, deltaX<0 (drag left) → next — same mapping
+  // goToPrev/goToNext already use for the chevron buttons.
+  const detailSwipeGesture = Gesture.Pan()
+    .enabled(hasPrevProfile || hasNextProfile)
+    .activeOffsetX([-10, 10])
+    .failOffsetY([-10, 10])
+    .onEnd(e => {
+      if (e.translationX > 0) runOnJS(goToPrev)()
+      else if (e.translationX < 0) runOnJS(goToNext)()
+    })
 
-  function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    const y = e.nativeEvent.contentOffset.y
+  // Worklet — runs on the UI thread, same frame as the scroll itself. Keeps
+  // scrollYShared/viewportHeightShared live for floatingCtaAnimStyle's
+  // interpolation, and mirrors the JS-thread bits (scrolled/showMenu header
+  // state) via runOnJS, same as before. cta2Visible (JS state) only needs to
+  // flip at the hand-off moment, not every frame — pointerEvents doesn't need
+  // per-frame precision the way the visual opacity does.
+  const onScroll = useAnimatedScrollHandler(e => {
+    const y = e.contentOffset.y
+    scrollYShared.value = y
     // Angular: `(this.scrWidth - 64) <= offset` (viewprofile.page.ts:1428-1441) —
     // the header switches to name+call+3-dot once scrolled ~one photo-height
     // (scrWidth, same as PHOTO_HEIGHT here) minus 64px, not a fixed constant.
     const isScrolled = y > PHOTO_HEIGHT - 64
-    setScrolled(isScrolled)
-    if (!isScrolled) setShowMenu(false)
-    setScrollY(y)
+    runOnJS(setScrolled)(isScrolled)
+    if (!isScrolled) runOnJS(setShowMenu)(false)
+    const cy = cta2Y.value
+    if (cy !== null) {
+      const clearance = FLOATING_CTA_HEIGHT + insets.bottom
+      const realCtaOnScreen = y + viewportHeightShared.value - clearance > cy
+      runOnJS(setCta2Visible)(realCtaOnScreen)
+    }
+  })
+
+  // Refreshes cta2Y — the real (second, inline) CTA's content-space Y —
+  // whenever content above it might have reflowed (star-match data, similar-
+  // profiles/biodata-QR images resolving, etc.), so the worklet's threshold
+  // never goes stale. This itself doesn't need to be per-frame; it only needs
+  // to happen occasionally, since the CTA's real position rarely changes.
+  function refreshCta2Y() {
+    const scrollNode = scrollViewRef.current as unknown as View | null
+    const ctaNode = cta2Ref.current
+    if (!scrollNode || !ctaNode) return
+    scrollNode.measureInWindow((_svX: number, svY: number) => {
+      ctaNode.measureInWindow((_ctaX: number, ctaY: number, _ctaW: number, ctaH: number) => {
+        // A 0×0/negative reading means the node hasn't actually laid out yet
+        // (e.g. this fired before first paint) — ignore it rather than
+        // clobbering a good value with garbage.
+        if (ctaH <= 0) return
+        cta2Y.value = ctaY - svY + scrollYShared.value
+      })
+    })
   }
+
+  // Re-measure once these finish loading — the async data most likely to
+  // reflow content above the real CTA after the initial onLayout capture.
+  useEffect(() => {
+    const timer = setTimeout(refreshCta2Y, 100)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile, starMatch, similarProfiles.length])
 
   // ── Actions — same communicationBtnOnClick plumbing Matches uses ─────────────
 
@@ -1168,18 +1357,6 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     })
   }
 
-  // Arrow-button navigation for the Similar Profiles carousel — mirrors the exact
-  // same "advance by one card, clamp at the ends" behavior Swiper.js's navigation
-  // module gives Angular's <app-swiper>.
-  function scrollSimilarBy(delta: number) {
-    const nextIndex = Math.max(0, Math.min(similarProfiles.length - 1, similarIndex + delta))
-    similarListRef.current?.scrollToOffset({ offset: nextIndex * SIMILAR_CARD_STRIDE, animated: true })
-    setSimilarIndex(nextIndex)
-  }
-
-  function onSimilarScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    setSimilarIndex(Math.round(e.nativeEvent.contentOffset.x / SIMILAR_CARD_STRIDE))
-  }
 
   // Feature 5 — Angular: pages/report-profile (routed page there; a modal here).
   // Opens the full reasons-picker form instead of a direct confirm+submit.
@@ -1217,20 +1394,12 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     )
   }
   if (!profile) {
-    // TEMP DEBUG — shows the raw API response so we can see exactly why adapting
-    // failed (bad matriId param, RESPONSECODE/ERRCODE mismatch, or an unexpected
-    // response envelope shape) without needing a dev console. Remove once confirmed.
     return (
       <SafeAreaView style={s.loaderScreen}>
         <Text style={s.notFoundText}>Unable to load this profile.</Text>
         <Pressable style={s.backBtnInline} onPress={() => handleBack()}>
           <Text style={s.backBtnInlineText}>{'‹ Back'}</Text>
         </Pressable>
-        <ScrollView style={s.debugBox}>
-          <Text style={s.debugLabel}>DEBUG matriId: {JSON.stringify(matriId)}</Text>
-          <Text style={s.debugLabel}>DEBUG raw response:</Text>
-          <Text style={s.debugText}>{JSON.stringify(_debugLastViewProfileResult(), null, 2)}</Text>
-        </ScrollView>
       </SafeAreaView>
     )
   }
@@ -1258,7 +1427,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // before Similar Profiles (plain inline, not sticky — confirmed against real
   // screenshots: more content visibly continues below it in the same shot). The
   // floating-overlay-until-displaced rendering for the FIRST copy lives further
-  // down (topCtaVisible); this helper builds the shared JSX both copies use.
+  // down (floatingCtaAnimStyle); this helper builds the shared JSX both copies use.
   function renderCtaBlock() {
     // TS can't narrow `profile` through this closure — re-guard explicitly (the
     // caller only ever invokes this after the outer `if (!profile) return` above).
@@ -1276,7 +1445,9 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                 disabled={disableDontShow(profile.dontShowStatus)}
               >
                 <CloseIcon width={24} height={24} />
-                <Text style={s.ctaDontShowText}>{t('GENERAL.DONTSHOWCTA')}</Text>
+                <Text style={[s.ctaDontShowText, disableDontShow(profile.dontShowStatus) && s.ctaDisabledText]}>
+                  {t('GENERAL.DONTSHOWCTA')}
+                </Text>
               </Pressable>
               <Pressable
                 style={[s.ctaViewLater, disableViewLater(profile.viewLaterStatus) && s.ctaDisabled]}
@@ -1284,7 +1455,9 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                 disabled={disableViewLater(profile.viewLaterStatus)}
               >
                 <ViewLaterIcon width={24} height={24} />
-                <Text style={s.ctaViewLaterText}>{t('GENERAL.VIEWLATER')}</Text>
+                <Text style={[s.ctaViewLaterText, disableViewLater(profile.viewLaterStatus) && s.ctaDisabledText]}>
+                  {t('GENERAL.VIEWLATER')}
+                </Text>
               </Pressable>
             </View>
             <Pressable style={s.ctaLike} onPress={handleLike}>
@@ -1333,12 +1506,6 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
       </Pressable>
     )
   }
-
-  // Floating top-CTA overlay stays visible until the scroll position reaches where
-  // the second (plain, inline) CTA copy naturally sits — approximating Angular's
-  // sticky-until-displaced behavior. Visible by default (cta2Y===null) until that
-  // second block's onLayout has actually reported a position.
-  const topCtaVisible = cta2Y === null || scrollY + viewportHeight < cta2Y
 
   // Desktop/laptop web gets the Figma "Jodii Desktop" two-column layout (see
   // ViewProfileDesktopLayout.tsx); native iOS/Android and narrow mobile-web keep
@@ -1457,7 +1624,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   }
 
   return (
-    <View style={s.screen}>
+    <Animated.View style={[s.screen, screenSlideStyle]}>
       <StatusBar style="dark" />
 
       {/* ── Header — a SEPARATE solid white bar above the photo (not floating over
@@ -1474,41 +1641,58 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
             <Text style={s.headerName} numberOfLines={1}>
               {ownProfile ? t('VIEWPROFILE.PROFILE_PREVIEW') : profile.name}
             </Text>
+            {/* Angular viewprofile.page.html:41-58 — on scroll (topProfileName) the
+                language dropdown is hidden (line 66: *ngIf="...&& !topProfileName")
+                and the header instead carries Name, then Message, then Call.
+                Angular: .width-height-18 (18x18, viewprofile.page.scss:22-25) with
+                mr-16 on the message icon only — box sized exactly to the icon, no
+                extra hit-area padding baked into the box itself (hitSlop covers
+                that instead), so it can't visually wobble against Call/⋮. */}
             {!sameGender && (
-              <Pressable style={s.headerIconBtn} onPress={handleCall} hitSlop={8}>
-                <CallIcon width={20} height={21} />
-              </Pressable>
+              <>
+                <Pressable style={s.headerIconBtnMsg} onPress={handleMessage} hitSlop={8}>
+                  <MessageIcon width={18} height={18} />
+                </Pressable>
+                <Pressable style={s.headerIconBtn18} onPress={handleCall} hitSlop={8}>
+                  <CallIcon width={18} height={18} />
+                </Pressable>
+              </>
             )}
           </>
         )}
-        {!scrolled && <View style={s.headerSpacer} />}
+        {!scrolled && (
+          <>
+            <View style={s.headerSpacer} />
+            <Pressable
+              style={s.langPill}
+              onPress={() => navigation.navigate('LanguageSelection')}
+              hitSlop={8}
+            >
+              <CdnSvg uri={CDN_SVG + 'revamp/lang-change-img.svg'} width={20} height={20} />
+              <Text style={s.langPillText} numberOfLines={1}>
+                {LANG_LABELS[i18n.language] ?? 'English'}
+              </Text>
+            </Pressable>
+          </>
+        )}
 
-        <Pressable
-          style={[s.langPill, scrolled && s.langPillCompact]}
-          onPress={() => navigation.navigate('LanguageSelection')}
-          hitSlop={8}
-        >
-          <CdnSvg uri={CDN_SVG + 'revamp/lang-change-img.svg'} width={20} height={20} />
-          <Text style={s.langPillText} numberOfLines={1}>
-            {LANG_LABELS[i18n.language] ?? 'English'}
-          </Text>
-        </Pressable>
-
+        {/* Angular: viewprofile.page.html:75-81 — the 3-dot only shows alongside
+            the scrolled header (topProfileName), and is an <ion-img> of
+            dot3-revamp.svg, not a text glyph. Tapping it opens the report block
+            (:1564-1568 -> button.component.html:80-98's ViewProfileThreeDotBtn),
+            whose ONLY option is "Report this Profile" (MORE_OPT_2) with a
+            report-profile icon beside it. There is no "Don't show" entry in
+            Angular's 3-dot menu — that lives on the CTA row instead. */}
         {scrolled && !ownProfile && (
           <View>
             <Pressable style={s.headerIconBtn} onPress={() => setShowMenu(v => !v)} hitSlop={8}>
-              <Text style={s.menuDots}>⋮</Text>
+              <CdnSvg uri={MENU_DOTS_URI} width={24} height={24} />
             </Pressable>
             {showMenu && (
               <View style={s.menuDropdown}>
-                <Pressable
-                  style={s.menuItem}
-                  onPress={() => { setShowMenu(false); handleDontShow() }}
-                >
-                  <Text style={s.menuItemText}>{t('MATCHES.MORE_OPT_1')}</Text>
-                </Pressable>
                 <Pressable style={s.menuItem} onPress={handleReportProfile}>
-                  <Text style={[s.menuItemText, s.menuItemDanger]}>{t('MATCHES.MORE_OPT_2')}</Text>
+                  <CdnSvg uri={REPORT_PROFILE_ICON_URI} width={20} height={20} />
+                  <Text style={s.menuItemText}>{t('MATCHES.MORE_OPT_2')}</Text>
                 </Pressable>
               </View>
             )}
@@ -1530,11 +1714,15 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         </Pressable>
       )}
 
-      <ScrollView
+      <Animated.ScrollView
+        ref={scrollViewRef}
         style={s.scrollView}
-        onLayout={e => setViewportHeight(e.nativeEvent.layout.height)}
+        onLayout={e => {
+          viewportHeightShared.value = e.nativeEvent.layout.height
+          refreshCta2Y()
+        }}
         onScroll={onScroll}
-        scrollEventThrottle={32}
+        scrollEventThrottle={16}
         /* No extra fixed buffer here — Angular's page just ends flush after its last
            section (breather card's own border-bottom is the visual end-cap); a fixed
            +32 padding left a dead white gap below MembershipBanner. insets.bottom
@@ -1610,13 +1798,15 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                   )}
                 </View>
               )}
-            {/* Figma (363:10859): top+bottom dark gradient over the photo — improves
-                legibility of the badges/dots overlaid on it, absent from the older
-                plain-photo version this screen started with. */}
+            {/* Angular: global.scss:4918-4928 `.top-slider-header-div .swiper-pagination`
+                — only a 50px-tall gradient strip pinned to the BOTTOM of the photo
+                (behind the pagination dots), not a full top+bottom overlay. The
+                earlier Figma-derived full-bleed rgba(0,0,0,0.8) top+bottom gradient
+                was darkening the whole photo, which Angular's plain hero image
+                doesn't do — replaced with Angular's exact bottom-only gradient. */}
             <LinearGradient
-              colors={['rgba(0,0,0,0.8)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0)', 'rgba(0,0,0,0.8)']}
-              locations={[0, 0.2, 0.8, 1]}
-              style={StyleSheet.absoluteFill}
+              colors={['#00000005', '#000000c4']}
+              style={s.photoBottomGradient}
               pointerEvents="none"
             />
             {profile.isNewlyJoined && !ownProfile && (
@@ -1649,6 +1839,12 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
             </>
           )}
         </View>
+
+        {/* ── Everything below the photo — Angular's swipe-to-navigate-profile
+            gesture is live across this whole area (see detailSwipeGesture's own
+            comment above for the exact Angular reference + exclusions). */}
+        <GestureDetector gesture={detailSwipeGesture}>
+        <View style={s.detailSwipeZone}>
 
         {/* ── Info card ──────────────────────────────────────────────────────── */}
         <View
@@ -1721,7 +1917,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           {/* The top CTA is NOT rendered inline here — Angular's copy of it is
               `position: sticky; bottom: 0`, so it rides pinned to the screen bottom
               through the whole detail-sections scroll instead of sitting inline
-              right here. Rendered as a floating overlay below (see topCtaVisible). */}
+              right here. Rendered as a floating overlay below (see floatingCtaAnimStyle). */}
 
           {/* ── Basic details ────────────────────────────────────────────────── */}
           <SectionHeader title={t('VIEWPROFILE.BASIC_DETAILS')} />
@@ -1783,21 +1979,53 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                   using it here was a mismatch from an earlier pass). For paid
                   viewers, a null starMatch (still loading, or the API call failed —
                   Angular's starAndraasiflag=false) hides the row entirely, same as Angular. */}
+              {/* Angular: global.scss .like-this-profile — a soft cream/gold highlight
+                  band (linear-gradient background + gradient border-image), not a
+                  plain-text row. Reproduced as a LinearGradient background; RN has
+                  no border-image equivalent so the gold edge is approximated with a
+                  matching solid-color top+bottom border. */}
               {profile.hasStarMatchInputs && (
                 ownEntryType === 'P' ? (
                   starMatch && (
-                    <Pressable onPress={handleViewStarMatchDetails}>
-                      <Text style={s.starMatchText}>
-                        {starMatch.displayText}{t('STARMATCHING.STAR_MATCHING_TXT')}
-                      </Text>
-                      <Text style={s.starMatchTeaser}>{t('VIEWPROFILE.PAID_MEMBER_REPORT')}</Text>
-                    </Pressable>
+                    <LinearGradient
+                      colors={['rgba(255,255,255,0)', '#FFF9E6', 'rgba(255,255,255,0)']}
+                      start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+                      locations={[0, 0.5, 1]}
+                      style={s.starMatchCard}
+                    >
+                      <CdnSvg uri={ICON.star} width={20} height={20} />
+                      <Pressable style={s.starMatchTextWrap} onPress={handleViewStarMatchDetails}>
+                        <Text style={s.starMatchText}>
+                          <Text style={s.starMatchRating}>{starMatch.displayText}</Text>
+                          {t('STARMATCHING.STAR_MATCHING_TXT')}
+                        </Text>
+                        <View style={s.starMatchLinkRow}>
+                          <Text style={s.starMatchTeaser}>{t('VIEWPROFILE.PAID_MEMBER_REPORT')}</Text>
+                          <RNImage source={{ uri: LINK_ARROW_GIF_URI }} style={s.starMatchLinkArrow} />
+                        </View>
+                      </Pressable>
+                    </LinearGradient>
                   )
                 ) : (
-                  <Pressable onPress={() => navigation.navigate('recharge')}>
-                    <Text style={s.starMatchText}>9/10{t('STARMATCHING.STAR_MATCHING_TXT')}</Text>
-                    <Text style={s.starMatchTeaser}>{t('VIEWPROFILE.FREE_MEMBER_REPORT')}</Text>
-                  </Pressable>
+                  <LinearGradient
+                    colors={['rgba(255,255,255,0)', '#FFF9E6', 'rgba(255,255,255,0)']}
+                    start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+                    locations={[0, 0.5, 1]}
+                    style={s.starMatchCard}
+                  >
+                    <CdnSvg uri={ICON.star} width={20} height={20} />
+                    <Pressable style={s.starMatchTextWrap} onPress={() => navigation.navigate('recharge')}>
+                      {/* Angular: .blur-text-vp-revamp — filter: blur(5px) on the
+                          score for free (ENTRYTYPE 'F') members. */}
+                      <Text style={s.starMatchText}>
+                        <Text style={s.starMatchBlurred}>9/10</Text>{t('STARMATCHING.STAR_MATCHING_TXT')}
+                      </Text>
+                      <View style={s.starMatchLinkRow}>
+                        <Text style={s.starMatchTeaser}>{t('VIEWPROFILE.FREE_MEMBER_REPORT')}</Text>
+                        <RNImage source={{ uri: LINK_ARROW_GIF_URI }} style={s.starMatchLinkArrow} />
+                      </View>
+                    </Pressable>
+                  </LinearGradient>
                 )
               )}
             </>
@@ -1937,11 +2165,9 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 
         {/* Second CTA — Angular repeats this exact block right after Property
             details, before Similar Profiles (confirmed against real screenshots).
-            A direct ScrollView-content sibling (own horizontal padding, not
-            infoCard's) so onLayout's `y` lands in the same coordinate space as
-            onScroll's contentOffset.y — needed to know when to hide the floating
-            top CTA below. */}
-        <View style={s.ctaBlockOuter} onLayout={e => setCta2Y(e.nativeEvent.layout.y)}>
+            ref+onLayout feed refreshCta2Y, which decides when the floating
+            top CTA above should hand off to this one — see its own comment. */}
+        <View ref={cta2Ref} style={s.ctaBlockOuter} onLayout={refreshCta2Y}>
           {ownProfile ? renderBiodataCta() : renderCtaBlock()}
         </View>
 
@@ -1961,40 +2187,24 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
             <Text style={s.similarHeader}>
               {t('VIEWPROFILE.SIMILARPROFILES').replace('#NAME#', profile.name)}
             </Text>
-            <View>
-              <FlatList
-                ref={similarListRef}
-                data={similarProfiles}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                snapToInterval={SIMILAR_CARD_STRIDE}
-                decelerationRate="fast"
-                onScroll={onSimilarScroll}
-                scrollEventThrottle={32}
-                keyExtractor={item => item.matriId}
-                contentContainerStyle={s.similarListContent}
-                renderItem={({ item }) => (
-                  <SimilarProfileCardItem
-                    card={item}
-                    oppGender={oppGender}
-                    t={t}
-                    onPress={() => handleSimilarProfilePress(item)}
-                  />
-                )}
-              />
-              {/* Angular: <app-swiper>'s navigation-module arrows — same dark
-                  circular button look as the photo swiper's desktop arrows. */}
-              {similarIndex > 0 && (
-                <Pressable style={[s.similarArrowBtn, s.similarArrowLeft]} onPress={() => scrollSimilarBy(-1)} hitSlop={8}>
-                  <Text style={s.similarArrowText}>{'‹'}</Text>
-                </Pressable>
+            <FlatList
+              ref={similarListRef}
+              data={similarProfiles}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              snapToInterval={SIMILAR_CARD_STRIDE}
+              decelerationRate="fast"
+              keyExtractor={item => item.matriId}
+              contentContainerStyle={s.similarListContent}
+              renderItem={({ item }) => (
+                <SimilarProfileCardItem
+                  card={item}
+                  oppGender={oppGender}
+                  t={t}
+                  onPress={() => handleSimilarProfilePress(item)}
+                />
               )}
-              {similarIndex < similarProfiles.length - 1 && (
-                <Pressable style={[s.similarArrowBtn, s.similarArrowRight]} onPress={() => scrollSimilarBy(1)} hitSlop={8}>
-                  <Text style={s.similarArrowText}>{'›'}</Text>
-                </Pressable>
-              )}
-            </View>
+            />
           </LinearGradient>
         )}
 
@@ -2003,7 +2213,10 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         {!sameGender && menuPromo?.MATCHESSLOT && (
           <MembershipBanner data={menuPromo.MATCHESSLOT} onPress={handleMembershipBannerPress} />
         )}
-      </ScrollView>
+
+        </View>
+        </GestureDetector>
+      </Animated.ScrollView>
 
       {/* Prev/next-PROFILE arrows — a screen-fixed overlay (sibling of the
           ScrollView, not content inside it) so they stay put at a constant
@@ -2030,13 +2243,16 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         </Pressable>
       )}
 
-      {/* Floating top CTA — see topCtaVisible comment above for why this exists
-          instead of rendering inline. */}
-      {topCtaVisible && (
-        <View style={[s.floatingCtaBar, { paddingBottom: 12 + insets.bottom }]}>
-          {renderCtaBlock()}
-        </View>
-      )}
+      {/* Floating top CTA — see cta2Y/floatingCtaAnimStyle's own comment above
+          for why this exists and why the hand-off is worklet-driven. Always
+          mounted (no conditional unmount) — opacity alone drives visibility,
+          so there's no mount/unmount pop and no gap between the two CTAs. */}
+      <Animated.View
+        style={[s.floatingCtaBar, { paddingBottom: 12 + insets.bottom }, floatingCtaAnimStyle]}
+        pointerEvents={cta2Visible ? 'none' : 'auto'}
+      >
+        {renderCtaBlock()}
+      </Animated.View>
 
       {activeSticky && (
         <StickyBanner
@@ -2129,7 +2345,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         uri={horoscopeSvgUrl}
         onClose={() => setHoroscopeSvgUrl(null)}
       />
-    </View>
+    </Animated.View>
   )
 }
 
@@ -2139,12 +2355,12 @@ const s = StyleSheet.create({
   notFoundText: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 14, color: Colors.textSecondary },
   backBtnInline:     { paddingHorizontal: 16, paddingVertical: 8 },
   backBtnInlineText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 14, color: Colors.link },
-  debugBox:   { maxHeight: 300, width: '100%', paddingHorizontal: 16 },
-  debugLabel: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 12, color: Colors.primary, marginTop: 8 },
-  debugText:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 11, color: Colors.textSecondary },
 
   scrollView:    { flex: 1 },
   scrollContent: {},
+  // Purely a gesture-handler boundary (see detailSwipeGesture) — no layout
+  // properties of its own so it doesn't affect the content flow it wraps.
+  detailSwipeZone: {},
 
   // photoWrap used to be the positioning ancestor for the prev/next-profile
   // arrows too — they've since moved to a screen-fixed overlay (a ScrollView
@@ -2223,13 +2439,18 @@ const s = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     alignItems: 'center', justifyContent: 'center',
   },
+  // Angular: global.scss:4918-4928 — 50px-tall gradient strip pinned to the
+  // bottom of the photo, behind the swiper pagination dots.
+  photoBottomGradient: {
+    position: 'absolute', left: 0, right: 0, bottom: 0, height: 50,
+  },
   overlayCard: {
     backgroundColor: Colors.scrimStrong, marginHorizontal: 24, padding: 16,
     borderRadius: 12, borderWidth: 1, borderColor: Colors.overlayBorder,
     alignItems: 'center', gap: 16,
   },
   overlayText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 13, color: Colors.white,
+    fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 13, color: Colors.white,
     textAlign: 'center', lineHeight: 17, width: '70%', alignSelf: 'center',
   },
 
@@ -2241,7 +2462,7 @@ const s = StyleSheet.create({
     paddingTop:        24,
     paddingBottom:     8,
   },
-  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 25 },
+  badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 20 },
   // Pinned to an exact 116x28 per a manual UI tweak — ProfileBadge is shared
   // (also used by MatchesScreen etc.), so this overrides size only here via its
   // optional `style` prop rather than changing the shared component's default.
@@ -2257,9 +2478,9 @@ const s = StyleSheet.create({
 
   nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   // Angular: heading1-semibold-22 black-color
-  name:    { flex: 1, fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 22, color: Colors.black },
+  name:    { flex: 1, fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 24, color: Colors.black },
   // Angular: body2-regular-14 black-color
-  jodiId:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.black, marginTop: 4 },
+  jodiId:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.black, marginTop: 4, marginBottom: 18 },
   likedMsg: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 12, color: Colors.likedStripText, marginTop: 6 },
 
   // Angular: viewprofile.page.html:469-489 — Call/WhatsApp icon buttons beside the name.
@@ -2271,17 +2492,31 @@ const s = StyleSheet.create({
   // this exact block, both above and below it in the normal scroll flow).
   ctaBlock: { marginTop: 16 },
   // Second CTA's own wrapper — matches infoCard's horizontal padding since it now
-  // sits outside infoCard (see the onLayout comment at its call site).
-  ctaBlockOuter: { paddingHorizontal: 24 },
+  // sits outside infoCard (see the onLayout comment at its call site). Angular:
+  // .sticky-btm { background: #ffffff } — an explicit opaque white card, always
+  // present, isolating this row from the greenish .similar-profile-bg gradient
+  // section immediately below it. Without this, the gradient shows through here.
+  // .button-banner (applied to both CTA instances) also carries its own drop
+  // shadow — same values as floatingCtaBar's below.
+  ctaBlockOuter: {
+    paddingHorizontal: 24, paddingVertical: 16, backgroundColor: Colors.surface,
+    shadowColor: '#000000', shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: 0, height: 4 },
+    elevation: 12,
+  },
   // Floating top-CTA overlay — Angular: .sticky-btm { position:sticky; bottom:0;
-  // background:#fff }, .button-banner's shadow. Pinned to the screen bottom, shown/
-  // hidden via topCtaVisible rather than true CSS position:sticky (no RN equivalent
-  // for "sticky within a scroll region until the next in-flow sticky candidate
-  // arrives").
+  // background:#fff }, .button-banner's shadow. Pinned to the screen bottom, opacity
+  // driven by floatingCtaAnimStyle (a worklet) rather than true CSS position:sticky
+  // (no RN equivalent for "sticky within a scroll region until the next in-flow
+  // sticky candidate arrives").
+  // Angular: .button-banner (co-applied with .sticky-btm on the same element —
+  // global.scss:5033-5055) — box-shadow: 0px 4px 24px 0px rgba(0,0,0,0.25). A
+  // downward, all-around soft shadow (24px blur bleeds visibly on top too, not
+  // an upward-only shadow) — NOT height:-4 as this had before. .sticky-btm
+  // itself contributes no shadow/border of its own, just position+background.
   floatingCtaBar: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
     backgroundColor: Colors.surface, paddingHorizontal: 24, paddingTop: 12,
-    shadowColor: '#000000', shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: 0, height: -4 },
+    shadowColor: '#000000', shadowOpacity: 0.25, shadowRadius: 24, shadowOffset: { width: 0, height: 4 },
     elevation: 12,
   },
 
@@ -2303,7 +2538,13 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
   ctaViewLaterText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 14, color: '#545454' },
-  ctaDisabled: { opacity: 0.4 },
+  // Angular: button-revamp.component.scss:13-21 — `ion-button[disabled]` only
+  // overrides background (#e6e6e6) and text (#8A8A8A) via `--background`/
+  // `--color`, `opacity: unset !important` (explicitly NOT dimmed) — the
+  // greyBorder class's own #545454 1px border (setButtonBorder mixin) is left
+  // untouched, so the border still shows on a disabled button, same as enabled.
+  ctaDisabled: { backgroundColor: '#e6e6e6' },
+  ctaDisabledText: { color: '#8A8A8A' },
   ctaLike: {
     height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.primaryDark, borderRadius: 8, gap: 6,
@@ -2354,8 +2595,33 @@ const s = StyleSheet.create({
   detailLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.black },
   detailValue: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 14, color: Colors.black, marginTop: 8 },
 
-  starMatchText:   { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 13, color: Colors.textDark, marginTop: 8 },
-  starMatchTeaser: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 13, color: Colors.link, marginTop: 8 },
+  // Angular: .like-this-profile — border-image linear-gradient(transparent →
+  // rgb(255,192,0) 50% → transparent); RN has no border-image, approximated with
+  // a solid gold top+bottom border matching the gradient's peak color.
+  starMatchCard: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 12,
+    paddingVertical: 20, paddingHorizontal: 4,
+    borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(255,192,0,0.4)',
+  },
+  starMatchTextWrap: { flex: 1 },
+  // Angular: only the rating number itself ("4.5/10") is semibold — the rest
+  // of the sentence ("stars matching with this profile") is regular weight.
+  // .body2-regular-14 on the "View details"/"Pay now..." link — also regular.
+  starMatchText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 13, color: Colors.textDark },
+  starMatchRating: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600' },
+  starMatchTeaser: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 13, color: Colors.link },
+  starMatchLinkRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 4 },
+  // Angular: button-revamp.component.html:15 — style="width: 24px; height: 20px".
+  starMatchLinkArrow: { width: 18, height: 18 },
+  // Angular: .blur-text-vp-revamp — filter: blur(5px) on the teaser score for
+  // free members. RN's Text has no blur filter; textShadow is the closest
+  // visual approximation available without a native blur-view dependency.
+  // Also semibold, same as starMatchRating — this is that same score text.
+  starMatchBlurred: {
+    fontFamily: Fonts.poppinsSemiBold, fontWeight: '600',
+    color: 'transparent',
+    textShadowColor: '#333333', textShadowRadius: 5, textShadowOffset: { width: 0, height: 0 },
+  },
 
   horoActionLink:    { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 14, color: Colors.link, marginTop: 8 },
   // Feature 6 — own-profile "add missing section" prompts, replacing a section
@@ -2375,43 +2641,68 @@ const s = StyleSheet.create({
   similarSection: { paddingTop: 32, paddingBottom: 24 },
   similarHeader: {
     fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 20, color: Colors.black,
-    marginBottom: 12, paddingHorizontal: 24,
+    marginBottom: 10, paddingHorizontal: 24,
   },
-  similarListContent: { paddingHorizontal: 24, gap: SIMILAR_CARD_GAP },
+  // paddingVertical gives each card's shadow (shadowRadius:12, extends above AND
+  // below the card bounds) room to render — with zero top padding the FlatList's
+  // content box hugged the cards' exact height, squeezing/clipping the shadow at
+  // the very top edge and making the rounded top corner look cut off.
+  similarListContent: { paddingHorizontal: 24, paddingVertical: 12, gap: SIMILAR_CARD_GAP },
   // Angular: profile-card.component.scss's `.card-ht2` (vmin-based, equal
   // width/height) — a SQUARE card, not the 140x180 rectangle this used to be.
+  // Angular: .card-type-1 — box-shadow: 0 2px 12px 0 rgba(0,0,0,0.34)
+  // (profile-card.component.scss:1-13). This outer wrapper carries ONLY the
+  // shadow (no background, no overflow:hidden — clipping would also clip the
+  // shadow itself) so it can't spill a visible box into the inter-card gap;
+  // similarCardClip below is the one that's actually opaque + rounded + clipped.
   similarCard: {
-    width: SIMILAR_CARD_WIDTH, height: SIMILAR_CARD_WIDTH, borderRadius: 12, overflow: 'hidden',
+    width: SIMILAR_CARD_WIDTH, height: SIMILAR_CARD_WIDTH, borderRadius: 12,
+    // Matches similarCardClip's own fill — closes the rounded-corner seam where
+    // the section's mint gradient background was showing through between this
+    // wrapper's square bounds and the clipped child's rounded ones.
     backgroundColor: Colors.divider,
+    shadowColor: '#000000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.3, shadowRadius: 12,
+    elevation: 6,
+  },
+  similarCardClip: {
+    flex: 1, borderRadius: 12, overflow: 'hidden', backgroundColor: Colors.divider,
   },
   similarCardImg: { width: '100%', height: '100%' },
+  // Angular: .request-photo-now-vp — transparent, full-bleed, flex-centered
+  // wrapper only (no background of its own).
   similarCardOverlay: {
     ...StyleSheet.absoluteFill,
     alignItems: 'center', justifyContent: 'center',
-    backgroundColor: Colors.scrimStrong, padding: 10, gap: 8,
+  },
+  // Angular: .request-photo-vp — the actual visible badge, inset 24px from each
+  // side, dark translucent background, thin light border, compact/content-sized
+  // (not edge-to-edge).
+  similarCardOverlayBadge: {
+    alignSelf: 'stretch', marginHorizontal: 24,
+    backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 12,
+    paddingHorizontal: 16, paddingVertical: 8, gap: 8,
+    alignItems: 'center',paddingLeft: 12,paddingRight:12,
   },
   similarCardOverlayText: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 11, color: Colors.white, textAlign: 'center', lineHeight: 15,
   },
   similarCardWaBtn: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
+    borderRadius: 8, paddingHorizontal: 6, height: 32, width: '100%',
   },
   similarCardWaBtnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 12, color: Colors.white },
+  // Angular: profile-card.component.scss's .information-block — a top-to-bottom
+  // black scrim (transparent → solid black), 16px vertical/12px horizontal padding,
+  // bottom corners rounded to match the card. Not a flat semi-transparent overlay.
   similarCardCaption: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.55)', paddingHorizontal: 10, paddingVertical: 8,
+    paddingHorizontal: 12, paddingVertical: 16,
+    borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
   },
-  similarCardName: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 13, color: Colors.white },
-  similarCardMeta: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 11, color: Colors.white, marginTop: 2 },
-  similarArrowBtn: {
-    position: 'absolute', top: '50%', marginTop: -16,
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center',
-  },
-  similarArrowLeft:  { left: 8 },
-  similarArrowRight: { right: 8 },
-  similarArrowText: { color: Colors.white, fontSize: 20, lineHeight: 20 },
+  // Angular: .heading3-semibold-16 (Poppins-Semibold, 16px, white).
+  similarCardName: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 18, color: Colors.white },
+  // Angular: .body2-regular-14 (Poppins-Regular, 14px, white), no margin from name.
+  similarCardMeta: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 16, color: Colors.white, paddingRight: 50 },
 
   // Header — a SEPARATE solid white bar in normal flow above the photo (never
   // overlaying it) — confirmed against the real app's screenshots. Content swaps
@@ -2421,6 +2712,14 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingHorizontal: 16, paddingBottom: 10,
+    // The 3-dot's dropdown is absolutely positioned at top:34 — i.e. it hangs
+    // BELOW this bar, over the ScrollView that follows it as a sibling. Later
+    // siblings paint on top by default, and photoWrap inside that ScrollView
+    // carries zIndex:1 of its own, so without lifting the whole header above
+    // the content the dropdown rendered behind the photo and looked like the
+    // menu simply wasn't opening. elevation covers the same case on Android,
+    // where zIndex alone doesn't govern paint order.
+    zIndex: 20, elevation: 20,
   },
   missingBanner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
@@ -2440,9 +2739,17 @@ const s = StyleSheet.create({
   headerSpacer: { flex: 1 },
   // Angular: `.vp-profile-name` (global.scss:22188-22192) — font16 (~16px),
   // Poppins-Medium, `--gray-color1` (#1f1e1b) — not SemiBold/pure-black.
-  headerName: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: 16, color: '#1f1e1b' },
-  headerIconBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  menuDots: { fontSize: 20, lineHeight: 20, color: '#333333', fontWeight: '700' },
+  headerName: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: 18, color: '#1f1e1b' },
+  headerIconBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  // Angular: .width-height-18 (viewprofile.page.scss:22-25) — box sized exactly
+  // to the 18x18 icon, not a bigger 28x28 hit-target box (hitSlop covers touch
+  // area instead) — a bigger box than the icon it holds is what made the row's
+  // spacing look inconsistent depending on render/measure timing.
+  headerIconBtn18: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
+  // Angular: message icon (mr-16) has 16px to its right, on top of headerBar's
+  // own row `gap: 10` — so this adds the remaining 6px to land on 16px total
+  // between Message and Call, matching the live app's spacing exactly.
+  headerIconBtnMsg: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center', marginRight: 6 },
 
   // Angular: dropdown.component.scss .lang-selection — height: 2.15rem (~34px),
   // border 1px #000, radius 8px. Pinned to an exact 108x38 per a manual UI tweak.
@@ -2456,12 +2763,20 @@ const s = StyleSheet.create({
   langPillText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 13, color: '#000000' },
 
   menuDropdown: {
-    position: 'absolute', top: 34, right: 0, minWidth: 200,
+    position: 'absolute', top: 40, right: 8, minWidth: 200,
     backgroundColor: Colors.white, borderRadius: 8, paddingVertical: 4,
     shadowColor: '#000000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 },
-    elevation: 6, zIndex: 10,
+    // Must out-rank headerBar's own elevation (20) — a child with a LOWER
+    // elevation than its parent gets drawn beneath the parent's background on
+    // Android, which would hide the dropdown even though it's mounted.
+    elevation: 24, zIndex: 24,
   },
-  menuItem: { paddingHorizontal: 16, paddingVertical: 12 },
-  menuItemText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.textDark },
-  menuItemDanger: { color: Colors.primary },
+  // Angular: button.component.html:85-90 — an ion-item holding the report icon
+  // (mr-4) then the label, both on one row; the label is body2-regular-14
+  // black-color, NOT a danger/red colour.
+  menuItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 16, paddingVertical: 12,
+  },
+  menuItemText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.black },
 })

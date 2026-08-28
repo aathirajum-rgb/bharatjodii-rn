@@ -79,6 +79,7 @@ import DailyRecommendationScreen   from '../screens/daily-recommendation/DailyRe
 import ViewProfileScreen           from '../screens/viewprofile/ViewProfileScreen'
 import BlockerScreen               from '../screens/verify/BlockerScreen'
 import VerifyIdScreen               from '../screens/verify/VerifyIdScreen'
+import SelfieVerificationScreen     from '../screens/verify/SelfieVerificationScreen'
 import MenuContactsScreen           from '../screens/menu-contacts/MenuContactsScreen'
 import ValidationScreen            from '../screens/validation/ValidationScreen'
 import DiscoverMatchesScreen       from '../screens/discover-matches/DiscoverMatchesScreen'
@@ -243,6 +244,9 @@ export type AppStackParamList = {
   // Angular: pages/verify-id — STUB (see screens/verify/VerifyIdScreen.tsx),
   // real govt-ID verification flow not ported yet.
   'verify-id': undefined
+  // Angular: pages/selfie-verification (see screens/verify/SelfieVerificationScreen.tsx)
+  // — reached from BlockerScreen.tsx's selfie row.
+  'selfie-verification': undefined
   // Angular: '/my-membership' route → pages/menu-contacts (see
   // screens/menu-contacts/MenuContactsScreen.tsx + MenuContactsDesktopLayout.tsx).
   'my-membership': undefined
@@ -631,6 +635,7 @@ export default function AppStack() {
         options={{ gestureEnabled: false }}
       />
       <Stack.Screen name="verify-id" component={VerifyIdScreen} />
+      <Stack.Screen name="selfie-verification" component={SelfieVerificationScreen} />
       <Stack.Screen name="my-membership" component={MenuContactsScreen} />
       <Stack.Screen name="Notification" component={NotificationScreen} />
       <Stack.Screen name="DiscoverMatches" component={DiscoverMatchesScreen} />
@@ -699,11 +704,13 @@ export default function AppStack() {
       <Stack.Screen name="EditProfileMarital" component={EditProfileMaritalScreen} />
       <Stack.Screen name="EditProfileHoroscope" component={AddHoroscopeScreen} />
       <Stack.Screen name="ExternalPage" component={ExternalPageScreen} />
-      <Stack.Screen
-        name="ComponentShowcase"
-        component={ComponentShowcaseScreen}
-        options={{ title: 'Component Library', headerStyle: { backgroundColor: Colors.devAccent }, headerTintColor: Colors.white }}
-      />
+      {__DEV__ && (
+        <Stack.Screen
+          name="ComponentShowcase"
+          component={ComponentShowcaseScreen}
+          options={{ title: 'Component Library', headerStyle: { backgroundColor: Colors.devAccent }, headerTintColor: Colors.white }}
+        />
+      )}
 
       {/* Angular: opened as a modal overlay on the current page — never a full push.
           LanguageSelectionScreen already self-dismisses via the centralized

@@ -62,11 +62,15 @@ function parseJson(segment: string): Record<string, any> | null {
 
 export function parseWebviewHandoffUrl(href: string): WebviewHandoff | null {
   const hashIdx = href.indexOf('#')
-  if (hashIdx === -1) return null
+  if (hashIdx === -1) {
+    return null
+  }
   const hash = href.slice(hashIdx + 1)
   const marker = '/webview/'
   const markerIdx = hash.indexOf(marker)
-  if (markerIdx === -1) return null
+  if (markerIdx === -1) {
+    return null
+  }
 
   let i = markerIdx + marker.length
 
@@ -152,6 +156,35 @@ export async function applyWebviewHandoff(handoff: WebviewHandoff): Promise<Appl
   }
 
   await storeWebURLData(merged)
+
+  // Web-only: store ALL keys from URL payload to localStorage for PWA login flow
+  if (Platform.OS === 'web') {
+    const ops: Promise<void>[] = []
+
+    // Store all keys from param object
+    Object.entries(param).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        ops.push(setItem(key, typeof value === 'string' ? value : JSON.stringify(value)))
+      }
+    })
+
+    // Store all keys from token object
+    if (token) {
+      Object.entries(token).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          ops.push(setItem(key, typeof value === 'string' ? value : JSON.stringify(value)))
+        }
+      })
+    }
+
+    // Store pageId for landing redirect
+    if (pageId) {
+      ops.push(setItem('WEBVIEW_PAGE_ID', pageId))
+    }
+
+    await Promise.all(ops)
+  }
+
   if (merged.APPTYPE !== undefined)  await setItem(StorageKeys.Auth.APP_TYPE, String(merged.APPTYPE))
   if (merged.LANG !== undefined)     await setItem(StorageKeys.Auth.LANG, String(merged.LANG))
   if (merged.WEBLOGIN !== undefined) await setItem(StorageKeys.Auth.WEB_LOGIN, String(merged.WEBLOGIN))

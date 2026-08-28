@@ -230,7 +230,6 @@ export default function ChatScreen({ navigation, route }: Props) {
   // only surfaces its popup lazily, from inside sendMessage()).
   async function refreshChatCount() {
     const result = await getChatCount(partnerId)
-    console.log('[Chat] getChatCount result', result)
     setChatCountResult(result)
     if (result.profileValidation === '0' && result.profileValidationMsg) {
       phoneInfo.handleResult({ type: 'under_validation', message: result.profileValidationMsg })
@@ -268,10 +267,8 @@ export default function ChatScreen({ navigation, route }: Props) {
   // ── Socket wiring ────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false
-    console.log('[Chat] mount — partnerId:', partnerId)
 
     const unsubscribeBasicView = onBasicView((data: any) => {
-      console.log('[Chat] onBasicView', data)
       if (cancelled || !data) return
       if (String(data.ID ?? '') !== partnerId) return
       // RESPBASIC carries some fields at the top level (ID, NAME confirmed) and
@@ -283,7 +280,6 @@ export default function ChatScreen({ navigation, route }: Props) {
       const onlineNow  = view.ONLINENOW ?? data.ONLINENOW
       const lastLogin  = view.LASTLOGIN ?? data.LASTLOGIN
       const blocked    = view.BLOCKED ?? data.BLOCKED
-      console.log('[Chat] onBasicView derived BLOCKED value:', blocked, '(expecting Y=I blocked them, B=they blocked me — unverified against real block data)')
       if (name) setPartnerName(name)
       if (photo) setPartnerPhoto(photo)
       if (onlineNow != null) setPartnerOnline(Number(onlineNow) === 1)
@@ -293,7 +289,6 @@ export default function ChatScreen({ navigation, route }: Props) {
     })
 
     const unsubscribeMessages = onChatMessages((data: ChatMessagesResponse) => {
-      console.log('[Chat] onChatMessages — CHATLIST length:', data?.CHATLIST?.length, 'TOTALMSGCNT:', data?.TOTALMSGCNT)
       if (cancelled) return
       const records = data?.CHATLIST ?? []
       const adapted = records.map(r => adaptChatMessageRecord(r, ownIdRef.current))
@@ -304,7 +299,6 @@ export default function ChatScreen({ navigation, route }: Props) {
     })
 
     const unsubscribeSend = onSendResponse((res: SendMessageResponse) => {
-      console.log('[Chat] onSendResponse', res)
       if (cancelled) return
       setSending(false)
       // Angular: RESPONSECODE 2 + ERRCODE 1 — send failed server-side, just
@@ -329,7 +323,6 @@ export default function ChatScreen({ navigation, route }: Props) {
     const unsubscribeReceiver = onReceiver((data: any) => {
       const msg = data?.MSG?.[0]
       if (cancelled || !msg) return
-      console.log('[Chat] onReceiver', msg)
 
       if (String(msg.SenderId) === partnerId && String(msg.ReceiverId) === ownIdRef.current) {
         const incoming = adaptChatMessageRecord(msg, ownIdRef.current)
@@ -472,8 +465,8 @@ export default function ChatScreen({ navigation, route }: Props) {
       audioRecorder.record()
       recordStartRef.current = Date.now()
       setIsRecording(true)
-    } catch (e) {
-      console.log('[Chat] mic record start failed', e)
+    } catch {
+      // mic failed to start — recording UI simply never enters
     }
   }
 

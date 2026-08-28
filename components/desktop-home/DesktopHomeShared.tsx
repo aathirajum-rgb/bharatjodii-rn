@@ -108,11 +108,11 @@ export function FadingDotPagination({ total, activeIndex }: { total: number; act
 // ─── Section footer row: pagination (left) + "See all" (right) ───────────────
 export function SectionFooter({
   total, activeIndex, seeAllLabel, onSeeAllPress,
-}: { total: number; activeIndex: number; seeAllLabel?: string | undefined; onSeeAllPress: () => void }) {
+}: { total: number; activeIndex: number; seeAllLabel?: string | undefined; onSeeAllPress?: (() => void) | undefined }) {
   return (
     <View style={s.footerRow}>
       <FadingDotPagination total={total} activeIndex={activeIndex} />
-      <SeeAllLink label={seeAllLabel} onPress={onSeeAllPress} />
+      {onSeeAllPress && <SeeAllLink label={seeAllLabel} onPress={onSeeAllPress} />}
     </View>
   )
 }
@@ -137,7 +137,7 @@ export function CarouselSection<T>({
   renderCard: (item: T, index: number) => ReactNode
   onHeaderPress?: (() => void) | undefined
   seeAllLabel?: string | undefined
-  onSeeAllPress: () => void
+  onSeeAllPress?: (() => void) | undefined
 }) {
   const [activeIndex, setActiveIndex] = useState(0)
   function handleScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {

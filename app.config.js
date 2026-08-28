@@ -83,7 +83,7 @@ module.exports = ({ config }) => ({
     ...config.web,
     name: f.appName,
     shortName: f.appName,
-    description: `${f.appName} App`,
+    description: `${f.appName} App`
   },
   extra: {
     appType: f.appType,

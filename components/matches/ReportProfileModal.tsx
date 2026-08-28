@@ -10,10 +10,10 @@
 // it. The PREVIOUS version of this file built that now-nonexistent-in-
 // production evidence UI anyway; simplified to match what Angular's real
 // users actually see today — a plain reason list + single submit button.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import LottieView from 'lottie-react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
@@ -21,6 +21,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import { fetchReportReasons, submitReport, type ReportReason } from '../../service/reportProfileService'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 const BACK_ICON_URI = CDN_SVG + 'arrow-back-activity.svg'
 // Angular: bottom-sheet.component.html:21 — same success animation used for
@@ -39,6 +40,11 @@ export default function ReportProfileModal({
   visible, partnerId, partnerName, onClose, onSubmitted,
 }: ReportProfileModalProps) {
   const { t } = useTranslation()
+  // "Report and Block" was hardcoded to Poppins — wrong once the app language
+  // switches away from English (Angular's --button-english-Medium var swaps
+  // per-language too). This mirrors that: NotoSans* family for the active
+  // language, Poppins for English, re-rendering on every language change.
+  const langFonts = useLanguageFonts()
   const [loading, setLoading] = useState(true)
   const [reasons, setReasons] = useState<ReportReason[]>([])
   const [disabledKeys, setDisabledKeys] = useState<string[]>([])
@@ -123,27 +129,16 @@ export default function ReportProfileModal({
                 earlier pass here misread the CSS class alone (defined once)
                 without checking the markup applies it per-item, and wrongly
                 "corrected" this into a single outer card with inner dividers. */}
-            {reasons.map(reason => {
-              const disabled = disabledKeys.includes(reason.key)
-              const selected = selectedKey === reason.key
-              return (
-                <Pressable
-                  key={reason.key}
-                  style={[m.reasonCard, disabled && m.reasonCardDisabled]}
-                  onPress={() => !disabled && setSelectedKey(reason.key)}
-                  disabled={disabled}
-                >
-                  <Text style={[m.reasonTitle, disabled && m.reasonTitleDisabled]}>{reason.title}</Text>
-                  {disabled ? (
-                    <Text style={m.alreadyReported}>{t('GENERAL.ALREADY_REPORTED')}</Text>
-                  ) : (
-                    <View style={[m.radioOuter, selected && m.radioOuterActive]}>
-                      {selected && <View style={m.radioInner} />}
-                    </View>
-                  )}
-                </Pressable>
-              )
-            })}
+            {reasons.map(reason => (
+              <ReasonRow
+                key={reason.key}
+                reason={reason}
+                disabled={disabledKeys.includes(reason.key)}
+                selected={selectedKey === reason.key}
+                onSelect={() => setSelectedKey(reason.key)}
+                t={t}
+              />
+            ))}
           </ScrollView>
         )}
 
@@ -155,14 +150,30 @@ export default function ReportProfileModal({
             so the real rendered app wins over the stylesheet on disk. */}
         <View style={m.footer}>
           <Pressable
-            style={[m.submitBtn, (!selectedReason || submitting) && m.submitBtnDisabled]}
+            // Same md-mode ion-button ripple as the reason rows — on a solid
+            // red button Ionic's ripple renders as a translucent white wash,
+            // not a light gray one.
+            android_ripple={{ color: 'rgba(255,255,255,0.25)', borderless: false }}
+            style={({ pressed }) => [
+              m.submitBtn,
+              (!selectedReason || submitting) && m.submitBtnDisabled,
+              pressed && selectedReason && !submitting && m.submitBtnPressed,
+            ]}
             disabled={!selectedReason || submitting}
             onPress={handleSubmit}
           >
             {submitting ? (
               <ActivityIndicator size="small" color={Colors.white} />
             ) : (
-              <Text style={m.submitBtnText}>{t('GENERAL.REPORT_BLOCK_CTA')}</Text>
+              <Text
+                style={[
+                  m.submitBtnText,
+                  { fontFamily: langFonts.regular },
+                  (!selectedReason) && m.submitBtnTextDisabled,
+                ]}
+              >
+                {t('GENERAL.REPORT_BLOCK_CTA')}
+              </Text>
             )}
           </Pressable>
         </View>
@@ -181,7 +192,7 @@ export default function ReportProfileModal({
               <Text style={m.successTitle}>{success.title}</Text>
               <Text style={m.successContent}>{success.content}</Text>
               <Pressable style={m.submitBtn} onPress={onSubmitted}>
-                <Text style={m.submitBtnText}>{success.cta}</Text>
+                <Text style={[m.submitBtnText, { fontFamily: langFonts.regular }]}>{success.cta}</Text>
               </Pressable>
             </View>
           </View>
@@ -221,20 +232,33 @@ const m = StyleSheet.create({
   // --inner-padding-start:16, --padding-end:16).
   reasonCard: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    borderWidth: 1, borderColor: '#545454', borderRadius: 8, backgroundColor: Colors.white,
-    paddingVertical: 12, paddingHorizontal: 16, marginTop: 16,
+    borderWidth: 0.5, borderColor: '#545454', borderRadius: 8, backgroundColor: Colors.white,
+    minHeight: 80, paddingVertical: 12, paddingHorizontal: 16, marginTop: 16,
+    // position:relative + overflow:hidden so the animated ripple-fade overlay
+    // (absolute-fill, in ReasonRow below) is clipped to the card's own
+    // rounded corners instead of spilling past them square.
+    position: 'relative', overflow: 'hidden',
   },
   reasonCardDisabled: { opacity: 0.6 },
-  reasonTitle: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, paddingRight: 12 },
+  // Angular wraps title + "Already reported" in one block-level <div> next to
+  // ion-radio (slot="end") — a column, not a row splitting text/label apart.
+  reasonTextCol: { flex: 1, paddingRight: 12 },
+  reasonTitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black,paddingRight: 40 },
   reasonTitleDisabled: { color: Colors.textSecondary },
-  // Angular: .text-disabled { color: #ef4444 }
-  alreadyReported: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#ef4444' },
+  // Angular: class="text-disabled report-profile-steps-content" — color:
+  // #ef4444 from .text-disabled, but font-family is
+  // var(--specialCta-english-Medium) from .report-profile-steps-content
+  // (Medium weight), not the body-regular font this previously used. Sits
+  // BELOW the title (see reasonTextCol), not beside it.
+  alreadyReported: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: 12, color: '#ef4444', marginTop: 8, marginBottom: 4 },
   // Unselected border a bit more visible than the near-invisible Colors.divider
   // (#f0f0f0) — matches the real screenshot's clearly-visible thin gray ring.
   radioOuter: {
-    width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: Colors.inputBorder,
+    width: 20, height: 20, borderRadius: 11, borderWidth: 2, borderColor: Colors.inputBorder,
     alignItems: 'center', justifyContent: 'center',
   },
+  // Angular's ion-radio [disabled] dims rather than removes the circle.
+  radioOuterDisabled: { opacity: 0.5 },
   // Live screenshot confirms the checked radio and submit button are BOTH
   // this app's usual brand-red (Colors.primaryDark, #B50033) — the same red
   // used everywhere else for primary actions, NOT the gold/#F1BA11 the CSS
@@ -250,11 +274,23 @@ const m = StyleSheet.create({
     width: '100%', height: 48, borderRadius: 8,
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.primaryDark,
+    // Clips the Android ripple to the button's own rounded corners instead
+    // of spilling past them square.
+    overflow: 'hidden',
   },
-  // Colors.primaryLight — this app's existing "disabled button bg" token,
-  // reused here instead of a one-off gray.
-  submitBtnDisabled: { backgroundColor: Colors.primaryLight },
-  submitBtnText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.white },
+  // Live screenshot's disabled state is a plain neutral gray fill, not the
+  // brand-red dimmed down — `Colors.primaryLight` (light red) and a plain
+  // opacity-on-red both still read as "red", so this uses `Colors.border`
+  // (the app's existing neutral-gray token) as an actual gray background.
+  submitBtnDisabled: { backgroundColor: Colors.border },
+  // iOS/web fallback for the md-mode ion-button ripple (Android gets the
+  // real ripple via android_ripple above) — a slightly darker red overlay,
+  // not a plain opacity dim.
+  submitBtnPressed: { backgroundColor: Colors.primary },
+  submitBtnText: { fontSize: 16, color: Colors.white },
+  // Dark-gray text reads correctly against the light-gray disabled bg —
+  // white-on-white-ish gray would be nearly invisible.
+  submitBtnTextDisabled: { color: Colors.textSecondary },
 
   // Angular: ion-backdrop (showBackdrop:true) behind the bottomsheet-revamp-popup.
   successOverlay: {
@@ -277,3 +313,89 @@ const m = StyleSheet.create({
   // Angular: body2-regular-14 color-1f1e1b, pr-32 mt-12
   successContent: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#1f1e1b', lineHeight: 20, marginBottom: 24 },
 })
+
+// Angular runs Ionic in mode="md" here — real touch feedback is
+// ion-ripple-effect (@ionic/core), which also supports an "unbounded" mode:
+// the circle starts at the BOX'S OWN CENTER (not the touch point) and
+// expands outward evenly in every direction at once until it covers the
+// whole box — matching "from middle, spreads both sides at the same time".
+// Kept clearly visible (0.35 opacity, not Ionic's barely-there 0.16 default)
+// and slow enough to actually see (450ms expand / 300ms fade), since the
+// point here is a perceptible effect, not literal fidelity to Ionic's real
+// (very fast, very faint) numbers. android_ripple still gives Android its
+// own native ripple; this is the hand-built iOS/web equivalent.
+function ReasonRow({
+  reason, disabled, selected, onSelect, t,
+}: {
+  reason: ReportReason
+  disabled: boolean
+  selected: boolean
+  onSelect: () => void
+  t: (key: string) => string
+}) {
+  const scale = useRef(new Animated.Value(0)).current
+  const opacity = useRef(new Animated.Value(0)).current
+  const [boxSize, setBoxSize] = useState({ width: 0, height: 0 })
+
+  // Circle starts at the box's own center and must reach every corner —
+  // radius = half the diagonal.
+  const centerX = boxSize.width / 2
+  const centerY = boxSize.height / 2
+  const finalRadius = Math.hypot(boxSize.width, boxSize.height) / 2
+  const diameter = finalRadius * 2
+
+  function handlePressIn() {
+    if (disabled) return
+    scale.setValue(0)
+    opacity.setValue(0.50)
+    Animated.timing(scale, { toValue: 1, duration: 450, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start()
+  }
+
+  function handlePressOut() {
+    if (disabled) return
+    Animated.timing(opacity, { toValue: 0, duration: 300, easing: Easing.linear, useNativeDriver: true }).start()
+  }
+
+  return (
+    <Pressable
+      android_ripple={{ color: Colors.inputBorder, borderless: false }}
+      style={m.reasonCard}
+      onLayout={ev => setBoxSize({ width: ev.nativeEvent.layout.width, height: ev.nativeEvent.layout.height })}
+      onPress={() => !disabled && onSelect()}
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
+      disabled={disabled}
+    >
+      {diameter > 0 && (
+        <Animated.View
+          pointerEvents="none"
+          style={{
+            position: 'absolute',
+            left: centerX - diameter / 2,
+            top: centerY - diameter / 2,
+            width: diameter,
+            height: diameter,
+            borderRadius: diameter / 2,
+            backgroundColor: Colors.inputBorder,
+            opacity,
+            transform: [{ scale }],
+          }}
+        />
+      )}
+      {/* Angular: report-profile.component.html:42-46 — the reason title and
+          the "Already reported" label are both inside the SAME <div> (block-
+          level, stacked), separate from ion-radio at slot="end" — title on
+          top, red label below it, not side-by-side with the label pushed to
+          the right edge. */}
+      <View style={m.reasonTextCol}>
+        <Text style={[m.reasonTitle, disabled && m.reasonTitleDisabled]}>{reason.title}</Text>
+        {disabled && <Text style={m.alreadyReported}>{t('GENERAL.ALREADY_REPORTED')}</Text>}
+      </View>
+      {/* Angular keeps ion-radio rendered even when [disabled]="true" — it
+          just becomes non-interactive, it doesn't disappear. */}
+      <View style={[m.radioOuter, selected && m.radioOuterActive, disabled && m.radioOuterDisabled]}>
+        {selected && <View style={m.radioInner} />}
+      </View>
+    </Pressable>
+  )
+}

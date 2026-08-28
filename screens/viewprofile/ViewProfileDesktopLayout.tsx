@@ -24,6 +24,7 @@ import {
 import MembershipBanner from '../../components/matches/MembershipBanner'
 import {
   ICON, familyCountText, SimilarProfileCardItem, HOME_PLACE_DOMAIN,
+  MENU_DOTS_URI, REPORT_PROFILE_ICON_URI,
 } from './ViewProfileScreen'
 import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interface'
 import type { SimilarProfileCard, StarMatchResult } from '../../service/viewProfileService'
@@ -432,17 +433,22 @@ export default function ViewProfileDesktopLayout({
                       <Pressable onPress={onWhatsApp} hitSlop={8}><WhatsAppIcon width={24} height={24} /></Pressable>
                     </>
                   )}
+                  {/* Angular: the 3-dot (viewprofile.page.html:77-79,
+                      dot3-revamp.svg) opens ViewProfileThreeDotBtn
+                      (button.component.html:80-98), whose only option is
+                      "Report this Profile" (MORE_OPT_2) with
+                      report-profile-img.svg beside it, in plain black text.
+                      "Don't show" is not part of that menu in Angular — it
+                      lives on the CTA row. */}
                   <View>
                     <Pressable style={s.menuBtn} onPress={() => setShowMenu(v => !v)} hitSlop={8}>
-                      <Text style={s.menuDots}>⋮</Text>
+                      <CdnSvg uri={MENU_DOTS_URI} width={24} height={24} />
                     </Pressable>
                     {showMenu && (
                       <View style={s.menuDropdown}>
-                        <Pressable style={s.menuItem} onPress={() => { setShowMenu(false); onDontShow() }}>
-                          <Text style={s.menuItemText}>{t('MATCHES.MORE_OPT_1')}</Text>
-                        </Pressable>
                         <Pressable style={s.menuItem} onPress={() => { setShowMenu(false); onReportProfile() }}>
-                          <Text style={[s.menuItemText, s.menuItemDanger]}>{t('MATCHES.MORE_OPT_2')}</Text>
+                          <CdnSvg uri={REPORT_PROFILE_ICON_URI} width={20} height={20} />
+                          <Text style={s.menuItemText}>{t('MATCHES.MORE_OPT_2')}</Text>
                         </Pressable>
                       </View>
                     )}
@@ -790,16 +796,19 @@ const s = StyleSheet.create({
   badgeRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   heroIcons: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   menuBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
-  menuDots: { fontSize: 20, lineHeight: 20, color: '#333333', fontWeight: '700' },
   menuDropdown: {
     position: 'absolute', top: 30, right: 0, minWidth: 200,
     backgroundColor: Colors.white, borderRadius: 8, paddingVertical: 4,
     shadowColor: '#000000', shadowOpacity: 0.15, shadowRadius: 8, shadowOffset: { width: 0, height: 4 },
     elevation: 6, zIndex: 10,
   },
-  menuItem: { paddingHorizontal: 16, paddingVertical: 12 },
-  menuItemText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textDark },
-  menuItemDanger: { color: Colors.primary },
+  // Angular: button.component.html:85-90 — report icon (mr-4) then label on one
+  // row; label is body2-regular-14 black-color, not a danger/red colour.
+  menuItem: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+    paddingHorizontal: 16, paddingVertical: 12,
+  },
+  menuItemText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
 
   name: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black, marginTop: 12 },
   jodiId: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, marginTop: 4 },

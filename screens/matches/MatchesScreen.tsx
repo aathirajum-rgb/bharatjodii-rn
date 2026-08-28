@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
-  Easing,
   FlatList,
   Image,
   Linking,
@@ -353,7 +352,9 @@ export const MatchCard = memo(function MatchCard({
               disabled={dontShowDisabled}
             >
               <CloseIcon width={24} height={24} />
-              <Text style={c.ctaDontShowText}>{t('GENERAL.DONTSHOWCTA')}</Text>
+              <Text style={[c.ctaDontShowText, dontShowDisabled && c.ctaDisabledText]}>
+                {t('GENERAL.DONTSHOWCTA')}
+              </Text>
             </Pressable>
             <Pressable
               style={[c.ctaViewLater, viewLaterDisabled && c.ctaDisabled]}
@@ -361,7 +362,9 @@ export const MatchCard = memo(function MatchCard({
               disabled={viewLaterDisabled}
             >
               <ViewLaterIcon width={24} height={24} />
-              <Text style={c.ctaViewLaterText}>{t('GENERAL.VIEWLATER')}</Text>
+              <Text style={[c.ctaViewLaterText, viewLaterDisabled && c.ctaDisabledText]}>
+                {t('GENERAL.VIEWLATER')}
+              </Text>
             </Pressable>
           </View>
           <Pressable style={c.ctaLike} onPress={onLike}>
@@ -963,8 +966,6 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   const titleHRef    = useRef(0)   // height of title row only — amount to slide (Angular offsetHt)
   const headerHRef   = useRef(0)   // full header height — used for FlatList paddingTop
   const [headerH, setHeaderH] = useState(0)
-  const scrollYRef   = useRef(0)
-  const isHiddenRef  = useRef(false)
 
   function handleTitleLayout(h: number) {
     if (h > 0) titleHRef.current = h
@@ -977,36 +978,8 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     }
   }
 
-  function handleScroll(e: any) {
-    // Header hide-on-scroll animation disabled per request — header now stays fixed.
-    // (Original Angular-mirroring slide logic kept here, commented out, in case it's revisited.)
-    // const current = e.nativeEvent.contentOffset.y | 0
-    // const delta   = current - scrollYRef.current
-    // if (Math.abs(delta) < 10) return
-    // scrollYRef.current = current
-    //
-    // // Angular: hide when scrollY > 100 && scrolling down, show when delta < -15 || scrollY < 50
-    // const shouldHide = current > 100 && delta > 0
-    // const shouldShow = delta < -15 || current < 50
-    //
-    // if (shouldHide && !isHiddenRef.current) {
-    //   isHiddenRef.current = true
-    //   Animated.timing(headerAnim, {
-    //     toValue:         -(titleHRef.current || 56),  // slide by title row height only
-    //     duration:        300,
-    //     easing:          Easing.ease,
-    //     useNativeDriver: true,
-    //   }).start()
-    // } else if (shouldShow && isHiddenRef.current) {
-    //   isHiddenRef.current = false
-    //   Animated.timing(headerAnim, {
-    //     toValue:         0,
-    //     duration:        300,
-    //     easing:          Easing.ease,
-    //     useNativeDriver: true,
-    //   }).start()
-    // }
-  }
+  // Header hide-on-scroll animation disabled per request — header now stays fixed.
+  function handleScroll() {}
 
   // apiStart tracks the cursor for pagination (how many profiles we've fetched from API)
   const apiStartRef = useRef(0)
@@ -1217,8 +1190,8 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
                 // no corresponding false-path anywhere in this file before this.
                 setShowPhotoPromotion(false)
               }
-            } catch (err) {
-              console.log('[PhotoBanner] error in banner check:', err)
+            } catch {
+              // banner check failed — hero banner just stays cleared for this load
             }
           }),
           fetchMenuPromo(),
@@ -2684,9 +2657,13 @@ const c = StyleSheet.create({
   },
   ctaViewLaterText: { fontFamily: Fonts.poppinsRegular, fontSize: 14, color: '#545454' },
 
-  // Angular: FUNC.disableDontShow()/disableViewLater() — dimmed, non-tappable once
-  // the action was already taken on a profile that reappears in a re-fetched list.
-  ctaDisabled: { opacity: 0.4 },
+  // Angular: button-revamp.component.scss:13-21 — `ion-button[disabled]` only
+  // overrides background (#e6e6e6) and text (#8A8A8A) via `--background`/
+  // `--color`, `opacity: unset !important` (explicitly NOT dimmed) — the
+  // greyBorder class's own #545454 1px border (setButtonBorder mixin) is left
+  // untouched, so the border still shows on a disabled button, same as enabled.
+  ctaDisabled: { backgroundColor: '#e6e6e6' },
+  ctaDisabledText: { color: '#8A8A8A' },
 
   // Figma: height 44, bg #b50033 (Colors.primaryDark, not the app's general primary red),
   // label Poppins-SemiBold 14 white
