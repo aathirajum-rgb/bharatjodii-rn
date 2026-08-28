@@ -149,13 +149,23 @@ export function LikeIcon({ width = 18, height = 19 }: IconProps) {
 // <b>/<strong> → bold Text node
 // <br> → newline character
 
+// Angular global.scss's known [innerHTML] span classes that carry their own
+// look — e.g. .height-revamp-text-small (HEIGHTCATEGORY's "(Greater than 6 ft)"
+// suffix): english-regular-poppins @ font12, vs. the surrounding value text's
+// own bold/medium style — so this class must actually knock weight/size back
+// down, not just inherit whatever the wrapping <Text style> already set.
+const HTML_SPAN_CLASS_STYLES: Record<string, Record<string, any>> = {
+  'height-revamp-text-small': { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 12 },
+}
+
 // Renders server HTML as styled React Native Text.
-// Handles <span style="color:...;font-size:...px"> and <span class="..."> (any
-// span, styled or not) plus <br> (newline). spanStyle is a baseline applied to
-// EVERY span segment (e.g. bumping a discount amount to a bigger/bolder look,
-// matching Angular's convention of giving that span its own CSS class rather
-// than an inline style) — an inline color/font-size on the span itself, when
-// present, overrides spanStyle for that property.
+// Handles <span style="color:...;font-size:...px">, <span class="..."> (mapped
+// via HTML_SPAN_CLASS_STYLES for classes with known look), plus <br> (newline).
+// spanStyle is a baseline applied to EVERY span segment (e.g. bumping a discount
+// amount to a bigger/bolder look, matching Angular's convention of giving that
+// span its own CSS class rather than an inline style) — a known class or an
+// inline color/font-size on the span itself, when present, overrides spanStyle
+// for that property.
 export function HtmlText({
   html, style, spanStyle, numberOfLines,
 }: { html: string; style?: any; spanStyle?: any; numberOfLines?: number | undefined }) {
@@ -169,10 +179,15 @@ export function HtmlText({
     if (sm.index > last) {
       segs.push({ text: cleaned.slice(last, sm.index).replace(/<[^>]*>/g, ''), segStyle: null })
     }
-    const inline    = sm[1].match(/style="([^"]*)"/)?.[1] ?? ''
+    const attrs     = sm[1]
+    const inline    = attrs.match(/style="([^"]*)"/)?.[1] ?? ''
+    const classM    = attrs.match(/class="([^"]*)"/)?.[1] ?? ''
     const colorM    = inline.match(/color:\s*([^;]+)/)
     const fontSizeM = inline.match(/font-size:\s*([\d.]+)px/)
     const segStyle: Record<string, any> = { ...spanStyle }
+    for (const cls of classM.split(/\s+/)) {
+      if (HTML_SPAN_CLASS_STYLES[cls]) Object.assign(segStyle, HTML_SPAN_CLASS_STYLES[cls])
+    }
     if (colorM)    segStyle.color    = colorM[1].trim()
     if (fontSizeM) segStyle.fontSize = Number(fontSizeM[1])
     segs.push({ text: sm[2].replace(/<[^>]*>/g, ''), segStyle: Object.keys(segStyle).length ? segStyle : null })

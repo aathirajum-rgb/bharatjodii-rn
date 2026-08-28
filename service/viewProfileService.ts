@@ -42,6 +42,10 @@ export async function getViewProfile(matriId: string): Promise<Record<string, an
   ])
   const lastLogin = session?.['LASTLOGIN'] ?? ''
   const params = `ID=${userId ?? ''}&VIEWEDID=${matriId}&MEMBERSHIPTYPE=${entryType ?? ''}&LASTLOGIN=${lastLogin}`
+  // TEMP DEBUG — pairs with DBG_VIEWPROFILE_RAW below, to check whether a
+  // technical-difficulties ERRCODE is a genuine backend error or an empty/stale
+  // ID/ENTRYTYPE/LASTLOGIN on our side causing the backend to reject the call.
+  if (__DEV__) console.log('DBG_VIEWPROFILE_PARAMS', params)
 
   const result = await apiCall(Endpoints.profile.view, 'POST', params)
   _lastRawResult = result
