@@ -82,8 +82,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const handoff = getInitialWebviewHandoff()
       if (handoff) {
         try {
-          window.history.replaceState(null, '', window.location.pathname + window.location.search)
-        } catch {}
+          const newUrl = window.location.pathname + window.location.search
+          if (__DEV__)
+            window.history.replaceState(null, '', newUrl)
+        } catch (e) {}
         const result = await applyWebviewHandoff(handoff)
         if (result) {
           const isNewUser = handoff.buildparam?.REGISTER === '1'
@@ -101,7 +103,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               // handlePageLanding gets a chance to read the '2' we just seeded.
               resetTo(ENavigation.ONBOARDING, { pageNo: '2' })
             } else {
-              await handlePageLanding(result.pageId, result.userId)
+              // Use landing pageId from URL immediately for routing (web-only)
+              // e.g., pageId='28' → recharge page
+              const storedPageId = Platform.OS === 'web' ? await getItem('WEBVIEW_PAGE_ID') : undefined
+              const landingPageId = result.pageId || storedPageId || undefined
+              await handlePageLanding(landingPageId, result.userId)
             }
           }
           return
@@ -143,7 +149,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (deactivated) {
           await handleDeactivation(deactivated)
         } else {
-          await handlePageLanding(pageId, userId)
+          // Web-only: check for stored landing pageId from webview URL (e.g., 28 → recharge)
+          const storedPageId = Platform.OS === 'web' ? await getItem('WEBVIEW_PAGE_ID') : undefined
+          const landingPageId = pageId || storedPageId || undefined
+          await handlePageLanding(landingPageId, userId)
         }
       }
     }

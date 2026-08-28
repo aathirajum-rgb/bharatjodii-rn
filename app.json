@@ -36,6 +36,9 @@
       "backgroundColor": "#ffffff",
       "themeColor": "#ffffff",
       "description": "Jodii App"
+    },
+     "experiments": {
+      "baseUrl": "/jodii"
     }
   }
 }

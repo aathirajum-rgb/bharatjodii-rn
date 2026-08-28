@@ -45,7 +45,7 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import {
   getViewProfile, markProfileViewed, getSimilarProfiles, viewHoroscope, getStarMatch,
   getBioDataLink, getEnlargedPhotos, getBiodataExtras, saveBiodataThemeId,
-  _debugLastViewProfileResult, _consumeInvalidMatriIdMessage,
+  _consumeInvalidMatriIdMessage,
   type SimilarProfileCard, type StarMatchResult, type BiodataTheme,
 } from '../../service/viewProfileService'
 import { viewProfileAdapter } from '../../adapters/viewProfile.adapter'
@@ -722,7 +722,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         })
       } else {
         // JODII-499: surface the real "Invalid MatriID" message when that's
-        // confirmed the cause — the TEMP DEBUG fallback below still covers
+        // confirmed the cause — the generic fallback below still covers
         // every other failure shape.
         setInvalidMatriIdMessage(_consumeInvalidMatriIdMessage())
       }
@@ -1394,20 +1394,12 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     )
   }
   if (!profile) {
-    // TEMP DEBUG — shows the raw API response so we can see exactly why adapting
-    // failed (bad matriId param, RESPONSECODE/ERRCODE mismatch, or an unexpected
-    // response envelope shape) without needing a dev console. Remove once confirmed.
     return (
       <SafeAreaView style={s.loaderScreen}>
         <Text style={s.notFoundText}>Unable to load this profile.</Text>
         <Pressable style={s.backBtnInline} onPress={() => handleBack()}>
           <Text style={s.backBtnInlineText}>{'‹ Back'}</Text>
         </Pressable>
-        <ScrollView style={s.debugBox}>
-          <Text style={s.debugLabel}>DEBUG matriId: {JSON.stringify(matriId)}</Text>
-          <Text style={s.debugLabel}>DEBUG raw response:</Text>
-          <Text style={s.debugText}>{JSON.stringify(_debugLastViewProfileResult(), null, 2)}</Text>
-        </ScrollView>
       </SafeAreaView>
     )
   }
@@ -2363,9 +2355,6 @@ const s = StyleSheet.create({
   notFoundText: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 14, color: Colors.textSecondary },
   backBtnInline:     { paddingHorizontal: 16, paddingVertical: 8 },
   backBtnInlineText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 14, color: Colors.link },
-  debugBox:   { maxHeight: 300, width: '100%', paddingHorizontal: 16 },
-  debugLabel: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 12, color: Colors.primary, marginTop: 8 },
-  debugText:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 11, color: Colors.textSecondary },
 
   scrollView:    { flex: 1 },
   scrollContent: {},

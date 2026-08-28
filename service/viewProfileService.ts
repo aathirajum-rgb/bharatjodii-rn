@@ -10,23 +10,14 @@ import { StorageKeys as SK } from '../constants/storage.keys'
 import { getSession } from './registrationService'
 import { stripAgeUnit, pickListingPhoto } from '../adapters/profileListing.adapter'
 
-// TEMP DEBUG — remove once the real API's response envelope is confirmed live.
-// Lets ViewProfileScreen show exactly what came back when adapting fails, instead
-// of guessing at the response shape from Angular source alone.
-let _lastRawResult: any = null
-export function _debugLastViewProfileResult(): any {
-  return _lastRawResult
-}
-
 // JODII-499: Angular's chat.service.ts/messages.component.ts show a dedicated
 // "Invalid MatriID" toast for RESPONSECODE==2 && ERRCODE==3 (checked in three
 // near-identical, uncentralized call sites there, all off the chatCount API).
 // There's no chat-thread screen in this port yet to reuse that exact call site,
 // so this is surfaced at the closest reachable RN equivalent — viewing a
-// profile by a bad matriId — via the same one-shot "debug slot" pattern as
-// _lastRawResult above, rather than changing getViewProfile()'s return shape
-// (which ~15 other call sites in ViewProfileScreen.tsx depend on staying a
-// plain Record<string,any> | null).
+// profile by a bad matriId — via a one-shot "consume once" slot, rather than
+// changing getViewProfile()'s return shape (which ~15 other call sites in
+// ViewProfileScreen.tsx depend on staying a plain Record<string,any> | null).
 let _lastInvalidMatriIdMessage: string | null = null
 export function _consumeInvalidMatriIdMessage(): string | null {
   const msg = _lastInvalidMatriIdMessage
@@ -48,8 +39,6 @@ export async function getViewProfile(matriId: string): Promise<Record<string, an
   if (__DEV__) console.log('DBG_VIEWPROFILE_PARAMS', params)
 
   const result = await apiCall(Endpoints.profile.view, 'POST', params)
-  _lastRawResult = result
-  if (__DEV__) console.log('DBG_VIEWPROFILE_RAW', JSON.stringify(result))
 
   // Confirmed live (2026-07-10 debug capture): this endpoint returns RESPONSECODE/
   // ERRCODE as numbers (1/0), not the string '1'/'0' most other endpoints in this
@@ -278,12 +267,6 @@ export interface SimilarProfileCard {
   isPhotoAvailable: boolean
 }
 
-// TEMP DEBUG — remove once the fallback's real behavior is confirmed live.
-let _lastSimilarDebug: any = null
-export function _debugLastSimilarProfilesResult(): any {
-  return _lastSimilarDebug
-}
-
 function toSimilarCard(p: Record<string, any>): SimilarProfileCard {
   return {
     matriId:          String(p['MATRIID'] ?? p['MATRID'] ?? p['NBID'] ?? ''),
@@ -322,7 +305,6 @@ export async function getSimilarProfiles(matriId: string): Promise<SimilarProfil
     .filter(p => p.matriId)
 
   if (primary.length > 2) {
-    _lastSimilarDebug = { source: 'primary', primaryCount: primary.length }
     return primary
   }
 
@@ -338,11 +320,6 @@ export async function getSimilarProfiles(matriId: string): Promise<SimilarProfil
     .filter((p: any) => p && !p['BANNERSLOT'])
     .map(toSimilarCard)
     .filter((p: SimilarProfileCard) => p.matriId)
-
-  _lastSimilarDebug = {
-    source: 'fallback', primaryCount: primary.length, fallbackCount: fallback.length,
-  }
-  if (__DEV__) console.log('DBG_SIMILARPROFILES', JSON.stringify(_lastSimilarDebug))
 
   return fallback.length > 0 ? fallback : primary
 }

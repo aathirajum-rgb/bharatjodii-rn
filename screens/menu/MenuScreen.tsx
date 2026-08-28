@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useFocusEffect } from '@react-navigation/native'
 import { useTranslation } from 'react-i18next'
 import {
   Animated,
@@ -193,7 +194,12 @@ export default function MenuScreen({ navigation }: Props) {
   const [appVersion,    setAppVersion]    = useState('')
   const [logoutSheetVisible, setLogoutSheetVisible] = useState(false)
 
-  useEffect(() => {
+  // On FOCUS, not just mount. Menu stays mounted in the tab stack, so a photo
+  // uploaded from Edit Profile never reached it — the mount-only read meant the
+  // avatar placeholder persisted until the app was restarted. HomeScreen
+  // already refetches on focus (useFocusEffect -> loadHome) for this reason.
+  const loadProfileSummary = useCallback(() => {
+    let cancelled = false
     Promise.all([
       getSession(),
       getItem(StorageKeys.Auth.USER_ID),
@@ -201,15 +207,22 @@ export default function MenuScreen({ navigation }: Props) {
       getItem(StorageKeys.App.APP_VERSION),
       getItem(StorageKeys.Verification.EKYC_STATUS),
     ]).then(([session, id, photo, ver, ekyc]) => {
+      if (cancelled) return
       setUserName(String(session['NAME'] ?? ''))
       setUserId(id ?? '')
       setPhotoUrl(photo ?? '')
+      // A newly arrived photo clears any earlier load failure, otherwise the
+      // placeholder would stick for the life of the mount.
+      setPhotoFailed(false)
       setEntryType(String(session['ENTRYTYPE'] ?? ''))
       setMembershipExp(String(session['PLANEXPIRY'] ?? session['VALIDTILL'] ?? ''))
       setAppVersion(ver ?? '')
       setIsVerified(ekyc === '1')
     })
+    return () => { cancelled = true }
   }, [])
+
+  useFocusEffect(loadProfileSummary)
 
   useEffect(() => {
     getOwnGenderAvatarUrl().then(setGenderAvatarUrl)

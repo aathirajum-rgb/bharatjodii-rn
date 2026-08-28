@@ -10,6 +10,7 @@ import { Endpoints } from './api.endpoints'
 import { getItem, setItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { getRegistrationArrays } from './registrationService'
+import { stripAndDecodeHtml } from '../utils/htmlEntities'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -50,6 +51,24 @@ function resolveImageUrl(url: string): string {
 // both the logged-in user's own id; TYPE=BIODATA additionally unlocks
 // BIODATATHEME (the swipeable color templates) and QRCODE on the SAME response.
 
+// Walks a decoded-JSON value and runs every string through Angular's
+// innerHTML-equivalent (strip markup, then decode entities). Arrays and nested
+// objects are rebuilt rather than mutated, so the caller's input is untouched.
+//
+// Safe over the whole payload including URLs and colours: decodeEntities only
+// rewrites a `&...;` sequence, and neither the CDN image URLs nor the theme's
+// "#011443" hex contain one.
+function decodeDeep(value: unknown): unknown {
+  if (typeof value === 'string') return stripAndDecodeHtml(value)
+  if (Array.isArray(value)) return value.map(decodeDeep)
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) out[k] = decodeDeep(v)
+    return out
+  }
+  return value
+}
+
 export async function getBiodataProfile(): Promise<BiodataProfile | null> {
   const userId = await getItem(SK.Auth.USER_ID)
   const params = `ID=${userId ?? ''}&VIEWEDID=${userId ?? ''}&TYPE=BIODATA`
@@ -59,8 +78,19 @@ export async function getBiodataProfile(): Promise<BiodataProfile | null> {
   // typo'd REPONSE key, not RESPONSE.
   if (!(result?.RESPONSECODE == 1 && result?.ERRCODE == 0)) return null
 
-  const raw = result?.REPONSE
-  if (!raw || typeof raw !== 'object') return null
+  const rawResponse = result?.REPONSE
+  if (!rawResponse || typeof rawResponse !== 'object') return null
+
+  // This endpoint returns non-Latin text as HTML numeric character references,
+  // not UTF-8 — Tamil "திருமண" arrives as "&#x0BA4;&#x0BBF;&#x0BB0;&#x0BC1;...".
+  // Angular renders every one of these through [innerHTML], which decodes the
+  // references (and strips markup) as a side effect. An RN <Text> does neither,
+  // so the escapes reached the screen verbatim in the Indic locales.
+  //
+  // Decoded once here, over the whole payload, rather than at the ~40 individual
+  // read sites in BiodataScreen — that way any field added later is covered too,
+  // including the ones feeding doshamText and the theme list below.
+  const raw = decodeDeep(rawResponse) as Record<string, any>
 
   const themes: BiodataTheme[] = Array.isArray(raw.BIODATATHEME)
     ? raw.BIODATATHEME

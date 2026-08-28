@@ -12,7 +12,7 @@ const CARD_H = 160
 type Props = {
   videos: HelpVideo[]
   onVideoPress: (video: HelpVideo) => void
-  onSeeAllPress: () => void
+  onSeeAllPress?: (() => void) | undefined
 }
 
 export default function SelfHelpVideosSection({ videos, onVideoPress, onSeeAllPress }: Props) {
