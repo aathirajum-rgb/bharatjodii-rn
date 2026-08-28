@@ -21,6 +21,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
 import { SemanticFontsEnglish } from '../../src/theme/fonts'
+import { decodeEntities } from '../../utils/htmlEntities'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 
 // ─── Shared card badge/photo CDN URLs ──────────────────────────────────────────
@@ -177,7 +178,7 @@ export function HtmlText({
   let sm: RegExpExecArray | null
   while ((sm = spanRe.exec(cleaned)) !== null) {
     if (sm.index > last) {
-      segs.push({ text: cleaned.slice(last, sm.index).replace(/<[^>]*>/g, ''), segStyle: null })
+      segs.push({ text: decodeEntities(cleaned.slice(last, sm.index).replace(/<[^>]*>/g, '')), segStyle: null })
     }
     const attrs     = sm[1]
     const inline    = attrs.match(/style="([^"]*)"/)?.[1] ?? ''
@@ -190,13 +191,13 @@ export function HtmlText({
     }
     if (colorM)    segStyle.color    = colorM[1].trim()
     if (fontSizeM) segStyle.fontSize = Number(fontSizeM[1])
-    segs.push({ text: sm[2].replace(/<[^>]*>/g, ''), segStyle: Object.keys(segStyle).length ? segStyle : null })
+    segs.push({ text: decodeEntities(sm[2].replace(/<[^>]*>/g, '')), segStyle: Object.keys(segStyle).length ? segStyle : null })
     last = sm.index + sm[0].length
   }
   if (last < cleaned.length) {
-    segs.push({ text: cleaned.slice(last).replace(/<[^>]*>/g, ''), segStyle: null })
+    segs.push({ text: decodeEntities(cleaned.slice(last).replace(/<[^>]*>/g, '')), segStyle: null })
   }
-  if (segs.length === 0) segs.push({ text: cleaned.replace(/<[^>]*>/g, ''), segStyle: null })
+  if (segs.length === 0) segs.push({ text: decodeEntities(cleaned.replace(/<[^>]*>/g, '')), segStyle: null })
   return (
     <Text style={style} numberOfLines={numberOfLines}>
       {segs.map((seg, i) =>

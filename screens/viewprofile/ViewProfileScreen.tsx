@@ -37,6 +37,7 @@ import PhotoViewerModal from '../../components/matches/PhotoViewerModal'
 import PhotoViewerModalDesktop from '../../components/matches/PhotoViewerModalDesktop'
 import HoroscopeSvgViewerModal from '../../components/matches/HoroscopeSvgViewerModal'
 import ReportProfileModal from '../../components/matches/ReportProfileModal'
+import LanguagePillSheet from '../../components/language-pill-sheet/LanguagePillSheet'
 import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
 import Popover, { type PopoverAnchor } from '../../components/popover/Popover'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
@@ -59,7 +60,7 @@ import { redirectToViewProfile } from '../../service/buttonService'
 import { shouldShowCoachMark, markCoachMarkShown } from '../../service/coachMarkService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
 import i18n from '../../i18n'
 import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interface'
@@ -203,7 +204,8 @@ export function familyCountText(
 // ─── Small presentational helpers ──────────────────────────────────────────────
 
 function SectionHeader({ title }: { title: string }) {
-  return <Text style={s.sectionHeader}>{title}</Text>
+  const langFonts = useLanguageFonts()
+  return <Text style={[s.sectionHeader, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 }
 
 // Angular: each row is icon + (label directly ABOVE value, not side-by-side), with
@@ -212,6 +214,7 @@ function SectionHeader({ title }: { title: string }) {
 function DetailRow({
   icon, label, value, isLast,
 }: { icon: string; label: string; value?: string | undefined; isLast?: boolean }) {
+  const langFonts = useLanguageFonts()
   if (!value) return null
   return (
     <View style={[s.detailRow, !isLast && s.detailRowBorder]}>
@@ -219,11 +222,11 @@ function DetailRow({
         <CdnSvg uri={icon} width={20} height={20} />
       </View>
       <View style={s.detailTextCol}>
-        <Text style={s.detailLabel}>{label}</Text>
+        <Text style={[s.detailLabel, { fontFamily: langFonts.regular }]}>{label}</Text>
         {/* Angular binds several of these via [innerHTML] (e.g. HEIGHTCATEGORY carries
             a literal <span class="height-revamp-text-small">...</span>) — a plain Text
             would show the raw tag text; HtmlText strips/renders it properly. */}
-        <HtmlText html={value} style={s.detailValue} />
+        <HtmlText html={value} style={[s.detailValue, { fontFamily: langFonts.medium }]} />
       </View>
     </View>
   )
@@ -247,6 +250,7 @@ export function SimilarProfileCardItem({
   // missing-caption bug a real screenshot caught).
   size?: number | undefined
 }) {
+  const langFonts = useLanguageFonts()
   return (
     <Pressable style={[s.similarCard, size ? { width: size, height: size } : null]} onPress={onPress}>
       <View style={s.similarCardClip}>
@@ -263,9 +267,9 @@ export function SimilarProfileCardItem({
                 style={s.similarCardCaption}
                 pointerEvents="none"
               >
-                <Text style={s.similarCardName} numberOfLines={1}>{card.name}</Text>
+                <Text style={[s.similarCardName, { fontFamily: langFonts.semiBold }]} numberOfLines={1}>{card.name}</Text>
                 {(card.age || card.education) && (
-                  <Text style={s.similarCardMeta} numberOfLines={2}>
+                  <Text style={[s.similarCardMeta, { fontFamily: langFonts.regular }]} numberOfLines={2}>
                     {[card.age && `${card.age} Yrs`, card.education].filter(Boolean).join(', ')}
                   </Text>
                 )}
@@ -283,7 +287,7 @@ export function SimilarProfileCardItem({
                 whole card edge-to-edge instead of a compact centered badge. */}
             <View style={s.similarCardOverlay}>
               <View style={s.similarCardOverlayBadge}>
-                <Text style={s.similarCardOverlayText}>
+                <Text style={[s.similarCardOverlayText, { fontFamily: langFonts.regular }]}>
                   {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
                 </Text>
                 {/* Angular: --ion-color-whatsapp-bg = linear-gradient(180deg, #4AC14B 0%,
@@ -296,7 +300,7 @@ export function SimilarProfileCardItem({
                   style={s.similarCardWaBtn}
                 >
                   <WhatsAppIcon width={16} height={16} />
-                  <Text style={s.similarCardWaBtnText}>{t('GENERAL.WHATSAPP')}</Text>
+                  <Text style={[s.similarCardWaBtnText, { fontFamily: langFonts.medium }]}>{t('GENERAL.WHATSAPP')}</Text>
                 </LinearGradient>
               </View>
             </View>
@@ -311,6 +315,7 @@ export function SimilarProfileCardItem({
 
 export default function ViewProfileScreen({ navigation, route }: { navigation: any; route: any }) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   const isDesktop = useIsDesktopWeb()
   // Feature 2 (prev/next profile swipe): matriId is now state, not a plain const —
   // navigating to a neighbor profile just swaps this and lets the existing load
@@ -583,6 +588,10 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   const [showCoachMark, setShowCoachMark] = useState(false)
   // Feature 5: report-profile reasons-picker modal.
   const [reportModalOpen, setReportModalOpen] = useState(false)
+  // Angular: the header language pill here opens LanguageSelectionComponent
+  // with actionType='mothertongue' — a 2-language bottom sheet (English +
+  // this domain's one regional language), NOT the full-page language list.
+  const [showLanguageSheet, setShowLanguageSheet] = useState(false)
   // Feature 6 biodata theming — 5 swipeable color/background templates, own-profile only.
   const [themes, setThemes] = useState<BiodataTheme[]>([])
   const [themeIndex, setThemeIndex] = useState(0)
@@ -746,7 +755,17 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 
     load()
     return () => { cancelled = true }
-  }, [matriId])
+    // i18n.language: Angular's changeLanguage() (matches.page.ts:3179-3202,
+    // mirrored by MatchesScreen.tsx's own mountedLangRef effect) re-fetches the
+    // WHOLE page on a language switch because these field values — Marital
+    // Status, Physical Status, Mother Tongue, Profile Created For, Home Town,
+    // Professional/Religious details, etc. — are returned by the API already
+    // localized via the request's own LANG param (service/apiClient.ts's
+    // buildCommonParams(), reading StorageKeys.Auth.LANG), not translated
+    // client-side. Without re-running this load on language change, only the
+    // static i18n labels (via t()) updated — the profile's own data VALUES
+    // stayed frozen in whatever language they were first fetched in.
+  }, [matriId, i18n.language])
 
   // Feature 8: show the coach-mark once ever, only when there's actually a
   // neighbor profile to tap to (no point advertising the arrows otherwise),
@@ -1386,9 +1405,9 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     // generic TEMP DEBUG fallback below rather than sitting on top of it.
     return (
       <SafeAreaView style={s.loaderScreen}>
-        <Text style={s.notFoundText}>{invalidMatriIdMessage}</Text>
+        <Text style={[s.notFoundText, { fontFamily: langFonts.medium }]}>{invalidMatriIdMessage}</Text>
         <Pressable style={s.backBtnInline} onPress={() => handleBack()}>
-          <Text style={s.backBtnInlineText}>{'‹ Back'}</Text>
+          <Text style={[s.backBtnInlineText, { fontFamily: langFonts.medium }]}>{'‹ Back'}</Text>
         </Pressable>
       </SafeAreaView>
     )
@@ -1396,9 +1415,9 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   if (!profile) {
     return (
       <SafeAreaView style={s.loaderScreen}>
-        <Text style={s.notFoundText}>Unable to load this profile.</Text>
+        <Text style={[s.notFoundText, { fontFamily: langFonts.medium }]}>Unable to load this profile.</Text>
         <Pressable style={s.backBtnInline} onPress={() => handleBack()}>
-          <Text style={s.backBtnInlineText}>{'‹ Back'}</Text>
+          <Text style={[s.backBtnInlineText, { fontFamily: langFonts.medium }]}>{'‹ Back'}</Text>
         </Pressable>
       </SafeAreaView>
     )
@@ -1445,7 +1464,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                 disabled={disableDontShow(profile.dontShowStatus)}
               >
                 <CloseIcon width={24} height={24} />
-                <Text style={[s.ctaDontShowText, disableDontShow(profile.dontShowStatus) && s.ctaDisabledText]}>
+                <Text style={[s.ctaDontShowText, { fontFamily: langFonts.regular }, disableDontShow(profile.dontShowStatus) && s.ctaDisabledText]}>
                   {t('GENERAL.DONTSHOWCTA')}
                 </Text>
               </Pressable>
@@ -1455,14 +1474,14 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                 disabled={disableViewLater(profile.viewLaterStatus)}
               >
                 <ViewLaterIcon width={24} height={24} />
-                <Text style={[s.ctaViewLaterText, disableViewLater(profile.viewLaterStatus) && s.ctaDisabledText]}>
+                <Text style={[s.ctaViewLaterText, { fontFamily: langFonts.regular }, disableViewLater(profile.viewLaterStatus) && s.ctaDisabledText]}>
                   {t('GENERAL.VIEWLATER')}
                 </Text>
               </Pressable>
             </View>
             <Pressable style={s.ctaLike} onPress={handleLike}>
               <LikeIcon width={24} height={24} />
-              <Text style={s.ctaLikeText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
+              <Text style={[s.ctaLikeText, { fontFamily: langFonts.semiBold }]}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
             </Pressable>
           </View>
         )}
@@ -1470,21 +1489,21 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         {showAfterLikeCTA(profile.likedStatus) && (
           <View style={s.afterLikeRow}>
             <View style={s.afterLikeTopRow}>
-              <Text style={s.afterLikeText}>{getAfterLikeContentText(ctaCtx, t)}</Text>
+              <Text style={[s.afterLikeText, { fontFamily: langFonts.medium }]}>{getAfterLikeContentText(ctaCtx, t)}</Text>
               <View style={s.ctaSendInterestWrap}>
                 {showFreeBadge(ctaCtx) && (
                   <View style={s.freeBadge} pointerEvents="none">
-                    <Text style={s.freeBadgeText}>{t('GENERAL.FREE')}</Text>
+                    <Text style={[s.freeBadgeText, { fontFamily: langFonts.semiBold }]}>{t('GENERAL.FREE')}</Text>
                   </View>
                 )}
                 <Pressable style={s.ctaSendInterest} onPress={handleCall}>
                   <CdnSvg uri={getAfterLikeCtaIcon(ctaCtx)} width={16} height={16} />
-                  <Text style={s.ctaSendInterestText}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
+                  <Text style={[s.ctaSendInterestText, { fontFamily: langFonts.regular }]}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
                 </Pressable>
               </View>
             </View>
             {showContactsLeftBanner(ctaCtx) && (
-              <Text style={s.contactsLeftText}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
+              <Text style={[s.contactsLeftText, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
             )}
           </View>
         )}
@@ -1502,7 +1521,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     if (!ownProfile) return null
     return (
       <Pressable style={s.biodataCta} onPress={handleDownloadBiodata}>
-        <Text style={s.biodataCtaText}>{t('BIO_DATA.BIODATA_DOWNLOAD_FREE')}</Text>
+        <Text style={[s.biodataCtaText, { fontFamily: langFonts.semiBold }]}>{t('BIO_DATA.BIODATA_DOWNLOAD_FREE')}</Text>
       </Pressable>
     )
   }
@@ -1541,7 +1560,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           onBack={() => handleBack()}
           onGoToPrev={goToPrev}
           onGoToNext={goToNext}
-          onLanguagePress={() => navigation.navigate('LanguageSelection')}
+          onLanguagePress={() => setShowLanguageSheet(true)}
           onLike={handleLike}
           onDontShow={handleDontShow}
           onViewLater={handleViewLater}
@@ -1619,6 +1638,8 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           onClose={() => setReportModalOpen(false)}
           onSubmitted={handleReportSubmitted}
         />
+
+        <LanguagePillSheet visible={showLanguageSheet} onClose={() => setShowLanguageSheet(false)} />
       </View>
     )
   }
@@ -1638,7 +1659,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 
         {scrolled && (
           <>
-            <Text style={s.headerName} numberOfLines={1}>
+            <Text style={[s.headerName, { fontFamily: langFonts.medium }]} numberOfLines={1}>
               {ownProfile ? t('VIEWPROFILE.PROFILE_PREVIEW') : profile.name}
             </Text>
             {/* Angular viewprofile.page.html:41-58 — on scroll (topProfileName) the
@@ -1665,11 +1686,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
             <View style={s.headerSpacer} />
             <Pressable
               style={s.langPill}
-              onPress={() => navigation.navigate('LanguageSelection')}
+              onPress={() => setShowLanguageSheet(true)}
               hitSlop={8}
             >
               <CdnSvg uri={CDN_SVG + 'revamp/lang-change-img.svg'} width={20} height={20} />
-              <Text style={s.langPillText} numberOfLines={1}>
+              <Text style={[s.langPillText, { fontFamily: langFonts.medium }]} numberOfLines={1}>
                 {LANG_LABELS[i18n.language] ?? 'English'}
               </Text>
             </Pressable>
@@ -1692,7 +1713,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               <View style={s.menuDropdown}>
                 <Pressable style={s.menuItem} onPress={handleReportProfile}>
                   <CdnSvg uri={REPORT_PROFILE_ICON_URI} width={20} height={20} />
-                  <Text style={s.menuItemText}>{t('MATCHES.MORE_OPT_2')}</Text>
+                  <Text style={[s.menuItemText, { fontFamily: langFonts.regular }]}>{t('MATCHES.MORE_OPT_2')}</Text>
                 </Pressable>
               </View>
             )}
@@ -1706,9 +1727,9 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           left, "Add now" + chevron link right. */}
       {ownProfile && !!profile && !!getFirstMissingScreen(profile) && (
         <Pressable style={s.missingBanner} onPress={handleMissingDetailsPress}>
-          <Text style={s.missingBannerText}>{t('BIO_DATA.MISSING_DETAILS_TXT')}</Text>
+          <Text style={[s.missingBannerText, { fontFamily: langFonts.regular }]}>{t('BIO_DATA.MISSING_DETAILS_TXT')}</Text>
           <View style={s.missingBannerCta}>
-            <Text style={s.missingBannerCtaText}>{t('BIO_DATA.ADD_NOW_TXT')}</Text>
+            <Text style={[s.missingBannerCtaText, { fontFamily: langFonts.regular }]}>{t('BIO_DATA.ADD_NOW_TXT')}</Text>
             <CdnSvg uri={CDN_REACT + '/menu_right_arrow.svg'} width={16} height={16} />
           </View>
         </Pressable>
@@ -1789,7 +1810,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                   {!sameGender && (
                     <View style={s.photoOverlay}>
                       <View style={s.overlayCard}>
-                        <Text style={s.overlayText}>
+                        <Text style={[s.overlayText, { fontFamily: langFonts.medium }]}>
                           {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
                         </Text>
                         <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={handleWhatsApp} />
@@ -1812,14 +1833,14 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
             {profile.isNewlyJoined && !ownProfile && (
               <View style={s.newBadge} pointerEvents="none">
                 <CdnSvg uri={NEWLY_JOINED_STAR_URI} width={14} height={14} />
-                <Text style={s.newBadgeText}>{t('MATCHES.NEW')}</Text>
+                <Text style={[s.newBadgeText, { fontFamily: langFonts.regular }]}>{t('MATCHES.NEW')}</Text>
               </View>
             )}
             {showCoachMark && (
               <Pressable style={s.coachMarkOverlay} onPress={dismissCoachMark}>
                 <View style={s.coachMarkCard}>
-                  <Text style={s.coachMarkText}>{t('VIEWPROFILE.GUIDEMOVENEXT')}</Text>
-                  <Text style={s.coachMarkDismiss}>{t('GENERAL.OK_PENDING')}</Text>
+                  <Text style={[s.coachMarkText, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.GUIDEMOVENEXT')}</Text>
+                  <Text style={[s.coachMarkDismiss, { fontFamily: langFonts.semiBold }]}>{t('GENERAL.OK_PENDING')}</Text>
                 </View>
               </Pressable>
             )}
@@ -1881,7 +1902,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               template — a comment with no content between it and Professional
               details — so it's been removed rather than kept as an extra copy). */}
           <View style={s.nameRow}>
-            <Text style={s.name} numberOfLines={1}>{profile.name}</Text>
+            <Text style={[s.name, { fontFamily: langFonts.semiBold }]} numberOfLines={1}>{profile.name}</Text>
             {/* Confirmed live in the Angular app: the Message/Call/WhatsApp icons
                 are hidden for as long as the Verified badge's info tooltip is open
                 (the tooltip sits right below the badge, directly over this row). */}
@@ -1899,7 +1920,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               </View>
             )}
           </View>
-          <Text style={s.jodiId}>{t('VIEWPROFILE.ID')} : {profile.profileId}</Text>
+          <Text style={[s.jodiId, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.ID')} : {profile.profileId}</Text>
 
           {/* !! coerces to a real boolean — the adapter's `?? undefined` doesn't
               catch a raw API value of "" (empty but present, not null/undefined),
@@ -1911,7 +1932,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               toLikedStatus() already clamps any raw '5' down to '0', so checking
               for '0' here covers both Angular states. */}
           {!!profile.likedMsg && (!ownProfile || !sameGender) && profile.likedStatus === '0' && (
-            <Text style={s.likedMsg}>{profile.likedMsg}</Text>
+            <Text style={[s.likedMsg, { fontFamily: langFonts.regular }]}>{profile.likedMsg}</Text>
           )}
 
           {/* The top CTA is NOT rendered inline here — Angular's copy of it is
@@ -1995,12 +2016,12 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                     >
                       <CdnSvg uri={ICON.star} width={20} height={20} />
                       <Pressable style={s.starMatchTextWrap} onPress={handleViewStarMatchDetails}>
-                        <Text style={s.starMatchText}>
-                          <Text style={s.starMatchRating}>{starMatch.displayText}</Text>
+                        <Text style={[s.starMatchText, { fontFamily: langFonts.regular }]}>
+                          <Text style={[s.starMatchRating, { fontFamily: langFonts.semiBold }]}>{starMatch.displayText}</Text>
                           {t('STARMATCHING.STAR_MATCHING_TXT')}
                         </Text>
                         <View style={s.starMatchLinkRow}>
-                          <Text style={s.starMatchTeaser}>{t('VIEWPROFILE.PAID_MEMBER_REPORT')}</Text>
+                          <Text style={[s.starMatchTeaser, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.PAID_MEMBER_REPORT')}</Text>
                           <RNImage source={{ uri: LINK_ARROW_GIF_URI }} style={s.starMatchLinkArrow} />
                         </View>
                       </Pressable>
@@ -2017,11 +2038,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                     <Pressable style={s.starMatchTextWrap} onPress={() => navigation.navigate('recharge')}>
                       {/* Angular: .blur-text-vp-revamp — filter: blur(5px) on the
                           score for free (ENTRYTYPE 'F') members. */}
-                      <Text style={s.starMatchText}>
-                        <Text style={s.starMatchBlurred}>9/10</Text>{t('STARMATCHING.STAR_MATCHING_TXT')}
+                      <Text style={[s.starMatchText, { fontFamily: langFonts.regular }]}>
+                        <Text style={[s.starMatchBlurred, { fontFamily: langFonts.semiBold }]}>9/10</Text>{t('STARMATCHING.STAR_MATCHING_TXT')}
                       </Text>
                       <View style={s.starMatchLinkRow}>
-                        <Text style={s.starMatchTeaser}>{t('VIEWPROFILE.FREE_MEMBER_REPORT')}</Text>
+                        <Text style={[s.starMatchTeaser, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.FREE_MEMBER_REPORT')}</Text>
                         <RNImage source={{ uri: LINK_ARROW_GIF_URI }} style={s.starMatchLinkArrow} />
                       </View>
                     </Pressable>
@@ -2050,19 +2071,19 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                   <CdnSvg uri={ICON.horoscope} width={20} height={20} />
                 </View>
                 <View style={s.detailTextCol}>
-                  <Text style={s.detailLabel}>{t('VIEWPROFILE.HOROSCOPE')}</Text>
+                  <Text style={[s.detailLabel, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.HOROSCOPE')}</Text>
                   {loginHoroAvail === '0' ? (
                     <>
-                      <Text style={s.detailValue}>
+                      <Text style={[s.detailValue, { fontFamily: langFonts.medium }]}>
                         {t('VIEWPROFILE.ADDYOURHORO').replace('#HIMHER#', t(`PRONOUN.${oppGender}.himhers`))}
                       </Text>
                       <Pressable onPress={handleAddHoroscope}>
-                        <Text style={s.horoActionLink}>{t('GENERAL.ADD_HOROSCOPE')}</Text>
+                        <Text style={[s.horoActionLink, { fontFamily: langFonts.regular }]}>{t('GENERAL.ADD_HOROSCOPE')}</Text>
                       </Pressable>
                     </>
                   ) : (
                     <Pressable onPress={handleViewHoroscope}>
-                      <Text style={s.horoActionLink}>{t('GENERAL.VIEW_HOROSCOPE')}</Text>
+                      <Text style={[s.horoActionLink, { fontFamily: langFonts.regular }]}>{t('GENERAL.VIEW_HOROSCOPE')}</Text>
                     </Pressable>
                   )}
                 </View>
@@ -2077,7 +2098,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               <SectionHeader title={t('VIEWPROFILE.HORO_DETAILS')} />
               <Pressable style={s.addDetailPrompt} onPress={handleAddHoroscope}>
                 <CdnSvg uri={ICON.horoscope} width={20} height={20} />
-                <Text style={s.addDetailPromptText}>{t('GENERAL.ADD_HOROSCOPE')}</Text>
+                <Text style={[s.addDetailPromptText, { fontFamily: langFonts.medium }]}>{t('GENERAL.ADD_HOROSCOPE')}</Text>
               </Pressable>
             </>
           )}
@@ -2119,7 +2140,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               <SectionHeader title={t('VIEWPROFILE.FAMILYDETAIL')} />
               <Pressable style={s.addDetailPrompt} onPress={handleAddFamilyDetails}>
                 <CdnSvg uri={ICON.brother} width={20} height={20} />
-                <Text style={s.addDetailPromptText}>{t('GENERAL.ADD_FAMILY_DETAILS')}</Text>
+                <Text style={[s.addDetailPromptText, { fontFamily: langFonts.medium }]}>{t('GENERAL.ADD_FAMILY_DETAILS')}</Text>
               </Pressable>
             </>
           )}
@@ -2145,7 +2166,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               <SectionHeader title={t('VIEWPROFILE.PROPERTY_DETAILS')} />
               <Pressable style={s.addDetailPrompt} onPress={handleAddPropertyDetails}>
                 <CdnSvg uri={ICON.property} width={20} height={20} />
-                <Text style={s.addDetailPromptText}>{t('BIO_DATA.ADD_PROPERTY_DETAILS')}</Text>
+                <Text style={[s.addDetailPromptText, { fontFamily: langFonts.medium }]}>{t('BIO_DATA.ADD_PROPERTY_DETAILS')}</Text>
               </Pressable>
             </>
           )}
@@ -2156,7 +2177,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           {ownProfile && !!biodataQrUrl && (
             <View style={s.biodataQrSection}>
               <Image source={{ uri: biodataQrUrl }} style={s.biodataQrImage} contentFit="contain" />
-              <Text style={s.biodataQrCaption}>
+              <Text style={[s.biodataQrCaption, { fontFamily: langFonts.medium }]}>
                 {t('BIO_DATA.QR_CODE_TXT').replace('#HISHER#', t(`PRONOUN.${loginGender}.hisher`))}
               </Text>
             </View>
@@ -2184,7 +2205,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
             end={{ x: 1, y: 1 }}
             style={s.similarSection}
           >
-            <Text style={s.similarHeader}>
+            <Text style={[s.similarHeader, { fontFamily: langFonts.semiBold }]}>
               {t('VIEWPROFILE.SIMILARPROFILES').replace('#NAME#', profile.name)}
             </Text>
             <FlatList
@@ -2333,6 +2354,8 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         onSubmitted={handleReportSubmitted}
       />
 
+      <LanguagePillSheet visible={showLanguageSheet} onClose={() => setShowLanguageSheet(false)} />
+
       <PhotoViewerModal
         visible={!!horoscopeImageUrl}
         images={horoscopeImageUrl ? [horoscopeImageUrl] : []}
@@ -2352,9 +2375,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 const s = StyleSheet.create({
   screen:       { flex: 1, backgroundColor: Colors.background },
   loaderScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: Colors.background },
-  notFoundText: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 14, color: Colors.textSecondary },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  notFoundText: { fontWeight: '500', fontSize: 14, color: Colors.textSecondary },
   backBtnInline:     { paddingHorizontal: 16, paddingVertical: 8 },
-  backBtnInlineText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 14, color: Colors.link },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  backBtnInlineText: { fontWeight: '500', fontSize: 14, color: Colors.link },
 
   scrollView:    { flex: 1 },
   scrollContent: {},
@@ -2380,7 +2405,8 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primaryDark, height: 24,
     paddingLeft: 8, paddingRight: 12, borderBottomRightRadius: 10, gap: 4,
   },
-  newBadgeText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 12, color: Colors.white },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  newBadgeText: { fontWeight: '400', fontSize: 12, color: Colors.white },
   // Feature 2 prev/next-profile chevrons — same dark-circle/white-chevron style
   // as PhotoSwiper's own desktop arrow fallback (matchesCard.shared.tsx). Angular:
   // viewprofile.page.scss:512,523 `top: calc(100vw + 32px)` — just below the square
@@ -2429,11 +2455,13 @@ const s = StyleSheet.create({
     paddingHorizontal: 20, paddingVertical: 16,
     alignItems: 'center', gap: 12, maxWidth: '70%',
   },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
   coachMarkText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.black, textAlign: 'center',
+    fontWeight: '400', fontSize: 14, color: Colors.black, textAlign: 'center',
   },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
   coachMarkDismiss: {
-    fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 14, color: Colors.primaryDark,
+    fontWeight: '600', fontSize: 14, color: Colors.primaryDark,
   },
   photoOverlay: {
     ...StyleSheet.absoluteFill,
@@ -2449,8 +2477,9 @@ const s = StyleSheet.create({
     borderRadius: 12, borderWidth: 1, borderColor: Colors.overlayBorder,
     alignItems: 'center', gap: 16,
   },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
   overlayText: {
-    fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 13, color: Colors.white,
+    fontWeight: '500', fontSize: 13, color: Colors.white,
     textAlign: 'center', lineHeight: 17, width: '70%', alignSelf: 'center',
   },
 
@@ -2478,10 +2507,12 @@ const s = StyleSheet.create({
 
   nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   // Angular: heading1-semibold-22 black-color
-  name:    { flex: 1, fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 24, color: Colors.black },
-  // Angular: body2-regular-14 black-color
-  jodiId:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.black, marginTop: 4, marginBottom: 18 },
-  likedMsg: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 12, color: Colors.likedStripText, marginTop: 6 },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  name:    { flex: 1, fontWeight: '600', fontSize: 24, color: Colors.black },
+  // Angular: body2-regular-14 black-color — fontFamily applied inline (langFonts.regular).
+  jodiId:  { fontWeight: '400', fontSize: 14, color: Colors.black, marginTop: 4, marginBottom: 18 },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  likedMsg: { fontWeight: '400', fontSize: 12, color: Colors.likedStripText, marginTop: 6 },
 
   // Angular: viewprofile.page.html:469-489 — Call/WhatsApp icon buttons beside the name.
   nameIconsRow: { flexDirection: 'row', alignItems: 'center', gap: 32 },
@@ -2531,13 +2562,15 @@ const s = StyleSheet.create({
     height: 44, backgroundColor: Colors.white,
     borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
-  ctaDontShowText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 14, color: '#545454' },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  ctaDontShowText: { fontWeight: '400', fontSize: 14, color: '#545454' },
   ctaViewLater: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, backgroundColor: Colors.white,
     borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
-  ctaViewLaterText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 14, color: '#545454' },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  ctaViewLaterText: { fontWeight: '400', fontSize: 14, color: '#545454' },
   // Angular: button-revamp.component.scss:13-21 — `ion-button[disabled]` only
   // overrides background (#e6e6e6) and text (#8A8A8A) via `--background`/
   // `--color`, `opacity: unset !important` (explicitly NOT dimmed) — the
@@ -2549,7 +2582,8 @@ const s = StyleSheet.create({
     height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.primaryDark, borderRadius: 8, gap: 6,
   },
-  ctaLikeText: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 14, color: Colors.white },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  ctaLikeText: { fontWeight: '600', fontSize: 14, color: Colors.white },
 
   // Feature 6 — same pill styling as ctaLike, standing in for the normal
   // Like/Contact CTA when viewing your own profile.
@@ -2557,32 +2591,38 @@ const s = StyleSheet.create({
     height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.primaryDark, borderRadius: 8, marginTop: 16,
   },
-  biodataCtaText: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 14, color: Colors.white },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  biodataCtaText: { fontWeight: '600', fontSize: 14, color: Colors.white },
 
   afterLikeRow: {
     backgroundColor: Colors.afterLikeBg, borderRadius: 8, borderWidth: 1,
     borderColor: Colors.afterLikeBorder, paddingHorizontal: 14, paddingVertical: 10,
   },
   afterLikeTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  afterLikeText:   { flex: 1, fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 13, color: Colors.black },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  afterLikeText:   { flex: 1, fontWeight: '500', fontSize: 13, color: Colors.black },
   ctaSendInterestWrap: { position: 'relative', flexShrink: 0 },
   ctaSendInterest: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, backgroundColor: Colors.primaryDark, borderRadius: 8, paddingHorizontal: 16,
   },
-  ctaSendInterestText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 14, color: Colors.white },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  ctaSendInterestText: { fontWeight: '400', fontSize: 14, color: Colors.white },
   freeBadge: {
     position: 'absolute', top: -10, right: 8, zIndex: 1,
     backgroundColor: Colors.badgeNewBg, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2,
   },
-  freeBadgeText: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 10, color: Colors.badgeNewText },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  freeBadgeText: { fontWeight: '600', fontSize: 10, color: Colors.badgeNewText },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
   contactsLeftText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 11, color: Colors.textSecondary, textAlign: 'center', marginTop: 8,
+    fontWeight: '400', fontSize: 11, color: Colors.textSecondary, textAlign: 'center', marginTop: 8,
   },
 
   // Angular: heading1-semibold-20 black-color, line-height:16, mt-24 mb-4
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
   sectionHeader: {
-    fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 20, color: Colors.black,
+    fontWeight: '600', fontSize: 20, color: Colors.black,
     marginTop: 24, marginBottom: 4,
   },
   // Angular: icon column (ion-col size="1") + text column (size="11", pl-12) —
@@ -2592,8 +2632,10 @@ const s = StyleSheet.create({
   detailRowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(204,204,204,0.5)' },
   detailIconCol: { width: 20, flexShrink: 0 },
   detailTextCol: { flex: 1, paddingLeft: 12 },
-  detailLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.black },
-  detailValue: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 14, color: Colors.black, marginTop: 8 },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  detailLabel: { fontWeight: '400', fontSize: 14, color: Colors.black },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  detailValue: { fontWeight: '500', fontSize: 14, color: Colors.black, marginTop: 8 },
 
   // Angular: .like-this-profile — border-image linear-gradient(transparent →
   // rgb(255,192,0) 50% → transparent); RN has no border-image, approximated with
@@ -2607,9 +2649,12 @@ const s = StyleSheet.create({
   // Angular: only the rating number itself ("4.5/10") is semibold — the rest
   // of the sentence ("stars matching with this profile") is regular weight.
   // .body2-regular-14 on the "View details"/"Pay now..." link — also regular.
-  starMatchText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 13, color: Colors.textDark },
-  starMatchRating: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600' },
-  starMatchTeaser: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 13, color: Colors.link },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  starMatchText:   { fontWeight: '400', fontSize: 13, color: Colors.textDark },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  starMatchRating: { fontWeight: '600' },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  starMatchTeaser: { fontWeight: '400', fontSize: 13, color: Colors.link },
   starMatchLinkRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 4 },
   // Angular: button-revamp.component.html:15 — style="width: 24px; height: 20px".
   starMatchLinkArrow: { width: 18, height: 18 },
@@ -2617,30 +2662,35 @@ const s = StyleSheet.create({
   // free members. RN's Text has no blur filter; textShadow is the closest
   // visual approximation available without a native blur-view dependency.
   // Also semibold, same as starMatchRating — this is that same score text.
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
   starMatchBlurred: {
-    fontFamily: Fonts.poppinsSemiBold, fontWeight: '600',
+    fontWeight: '600',
     color: 'transparent',
     textShadowColor: '#333333', textShadowRadius: 5, textShadowOffset: { width: 0, height: 0 },
   },
 
-  horoActionLink:    { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 14, color: Colors.link, marginTop: 8 },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  horoActionLink:    { fontWeight: '400', fontSize: 14, color: Colors.link, marginTop: 8 },
   // Feature 6 — own-profile "add missing section" prompts, replacing a section
   // that would otherwise render nothing when its data is empty.
   addDetailPrompt: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
-  addDetailPromptText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 14, color: Colors.link },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  addDetailPromptText: { fontWeight: '500', fontSize: 14, color: Colors.link },
 
   biodataQrSection: { alignItems: 'center', paddingTop: 24, gap: 16 },
   biodataQrImage: { width: 160, height: 160 },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
   biodataQrCaption: {
-    fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 12, color: '#1a1818', textAlign: 'center',
+    fontWeight: '500', fontSize: 12, color: '#1a1818', textAlign: 'center',
   },
 
   // Angular: app-swiper.component.html:2 — `ion-row class="pt-32 ... pb-24"` — header
   // text aligned with the rest of the padded content, but the card row itself bleeds
   // to the screen edges.
   similarSection: { paddingTop: 32, paddingBottom: 24 },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
   similarHeader: {
-    fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 20, color: Colors.black,
+    fontWeight: '600', fontSize: 20, color: Colors.black,
     marginBottom: 10, paddingHorizontal: 24,
   },
   // paddingVertical gives each card's shadow (shadowRadius:12, extends above AND
@@ -2683,14 +2733,16 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 8, gap: 8,
     alignItems: 'center',paddingLeft: 12,paddingRight:12,
   },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
   similarCardOverlayText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 11, color: Colors.white, textAlign: 'center', lineHeight: 15,
+    fontWeight: '400', fontSize: 11, color: Colors.white, textAlign: 'center', lineHeight: 15,
   },
   similarCardWaBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
     borderRadius: 8, paddingHorizontal: 6, height: 32, width: '100%',
   },
-  similarCardWaBtnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 12, color: Colors.white },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  similarCardWaBtnText: { fontWeight: '500', fontSize: 12, color: Colors.white },
   // Angular: profile-card.component.scss's .information-block — a top-to-bottom
   // black scrim (transparent → solid black), 16px vertical/12px horizontal padding,
   // bottom corners rounded to match the card. Not a flat semi-transparent overlay.
@@ -2700,9 +2752,11 @@ const s = StyleSheet.create({
     borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
   },
   // Angular: .heading3-semibold-16 (Poppins-Semibold, 16px, white).
-  similarCardName: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 18, color: Colors.white },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  similarCardName: { fontWeight: '600', fontSize: 18, color: Colors.white },
   // Angular: .body2-regular-14 (Poppins-Regular, 14px, white), no margin from name.
-  similarCardMeta: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 16, color: Colors.white, paddingRight: 50 },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  similarCardMeta: { fontWeight: '400', fontSize: 16, color: Colors.white, paddingRight: 50 },
 
   // Header — a SEPARATE solid white bar in normal flow above the photo (never
   // overlaying it) — confirmed against the real app's screenshots. Content swaps
@@ -2725,12 +2779,14 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: Colors.selectionBg, paddingHorizontal: 16, paddingVertical: 12,
   },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
   missingBannerText: {
-    flex: 1, marginRight: 12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12,
+    flex: 1, marginRight: 12, fontSize: 12,
     color: '#1e1e1e', letterSpacing: 0.24,
   },
   missingBannerCta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  missingBannerCtaText: { fontFamily: Fonts.poppinsRegular, fontSize: 12, color: Colors.link },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  missingBannerCtaText: { fontSize: 12, color: Colors.link },
 
   // Angular: ion-back-button .default-back — --icon-font-size: 24px. Pinned to
   // an exact 48x48 per a manual UI tweak, then trimmed to 42x42 to bring the
@@ -2739,7 +2795,8 @@ const s = StyleSheet.create({
   headerSpacer: { flex: 1 },
   // Angular: `.vp-profile-name` (global.scss:22188-22192) — font16 (~16px),
   // Poppins-Medium, `--gray-color1` (#1f1e1b) — not SemiBold/pure-black.
-  headerName: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: 18, color: '#1f1e1b' },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  headerName: { flex: 1, fontWeight: '500', fontSize: 18, color: '#1f1e1b' },
   headerIconBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   // Angular: .width-height-18 (viewprofile.page.scss:22-25) — box sized exactly
   // to the 18x18 icon, not a bigger 28x28 hit-target box (hitSlop covers touch
@@ -2760,7 +2817,8 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white, width: 108, height: 38,
   },
   langPillCompact: { width: 108 },
-  langPillText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 13, color: '#000000' },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  langPillText: { fontWeight: '500', fontSize: 13, color: '#000000' },
 
   menuDropdown: {
     position: 'absolute', top: 40, right: 8, minWidth: 200,
@@ -2778,5 +2836,6 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 16, paddingVertical: 12,
   },
-  menuItemText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.black },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  menuItemText: { fontWeight: '400', fontSize: 14, color: Colors.black },
 })

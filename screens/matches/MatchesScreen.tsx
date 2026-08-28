@@ -32,11 +32,12 @@ import {
   type AfterLikeCtx,
 } from '../../components/matches/matchesCard.shared'
 import MatchesDesktopLayout from './MatchesDesktopLayout'
+import LanguagePillSheet from '../../components/language-pill-sheet/LanguagePillSheet'
 import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import MembershipBanner from '../../components/matches/MembershipBanner'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN_SVG } from '../../constants/cdn'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { isBanner, type MatchProfile, type BannerItem, type MatchListItem } from '../../types/interfaces/matches.interface'
@@ -60,7 +61,7 @@ import {
   shouldSkipPhoneConfirm,
   getContactConfirmContent as getSharedContactConfirmContent,
 } from '../../service/communicationService'
-import { fetchBulkLikeMatches } from '../../service/profileService'
+import { fetchBulkLikeMatches, getPPSetData } from '../../service/profileService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import { setFilterEventType } from '../../service/filterService'
 import { getHeroBannerDetails, openMembershipTab } from '../../service/paymentService'
@@ -146,6 +147,7 @@ export const MatchCard = memo(function MatchCard({
   showLikedBadge?: boolean | undefined
 }) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   const { LinearGradient } = require('expo-linear-gradient')
   const hasRealPhoto      = profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0
   const isHiddenPhoto     = profile.isPhotoAvailable && profile.isPhotoProtect
@@ -196,7 +198,7 @@ export const MatchCard = memo(function MatchCard({
             />
             <View style={c.photoOverlay}>
               <View style={c.overlayCard}>
-                <Text style={c.overlayText}>
+                <Text style={[c.overlayText, { fontFamily: langFonts.regular }]}>
                   {t(hiddenPhotoPending ? 'VIEWPROFILE.HORO_HIDDEN_PHOTO' : 'VIEWPROFILE.HORO_HIDDEN_LIKE')
                     .replace(/##HE_SHE##/g, t(`PRONOUN.${oppGender}.heshe`))
                     .replace(/##HIS_HER##/g, t(`PRONOUN.${oppGender}.hisher`))
@@ -215,7 +217,7 @@ export const MatchCard = memo(function MatchCard({
                       style={c.waBtn}
                     >
                       <LikeIcon width={16} height={16} />
-                      <Text style={c.waBtnText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
+                      <Text style={[c.waBtnText, { fontFamily: langFonts.medium }]}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
                     </LinearGradient>
                   </Pressable>
                 )}
@@ -246,7 +248,7 @@ export const MatchCard = memo(function MatchCard({
         {profile.isNewlyJoined && (
           <View style={c.newBadge} pointerEvents="none">
             <CdnSvg uri={NEWLY_JOINED_STAR_URI} width={14} height={14} />
-            <Text style={c.newBadgeText}>{t('MATCHES.NEW')}</Text>
+            <Text style={[c.newBadgeText, { fontFamily: langFonts.medium }]}>{t('MATCHES.NEW')}</Text>
           </View>
         )}
       </View>
@@ -281,7 +283,7 @@ export const MatchCard = memo(function MatchCard({
           style={c.likedStrip}
         >
           <CdnSvg uri={CDN + 'liked-new.svg'} width={20} height={20} />
-          <Text style={c.likedText} numberOfLines={1}>{profile.likedDateText}</Text>
+          <Text style={[c.likedText, { fontFamily: langFonts.regular }]} numberOfLines={1}>{profile.likedDateText}</Text>
         </LinearGradient>
       )}
 
@@ -290,7 +292,7 @@ export const MatchCard = memo(function MatchCard({
       {profile.isNewLabel && !!profile.labelContent && (
         <View style={c.activityRow}>
           <CdnSvg uri={CDN + 'revamp/viewed-icon-updated.svg'} width={16} height={16} style={{ marginTop: 2, flexShrink: 0 }} />
-          <Text style={c.activityText}>{profile.labelContent}</Text>
+          <Text style={[c.activityText, { fontFamily: langFonts.medium }]}>{profile.labelContent}</Text>
         </View>
       )}
 
@@ -301,7 +303,7 @@ export const MatchCard = memo(function MatchCard({
             right next to it, not pushed to the far edge of the row. Still truncates
             via numberOfLines if the name itself is too long for the row. */}
         <Pressable style={{ flexShrink: 1 }} onPress={onPress}>
-          <Text style={c.name} numberOfLines={1}>{profile.name}</Text>
+          <Text style={[c.name, { fontFamily: langFonts.semiBold }]} numberOfLines={1}>{profile.name}</Text>
         </Pressable>
         {/* Angular: .phone-icon — plain 24x24 image, no circle/border */}
         {onMessage && (
@@ -321,7 +323,7 @@ export const MatchCard = memo(function MatchCard({
       {/* Angular: bindBasicView() — "27 yrs | 5'5" | Brahmin | B.Tech | Engineer | Chennai, TN" —
           solid black segments, "|" separators alone drop to 20% opacity. */}
       <Pressable onPress={onPress}>
-        <Text style={c.basicView} numberOfLines={4}>
+        <Text style={[c.basicView, { fontFamily: langFonts.regular }]} numberOfLines={4}>
           {buildBasicViewParts(profile, oppGender === 'M').map((part, i) => (
             <Text key={i}>
               {i > 0 && <Text style={c.basicViewSep}> | </Text>}
@@ -335,7 +337,7 @@ export const MatchCard = memo(function MatchCard({
       {/* Angular: app-button-revamp [iconType]="forwardAnimation" — swaps the plain
           chevron for this animated GIF (button-revamp.component.html IsShowAnimation()). */}
       <Pressable onPress={onPress} style={c.viewProfileBtn}>
-        <Text style={c.viewProfileText}>{t('MATCHES.VIEW_PROFILE_CTA')}</Text>
+        <Text style={[c.viewProfileText, { fontFamily: langFonts.medium }]}>{t('MATCHES.VIEW_PROFILE_CTA')}</Text>
         <Image source={{ uri: RIGHT_ARROW_ANIMATION_URI }} style={c.viewProfileArrow} />
       </Pressable>
 
@@ -352,7 +354,7 @@ export const MatchCard = memo(function MatchCard({
               disabled={dontShowDisabled}
             >
               <CloseIcon width={24} height={24} />
-              <Text style={[c.ctaDontShowText, dontShowDisabled && c.ctaDisabledText]}>
+              <Text style={[c.ctaDontShowText, { fontFamily: langFonts.regular }, dontShowDisabled && c.ctaDisabledText]}>
                 {t('GENERAL.DONTSHOWCTA')}
               </Text>
             </Pressable>
@@ -362,14 +364,14 @@ export const MatchCard = memo(function MatchCard({
               disabled={viewLaterDisabled}
             >
               <ViewLaterIcon width={24} height={24} />
-              <Text style={[c.ctaViewLaterText, viewLaterDisabled && c.ctaDisabledText]}>
+              <Text style={[c.ctaViewLaterText, { fontFamily: langFonts.regular }, viewLaterDisabled && c.ctaDisabledText]}>
                 {t('GENERAL.VIEWLATER')}
               </Text>
             </Pressable>
           </View>
           <Pressable style={c.ctaLike} onPress={onLike}>
             <LikeIcon width={24} height={24} />
-            <Text style={c.ctaLikeText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
+            <Text style={[c.ctaLikeText, { fontFamily: langFonts.semiBold }]}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
           </Pressable>
         </View>
       )}
@@ -378,24 +380,24 @@ export const MatchCard = memo(function MatchCard({
         // Angular: matches-cta-bg-color (pink gradient bg) + getContentAfterLike() text +
         // Call Now/Pay Now CTA (#22) + FREE badge (#24) + contacts-left line (#23).
         <View style={c.afterLikeRow}>
-          <Text style={c.afterLikeText}>
+          <Text style={[c.afterLikeText, { fontFamily: langFonts.medium }]}>
             {getAfterLikeContentText(ctaCtx, t)}
           </Text>
           <View style={c.ctaSendInterestWrap}>
             {showFreeBadge(ctaCtx) && (
               <View style={c.freeBadge} pointerEvents="none">
-                <Text style={c.freeBadgeText}>{t('GENERAL.FREE')}</Text>
+                <Text style={[c.freeBadgeText, { fontFamily: langFonts.semiBold }]}>{t('GENERAL.FREE')}</Text>
               </View>
             )}
             <Pressable style={c.ctaSendInterest} onPress={onCall}>
               <View style={c.ctaSendInterestIconBox}>
                 <CdnSvg uri={getAfterLikeCtaIcon(ctaCtx)} width={18} height={18} />
               </View>
-              <Text style={c.ctaSendInterestText}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
+              <Text style={[c.ctaSendInterestText, { fontFamily: langFonts.medium }]}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
             </Pressable>
           </View>
           {showContactsLeftBanner(ctaCtx) && (
-            <Text style={c.contactsLeftText}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
+            <Text style={[c.contactsLeftText, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
           )}
         </View>
       )}
@@ -415,6 +417,7 @@ export const MatchCard = memo(function MatchCard({
 function PhotoPromotionBanner({ data, onPress }: { data: any; onPress: () => void }) {
   const { LinearGradient } = require('expo-linear-gradient')
   const stripHtml = (s: string) => s?.replace(/<[^>]*>/g, '') ?? ''
+  const langFonts = useLanguageFonts()
   return (
     // Angular: free-trial-height min-height:38vmin, BGCOLOR gradient #FFDDDD→#FFF
     <Pressable onPress={onPress}>
@@ -436,14 +439,14 @@ function PhotoPromotionBanner({ data, onPress }: { data: any; onPress: () => voi
 
         {/* Right: title + body + CTA — Angular ion-col size="8", pt-6 */}
         <View style={pb.textCol}>
-          {!!data.TITLE && <Text style={pb.title}>{stripHtml(data.TITLE)}</Text>}
-          {!!data.BODY  && <Text style={pb.body}>{stripHtml(String(data.BODY))}</Text>}
+          {!!data.TITLE && <Text style={[pb.title, { fontFamily: langFonts.semiBold }]}>{stripHtml(data.TITLE)}</Text>}
+          {!!data.BODY  && <Text style={[pb.body, { fontFamily: langFonts.regular }]}>{stripHtml(String(data.BODY))}</Text>}
           {!!data.CTA   && (
             <Pressable
               style={[pb.ctaBtn, { backgroundColor: data.CTABGCOLOR || Colors.primaryDark }]}
               onPress={onPress}
             >
-              <Text style={[pb.ctaText, { color: data.CTACOLOR || Colors.white }]}>{stripHtml(data.CTA)}</Text>
+              <Text style={[pb.ctaText, { fontFamily: langFonts.semiBold, color: data.CTACOLOR || Colors.white }]}>{stripHtml(data.CTA)}</Text>
             </Pressable>
           )}
         </View>
@@ -470,14 +473,15 @@ function PcsBanner({
 }) {
   const { LinearGradient } = require('expo-linear-gradient')
   const iconSize = Math.round(SW * 0.4444)
+  const langFonts = useLanguageFonts()
   return (
     <LinearGradient colors={gradientColors} start={{ x: 0, y: 0 }} end={{ x: 0, y: 1 }} style={pcs.container}>
       <View style={{ width: iconSize, height: iconSize }}>
         <CdnSvg uri={imageUri} width="100%" height="100%" />
       </View>
-      <Text style={pcs.title}>{title}</Text>
+      <Text style={[pcs.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
       <Pressable style={[pcs.cta, { backgroundColor: ctaBg }]} onPress={onPress}>
-        <Text style={pcs.ctaText}>{cta}</Text>
+        <Text style={[pcs.ctaText, { fontFamily: langFonts.regular }]}>{cta}</Text>
       </Pressable>
     </LinearGradient>
   )
@@ -490,9 +494,9 @@ const pcs = StyleSheet.create({
     paddingTop:         24,
     paddingBottom:      24,
   },
+  // fontFamily applied inline (langFonts.semiBold) — see PcsBanner's Text usage.
   title: {
     marginTop:  16,
-    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   19,
     color:      '#000000',
     textAlign:  'center',
@@ -506,8 +510,8 @@ const pcs = StyleSheet.create({
     alignItems:     'center',
     justifyContent: 'center',
   },
+  // fontFamily applied inline (langFonts.regular) — see PcsBanner's Text usage.
   ctaText: {
-    fontFamily: Fonts.poppinsRegular,
     fontSize:   14,
     color:      Colors.white,
   },
@@ -522,12 +526,13 @@ const pcs = StyleSheet.create({
 function SimplePromoBanner({
   imageUri, title, cta, ctaBg, onPress,
 }: { imageUri?: string | undefined; title: string; cta: string; ctaBg?: string | undefined; onPress: () => void }) {
+  const langFonts = useLanguageFonts()
   return (
     <Pressable style={spb.card} onPress={onPress}>
       {!!imageUri && <Image source={{ uri: imageUri }} style={spb.image} resizeMode="contain" />}
-      <Text style={spb.title} numberOfLines={2}>{title}</Text>
+      <Text style={[spb.title, { fontFamily: langFonts.medium }]} numberOfLines={2}>{title}</Text>
       <View style={[spb.cta, ctaBg ? { backgroundColor: ctaBg } : null]}>
-        <Text style={spb.ctaText}>{cta}</Text>
+        <Text style={[spb.ctaText, { fontFamily: langFonts.semiBold }]}>{cta}</Text>
       </View>
     </Pressable>
   )
@@ -550,9 +555,9 @@ const spb = StyleSheet.create({
     elevation:         2,
   },
   image: { width: 40, height: 40 },
+  // fontFamily applied inline (langFonts.medium) — see SimplePromoBanner's Text usage.
   title: {
     flex:       1,
-    fontFamily: SemanticFontsEnglish.headingEnglishMedium,
     fontSize:   13,
     color:      Colors.textDark,
   },
@@ -564,8 +569,8 @@ const spb = StyleSheet.create({
     paddingVertical:   8,
     paddingHorizontal: 12,
   },
+  // fontFamily applied inline (langFonts.semiBold) — see SimplePromoBanner's Text usage.
   ctaText: {
-    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   12,
     color:      Colors.white,
   },
@@ -576,6 +581,7 @@ const spb = StyleSheet.create({
 // Layout: image left (4/12) + text right (8/12): TITLE + SUBHEADER + BODY.CONTENT1/CONTENT2 + CTA
 
 function AddPhotoBanner({ data, onPress }: { data: any; onPress: () => void }) {
+  const langFonts = useLanguageFonts()
   if (!data) return null
   // Angular: breather ADDPHOTO — single column, linear-gradient(133deg, #F2F4FF → #DCFFF0)
   const { LinearGradient } = require('expo-linear-gradient')
@@ -602,30 +608,30 @@ function AddPhotoBanner({ data, onPress }: { data: any; onPress: () => void }) {
         )}
 
         {/* Title — Angular: heading1-semibold-22 black-color line-height-32 */}
-        <Text style={ap.title}>{title}</Text>
+        <Text style={[ap.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {/* Subheader — Angular: body1-medium-14 black-color */}
-        <Text style={ap.subheader}>{subhead}</Text>
+        <Text style={[ap.subheader, { fontFamily: langFonts.medium }]}>{subhead}</Text>
 
         {/* Bullets — Angular: ul pl-24, li body2-regular-14, benefits-container gap:12 */}
         <View style={ap.bullets}>
           {!!line1 && (
             <View style={ap.bulletRow}>
               <Text style={ap.bullet}>{'•'}</Text>
-              <Text style={ap.bulletText}>{line1}</Text>
+              <Text style={[ap.bulletText, { fontFamily: langFonts.regular }]}>{line1}</Text>
             </View>
           )}
           {!!line2 && (
             <View style={ap.bulletRow}>
               <Text style={ap.bullet}>{'•'}</Text>
-              <Text style={ap.bulletText}>{line2}</Text>
+              <Text style={[ap.bulletText, { fontFamily: langFonts.regular }]}>{line2}</Text>
             </View>
           )}
         </View>
 
         {/* CTA — Angular: hasFullWidth, mt-6 */}
         <Pressable style={[ap.ctaBtn, { backgroundColor: ctaBg }]} onPress={onPress}>
-          <Text style={ap.ctaText}>{cta}</Text>
+          <Text style={[ap.ctaText, { fontFamily: langFonts.semiBold }]}>{cta}</Text>
         </Pressable>
       </LinearGradient>
     </Pressable>
@@ -640,6 +646,7 @@ const FEMALE_AVATAR = CDN + 'female_avatar_new.svg'
 
 function ExtendedMatchesCard({ count, onPress }: { count: number; onPress: () => void }) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   return (
     <Pressable style={e.card} onPress={onPress}>
       {/* 3 overlapping avatars + count badge */}
@@ -650,16 +657,16 @@ function ExtendedMatchesCard({ count, onPress }: { count: number; onPress: () =>
           </View>
         ))}
         <View style={[e.countCircle, { marginLeft: -12 }]}>
-          <Text style={e.countNum}>+{count}</Text>
-          <Text style={e.countLabel}>{t('MATCHES.MORE')}</Text>
+          <Text style={[e.countNum, { fontFamily: langFonts.semiBold }]}>+{count}</Text>
+          <Text style={[e.countLabel, { fontFamily: langFonts.regular }]}>{t('MATCHES.MORE')}</Text>
         </View>
       </View>
 
       {/* Title */}
-      <Text style={e.title}>{t('MATCHES.CONTINUE_TITLE')}</Text>
+      <Text style={[e.title, { fontFamily: langFonts.semiBold }]}>{t('MATCHES.CONTINUE_TITLE')}</Text>
 
       {/* Description */}
-      <Text style={e.desc}>
+      <Text style={[e.desc, { fontFamily: langFonts.regular }]}>
         {t('MATCHES.CONTINUE_CONT')}
       </Text>
 
@@ -678,12 +685,13 @@ function ExtendedMatchesCard({ count, onPress }: { count: number; onPress: () =>
 
 function NoMatchesCard({ onPress }: { onPress: () => void }) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   return (
     <View style={n.card}>
-      <Text style={n.title}>{t(EEndCardText.noMatches)}</Text>
-      <Text style={n.desc}>{t(EEndCardText.modifyPreference)}</Text>
+      <Text style={[n.title, { fontFamily: langFonts.semiBold }]}>{t(EEndCardText.noMatches)}</Text>
+      <Text style={[n.desc, { fontFamily: langFonts.regular }]}>{t(EEndCardText.modifyPreference)}</Text>
       <Pressable style={n.cta} onPress={onPress}>
-        <Text style={n.ctaText}>{t(EEndCardText.ctaModifyPreference)}</Text>
+        <Text style={[n.ctaText, { fontFamily: langFonts.medium }]}>{t(EEndCardText.ctaModifyPreference)}</Text>
       </Pressable>
     </View>
   )
@@ -697,14 +705,14 @@ const n = StyleSheet.create({
     paddingHorizontal: 24,
     gap:               6,
   },
+  // fontFamily applied inline (langFonts.semiBold) — see NoMatchesCard's Text usage.
   title: {
-    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   16,
     color:      '#000000',
     textAlign:  'center',
   },
+  // fontFamily applied inline (langFonts.regular) — see NoMatchesCard's Text usage.
   desc: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      '#000000',
     textAlign:  'center',
@@ -719,8 +727,8 @@ const n = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical:   10,
   },
+  // fontFamily applied inline (langFonts.medium) — see NoMatchesCard's Text usage.
   ctaText: {
-    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   14,
     color:      Colors.primaryDark,
   },
@@ -730,15 +738,16 @@ const n = StyleSheet.create({
 // via EKYCFLAG=1 for non-verified male users). Removed live by subscribeIdVerified().
 function IdVerifyBanner({ onPress }: { onPress: () => void }) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   return (
     <Pressable style={iv.card} onPress={onPress}>
       <CdnSvg uri={CDN + 'id-verify-promo.svg'} width={40} height={40} />
       <View style={iv.textCol}>
-        <Text style={iv.title}>{t('VERIFY_ID.VERIFY_PROFILE_TXT')}</Text>
-        <Text style={iv.body}>{t('VERIFY_ID.VERIFY_PROFILE_TXT_1')}</Text>
+        <Text style={[iv.title, { fontFamily: langFonts.semiBold }]}>{t('VERIFY_ID.VERIFY_PROFILE_TXT')}</Text>
+        <Text style={[iv.body, { fontFamily: langFonts.regular }]}>{t('VERIFY_ID.VERIFY_PROFILE_TXT_1')}</Text>
       </View>
       <View style={iv.cta}>
-        <Text style={iv.ctaText}>{t('VERIFY_ID.VERIFY_NOW_CTA')}</Text>
+        <Text style={[iv.ctaText, { fontFamily: langFonts.semiBold }]}>{t('VERIFY_ID.VERIFY_NOW_CTA')}</Text>
       </View>
     </Pressable>
   )
@@ -756,13 +765,13 @@ const iv = StyleSheet.create({
     gap:               12,
   },
   textCol: { flex: 1 },
+  // fontFamily applied inline (langFonts.semiBold) — see IdVerifyBanner's Text usage.
   title: {
-    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   14,
     color:      Colors.textDark,
   },
+  // fontFamily applied inline (langFonts.regular) — see IdVerifyBanner's Text usage.
   body: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   12,
     color:      Colors.textSecondary,
     marginTop:  2,
@@ -773,8 +782,8 @@ const iv = StyleSheet.create({
     paddingVertical:   8,
     paddingHorizontal: 12,
   },
+  // fontFamily applied inline (langFonts.semiBold) — see IdVerifyBanner's Text usage.
   ctaText: {
-    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   12,
     color:      Colors.white,
   },
@@ -795,6 +804,7 @@ async function goToEditPreferences(navigation: any) {
 export default function MatchesScreen({ navigation, route }: { navigation: any; route?: any }) {
   const { t, i18n } = useTranslation()
   const isDesktop = useIsDesktopWeb()
+  const langFonts = useLanguageFonts()
 
   // Android: HomeScreenActivity's ExitPopup — now registered centrally in
   // RootNavigation.tsx as handleBack()'s root fallback (fires whenever
@@ -855,6 +865,12 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   // Angular: fullpage-modalpopup.component.ts sendLikes() — male users mid photo
   // promotion see a photo-upsell prompt instead of the plain success confirmation.
   const [showPhotoBulkLikePrompt, setShowPhotoBulkLikePrompt] = useState(false)
+
+  // Angular: the header language pill here opens LanguageSelectionComponent
+  // with actionType='mothertongue' — a 2-language bottom sheet (English +
+  // this domain's one regional language), NOT the full-page language list
+  // menu/settings/signin use.
+  const [showLanguageSheet, setShowLanguageSheet] = useState(false)
 
   // ── Extended matches ("Continue seeing profiles" end-card) ─────────────────
   const [loadingExtended, setLoadingExtended] = useState(false)
@@ -978,8 +994,39 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     }
   }
 
-  // Header hide-on-scroll animation disabled per request — header now stays fixed.
-  function handleScroll() {}
+  // Header hide-on-scroll — Angular: onScroll() (matches.page.ts:3087-3118). Hides the
+  // title row (slides up by titleHRef, same amount the pref+chips row becomes the new
+  // sticky top bar) once scrolled past 100px while still scrolling down, and brings it
+  // back on any meaningful upward scroll or once back near the top. The FlatList wrapper
+  // below shares this exact same Animated.Value so its content slides up in lockstep,
+  // closing the gap the tucked-away title leaves — mirrors Angular's .content.hidden
+  // translateY(-var(--header-offset)) counterpart to .header.hidden.
+  const lastScrollYRef    = useRef(0)
+  const headerHiddenRef   = useRef(false)
+
+  function handleScroll(e: any) {
+    const current = e.nativeEvent.contentOffset.y
+    const delta = current - lastScrollYRef.current
+    // Angular: ignores sub-10px jitter so the header doesn't flicker on tiny scroll ticks.
+    if (Math.abs(delta) < 10) return
+    lastScrollYRef.current = current
+
+    const shouldHide = current > 100 && delta > 0
+    const shouldShow = delta < -15 || current < 50
+
+    let nextHidden = headerHiddenRef.current
+    if (shouldHide) nextHidden = true
+    else if (shouldShow) nextHidden = false
+
+    if (nextHidden !== headerHiddenRef.current) {
+      headerHiddenRef.current = nextHidden
+      Animated.timing(headerAnim, {
+        toValue:        nextHidden ? -titleHRef.current : 0,
+        duration:       300,
+        useNativeDriver: true,
+      }).start()
+    }
+  }
 
   // apiStart tracks the cursor for pagination (how many profiles we've fetched from API)
   const apiStartRef = useRef(0)
@@ -1296,6 +1343,18 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     const ctrl = { cancelled: false, notifTimer: undefined as ReturnType<typeof setTimeout> | undefined }
     loadMatches(ctrl, true)
     return () => { ctrl.cancelled = true; clearTimeout(ctrl.notifTimer) }
+  }, [])
+
+  // Angular: matches.page.ts ngOnInit() calls getPPSETData(1) unconditionally
+  // — matches is the default landing page after login, so this is the
+  // earliest point in a normal session where MOTHERTONGUE (from
+  // RESPONSE.PI_MOTHERTONGUE) becomes available in storage, which the
+  // mothertongue language pill/sheet depends on. Previously only wired up in
+  // MenuContactsScreen, so users who hadn't visited Menu yet always fell
+  // through to the wrong static language-pill fallback. Fire-and-forget —
+  // doesn't block or gate the main matches load above.
+  useEffect(() => {
+    getPPSetData().catch(() => {})
   }, [])
 
   // Angular: changeLanguage() (matches.page.ts:3179-3202) — switching language tears
@@ -2025,7 +2084,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
       // flag shows this text on the first extended profile.
       if (item.bannerSlot === 'EXTENDED_INTRO') {
         return (
-          <Text style={s.extendedIntroText}>{t('MATCHES.SEEINGMATCHES')}</Text>
+          <Text style={[s.extendedIntroText, { fontFamily: langFonts.semiBold }]}>{t('MATCHES.SEEINGMATCHES')}</Text>
         )
       }
       return null
@@ -2083,7 +2142,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         <MatchesDesktopLayout
           langCode={i18n.language}
           onTabPress={handleTabPress}
-          onLanguagePress={() => navigation.navigate('LanguageSelection')}
+          onLanguagePress={() => setShowLanguageSheet(true)}
           loading={loading}
           totalCount={totalCount}
           listData={listData}
@@ -2206,6 +2265,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           onSecondaryPress={handlePhoneInfoSecondaryPress}
           onLinkPress={handlePhoneInfoClose}
         />
+        <LanguagePillSheet visible={showLanguageSheet} onClose={() => setShowLanguageSheet(false)} />
         <Toast request={toastRequest} />
       </>
     )
@@ -2225,7 +2285,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         langCode={i18n.language}
         selectedChip={selectedChip}
         onChipSelect={applyQuickFilter}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
+        onLanguagePress={() => setShowLanguageSheet(true)}
         onEditPreferences={() => goToEditPreferences(navigation)}
         onHeaderLayout={handleHeaderLayout}
         onTitleLayout={handleTitleLayout}
@@ -2394,6 +2454,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         onSecondaryPress={handlePhoneInfoSecondaryPress}
         onLinkPress={handlePhoneInfoClose}
       />
+      <LanguagePillSheet visible={showLanguageSheet} onClose={() => setShowLanguageSheet(false)} />
       {/* AppFooter's tab bar is 56px tall (+ its own safe-area padding) — the
           Toast's default 24px clearance alone left it overlapping the footer. */}
       <Toast request={toastRequest} bottomOffset={56 + 16} />
@@ -2407,8 +2468,8 @@ const s = StyleSheet.create({
   screen:       { flex: 1, backgroundColor: Colors.white },
   loaderBox:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
   footerLoader: { marginVertical: 16 },
+  // fontFamily applied inline (langFonts.semiBold) — see EXTENDED_INTRO's Text usage.
   extendedIntroText: {
-    fontFamily:        Fonts.poppinsSemiBold,
     fontSize:          18,
     color:             Colors.black,
     textAlign:         'center',
@@ -2437,10 +2498,11 @@ const c = StyleSheet.create({
   },
   singlePhotoPressable: { width: '100%', height: '100%' },
 
-  // Angular no-photo placeholder
+  // Angular no-photo placeholder — currently unused (no JSX renders these;
+  // hasRealPhoto/isHiddenPhoto cover every branch MatchCard actually takes).
   noPhoto:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   noPhotoIcon: { width: 56, height: 56, opacity: 0.35 },
-  noPhotoText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textMuted },
+  noPhotoText: { fontSize: 14, color: Colors.textMuted },
 
   // Angular: .newly-joined posabsolute — uses newly-joined.svg as bg, top-left of photo
   newBadge: {
@@ -2456,8 +2518,8 @@ const c = StyleSheet.create({
     borderBottomRightRadius: 12,
     gap: 4,
   },
+  // fontFamily applied inline (langFonts.medium) — see MatchCard's Text usage.
   newBadgeText: {
-    fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium,
     fontSize:   12,
     color:      Colors.white,
   },
@@ -2470,16 +2532,16 @@ const c = StyleSheet.create({
     paddingHorizontal: 16,
     gap:              8,
   },
+  // fontFamily applied inline (langFonts.medium) — see MatchCard's Text usage.
   activityText: {
-    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     color:      Colors.black,
     flex:       1,
   },
 
   // Angular: getContentAfterLike() text above Send Interest CTA
+  // fontFamily applied inline (langFonts.medium) — see MatchCard's Text usage.
   afterLikeText: {
-    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     color:      Colors.black,
     textAlign:  'center',
@@ -2504,8 +2566,8 @@ const c = StyleSheet.create({
     width:             '70%',
     gap:               12,
   },
+  // fontFamily applied inline (langFonts.regular) — see MatchCard's Text usage.
   overlayText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   13,
     color:      Colors.white,
     textAlign:  'center',
@@ -2524,8 +2586,8 @@ const c = StyleSheet.create({
     marginTop:         8,
     gap:               6,
   },
+  // fontFamily applied inline (langFonts.medium) — see MatchCard's Text usage.
   waBtnText: {
-    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   13,
     color:      Colors.white,
   },
@@ -2560,7 +2622,8 @@ const c = StyleSheet.create({
     gap:              4,
   },
   likedIcon: { width: 20, height: 20, flexShrink: 0 },
-  likedText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.likedStripText },
+  // fontFamily applied inline (langFonts.regular) — see MatchCard's Text usage.
+  likedText: { fontSize: 12, color: Colors.likedStripText },
 
   // Angular: d-flex align-center-item mt-12 pl-16 pr-16
   nameRow: {
@@ -2570,16 +2633,16 @@ const c = StyleSheet.create({
     paddingHorizontal: 16,
     gap:              12,
   },
-  // Figma: #000000
-  name:       { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: '#000000' },
+  // Figma: #000000 — fontFamily applied inline (langFonts.semiBold) — see MatchCard's Text usage.
+  name:       { fontSize: 18, color: '#000000' },
   iconBtn:    { flexShrink: 0 },
   nameRowIcon:  { width: 24, height: 24 },
   nameRowIconWa:{ width: 28, height: 28 },
 
   // Angular: body2-regular-14 mt-2 pl-16 pr-16 bv-minht text-space
   // Figma: solid #000000; the "|" separators alone drop to 20% opacity
+  // fontFamily applied inline (langFonts.regular) — see MatchCard's Text usage.
   basicView: {
-    fontFamily:       SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:         14,
     color:            '#000000',
     lineHeight:       20,
@@ -2597,8 +2660,8 @@ const c = StyleSheet.create({
     paddingVertical:   8,
     gap:               2,
   },
+  // fontFamily applied inline (langFonts.medium) — see MatchCard's Text usage.
   viewProfileText: {
-    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   14,
     color:      Colors.link,
   },
@@ -2642,7 +2705,8 @@ const c = StyleSheet.create({
     borderColor:    '#545454',
     borderRadius:   8,
   },
-  ctaDontShowText: { fontFamily: Fonts.poppinsRegular, fontSize: 14, color: '#545454' },
+  // fontFamily applied inline (langFonts.regular) — see MatchCard's Text usage.
+  ctaDontShowText: { fontSize: 14, color: '#545454' },
 
   ctaViewLater: {
     flex:           1,
@@ -2655,7 +2719,8 @@ const c = StyleSheet.create({
     borderColor:    '#545454',
     borderRadius:   8,
   },
-  ctaViewLaterText: { fontFamily: Fonts.poppinsRegular, fontSize: 14, color: '#545454' },
+  // fontFamily applied inline (langFonts.regular) — see MatchCard's Text usage.
+  ctaViewLaterText: { fontSize: 14, color: '#545454' },
 
   // Angular: button-revamp.component.scss:13-21 — `ion-button[disabled]` only
   // overrides background (#e6e6e6) and text (#8A8A8A) via `--background`/
@@ -2677,7 +2742,8 @@ const c = StyleSheet.create({
     gap:             6,
   },
   ctaLikeIcon: { width: 24, height: 24 },
-  ctaLikeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.white },
+  // fontFamily applied inline (langFonts.semiBold) — see MatchCard's Text usage.
+  ctaLikeText: { fontSize: 14, color: Colors.white },
 
   // Angular: matches-cta-bg-color (pink gradient) + "Send Interest" primary CTA
   afterLikeRow: {
@@ -2706,8 +2772,8 @@ const c = StyleSheet.create({
     alignItems:     'center',
     justifyContent: 'center',
   },
+  // fontFamily applied inline (langFonts.medium) — see MatchCard's Text usage.
   ctaSendInterestText: {
-    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   14,
     color:      Colors.white,
     lineHeight: 20,
@@ -2722,13 +2788,13 @@ const c = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical:   2,
   },
+  // fontFamily applied inline (langFonts.semiBold) — see MatchCard's Text usage.
   freeBadgeText: {
-    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   10,
     color:      Colors.badgeNewText,
   },
+  // fontFamily applied inline (langFonts.regular) — see MatchCard's Text usage.
   contactsLeftText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   11,
     color:      Colors.textSecondary,
     textAlign:  'center',
@@ -2778,17 +2844,16 @@ const e = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
   },
-  countNum:   { fontFamily: Fonts.poppinsSemiBold, fontSize: 13, color: Colors.white, lineHeight: 16 },
-  countLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular,  fontSize: 10, color: Colors.white, lineHeight: 13 },
+  // fontFamily applied inline (langFonts.semiBold/.regular) — see ExtendedMatchesCard's Text usage.
+  countNum:   { fontSize: 13, color: Colors.white, lineHeight: 16 },
+  countLabel: { fontSize: 10, color: Colors.white, lineHeight: 13 },
   title: {
-    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   18,
     color:      Colors.extendedCardTitle,
     textAlign:  'center',
     marginBottom: 8,
   },
   desc: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      Colors.textSecondary,
     textAlign:  'center',
@@ -2845,15 +2910,15 @@ const pb = StyleSheet.create({
     justifyContent: 'center',
   },
   // Angular: heading3-semibold-16 black-color
+  // fontFamily applied inline (langFonts.semiBold) — see PhotoPromotionBanner's Text usage.
   title: {
-    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   16,
     color:      Colors.black,
     lineHeight: 22,
   },
   // Angular: mt-8 body3-regular-12 black-color
+  // fontFamily applied inline (langFonts.regular) — see PhotoPromotionBanner's Text usage.
   body: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   12,
     color:      Colors.black,
     marginTop:  8,
@@ -2868,8 +2933,8 @@ const pb = StyleSheet.create({
     alignSelf:         'flex-start',
     alignItems:        'center',
   },
+  // fontFamily applied inline (langFonts.semiBold) — see PhotoPromotionBanner's Text usage.
   ctaText: {
-    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   14,
   },
 })
@@ -2894,15 +2959,15 @@ const ap = StyleSheet.create({
     resizeMode: 'contain',
   },
   // Angular: heading1-semibold-22 black-color line-height-32
+  // fontFamily applied inline (langFonts.semiBold) — see AddPhotoBanner's Text usage.
   title: {
-    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   22,
     color:      Colors.black,
     lineHeight: 32,
   },
   // Angular: body1-medium-14 black-color
+  // fontFamily applied inline (langFonts.medium) — see AddPhotoBanner's Text usage.
   subheader: {
-    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     color:      Colors.black,
   },
@@ -2924,8 +2989,8 @@ const ap = StyleSheet.create({
     flexShrink: 0,
   },
   // Angular: body2-regular-14 black-color
+  // fontFamily applied inline (langFonts.regular) — see AddPhotoBanner's Text usage.
   bulletText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      Colors.black,
     flex:       1,
@@ -2938,8 +3003,8 @@ const ap = StyleSheet.create({
     paddingVertical: 14,
     alignItems:      'center',
   },
+  // fontFamily applied inline (langFonts.semiBold) — see AddPhotoBanner's Text usage.
   ctaText: {
-    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   14,
     color:      Colors.white,
   },

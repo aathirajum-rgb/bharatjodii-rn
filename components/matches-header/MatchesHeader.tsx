@@ -8,16 +8,21 @@ import FacetFilterModal from './FacetFilterModal'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import type { ExploreFacet } from '../../service/homeService'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 const CDN = CDN_SVG
 
-// Exported so MatchesDesktopNav shares the same language-label map instead of
-// duplicating it.
+// Exported so MatchesDesktopNav/ViewProfile share the same language-label map
+// instead of duplicating it.
+// Angular: FUNC.getSelectedKeyValue(langArrayList, LANG, '2') — type '2' maps
+// to the TITLE field of core/config/common.config.ts's languageArray, i.e.
+// each language's OWN native-script name (e.g. "తెలుగు"), not its English
+// name ("Telugu") — this previously showed the English name for every
+// language, which never matched what the real app displays on this pill.
 export const LANG_LABELS: Record<string, string> = {
-  en: 'English', tm: 'Tamil', tl: 'Telugu', hi: 'Hindi',
-  ml: 'Malayalam', kn: 'Kannada', bn: 'Bengali', mt: 'Marathi',
-  or: 'Odia', gj: 'Gujarati', pa: 'Punjabi',
+  en: 'English', tm: 'தமிழ்', tl: 'తెలుగు', hi: 'हिंदी',
+  ml: 'മലയാളം', kn: 'ಕನ್ನಡ', bn: 'বাংলা', mt: 'मराठी',
+  or: 'ଓଡ଼ିଆ', gj: 'ગુજરાતી', pa: 'ਪੰਜਾਬੀ',
 }
 
 // ─── Props ─────────────────────────────────────────────────────────────────────
@@ -69,6 +74,7 @@ export default function MatchesHeader({
   isExploreMode = false,
 }: MatchesHeaderProps) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   const langLabel = LANG_LABELS[langCode] ?? 'English'
   const [showFacetModal, setShowFacetModal] = useState(false)
 
@@ -99,7 +105,7 @@ export default function MatchesHeader({
         >
           {/* Angular matches.page.ts's setPageTitle() — "Matches (#COUNT)" (SEARCH.MATCHES_FOUND),
               not a count-first "323 Matches". */}
-          <Text style={s.title}>
+          <Text style={[s.title, { fontFamily: langFonts.semiBold }]}>
             {loading ? (titleOverride ?? t('GENERAL.ICON_1')) : (titleOverride ?? t('SEARCH.MATCHES_FOUND').replace('#COUNT', String(totalCount)))}
           </Text>
 
@@ -107,7 +113,7 @@ export default function MatchesHeader({
             {/* Figma: bordered pill — 1px black, 8px radius, pl-8/pr-12/py-4, gap-4 */}
             <Pressable style={s.langPill} onPress={onLanguagePress} hitSlop={8}>
               <CdnSvg uri={CDN + 'revamp/lang-change-img.svg'} width={24} height={24} />
-              <Text style={s.langText}>{langLabel}</Text>
+              <Text style={[s.langText, { fontFamily: langFonts.medium }]}>{langLabel}</Text>
             </Pressable>
           </View>
         </View>
@@ -117,11 +123,11 @@ export default function MatchesHeader({
             Angular: *ngIf="!isExploreMatches && contentLoaded" — hidden inside a category. */}
         {!loading && !isExploreMode && (
           <View style={s.ppRow}>
-            <Text style={s.ppText}>
+            <Text style={[s.ppText, { fontFamily: langFonts.regular }]}>
               {t('MATCHES.PROFILE_COUNT').replace('#COUNT#', String(totalCount))}
             </Text>
             <Pressable style={s.ppEditBtn} onPress={onEditPreferences} hitSlop={8}>
-              <Text style={s.ppEditText}>{t('MATCHES.EDIT_PP')}</Text>
+              <Text style={[s.ppEditText, { fontFamily: langFonts.regular }]}>{t('MATCHES.EDIT_PP')}</Text>
               <CdnSvg uri={CDN + 'registration-new/edit-pencil.svg'} width={16} height={16} style={{ marginLeft: 4 }} />
             </Pressable>
           </View>
@@ -141,7 +147,7 @@ export default function MatchesHeader({
             {hasMoreFacets && (
               <Pressable style={s.facetChip} onPress={() => setShowFacetModal(true)}>
                 <CdnSvg uri={CDN + 'discover-matches/filter-image-discover.svg'} width={16} height={16} style={{ marginRight: 4 }} />
-                <Text style={s.facetChipText}>
+                <Text style={[s.facetChipText, { fontFamily: langFonts.regular }]}>
                   {t('SEARCH.VIEW_MORE').replace('#COUNT#', String(allFacets.length - 2))}
                 </Text>
               </Pressable>
@@ -153,7 +159,7 @@ export default function MatchesHeader({
                 onPress={() => f.count !== 0 && onFacetToggle?.(f.key)}
                 disabled={f.count === 0}
               >
-                <Text style={[s.facetChipText, f.checked && s.facetChipTextSelected]}>{f.value}</Text>
+                <Text style={[s.facetChipText, { fontFamily: langFonts.regular }, f.checked && s.facetChipTextSelected]}>{f.value}</Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -219,11 +225,11 @@ const s = StyleSheet.create({
     paddingLeft:       16,
     paddingRight:      16,
     marginBottom:      12,
+    marginTop    : 12,
     gap:               2,
   },
-  // Figma: #000000
+  // Figma: #000000 — fontFamily applied inline (langFonts.regular), see Text usage.
   ppText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      '#000000',
   },
@@ -231,14 +237,13 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems:    'center',
   },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
   ppEditText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     color:      Colors.link,
   },
-  // Figma: Poppins-SemiBold 18 #000000
+  // Figma: Poppins-SemiBold 18 #000000 — fontFamily applied inline (langFonts.semiBold).
   title: {
-    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   18,
     lineHeight: 24,
     color:      '#000000',
@@ -260,8 +265,8 @@ const s = StyleSheet.create({
     paddingRight:      12,
     paddingVertical:   4,
   },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
   langText: {
-    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   12,
     color:      '#000000',
   },
@@ -287,8 +292,8 @@ const s = StyleSheet.create({
     backgroundColor: Colors.chipSurfaceSelected,
   },
   facetChipDisabled: { opacity: 0.4 },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
   facetChipText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   12,
     color:      '#4c4c4c',
   },

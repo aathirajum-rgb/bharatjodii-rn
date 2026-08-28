@@ -13,9 +13,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+
+const CDN = CDN_SVG
 
 const SCREEN_H = Dimensions.get('window').height
 
@@ -192,11 +195,14 @@ export default function BottomSheet({
     ? (data?.content ?? '').split('\n\n')
     : []
 
-  // Close button — Angular: mobile's bottomsheet-cross floats ABOVE the sheet
-  // (top:-48px, centered); desktop's sits INSIDE the card's own top-right
-  // corner instead (same convention WhatsAppPaywallModal already uses) — no
-  // drag handle exists anywhere in Angular's bottom-sheet component, so this
-  // port has none either.
+  // Close button — Angular: mobile's `.bottomsheet-cross` is a bare
+  // bottomsheet-cross.svg image floating ABOVE the sheet (top:-40px, left:45%)
+  // with NO circular background behind it — bottomsheet.component.html/scss
+  // and language-selection.component.html's `mothertongue` variant both use
+  // this exact same icon/position. Desktop sits INSIDE the card's own
+  // top-right corner instead (same convention WhatsAppPaywallModal already
+  // uses, not an Angular-mobile pattern) — no drag handle exists anywhere in
+  // Angular's bottom-sheet component, so this port has none either.
   // Desktop: a real in-flow row (not absolutely positioned) so it always
   // reserves its own space above the title/content — an earlier version
   // floated it absolutely over the top-right corner, which overlapped the
@@ -204,9 +210,13 @@ export default function BottomSheet({
   // down first (most of them — many BottomSheet uses are content-only).
   const closeButton = showClose && !isViewPhoneConfirm && (
     <Pressable onPress={onClose} hitSlop={10} style={isDesktop ? styles.desktopCloseBtn : styles.closeBtn}>
-      <View style={isDesktop ? styles.desktopCloseCircle : styles.closeCircle}>
-        <Text style={styles.closeX}>✕</Text>
-      </View>
+      {isDesktop ? (
+        <View style={styles.desktopCloseCircle}>
+          <Text style={styles.closeX}>✕</Text>
+        </View>
+      ) : (
+        <CdnSvg uri={CDN + 'revamp/bottomsheet-cross.svg'} width={32} height={32} />
+      )}
     </Pressable>
   )
 
@@ -350,13 +360,16 @@ export default function BottomSheet({
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      {/* Animated scrim — pointer-events none so it doesn't block the Pressable */}
+      {/* Animated scrim — pointer-events none so it doesn't block the Pressable.
+          Angular: global.scss's `.sc-ion-modal-md-h:first-of-type,
+          .sc-ion-modal-ios-h:first-of-type { --backdrop-opacity: var(--ion-backdrop-opacity, 0.8); }`
+          — Ionic's own base ion-modal backdrop (every bottom sheet is one), 0.8 not 0.5. */}
       <Animated.View
         style={[
           StyleSheet.absoluteFill,
           {
             backgroundColor: Colors.black,
-            opacity: scrimAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.5] }),
+            opacity: scrimAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.9] }),
           },
         ]}
         pointerEvents="none"
@@ -464,22 +477,13 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
   },
+  // Angular: `.bottomsheet-cross { position: absolute; top: -40px; left: 45%; }`
+  // — a bare floating icon, not centered via a full-width flex row.
   closeBtn: {
-    position:  'absolute',
-    
-    top:       -48,
-    left:      0,
-    right:     0,
-    alignItems: 'center',
-    zIndex:    10,
-  },
-  closeCircle: {
-    width:           28,
-    height:          28,
-    borderRadius:    14,
-    backgroundColor: Colors.surfaceInput,
-    alignItems:      'center',
-    justifyContent:  'center',
+    position: 'absolute',
+    top:      -40,
+    left:     '45%',
+    zIndex:   10,
   },
   closeX: {
     fontSize:   12,

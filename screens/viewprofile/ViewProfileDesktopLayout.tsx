@@ -30,7 +30,7 @@ import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interf
 import type { SimilarProfileCard, StarMatchResult } from '../../service/viewProfileService'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // Same back-icon asset ViewProfileScreen's own mobile header uses.
 const BACK_ICON_URI = CDN_REACT + '/arrowleft.svg'
@@ -110,20 +110,22 @@ export interface ViewProfileDesktopLayoutProps {
 // single inline row, unlike mobile's DetailRow (ViewProfileScreen.tsx) which
 // stacks label above value. Same data/gating, different presentation only.
 function DesktopDetailRow({ icon, label, value }: { icon: string; label: string; value?: string | undefined }) {
+  const langFonts = useLanguageFonts()
   if (!value) return null
   return (
     <View style={ds.row}>
       <CdnSvg uri={icon} width={24} height={24} />
       <View style={ds.rowLabelValue}>
-        <Text style={ds.label}>{label}</Text>
-        <HtmlText html={value} style={ds.value} />
+        <Text style={[ds.label, { fontFamily: langFonts.regular }]}>{label}</Text>
+        <HtmlText html={value} style={[ds.value, { fontFamily: langFonts.medium }]} />
       </View>
     </View>
   )
 }
 
 function DesktopSectionHeader({ title, first }: { title: string; first?: boolean }) {
-  return <Text style={[ds.sectionHeader, first && ds.sectionHeaderFirst]}>{title}</Text>
+  const langFonts = useLanguageFonts()
+  return <Text style={[ds.sectionHeader, { fontFamily: langFonts.semiBold }, first && ds.sectionHeaderFirst]}>{title}</Text>
 }
 
 // Hoisted to module scope — these used to be defined INSIDE ViewProfileDesktopLayout's
@@ -158,6 +160,7 @@ function CtaRow({
   ctaCtx: AfterLikeCtx
   t: (key: string) => string
 }) {
+  const langFonts = useLanguageFonts()
   if (sameGender || ownProfile) return null
   if (showLikeCTA(likedStatus)) {
     return (
@@ -168,7 +171,7 @@ function CtaRow({
           disabled={disableDontShow(dontShowStatus)}
         >
           <CloseIcon width={16} height={16} />
-          <Text style={ds.ctaDontShowText}>{t('GENERAL.DONTSHOWCTA')}</Text>
+          <Text style={[ds.ctaDontShowText, { fontFamily: langFonts.regular }]}>{t('GENERAL.DONTSHOWCTA')}</Text>
         </Pressable>
         <Pressable
           style={[ds.ctaViewLater, compact && ds.ctaCompact, disableViewLater(viewLaterStatus) && ds.ctaDisabled]}
@@ -176,11 +179,11 @@ function CtaRow({
           disabled={disableViewLater(viewLaterStatus)}
         >
           <ViewLaterIcon width={16} height={16} />
-          <Text style={ds.ctaViewLaterText}>{t('GENERAL.VIEWLATER')}</Text>
+          <Text style={[ds.ctaViewLaterText, { fontFamily: langFonts.regular }]}>{t('GENERAL.VIEWLATER')}</Text>
         </Pressable>
         <Pressable style={[ds.ctaLike, compact && ds.ctaCompact]} onPress={onLike}>
           <LikeIcon width={16} height={17} />
-          <Text style={ds.ctaLikeText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
+          <Text style={[ds.ctaLikeText, { fontFamily: langFonts.semiBold }]}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
         </Pressable>
       </View>
     )
@@ -188,20 +191,20 @@ function CtaRow({
   if (showAfterLikeCTA(likedStatus)) {
     return (
       <View style={ds.afterLikeRow}>
-        <Text style={ds.afterLikeText} numberOfLines={1}>{getAfterLikeContentText(ctaCtx, t)}</Text>
+        <Text style={[ds.afterLikeText, { fontFamily: langFonts.medium }]} numberOfLines={1}>{getAfterLikeContentText(ctaCtx, t)}</Text>
         <View style={ds.ctaSendInterestWrap}>
           {showFreeBadge(ctaCtx) && (
             <View style={ds.freeBadge} pointerEvents="none">
-              <Text style={ds.freeBadgeText}>{t('GENERAL.FREE')}</Text>
+              <Text style={[ds.freeBadgeText, { fontFamily: langFonts.semiBold }]}>{t('GENERAL.FREE')}</Text>
             </View>
           )}
           <Pressable style={ds.ctaSendInterest} onPress={onCall}>
             <CdnSvg uri={getAfterLikeCtaIcon(ctaCtx)} width={16} height={16} />
-            <Text style={ds.ctaSendInterestText}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
+            <Text style={[ds.ctaSendInterestText, { fontFamily: langFonts.medium }]}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
           </Pressable>
         </View>
         {showContactsLeftBanner(ctaCtx) && !compact && (
-          <Text style={ds.contactsLeftText}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
+          <Text style={[ds.contactsLeftText, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
         )}
       </View>
     )
@@ -218,6 +221,7 @@ function NeighborButton({
   onPress: () => void
   t: (key: string) => string
 }) {
+  const langFonts = useLanguageFonts()
   if (!enabled) return null
   // Angular has no localized "Previous" string anywhere in locales/en.json for
   // this desktop-only control (mobile's equivalent is a bare ‹/› chevron, no
@@ -230,7 +234,7 @@ function NeighborButton({
       {side === 'next' && !!preview?.photoUri && (
         <Image source={{ uri: preview.photoUri }} style={s.neighborAvatar} contentFit="cover" />
       )}
-      <Text style={s.neighborBtnText}>{label}</Text>
+      <Text style={[s.neighborBtnText, { fontFamily: langFonts.medium }]}>{label}</Text>
       {side === 'prev' && !!preview?.photoUri && (
         <Image source={{ uri: preview.photoUri }} style={s.neighborAvatar} contentFit="cover" />
       )}
@@ -250,6 +254,7 @@ export default function ViewProfileDesktopLayout({
   onAddFamilyDetails, onAddPropertyDetails, onDownloadBiodata, onViewStarMatchDetails, onReportProfile,
 }: ViewProfileDesktopLayoutProps) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   const [showMenu, setShowMenu] = useState(false)
   // Figma node 141:36781 — a condensed bar (avatar+name / CTA / Previous-Next)
   // that replaces the normal top bar+pagination once scrolled past the hero
@@ -332,9 +337,9 @@ export default function ViewProfileDesktopLayout({
           either — the back control lives in the pagination row below, next to
           the "N / Total Profiles" text, confirmed against node 290:2220). */}
       <View style={s.topBar}>
-        <Text style={s.logo}>Jodii</Text>
+        <Text style={[s.logo, { fontFamily: langFonts.semiBold }]}>Jodii</Text>
         <Pressable style={s.langBtn} onPress={onLanguagePress}>
-          <Text style={s.langText}>{LANG_LABELS[langCode] ?? 'English'}</Text>
+          <Text style={[s.langText, { fontFamily: langFonts.regular }]}>{LANG_LABELS[langCode] ?? 'English'}</Text>
           <Text style={s.langChevron}>{'▾'}</Text>
         </Pressable>
       </View>
@@ -347,7 +352,7 @@ export default function ViewProfileDesktopLayout({
             {!!profile.photos[0] && (
               <Image source={{ uri: profile.photos[0] }} style={s.stickyAvatar} contentFit="cover" />
             )}
-            <Text style={s.stickyName} numberOfLines={1}>{profile.name}</Text>
+            <Text style={[s.stickyName, { fontFamily: langFonts.semiBold }]} numberOfLines={1}>{profile.name}</Text>
           </View>
           <CtaRow
             compact
@@ -383,7 +388,7 @@ export default function ViewProfileDesktopLayout({
           <View style={s.paginationRow}>
             <Pressable style={s.paginationBack} onPress={onBack} hitSlop={8}>
               <CdnSvg uri={BACK_ICON_URI} width={24} height={24} />
-              <Text style={s.paginationText}>
+              <Text style={[s.paginationText, { fontFamily: langFonts.semiBold }]}>
                 {profileIndex + 1} / {totalProfiles} {t('PROFILES.PROFILES')}
               </Text>
             </Pressable>
@@ -448,7 +453,7 @@ export default function ViewProfileDesktopLayout({
                       <View style={s.menuDropdown}>
                         <Pressable style={s.menuItem} onPress={() => { setShowMenu(false); onReportProfile() }}>
                           <CdnSvg uri={REPORT_PROFILE_ICON_URI} width={20} height={20} />
-                          <Text style={s.menuItemText}>{t('MATCHES.MORE_OPT_2')}</Text>
+                          <Text style={[s.menuItemText, { fontFamily: langFonts.regular }]}>{t('MATCHES.MORE_OPT_2')}</Text>
                         </Pressable>
                       </View>
                     )}
@@ -457,12 +462,12 @@ export default function ViewProfileDesktopLayout({
               )}
             </View>
 
-            <Text style={s.name} numberOfLines={1}>{profile.name}</Text>
-            <Text style={s.jodiId}>{t('VIEWPROFILE.ID')} : {profile.profileId}</Text>
+            <Text style={[s.name, { fontFamily: langFonts.semiBold }]} numberOfLines={1}>{profile.name}</Text>
+            <Text style={[s.jodiId, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.ID')} : {profile.profileId}</Text>
             {/* Angular: viewprofile.page.html:448-458 — was missing entirely on
                 desktop; see ViewProfileScreen.tsx's matching row for the full gate. */}
             {!!profile.likedMsg && (!ownProfile || !sameGender) && profile.likedStatus === '0' && (
-              <Text style={s.likedMsg}>{profile.likedMsg}</Text>
+              <Text style={[s.likedMsg, { fontFamily: langFonts.regular }]}>{profile.likedMsg}</Text>
             )}
             {/* Angular sends some parts (e.g. HEIGHTCATEGORY) as raw server HTML —
                 a `<span class="height-revamp-text-small">...</span>` around the
@@ -470,11 +475,11 @@ export default function ViewProfileDesktopLayout({
                 HtmlText (same helper the mobile DetailRow uses) strips/renders it.
                 numberOfLines=2 (not 1) so longer combos wrap instead of getting
                 cut off mid-word. */}
-            <HtmlText html={buildBasicView(profile)} style={s.basicInfo} numberOfLines={2} />
+            <HtmlText html={buildBasicView(profile)} style={[s.basicInfo, { fontFamily: langFonts.regular }]} numberOfLines={2} />
 
             {ownProfile ? (
               <Pressable style={s.biodataCta} onPress={onDownloadBiodata}>
-                <Text style={s.biodataCtaText}>{t('BIO_DATA.BIODATA_DOWNLOAD_FREE')}</Text>
+                <Text style={[s.biodataCtaText, { fontFamily: langFonts.semiBold }]}>{t('BIO_DATA.BIODATA_DOWNLOAD_FREE')}</Text>
               </Pressable>
             ) : (
               <CtaRow
@@ -547,16 +552,16 @@ export default function ViewProfileDesktopLayout({
                   ownEntryType === 'P' ? (
                     starMatch && (
                       <Pressable onPress={onViewStarMatchDetails}>
-                        <Text style={ds.starMatchText}>
+                        <Text style={[ds.starMatchText, { fontFamily: langFonts.medium }]}>
                           {starMatch.displayText}{t('STARMATCHING.STAR_MATCHING_TXT')}
                         </Text>
-                        <Text style={ds.starMatchTeaser}>{t('VIEWPROFILE.PAID_MEMBER_REPORT')}</Text>
+                        <Text style={[ds.starMatchTeaser, { fontFamily: langFonts.medium }]}>{t('VIEWPROFILE.PAID_MEMBER_REPORT')}</Text>
                       </Pressable>
                     )
                   ) : (
                     <>
-                      <Text style={ds.starMatchText}>9/10{t('STARMATCHING.STAR_MATCHING_TXT')}</Text>
-                      <Text style={ds.starMatchTeaser}>{t('VIEWPROFILE.FREE_MEMBER_REPORT')}</Text>
+                      <Text style={[ds.starMatchText, { fontFamily: langFonts.medium }]}>9/10{t('STARMATCHING.STAR_MATCHING_TXT')}</Text>
+                      <Text style={[ds.starMatchTeaser, { fontFamily: langFonts.medium }]}>{t('VIEWPROFILE.FREE_MEMBER_REPORT')}</Text>
                     </>
                   )
                 )}
@@ -574,15 +579,15 @@ export default function ViewProfileDesktopLayout({
                 <View style={ds.row}>
                   <CdnSvg uri={ICON.horoscope} width={24} height={24} />
                   <View style={ds.rowLabelValue}>
-                    <Text style={ds.label}>{t('VIEWPROFILE.HOROSCOPE')}</Text>
+                    <Text style={[ds.label, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.HOROSCOPE')}</Text>
                     <View style={{ flex: 1 }}>
                       {loginHoroAvail === '0' ? (
                         <>
-                          <Text style={ds.value}>{t('VIEWPROFILE.ADDYOURHORO').replace('#HIMHER#', t(`PRONOUN.${oppGender}.himhers`))}</Text>
-                          <Pressable onPress={onAddHoroscope}><Text style={ds.actionLink}>{t('GENERAL.ADD_HOROSCOPE')}</Text></Pressable>
+                          <Text style={[ds.value, { fontFamily: langFonts.medium }]}>{t('VIEWPROFILE.ADDYOURHORO').replace('#HIMHER#', t(`PRONOUN.${oppGender}.himhers`))}</Text>
+                          <Pressable onPress={onAddHoroscope}><Text style={[ds.actionLink, { fontFamily: langFonts.regular }]}>{t('GENERAL.ADD_HOROSCOPE')}</Text></Pressable>
                         </>
                       ) : (
-                        <Pressable onPress={onViewHoroscope}><Text style={ds.actionLink}>{t('GENERAL.VIEW_HOROSCOPE')}</Text></Pressable>
+                        <Pressable onPress={onViewHoroscope}><Text style={[ds.actionLink, { fontFamily: langFonts.regular }]}>{t('GENERAL.VIEW_HOROSCOPE')}</Text></Pressable>
                       )}
                     </View>
                   </View>
@@ -628,7 +633,7 @@ export default function ViewProfileDesktopLayout({
                 <DesktopSectionHeader title={t('VIEWPROFILE.FAMILYDETAIL')} />
                 <Pressable style={ds.addDetailPrompt} onPress={onAddFamilyDetails}>
                   <CdnSvg uri={ICON.brother} width={20} height={20} />
-                  <Text style={ds.addDetailPromptText}>{t('GENERAL.ADD_FAMILY_DETAILS')}</Text>
+                  <Text style={[ds.addDetailPromptText, { fontFamily: langFonts.medium }]}>{t('GENERAL.ADD_FAMILY_DETAILS')}</Text>
                 </Pressable>
               </>
             )}
@@ -654,7 +659,7 @@ export default function ViewProfileDesktopLayout({
                 <DesktopSectionHeader title={t('VIEWPROFILE.PROPERTY_DETAILS')} />
                 <Pressable style={ds.addDetailPrompt} onPress={onAddPropertyDetails}>
                   <CdnSvg uri={ICON.property} width={20} height={20} />
-                  <Text style={ds.addDetailPromptText}>{t('BIO_DATA.ADD_PROPERTY_DETAILS')}</Text>
+                  <Text style={[ds.addDetailPromptText, { fontFamily: langFonts.medium }]}>{t('BIO_DATA.ADD_PROPERTY_DETAILS')}</Text>
                 </Pressable>
               </>
             )}
@@ -690,7 +695,7 @@ export default function ViewProfileDesktopLayout({
             style={[s.similarSection, leftColWidth ? { width: leftColWidth } : null]}
           >
             <View style={s.similarHeaderRow}>
-              <Text style={s.similarHeader}>
+              <Text style={[s.similarHeader, { fontFamily: langFonts.semiBold }]}>
                 {t('VIEWPROFILE.SIMILARPROFILES').replace('#NAME#', profile.name)}
               </Text>
             </View>
@@ -745,12 +750,14 @@ const s = StyleSheet.create({
     paddingHorizontal: 32, paddingVertical: 14,
     backgroundColor: Colors.white, borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle,
   },
-  logo: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.primary },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  logo: { fontSize: 22, color: Colors.primary },
   langBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 6,
     paddingHorizontal: 12, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 8,
   },
-  langText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textDark },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  langText: { fontSize: 13, color: Colors.textDark },
   langChevron: { fontSize: 10, color: Colors.textSecondary },
 
   // Figma 141:36781 — condensed sticky bar (avatar+name / CTA / prev-next).
@@ -763,7 +770,8 @@ const s = StyleSheet.create({
   },
   stickyLeft: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 160 },
   stickyAvatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.divider },
-  stickyName: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black, maxWidth: 140 },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  stickyName: { fontSize: 14, color: Colors.black, maxWidth: 140 },
   stickyNav: { flexDirection: 'row', alignItems: 'center', gap: 8, minWidth: 160, justifyContent: 'flex-end' },
 
   scroll: { flex: 1 },
@@ -771,7 +779,8 @@ const s = StyleSheet.create({
 
   paginationRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   paginationBack: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  paginationText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  paginationText: { fontSize: 18, color: Colors.black },
   paginationNav: { flexDirection: 'row', alignItems: 'center', gap: 8 },
 
   neighborBtn: {
@@ -780,7 +789,8 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.borderNeutral, backgroundColor: Colors.white,
   },
   neighborAvatar: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.divider },
-  neighborBtnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 13, color: Colors.textDark },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  neighborBtnText: { fontSize: 13, color: Colors.textDark },
 
   heroCard: {
     flexDirection: 'row', gap: 24, backgroundColor: Colors.white,
@@ -808,19 +818,25 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 4,
     paddingHorizontal: 16, paddingVertical: 12,
   },
-  menuItemText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  menuItemText: { fontSize: 14, color: Colors.black },
 
-  name: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black, marginTop: 12 },
-  jodiId: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, marginTop: 4 },
-  likedMsg: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.likedStripText, marginTop: 6 },
-  basicInfo: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary, marginTop: 6, lineHeight: 18 },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  name: { fontSize: 22, color: Colors.black, marginTop: 12 },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  jodiId: { fontSize: 14, color: Colors.black, marginTop: 4 },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  likedMsg: { fontSize: 12, color: Colors.likedStripText, marginTop: 6 },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  basicInfo: { fontSize: 13, color: Colors.textSecondary, marginTop: 6, lineHeight: 18 },
 
   biodataCta: {
     height: 40, alignSelf: 'flex-start', paddingHorizontal: 20, marginTop: 16,
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.primaryDark, borderRadius: 8,
   },
-  biodataCtaText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.white },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  biodataCtaText: { fontSize: 14, color: Colors.white },
 
   twoColumn: { flexDirection: 'row', gap: 24 },
   // Figma node 310:11679 — the whole detail-sections column sits on its own
@@ -848,7 +864,8 @@ const s = StyleSheet.create({
   // edge) instead of closing at the same right edge as everything above it.
   similarSection: { width: '100%', overflow: 'hidden', marginTop: 32, paddingVertical: 24, borderRadius: 12 },
   similarHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: SIMILAR_LIST_PADDING },
-  similarHeader: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black, marginBottom: 12 },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  similarHeader: { fontSize: 20, color: Colors.black, marginBottom: 12 },
   similarListContent: { paddingHorizontal: SIMILAR_LIST_PADDING, gap: SIMILAR_CARD_GAP },
   // No explicit width needed — this stretches to fill similarSection, which is
   // itself already pinned to leftColWidth (see the inline style override on
@@ -872,17 +889,24 @@ const ds = StyleSheet.create({
   rowsGroup: { gap: 16, marginTop: 24 },
   row: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, marginBottom: 16 },
   rowLabelValue: { flex: 1, flexDirection: 'row', gap: 8 },
-  label: { width: 170, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
-  value: { flex: 1, fontFamily: Fonts.poppinsMedium, fontSize: 14, color: Colors.black },
-  actionLink: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.link, marginTop: 4 },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  label: { width: 170, fontSize: 14, color: Colors.black },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  value: { flex: 1, fontSize: 14, color: Colors.black },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  actionLink: { fontSize: 14, color: Colors.link, marginTop: 4 },
   addDetailPrompt: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
-  addDetailPromptText: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: 14, color: Colors.link },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  addDetailPromptText: { fontSize: 14, color: Colors.link },
 
-  sectionHeader: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black, marginTop: 48 },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  sectionHeader: { fontSize: 20, color: Colors.black, marginTop: 48 },
   sectionHeaderFirst: { marginTop: 0 },
 
-  starMatchText:   { fontFamily: Fonts.poppinsMedium, fontSize: 13, color: Colors.textDark, marginTop: 8 },
-  starMatchTeaser: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: 13, color: Colors.link, marginTop: 8 },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  starMatchText:   { fontSize: 13, color: Colors.textDark, marginTop: 8 },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  starMatchTeaser: { fontSize: 13, color: Colors.link, marginTop: 8 },
 
   ctaRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
   ctaDontShow: {
@@ -890,19 +914,22 @@ const ds = StyleSheet.create({
     height: 44, paddingHorizontal: 16, backgroundColor: Colors.white,
     borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
-  ctaDontShowText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#545454' },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  ctaDontShowText: { fontSize: 14, color: '#545454' },
   ctaViewLater: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, paddingHorizontal: 16, backgroundColor: Colors.white,
     borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
-  ctaViewLaterText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#545454' },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  ctaViewLaterText: { fontSize: 14, color: '#545454' },
   ctaDisabled: { opacity: 0.4 },
   ctaLike: {
     height: 44, paddingHorizontal: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     backgroundColor: Colors.primaryDark, borderRadius: 8,
   },
-  ctaLikeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.white },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  ctaLikeText: { fontSize: 14, color: Colors.white },
   ctaCompact: { height: 36, paddingHorizontal: 12 },
 
   afterLikeRow: {
@@ -910,17 +937,21 @@ const ds = StyleSheet.create({
     backgroundColor: Colors.afterLikeBg, borderRadius: 8, borderWidth: 1, borderColor: Colors.afterLikeBorder,
     paddingHorizontal: 14, paddingVertical: 10,
   },
-  afterLikeText: { flex: 1, fontFamily: Fonts.poppinsMedium, fontSize: 13, color: Colors.black },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  afterLikeText: { flex: 1, fontSize: 13, color: Colors.black },
   ctaSendInterestWrap: { position: 'relative', flexShrink: 0 },
   ctaSendInterest: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 40, backgroundColor: Colors.primaryDark, borderRadius: 8, paddingHorizontal: 16,
   },
-  ctaSendInterestText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 13, color: Colors.white },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  ctaSendInterestText: { fontSize: 13, color: Colors.white },
   freeBadge: {
     position: 'absolute', top: -10, right: 8, zIndex: 1,
     backgroundColor: Colors.badgeNewBg, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2,
   },
-  freeBadgeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 10, color: Colors.badgeNewText },
-  contactsLeftText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 11, color: Colors.textSecondary },
+  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  freeBadgeText: { fontSize: 10, color: Colors.badgeNewText },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  contactsLeftText: { fontSize: 11, color: Colors.textSecondary },
 })
