@@ -22,6 +22,7 @@ import { openMembershipTab } from '../../service/paymentService'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileMrgReasonDesktopLayout from './DeleteProfileMrgReasonDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { handleBack } from '../../utils/navigationRef'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -190,7 +191,7 @@ export default function DeleteProfileMrgReasonScreen({ navigation, route }: Prop
       <View style={s.header}>
         <Pressable
           style={s.backBtn}
-          onPress={() => navigation.goBack()}
+          onPress={() => handleBack()}
           accessibilityRole="button"
           accessibilityLabel="Back"
         >

@@ -21,6 +21,7 @@ import { Colors } from '../../constants/colors'
 import { CDN, CDN_REVAMP } from '../../constants/cdn'
 import { EnvConfig } from '../../constants/env'
 import { getOppGenderAvatarUrl } from '../../utils/avatar'
+import { handleBack } from '../../utils/navigationRef'
 import {
   socketConnection, emitNotificationDetails,
   onNotificationList, isConnected,
@@ -42,7 +43,7 @@ const { height: SH } = Dimensions.get('window')
 
 type Props = { navigation: any }
 
-export default function NotificationScreen({ navigation }: Props) {
+export default function NotificationScreen({ navigation: _navigation }: Props) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
 
@@ -100,7 +101,7 @@ export default function NotificationScreen({ navigation }: Props) {
         <AppHeader
           type="header2"
           title={t('NOTIFICATION.TITLE')}
-          onBackPress={() => navigation.goBack()}
+          onBackPress={() => handleBack()}
         />
 
         {!isReady ? (

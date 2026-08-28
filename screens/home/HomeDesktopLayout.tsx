@@ -151,8 +151,7 @@ export default function HomeDesktopLayout({
               total={viewedMeTotal}
               newCount={newlyViewedCount}
               onCardPress={onCardPress}
-              // TODO: no dedicated "who viewed me" list screen registered yet
-              onSeeAllPress={() => {}}
+              onSeeAllPress={() => navigation.navigate('Activity')}
             />
           </View>
 
@@ -176,8 +175,7 @@ export default function HomeDesktopLayout({
               items={newlyJoined}
               total={newlyJoinedTotal}
               onCardPress={onCardPress}
-              // TODO: no dedicated "newly joined" list screen registered yet
-              onSeeAllPress={() => {}}
+              onSeeAllPress={() => navigation.navigate('Matches')}
             />
           </View>
 
@@ -186,8 +184,7 @@ export default function HomeDesktopLayout({
               items={profilesViewed}
               total={profilesViewedTotal}
               onCardPress={onCardPress}
-              // TODO: no dedicated "profiles you viewed" list screen registered yet
-              onSeeAllPress={() => {}}
+              onSeeAllPress={() => navigation.navigate('Activity')}
             />
           </View>
 
@@ -200,8 +197,6 @@ export default function HomeDesktopLayout({
               likedMe={likedMe}
               likedMeTotal={likedMeTotal}
               onCardPress={onCardPress}
-              // TODO: no dedicated "liked profiles" list screen registered yet
-              onSeeAllPress={() => {}}
             />
           </View>
 
@@ -226,8 +221,6 @@ export default function HomeDesktopLayout({
               <SelfHelpVideosSection
                 videos={videos}
                 onVideoPress={item => item.videoUrl && setVideoModalUrl(item.videoUrl)}
-                // TODO: no dedicated "self-help videos" list screen registered yet
-                onSeeAllPress={() => {}}
               />
             </View>
           )}

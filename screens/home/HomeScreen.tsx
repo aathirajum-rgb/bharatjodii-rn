@@ -32,15 +32,13 @@ import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import { useContactGating } from '../../hooks/useContactGating'
 import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
 import { openMembershipTab, paymentTrack, getHeroBannerDetails, getMenuPromo, redirectToIntermediatePage } from '../../service/paymentService'
-import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm } from '../../service/communicationService'
+import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import { getItem, setItem, removeItem, getJson } from '../../service/storageService'
-import { getRegistrationArrays } from '../../service/registrationService'
+import { getRegistrationArrays, getSessionValue } from '../../service/registrationService'
 import { logScreen } from '../../service/analyticsService'
-import { socketConnection, emitNotificationDetails, onNotificationList } from '../../service/socketService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { APP_VERSION } from '../../constants/appVersion'
-import { EnvConfig } from '../../constants/env'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
@@ -59,6 +57,7 @@ import {
   computeForceUpdateInfo,
   isPaidVerifiedNoPhotoMale,
   isNonIdVerifiedPaidMale,
+  applyWhatsAppPhotoRequestFlags,
   type LikedTab,
   type HeroBannerVariant,
   type ForceUpdateInfo,
@@ -77,6 +76,14 @@ import {
 const CDN = 'https://imgs.jodii.app/assets/images/svg/'
 const FWD_ICON = `${CDN}revamp/forward-icon-link.svg`
 const { width: SW } = Dimensions.get('window')
+
+// Angular: services/common.ts's `showRedDot` — a singleton service property
+// (default true, flipped false in footer.component.ts:165 once the user taps
+// the membership footer tab) that stays false for the rest of the app
+// session, surviving in-app navigation but resetting on an actual app
+// reload/restart — mirrored here as a module-level flag rather than React
+// state so it survives HomeScreen unmounting/remounting across tab navigation.
+let membershipDotDismissedForSession = false
 
 // Angular: explore.component.html / discover-matches.component.html both wrap
 // the category grid in <ion-row class="... pl-4 pr-24">, with each
@@ -131,67 +138,23 @@ function moreItemsFrom(list: SwiperItem[], cap: number): { THUMBIMG: string }[] 
   return list.slice(cap, cap + 3).map(i => ({ THUMBIMG: i.profileImg ?? '' }))
 }
 
-// ─── Mock Data (shown briefly on first paint / kept if a fetch comes back empty) ──
-
-const MOCK_ALL_MATCHES: SwiperItem[] = [
-  { profileId: 'am1', name: 'Meenakshi',  age: '26 Yrs', education: "Bachelor's Degree", isNewlyJoined: false, likedStatus: '0' },
-  { profileId: 'am2', name: 'Dhaarani',   age: '26 Yrs', education: "Bachelor's Degree", isNewlyJoined: false, likedStatus: '0' },
-  { profileId: 'am3', name: 'Keerthana',  age: '26 Yrs', education: "Bachelor's Degree", isNewlyJoined: false, likedStatus: '0' },
-  { profileId: 'am4', name: 'Kavitha',    age: '27 Yrs', education: "Bachelor's Degree", isNewlyJoined: false, likedStatus: '0' },
-]
-
-const MOCK_VIEWED_ME: SwiperItem[] = [
-  { profileId: 'vm1', name: 'Kamatchi',        age: '26 Yrs', education: "Bachelor's Degree", isNewLabel: true, labelContent: 'NEW', likedViewedDateText: 'Viewed you on 11-May-2025', likedStatus: '0' },
-  { profileId: 'vm2', name: 'Saraswathi',      age: '22 Yrs', education: "Bachelor's Degree", likedViewedDateText: 'Viewed you on 4-May-2025',  likedStatus: '0' },
-  { profileId: 'vm3', name: 'Deepa',           age: '30 Yrs', education: "Master's Degree",   likedViewedDateText: 'Viewed you on 4-May-2025',  likedStatus: '0' },
-]
-
-const MOCK_TODAY_MATCHES: SwiperItem[] = [
-  { profileId: 'tm1', name: 'Priyadharshini',  age: '26 Yrs', education: "Bachelor's Degree", isNewlyJoined: true,  likedStatus: '0' },
-  { profileId: 'tm2', name: 'Divyadharshini',  age: '22 Yrs', education: "Bachelor's Degree", isNewlyJoined: false, likedStatus: '0' },
-  { profileId: 'tm3', name: 'Karthika',        age: '24 Yrs', education: "Master's Degree",   isNewlyJoined: false, likedStatus: '0' },
-]
-
-const MOCK_NEWLY_JOINED: SwiperItem[] = [
-  { profileId: 'nj1', name: 'Dhaarani',        age: '26 Yrs', education: "Bachelor's Degree", isNewlyJoined: true,  likedStatus: '0' },
-  { profileId: 'nj2', name: 'Aabidah',         age: '26 Yrs', education: "Bachelor's Degree", isNewlyJoined: true,  likedStatus: '0' },
-  { profileId: 'nj3', name: 'Aradhya',         age: '26 Yrs', education: "Bachelor's Degree", isNewlyJoined: true,  likedStatus: '0' },
-]
-
-const MOCK_PROFILES_VIEWED: SwiperItem[] = [
-  { profileId: 'pv1', name: 'Meenakshi',       age: '26 Yrs', education: "Bachelor's Degree", likedViewedDateText: 'You viewed on 11-May-2025', likedStatus: '0' },
-  { profileId: 'pv2', name: 'Divya',           age: '26 Yrs', education: "Bachelor's Degree", likedViewedDateText: 'You viewed on 8-May-2025',  likedStatus: '0' },
-  { profileId: 'pv3', name: 'Rajalakshmi',     age: '26 Yrs', education: "Bachelor's Degree", likedViewedDateText: 'You viewed on 3-May-2025',  likedStatus: '0' },
-]
-
-const MOCK_LIKED_BY_ME: SwiperItem[] = [
-  { profileId: 'lm1', name: 'Ramya Muralitharan',      age: '26 Yrs', education: "Bachelor's Degree", likedViewedDateText: 'You liked her on 14 Jan 2026', likedStatus: '1' },
-  { profileId: 'lm2', name: 'Priyanka Sathiyamoorthy', age: '25 Yrs', education: "Bachelor's Degree", likedViewedDateText: 'You liked her on 02 Jan 2026', likedStatus: '1' },
-]
-
-const MOCK_LIKED_ME: SwiperItem[] = [
-  { profileId: 'lme1', name: 'Kavitha',        age: '27 Yrs', education: "Bachelor's Degree", likedViewedDateText: 'Liked you on 05 Jan 2026', likedStatus: '0' },
-  { profileId: 'lme2', name: 'Deepika',        age: '24 Yrs', education: "Master's Degree",   likedViewedDateText: 'Liked you on 03 Jan 2026', likedStatus: '0' },
-]
-
-const MOCK_STORIES: SwiperItem[] = [
-  { profileId: 's1', name: 'Shankar & Aradhya', location: 'Chennai',    date: 'Posted on 20th Nov 2025' },
-  { profileId: 's2', name: 'Vinoth & Priyanka', location: 'Coimbatore', date: 'Posted on 20th Nov 2025' },
-  { profileId: 's3', name: 'Srikanth & Ramya',  location: 'Chennai',    date: 'Posted on 28th Oct 2025' },
-]
-
-const MOCK_CATEGORIES: ExploreCategory[] = [
-  { id: 'c1', label: 'Diploma and below',    count: 33,  imageUrl: '', bgColor: '#DCF0FF' },
-  { id: 'c2', label: 'Graduate and above',   count: 55,  imageUrl: '', bgColor: '#E6DCFF' },
-  { id: 'c3', label: 'Same community',       count: 99,  imageUrl: '', bgColor: '#FFF6DC' },
-  { id: 'c4', label: 'Own business',         count: 40,  imageUrl: '', bgColor: '#DCFFE6' },
-]
+// Angular: common-funtions.ts's updatePluralContent() — used ONLY for the
+// "Who Viewed You" header on Home (explore.component.html:44,
+// sectionTitle.profilesWhoviewedYou) — substitutes a locale-specific
+// #PLURAL# token (e.g. Tamil's WHO_VIEWED_YOU_HEADER) with '' at count===1,
+// PROFILES.PLURALMEMBER at count>1, or leaves it untouched at count===0
+// (bug-compatible — Angular's own two-branch check never covers 0 either,
+// but this header never renders at count 0 in practice: it's gated on
+// viewedMe.length > 3). English's own translation has no #PLURAL# token in
+// this specific key, so this is a no-op there.
+function applyPluralToken(t: (key: string) => string, content: string, count: number): string {
+  if (!content.includes('#PLURAL#')) return content
+  if (count === 1) return content.replace('#PLURAL#', '')
+  if (count > 1) return content.replace('#PLURAL#', t('PROFILES.PLURALMEMBER'))
+  return content
+}
 
 export type { HelpVideo }
-const MOCK_VIDEOS: HelpVideo[] = [
-  { id: 'v1', title: 'How to search matches as per your preferences', thumbUrl: '', videoUrl: '' },
-  { id: 'v2', title: 'Tips to get more profile views',                 thumbUrl: '', videoUrl: '' },
-]
 
 // ─── Complete Your Profile ────────────────────────────────────────────────────
 // Generic renderer over homeGating's filterCompleteProfileCards() output — one
@@ -248,23 +211,23 @@ export interface LikedProfilesSectionProps {
   likedMe:      SwiperItem[]
   likedByCount: number
   likedMeCount: number
+  gender:       'M' | 'F'
   onCardPress:  (item: SwiperItem) => void
   onLikePress:  (item: SwiperItem) => void
+  // Photo-protected/no-photo overlay's WhatsApp CTA — see ProfilePhoto.tsx.
+  onWhatsAppPress: (item: SwiperItem) => void
 }
 
 export function LikedProfilesSection({
-  likedTab, onTabChange, likedByMe, likedMe, likedByCount, likedMeCount, onCardPress, onLikePress,
+  likedTab, onTabChange, likedByMe, likedMe, likedByCount, likedMeCount, gender, onCardPress, onLikePress, onWhatsAppPress,
 }: LikedProfilesSectionProps) {
   const { t } = useTranslation()
 
   // Angular: app-swiper.component.ts's hasLikedYouData()/hasLikedByMeData()
-  // OR the count with actual returned items — but NOT replicated here: this
-  // port's likedMe/likedByMe arrays default to (and can keep showing) mock
-  // placeholder data whenever the real fetch legitimately returns zero items
-  // (see HomeScreen's loadHome() — setLikedMe/setLikedByMe are only called
-  // when the result is non-empty), so ORing in `.length > 0` picked up that
-  // leftover mock data and kept a "(0)" tab visible. likedMeCount/likedByCount
-  // (comTotalFor, no mock fallback) are the only trustworthy signal here.
+  // OR the count with actual returned items — but this port uses
+  // likedMeCount/likedByCount (comTotalFor) instead of `.length > 0` on the
+  // listing arrays, since those totals are the section header's own
+  // trustworthy source (see comTotalFor's header comment).
   // "LikedYou" in Angular (people who liked the viewer) = this port's
   // likedMe/likedMeCount; "LikedByMe" (people the viewer liked) = likedByMe/likedByCount.
   const hasLikedMe   = likedMeCount > 0
@@ -284,13 +247,20 @@ export function LikedProfilesSection({
           suffixed with (likedYouCount + likedByMeCount) when > 0. */}
       <Text style={s.sectionTitle}>{`${t('GENERAL.ICON_3')} (${likedByCount + likedMeCount})`}</Text>
       {showTabs ? (
+        // Angular: app-swiper.component.html:42-55 — the segment's tab ORDER
+        // is gender-dependent (female sees "Liked you" first, male sees
+        // "Liked by me" first); each tab keeps its own fixed label/id either
+        // way, only the left/right position swaps.
         <View style={s.tabRow}>
-          <Pressable style={[s.tabPill, likedTab === 'likedyou'  && s.tabPillActive]} onPress={() => onTabChange('likedyou')}>
-            <Text style={[s.tabPillText, likedTab === 'likedyou'  && s.tabPillTextActive]}>{`${t('LIKE_LIST.LIKEDYOU_HOME')} (${likedMeCount})`}</Text>
-          </Pressable>
-          <Pressable style={[s.tabPill, likedTab === 'likedbyme' && s.tabPillActive]} onPress={() => onTabChange('likedbyme')}>
-            <Text style={[s.tabPillText, likedTab === 'likedbyme' && s.tabPillTextActive]}>{`${t('LIKE_LIST.LIKESENT_HOME')} (${likedByCount})`}</Text>
-          </Pressable>
+          {(gender === 'F' ? (['likedyou', 'likedbyme'] as const) : (['likedbyme', 'likedyou'] as const)).map(tab => (
+            <Pressable key={tab} style={[s.tabPill, likedTab === tab && s.tabPillActive]} onPress={() => onTabChange(tab)}>
+              <Text style={[s.tabPillText, likedTab === tab && s.tabPillTextActive]}>
+                {tab === 'likedyou'
+                  ? `${t('LIKE_LIST.LIKEDYOU_HOME')} (${likedMeCount})`
+                  : `${t('LIKE_LIST.LIKESENT_HOME')} (${likedByCount})`}
+              </Text>
+            </Pressable>
+          ))}
         </View>
       ) : (
         // Angular: showOnlyLikedYouText/showOnlyLikedByMeText — no tab
@@ -309,6 +279,7 @@ export function LikedProfilesSection({
         showSeeAll={false}
         onCardPress={onCardPress}
         onLikePress={onLikePress}
+        onWhatsAppPress={onWhatsAppPress}
       />
     </>
   )
@@ -343,7 +314,6 @@ export function ExploreCategoriesSection({
   categories, onCategoryPress,
 }: ExploreCategoriesSectionProps) {
   const { t } = useTranslation()
-  console.log("categories ",categories)
   return (
     <>
       {/* Angular: home.enum.ts's sectionTitle.exploreMatches = 'HOME.EXPLORE_MATCHES_TXT'
@@ -477,8 +447,8 @@ export function SelfHelpVideoPlayer({ uri }: { uri: string }) {
 // with a decorative image on the right. There is no WhatsApp button at all
 // in Angular's real Home help section.
 export function HelpSection({
-  onCallPress, phone = '+91 9876543210',
-}: { onCallPress: () => void; phone?: string }) {
+  onCallPress, phone,
+}: { onCallPress: () => void; phone: string }) {
   const { t } = useTranslation()
   // Measured directly off the live Angular app's inline style on #helpBanner
   // (matches FAQ_DETAILS.BANNER.BANNERBG exactly): linear-gradient(335deg,
@@ -518,7 +488,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   // Call/WhatsApp button already uses (ActivityScreen.tsx/MatchesScreen.tsx).
   const gating = useContactGating()
   const phoneInfo = usePhoneInfoSheet()
-  const [contactConfirm, setContactConfirm] = useState<{ item: SwiperItem; action: 'whatsapp' } | null>(null)
+  const [contactConfirm, setContactConfirm] = useState<{ item: SwiperItem; action: 'whatsappNudge'; fromPage: string } | null>(null)
   const [contactDetails, setContactDetails] = useState<{
     name: string; mobile?: string | undefined; dialNumber?: string | undefined; whatsappNumber?: string | undefined
     showCounter?: boolean | undefined; viewedCount?: string | undefined; totalCount?: string | undefined
@@ -527,7 +497,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [whatsappPaywallItem, setWhatsappPaywallItem] = useState<SwiperItem | null>(null)
 
   const [likedTab, setLikedTab] = useState<LikedTab>('likedbyme')
-  const [categories, setCategories] = useState<ExploreCategory[]>(MOCK_CATEGORIES)
+  const [categories, setCategories] = useState<ExploreCategory[]>([])
 
   // ── Session / profile-completion / gating inputs ──────────────────────────
   const [userName, setUserName]           = useState('')
@@ -551,13 +521,17 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [assistDismissed, setAssistDismissed]       = useState(false)
   const [paymentFailedDismissed, setPaymentFailedDismissed] = useState(false)
 
-  // ── Sticky banner (pinned above footer) — Angular's Home screen renders this
-  // as a THIRD, separate slot from the hero banner above (§16 in the source
-  // analysis: the generic sticky explicitly excludes PAYMENTFAILED_STICKY, which
-  // stays in the hero-banner slot handled above). Covers force-update (highest
-  // priority, same as MatchesScreen.tsx's judgment call) and the profile-
-  // validation-rejected banner (PISTATUS in [5,13]).
+  // ── Sticky banners (pinned above footer) — Angular's Home screen renders
+  // TWO genuinely independent <app-payment-stickey> elements here, each with
+  // its own *ngIf and its own close handling (explore.component.html:198-205):
+  // one for force-update (*ngIf="contentLoaded && APPFORCEUPDATE.SHOWFLAG=='1'",
+  // no scroll-gating), and a separate one for the profile-validation/autopay/
+  // photo-promo "nudge" (*ngIf="showStickyBanner && hideNotch && ..."). They
+  // can render simultaneously and dismissing one never affects the other —
+  // matched below with two independent dismiss states instead of one shared
+  // slot/priority chain.
   const [forceUpdateInfo, setForceUpdateInfo]           = useState<ForceUpdateInfo | null>(null)
+  const [forceUpdateDismissed, setForceUpdateDismissed] = useState(false)
   const [profileValidationBanner, setProfileValidationBanner] = useState<ProfileValidationBanner | null>(null)
   // Angular: tapping the ProfileValidSticky opens bottomSheetService.showBtmSheet()
   // (action='profileValidation') — a SEPARATE open/close state from the sticky
@@ -577,11 +551,14 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   // by construction in Angular, matched below by gating the fetch the same way.
   const [autopaySticky, setAutopaySticky] = useState<{ content: string; ctaLabel: string } | null>(null)
   const [stickyDismissed, setStickyDismissed]           = useState(false)
-  // Angular: logScrollEnd() hides the sticky banner once the user has scrolled
-  // past the header while actively scrolling down (shows again scrolling up or
-  // near the top) — RN has no overlaid/translucent header to recolor the way
-  // Angular's does, so only the sticky-banner-hide half of that behavior applies.
-  const [hideStickyOnScroll, setHideStickyOnScroll] = useState(false)
+  // Angular: logScrollEnd()'s `hideNotch` — the sticky banner is HIDDEN by
+  // default (hideNotch starts false) and only appears once the user has
+  // scrolled down past the hero banner/header (hideNotch → true), hiding
+  // again immediately on any upward scroll (explore.component.ts:730-745,
+  // explore.component.html:198-199's `*ngIf="... && hideNotch"`). RN has no
+  // overlaid/translucent header to recolor the way Angular's does, so only
+  // this show/hide half of that behavior applies.
+  const [showStickyOnScroll, setShowStickyOnScroll] = useState(false)
   const scrollYRef = useRef(0)
 
   // Self-help video playback — Angular has no modal for this either (its
@@ -595,30 +572,30 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [newlyJoinedLoaded, setNewlyJoinedLoaded] = useState(false)
 
   // ── Listing sections ───────────────────────────────────────────────────────
-  const [allMatches, setAllMatches]           = useState(MOCK_ALL_MATCHES)
-  const [allMatchesTotal, setAllMatchesTotal] = useState(MOCK_ALL_MATCHES.length)
+  const [allMatches, setAllMatches]           = useState<SwiperItem[]>([])
+  const [allMatchesTotal, setAllMatchesTotal] = useState(0)
   // No viewedMeTotal state — the section's visibility gate reads viewedMe's own
   // array length (matching Angular's swiperViewedYouList.length check exactly),
   // and its header count comes from comTotalFor(comCount, 'viewedyou') instead.
-  const [viewedMe, setViewedMe]               = useState(MOCK_VIEWED_ME)
-  const [todayMatches, setTodayMatches]       = useState(MOCK_TODAY_MATCHES)
-  const [todayTotal, setTodayTotal]           = useState(MOCK_TODAY_MATCHES.length)
-  const [newlyJoined, setNewlyJoined]         = useState(MOCK_NEWLY_JOINED)
-  const [newlyJoinedTotal, setNewlyJoinedTotal] = useState(MOCK_NEWLY_JOINED.length)
+  const [viewedMe, setViewedMe]               = useState<SwiperItem[]>([])
+  const [todayMatches, setTodayMatches]       = useState<SwiperItem[]>([])
+  const [todayTotal, setTodayTotal]           = useState(0)
+  const [newlyJoined, setNewlyJoined]         = useState<SwiperItem[]>([])
+  const [newlyJoinedTotal, setNewlyJoinedTotal] = useState(0)
   // No profilesViewedTotal state — Angular sources this section's header
   // count from comTotalFor(comCount, 'viewedbyme') exclusively (see that
   // function's header comment), not from this listing's own response.
-  const [profilesViewed, setProfilesViewed]   = useState(MOCK_PROFILES_VIEWED)
+  const [profilesViewed, setProfilesViewed]   = useState<SwiperItem[]>([])
   // No likedByMeTotal state — the section's visibility gate reads likedByMe's/
   // likedMe's own array lengths (matching Angular's likedByMeProfiles.length /
   // likedYouProfiles.length check exactly), and header counts come from
   // comTotalFor(comCount, ...) instead.
-  const [likedByMe, setLikedByMe]             = useState(MOCK_LIKED_BY_ME)
-  const [likedMe, setLikedMe]                 = useState(MOCK_LIKED_ME)
-  const [likedMeTotal, setLikedMeTotal]       = useState(MOCK_LIKED_ME.length)
-  const [stories, setStories]                 = useState<SwiperItem[]>(MOCK_STORIES)
-  const [videos, setVideos]                   = useState<HelpVideo[]>(MOCK_VIDEOS)
-  const [customerCare, setCustomerCare]       = useState({ phone: '+91 9876543210', whatsapp: '' })
+  const [likedByMe, setLikedByMe]             = useState<SwiperItem[]>([])
+  const [likedMe, setLikedMe]                 = useState<SwiperItem[]>([])
+  const [likedMeTotal, setLikedMeTotal]       = useState(0)
+  const [stories, setStories]                 = useState<SwiperItem[]>([])
+  const [videos, setVideos]                   = useState<HelpVideo[]>([])
+  const [customerCare, setCustomerCare]       = useState({ phone: '', whatsapp: '' })
 
   // Angular: ngOnInit()/ionViewDidEnter() — loadHome() is the RN equivalent of
   // BOTH combined. Called on every focus (useFocusEffect below); `includePopups`
@@ -626,21 +603,19 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   // once-per-install first-land ping) so they don't refire every time the user
   // tabs back to Home.
   const loadHome = useCallback(async (ctrl: { cancelled: boolean }, includePopups: boolean) => {
-    // TEMP DEBUG — pinpointing a reported 5+ second "stuck" feeling on native
-    // right after landing on Home. Times the two biggest suspects: the
-    // blocking refreshSession() await (network-bound — everything below is
-    // serialized behind it) vs. overall loadHome wall-clock (render-churn
-    // territory, if refreshSession itself is fast but the total isn't).
-    // Remove once the real bottleneck is confirmed from device logs.
-    const __t0 = Date.now()
-
     // Angular's RN port convention (MatchesScreen.tsx's loadMatches() step 1):
     // every screen that fires listing API calls must refreshSession() first to
     // guarantee a valid/upgraded ATN — this was missing here, and its absence
     // is why every single Home listing call was failing with ERRCODE 23
     // ("Token expired") uniformly, all at once, regardless of endpoint.
     await refreshSession()
-    if (__DEV__) console.log('DBG_HOME_TIMING refreshSession took', Date.now() - __t0, 'ms')
+    if (ctrl.cancelled) return
+
+    // Angular: common-funtions.ts's whatsAppPhotoFlag() — server-driven
+    // eligibility for the WhatsApp photo-request nudge, copied verbatim from
+    // the login response (see registrationService.ts's storeWebURLData). Read
+    // once per load and applied to every listing section below.
+    const waPhotoFlag = String((await getSessionValue('WAPHOTOFLAG')) ?? '0')
     if (ctrl.cancelled) return
 
     if (includePopups) {
@@ -663,6 +638,17 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       if (session.userName) setUserName(session.userName)
       setEntryType(session.membershipType)
       setLang(session.lang)
+      // Angular: explore.component.ts's getSelfHelpVideos() is only ever
+      // called for non-English UI (explore.component.html:181's *ngIf="lang
+      // !== 'en'" gates the section, and the fetch itself is skipped
+      // entirely for English rather than fetched-but-hidden) — was
+      // previously firing unconditionally on every load regardless of
+      // language, wasting the call for English users.
+      if (session.lang !== 'en') {
+        fetchFaqVideos().then(result => {
+          if (!ctrl.cancelled && result.length > 0) setVideos(result)
+        })
+      }
       setPpSetData(data)
       const completeness = Number(data?.['PROFILECOMPLETENESS'])
       if (!Number.isNaN(completeness)) setCompletionPct(completeness)
@@ -881,15 +867,16 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       let tag = String(menuPromo?.['MENUDISCOUNT'] ?? '')
       if (['0', '0 OFF', '₹0 OFF'].includes(tag) || entryTypeVal === 'P') tag = ''
       setUpgradeTag(tag)
-      // Angular's exact showRedDot trigger lives outside footer.component.ts
-      // (a separate common.ts flag set elsewhere) and isn't traced here —
-      // approximated as "would show the tag at all" rather than guessed further.
-      setShowMembershipDot(membershipExpiry && entryTypeVal === 'F' && !!tag)
+      // Angular: footer.component.html:52's showRedDot && membershipExpiry &&
+      // ENTRYTYPE==='F' && upgradeTag!=='' — showRedDot itself defaults true
+      // and only ever flips false for the rest of the session once the user
+      // has tapped the membership tab (see membershipDotDismissedForSession).
+      setShowMembershipDot(!membershipDotDismissedForSession && membershipExpiry && entryTypeVal === 'F' && !!tag)
 
-      // ── Sticky banner — force-update (Angular/MatchesScreen.tsx line 1115's
-      // exact comparison, copied verbatim for parity) takes priority; else the
-      // profile-validation-rejected banner when PISTATUS is 5 (rejected) or 13
-      // (under review).
+      // ── Force-update sticky — Angular populates updatePopupContent.APPFORCEUPDATE
+      // independently of checkProfileStatus() below (explore.component.ts:553),
+      // suppressed only by the free-female photo-promo variant, never by
+      // whether a profile-validation/autopay nudge also applies.
       // Was reading Constants.expoConfig?.version (app.json's "1.0.0" Expo
       // scaffolding default, a separate native-build identifier never meant
       // to track this) instead of the app's own real version — with any
@@ -900,7 +887,13 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       if (ctrl.cancelled) return
       setForceUpdateInfo(forceUpdate)
 
-      if (!forceUpdate) {
+      // ── Profile-validation / autopay nudge — Angular's checkProfileStatus()
+      // (which alone decides between these two) is called ONLY from
+      // getPPSETData()'s final `else` branch (explore.component.ts:537-540):
+      // i.e. only when none of the payment-failed / photo-promo hero-banner
+      // variants matched — not gated on force-update at all, so this can
+      // render at the same time as the force-update sticky above.
+      if (variant === 'default') {
         if (['5', '13'].includes(String(data?.['PISTATUS']))) {
           setAutopaySticky(null)
           const validationBanner = await fetchProfileValidationBanner()
@@ -916,27 +909,30 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             setAutopaySticky({ content: String(paymentDetails['status']), ctaLabel: String(paymentDetails['cta2'] ?? '') })
           }
         }
+      } else {
+        setProfileValidationBanner(null)
+        setAutopaySticky(null)
       }
     })
 
     fetchHomeAllMatches().then(result => {
       if (ctrl.cancelled) return
       if (result.items.length > 0) {
-        setAllMatches(result.items)
+        setAllMatches(applyWhatsAppPhotoRequestFlags(result.items, waPhotoFlag))
         setAllMatchesTotal(result.totalCount)
       }
       setAllMatchesLoaded(true)
     })
     fetchViewedYou().then(result => {
       if (!ctrl.cancelled && result.items.length > 0) {
-        setViewedMe(result.items)
+        setViewedMe(applyWhatsAppPhotoRequestFlags(result.items, waPhotoFlag))
       }
     })
     fetchDailyRec().then(result => {
       if (!ctrl.cancelled && result.items.length > 0) {
         // Full array kept in state (not sliced here) — display and the
         // "view more" card's thumbnail preview each slice it separately below.
-        setTodayMatches(result.items)
+        setTodayMatches(applyWhatsAppPhotoRequestFlags(result.items, waPhotoFlag))
         // Angular: explore.component.ts's setDRProfiles() — drTotalCount =
         // resultData.length, the count of items THIS call actually returned
         // (capped by the API's own LIMIT=15 param above), not a separate
@@ -950,14 +946,14 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     fetchNewlyJoined().then(result => {
       if (ctrl.cancelled) return
       if (result.items.length > 0) {
-        setNewlyJoined(result.items)
+        setNewlyJoined(applyWhatsAppPhotoRequestFlags(result.items, waPhotoFlag))
         setNewlyJoinedTotal(result.totalCount)
       }
       setNewlyJoinedLoaded(true)
     })
     fetchViewedByMe().then(result => {
       if (!ctrl.cancelled && result.items.length > 0) {
-        setProfilesViewed(result.items)
+        setProfilesViewed(applyWhatsAppPhotoRequestFlags(result.items, waPhotoFlag))
       }
     })
     // Fetched together (rather than two independent .then()s) so the default-tab
@@ -968,10 +964,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       ([likedByMeResult, likedYouResult, g]) => {
         if (ctrl.cancelled) return
         if (likedByMeResult.items.length > 0) {
-          setLikedByMe(likedByMeResult.items)
+          setLikedByMe(applyWhatsAppPhotoRequestFlags(likedByMeResult.items, waPhotoFlag))
         }
         if (likedYouResult.items.length > 0) {
-          setLikedMe(likedYouResult.items)
+          setLikedMe(applyWhatsAppPhotoRequestFlags(likedYouResult.items, waPhotoFlag))
           setLikedMeTotal(likedYouResult.totalCount)
         }
         setLikedTab(computeDefaultLikedTab(g === 'M' ? 'M' : 'F', likedYouResult.totalCount, likedByMeResult.totalCount))
@@ -979,9 +975,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     )
     fetchSuccessStories().then(result => {
       if (!ctrl.cancelled && result.length > 1) setStories(result)
-    })
-    fetchFaqVideos().then(result => {
-      if (!ctrl.cancelled && result.length > 0) setVideos(result)
     })
     fetchCustomerCare().then(result => {
       if (!ctrl.cancelled && (result.phone || result.whatsapp)) setCustomerCare(result)
@@ -996,10 +989,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     // skeleton-loader treatment after that.
     Promise.all([fetchHomeSession(), fetchAndStorePPSetData()]).finally(() => {
       if (!ctrl.cancelled) setContentLoaded(true)
-      // TEMP DEBUG — see note at loadHome's top. This is when the header/
-      // footer-critical chain (refreshSession + fetchHomeSession +
-      // fetchAndStorePPSetData) has fully resolved.
-      if (__DEV__) console.log('DBG_HOME_TIMING contentLoaded flipped at', Date.now() - __t0, 'ms')
     })
   }, [assistDismissed, paymentFailedDismissed])
 
@@ -1010,8 +999,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const isFirstFocusRef = useRef(true)
   useFocusEffect(
     useCallback(() => {
-      // TEMP DEBUG — see note at loadHome's top.
-      if (__DEV__) console.log('DBG_HOME_TIMING focus fired', Date.now())
       const ctrl = { cancelled: false }
       const includePopups = isFirstFocusRef.current
       isFirstFocusRef.current = false
@@ -1042,24 +1029,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     return () => { ctrl.cancelled = true }
   }, [i18n.language, loadHome])
 
-  // ── Live notification counts via socket (Angular: socketService.getNotificationLogin()
-  // subscription in ngAfterViewInit) — connects once, requests counts, and updates
-  // comCount live rather than only on load/focus. Nothing else in this app has
-  // wired this socket up yet, so this is the first real consumer.
-  useEffect(() => {
-    let cancelled = false
-    socketConnection(EnvConfig.notify).then(() => {
-      if (cancelled) return
-      emitNotificationDetails()
-    })
-    const unsubscribe = onNotificationList((data: any) => {
-      if (cancelled || !data) return
-      const list = data?.['COMCOUNT'] ?? data?.['RESPONSE']?.['COMCOUNT']
-      if (Array.isArray(list)) setComCount(list)
-    })
-    return () => { cancelled = true; unsubscribe() }
-  }, [])
-
   const hasPaidBadge = computeHasPaidBadge(
     entryType, payRenewalFlag,
     isPaidVerifiedNoPhotoMale(entryType, ekycStatus, gender, ppSetData?.['PI_PHOTOSTATUS'] ?? 'N'),
@@ -1075,9 +1044,14 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       case 1: navigation.navigate('Matches');  break
       case 2: navigation.navigate('Activity'); break
       case 4: navigation.navigate('MessagerList'); break
-      // Angular: footer.component.ts — paymentTrack(31) fires right before
-      // routing a free member to the payment intermediate page.
-      case 3: openMembershipTab(); break
+      // Angular: footer.component.ts:165 — showRedDot flips false for the
+      // rest of the session the moment the membership tab is tapped, before
+      // paymentTrack(31)/routing even happens below.
+      case 3:
+        membershipDotDismissedForSession = true
+        setShowMembershipDot(false)
+        openMembershipTab()
+        break
     }
   }
 
@@ -1135,27 +1109,29 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     setItem(StorageKeys.Promotions.ASSISTED_PROMO, '1')
   }
 
-  // ── Sticky banner (force-update / photo-promo nudge / profile-validation) ──
-  // Angular: getPPSETData()'s force-update branch explicitly checks
-  // `!this.showPhotoPromotion` before showing — force-update wins over the
-  // free-female photo nudge specifically. The other two photoPromo variants
-  // (non-id-verify, paid-no-photo) aren't excluded quite so explicitly in the
-  // source, but since only one sticky slot exists on screen at all, the same
-  // forceUpdate-wins precedence is applied uniformly here rather than
-  // reproducing that narrow, likely-unintentional overlap.
-  const activeSticky: 'forceUpdate' | 'photoPromo' | 'autopay' | 'profileValidation' | null =
+  // ── Sticky banners (force-update is its own independent slot; photo-promo
+  // nudge / autopay / profile-validation share a second slot — see the state
+  // declarations above for why these are split instead of one priority chain).
+  const showForceUpdate = !!forceUpdateInfo && !forceUpdateDismissed
+  const activeSticky: 'photoPromo' | 'autopay' | 'profileValidation' | null =
     stickyDismissed ? null
-    : forceUpdateInfo ? 'forceUpdate'
     : photoPromoSticky ? 'photoPromo'
     : autopaySticky ? 'autopay'
     : profileValidationBanner ? 'profileValidation'
     : null
 
+  function handleForceUpdatePress() {
+    const url = String(Constants.expoConfig?.extra?.['playStoreUrl'] ?? 'https://play.google.com/store/apps/details?id=jodii.app')
+    Linking.openURL(url)
+  }
+
+  function handleForceUpdateClose() {
+    setItem('PLAYSTOREUPDATE', '2')   // Angular: "show again next login"
+    setForceUpdateDismissed(true)
+  }
+
   function handleStickyPress() {
-    if (activeSticky === 'forceUpdate') {
-      const url = String(Constants.expoConfig?.extra?.['playStoreUrl'] ?? 'https://play.google.com/store/apps/details?id=jodii.app')
-      Linking.openURL(url)
-    } else if (activeSticky === 'photoPromo') {
+    if (activeSticky === 'photoPromo') {
       if (photoPromoSticky?.type === 'ADDPHOTO') {
         navigation.navigate('Gallery')
       } else {
@@ -1189,23 +1165,21 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   }
 
   function handleStickyClose() {
-    if (activeSticky === 'forceUpdate') {
-      setItem('PLAYSTOREUPDATE', '2')   // Angular: "show again next login"
-    }
     setStickyDismissed(true)
   }
 
-  // Angular: logScrollEnd(ev) — hides the sticky banner while actively
-  // scrolling down past a small threshold; shows it again scrolling up or near
-  // the top. Simplified from Angular's header-height-relative thresholds (no
-  // overlaid header here to measure against) to a flat 40px scroll delta.
+  // Angular: logScrollEnd(ev) — the sticky is hidden until the user scrolls
+  // down past the hero banner/header (offsetHeight, falling back to 80 for
+  // free-entry-type users / 104 otherwise per explore.component.ts:740), then
+  // hides again the instant they scroll up at all.
   function handleScroll(e: any) {
     const y = e.nativeEvent.contentOffset.y
     const delta = y - scrollYRef.current
     if (Math.abs(delta) < 10) return
     scrollYRef.current = y
-    if (y > 40 && delta > 0) setHideStickyOnScroll(true)
-    else if (delta < 0 || y < 40) setHideStickyOnScroll(false)
+    const offsetHeight = entryType === 'F' ? 80 : 104
+    if (y > offsetHeight && delta > 0) setShowStickyOnScroll(true)
+    else if (delta < 0) setShowStickyOnScroll(false)
   }
 
   // Angular: clickOnViewProfile() → matriIdDBset() (prev/next swipe chain) →
@@ -1234,38 +1208,34 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     }
   }
 
-  function confirmThenWhatsApp(item: SwiperItem) {
+  // Angular: matches-card.component's WhatsApp photo-request overlay (see
+  // ProfilePhoto.tsx) — fromPage varies per section, matching goToProfile's
+  // own per-section fromPage argument below.
+  function confirmThenWhatsApp(item: SwiperItem, fromPage: string) {
     if (!item.profileId) return
     if (shouldSkipPhoneConfirm(item.phoneViewed ?? '', item.likedStatus ?? '0', gating.indNumbersLeft, gating.ownEntryType)) {
-      handleContactConfirmYes({ item, action: 'whatsapp' })
+      handleContactConfirmYes({ item, action: 'whatsappNudge', fromPage })
     } else {
-      setContactConfirm({ item, action: 'whatsapp' })
+      setContactConfirm({ item, action: 'whatsappNudge', fromPage })
     }
   }
 
   function getContactConfirmContent(): string {
     if (!contactConfirm) return ''
-    const question = t('VIEWPROFILE.VIEWPHONECONFIRM')
-      .replace('#HISHER#', t(`PRONOUN.${gating.oppGender}.hisher`))
-      .replace('#HIMHER#', t(`PRONOUN.${gating.oppGender}.himher`))
-    const quota = t('VIEWPROFILE.VIEWPHONEDETAIL')
-      .replace('#VAR#', gating.contactQuota.viewed)
-      .replace('#VAR1#', gating.contactQuota.left)
-      .replace('#VAR2#', gating.contactQuota.expiry)
-    return `${question}\n\n${quota}`
+    return getSharedContactConfirmContent(t, gating.oppGender, gating.contactQuota)
   }
 
   function handleContactConfirmClose() {
     setContactConfirm(null)
   }
 
-  async function handleContactConfirmYes(override?: { item: SwiperItem; action: 'whatsapp' }) {
+  async function handleContactConfirmYes(override?: { item: SwiperItem; action: 'whatsappNudge'; fromPage: string }) {
     const pending = override ?? contactConfirm
     if (!pending) return
-    const { item } = pending
+    const { item, fromPage } = pending
     setContactConfirm(null)
     try {
-      const result = await communicationBtnOnClick('home_matches', 'whatsapp', { MATRIID: item.profileId })
+      const result = await communicationBtnOnClick(fromPage, 'whatsappNudge', { MATRIID: item.profileId })
       if (result.type === 'show_contact') {
         setContactDetails({
           name: item.name ?? '', mobile: result.mobile, dialNumber: result.dialNumber, whatsappNumber: result.whatsappNumber,
@@ -1303,11 +1273,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const likeLikedMe      = makeLikeHandler(setLikedMe)
 
   // Angular: redirectToPCS(cardDetails) — each card type navigates to its own
-  // edit screen. IDVERIFY has no registered route in this app yet (no dedicated
-  // screen exists) — left as a TODO no-op rather than guessing.
-  // StarRaasiScreen moved from page '29' to '33' when the horoscope generation
-  // flow (pages 29/30/31) was added — '29' is now GenerateHoroscopeScreen.
-  function handleCompleteProfileCard(card: CompleteProfileCard) {
+  // edit screen. StarRaasiScreen moved from page '29' to '33' when the
+  // horoscope generation flow (pages 29/30/31) was added — '29' is now
+  // GenerateHoroscopeScreen.
+  async function handleCompleteProfileCard(card: CompleteProfileCard) {
     switch (card.type) {
       case 'PHOTO':       navigation.navigate('Gallery'); break
       case 'STAR_RAASI':  navigation.navigate('onboarding', { pageNo: '33', standalone: true }); break
@@ -1317,7 +1286,18 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       case 'DIET':        navigation.navigate('onboarding', { pageNo: '38', standalone: true }); break
       case 'HOMETOWN':    navigation.navigate('onboarding', { pageNo: '44', standalone: true }); break
       case 'HOROSCOPE':   navigation.navigate('onboarding', { pageNo: '29', standalone: true }); break
-      case 'IDVERIFY':    navigation.navigate('verify-id'); break
+      case 'IDVERIFY': {
+        // Angular: complete-profile.component.ts:124-135's IDVERIFY case —
+        // navigates to /verify-id ONLY for a non-ID-verified paid male
+        // (isNonIdVerifyUser()); under the legacy female free-3-contact promo
+        // it shows a different popup instead (not built here — narrow/legacy
+        // segment); otherwise the tap is a no-op in the real app too.
+        const paidFlag = await getItem(StorageKeys.Payment.PAY_P_FLAG)
+        if (isNonIdVerifiedPaidMale(entryType, gender, ekycStatus, paidFlag ?? '')) {
+          navigation.navigate('verify-id')
+        }
+        break
+      }
     }
   }
 
@@ -1344,12 +1324,13 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         // photoPromo/autopay stickies are mobile-scoped for now (this pass) —
         // HomeDesktopLayout doesn't render them yet, so they're narrowed away
         // here rather than widening that component's prop type for variants
-        // it can't show.
-        activeSticky={activeSticky === 'photoPromo' || activeSticky === 'autopay' ? null : activeSticky}
-        stickyText={activeSticky === 'forceUpdate' ? t('APP_UPDATE.NOTE') : profileValidationBanner?.stickyContent ?? ''}
-        stickyCtaLabel={activeSticky === 'forceUpdate' ? t('APP_UPDATE.CTA') : profileValidationBanner?.bottomCtaLabel ?? ''}
-        onStickyPress={handleStickyPress}
-        onStickyClose={handleStickyClose}
+        // it can't show. forceUpdate is its own independent slot (see the
+        // mobile render below), so it's merged back in here for desktop only.
+        activeSticky={showForceUpdate ? 'forceUpdate' : activeSticky === 'profileValidation' ? 'profileValidation' : null}
+        stickyText={showForceUpdate ? t('APP_UPDATE.NOTE') : profileValidationBanner?.stickyContent ?? ''}
+        stickyCtaLabel={showForceUpdate ? t('APP_UPDATE.CTA') : profileValidationBanner?.bottomCtaLabel ?? ''}
+        onStickyPress={showForceUpdate ? handleForceUpdatePress : handleStickyPress}
+        onStickyClose={showForceUpdate ? handleForceUpdateClose : handleStickyClose}
         allMatches={allMatches}
         allMatchesTotal={allMatchesTotal}
         viewedMe={viewedMe}
@@ -1393,11 +1374,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         completionPct={completionPct}
         hasPaidBatch={hasPaidBadge}
         homeToolBar={toolbar}
-        // Angular: header.component.html's avatar click is reDirectPage('/edit-profile')
-        // — there's no self-view-profile flow in the real app at all, this is
-        // the actual, correct target, not a stand-in for a missing one.
+        // Angular: header.component.html:52,77 — the avatar AND the "Edit
+        // Profile" link both call the identical reDirectPage('/edit-profile')
+        // — one single destination, not two different screens.
         onAvatarPress={() => navigation.navigate('EditProfile')}
-        onEditProfilePress={() => navigation.navigate('onboarding', { pageNo: '2', standalone: true })}
+        onEditProfilePress={() => navigation.navigate('EditProfile')}
         onToolbarItemPress={handleToolbarPress}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />
@@ -1458,7 +1439,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               onCardPress={item => goToProfile(item, allMatches, 'home_matches')}
               onLikePress={likeAllMatches}
               onSeeAllPress={() => navigation.navigate('Matches')}
-              onWhatsAppPress={confirmThenWhatsApp}
+              onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_matches')}
             />
           ) : null}
         </View>
@@ -1484,7 +1465,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 resizeMode="cover"
               />
               <SwiperCard
-                swiperHeader={`${t('HOME.WHO_VIEWED_YOU_HEADER')} (${comTotalFor(comCount, 'viewedyou')})`}
+                swiperHeader={`${applyPluralToken(t, t('HOME.WHO_VIEWED_YOU_HEADER'), comTotalFor(comCount, 'viewedyou'))} (${comTotalFor(comCount, 'viewedyou')})`}
                 newCount={comCountFor(comCount, 'viewedyou')}
                 cardVariant={3}
                 cardSection="viewedyou"
@@ -1494,6 +1475,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 onCardPress={item => goToProfile(item, viewedMe, 'home_viewedyou')}
                 onLikePress={likeViewedMe}
                 onSeeAllPress={() => navigation.navigate('Activity')}
+                onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_viewedyou')}
               />
             </LinearGradient>
           </>
@@ -1533,6 +1515,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 onCardPress={item => goToProfile(item, todayMatches, 'home_dailyrec')}
                 onLikePress={likeTodayMatches}
                 onSeeAllPress={() => navigation.navigate('Matches')}
+                onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_dailyrec')}
               />
             </View>
           </>
@@ -1563,6 +1546,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 onCardPress={item => goToProfile(item, newlyJoined, 'home_newmatches')}
                 onLikePress={likeNewlyJoined}
                 onSeeAllPress={() => navigation.navigate('Matches')}
+                onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_newmatches')}
               />
             </LinearGradient>
           </>
@@ -1590,6 +1574,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 onCardPress={item => goToProfile(item, profilesViewed, 'home_viewedbyme')}
                 onLikePress={likeProfilesViewed}
                 onSeeAllPress={() => navigation.navigate('Activity')}
+                onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_viewedbyme')}
               />
             </View>
           </>
@@ -1614,8 +1599,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               likedMe={likedMe}
               likedByCount={comTotalFor(comCount, 'likedbyme')}
               likedMeCount={comTotalFor(comCount, 'likedyou')}
+              gender={gender}
               onCardPress={item => goToProfile(item, likedTab === 'likedbyme' ? likedByMe : likedMe, 'home_liked')}
               onLikePress={likedTab === 'likedbyme' ? likeLikedByMe : likeLikedMe}
+              onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_liked')}
             />
           </CdnSvgBackground>
         )}
@@ -1685,17 +1672,20 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       </ScrollView>
       )}
 
-      {activeSticky === 'forceUpdate' && !hideStickyOnScroll && (
-        <ForceUpdateCard onPress={handleStickyPress} onClose={handleStickyClose} />
+      {/* Angular: force-update's own *ngIf has no scroll-gating at all
+          (contentLoaded && SHOWFLAG=='1' only) — independent of, and able to
+          render alongside, the nudge sticky below. */}
+      {showForceUpdate && (
+        <ForceUpdateCard onPress={handleForceUpdatePress} onClose={handleForceUpdateClose} />
       )}
-      {activeSticky === 'photoPromo' && !hideStickyOnScroll && (
+      {activeSticky === 'photoPromo' && showStickyOnScroll && (
         <PhotoPromoSticky
           content={photoPromoSticky!.content}
           imageUrl={photoPromoSticky!.imageUrl}
           onPress={handleStickyPress}
         />
       )}
-      {activeSticky === 'autopay' && !hideStickyOnScroll && (
+      {activeSticky === 'autopay' && showStickyOnScroll && (
         <StickyBanner
           text={autopaySticky!.content}
           ctaLabel={autopaySticky!.ctaLabel}
@@ -1703,7 +1693,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           onClose={handleStickyClose}
         />
       )}
-      {activeSticky === 'profileValidation' && !hideStickyOnScroll && (
+      {activeSticky === 'profileValidation' && showStickyOnScroll && (
         <PhotoPromoSticky
           content={profileValidationBanner!.stickyContent}
           imageUrl={profileValidationBanner!.stickyImg}

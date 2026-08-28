@@ -17,35 +17,23 @@ import ButtonRevamp from '../components/button-revamp/ButtonRevamp'
 import { Colors } from '../constants/colors'
 import type { FooterTab } from '../components/app-footer/AppFooter'
 import { Fonts, SemanticFontsEnglish } from '../src/theme/fonts'
+import { handleBack } from '../utils/navigationRef'
 
-const LANGUAGES = [
-  { id: 'en', native: 'English',   english: 'English'   },
-  { id: 'tm', native: 'தமிழ்',     english: 'Tamil'     },
-  { id: 'tl', native: 'తెలుగు',    english: 'Telugu'    },
-  { id: 'hi', native: 'हिंदी',      english: 'Hindi'     },
-  { id: 'ml', native: 'മലയാളം',    english: 'Malayalam' },
-  { id: 'kn', native: 'ಕನ್ನಡ',     english: 'Kannada'   },
-  { id: 'bn', native: 'বাংলা',      english: 'Bengali'   },
-  { id: 'mt', native: 'मराठी',      english: 'Marathi'   },
-  { id: 'or', native: 'ଓଡ଼ିଆ',     english: 'Odia'      },
-  { id: 'gj', native: 'ગુજરાતી',   english: 'Gujarati'  },
-  { id: 'pa', native: 'ਪੰਜਾਬੀ',    english: 'Punjabi'   },
-] as const
-
-type LangId = (typeof LANGUAGES)[number]['id']
+type LangOption = { id: string; native: string; english: string }
 
 export interface LanguageSelectionDesktopLayoutProps {
   navigation:   any
   userName:     string
-  selected:     LangId | null
+  languages:    LangOption[]
+  selected:     string | null
   submitting:   boolean
-  onSelect:     (langId: LangId) => void
+  onSelect:     (langId: string) => void
   onNext:       () => void
   onTabPress:   (tab: FooterTab) => void
 }
 
 export default function LanguageSelectionDesktopLayout({
-  navigation, userName, selected, submitting, onSelect, onNext, onTabPress,
+  navigation, userName, languages, selected, submitting, onSelect, onNext, onTabPress,
 }: LanguageSelectionDesktopLayoutProps) {
   const { t } = useTranslation()
 
@@ -56,7 +44,7 @@ export default function LanguageSelectionDesktopLayout({
       <View style={s.main}>
         <View style={s.titleRow}>
           <Text style={s.pageTitle}>{t('MENU.TTTLE_6')}</Text>
-          <Pressable onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8}>
+          <Pressable onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Close" hitSlop={8}>
             <Text style={s.closeX}>✕</Text>
           </Pressable>
         </View>
@@ -65,7 +53,7 @@ export default function LanguageSelectionDesktopLayout({
           <Text style={s.heading}>{t('LOGIN_PAGE.SELECT_LANG')}</Text>
 
           <View style={s.grid}>
-            {LANGUAGES.map(lang => {
+            {languages.map(lang => {
               const isSelected = selected === lang.id
               return (
                 <Pressable
@@ -88,8 +76,10 @@ export default function LanguageSelectionDesktopLayout({
             })}
           </View>
 
+          {/* Angular: language-selection.component.html's button uses
+              REGISTRATION.SELECT ("Select"), not a "Next" label. */}
           <ButtonRevamp
-            label={t('LOGIN_PAGE.NEXT', 'Next')}
+            label={t('REGISTRATION.SELECT', 'Select')}
             variant="primary"
             disabled={!selected}
             loading={submitting}
@@ -125,8 +115,8 @@ const s = StyleSheet.create({
     backgroundColor: Colors.surface, flexDirection: 'row', alignItems: 'center', paddingLeft: 16, paddingRight: 10,
   },
   langCardSelected: { borderColor: Colors.primaryDark, backgroundColor: Colors.selectionBg },
-  langText: { flex: 1, gap: 8 },
-  nativeName: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.textDark },
+  langText: { flex: 1, gap: 4 },
+  nativeName: { fontFamily: Fonts.poppinsBold, fontSize: 16, color: Colors.textDark },
   englishName: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textSecondary },
 
   radio: {

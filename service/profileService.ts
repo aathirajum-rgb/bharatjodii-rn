@@ -88,11 +88,27 @@ export async function managePhotos(): Promise<{ count: string; photos: any[] }> 
   if (result?.RESPONSECODE == 1 && result?.ERRCODE == 0 && result?.RESPONSE?.PHOTOS) {
     const photos: any[] = result.RESPONSE.PHOTOS
     const count = String(result.RESPONSE.PHOTOCOUNT ?? '0')
-    const main  = photos.find(p => p.MAINPHOTO == 1)
+    // Angular: common.ts getuserphotos() —
+    //   _photourl = photos.length ? photos[0].PHOTOTHUMB : ''
+    //   _photo    = photos.filter(x => x.MAINPHOTO == 1)
+    //   photourl  = _photo.length ? _photo[0].PHOTOTHUMB : _photourl
+    //   if (photourl) localStorage.setItem('PHOTOURL', photourl)
+    //
+    // Two safeguards this port had dropped, both of which caused a freshly
+    // uploaded photo to vanish from Home and Menu:
+    //  1. FALL BACK to photos[0] when nothing is flagged MAINPHOTO == 1. A new
+    //     upload isn't the main photo until it's explicitly promoted (see
+    //     setMainPhoto), so `find(MAINPHOTO == 1)` is routinely undefined.
+    //  2. NEVER write an empty string. The old `main?.PHOTOTHUMB ?? ''` did, so
+    //     managePhotos() — which EditProfileScreen calls on every focus, right
+    //     after the upload had stored the real URL — immediately blanked
+    //     PHOTO_URL again. Home/Menu then read '' and fell back to the avatar.
+    const main     = photos.find(p => p.MAINPHOTO == 1)
+    const photoUrl = main?.PHOTOTHUMB ?? photos[0]?.PHOTOTHUMB ?? ''
 
     await Promise.all([
       setItem('PHOTOCOUNT', count),
-      setItem(SK.User.PHOTO_URL, main?.PHOTOTHUMB ?? ''),
+      ...(photoUrl ? [setItem(SK.User.PHOTO_URL, photoUrl)] : []),
       setJson('USERPHOTOS', photos),
       setItem('PHOTOAVAILABLE', 'Y'),
     ])

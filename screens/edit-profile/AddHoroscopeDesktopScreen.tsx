@@ -39,6 +39,7 @@ import { fetchEditProfileInfo } from '../../service/editProfileService'
 import { fetchStates, fetchHoroCities, generateHoroscope, type HoroCity } from '../../service/registrationService'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { handleBack } from '../../utils/navigationRef'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 const CDN_ILLUSTRATION = CDN_REG + 'horoscope-generate.svg'
@@ -90,7 +91,7 @@ function parseDob(raw: string | undefined): { date: string; month: string; year:
   return { year, month, date }
 }
 
-export default function AddHoroscopeDesktopScreen({ navigation }: Props) {
+export default function AddHoroscopeDesktopScreen({ navigation: _navigation }: Props) {
   const { t } = useTranslation()
 
   const [step, setStep] = useState<Step>('intro')
@@ -202,7 +203,7 @@ export default function AddHoroscopeDesktopScreen({ navigation }: Props) {
         Alert.alert('Something went wrong', 'Could not save horoscope details. Please try again.')
         return
       }
-      navigation.goBack()
+      handleBack()
     } catch {
       setSubmitting(false)
       Alert.alert('Something went wrong', 'Could not save horoscope details. Please try again.')
@@ -214,7 +215,7 @@ export default function AddHoroscopeDesktopScreen({ navigation }: Props) {
       <View style={s.header}>
         <Pressable
           style={s.backBtn}
-          onPress={() => (step === 'form' ? setStep('intro') : navigation.goBack())}
+          onPress={() => (step === 'form' ? setStep('intro') : handleBack())}
           accessibilityRole="button" accessibilityLabel="Back"
         >
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
@@ -239,7 +240,7 @@ export default function AddHoroscopeDesktopScreen({ navigation }: Props) {
               <Text style={s.generateBtnText}>{t('REGISTRATION.GENERATEHOROSCOPECTA', 'Generate horoscope for FREE')}</Text>
             </Pressable>
 
-            <Pressable onPress={() => navigation.goBack()} hitSlop={8}>
+            <Pressable onPress={() => handleBack()} hitSlop={8}>
               <Text style={s.skipLink}>{t('REG.DO_LATER', "I'll do this later")} ›</Text>
             </Pressable>
           </>

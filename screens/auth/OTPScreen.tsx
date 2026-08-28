@@ -24,6 +24,7 @@ import { getItem, setItem } from '../../service/storageService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { useAuth } from '../../contexts/AuthContext'
 import { CDN_REG } from '../../constants/cdn'
+import { handleBack } from '../../utils/navigationRef'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -269,7 +270,7 @@ export default function OTPScreen({ navigation, route }: Props) {
 
   // Edit number → go back to LoginScreen — matches Angular redirectSignin()
   function handleEdit() {
-    navigation.goBack()
+    handleBack()
   }
 
   // Angular subtitle: 'LOGIN_PAGE.DIGITCODE' with ##NO## replaced by mobile
@@ -356,6 +357,12 @@ export default function OTPScreen({ navigation, route }: Props) {
                 }}
                 onBlur={() => setFocusedIndex(cur => cur === i ? null : cur)}
                 keyboardType="number-pad"
+                // Cross-platform native OTP autofill hint — RN maps this to iOS
+                // textContentType="oneTimeCode" (QuickType bar) and Android
+                // autoComplete="sms-otp" (Autofill Framework). Independent of the
+                // SMS Retriever hook above: both funnel into handleChange's existing
+                // multi-digit paste branch, so no separate handling is needed.
+                autoComplete="one-time-code"
                 maxLength={2}         // 2 to allow paste detection; trimmed in handleChange
                 returnKeyType={i === OTP_LENGTH - 1 ? 'done' : 'next'}
                 onSubmitEditing={i === OTP_LENGTH - 1 ? () => handleVerify() : undefined}
@@ -500,9 +507,9 @@ const styles = StyleSheet.create({
     height:             56,
     borderWidth:        1,
     borderRadius:       8,
-    fontFamily:         Fonts.poppinsSemiBold,
+    fontFamily:         Fonts.poppinsRegular,
     fontSize:           22,
-    fontWeight:         '600',
+    fontWeight:         '400',
     color:              Colors.textPrimary,
     backgroundColor:    Colors.surface,
     textAlign:          'center',

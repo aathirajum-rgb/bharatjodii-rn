@@ -224,16 +224,18 @@ export default function MessagerListScreen({ navigation }: Props) {
     emitChatList(CONVERSATION_TAB_VALUE, conversationStartRef.current, LIMIT)
   }, [conversationsLoadingMore, conversationsHasMore, conversationsLoaded])
 
-  // Angular: navigateToPage() — reported/deleted rows show a toast instead of
-  // opening the chat; a live row opens ChatScreen.tsx (the '/messages' target).
+  // Angular: navigateToPage() (JODII-453 fix) — a reported chat is opened and
+  // read like any other one now, ChatScreen.tsx shows the reported note in
+  // place of the input instead of this page refusing the tap; only a deleted
+  // profile still shows a toast and stays unreachable.
   function handleConversationPress(item: ChatListItem) {
-    if (item.isReported) { showToast(t('MESSAGES.REPORTED_PROFILE')); return }
     if (item.isDeleted) { showToast(t('LIKE_LIST.DELETED_PROFILE_TXT')); return }
     navigation.navigate('chat-window', {
       partnerId: item.matriId,
       partnerName: item.name,
       partnerPhoto: item.photoUrl,
       partnerOnline: item.isOnline,
+      partnerReported: item.isReported,
       ...(item.lastActive != null ? { partnerLastActive: item.lastActive } : {}),
     })
   }

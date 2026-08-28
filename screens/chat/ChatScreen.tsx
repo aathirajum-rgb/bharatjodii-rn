@@ -37,6 +37,7 @@ import {
   emitSendMessage, onSendResponse, emitMessageStatus, onReceiver,
 } from '../../service/socketService'
 import { blockChatProfile, unblockChatProfile } from '../../service/communicationService'
+import { handleBack } from '../../utils/navigationRef'
 import {
   getChatCount, consumeChatCount, checkChatLimit, fetchChatPaymentPromo,
   type ChatCountResult, type ChatPaymentPromo,
@@ -99,6 +100,11 @@ export default function ChatScreen({ navigation, route }: Props) {
   const [partnerPhoto, setPartnerPhoto] = useState(String(route.params?.partnerPhoto ?? ''))
   const [partnerOnline, setPartnerOnline] = useState(Boolean(route.params?.partnerOnline))
   const [partnerLastActive, setPartnerLastActive] = useState<number | null>(route.params?.partnerLastActive ?? null)
+  // Angular: oppositeIdDetails.Reported (JODII-453 fix) — the row's own Reported
+  // flag carried through nav params, not refreshed from BasicView. A reported
+  // chat is read only: it opens like any other, but the footer swaps to a
+  // read-only note in place of the input.
+  const reported = Boolean(route.params?.partnerReported)
 
   const ownIdRef = useRef('')
   const [messages, setMessages] = useState<ChatMessageItem[]>([])
@@ -224,7 +230,6 @@ export default function ChatScreen({ navigation, route }: Props) {
   // only surfaces its popup lazily, from inside sendMessage()).
   async function refreshChatCount() {
     const result = await getChatCount(partnerId)
-    console.log('[Chat] getChatCount result', result)
     setChatCountResult(result)
     if (result.profileValidation === '0' && result.profileValidationMsg) {
       phoneInfo.handleResult({ type: 'under_validation', message: result.profileValidationMsg })
@@ -262,10 +267,8 @@ export default function ChatScreen({ navigation, route }: Props) {
   // ── Socket wiring ────────────────────────────────────────────────────────
   useEffect(() => {
     let cancelled = false
-    console.log('[Chat] mount — partnerId:', partnerId)
 
     const unsubscribeBasicView = onBasicView((data: any) => {
-      console.log('[Chat] onBasicView', data)
       if (cancelled || !data) return
       if (String(data.ID ?? '') !== partnerId) return
       // RESPBASIC carries some fields at the top level (ID, NAME confirmed) and
@@ -277,7 +280,6 @@ export default function ChatScreen({ navigation, route }: Props) {
       const onlineNow  = view.ONLINENOW ?? data.ONLINENOW
       const lastLogin  = view.LASTLOGIN ?? data.LASTLOGIN
       const blocked    = view.BLOCKED ?? data.BLOCKED
-      console.log('[Chat] onBasicView derived BLOCKED value:', blocked, '(expecting Y=I blocked them, B=they blocked me — unverified against real block data)')
       if (name) setPartnerName(name)
       if (photo) setPartnerPhoto(photo)
       if (onlineNow != null) setPartnerOnline(Number(onlineNow) === 1)
@@ -287,7 +289,6 @@ export default function ChatScreen({ navigation, route }: Props) {
     })
 
     const unsubscribeMessages = onChatMessages((data: ChatMessagesResponse) => {
-      console.log('[Chat] onChatMessages — CHATLIST length:', data?.CHATLIST?.length, 'TOTALMSGCNT:', data?.TOTALMSGCNT)
       if (cancelled) return
       const records = data?.CHATLIST ?? []
       const adapted = records.map(r => adaptChatMessageRecord(r, ownIdRef.current))
@@ -298,7 +299,6 @@ export default function ChatScreen({ navigation, route }: Props) {
     })
 
     const unsubscribeSend = onSendResponse((res: SendMessageResponse) => {
-      console.log('[Chat] onSendResponse', res)
       if (cancelled) return
       setSending(false)
       // Angular: RESPONSECODE 2 + ERRCODE 1 — send failed server-side, just
@@ -323,7 +323,6 @@ export default function ChatScreen({ navigation, route }: Props) {
     const unsubscribeReceiver = onReceiver((data: any) => {
       const msg = data?.MSG?.[0]
       if (cancelled || !msg) return
-      console.log('[Chat] onReceiver', msg)
 
       if (String(msg.SenderId) === partnerId && String(msg.ReceiverId) === ownIdRef.current) {
         const incoming = adaptChatMessageRecord(msg, ownIdRef.current)
@@ -466,8 +465,8 @@ export default function ChatScreen({ navigation, route }: Props) {
       audioRecorder.record()
       recordStartRef.current = Date.now()
       setIsRecording(true)
-    } catch (e) {
-      console.log('[Chat] mic record start failed', e)
+    } catch {
+      // mic failed to start — recording UI simply never enters
     }
   }
 
@@ -591,7 +590,7 @@ export default function ChatScreen({ navigation, route }: Props) {
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       {/* ── Header ── */}
       <View style={styles.header}>
-        <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={styles.backBtn}>
+        <Pressable onPress={() => handleBack()} hitSlop={12} style={styles.backBtn}>
           <CdnSvg uri={BACK_ICON_URI} width={20} height={20} />
         </Pressable>
         <View style={styles.avatarWrap}>
@@ -608,7 +607,7 @@ export default function ChatScreen({ navigation, route }: Props) {
         {menuOpen && (
           <ThreeDotMenu
             positionStyle={styles.menuPosition}
-            showBlock={blockedState === 'none'}
+            showBlock={blockedState === 'none' && !reported}
             onBlock={handleMenuBlock}
             showUnblock={blockedState === 'by_me'}
             onUnblock={handleMenuUnblock}
@@ -657,7 +656,14 @@ export default function ChatScreen({ navigation, route }: Props) {
         )}
 
         {/* ── Input / blocked / limit-exceeded banner ── */}
-        {blockedState === 'by_them' ? (
+        {reported ? (
+          // Angular: isChatReported() (JODII-453 fix) — a reported chat can be
+          // read but not answered, this note takes priority over the block/
+          // limit banners below since none of those reasons matter once reported.
+          <View style={[styles.blockedBanner, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+            <Text style={styles.blockedText}>{t('MESSAGES.REPORTED_PROFILE')}</Text>
+          </View>
+        ) : blockedState === 'by_them' ? (
           <View style={[styles.blockedBanner, { paddingBottom: Math.max(insets.bottom, 20) }]}>
             <Text style={styles.blockedText}>{t('PRIVACY.OPP_BLOCK_TEXT')}</Text>
           </View>

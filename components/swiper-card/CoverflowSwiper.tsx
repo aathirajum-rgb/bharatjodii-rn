@@ -55,10 +55,12 @@ export interface CoverflowSwiperProps {
   onCardPress?: ((item: SwiperItem, index: number) => void) | undefined
   onLikePress?: ((item: SwiperItem, index: number) => void) | undefined
   onSeeAllPress?: (() => void) | undefined
+  // Photo-protected/no-photo overlay's WhatsApp CTA — see ProfilePhoto.tsx.
+  onWhatsAppPress?: ((item: SwiperItem, index: number) => void) | undefined
 }
 
 export default function CoverflowSwiper({
-  swiperHeader, items, moreItems, onCardPress, onLikePress, onSeeAllPress,
+  swiperHeader, items, moreItems, onCardPress, onLikePress, onSeeAllPress, onWhatsAppPress,
 }: CoverflowSwiperProps) {
   const { t } = useTranslation()
   const scrollX = useRef(new Animated.Value(0)).current
@@ -166,6 +168,7 @@ export default function CoverflowSwiper({
             likedStatus={item.likedStatus}
             onPress={() => onCardPress?.(item, index)}
             onLikePress={() => onLikePress?.(item, index)}
+            onWhatsApp={() => onWhatsAppPress?.(item, index)}
           />
         )))}
 

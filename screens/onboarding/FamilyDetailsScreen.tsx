@@ -58,7 +58,7 @@ type Props = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function FamilyDetailsScreen({ navigation }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const langFonts = useLanguageFonts()
 
   const [brotherOptions, setBrotherOptions] = useState<Option[]>([])
@@ -129,14 +129,22 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
     navigation.push('onboarding', { pageNo: '28' })
   }
 
+  // Angular: registration-revamp.component.html's skip CTA is
+  // *ngIf="SHOWSKIPBTN && !isInputFocused && (!showSkipBtn(regPageContent) || ...)",
+  // and showSkipBtn() just returns showNextCTA (true once Next is enabled)
+  // for every page except the '20'/'29' overrides — page 27 isn't in that
+  // list, so skip is visible only until both brothers and sisters are
+  // picked, then hides. Same rule as pages 34/35.
   useOnboardingFooter({
     nextDisabled: !isReady,
     nextLoading: submitting,
     onNext: handleNext,
-    showSkip: true,
+    showSkip: !isReady,
     skipLabel: t('REG.DO_LATER', "I'll do this later"),
     onSkip: handleSkip,
-  }, [isReady, submitting])
+    // i18n.language: skipLabel is translated, so re-push footer state on a
+    // language change or it stays stuck on whatever language was active at mount.
+  }, [isReady, submitting, i18n.language])
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -160,7 +168,9 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
         ) : (
           <>
             {/* Brothers section */}
-            <Text style={styles.sectionLabel}>No of brothers</Text>
+            <Text style={[styles.sectionLabel, { fontFamily: langFonts.medium }]}>
+              {t('REGISTRATION.NO_OF_BROTHERS', 'No of brothers')}
+            </Text>
             <View style={styles.chipGrid}>
               {brotherOptions.map(opt => {
                 const isSelected = selBrothers === opt.key
@@ -185,7 +195,9 @@ export default function FamilyDetailsScreen({ navigation }: Props) {
             </View>
 
             {/* Sisters section */}
-            <Text style={[styles.sectionLabel, styles.sectionLabelSpacing]}>No of sisters</Text>
+            <Text style={[styles.sectionLabel, styles.sectionLabelSpacing, { fontFamily: langFonts.medium }]}>
+              {t('REGISTRATION.NO_OF_SISTERS', 'No of sisters')}
+            </Text>
             <View style={styles.chipGrid}>
               {sisterOptions.map(opt => {
                 const isSelected = selSisters === opt.key

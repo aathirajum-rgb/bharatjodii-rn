@@ -11,6 +11,7 @@ import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import { getItem } from '../../service/storageService'
+import { handleBack as goBackCentral } from '../../utils/navigationRef'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import i18n from '../../i18n'
@@ -91,7 +92,7 @@ export default function StarMatchingScreen({ navigation, route }: { navigation: 
     // Angular: reDirectoPage() — cancels the detail view first, only leaves the
     // screen on a second back-press.
     if (showDetail) setShowDetail(false)
-    else navigation.goBack()
+    else goBackCentral()
   }
 
   // Desktop/laptop web gets the Figma "Jodii Desktop" single-card layout (see

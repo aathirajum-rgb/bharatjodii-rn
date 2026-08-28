@@ -18,6 +18,7 @@ import { CDN_REACT } from '../../constants/cdn'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { MONTHS, MONTHS_OPTIONS, buildMarriageYears, type DateChip } from './DeleteProfileShareDetailsScreen'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { handleBack } from '../../utils/navigationRef'
 
 const GIFT_GIF = CDN_REACT + '/marriage_gift.gif'
 const MARRIAGE_YEARS = buildMarriageYears()
@@ -60,7 +61,7 @@ export default function DeleteProfileShareDetailsDesktopLayout({
   return (
     <DesktopPageShell navigation={navigation} userName={userName} activeItem="settings" onTabPress={onTabPress}>
       <View style={s.header}>
-        <Pressable onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}>
+        <Pressable onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}>
           <Text style={s.backArrow}>←</Text>
         </Pressable>
         <Text style={s.title}>{t('DELETE_PROFILE.HEADER')}</Text>

@@ -22,6 +22,7 @@ import { openMembershipTab } from '../../service/paymentService'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileHideDesktopLayout from './DeleteProfileHideDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { handleBack } from '../../utils/navigationRef'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -218,7 +219,7 @@ export default function DeleteProfileHideScreen({ navigation, route }: Props) {
       <View style={s.header}>
         <Pressable
           style={s.backBtn}
-          onPress={() => navigation.goBack()}
+          onPress={() => handleBack()}
           accessibilityRole="button"
           accessibilityLabel="Back"
         >

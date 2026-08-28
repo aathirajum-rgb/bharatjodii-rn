@@ -1,6 +1,6 @@
 import { apiCall } from './apiClient'
 import { getItem, setItem, setJson } from './storageService'
-import { getSession, parseAndStoreWebViewURL } from './registrationService'
+import { getSession, parseAndStoreWebViewURL, getRegistrationArrays } from './registrationService'
 import { Endpoints } from './api.endpoints'
 import { StorageKeys } from '../constants/storage.keys'
 import i18n from '../i18n'
@@ -91,6 +91,13 @@ export function toProfile(p: Record<string, any>): SwiperItem {
     // Angular: IsPhotoAvailable checks PHOTOAVAILABLE == "Y", getPhotoProtect checks PHOTOPROTECTED == 'Y'
     isPhotoAvailable:    p['PHOTOAVAILABLE']  == 'Y',
     isPhotoProtect:      p['PHOTOPROTECTED']  == 'Y',
+    // Angular: common-funtions.ts's IsAddPhotoRequestSent(profile) reads
+    // ADDPHOTOREQUEST ('0'..'3'); '1'/'3' mean an add-photo WhatsApp request
+    // was already sent for this profile (showWhatsAppPhotoRequest() then
+    // hides the CTA). Session-level WAPHOTOFLAG eligibility (whether to show
+    // the nudge AT ALL) isn't a per-profile field, so it's applied separately —
+    // see homeGating.ts's applyWhatsAppPhotoRequestFlags().
+    isAddPhotoRequest:   ['1', '3'].includes(String(p['ADDPHOTOREQUEST'] ?? '0')),
     // Angular: common-funtions.ts's IsNewMember() — profileInfo.NEWUSER === "1",
     // NOT a field called ISNEWLYJOINED (that key doesn't exist on the API
     // response at all, so this always evaluated false).
@@ -141,8 +148,14 @@ export function toListingResult(res: Record<string, any>): ListingResult {
   const bannerSlots: Array<{ slot: string; insertAfter: number }> = []
 
   for (const p of all) {
-    // STATUS 997/999/1000 = loader / end-of-list / hidden placeholders
-    if (p['STATUS'] === '997' || p['STATUS'] === '999' || p['STATUS'] === '1000') continue
+    // STATUS 997/999/1000 = loader / end-of-list / hidden placeholders. Confirmed live
+    // (JODII debug) that the server sends this as a JSON NUMBER (999), not a string —
+    // a strict '===' string comparison here let the end-of-list sentinel fall through
+    // to toProfile(), producing a card with no MATRIID/name (icons only, tap fails with
+    // an empty matriId). Angular's own checks are loose (profile.STATUS == "999")
+    // everywhere in matches.page.ts, which is why this never surfaced there.
+    const status = String(p['STATUS'] ?? '')
+    if (status === '997' || status === '999' || status === '1000') continue
     if (p['BANNERSLOT']) {
       // Track banner position as "after N profile items"
       bannerSlots.push({ slot: String(p['BANNERSLOT']), insertAfter: items.length })
@@ -820,28 +833,42 @@ export async function fetchFaqVideos(): Promise<HelpVideo[]> {
 }
 
 // ─── Customer care ────────────────────────────────────────────────────────────
-// Tries AsyncStorage first (populated at login), falls back to nbMenu API.
-
+// Angular's exact resolution chain, copied from manage-account.page.ts:
+//
+//   CustomerCareNo = isValidparam(localStorage['CUSTOMER-CARE'])
+//     ? localStorage['CUSTOMER-CARE']
+//     : REGISTRATIONARRAYS['WHATAPPNUMBER']
+//
+// Two things this used to get wrong, both of which made it return '':
+//
+//  1. CUSTOMER-CARE holds a BARE phone string, not JSON. Angular reads it with
+//     a plain localStorage.getItem() in all ~20 places it appears (and every
+//     other reader in this app — AppStack, BlockerScreen, DeleteProfile* —
+//     treats it as a string too). The JSON.parse()/data['PHONE'] path here
+//     always threw and fell through. Note nothing in either codebase ever
+//     WRITES this key — in Angular it comes from the native shell — so in this
+//     app it is currently always absent and the fallback is what actually runs.
+//
+//  2. The fallback called payment/nbmenu/v1, which returns the menu-PROMO
+//     payload (see Angular's payment.service.ts getMenuPromo(), which stores
+//     the whole response under MENU_PROMO). It carries no phone number at all,
+//     so this returned { phone: '', whatsapp: '' } every time. The real source
+//     is registrationform/v1's WHATAPPNUMBER — verified against a live staging
+//     response, where it's the only phone-shaped field present.
+//
+// getRegistrationArrays() is cached, so this normally costs no network call.
 export async function fetchCustomerCare(): Promise<{ phone: string; whatsapp: string }> {
-  const stored = await getItem(StorageKeys.App.CUSTOMER_CARE)
-  if (stored) {
-    try {
-      const data = JSON.parse(stored)
-      const phone    = data['PHONE']    ?? data['MOBILE']   ?? data['CSMOBILE'] ?? ''
-      const whatsapp = data['WHATSAPP'] ?? data['WAMOBILE'] ?? phone
-      if (phone || whatsapp) return { phone, whatsapp }
-    } catch { /* fall through to API */ }
-  }
-  // Same shape confirmed working for getMenuPromo() in paymentService.ts —
-  // the previous empty-string params here was almost certainly hitting the
-  // same "unrecognized shape" rejection as the other functions fixed above.
-  const userId = await getItem(StorageKeys.Auth.USER_ID)
-  const res = await apiCall(Endpoints.payment.nbMenu, 'POST', `ID=${userId ?? ''}&TYPE=MENU`)
-  // Fields may be top-level or nested under RESPONSE depending on this
-  // endpoint's actual envelope (unconfirmed) — check both.
-  const data = res['RESPONSE'] ?? res
-  return {
-    phone:    data['CSMOBILE']  ?? data['PHONE']    ?? '',
-    whatsapp: data['WAMOBILE']  ?? data['WHATSAPP'] ?? data['CSMOBILE'] ?? '',
-  }
+  const stored = (await getItem(StorageKeys.App.CUSTOMER_CARE))?.trim()
+  if (stored) return { phone: stored, whatsapp: stored }
+
+  try {
+    const arrays = await getRegistrationArrays()
+    // Angular treats this single number as both the call and WhatsApp target
+    // (manage-account.page.ts uses WHATAPPNUMBER for CustomerCareNo; explore.
+    // component.ts uses the same value as the WhatsApp number).
+    const number = String(arrays?.['WHATAPPNUMBER'] ?? '').trim()
+    if (number) return { phone: number, whatsapp: number }
+  } catch { /* leave both empty rather than surfacing a bootstrap failure */ }
+
+  return { phone: '', whatsapp: '' }
 }

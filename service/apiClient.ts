@@ -74,7 +74,6 @@ type ApiResult = Record<string, any>
 async function handleErrCode(
   errCode: number | string,
   newRtn: string | undefined,
-  moduleName: string,
   retry: () => Promise<ApiResult>,
 ): Promise<ApiResult | null> {
 
@@ -88,8 +87,6 @@ async function handleErrCode(
 
   if (code === 23) {
     // Both tokens invalid — force logout
-    const userId = await getItem(StorageKeys.Auth.USER_ID)
-    console.warn(`[apiClient] Token expired (ERRCODE 23) — user ${userId} — ${moduleName}`)
     // await clearSession()
     return null
   }
@@ -153,15 +150,14 @@ export async function apiCall(
     const errCode = res['ERRCODE']
     if (errCode === '22' || errCode === '61' || errCode === '23') {
       if (_retrying) return errorResponse(url) // prevent infinite retry
-      const result = await handleErrCode(errCode, res['RTN'], url, () =>
+      const result = await handleErrCode(errCode, res['RTN'], () =>
         apiCall(url, method, params, true),
       )
       return result ?? res
     }
 
     return res
-  } catch (err: any) {
-    console.log('DBG_APICALL_ERR', url, err?.message, err?.code, JSON.stringify(err?.toJSON?.()))
+  } catch {
     return errorResponse(url)
   }
 }
@@ -208,7 +204,7 @@ export async function uploadFile(
     const errCode = res['ERRCODE']
     if (errCode === 22 || errCode === 61 || errCode === 23) {
       if (_retrying) return errorResponse(url)
-      const result = await handleErrCode(errCode, res['RTN'], url, () =>
+      const result = await handleErrCode(errCode, res['RTN'], () =>
         uploadFile(url, formData, true),
       )
       return result ?? res

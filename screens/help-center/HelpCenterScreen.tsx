@@ -17,6 +17,7 @@ import { StorageKeys } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
 import { apiCall } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
+import { handleBack } from '../../utils/navigationRef'
 import { fetchCustomerCare } from '../../service/homeService'
 import { setFilterEventType } from '../../service/filterService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
@@ -162,7 +163,7 @@ export default function HelpCenterScreen({ navigation }: Props) {
       <View style={s.header}>
         <Pressable
           style={s.backBtn}
-          onPress={() => navigation.goBack()}
+          onPress={() => handleBack()}
           accessibilityRole="button"
           accessibilityLabel="Back"
         >

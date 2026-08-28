@@ -11,16 +11,20 @@
 // Name, Mother tongue, Location (Lives in), and Hometown.
 //
 // One-time-edit locks (Angular: NAMEEDIT/MOTHERTONGUEEDIT flags): a locked
-// field stays tappable but shows a "contact support" message instead of
-// opening its editor — ported from edit-profile.page.ts's showDisableToast()/
-// restrictPopup(). Name gets its own dedicated message (NAMEDISABLE); Mother
-// tongue falls back to the generic RESTRICT_FIELD/RESTRICT_SUPPORT pair,
-// matching Angular exactly (no dedicated MOTHERTONGUEDISABLE string exists).
+// field stays tappable but opens FieldRestrictedSheet instead of its editor —
+// the port of edit-profile.page.ts's showDisableToast() -> restrictPopup(),
+// i.e. lowerpopup.component's `action == 'editFieldRestrict'` popup. Both
+// fields get the same generic RESTRICT_FIELD/RESTRICT_SUPPORT copy, matching
+// Angular (its per-field NAMEDISABLE toast is commented out there).
 //
 // Location/Hometown are each a State→City cascade, mirroring the Religion→
-// Caste pattern already built. NRI-specific fields (nriCountry/nriState) and
-// the Hindi-specific "home place domain" conditional aren't handled — flagged,
-// not silently assumed away.
+// Caste pattern already built.
+//
+// Native place / Hometown city are only asked for the mother tongues in the
+// native-place domain (Angular: isHomeTownVisible() over NATIVEPLACEDOMAIN,
+// falling back to the hardcoded homeTownDomain list) — see homeTownVisible
+// below. NRI-specific fields (nriCountry/nriState) are still not handled —
+// flagged, not silently assumed away.
 
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -29,18 +33,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import { fetchEditProfileInfo, submitFieldChanges, type FieldChange } from '../../service/editProfileService'
-import { fetchMotherTongueOptions, fetchStates, fetchCities } from '../../service/registrationService'
+import { fetchMotherTongueOptions, fetchStates, fetchCities, fetchHomeTownDomain } from '../../service/registrationService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import SelectField from '../../components/input/SelectField'
 import FloatingLabelInput, { validateName } from '../../components/input/FloatingLabelInput'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
+import FieldRestrictedSheet from '../../components/edit-profile/FieldRestrictedSheet'
+import { handleBack } from '../../utils/navigationRef'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
 type Props = { navigation: any }
 type Picker = 'motherTongue' | 'state' | 'city' | 'homeState' | 'homeCity' | null
 
-export default function BasicDetailsScreen({ navigation }: Props) {
+export default function BasicDetailsScreen({ navigation: _navigation }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
 
@@ -53,6 +59,12 @@ export default function BasicDetailsScreen({ navigation }: Props) {
 
   const [motherTongue, setMotherTongue]                 = useState<PickerOption | null>(null)
   const [motherTongueEditable, setMotherTongueEditable] = useState(true)
+  const [restrictedVisible, setRestrictedVisible] = useState(false)
+  // Angular: isHomeTownVisible() — only a few mother tongues are asked for a
+  // separate native place. Mother tongue is editable on THIS screen, so the
+  // domain list is held and re-checked against the live selection rather than
+  // resolved once for the loaded value.
+  const [homeTownDomain, setHomeTownDomain] = useState<string[]>([])
 
   const [state, setState] = useState<PickerOption | null>(null)
   const [city, setCity]   = useState<PickerOption | null>(null)
@@ -89,12 +101,14 @@ export default function BasicDetailsScreen({ navigation }: Props) {
       homeState: info.homeState, homeCity: info.homeCity,
     })
 
-    const [motherTongueList, stateList] = await Promise.all([
+    const [motherTongueList, stateList, homeTownDomainList] = await Promise.all([
       fetchMotherTongueOptions(),
       fetchStates(),
+      fetchHomeTownDomain(),
     ])
     setMotherTongueOptions(motherTongueList)
     setStateOptions(stateList)
+    setHomeTownDomain(homeTownDomainList)
     setMotherTongue(motherTongueList.find(o => o.key === info.motherTongue) ?? null)
     setState(stateList.find(o => o.key === info.state) ?? null)
     setHomeState(stateList.find(o => o.key === info.homeState) ?? null)
@@ -113,12 +127,13 @@ export default function BasicDetailsScreen({ navigation }: Props) {
 
   useEffect(() => { load() }, [load])
 
-  function showRestricted(field: 'name' | 'motherTongue') {
-    if (field === 'name') {
-      Alert.alert(t('EDITPROFILE.RESTRICT_FIELD'), t('EDITPROFILE.NAMEDISABLE'))
-    } else {
-      Alert.alert(t('EDITPROFILE.RESTRICT_FIELD'), t('EDITPROFILE.RESTRICT_SUPPORT'))
-    }
+  // Angular's showDisableToast() routes every locked field — name included —
+  // through the same restrictPopup(), which always renders the generic
+  // RESTRICT_FIELD/RESTRICT_SUPPORT pair (its per-field NAMEDISABLE toast is
+  // commented out there). So one shared sheet covers both fields rather than
+  // the two different native OS alerts this used to raise.
+  function showRestricted() {
+    setRestrictedVisible(true)
   }
 
   async function handleSelectState(opt: PickerOption) {
@@ -143,6 +158,10 @@ export default function BasicDetailsScreen({ navigation }: Props) {
     setName(text)
     if (nameError) setNameError(undefined)
   }
+
+  // Angular: isHomeTownVisible() against the live mother-tongue selection, not
+  // the loaded one — this screen can change it.
+  const homeTownVisible = !!motherTongue && homeTownDomain.includes(String(motherTongue.key))
 
   async function handleSubmit() {
     if (submitting) return
@@ -172,7 +191,10 @@ export default function BasicDetailsScreen({ navigation }: Props) {
         existingValue: `${original.state ?? ''}~${original.city ?? ''}`,
       })
     }
-    if (homeState && homeCity && (homeState.key !== original.homeState || homeCity.key !== original.homeCity)) {
+    // Gated on homeTownVisible too: if the member's mother tongue isn't in the
+    // native-place domain the fields aren't shown, so any values still sitting
+    // in state (e.g. loaded, then mother tongue switched) must not be saved.
+    if (homeTownVisible && homeState && homeCity && (homeState.key !== original.homeState || homeCity.key !== original.homeCity)) {
       changes.push({
         field: 'HOMESTATE',
         value: `${homeState.key}~${homeCity.key}`,
@@ -182,7 +204,7 @@ export default function BasicDetailsScreen({ navigation }: Props) {
 
     if (changes.length === 0) {
       setSubmitting(false)
-      navigation.goBack()
+      handleBack()
       return
     }
 
@@ -196,7 +218,7 @@ export default function BasicDetailsScreen({ navigation }: Props) {
       )
       return
     }
-    navigation.goBack()
+    handleBack()
   }
 
   if (loading) {
@@ -210,7 +232,7 @@ export default function BasicDetailsScreen({ navigation }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle} numberOfLines={1}>{t('EDITPROFILE.EDIT_PROFILE')}</Text>
@@ -228,20 +250,27 @@ export default function BasicDetailsScreen({ navigation }: Props) {
             variant="name"
           />
         ) : (
-          <SelectField label={t('EDITPROFILE.NAME')} value={name} locked onPress={() => showRestricted('name')} />
+          <SelectField label={t('EDITPROFILE.NAME')} value={name} locked onPress={showRestricted} />
         )}
 
         {motherTongueEditable ? (
           <SelectField label={t('EDITPROFILE.MOTHERTONGUE')} value={motherTongue?.label} onPress={() => setActivePicker('motherTongue')} />
         ) : (
-          <SelectField label={t('EDITPROFILE.MOTHERTONGUE')} value={motherTongue?.label} locked onPress={() => showRestricted('motherTongue')} />
+          <SelectField label={t('EDITPROFILE.MOTHERTONGUE')} value={motherTongue?.label} locked onPress={showRestricted} />
         )}
 
         <SelectField label={t('EDITPROFILE.CURRENT_LOCATION')} value={state?.label} onPress={() => setActivePicker('state')} />
         <SelectField label="City" value={city?.label} placeholder={state ? 'Select city' : 'Select state first'} onPress={() => state && setActivePicker('city')} />
 
-        <SelectField label={t('EDITPROFILE.NATIVE_PLACE')} value={homeState?.label} onPress={() => setActivePicker('homeState')} />
-        <SelectField label="Hometown city" value={homeCity?.label} placeholder={homeState ? 'Select city' : 'Select state first'} onPress={() => homeState && setActivePicker('homeCity')} />
+        {/* Only asked for the mother tongues in the native-place domain — see
+            homeTownDomain above. Re-evaluated against the CURRENT selection, so
+            switching mother tongue shows/hides the pair immediately. */}
+        {homeTownVisible && (
+          <>
+            <SelectField label={t('EDITPROFILE.NATIVE_PLACE')} value={homeState?.label} onPress={() => setActivePicker('homeState')} />
+            <SelectField label="Hometown city" value={homeCity?.label} placeholder={homeState ? 'Select city' : 'Select state first'} onPress={() => homeState && setActivePicker('homeCity')} />
+          </>
+        )}
 
         <Pressable style={s.submitBtn} onPress={handleSubmit} disabled={submitting}>
           {submitting ? <ActivityIndicator color={Colors.white} /> : <Text style={s.submitBtnText}>{t('GENERAL.SUBMIT')}</Text>}
@@ -293,6 +322,8 @@ export default function BasicDetailsScreen({ navigation }: Props) {
         onSelect={opt => { setHomeCity(opt); setActivePicker(null) }}
         onClose={() => setActivePicker(null)}
       />
+
+      <FieldRestrictedSheet visible={restrictedVisible} onClose={() => setRestrictedVisible(false)} />
     </View>
   )
 }

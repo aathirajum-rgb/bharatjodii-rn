@@ -33,6 +33,7 @@ import SearchByIdDesktopLayout from './SearchByIdDesktopLayout'
 import { getItem } from '../../service/storageService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { openMembershipTab } from '../../service/paymentService'
+import { handleBack } from '../../utils/navigationRef'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
@@ -105,7 +106,7 @@ export default function SearchByIdScreen({ navigation }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle} numberOfLines={1}>{t('SEARCH.SEARCH_BY_ID')}</Text>

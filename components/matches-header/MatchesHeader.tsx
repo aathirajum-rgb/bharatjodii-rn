@@ -97,11 +97,10 @@ export default function MatchesHeader({
             if (h > 0) onTitleLayout(h)
           }}
         >
-          {/* Figma: count-first — "323 Matches", not Angular's "Matches (323)" — so we
-              reuse the bare noun from GENERAL.ICON_1 (also the footer tab label) rather
-              than SEARCH.MATCHES_FOUND, which bakes in Angular's word order/parens. */}
+          {/* Angular matches.page.ts's setPageTitle() — "Matches (#COUNT)" (SEARCH.MATCHES_FOUND),
+              not a count-first "323 Matches". */}
           <Text style={s.title}>
-            {loading ? (titleOverride ?? t('GENERAL.ICON_1')) : (titleOverride ?? `${totalCount} ${t('GENERAL.ICON_1')}`)}
+            {loading ? (titleOverride ?? t('GENERAL.ICON_1')) : (titleOverride ?? t('SEARCH.MATCHES_FOUND').replace('#COUNT', String(totalCount)))}
           </Text>
 
           <View style={s.titleActions}>

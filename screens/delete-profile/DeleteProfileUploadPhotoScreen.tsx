@@ -26,6 +26,7 @@ import { openMembershipTab } from '../../service/paymentService'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileUploadPhotoDesktopLayout from './DeleteProfileUploadPhotoDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { handleBack } from '../../utils/navigationRef'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -193,7 +194,7 @@ export default function DeleteProfileUploadPhotoScreen({ navigation, route }: Pr
       <View style={s.header}>
         <Pressable
           style={s.backBtn}
-          onPress={() => navigation.goBack()}
+          onPress={() => handleBack()}
           accessibilityRole="button"
           accessibilityLabel="Back"
         >

@@ -72,7 +72,7 @@ import {
   fetchDrinkingHabitOptions, fetchSmokingHabitOptions, fetchEatingHabitOptions, fetchPropertyOptions,
   fetchProfileCreatedByOptions, fetchMaritalStatusOptions, fetchPhysicalStatusOptions, getRegValue,
   fetchEducationGroupOptions, isEducationGroupEligible, isJobDetailEligible,
-  isValidJobDetailFormat, updateFewMoreDetail,
+  isValidJobDetailFormat, updateFewMoreDetail, fetchHomeTownDomain,
 } from '../../service/registrationService'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
@@ -96,6 +96,11 @@ const VEHICLE_CODES = new Set(['5', '6', '7'])
 // see the bug report screenshot). Icons are downloaded assets, not text
 // glyphs — Figma's trash-2/plus-circle already bake in their own white
 // rounded-square / grey-circle backdrops, confirmed from the real SVGs.
+// Leading icon on the "Photo privacy" link — same asset the mobile screen uses
+// (Figma node 3366:13117: 32px icon box, gap 4, then the underlined label).
+const PRIVACY_ICON = CDN_REACT + '/edit_privacy.svg'
+const PRIVACY_ICON_SIZE = 32
+
 const DELETE_ICON = CDN_REACT + '/edit-profile-photo-delete-icon.svg'
 const ADD_ICON    = CDN_REACT + '/edit-profile-photo-add-icon.svg'
 
@@ -169,6 +174,10 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
   const [city, setCity]   = useState<Opt | null>(null)
   const [homeState, setHomeState] = useState<Opt | null>(null)
   const [homeCity, setHomeCity]   = useState<Opt | null>(null)
+  // Angular: isHomeTownVisible() — Native place / Hometown city are only asked
+  // for the mother tongues in the native-place domain. Mother tongue is editable
+  // on this screen, so the domain list is checked against the live selection.
+  const [homeTownDomain, setHomeTownDomain] = useState<string[]>([])
 
   // ── Professional details ──
   const [education, setEducation]   = useState<Opt | null>(null)
@@ -298,6 +307,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     setPropertyOptions(propertyList.filter(o => !VEHICLE_CODES.has(o.key)))
     setMaritalStatusOptions(maritalStatusList)
     setPhysicalStatusOptions(physicalStatusList)
+    setHomeTownDomain(await fetchHomeTownDomain())
 
     setMotherTongue(motherTongueList.find(o => o.key === info.motherTongue) ?? null)
     setState(stateList.find(o => o.key === info.state) ?? null)
@@ -319,7 +329,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
       info.homeState ? fetchCities(info.homeState) : Promise.resolve([]),
       info.religion ? fetchCasteOptions(info.religion, info.motherTongue ?? '') : Promise.resolve([]),
       info.raasi ? fetchStarOptions(info.raasi) : Promise.resolve([]),
-      (info.education && isEducationGroupEligible(info.education)) ? fetchEducationGroupOptions(info.education) : Promise.resolve([]),
+      (info.education && isEducationGroupEligible(info.education)) ? fetchEducationGroupOptionsFlat(info.education) : Promise.resolve([]),
     ])
     setCityOptions(cityList)
     setHomeCityOptions(homeCityList)
@@ -377,7 +387,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     setEducation(opt)
     if (opt.key === education?.key) return
     setEducationGroup(null)
-    setEducationGroupOptions(isEducationGroupEligible(opt.key) ? await fetchEducationGroupOptions(opt.key) : [])
+    setEducationGroupOptions(isEducationGroupEligible(opt.key) ? await fetchEducationGroupOptionsFlat(opt.key) : [])
   }
 
   function handleSelectOccupation(opt: Opt) {
@@ -559,6 +569,9 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
 
   // ── Save ──
 
+  // Angular: isHomeTownVisible() against the live mother-tongue selection.
+  const homeTownVisible = !!motherTongue && homeTownDomain.includes(String(motherTongue.key))
+
   async function handleSave() {
     if (saving) return
 
@@ -579,7 +592,10 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
     if (state && city && (state.key !== original.state || city.key !== original.city)) {
       changes.push({ field: 'STATE', value: `${state.key}~${city.key}`, existingValue: `${original.state ?? ''}~${original.city ?? ''}` })
     }
-    if (homeState && homeCity && (homeState.key !== original.homeState || homeCity.key !== original.homeCity)) {
+    // homeTownVisible-gated: when the mother tongue isn't in the native-place
+    // domain the fields aren't rendered, so leftover state (loaded, then mother
+    // tongue switched) must not be saved.
+    if (homeTownVisible && homeState && homeCity && (homeState.key !== original.homeState || homeCity.key !== original.homeCity)) {
       changes.push({ field: 'HOMESTATE', value: `${homeState.key}~${homeCity.key}`, existingValue: `${original.homeState ?? ''}~${original.homeCity ?? ''}` })
     }
     if (education && education.key !== original.education) {
@@ -717,9 +733,11 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
           <View style={s.photoHeaderRow}>
             <Text style={s.sectionTitle}>{t('EDITPROFILE.PHOTOS')}</Text>
             <Pressable
+              style={s.photoPrivacyBtn}
               onPress={() => (photos.length > 0 ? setPhotoPrivacyVisible(true) : openFilePicker())}
               hitSlop={8}
             >
+              <CdnSvg uri={PRIVACY_ICON} width={PRIVACY_ICON_SIZE} height={PRIVACY_ICON_SIZE} />
               <Text style={s.link}>{t('EDITPROFILE.PHOTO_PRIVACY')}</Text>
             </Pressable>
           </View>
@@ -804,15 +822,22 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
                 disabled={!state} {...(state ? {} : { placeholder: 'Select state first' })}
               />
             </View>
-            <View style={[s.cell, rowZ(4)]}>
-              <DesktopSelectField label={t('EDITPROFILE.NATIVE_PLACE')} options={stateOptions} selectedKey={homeState?.key ?? null} onSelect={handleSelectHomeState} />
-            </View>
-            <View style={[s.cell, rowZ(4)]}>
-              <DesktopSelectField
-                label="Hometown city" options={homeCityOptions} selectedKey={homeCity?.key ?? null} onSelect={setHomeCity}
-                disabled={!homeState} {...(homeState ? {} : { placeholder: 'Select state first' })}
-              />
-            </View>
+            {/* Only asked for the mother tongues in the native-place domain —
+                see homeTownDomain. Checked against the CURRENT selection so
+                changing mother tongue shows/hides the pair immediately. */}
+            {homeTownVisible && (
+              <>
+                <View style={[s.cell, rowZ(4)]}>
+                  <DesktopSelectField label={t('EDITPROFILE.NATIVE_PLACE')} options={stateOptions} selectedKey={homeState?.key ?? null} onSelect={handleSelectHomeState} />
+                </View>
+                <View style={[s.cell, rowZ(4)]}>
+                  <DesktopSelectField
+                    label="Hometown city" options={homeCityOptions} selectedKey={homeCity?.key ?? null} onSelect={setHomeCity}
+                    disabled={!homeState} {...(homeState ? {} : { placeholder: 'Select state first' })}
+                  />
+                </View>
+              </>
+            )}
             <View style={[s.cell, rowZ(5)]}>
               <DesktopSelectField label={t('EDITPROFILE.MARITALSTATUS')} options={maritalStatusOptions} selectedKey={maritalStatus?.key ?? null} onSelect={setMaritalStatus} />
             </View>
@@ -1023,6 +1048,9 @@ const s = StyleSheet.create({
   cell: { width: CELL_W },
 
   photoHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
+  // Icon + label on one centred row, 4px apart. The icon stays outside the
+  // <Text> so `s.link`'s underline doesn't run beneath it.
+  photoPrivacyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
 
   // Figma node 642:2780: a 204×204 primary tile (left) beside a wrapping
   // grid of 98×98 tiles (right) — two distinct regions, not one uniform

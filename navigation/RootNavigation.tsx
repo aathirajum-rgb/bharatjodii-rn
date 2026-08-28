@@ -1,14 +1,15 @@
 import { NavigationContainer } from '@react-navigation/native'
 import Constants from 'expo-constants'
 import * as Linking from 'expo-linking'
-import { useCallback } from 'react'
-import { ActivityIndicator, View } from 'react-native'
+import { useCallback, useEffect } from 'react'
+import { ActivityIndicator, BackHandler, Platform, View } from 'react-native'
 import FLAVORS from '../constants/flavorConfig'
 import { useAuth } from '../contexts/AuthContext'
+import { useExitConfirm } from '../hooks/useExitConfirm'
 import type { ProfileDeactivateInfo } from '../components/auth/ProfileDeactivatedModal'
 import { refreshSession } from '../service/homeService'
 import { getItem, setItem } from '../service/storageService'
-import { navigationRef } from '../utils/navigationRef'
+import { handleBack, navigationRef } from '../utils/navigationRef'
 import AppStack from './AppStack'
 import AuthStack from './AuthStack'
 
@@ -76,6 +77,27 @@ export default function RootNavigation() {
   const handleStateChange = useCallback(() => {
     guardCheck(isAuthenticated, handleDeactivation)
   }, [isAuthenticated, handleDeactivation])
+
+  // Registers the "Do you want to exit?" alert as handleBack()'s root
+  // fallback, only for the authenticated app — AuthStack's root (Splash/
+  // Login) keeps the OS default back behavior, same as before this hook
+  // moved here from being wired into a single screen (MatchesScreen).
+  useExitConfirm(isAuthenticated)
+
+  // Single Android hardware-back listener for the whole app — the ONLY one,
+  // registered once here rather than per-screen, so it can never race or
+  // double-fire against another. It calls the exact same handleBack() that
+  // every custom back icon/button in the app calls (AppHeader, etc.), so
+  // hardware back and UI back can never diverge. A screen that needs to
+  // intercept hardware back for its own reason (e.g. HostedCheckoutWebViewScreen
+  // treating back as "cancel payment") still can — its own listener, being
+  // registered later/deeper while focused, runs first and can swallow the
+  // event before this one ever sees it.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return
+    const sub = BackHandler.addEventListener('hardwareBackPress', handleBack)
+    return () => sub.remove()
+  }, [])
 
   // Blank while we check AsyncStorage — prevents a flash of the wrong stack
   if (loading) {

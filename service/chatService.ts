@@ -49,7 +49,6 @@ export async function getChatCount(partnerId: string): Promise<ChatCountResult> 
   const loginId = (await getItem(SK.Auth.USER_ID)) ?? ''
   const params  = `ID=${loginId}&PARTNERID=${partnerId}&TYPE=1`
   const result  = await apiCall(Endpoints.communication.chatCount, 'POST', params)
-  console.log('[chatService] getChatCount raw response', result)
 
   const responseCode = String(result?.RESPONSECODE ?? '')
   const errCode       = String(result?.ERRCODE ?? '')
@@ -119,7 +118,6 @@ export async function consumeChatCount(partnerId: string): Promise<void> {
   const loginId = (await getItem(SK.Auth.USER_ID)) ?? ''
   const params  = `ID=${loginId}&PARTNERID=${partnerId}&TYPE=2`
   const result  = await apiCall(Endpoints.communication.chatCount, 'POST', params)
-  console.log('[chatService] consumeChatCount raw response', result)
   if (String(result?.RESPONSECODE) === '1' && String(result?.ERRCODE) === '0') {
     const resp = result.RESPONSE ?? {}
     await setItem(`CHATBALANCE_${partnerId}`, String(resp?.CHATBALANCE ?? '0'))
@@ -170,7 +168,6 @@ export async function fetchChatPaymentPromo(partnerName: string): Promise<ChatPa
   const entryType = (await getSessionValue('ENTRYTYPE')) ?? ''
   const params    = `ID=${loginId}&TYPE=CHAT&MEMBERSHIPTYPE=${entryType}&PRODUCTID=1&NAME=${encodeURIComponent(partnerName)}`
   const result    = await apiCall(Endpoints.payment.banner, 'POST', params)
-  console.log('[chatService] fetchChatPaymentPromo raw response', result)
 
   if (String(result?.ERRCODE ?? '') !== '0' || !result?.RESPONSE) return null
   const r = result.RESPONSE

@@ -34,6 +34,8 @@ import {
 import { PICKER_PANEL_WIDTH } from '../../constants/registration.constants'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import SelectField from '../../components/input/SelectField'
+import FieldRestrictedSheet from '../../components/edit-profile/FieldRestrictedSheet'
+import { handleBack } from '../../utils/navigationRef'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 const ITEM_H = 40
@@ -99,7 +101,7 @@ function parseHtmlLabel(raw: string): { label: string; subtitle: string } {
 
 const YEARS = buildYears()
 
-export default function EditProfileAgeHeightScreen({ navigation }: Props) {
+export default function EditProfileAgeHeightScreen({ navigation: _navigation }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
 
@@ -108,6 +110,7 @@ export default function EditProfileAgeHeightScreen({ navigation }: Props) {
 
   // ── Age ──
   const [ageEditable, setAgeEditable] = useState(true)
+  const [restrictedVisible, setRestrictedVisible] = useState(false)
   const [selDate, setSelDate]   = useState('')
   const [selMonth, setSelMonth] = useState('')
   const [selYear, setSelYear]   = useState('')
@@ -262,22 +265,36 @@ export default function EditProfileAgeHeightScreen({ navigation }: Props) {
 
     const changes: FieldChange[] = []
 
+    // Angular (form-fields.component.ts's goToNext()) never gates these calls
+    // on "did the value change from the prefill" — EXISTINGVALUE is sent for
+    // backend audit only, the update call itself always fires. Matching that
+    // here matters specifically for Age: this screen is reached via the
+    // server's own "Age still incomplete" signal (page_id 47), so if the
+    // prefilled value happens to equal what the user re-confirms, skipping
+    // the call would leave the backend's flag never cleared and re-land the
+    // user right back on this screen on the next login.
     if (ageEditable) {
-      const ageValue = isDobComplete ? String(calculatedAge) : directAge
-      if (ageValue && ageValue !== original.age) {
-        changes.push({ field: 'AGE', value: ageValue, existingValue: original.age })
+      if (isDobComplete) {
+        // Angular fires BOTH calls for a completed DOB entry: TYPE=20 (DOB,
+        // tilde-joined YEAR~MONTH~DATE) then TYPE=3 (AGE, computed). Sending
+        // only AGE (as this screen used to) can leave the backend's
+        // DOB-specific completeness check unsatisfied.
+        changes.push({ field: 'DOB', value: `${selYear}~${selMonth}~${selDate}`, existingValue: original.age })
+        changes.push({ field: 'AGE', value: String(calculatedAge), existingValue: original.age })
+      } else if (directAge) {
+        changes.push({ field: 'AGE', value: directAge, existingValue: original.age })
       }
     }
 
-    if (selectedHeight && selectedHeight.key !== original.height) {
+    if (selectedHeight) {
       changes.push({ field: 'HEIGHT', value: selectedHeight.key, existingValue: original.height || original.heightCategory })
-    } else if (selectedCategory && selectedCategory !== original.heightCategory) {
+    } else if (selectedCategory) {
       changes.push({ field: 'HEIGHTCATEGORY', value: selectedCategory, existingValue: original.heightCategory || original.height })
     }
 
     if (changes.length === 0) {
       setSubmitting(false)
-      navigation.goBack()
+      handleBack()
       return
     }
 
@@ -291,7 +308,7 @@ export default function EditProfileAgeHeightScreen({ navigation }: Props) {
       )
       return
     }
-    navigation.goBack()
+    handleBack()
   }
 
   if (loading) {
@@ -313,7 +330,7 @@ export default function EditProfileAgeHeightScreen({ navigation }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle} numberOfLines={1}>{t('EDITPROFILE.EDIT_PROFILE')}</Text>
@@ -329,7 +346,11 @@ export default function EditProfileAgeHeightScreen({ navigation }: Props) {
             label={t('EDITPROFILE.AGE')}
             value={original.age ? `${original.age} years old` : undefined}
             locked
-            onPress={() => Alert.alert(t('EDITPROFILE.RESTRICT_FIELD'), t('EDITPROFILE.AGEDISABLE'))}
+            // Angular: showDisableToast('age') -> restrictPopup(), i.e. the
+            // lowerpopup 'editFieldRestrict' popup with the generic
+            // RESTRICT_FIELD/RESTRICT_SUPPORT copy — its per-field AGEDISABLE
+            // toast is commented out there, same as NAMEDISABLE.
+            onPress={() => setRestrictedVisible(true)}
           />
         ) : (
           <>
@@ -514,6 +535,7 @@ export default function EditProfileAgeHeightScreen({ navigation }: Props) {
           </Animated.View>
         </View>
       </Modal>
+      <FieldRestrictedSheet visible={restrictedVisible} onClose={() => setRestrictedVisible(false)} />
     </View>
   )
 }

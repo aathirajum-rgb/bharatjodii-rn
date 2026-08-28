@@ -13,6 +13,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { handleBack } from '../../utils/navigationRef'
 
 const ICON_PHONE = CDN_REACT + '/call_icon.svg'
 
@@ -42,7 +43,7 @@ export default function DeleteProfileUnsatisfactoryDesktopLayout({
   return (
     <DesktopPageShell navigation={navigation} userName={userName} activeItem="settings" onTabPress={onTabPress}>
       <View style={s.header}>
-        <Pressable onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}>
+        <Pressable onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back" hitSlop={8}>
           <Text style={s.backArrow}>←</Text>
         </Pressable>
         <Text style={s.title}>{t('DELETE_PROFILE.HEADER')}</Text>

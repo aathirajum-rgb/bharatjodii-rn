@@ -8,7 +8,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import {
-  WhatsAppIcon, WhatsAppUnlockButton, CallIcon, CloseIcon, ViewLaterIcon, LikeIcon,
+  WhatsAppIcon, WhatsAppUnlockButton, CallIcon, MessageIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   buildBasicView, showLikeCTA, showAfterLikeCTA,
   getBlurPhotoUri, NEWLY_JOINED_STAR_URI, RIGHT_ARROW_ANIMATION_URI, ProfileBadge, PhotoSwiper,
   getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showContactsLeftBanner, showFreeBadge,
@@ -28,7 +28,7 @@ const DEFAULT_PHOTO_SIZE = 248
 
 export default function MatchCardDesktop({
   profile, oppGender, ownEntryType, femaleFreeEligible, indNumbersLeft,
-  onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp,
+  onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp, onMessage,
   showLikedBadge, menu, photoSize,
 }: {
   profile:            MatchProfile
@@ -42,6 +42,9 @@ export default function MatchCardDesktop({
   onViewLater: () => void
   onCall:      () => void
   onWhatsApp:  () => void
+  // Optional — only Matches wires this up so far; other MatchCardDesktop callers
+  // (Activity/ViewProfile/ViewLater/IgnoredProfiles) are untouched by this fix.
+  onMessage?:  () => void
   // See MatchCard (MatchesScreen.tsx) for why this exists — this card never
   // had the liked-date strip at all (a separate gap from the mobile one).
   showLikedBadge?: boolean | undefined
@@ -154,6 +157,13 @@ export default function MatchCardDesktop({
               </View>
             )}
             <View style={c.contactIcons}>
+              {/* Angular: matches-card.component.html — message icon precedes call/WhatsApp,
+                  plain 24x24 image (.phone-icon), no wrapper. */}
+              {onMessage && (
+                <Pressable onPress={onMessage} hitSlop={8}>
+                  <MessageIcon width={24} height={24} />
+                </Pressable>
+              )}
               {/* Figma node 606:6276: the call icon sits inside its own white
                   circular button (24×24, #006C48 border) — unlike WhatsApp,
                   which is just its own icon graphic with no extra wrapper. */}
@@ -193,7 +203,7 @@ export default function MatchCardDesktop({
           <Pressable onPress={onPress}>
             <Text style={c.name} numberOfLines={1}>{profile.name}</Text>
             <Text style={c.jodiId}>{t('MATCHES.JODI_ID').replace('#ID#', profile.profileId)}</Text>
-            <Text style={c.basicView} numberOfLines={2}>{buildBasicView(profile)}</Text>
+            <Text style={c.basicView} numberOfLines={2}>{buildBasicView(profile, oppGender === 'M')}</Text>
             <View style={c.viewProfileRow}>
               <Text style={c.viewProfile}>{t('MATCHES.VIEW_PROFILE_CTA')}</Text>
               {/* Angular: button-revamp.component.html's IsShowAnimation() branch — real

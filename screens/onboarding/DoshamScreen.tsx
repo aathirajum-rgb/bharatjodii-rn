@@ -44,8 +44,13 @@ export default function DoshamScreen({ navigation }: Props) {
   const { t } = useTranslation()
   const langFonts = useLanguageFonts()
 
-  // null = step 1 (yes/no not answered); true = step 2 (yes); false = submitted no
-  const [hasDosham,    setHasDosham]    = useState<boolean | null>(null)
+  // null = not answered yet; true = Yes picked; false = No picked (step 1 —
+  // Next stays gated behind this pick, but the view doesn't change until Next
+  // is tapped, matching Angular's clickOnNext-driven navigation).
+  const [hasDosham,       setHasDosham]       = useState<boolean | null>(null)
+  // Flips true only once Next is tapped on the Yes branch — this is what
+  // actually swaps the view to the dosham-type checkbox list (step 2).
+  const [showDoshamTypes, setShowDoshamTypes] = useState(false)
   const [doshamTypes,  setDoshamTypes]  = useState<Option[]>([])
   // multi-select — set of selected keys
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(new Set())
@@ -77,30 +82,23 @@ export default function DoshamScreen({ navigation }: Props) {
     }
   }
 
-  async function handleYes() {
+  // Angular: choosing Yes/No via app-radio only records the value and enables
+  // the Next CTA (enableNextCTA) — it does not navigate/fetch by itself. The
+  // dosham-type list is only loaded once Next is tapped (clickOnNext → page 33).
+  function handleYes() {
+    if (submitting) return
     setHasDosham(true)
-    await loadDoshamTypes()
   }
 
-  // Unlike the other onboarding screens this list is fetched on demand (the "Yes"
-  // branch), not on mount — so only re-fetch when it is actually on screen.
-  // Selection is held as KEYs in `selectedKeys`, so it survives the re-label.
-  useLanguageReload(() => { if (hasDosham) loadDoshamTypes() })
-
-  async function handleNo() {
+  function handleNo() {
     if (submitting) return
     setHasDosham(false)
-    setSubmitting(true)
-    try {
-      await setRegValue('DOSHAM', '2')
-      await submitHoroscopeDetails(star, raasi, '2')
-      await refreshSession()
-      await setItem('LASTAPPLOGINAT', new Date().toISOString())
-      navigation.navigate('Home')
-    } catch {
-      setSubmitting(false)
-    }
   }
+
+  // Step 2 is entered only via handleNext (Yes branch) — re-fetch on a live
+  // language change only while actually showing the checkbox list.
+  // Selection is held as KEYs in `selectedKeys`, so it survives the re-label.
+  useLanguageReload(() => { if (showDoshamTypes) loadDoshamTypes() })
 
   function toggleDoshamType(key: string) {
     setSelectedKeys(prev => {
@@ -111,20 +109,48 @@ export default function DoshamScreen({ navigation }: Props) {
     })
   }
 
+  // Angular's clickOnNext(currentPageType) for page 32: No submits '2' (no
+  // dosham) straight away; Yes navigates to page 33 (the dosham-type
+  // checklist) — modeled here as revealing step 2 in place. Tapping Next
+  // again from step 2 then submits the '~'-joined selected dosham keys.
   async function handleNext() {
-    if (selectedKeys.size === 0 || submitting) return
-    setSubmitting(true)
-    const doshamValue = Array.from(selectedKeys).join('~')
-    try {
-      await setRegValue('DOSHAM', doshamValue)
-      await submitHoroscopeDetails(star, raasi, doshamValue)
-      await refreshSession()
-      await setItem('LASTAPPLOGINAT', new Date().toISOString())
-      navigation.navigate('Home')
-    } catch {
-      // allow retry
-    } finally {
-      setSubmitting(false)
+    if (submitting) return
+
+    if (showDoshamTypes) {
+      if (selectedKeys.size === 0) return
+      setSubmitting(true)
+      const doshamValue = Array.from(selectedKeys).join('~')
+      try {
+        await setRegValue('DOSHAM', doshamValue)
+        await submitHoroscopeDetails(star, raasi, doshamValue)
+        await refreshSession()
+        await setItem('LASTAPPLOGINAT', new Date().toISOString())
+        navigation.navigate('Home')
+      } catch {
+        // allow retry
+      } finally {
+        setSubmitting(false)
+      }
+      return
+    }
+
+    if (hasDosham === false) {
+      setSubmitting(true)
+      try {
+        await setRegValue('DOSHAM', '2')
+        await submitHoroscopeDetails(star, raasi, '2')
+        await refreshSession()
+        await setItem('LASTAPPLOGINAT', new Date().toISOString())
+        navigation.navigate('Home')
+      } catch {
+        setSubmitting(false)
+      }
+      return
+    }
+
+    if (hasDosham === true) {
+      setShowDoshamTypes(true)
+      await loadDoshamTypes()
     }
   }
 
@@ -141,15 +167,22 @@ export default function DoshamScreen({ navigation }: Props) {
     .replace('  ', ' ')
     .trim()
 
+  // Angular (registration-revamp.component.html): the Next CTA is always rendered,
+  // just disabled via showNextCTA until a value is picked — never unmounted like
+  // nextHidden used to do here. Skip ("I'll do this later") is the inverse: shown
+  // while nothing is selected yet on step 1, hidden once showNextCTA flips true
+  // (showSkipBtn()). Step 2 (page 33/DOSHAMHASH in Angular's config) has no
+  // SHOWSKIPBTN at all — the user already said Yes to get here, so Skip never
+  // shows on the checkbox page regardless of how many boxes are checked.
+  const hasSelection = showDoshamTypes ? selectedKeys.size > 0 : hasDosham !== null
   useOnboardingFooter({
-    nextHidden:   hasDosham !== true,
-    nextDisabled: selectedKeys.size === 0,
+    nextDisabled: !hasSelection,
     nextLoading:  submitting,
     onNext:       handleNext,
-    showSkip:     true,
+    showSkip:     !showDoshamTypes && !hasSelection,
     skipLabel:    t('REG.DO_LATER', "I'll do this later"),
     onSkip:       handleSkip,
-  }, [hasDosham, selectedKeys.size, submitting])
+  }, [hasDosham, showDoshamTypes, selectedKeys.size, submitting, hasSelection])
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -166,54 +199,48 @@ export default function DoshamScreen({ navigation }: Props) {
           {title}
         </Text>
 
-        {/* ── Step 1: Yes / No — standard pill-chip pattern (Figma: h40, radius50, left indicator) ── */}
-        {hasDosham !== true && (
+        {/* ── Step 1: Yes / No — standard pill-chip pattern (Figma: h40, radius50, left indicator) ──
+            Angular order is Yes first, then No (registration-revamp's app-radio listData).
+            Selecting either just marks the choice — the view doesn't advance to step 2
+            until Next is tapped, so both buttons need a visible active state now. */}
+        {!showDoshamTypes && (
           <View style={styles.yesNoRow}>
+            <Pressable
+              style={[styles.yesNoBtn, hasDosham === true && styles.yesNoBtnActive]}
+              onPress={handleYes}
+              disabled={submitting}
+              accessibilityRole="button"
+            >
+              <View style={[styles.yesNoIcon, hasDosham === true && styles.yesNoIconActive]}>
+                {hasDosham === true && <Text style={styles.yesNoCheckmark}>✓</Text>}
+              </View>
+              <Text style={[styles.yesNoBtnText, hasDosham === true && styles.yesNoBtnTextActive]}>
+                {t('GENERAL.YES', 'Yes')}
+              </Text>
+            </Pressable>
+
             <Pressable
               style={[styles.yesNoBtn, hasDosham === false && styles.yesNoBtnActive]}
               onPress={handleNo}
               disabled={submitting}
               accessibilityRole="button"
             >
-              {submitting && hasDosham === false ? (
-                <ActivityIndicator color={Colors.primary} />
-              ) : (
-                <>
-                  <View style={[styles.yesNoIcon, hasDosham === false && styles.yesNoIconActive]}>
-                    {hasDosham === false && <Text style={styles.yesNoCheckmark}>✓</Text>}
-                  </View>
-                  <Text style={[styles.yesNoBtnText, hasDosham === false && styles.yesNoBtnTextActive]}>
-                    No
-                  </Text>
-                </>
-              )}
-            </Pressable>
-
-            {/* No active/checkmark state here (unlike the No button above) —
-                handleYes() flips hasDosham to true immediately, which un-renders
-                this whole step-1 block in the same tick, so an "active Yes" look
-                could never actually be seen. */}
-            <Pressable
-              style={styles.yesNoBtn}
-              onPress={handleYes}
-              disabled={submitting}
-              accessibilityRole="button"
-            >
-              <View style={styles.yesNoIcon} />
-              <Text style={styles.yesNoBtnText}>
-                Yes
+              <View style={[styles.yesNoIcon, hasDosham === false && styles.yesNoIconActive]}>
+                {hasDosham === false && <Text style={styles.yesNoCheckmark}>✓</Text>}
+              </View>
+              <Text style={[styles.yesNoBtnText, hasDosham === false && styles.yesNoBtnTextActive]}>
+                {t('GENERAL.NO', 'No')}
               </Text>
             </Pressable>
           </View>
         )}
 
-        {/* ── Step 2: Dosham type multi-select ── */}
-        {hasDosham === true && (
+        {/* ── Step 2: Dosham type multi-select — entered only via Next (handleNext) ──
+            Angular's registration-revamp (pages 32/33) has no subtitle here — the
+            "You can choose one or more dosham" text only exists in the old, unrelated
+            registration.page.html (legacy flow, page type '35'), so it doesn't belong. */}
+        {showDoshamTypes && (
           <>
-            <Text style={[styles.subTitle, { fontFamily: langFonts.regular }]}>
-              {t('DOSHAM_SUBCONTENT', 'You can choose one or more dosham')}
-            </Text>
-
             {fetching ? (
               <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
             ) : (
@@ -250,13 +277,6 @@ export default function DoshamScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   loader: { marginTop: 48 },
-
-  subTitle: {
-    fontSize:     13,
-    fontWeight:   '400',
-    color:        Colors.textMedium,
-    marginBottom: 16,
-  },
 
   // ── Yes / No — standard pill-chip pattern (Figma: h40, radius50, border #8a8a8a) ──
   yesNoRow: {

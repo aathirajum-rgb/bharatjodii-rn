@@ -16,24 +16,43 @@ import LanguageSelectionDesktopLayout from './LanguageSelectionDesktopLayout';
 import { getItem } from '../service/storageService';
 import { StorageKeys } from '../constants/storage.keys';
 import { openMembershipTab } from '../service/paymentService';
+import { handleBack } from '../utils/navigationRef';
+import { getRegistrationArrays } from '../service/registrationService';
 import type { FooterTab } from '../components/app-footer/AppFooter';
 
-// Language order matches Figma design (en.json node-id 11851:6689)
-const LANGUAGES = [
+type LangOption = { id: string; native: string; english: string };
+
+// Angular (language-selection.component.ts's ngOnInit): languageArray starts
+// as this SAME static list (core/config/common.config.ts's languageArray),
+// then getDynamicPopulateArrayList() (the shared type=all/LANG=<lang>
+// initialfetch bootstrap — same call/cache as getRegistrationArrays() here)
+// overwrites it with hasArrayData?.LANGSELECTION if the API provides one —
+// so the actual on-screen order is server-driven, not fixed. This fallback
+// order matches that static config exactly (English, Tamil, Telugu,
+// Malayalam, Kannada, Marathi, Odia, Gujarati, Bengali, Hindi, Punjabi), used
+// only if LANGSELECTION is absent/empty from the API response.
+const FALLBACK_LANGUAGES: LangOption[] = [
   { id: 'en', native: 'English',   english: 'English'   },
   { id: 'tm', native: 'தமிழ்',     english: 'Tamil'     },
   { id: 'tl', native: 'తెలుగు',    english: 'Telugu'    },
-  { id: 'hi', native: 'हिंदी',      english: 'Hindi'     },
   { id: 'ml', native: 'മലയാളം',    english: 'Malayalam' },
   { id: 'kn', native: 'ಕನ್ನಡ',     english: 'Kannada'   },
-  { id: 'bn', native: 'বাংলা',      english: 'Bengali'   },
   { id: 'mt', native: 'मराठी',      english: 'Marathi'   },
   { id: 'or', native: 'ଓଡ଼ିଆ',     english: 'Odia'      },
   { id: 'gj', native: 'ગુજરાતી',   english: 'Gujarati'  },
+  { id: 'bn', native: 'বাংলা',      english: 'Bengali'   },
+  { id: 'hi', native: 'हिंदी',      english: 'Hindi'     },
   { id: 'pa', native: 'ਪੰਜਾਬੀ',    english: 'Punjabi'   },
-] as const;
+];
 
-type LangId = (typeof LANGUAGES)[number]['id'];
+// Angular's own ultra-fallback (ngOnInit, when languageArray.length == 0
+// even after the API call) — just English + Tamil.
+const EMPTY_FALLBACK_LANGUAGES: LangOption[] = [
+  { id: 'en', native: 'English', english: 'English' },
+  { id: 'tm', native: 'தமிழ்',   english: 'Tamil'   },
+];
+
+type LangId = string;
 
 type Props = { onSelect: (langId: string) => void; navigation?: any; presentedAsModal?: boolean };
 
@@ -45,17 +64,46 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
   const isDesktop = useIsDesktopWeb();
   const [userName, setUserName] = useState('');
   const [scriptFontsReady, setScriptFontsReady] = useState(false);
+  const [languages, setLanguages] = useState<LangOption[]>(FALLBACK_LANGUAGES);
 
   useEffect(() => {
     getItem(StorageKeys.User.NAME).then(name => setUserName(name ?? ''));
   }, []);
 
+  // Angular: languageArray starts as the static config list, then
+  // getDynamicPopulateArrayList() overwrites it with LANGSELECTION from the
+  // shared type=all bootstrap response if present — mirrored here the same
+  // way. getRegistrationArrays() has no auth/user-ID dependency (just LANG +
+  // country code), so it's safe to call from this pre-login, first-run screen.
+  useEffect(() => {
+    getRegistrationArrays()
+      .then(data => {
+        const raw = data?.LANGSELECTION;
+        if (!Array.isArray(raw) || raw.length === 0) return;
+        const mapped: LangOption[] = raw
+          .map((item: any) => ({
+            id:      String(item.ID ?? item.id ?? ''),
+            native:  String(item.TITLE ?? item.title ?? ''),
+            english: String(item.TEXT ?? item.text ?? ''),
+          }))
+          .filter(l => l.id && l.native && l.english);
+        setLanguages(mapped.length ? mapped : EMPTY_FALLBACK_LANGUAGES);
+      })
+      .catch(() => {
+        // Network/parse failure — keep the static FALLBACK_LANGUAGES already
+        // set as initial state, same as Angular keeping CONFIG.languageArray
+        // when the API call never resolves.
+      });
+  }, []);
+
   // This screen shows every language's native name at once (unlike the rest of
   // the app, which only ever needs the current language's font), so every
-  // Noto Sans script font must be preloaded here.
+  // Noto Sans script font must be preloaded here. Re-runs if `languages`
+  // changes (API response arriving after the static fallback's initial paint)
+  // so a server-driven list's scripts still get preloaded.
   useEffect(() => {
-    Promise.all(LANGUAGES.map(lang => loadFonts(lang.id))).then(() => setScriptFontsReady(true));
-  }, []);
+    Promise.all(languages.map(lang => loadFonts(lang.id))).then(() => setScriptFontsReady(true));
+  }, [languages]);
 
   const handleNext = async () => {
     if (!selected || submitting) return;
@@ -70,7 +118,7 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
     await submitLanguage(current, selected);
     await i18n.changeLanguage(selected);
     if (navigation?.canGoBack()) {
-      navigation.goBack();
+      handleBack();
     } else {
       onSelect(selected);
     }
@@ -92,6 +140,7 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
       <LanguageSelectionDesktopLayout
         navigation={navigation}
         userName={userName}
+        languages={languages}
         selected={selected}
         submitting={submitting}
         onSelect={setSelected}
@@ -113,7 +162,7 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
           type="registration"
           showBackBtn={navigation?.canGoBack() ?? false}
           closeIcon
-          onBackPress={() => navigation?.goBack()}
+          onBackPress={() => handleBack()}
         />
       )}
 
@@ -123,7 +172,11 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
           styles.scrollContent,
           // Header (when shown) already handles the top inset via its own
           // SafeAreaView — only add it here for the header-less onboarding case.
-          { paddingTop: (presentedAsModal ? 0 : insets.top) + 20 },
+          // Angular's ion-content has no extra top margin/padding beyond the
+          // safe area on this page (language-selection.component.html's title
+          // row is just pl-24/pr-24, no top spacing class) — so no extra +20
+          // here either, just the raw safe-area inset.
+          { paddingTop: presentedAsModal ? 0 : insets.top },
           { paddingBottom: FOOTER_H + insets.bottom + 12 },
         ]}
         showsVerticalScrollIndicator={false}
@@ -131,7 +184,7 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
         <Text style={styles.title}>{t('LOGIN_PAGE.SELECT_LANG')}</Text>
 
         <View style={styles.grid}>
-          {LANGUAGES.map(lang => {
+          {languages.map(lang => {
             const isSelected = selected === lang.id;
             return (
               <Pressable
@@ -170,8 +223,10 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
           { paddingBottom: insets.bottom + 20 },
         ]}
       >
+        {/* Angular: language-selection.component.html's button uses
+            REGISTRATION.SELECT ("Select"), not a "Next" label. */}
         <ButtonRevamp
-          label={t('LOGIN_PAGE.NEXT', 'Next')}
+          label={t('REGISTRATION.SELECT', 'Select')}
           variant="primary"
           size="standard"
           fullWidth
@@ -188,7 +243,6 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
 
 const GRID_H_PAD = 24;   // horizontal padding matching Figma left:24px
 const GRID_GAP   = 16;   // gap between cards
-const CARD_W     = 148;  // fixed card width (2 cards + gap = 312px content area)
 const CARD_H     = 64;   // fixed card height
 const FOOTER_H   = 84;   // footer container height
 
@@ -210,6 +264,7 @@ const styles = StyleSheet.create({
     fontWeight:   '600',
     color:        Colors.textPrimary,
     marginBottom: 37,
+    paddingTop: 50,
   },
 
   // 2-column grid using flexWrap (avoids FlatList numColumns quirks)
@@ -219,9 +274,13 @@ const styles = StyleSheet.create({
     gap:           GRID_GAP,
   },
 
-  // Language card
+  // Language card — Angular: ion-col size="6" (a true 50%-of-row column, so
+  // its cards always fill the full row width on any viewport). A fixed
+  // CARD_W here left visible empty space on the right on anything wider than
+  // exactly 360px; '48%' + the row's 16px gap fills the row responsively
+  // the same way, instead of pinning to one fixed pixel width from Figma.
   card: {
-    width:           CARD_W,
+    width:           '47%',
     height:          CARD_H,
     borderWidth:     1,
     borderColor:     Colors.inputBorder,
@@ -236,26 +295,30 @@ const styles = StyleSheet.create({
     borderColor:     Colors.primaryDark,
     backgroundColor: Colors.selectionBg,
   },
+  // Angular: no explicit gap between the native-name <h2> and English <p> —
+  // just tight default text-block spacing. gap:8 read as noticeably looser;
+  // 4 matches the tight native/English pairing used elsewhere in this app.
   cardText: {
     flex: 1,
-    gap:  8,
+    //gap:  4,
   },
   nativeName: {
     fontFamily: FontsByLanguage.en.semiBold,
-    fontSize:   FontSizes.font16,
-    fontWeight: '600',
+    fontSize:   FontSizes.font18,
+  
     color:      Colors.textPrimary,
   },
   englishName: {
     fontFamily: FontsByLanguage.en.regular,
     fontSize:   FontSizes.font12,
-    color:      Colors.textSecondary,
+    color:      Colors.textPrimary,
+    
   },
 
   // Radio indicator (Figma: 24×24, Radio Button node 824:2040)
   radio: {
-    width:           24,
-    height:          24,
+    width:           16,
+    height:          16,
     borderRadius:    12,
     borderWidth:     2,
     borderColor:     Colors.borderNeutral,
@@ -267,8 +330,8 @@ const styles = StyleSheet.create({
     borderColor: Colors.primaryDark,
   },
   radioDot: {
-    width:           12,
-    height:          12,
+    width:           8,
+    height:          8,
     borderRadius:    6,
     backgroundColor: Colors.primaryDark,
   },

@@ -48,7 +48,7 @@ import {
 } from '../../service/registrationService'
 import { resetTo } from '../../utils/navigationRef'
 import { ENavigation } from '../../types/enums/navigation.enum'
-import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
+import { PROFILE_POSSESSIVE, PROFILE_SINGULAR } from '../../constants/registration.constants'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
 import SelectField from '../../components/input/SelectField'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
@@ -123,7 +123,7 @@ type Props = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ValidationScreen({ route }: Props) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const insets = useSafeAreaInsets()
 
   const entryMode = route?.params?.mode
@@ -138,6 +138,9 @@ export default function ValidationScreen({ route }: Props) {
   const [gender, setGender] = useState('1')
   const [matriId, setMatriId] = useState('')
   const [createdBy, setCreatedBy] = useState('1')
+  // Angular: validation.component.ts's editProfileData.COUNTRY — '98' is India.
+  // Drives the STATE/CITY submit branch in buildChanges() below.
+  const [country, setCountry] = useState('98')
   // Angular: getRegistrationConfirm2ComponentData()'s isSecondReview — on the
   // re-shown popup (EDITCNT === 1) the title asks the member to confirm they
   // want to proceed instead of the standard confirm wording.
@@ -291,6 +294,7 @@ export default function ValidationScreen({ route }: Props) {
     const genderVal = rv.GENDER ?? '1'
     setCreatedBy(rv.CREATEDBY ?? '1')
     setGender(genderVal)
+    setCountry(info.country ?? '98')
 
     // Captured once per mount, before any edit — see confirmBaseline above.
     if (!confirmBaseline.current) {
@@ -472,11 +476,25 @@ export default function ValidationScreen({ route }: Props) {
     if (motherTongue && motherTongue.key !== original.MOTHERTONGUE) {
       changes.push({ field: 'MOTHERTONGUE', value: motherTongue.key, existingValue: original.MOTHERTONGUE })
     }
-    if (state && city && (state.key !== original.STATE || city.key !== original.CITY)) {
-      changes.push({
-        field: 'STATE', value: `${state.key}~${city.key}`,
-        existingValue: `${original.STATE ?? ''}~${original.CITY ?? ''}`,
-      })
+    // Angular: STATE and CITY are edited independently (validation.component.ts
+    // updateAndCallRegistrationApi() calls). Non-Indian (country !== '98'):
+    // STATE submits "key~country" under NRISTATE (editType 27); CITY submits
+    // plain. Indian (country === '98'): STATE submits plain; CITY submits
+    // "key~state" under the base STATE/CITY editType (6).
+    const isIndia = country === '98'
+    if (state && state.key !== original.STATE) {
+      if (isIndia) {
+        changes.push({ field: 'STATE', value: state.key, existingValue: original.STATE })
+      } else {
+        changes.push({ field: 'NRISTATE', value: `${state.key}~${country}`, existingValue: original.STATE })
+      }
+    }
+    if (city && city.key !== original.CITY) {
+      if (isIndia) {
+        changes.push({ field: 'CITY', value: `${city.key}~${state?.key ?? original.STATE ?? ''}`, existingValue: original.CITY })
+      } else {
+        changes.push({ field: 'CITY', value: city.key, existingValue: original.CITY })
+      }
     }
     if (qualification && qualification.key !== original.QUALIFICATION) {
       changes.push({ field: 'QUALIFICATION', value: qualification.key, existingValue: original.QUALIFICATION })
@@ -490,11 +508,15 @@ export default function ValidationScreen({ route }: Props) {
     if (religion && religion.key !== original.RELIGION) {
       changes.push({ field: 'RELIGION', value: religion.key, existingValue: original.RELIGION })
     }
+    // Angular: callEditProfileUpdate() (validation.component.ts) — CASTE is
+    // submitted as "CASTE~" (trailing tilde, empty subcaste slot); SUBCASTE is
+    // submitted as "CASTE~SUBCASTE" (caste and subcaste concatenated), both
+    // under editType 11.
     if (caste && caste.key !== original.CASTE) {
-      changes.push({ field: 'CASTE', value: caste.key, existingValue: original.CASTE })
+      changes.push({ field: 'CASTE', value: `${caste.key}~`, existingValue: original.CASTE })
     }
     if (hasSubcaste && subCaste && subCaste.key !== original.SUBCASTE) {
-      changes.push({ field: 'SUBCASTE', value: subCaste.key, existingValue: original.SUBCASTE })
+      changes.push({ field: 'SUBCASTE', value: `${caste?.key ?? original.CASTE ?? ''}~${subCaste.key}`, existingValue: original.SUBCASTE })
     }
     if (hasGothra && gothra && gothra.key !== original.GOTHRA) {
       changes.push({ field: 'GOTHRA', value: gothra.key, existingValue: original.GOTHRA })
@@ -720,20 +742,35 @@ export default function ValidationScreen({ route }: Props) {
       ? t('REGISTRATION.MISSING_DETAILS_2', 'Are you sure you want to proceed with these details ?')
       : fillProfileType('REGISTRATION.CONFIRM_SHEET', 'Please confirm your #PROFILETYPE# details below')
 
-  // Angular: updateAgeContent() + c2AgeTemplate() — the age statement under the
-  // DOB row. Myself ('1') uses AGESTATEMENTMYSELF ("You are 21 years old"),
-  // everyone else AGESTATEMENT with the possessive. Shown only once the DOB (or
-  // typed age) is valid. The locale strings wrap #AGE# in a <span> for the web's
-  // bold styling — stripped here since RN renders plain text.
+  // Angular: updateAgeContent() + c2AgeTemplate(). Myself ('1') uses
+  // AGESTATEMENTMYSELF ("You are 21 years old"), everyone else AGESTATEMENT.
+  // Shown only once the DOB (or typed age) is valid. The locale strings wrap
+  // #AGE# in a <span> for the web's bold styling — stripped here since RN
+  // renders plain text.
+  //
+  // Angular: replaceProfileType() (registration.service.ts) special-cases
+  // AGESTATEMENT + English to the SINGULAR form ("Your son is 21 years old"),
+  // not the possessive used for every other #PROFILETYPE# substitution (e.g.
+  // CONFIRM_SHEET "Your son's details"). Other languages keep the possessive.
   const ageStatement = (() => {
     if (!shouldShowField('DOB')) return ''
     let age = ''
     if (hasUserDob && isDobValid()) age = String(calculateAge(dobYear!.key, dobMonth!.key, dobDate!.key))
     else if (!hasUserDob && ageValue && !isAgeOutOfLimit()) age = ageValue
     if (!age) return ''
-    const template = createdBy === '1'
-      ? t('REGISTRATION.AGESTATEMENTMYSELF', 'You are #AGE# years old')
-      : fillProfileType('REGISTRATION.AGESTATEMENT', 'Your #PROFILETYPE# is #AGE# years old')
+    let template: string
+    if (createdBy === '1') {
+      template = t('REGISTRATION.AGESTATEMENTMYSELF', 'You are #AGE# years old')
+    } else if (i18n.language === 'en') {
+      const singularKey = PROFILE_SINGULAR[createdBy]
+      const profileType = singularKey ? t(`REGISTRATION.${singularKey}`) : ''
+      template = t('REGISTRATION.AGESTATEMENT', 'Your #PROFILETYPE# is #AGE# years old')
+        .replace('#PROFILETYPE#', profileType)
+        .replace(/\s{2,}/g, ' ')
+        .trim()
+    } else {
+      template = fillProfileType('REGISTRATION.AGESTATEMENT', 'Your #PROFILETYPE# is #AGE# years old')
+    }
     return template.replace('#AGE#', age).replace(/<[^>]+>/g, '').replace(/\s{2,}/g, ' ').trim()
   })()
 

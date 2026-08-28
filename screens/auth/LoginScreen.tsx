@@ -23,6 +23,7 @@ import { Fonts } from '../../src/theme/fonts'
 import { StorageKeys } from '../../constants/storage.keys'
 import { callPartialRegistrationAPI, login, setRegValues } from '../../service/registrationService'
 import { getItem, setItem } from '../../service/storageService'
+import { handleBack } from '../../utils/navigationRef'
 import { ENavigation } from '../../types/enums/navigation.enum'
 
 // ─── Country codes (Angular signin.config.ts: COUNTRYCODELIST) ────────────────
@@ -214,7 +215,7 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
       <AppHeader
         type="registration"
         showBackBtn
-        onBackPress={() => navigation.canGoBack() && navigation.goBack()}
+        onBackPress={() => handleBack()}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />
 

@@ -35,6 +35,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
+import { handleBack } from '../../utils/navigationRef'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import SearchDesktopLayout from './SearchDesktopLayout'
 import { fetchSearchResults } from '../../service/homeService'
@@ -463,7 +464,7 @@ export default function SearchScreen({ navigation }: Props) {
     <View style={[s.screen, { paddingTop: insets.top }]}>
 
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
         <Text style={s.headerTitle}>

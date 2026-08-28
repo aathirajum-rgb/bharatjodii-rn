@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN, CDN_REACT } from '../../constants/cdn'
+import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import FloatingLabelInput from '../../components/input/FloatingLabelInput'
@@ -102,7 +103,7 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
   }
 
   function handleBack() {
-    if (navigation.canGoBack()) navigation.goBack()
+    if (navigation.canGoBack()) handleRootBack()
     else navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
   }
 

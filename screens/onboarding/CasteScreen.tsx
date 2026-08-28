@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
+import { SvgXml } from 'react-native-svg'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
 import RegistrationSuccessSheet from '../../components/registration-success-sheet/RegistrationSuccessSheet'
@@ -36,6 +37,12 @@ import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 const CDN_PAGE_ICON = CDN_REG + 'caste.svg'
 const FOOTER_H      = 140
+
+// Angular's dropdown-field arrow is Ionic's "chevron-forward-outline" icon —
+// same as ReligionScreen's select field — not the plain "›" glyph this screen
+// previously drew. Inlined verbatim (stroke fixed to black instead of
+// currentColor, since SvgXml doesn't inherit CSS color) for a pixel-exact match.
+const CHEVRON_FORWARD_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M184 112l144 144-144 144"/></svg>`
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -175,19 +182,22 @@ export default function CasteScreen({ navigation }: Props) {
   }, [casteOptions])
 
   const isChristian = religion === '2'
-  const noun        = isChristian ? 'division' : 'caste'
-  const nounCap     = isChristian ? 'Division'  : 'Caste'
 
   const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
   const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
-  const title = t('REGISTRATION.CASTE', 'Select your #PROFILETYPE# caste')
+  // Angular (registration.config.ts page 14, variants "1" vs "2"): Christian
+  // users get a fully separate, fully-translated config block — TITLE swaps
+  // to REGISTRATION.DIVISION and every field key swaps to its DIVISION*
+  // counterpart, not just an English word substitution.
+  const title = t(isChristian ? 'REGISTRATION.DIVISION' : 'REGISTRATION.CASTE',
+    isChristian ? 'Select your #PROFILETYPE# division' : 'Select your #PROFILETYPE# caste')
     .replace('#PROFILETYPE#', translatedProfileType)
     .replace('  ', ' ')
     .trim()
 
-  const casteLabelText     = t('REGISTRATION.CASTELABEL', 'Caste')
-  const selectCasteText    = t('REGISTRATION.SELECTCASTE', 'Select caste')
-  const searchCasteText    = t('REGISTRATION.SEARCHCASTE', 'Search caste')
+  const casteLabelText     = t(isChristian ? 'REGISTRATION.DIVISIONLABEL'  : 'REGISTRATION.CASTELABEL',  isChristian ? 'Division'        : 'Caste')
+  const selectCasteText    = t(isChristian ? 'REGISTRATION.SELECTDIVISION' : 'REGISTRATION.SELECTCASTE', isChristian ? 'Select division'  : 'Select caste')
+  const searchCasteText    = t(isChristian ? 'REGISTRATION.SEARCHDIVISION' : 'REGISTRATION.SEARCHCASTE', isChristian ? 'Search division'  : 'Search caste')
   const subcasteLabelText  = t('REGISTRATION.SUBCASTELABEL', 'SubCaste')
   const selectSubcasteText = t('REGISTRATION.SELECTSUBCASTE', 'Select subcaste')
   const searchSubcasteText = t('REGISTRATION.SEARCHSUBCASTE', 'Search subcaste')
@@ -257,16 +267,21 @@ export default function CasteScreen({ navigation }: Props) {
           <View style={styles.fields}>
             {/* ── Caste / Division select field ──────────────────────── */}
             <View style={styles.fieldWrapper}>
-              <View style={styles.fieldLabelBadge}>
-                <Text style={[styles.fieldLabelText, { fontFamily: langFonts.regular }]}>
-                  {isChristian ? nounCap : casteLabelText}
-                </Text>
-              </View>
+              {/* Angular: registration-revamp.component.html's floating label div only
+                  shows *ngIf a value is already selected for the field (IsValidParamWithoutZero) —
+                  so "Division"/"Caste" should not appear above the box until after selection. */}
+              {!!selectedCaste && (
+                <View style={styles.fieldLabelBadge}>
+                  <Text style={[styles.fieldLabelText, { fontFamily: langFonts.regular }]}>
+                    {casteLabelText}
+                  </Text>
+                </View>
+              )}
               <Pressable
                 style={styles.selectField}
                 onPress={() => setActivePanel('caste')}
                 accessibilityRole="button"
-                accessibilityLabel={isChristian ? `Select ${noun}` : selectCasteText}
+                accessibilityLabel={selectCasteText}
               >
                 <Text
                   style={[
@@ -276,9 +291,9 @@ export default function CasteScreen({ navigation }: Props) {
                   ]}
                   numberOfLines={1}
                 >
-                  {selectedCaste ? selectedCaste.label : (isChristian ? `Select ${noun}` : selectCasteText)}
+                  {selectedCaste ? selectedCaste.label : selectCasteText}
                 </Text>
-                <Text style={styles.selectFieldArrow}>›</Text>
+                <SvgXml xml={CHEVRON_FORWARD_XML} width={24} height={24} />
               </Pressable>
             </View>
 
@@ -314,7 +329,7 @@ export default function CasteScreen({ navigation }: Props) {
                     >
                       {selectedSubcaste ? selectedSubcaste.label : selectSubcasteText}
                     </Text>
-                    <Text style={styles.selectFieldArrow}>›</Text>
+                    <SvgXml xml={CHEVRON_FORWARD_XML} width={24} height={24} />
                   </Pressable>
                 </View>
               ) : null
@@ -328,8 +343,8 @@ export default function CasteScreen({ navigation }: Props) {
       {/* Single picker — renders caste/division or subcaste list based on activePanel */}
       <SearchablePicker
         visible={activePanel !== null}
-        title={activePanel === 'caste' ? (isChristian ? `Select ${noun}` : selectCasteText) : selectSubcasteText}
-        placeholder={activePanel === 'caste' ? (isChristian ? `Search ${noun}` : searchCasteText) : searchSubcasteText}
+        title={activePanel === 'caste' ? selectCasteText : selectSubcasteText}
+        placeholder={activePanel === 'caste' ? searchCasteText : searchSubcasteText}
         options={activePanel === 'caste' ? orderedCasteOptions : subcasteOptions}
         selectedKey={activePanel === 'caste' ? selectedCaste?.key ?? null : selectedSubcaste?.key ?? null}
         onSelect={activePanel === 'caste' ? selectCaste : selectSubcaste}
@@ -407,10 +422,5 @@ const styles = StyleSheet.create({
   },
   selectFieldTextActive: {
     fontWeight: '500',
-  },
-  selectFieldArrow: {
-    fontSize:   22,
-    color:      Colors.textPrimary,
-    lineHeight: 26,
   },
 })

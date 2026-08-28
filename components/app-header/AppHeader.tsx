@@ -7,9 +7,10 @@ import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
 import Badge from '../badge/Badge'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import { getOwnGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
+import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { handleBack } from '../../utils/navigationRef'
 
 // Angular's header back-button and language-pill dropdown both use Ionic's
 // bundled "chevron-back-outline" / "chevron-down-outline" icons (ion-icon
@@ -19,6 +20,26 @@ import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 // tsx's CHEVRON_FORWARD_XML, mirrored/rotated for the back and down directions.
 const CHEVRON_BACK_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M328 112L184 256l144 144"/></svg>`
 const CHEVRON_DOWN_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M112 184l144 144 144-144"/></svg>`
+
+// Angular: header.component.ts's langLableName — home page's header1 pill
+// reads FUNC.getSelectedKeyValue(langArrayList, language, '2') (type '2' =
+// TITLE, the full language name, e.g. "Hindi"), NOT the short
+// REGISTRATION.SELECTED_LANGUAGE string ("Eng") that the registration/signIn
+// header below still (correctly) uses. Same id→English-name list as
+// LanguageSelectionScreen.tsx's FALLBACK_LANGUAGES.
+const LANGUAGE_FULL_NAMES: Record<string, string> = {
+  en: 'English',
+  tm: 'Tamil',
+  tl: 'Telugu',
+  hi: 'Hindi',
+  ml: 'Malayalam',
+  kn: 'Kannada',
+  bn: 'Bengali',
+  mt: 'Marathi',
+  or: 'Odia',
+  gj: 'Gujarati',
+  pa: 'Punjabi',
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -103,26 +124,53 @@ export default function AppHeader({
   onAvatarPress,
   onEditProfilePress,
   onToolbarItemPress,
-  onBackPress,
+  // Defaults to the centralized handleBack() (utils/navigationRef.ts) — the
+  // same function the Android hardware back button calls — so every screen
+  // using AppHeader gets identical back behavior for free. A screen only
+  // needs to pass its own onBackPress when it must do something BEFORE
+  // backing out (e.g. OnboardingRouter's static-map fallback below).
+  onBackPress = handleBack,
   onLanguagePress,
   style,
 }: AppHeaderProps) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const langFonts = useLanguageFonts()
 
-  // Resolve language label — use explicit prop, else the short label from
-  // locales/*.json's REGISTRATION.SELECTED_LANGUAGE (e.g. "Eng" for English)
-  const resolvedLangLabel = languageLabel ?? t('REGISTRATION.SELECTED_LANGUAGE')
+  // Resolve language label — use explicit prop, else fall back per header
+  // type: header1 (home/dashboard) shows the full name ("English"/"Hindi"/...)
+  // like Angular's langLableName; registration/signIn keep the short label
+  // from locales/*.json's REGISTRATION.SELECTED_LANGUAGE (e.g. "Eng").
+  const resolvedLangLabel =
+    languageLabel ??
+    (type === 'header1'
+      ? (LANGUAGE_FULL_NAMES[i18n.language] ?? LANGUAGE_FULL_NAMES.en)
+      : t('REGISTRATION.SELECTED_LANGUAGE'))
 
   // Angular: header.component.ts's common.getAvatarImg() (called with no args,
   // i.e. isOppositeProfile=false) — the logged-in user's OWN avatar placeholder
   // uses their OWN gender, unlike a profile card's opposite-gender placeholder.
-  const [ownAvatarFallback, setOwnAvatarFallback] = useState(FEMALE_AVATAR_URL)
+  //
+  // Seeded empty, NOT with FEMALE_AVATAR_URL: login gender comes from async
+  // storage, so a hardcoded seed showed every male user a female silhouette for
+  // the first frames of every Home load. An empty avatar slot for one tick
+  // beats rendering the wrong gender. Same guard MenuScreen/HomeSidebar use.
+  const [ownAvatarFallback, setOwnAvatarFallback] = useState('')
+  // A cached PHOTO_URL can outlive the photo itself (deleted server-side, CDN
+  // miss). Without this the header rendered a blank box instead of falling
+  // back, which looks identical to "no avatar at all".
+  const [photoFailed, setPhotoFailed] = useState(false)
+
   useEffect(() => {
     let cancelled = false
     getOwnGenderAvatarUrl().then(url => { if (!cancelled) setOwnAvatarFallback(url) })
     return () => { cancelled = true }
   }, [])
+
+  // Reset the failure latch when a new photo actually arrives, so a re-upload
+  // isn't permanently stuck on the placeholder for the life of the mount.
+  useEffect(() => { setPhotoFailed(false) }, [userImg])
+
+  const avatarUri = (userImg && !photoFailed) ? userImg : ownAvatarFallback
 
   // ── header1: home screen header (Figma node 15859:14389 top area) ───────────
   // Row 1 (app bar): hamburger | [flex] | language selector | toolbar icons
@@ -145,16 +193,19 @@ export default function AppHeader({
             style={styles.h1IconBtn}
             onPress={() => onToolbarItemPress?.('menu')}
           >
-            <CdnSvg uri={ICONS.menuHome} width={18} height={18} />
+            <CdnSvg uri={ICONS.menuHome} width={27} height={27} />
           </Pressable>
 
           <View style={styles.flex1} />
 
           {/* Language selector pill — always visible, auto-detects language */}
+          {/* Angular: dropdown.component.html hides the up/down-arrow icon
+              entirely when actionType === 'languageChanges' — the home
+              header's language pill has no chevron, unlike the
+              registration/signIn one below. */}
           <Pressable style={styles.h1LangBtn} onPress={onLanguagePress}>
             <CdnSvg uri={ICONS.lang} width={20} height={20} />
             <Text style={[styles.h1LangText, { fontFamily: langFonts.medium }]}>{resolvedLangLabel}</Text>
-            <SvgXml xml={CHEVRON_DOWN_XML} width={24} height={24} />
           </Pressable>
 
           {/* Angular: home.config.ts's homeToolBar — discover-matches (search)
@@ -166,7 +217,7 @@ export default function AppHeader({
               style={styles.h1IconBtn}
               onPress={() => onToolbarItemPress?.(item.toolType)}
             >
-              <CdnSvg uri={item.toolImg} width={19} height={19} />
+              <CdnSvg uri={item.toolImg} width={27} height={27} />
               {!!(item.showNotification && item.notifyCount && item.notifyCount !== '0') && (
                 <BadgeCount count={item.notifyCount!} />
               )}
@@ -187,12 +238,20 @@ export default function AppHeader({
               guaranteed SVG like the fallback placeholder is, so this needs
               CdnImage's format detection, not a hardcoded CdnSvg. */}
           <Pressable style={styles.h1AvatarWrap} onPress={onAvatarPress}>
-            <CdnImage
-              uri={userImg ?? ownAvatarFallback}
-              width={48}
-              height={48}
-              style={styles.h1AvatarRadius}
-            />
+            {!!avatarUri && (
+              <CdnImage
+                uri={avatarUri}
+                width={48}
+                height={48}
+                style={styles.h1AvatarRadius}
+                // cover, not CdnImage's 'contain' default — a portrait photo
+                // letterboxed inside the 48px circle instead of filling it.
+                // Only affects the raster path; an SVG placeholder routes to
+                // CdnSvg, which sizes itself.
+                resizeMode="cover"
+                onError={() => setPhotoFailed(true)}
+              />
+            )}
           </Pressable>
 
           <Pressable style={styles.h1NameBlock} onPress={onEditProfilePress}>
@@ -313,8 +372,8 @@ const styles = StyleSheet.create({
     marginLeft: 12,
   },
   h1UserName: {
-    fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   15,
+    fontFamily: Fonts.poppinsMedium,
+    fontSize:   16,
     color:      Colors.textPrimary,
     lineHeight: 22,
   },
@@ -359,8 +418,8 @@ const styles = StyleSheet.create({
   // solid black 1px border) wraps .width-height-32 (9vmin ≈ 32px on a
   // typical phone width) — corrected from an earlier, too-large 36×36 guess.
   h1IconBtn: {
-    width:           32,
-    height:          32,
+    width:           37,
+    height:          37,
     borderRadius:    8,
     backgroundColor: 'transparent',
     borderWidth:     1,

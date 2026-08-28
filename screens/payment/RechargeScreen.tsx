@@ -16,7 +16,7 @@
 
 import { useEffect, useState } from 'react'
 import {
-  ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useTranslation } from 'react-i18next'
@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
+import { handleBack } from '../../utils/navigationRef'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
@@ -35,14 +36,11 @@ import {
   type MembershipPlan, type MembershipPlansData, type SelectedPackage,
 } from '../../service/paymentService'
 
-const ICON_BACK     = CDN_REACT + '/menu_back_arrow.svg'
-const ICON_WHATSAPP = CDN_SVG + 'revamp/whatsapp-revamp.svg'
-const ICON_LIKE     = CDN_SVG + 'bottom-nav/like.svg'
-const ICON_CALL     = CDN_SVG + 'revamp/call-blue.svg'
-
-// Angular: benefits-card.component.html hides the second benefits row
-// ("...additional matches who liked you") specifically for the weekly pack.
-const WEEKLY_PACK_PRODUCT_ID = '76'
+const ICON_BACK      = CDN_REACT + '/menu_back_arrow.svg'
+const ICON_WHATSAPP  = CDN_SVG + 'revamp/whatsapp-revamp.svg'
+const ICON_MESSAGE   = CDN_SVG + 'message-matches.svg'
+const ICON_HOROSCOPE = CDN_SVG + 'viewprofile/horoscope-icon.svg'
+const ICON_CALL      = CDN_SVG + 'revamp/call-blue.svg'
 
 type Props = { navigation: any; route: any }
 
@@ -113,7 +111,7 @@ export default function RechargeScreen({ navigation, route }: Props) {
   // closeIntermediatePage() has an equivalent fallback rather than assuming
   // a previous page always exists.
   function handleClose() {
-    if (navigation.canGoBack()) navigation.goBack()
+    if (navigation.canGoBack()) handleBack()
     else navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
   }
 
@@ -235,8 +233,10 @@ export default function RechargeScreen({ navigation, route }: Props) {
             {!!data.helpline && (
               <View style={s.needHelpRow}>
                 <Text style={s.needHelpText}>Need help? </Text>
-                <CdnSvg uri={ICON_CALL} width={16} height={16} />
-                <Text style={s.needHelpNumber}>{data.helpline}</Text>
+                <Pressable style={s.needHelpContact} onPress={() => Linking.openURL(`tel:${data.helpline}`)} hitSlop={8}>
+                  <CdnSvg uri={ICON_CALL} width={16} height={16} />
+                  <Text style={s.needHelpNumber}>{data.helpline}</Text>
+                </Pressable>
               </View>
             )}
           </View>
@@ -276,8 +276,10 @@ export default function RechargeScreen({ navigation, route }: Props) {
           {!!data?.helpline && (
             <View style={[s.needHelpRow, { marginTop: 8 }]}>
               <Text style={s.needHelpText}>Need help? </Text>
-              <CdnSvg uri={ICON_CALL} width={16} height={16} />
-              <Text style={s.needHelpNumber}>{data.helpline}</Text>
+              <Pressable style={s.needHelpContact} onPress={() => Linking.openURL(`tel:${data.helpline}`)} hitSlop={8}>
+                <CdnSvg uri={ICON_CALL} width={16} height={16} />
+                <Text style={s.needHelpNumber}>{data.helpline}</Text>
+              </Pressable>
             </View>
           )}
         </View>
@@ -293,7 +295,6 @@ export function PlanCard({
   plan, selected, onPress,
 }: { plan: MembershipPlan; selected: boolean; onPress: () => void }) {
   const hasStrike  = !!plan.offerprice
-  const showSecondBenefit = plan.productid !== WEEKLY_PACK_PRODUCT_ID && !!plan.benefits[1]
 
   return (
     <View style={plan.splprodflag === '1' ? s.cardWrap : undefined}>
@@ -355,10 +356,16 @@ export function PlanCard({
           <CdnSvg uri={ICON_WHATSAPP} width={16} height={16} style={s.benefitIcon} />
           <Text style={s.benefitText}>{renderBenefitText(plan.benefits[0]?.value)}</Text>
         </View>
-        {showSecondBenefit && (
+        {!!plan.benefits[1] && (
           <View style={s.benefitRow}>
-            <CdnSvg uri={ICON_LIKE} width={16} height={16} style={s.benefitIcon} />
+            <CdnSvg uri={ICON_MESSAGE} width={16} height={16} style={s.benefitIcon} />
             <Text style={s.benefitText}>{renderBenefitText(plan.benefits[1].value)}</Text>
+          </View>
+        )}
+        {!!plan.benefits[2] && (
+          <View style={s.benefitRow}>
+            <CdnSvg uri={ICON_HOROSCOPE} width={16} height={16} style={s.benefitIcon} />
+            <Text style={s.benefitText}>{renderBenefitText(plan.benefits[2].value)}</Text>
           </View>
         )}
       </Pressable>
@@ -466,7 +473,8 @@ const s = StyleSheet.create({
   sheetList:        { maxHeight: 480 },
   sheetListContent: { gap: 20, paddingBottom: 8 },
 
-  needHelpRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  needHelpText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
-  needHelpNumber: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.link, marginLeft: 4 },
+  needHelpRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  needHelpText:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
+  needHelpContact: { flexDirection: 'row', alignItems: 'center' },
+  needHelpNumber:  { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.link, marginLeft: 4 },
 })

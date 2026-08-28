@@ -147,6 +147,10 @@ export class ViewProfileAdapter implements Adapter<ViewProfileModel> {
       hasStarMatchInputs: !!(religious['RAASI'] && religious['STAR']),
 
       likedMsg: comm['LIKEDMSG'] ?? undefined,
+
+      // Angular: viewprofile.page.ts:618-640 presentPopover() — content: this.vpdata?.
+      // PERSONALINFO.IDDET.BODY, shown in the Verified badge's info popover.
+      verifiedInfoText: personal['IDDET']?.['BODY'] ?? undefined,
     }
 
     this.onAdapt?.(model)

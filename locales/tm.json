@@ -1569,6 +1569,9 @@
         "MINS" : "நிமிடங்கள்"
     },
     "GENERAL": {
+        "EXIT_CONFIRM_TITLE":"நீங்கள் வெளியேற வேண்டுமா?",
+        "EXIT_YES":"ஆமாம்",
+        "EXIT_NO":"இல்லை",
         "PROFILEDELETED": "இந்த வரன் நீக்கப்பட்டது",
         "PROFILEDELETED_HV": "வரன் நீக்கப்பட்டது",
         "NOINTERNET": "இணைய இணைப்பைச் சரிபார்க்கவும்",
