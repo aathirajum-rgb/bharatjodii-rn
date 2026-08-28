@@ -84,6 +84,15 @@ export default function OTPScreen({ navigation, route }: Props) {
     },
   })
 
+  // Retrieve pageId from stored webview handoff (web platform only)
+  useEffect(() => {
+    if (Platform.OS === 'web') {
+      getItem('WEBVIEW_PAGE_ID').then(storedPageId => {
+        if (storedPageId) pendingPageId.current = storedPageId
+      })
+    }
+  }, [])
+
   // Auto-focus first box once the page settles — matches Angular ionViewDidEnter's
   // setFocusOnOtpPage (fixed 500ms setTimeout). On native we still prefer waiting
   // for 'transitionEnd' over a fixed timeout, since it avoids a KeyboardAvoidingView
