@@ -16,16 +16,19 @@ export interface DeleteProfileMrgReasonDesktopLayoutProps {
   onTabPress: (tab: FooterTab) => void
 
   options:        Array<{ key: string; label: string }>
-  selectedOption: string
+  // Nullable: the screen starts with NO option chosen, which is what keeps the
+  // CTA disabled until the user picks one.
+  selectedOption: string | null
   onSelectOption: (key: string) => void
   isDeleting:     boolean
   onNext:         () => void
   nextLabel:      string
+  nextDisabled?:  boolean
 }
 
 export default function DeleteProfileMrgReasonDesktopLayout({
   navigation, userName, onTabPress,
-  options, selectedOption, onSelectOption, isDeleting, onNext, nextLabel,
+  options, selectedOption, onSelectOption, isDeleting, onNext, nextLabel, nextDisabled,
 }: DeleteProfileMrgReasonDesktopLayoutProps) {
   const { t } = useTranslation()
 
@@ -67,7 +70,13 @@ export default function DeleteProfileMrgReasonDesktopLayout({
         {isDeleting ? (
           <View style={s.nextBtnLoading}><ActivityIndicator color={Colors.white} size="small" /></View>
         ) : (
-          <ButtonRevamp label={nextLabel} variant="primary" onPress={onNext} style={s.nextBtn} />
+          <ButtonRevamp
+            label={nextLabel}
+            variant="primary"
+            disabled={!!nextDisabled}
+            onPress={onNext}
+            style={s.nextBtn}
+          />
         )}
       </View>
     </DesktopPageShell>

@@ -75,7 +75,12 @@ export default function DeleteProfileMrgReasonScreen({ navigation, route }: Prop
   const { t }  = useTranslation()
   const isDesktop = useIsDesktopWeb()
 
-  const [selectedMrgReason, setSelectedMrgReason] = useState<MrgKey>('1')
+  // Starts UNSELECTED. Angular's deletedProfileValues.MRGFIXEDREASON is '' until
+  // the user picks, and its CTA block is gated on
+  //   *ngIf="deletedProfileValues[selectedName] != '' && ['1','2'].includes(pageType)"
+  // — i.e. no option, no button. Pre-selecting '1' here meant the CTA was live
+  // on arrival and a user could delete without ever choosing.
+  const [selectedMrgReason, setSelectedMrgReason] = useState<MrgKey | null>(null)
   const [deleting,          setDeleting]          = useState(false)
   const [userName,          setUserName]          = useState('')
 
@@ -135,7 +140,9 @@ export default function DeleteProfileMrgReasonScreen({ navigation, route }: Prop
     // Angular landingDetails.MRGFIXEDREASON maps:
     //   '1' (Found on Jodii)           → page 3 (partner name + marriage date)
     //   '2' (Found on another website) → page 10 (enter website/app name)
-    //   '3' (Found from other sources) → callDeleteAPI('2') — directly deletes profile
+    //   '3' (Found from other sources) → callDeleteAPI('2') — deletes, then the
+    //                                    profile-deleted-successfully screen
+    if (!selectedMrgReason) return   // CTA is disabled in this state; belt-and-braces
     if (selectedMrgReason === '1') {
       navigation.navigate('DeleteProfileShareDetails', {
         reason:        route.params?.reason ?? '1',
@@ -179,7 +186,8 @@ export default function DeleteProfileMrgReasonScreen({ navigation, route }: Prop
         onSelectOption={key => setSelectedMrgReason(key as MrgKey)}
         isDeleting={deleting}
         onNext={handleNext}
-        nextLabel={selectedMrgReason === '3' ? t('DELETE_PROFILE.DELETE_CTA') : t('DELETE_PROFILE.NEXT_CTA')}
+        nextLabel={t('DELETE_PROFILE.NEXT_CTA')}
+        nextDisabled={!selectedMrgReason}
       />
     )
   }
@@ -236,9 +244,14 @@ export default function DeleteProfileMrgReasonScreen({ navigation, route }: Prop
           </View>
         ) : (
           <ButtonRevamp
-            label={selectedMrgReason === '3' ? t('DELETE_PROFILE.DELETE_CTA') : t('DELETE_PROFILE.NEXT_CTA')}
+            // Always "Next", including for option '3' — Angular's page-1/2 CTA
+            // block only ever renders pageContent.NEXT_CTA; the DELETE_CTA
+            // label belongs to the later website-name page. Option '3' still
+            // deletes; it just isn't labelled that way.
+            label={t('DELETE_PROFILE.NEXT_CTA')}
             variant="primary"
             fullWidth
+            disabled={!selectedMrgReason}
             onPress={handleNext}
           />
         )}

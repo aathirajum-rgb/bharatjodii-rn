@@ -15,16 +15,16 @@
 //  - Empty and loading states render Angular's own Lottie animations
 //    (profiles-you-removed.json / like-list-loding-screen.json) through the
 //    shared CdnLottie component, same as NotificationScreen's empty/loading
-//    states. NOTE CdnLottie.web.tsx renders an empty box by design — there is
-//    no web Lottie player wired up (see its header), so on mobile WEB the
-//    caption shows under a blank space rather than an animation. Native plays
-//    it. The infinite-scroll footer keeps a plain spinner, matching Angular's
+//    states. Both platforms animate: native via lottie-react-native, web via
+//    @lottiefiles/dotlottie-react (CdnLottie.web.tsx used to render an empty
+//    box — that was the cause of the blank gap above the caption on web, and it
+//    is fixed). The infinite-scroll footer keeps a plain spinner, matching Angular's
 //    own <ion-infinite-scroll-content loadingSpinner="circular">.
 
 import { useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, View,
+  ActivityIndicator, Alert, FlatList, Pressable, StyleSheet, Text, useWindowDimensions, View,
 } from 'react-native'
 
 import { useFocusEffect } from '@react-navigation/native'
@@ -60,9 +60,12 @@ const DEFAULT_PHOTO_FEMALE = CDN_REACT + '/ignore_profile_female.svg'
 // when it is.
 const LOTTIE_EMPTY   = CDN_REACT_LOTTIE + 'deleted_profile_empty.json'
 const LOTTIE_LOADING = CDN_LOTTIE + 'like-list-loding-screen.json'
-// Source animation is a 512x512 square; 200 keeps it comfortably inside the
-// narrowest phone with the caption below it.
-const LOTTIE_SIZE = "380px"
+// Source animation is a 512x512 square. RN sizes are unitless NUMBERS -- a
+// "380px" string is a type error and renders nothing. 380 is the cap; on
+// narrower phones lottieSize() shrinks it to fit inside the 32pt side padding.
+const LOTTIE_MAX = 380
+const lottieSize = (viewportWidth: number) =>
+  Math.min(LOTTIE_MAX, Math.max(0, viewportWidth - 64))
 
 const LIMIT = 20
 
@@ -135,6 +138,9 @@ export default function IgnoredProfilesScreen({ navigation }: Props) {
   const isDesktop = useIsDesktopWeb()
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+  // Read at render time (not module level) so it tracks rotation and split view.
+  const { width: viewportWidth } = useWindowDimensions()
+  const lottiePx = lottieSize(viewportWidth)
 
   const [activeTab,   setActiveTab]   = useState<Tab>('dontshow')
   const [profiles,    setProfiles]    = useState<IgnoredProfile[]>([])
@@ -299,14 +305,14 @@ export default function IgnoredProfilesScreen({ navigation }: Props) {
       {loading ? (
         // Angular: the !contentLoaded row with like-list-loding-screen.json.
         <View style={s.center}>
-          <CdnLottie uri={LOTTIE_LOADING} width={LOTTIE_SIZE} height={LOTTIE_SIZE} />
+          <CdnLottie uri={LOTTIE_LOADING} width={lottiePx} height={lottiePx} />
         </View>
       ) : profiles.length === 0 ? (
         // Angular: the no-content row — profiles-you-removed.json ABOVE the
         // per-tab caption (NORESULT_1 / NORESULT_22), which carries `pt-48
         // heading4-medium-16`, i.e. 48pt clear of the animation at 16px medium.
         <View style={s.center}>
-          <CdnLottie uri={LOTTIE_EMPTY} width={LOTTIE_SIZE} height={LOTTIE_SIZE} />
+          <CdnLottie uri={LOTTIE_EMPTY} width={lottiePx} height={lottiePx} />
           <Text style={s.emptyText}>{emptyText}</Text>
         </View>
       ) : (

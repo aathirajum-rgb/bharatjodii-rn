@@ -70,6 +70,22 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
     getItem(StorageKeys.User.NAME).then(name => setUserName(name ?? ''));
   }, []);
 
+  // Angular (ngOnInit):
+  //   this.language = this.data?.language ? this.data.language : localStorage.getItem('LANG');
+  //   if (this.language) { this.selectLang(this.language); }
+  // i.e. the screen opens with the member's CURRENT language already checked.
+  // This port left `selected` as null, so no radio was ever checked on entry
+  // and the Select CTA started disabled — the user had to re-pick the language
+  // they were already using.
+  //
+  // Functional update rather than a plain set: storage is async, and a tap that
+  // lands before it resolves must not be clobbered by the stored value.
+  useEffect(() => {
+    getCurrentLanguage().then(lang => {
+      if (lang) setSelected(prev => prev ?? lang);
+    });
+  }, []);
+
   // Angular: languageArray starts as the static config list, then
   // getDynamicPopulateArrayList() overwrites it with LANGSELECTION from the
   // shared type=all bootstrap response if present — mirrored here the same

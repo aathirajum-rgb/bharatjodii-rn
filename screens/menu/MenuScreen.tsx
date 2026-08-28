@@ -17,7 +17,11 @@ import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import { StorageKeys } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
-import { getSession } from '../../service/registrationService'
+import { getSession, getSessionValue } from '../../service/registrationService'
+import { fetchMenuPromo } from '../../service/homeService'
+import { paymentTrack, redirectToIntermediatePage } from '../../service/paymentService'
+import { checkFreeTrialCondition } from '../../service/payWallService'
+import { stripAndDecodeHtml } from '../../utils/htmlEntities'
 import { clearSession } from '../../service/apiClient'
 import { handleBack } from '../../utils/navigationRef'
 import { disconnectSocket } from '../../service/socketService'
@@ -53,6 +57,19 @@ export const ICON = {
   terms:         R + 'settings_terms_condition.svg',
   logout:        R + 'settings_logout.svg',
   logoutSheet:   R + 'bottomsheet_logout.svg',
+  // Expired-membership banner glyph. Hyphenated, unlike the underscore names
+  // above — that's how it is on the server (react/expired-alert.svg, 44x44).
+  expiredAlert:  R + 'expired-alert.svg',
+}
+
+// Angular: menu.page.html's buy-membership banner binds CONTENT1 with
+// [innerHTML]. It arrives as a one-line HTML string with a single <br> between
+// the headline and its sub-line — e.g. "Flat &#8377;300 OFF<br>on Jodii
+// membership". RN <Text> can't parse markup, so split on the <br> and decode
+// each half. `sub` is '' when the server sends no <br>.
+function splitPromoLines(html: string): [string, string] {
+  const [head = '', ...rest] = html.split(/<br\s*\/?>/i)
+  return [stripAndDecodeHtml(head), stripAndDecodeHtml(rest.join(' '))]
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -151,7 +168,7 @@ export function LogoutSheet({ visible, onYes, onNo }: { visible: boolean; onYes:
         <Text style={ls.title}>{t('ACCOUNT.LOGOUT')}</Text>
 
         {/* Message */}
-        <Text style={ls.message}>{t('ACCOUNT.LOGOUT_SHEET_MSG')}</Text>
+        <Text style={ls.message}>{t('ACCOUNT.LOGOUT_MSG_2')}</Text>
 
         {/* Side-by-side: Yes (secondary) | No (primary) */}
         <View style={ls.btnRow}>
@@ -193,6 +210,14 @@ export default function MenuScreen({ navigation }: Props) {
   const [membershipExp, setMembershipExp] = useState('')
   const [appVersion,    setAppVersion]    = useState('')
   const [logoutSheetVisible, setLogoutSheetVisible] = useState(false)
+  // Angular's PROMO_CONT — payment/nbmenu/v1's RESPONSE, carrying CONTENT1
+  // (the offer copy), CTA_TXT (button label), PAYMENTID, and a HOMEPAGE object
+  // whose MENUTITLE/CTA drive the expired variant of the banner.
+  const [promo, setPromo] = useState<Record<string, any> | null>(null)
+  // Angular: payWallService.checkFreeTrialCondition('expired') — decides which
+  // of the two banner variants renders. Async here (storage reads), so it lands
+  // in state rather than being called inline from render.
+  const [promoExpired, setPromoExpired] = useState(false)
 
   // On FOCUS, not just mount. Menu stays mounted in the tab stack, so a photo
   // uploaded from Edit Profile never reached it — the mount-only read meant the
@@ -214,7 +239,19 @@ export default function MenuScreen({ navigation }: Props) {
       // A newly arrived photo clears any earlier load failure, otherwise the
       // placeholder would stick for the life of the mount.
       setPhotoFailed(false)
-      setEntryType(String(session['ENTRYTYPE'] ?? ''))
+      const et = String(session['ENTRYTYPE'] ?? '')
+      setEntryType(et)
+
+      // Angular: gethttpArrayValue() only calls getMenuPromo(0) when
+      // ENTRYTYPE == 'F' — paid members never fetch it. Same gate here, so a
+      // paid member costs no extra request.
+      if (et === 'F') {
+        fetchMenuPromo().then(p => { if (!cancelled) setPromo(p ?? null) })
+        checkFreeTrialCondition('expired').then(exp => { if (!cancelled) setPromoExpired(exp) })
+      } else {
+        setPromo(null)
+        setPromoExpired(false)
+      }
       setMembershipExp(String(session['PLANEXPIRY'] ?? session['VALIDTILL'] ?? ''))
       setAppVersion(ver ?? '')
       setIsVerified(ekyc === '1')
@@ -236,6 +273,45 @@ export default function MenuScreen({ navigation }: Props) {
   function handleDownloadBiodata() {
     navigation.navigate('Biodata')
   }
+
+  // Angular menu.page.html has TWO mutually-exclusive variants of this banner,
+  // both requiring `PROMO_CONT && ENTRYTYPE === 'F'` and split on
+  // payWallService.checkFreeTrialCondition('expired'):
+  //
+  //   !expired → CONTENT1            + CTA_TXT          (offer band)
+  //    expired → HOMEPAGE.MENUTITLE  + HOMEPAGE.CTA     (expired band)
+  //
+  // Heads up: in the current Angular build the expired variant is UNREACHABLE —
+  // checkFreeTrialCondition() has its body commented out (JODII-345) and
+  // unconditionally returns false. The condition is implemented for real here
+  // (see checkFreeTrialCondition in payWallService), ported from that
+  // commented-out body, which is also still live and uncommented in
+  // explore.component.ts's own copy of the method.
+  const showPromo = !!promo && entryType === 'F'
+
+  // Angular renders both variants' copy with [innerHTML]; RN <Text> can't parse
+  // markup, so the <br> is split here and each half decoded (₹ arrives as
+  // &#8377;). The expired variant reads its copy from PROMO_CONT.HOMEPAGE.
+  const promoHome = (promo?.['HOMEPAGE'] ?? {}) as Record<string, any>
+
+  const [promoHeadline, promoSub] = splitPromoLines(
+    String(promoExpired ? (promoHome['MENUTITLE'] ?? '') : (promo?.['CONTENT1'] ?? '')),
+  )
+  const promoCta = stripAndDecodeHtml(
+    String(promoExpired ? (promoHome['CTA'] ?? '') : (promo?.['CTA_TXT'] ?? '')),
+  )
+
+  // Angular goToPayment(): paymentTrack('98') → redirectToIntermediatePage(
+  //   router.url, PROMO_CONT.PAYMENTID, S&FPROMOTION ?? '7') → GA beacons.
+  const handleBuyMembership = useCallback(async () => {
+    await paymentTrack('98')
+    const paymentId = String(promo?.['PAYMENTID'] ?? '')
+    const promotion = String((await getSessionValue(StorageKeys.Promotions.SF_PROMOTION)) ?? '7')
+    await redirectToIntermediatePage('menu', paymentId, promotion)
+    // Angular: pushfirebaseEvents('Menu', 'Banner-Clicked', 'PaymentBannerPromo')
+    // — signature is (action, label, category).
+    logEvent({ category: 'PaymentBannerPromo', action: 'Menu', label: 'Banner-Clicked' })
+  }, [promo])
 
   const handleLogout = useCallback(() => {
     setLogoutSheetVisible(true)
@@ -320,19 +396,73 @@ export default function MenuScreen({ navigation }: Props) {
               )}
             </View>
           </View>
+
+          {/* ── Buy-membership promo band (free members only) ──
+              Sits INSIDE the profile card as its bottom section, so the two
+              share one rounded outline (card has overflow:'hidden', which clips
+              this band's corners to the card radius).
+
+              Content is server-driven: CONTENT1 arrives as
+              "Flat ₹300 OFF<br>on Jodii membership" — headline before the <br>,
+              sub-line after. splitPromoLines() does that split, so nothing here
+              is hardcoded copy. */}
+          {showPromo && (promoExpired ? (
+            // EXPIRED variant: pink ground, alert glyph left of the copy, and a
+            // text-link CTA on its own line rather than a filled button.
+            <Pressable
+              style={s.promoBandExpired}
+              onPress={handleBuyMembership}
+              accessibilityRole="button"
+            >
+              <View style={s.promoExpiredRow}>
+                <CdnSvg uri={ICON.expiredAlert} width={28} height={28} />
+                <View style={s.promoTextCol}>
+                  <Text style={s.promoHeadline}>{promoHeadline}</Text>
+                  {!!promoSub && <Text style={s.promoSub}>{promoSub}</Text>}
+                </View>
+              </View>
+
+              {!!promoCta && (
+                <View style={s.promoLinkRow}>
+                  <Text style={s.promoLink}>{promoCta}</Text>
+                  {/* Chevron drawn as a glyph, not the CDN arrow icon — it has
+                      to inherit the link's pink, and CdnSvg can't recolor. */}
+                  <Text style={s.promoLinkChevron}>{'›'}</Text>
+                </View>
+              )}
+            </Pressable>
+          ) : (
+            // OFFER variant: green ground, copy left, filled pill right.
+            <Pressable
+              style={s.promoBand}
+              onPress={handleBuyMembership}
+              accessibilityRole="button"
+            >
+              <View style={s.promoTextCol}>
+                <Text style={s.promoHeadline}>{promoHeadline}</Text>
+                {!!promoSub && <Text style={s.promoSub}>{promoSub}</Text>}
+              </View>
+
+              {!!promoCta && (
+                <View style={s.promoBtn}>
+                  <Text style={s.promoBtnText}>{promoCta}</Text>
+                </View>
+              )}
+            </Pressable>
+          ))}
         </View>
 
         {/* ── Card 2: Edit Profile + Search by ID ── */}
         <View style={s.card}>
           <MenuRow
             icon={ICON.edit}
-            title={t('MENU.EDIT_PROFILE')}
+            title={t('MENU.SUBMENU_1_1')}
             onPress={() => navigation.navigate('EditProfile')}
             showDivider
           />
           <MenuRow
             icon={ICON.searchId}
-            title={t('MENU.SEARCH_BY_ID')}
+            title={t('SEARCH.SEARCH_BY_ID')}
             onPress={() => navigation.navigate('SearchById')}
           />
         </View>
@@ -341,7 +471,7 @@ export default function MenuScreen({ navigation }: Props) {
         <View style={s.card}>
           <MenuRow
             icon={ICON.biodata}
-            title={t('MENU.DOWNLOAD_BIODATA')}
+            title={t('BIO_DATA.DOWNLOAD_BIODATA')}
             onPress={handleDownloadBiodata}
           />
         </View>
@@ -350,19 +480,19 @@ export default function MenuScreen({ navigation }: Props) {
         <View style={s.card}>
           <MenuRow
             icon={ICON.wedding}
-            title={t('MENU.SUCCESS_STORIES')}
+            title={t('MENU.WEDDING_STORY')}
             onPress={() => navigation.navigate('SuccessStories')}
             showDivider
           />
           <MenuRow
             icon={ICON.dontShow}
-            title={t('MENU.IGNORED_PROFILES')}
+            title={t('PROFILES.DONT_SHOW')}
             onPress={() => navigation.navigate('IgnoredProfiles')}
             showDivider
           />
           <MenuRow
             icon={ICON.support}
-            title={t('MENU.CUSTOMER_SUPPORT')}
+            title={t('GENERAL.NEED_HELP')}
             onPress={() => navigation.navigate('HelpCenter')}
           />
         </View>
@@ -391,8 +521,8 @@ export default function MenuScreen({ navigation }: Props) {
           <MenuRow
             icon={ICON.terms}
             iconSize={18}
-            title={t('ACCOUNT.TERMS_CONDITIONS')}
-            onPress={() => navigation.navigate('ExternalPage', { url: TERMS_CONDITIONS_URL, title: t('ACCOUNT.TERMS_CONDITIONS') })}
+            title={t('REGISTRATION.TERMSANDCONDITIONS')}
+            onPress={() => navigation.navigate('ExternalPage', { url: TERMS_CONDITIONS_URL, title: t('REGISTRATION.TERMSANDCONDITIONS') })}
             showDivider
           />
           <MenuRow
@@ -404,7 +534,7 @@ export default function MenuScreen({ navigation }: Props) {
 
         {/* ── Footer ── */}
         {!!appVersion && (
-          <Text style={s.footerVersion}>{t('MENU.APPVERSION_LBL')} {appVersion}</Text>
+          <Text style={s.footerVersion}>{t('MENU.APPVERSION')} {appVersion}</Text>
         )}
 
       </ScrollView>
@@ -448,6 +578,78 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white,
     borderRadius:    12,
     overflow:        'hidden',
+  },
+
+  // ── Buy-membership promo band ──
+  // Bottom section of the profile card: pale-green ground, copy left, solid
+  // green pill right. No radius of its own — the parent card clips it.
+  promoBand: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
+    gap:               12,
+    paddingVertical:   14,
+    paddingHorizontal: 16,
+    backgroundColor:   '#EAF7E7',
+  },
+  // Expired variant: same band slot, pink ground, stacked (icon+copy row, then
+  // the link row) rather than side-by-side.
+  promoBandExpired: {
+    paddingVertical:   14,
+    paddingHorizontal: 16,
+    backgroundColor:   '#FDECEF',
+  },
+  promoExpiredRow: {
+    flexDirection: 'row',
+    alignItems:    'flex-start',
+    gap:           10,
+  },
+  promoLinkRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           4,
+    marginTop:     10,
+  },
+  promoLink: {
+    fontSize:   14,
+    lineHeight: 18,
+    fontWeight: '600',
+    color:      Colors.inputError,
+  },
+  promoLinkChevron: {
+    fontSize:   18,
+    lineHeight: 18,
+    fontWeight: '600',
+    color:      Colors.inputError,
+  },
+  promoTextCol: {
+    flexShrink: 1,
+  },
+  promoHeadline: {
+    fontSize:   17,
+    lineHeight: 22,
+    fontWeight: '700',
+    color:      '#1A1A1A',
+  },
+  promoSub: {
+    marginTop:  2,
+    fontSize:   13,
+    lineHeight: 18,
+    color:      '#4A4A4A',
+  },
+  // Pill, not the 8pt rounded rect — radius is half the ~44pt tap height.
+  promoBtn: {
+    flexShrink:        0,
+    backgroundColor:   '#1D8A34',
+    borderRadius:      22,
+    paddingVertical:   11,
+    paddingHorizontal: 24,
+  },
+  promoBtnText: {
+    fontSize:   14,
+    lineHeight: 18,
+    fontWeight: '600',
+    color:      Colors.white,
   },
 
   // ── Profile card internals ──
