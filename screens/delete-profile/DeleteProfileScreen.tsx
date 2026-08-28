@@ -181,14 +181,17 @@ export default function DeleteProfileScreen({ navigation }: Props) {
 
   function handleNext() {
     const reasonName = t(`DELETE_PROFILE.REASON_${selectedReason}`)
-    if (selectedReason === '1') {
+    if (selectedReason === '1' || selectedReason === '2') {
+      // '1' Marriage fixed, '2' Already married — both land on the
+      // "Congratulations! / How did you find your partner?" page (Angular
+      // pageType '2', MRGFIXEDREASON).
+      //
+      // DIVERGENCE, deliberate: Angular's landingDetails.REASON['2'].nextId is
+      // '4' → 'HIDDENDAYS'. Sending an already-married user to a hide-for-N-days
+      // page reads like a stale mapping, and the requested flow is the
+      // congratulations page. DeleteProfileHide is still reachable — the "Want
+      // to take a break" sheet below navigates to it.
       navigation.navigate('DeleteProfileMrgReason', { reason: selectedReason, reasonName })
-    } else if (selectedReason === '2') {
-      // Angular: landingDetails.REASON['2'].nextId === '4' → pageName['4'] ===
-      // 'HIDDENDAYS' — the same hide-or-delete page DeleteProfileHideScreen.tsx
-      // already implements (it reads REGISTRATIONARRAYS.DELETEPROFILE.PAGE4
-      // and takes this same reasonName param), just never wired up from here.
-      navigation.navigate('DeleteProfileHide', { reasonName })
     } else if (selectedReason === '3') {
       setShowBreakSheet(true)
     } else if (selectedReason === '4') {
