@@ -73,6 +73,10 @@ export default function MessagerListScreen({ navigation }: Props) {
   const [activeSection, setActiveSection] = useState<MessageSection>('messages')
   const [activeTab,   setActiveTab]   = useState<MessageTab>('whoseviewednumber')
   const [ownEntryType, setOwnEntryType] = useState('')
+  // Angular: getGenderPrefix_His_Her() — getLogInGender() == 'F' ? HIS : HER,
+  // i.e. the pronoun of the OPPOSITE gender (matches are always opposite-
+  // gender) — same oppGender convention MatchesScreen.tsx uses.
+  const [oppGender, setOppGender] = useState<'M' | 'F'>('F')
   const [tabData, setTabData] = useState<Record<MessageTab, TabData>>({
     whoseviewednumber: { ...INITIAL_TAB_DATA },
     whoviewednumber:   { ...INITIAL_TAB_DATA },
@@ -88,6 +92,12 @@ export default function MessagerListScreen({ navigation }: Props) {
   const conversationStartRef = useRef(0)
 
   const [newCounts, setNewCounts] = useState<Record<MessageTab, number>>({ whoseviewednumber: 0, whoviewednumber: 0 })
+  // Angular: setTabTotalCount()/syncSectionCounts() — the "All Messages"
+  // section badge is the live socket NEWCHATCNT of the conversation tab
+  // (TAPTYPE 5), with no read/dismiss tracking at all (unlike the phoneviews
+  // tabs' ViewedActivitytList) — it just reflects whatever the socket last
+  // reported, every time.
+  const [conversationsUnread, setConversationsUnread] = useState(0)
   const [viewedTabs, setViewedTabs] = useState<Record<string, boolean>>({})
   const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
 
@@ -126,11 +136,13 @@ export default function MessagerListScreen({ navigation }: Props) {
     Promise.all([
       getItem(StorageKeys.Auth.USER_ID),
       getSessionValue('ENTRYTYPE'),
+      getItem(StorageKeys.User.LOGIN_GENDER),
       getJson<Record<string, boolean>>('VIEWEDACTIVITYLIST'),
       fetchNotifCount().catch(() => ({ newCount: 0, comCount: [] })),
-    ]).then(([id, entryType, viewed, notif]) => {
+    ]).then(([id, entryType, loginGender, viewed, notif]) => {
       userIdRef.current = id ?? ''
       setOwnEntryType(entryType ?? '')
+      setOppGender(loginGender === 'F' ? 'M' : 'F')
       setViewedTabs(viewed ?? {})
 
       const whoseViewedEntry = notif.comCount.find(c => c.comtype === 'whoseviewednumber')
@@ -168,6 +180,11 @@ export default function MessagerListScreen({ navigation }: Props) {
         setConversationsHasMore(records.length >= LIMIT)
         setConversationsLoaded(true)
         setConversationsLoadingMore(false)
+        // Angular: setTabTotalCount() — an empty tab can't hold unread
+        // messages, but the socket leaves NEWCHATCNT out of that response, so
+        // without this the previous count would stick on the badge forever.
+        if (data.NEWCHATCNT != null) setConversationsUnread(data.NEWCHATCNT)
+        else if (data.TOTALREC === 0) setConversationsUnread(0)
         return
       }
 
@@ -325,7 +342,7 @@ export default function MessagerListScreen({ navigation }: Props) {
   }
 
   const sectionItems = [
-    { key: 'messages',   label: t('MESSAGES.CONVERSATION_TITLE') },
+    { key: 'messages',   label: t('MESSAGES.CONVERSATION_TITLE'), badge: conversationsUnread },
     { key: 'phoneviews', label: t('MESSAGES.VIEWED_NUMBERS') },
   ]
 
@@ -354,6 +371,7 @@ export default function MessagerListScreen({ navigation }: Props) {
         emptySubtext={emptySubtext()}
         emptyButtonText={emptyButtonText()}
         langCode={i18n.language}
+        oppGender={oppGender}
         onSwitchTab={switchTab}
         onLoadMore={handleEndReached}
         onPress={handlePhoneViewPress}
@@ -418,7 +436,7 @@ export default function MessagerListScreen({ navigation }: Props) {
           <FlatList
             data={conversations}
             keyExtractor={item => item.matriId}
-            renderItem={({ item }) => <ConversationRow item={item} onPress={handleConversationPress} />}
+            renderItem={({ item }) => <ConversationRow item={item} onPress={handleConversationPress} oppGender={oppGender} />}
             ItemSeparatorComponent={() => <View style={styles.conversationSeparator} />}
             onEndReached={handleConversationsEndReached}
             onEndReachedThreshold={0.4}
@@ -472,7 +490,7 @@ export default function MessagerListScreen({ navigation }: Props) {
               <FlatList
                 data={current.items}
                 keyExtractor={item => item.matriId}
-                renderItem={({ item }) => <ConversationRow item={item} onPress={handlePhoneViewPress} />}
+                renderItem={({ item }) => <ConversationRow item={item} onPress={handlePhoneViewPress} oppGender={oppGender} />}
                 ItemSeparatorComponent={() => <View style={styles.conversationSeparator} />}
                 ListFooterComponent={renderFooter}
                 onEndReached={handleEndReached}

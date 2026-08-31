@@ -1380,7 +1380,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         onAvatarPress={() => navigation.navigate('EditProfile')}
         onEditProfilePress={() => navigation.navigate('EditProfile')}
         onToolbarItemPress={handleToolbarPress}
-        onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />
 
       {!contentLoaded ? (

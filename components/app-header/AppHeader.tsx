@@ -11,6 +11,7 @@ import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { handleBack } from '../../utils/navigationRef'
+import LanguagePill from '../language-pill/LanguagePill'
 
 // Angular's header back-button and language-pill dropdown both use Ionic's
 // bundled "chevron-back-outline" / "chevron-down-outline" icons (ion-icon
@@ -20,26 +21,6 @@ import { handleBack } from '../../utils/navigationRef'
 // tsx's CHEVRON_FORWARD_XML, mirrored/rotated for the back and down directions.
 const CHEVRON_BACK_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M328 112L184 256l144 144"/></svg>`
 const CHEVRON_DOWN_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M112 184l144 144 144-144"/></svg>`
-
-// Angular: header.component.ts's langLableName — home page's header1 pill
-// reads FUNC.getSelectedKeyValue(langArrayList, language, '2') (type '2' =
-// TITLE, the full language name, e.g. "Hindi"), NOT the short
-// REGISTRATION.SELECTED_LANGUAGE string ("Eng") that the registration/signIn
-// header below still (correctly) uses. Same id→English-name list as
-// LanguageSelectionScreen.tsx's FALLBACK_LANGUAGES.
-const LANGUAGE_FULL_NAMES: Record<string, string> = {
-  en: 'English',
-  tm: 'Tamil',
-  tl: 'Telugu',
-  hi: 'Hindi',
-  ml: 'Malayalam',
-  kn: 'Kannada',
-  bn: 'Bengali',
-  mt: 'Marathi',
-  or: 'Odia',
-  gj: 'Gujarati',
-  pa: 'Punjabi',
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,15 +117,10 @@ export default function AppHeader({
   const { t, i18n } = useTranslation()
   const langFonts = useLanguageFonts()
 
-  // Resolve language label — use explicit prop, else fall back per header
-  // type: header1 (home/dashboard) shows the full name ("English"/"Hindi"/...)
-  // like Angular's langLableName; registration/signIn keep the short label
-  // from locales/*.json's REGISTRATION.SELECTED_LANGUAGE (e.g. "Eng").
-  const resolvedLangLabel =
-    languageLabel ??
-    (type === 'header1'
-      ? (LANGUAGE_FULL_NAMES[i18n.language] ?? LANGUAGE_FULL_NAMES.en)
-      : t('REGISTRATION.SELECTED_LANGUAGE'))
+  // Resolve language label for the registration/signIn pill only — header1
+  // (home/dashboard) now renders <LanguagePill>, which computes its own
+  // native-script label internally.
+  const resolvedLangLabel = languageLabel ?? t('REGISTRATION.SELECTED_LANGUAGE')
 
   // Angular: header.component.ts's common.getAvatarImg() (called with no args,
   // i.e. isOppositeProfile=false) — the logged-in user's OWN avatar placeholder
@@ -198,15 +174,13 @@ export default function AppHeader({
 
           <View style={styles.flex1} />
 
-          {/* Language selector pill — always visible, auto-detects language */}
-          {/* Angular: dropdown.component.html hides the up/down-arrow icon
-              entirely when actionType === 'languageChanges' — the home
-              header's language pill has no chevron, unlike the
-              registration/signIn one below. */}
-          <Pressable style={styles.h1LangBtn} onPress={onLanguagePress}>
-            <CdnSvg uri={ICONS.lang} width={20} height={20} />
-            <Text style={[styles.h1LangText, { fontFamily: langFonts.medium }]}>{resolvedLangLabel}</Text>
-          </Pressable>
+          {/* Language selector pill — always visible, auto-detects language.
+              Angular: every header pill that reaches LanguageChangeService
+              (Home included) opens the SAME 2-language "mothertongue" bottom
+              sheet — confirmed via exhaustive source trace, no exception.
+              LanguagePill owns that sheet internally, so this no longer needs
+              onLanguagePress wired from the caller. */}
+          <LanguagePill langCode={i18n.language} />
 
           {/* Angular: home.config.ts's homeToolBar — discover-matches (search)
               then notification, in that order; each icon rendered from its own
@@ -394,26 +368,6 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
 
-  // Language selector pill
-  // Measured off the live Angular app (.lang-selection computed style):
-  // 8px radius, transparent fill, solid black 1px border, ~37px tall —
-  // same visual language as the icon buttons, not a grey-bordered pill.
-  h1LangBtn: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    gap:               4,
-    borderWidth:       1,
-    borderColor:       '#000000',
-    borderRadius:      8,
-    paddingVertical:   4,
-    paddingHorizontal: 8,
-    height:            36,
-  },
-  h1LangText: {
-    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
-    fontSize:   11,
-    color:      Colors.textPrimary,
-  },
   // Icon buttons — Angular: .home-header-icon (8px radius, transparent fill,
   // solid black 1px border) wraps .width-height-32 (9vmin ≈ 32px on a
   // typical phone width) — corrected from an earlier, too-large 36×36 guess.

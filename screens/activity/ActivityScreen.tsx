@@ -19,7 +19,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
-import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import LanguagePill from '../../components/language-pill/LanguagePill'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
@@ -41,7 +41,6 @@ import { logEvent, logScreen } from '../../service/analyticsService'
 import { getItem, getJson, setJson } from '../../service/storageService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG } from '../../constants/cdn'
 import i18n from '../../i18n'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
@@ -62,7 +61,6 @@ interface TabData {
 
 const LIMIT = 20
 const INITIAL_TAB_DATA: TabData = { profiles: [], total: 0, hasMore: true, loadingMore: false, start: 0, loaded: false }
-const CDN = CDN_SVG
 
 // ─── ActivityScreen ───────────────────────────────────────────────────────────
 
@@ -561,10 +559,7 @@ export default function ActivityScreen({ navigation }: Props) {
       {/* ── Header ── */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>{t('GENERAL.ICON_3')}</Text>
-        <Pressable style={styles.langPill} onPress={() => navigation.navigate('LanguageSelection')} hitSlop={8}>
-          <CdnSvg uri={CDN + 'revamp/lang-change-img.svg'} width={22} height={22} />
-          <Text style={styles.langText}>English</Text>
-        </Pressable>
+        <LanguagePill langCode={i18n.language} />
       </View>
 
       {/* ── Tab chips ── */}
@@ -686,12 +681,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.divider,
   },
   headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textDark },
-  langPill: {
-    flexDirection: 'row', alignItems: 'center', gap: 4,
-    borderWidth: 1, borderColor: Colors.borderNeutral, borderRadius: 8,
-    paddingHorizontal: 8, paddingVertical: 4,
-  },
-  langText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 12, color: Colors.textDark },
 
   // ── Tab bar — Figma: unselected border #b0b0b0, selected bg/border chip tokens ──
   tabBarWrap: { backgroundColor: Colors.surface },

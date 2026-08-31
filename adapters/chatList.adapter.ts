@@ -17,6 +17,12 @@ function resolveKind(msgType: ChatListRecord['msgType']): ChatListItem['kind'] {
 export function adaptChatListRecord(record: ChatListRecord, loginUserId: string): ChatListItem {
   const kind = resolveKind(record.msgType)
   const isOwnMessage = String(record.SenderId) === String(loginUserId)
+  // Angular: messages.component.ts:1321 — "11 is viewed by me, 12 is viewed
+  // your mobile number, 13 is both are viewed". This is keyed off msgType
+  // alone, NOT SenderId/MatriId (messages.component.ts:1633-1634 checks
+  // MessageType + MatriId together, but the messager-list summary line
+  // (messager-list.component.html:205) only ever tests msgType).
+  const youViewedThem = ['11', 11, '13', 13].includes(record.msgType)
 
   const item: ChatListItem = {
     matriId:      record.MatriId,
@@ -32,6 +38,7 @@ export function adaptChatListRecord(record: ChatListRecord, loginUserId: string)
     text:         kind === 'audio' ? (record.Duration ?? '') : (record.Message ?? ''),
     isOwnMessage,
     readStatus:   Number(record.ReadStatus) || 0,
+    ...(kind === 'viewed_number' ? { youViewedThem } : {}),
   }
   // lastlogin is epoch SECONDS (confirmed against a real captured RESPMYCHAT
   // payload — 10-digit values) — Date-friendly fields elsewhere in this app

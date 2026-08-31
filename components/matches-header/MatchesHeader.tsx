@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import FilterChipsRow, { MOBILE_FILTER_CHIPS } from './FilterChipsRow'
 import FacetFilterModal from './FacetFilterModal'
+import LanguagePill, { LANG_LABELS } from '../language-pill/LanguagePill'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import type { ExploreFacet } from '../../service/homeService'
@@ -12,18 +13,11 @@ import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 const CDN = CDN_SVG
 
-// Exported so MatchesDesktopNav/ViewProfile share the same language-label map
-// instead of duplicating it.
-// Angular: FUNC.getSelectedKeyValue(langArrayList, LANG, '2') — type '2' maps
-// to the TITLE field of core/config/common.config.ts's languageArray, i.e.
-// each language's OWN native-script name (e.g. "తెలుగు"), not its English
-// name ("Telugu") — this previously showed the English name for every
-// language, which never matched what the real app displays on this pill.
-export const LANG_LABELS: Record<string, string> = {
-  en: 'English', tm: 'தமிழ்', tl: 'తెలుగు', hi: 'हिंदी',
-  ml: 'മലയാളം', kn: 'ಕನ್ನಡ', bn: 'বাংলা', mt: 'मराठी',
-  or: 'ଓଡ଼ିଆ', gj: 'ગુજરાતી', pa: 'ਪੰਜਾਬੀ',
-}
+// Re-exported so existing imports (ViewProfileScreen.tsx, ViewProfileDesktopLayout.tsx,
+// MatchesDesktopNav.tsx, StarMatchingDesktopLayout.tsx) keep working unchanged —
+// the canonical definition now lives in components/language-pill/LanguagePill.tsx,
+// which also owns the pill's markup/styling and the sheet it opens.
+export { LANG_LABELS }
 
 // ─── Props ─────────────────────────────────────────────────────────────────────
 
@@ -34,7 +28,6 @@ export interface MatchesHeaderProps {
   langCode:        string
   selectedChip:    string
   onChipSelect:    (key: string) => void
-  onLanguagePress?: () => void
   onEditPreferences?: () => void
   onHeaderLayout:  (height: number) => void
   onTitleLayout:   (height: number) => void
@@ -63,7 +56,6 @@ export default function MatchesHeader({
   langCode,
   selectedChip,
   onChipSelect,
-  onLanguagePress,
   onEditPreferences,
   onHeaderLayout,
   onTitleLayout,
@@ -75,7 +67,6 @@ export default function MatchesHeader({
 }: MatchesHeaderProps) {
   const { t } = useTranslation()
   const langFonts = useLanguageFonts()
-  const langLabel = LANG_LABELS[langCode] ?? 'English'
   const [showFacetModal, setShowFacetModal] = useState(false)
 
   // Angular: matches.page.ts facetChipLimit = 3 — always slice(0, 3) inline,
@@ -110,11 +101,7 @@ export default function MatchesHeader({
           </Text>
 
           <View style={s.titleActions}>
-            {/* Figma: bordered pill — 1px black, 8px radius, pl-8/pr-12/py-4, gap-4 */}
-            <Pressable style={s.langPill} onPress={onLanguagePress} hitSlop={8}>
-              <CdnSvg uri={CDN + 'revamp/lang-change-img.svg'} width={24} height={24} />
-              <Text style={[s.langText, { fontFamily: langFonts.medium }]}>{langLabel}</Text>
-            </Pressable>
+            <LanguagePill langCode={langCode} />
           </View>
         </View>
 
@@ -252,23 +239,6 @@ const s = StyleSheet.create({
     flexDirection: 'row',
     alignItems:    'center',
     gap:           4,
-  },
-  // Figma: bordered pill — 1px solid black, 8px radius, pl-8/pr-12/py-4, gap-4
-  langPill: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    gap:               4,
-    borderWidth:       1,
-    borderColor:       '#000000',
-    borderRadius:      8,
-    paddingLeft:       8,
-    paddingRight:      12,
-    paddingVertical:   4,
-  },
-  // fontFamily applied inline (langFonts.medium) — see Text usage.
-  langText: {
-    fontSize:   12,
-    color:      '#000000',
   },
   facetRow: {
     paddingLeft:   16,

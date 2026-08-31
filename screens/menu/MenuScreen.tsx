@@ -29,6 +29,7 @@ import { logEvent, dispatchNativeEvent } from '../../service/analyticsService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import LanguagePillSheet from '../../components/language-pill/LanguagePillSheet'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -195,6 +196,13 @@ export function LogoutSheet({ visible, onYes, onNo }: { visible: boolean; onYes:
 export default function MenuScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+
+  // Angular: Menu's own languageChange() opens LanguageSelectionComponent as a
+  // real modal overlay (ModalController), not a page push — React Navigation's
+  // presentation:'modal' (still used by the LanguageSelection route for
+  // onboarding) is a full-screen page with a different transition, not a true
+  // popup. This local sheet replaces the navigate() call below for Menu only.
+  const [showLanguageSheet, setShowLanguageSheet] = useState(false)
 
   const [userName,      setUserName]      = useState('')
   const [userId,        setUserId]        = useState('')
@@ -502,7 +510,7 @@ export default function MenuScreen({ navigation }: Props) {
           <MenuRow
             icon={ICON.language}
             title={t('MENU.TTTLE_6')}
-            onPress={() => navigation.navigate('LanguageSelection')}
+            onPress={() => setShowLanguageSheet(true)}
             showDivider
           />
           <MenuRow
@@ -543,6 +551,12 @@ export default function MenuScreen({ navigation }: Props) {
         visible={logoutSheetVisible}
         onYes={handleConfirmLogout}
         onNo={() => setLogoutSheetVisible(false)}
+      />
+
+      <LanguagePillSheet
+        visible={showLanguageSheet}
+        onClose={() => setShowLanguageSheet(false)}
+        allLanguages
       />
     </View>
   )

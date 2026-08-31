@@ -44,5 +44,9 @@ export interface ChatListItem {
   text:         string          // message text (kind='text') or audio duration (kind='audio')
   isOwnMessage: boolean         // SenderId === logged-in user — drives the read-tick icon
   readStatus:   number          // 1|2|3, only meaningful when isOwnMessage && kind==='text'
+  // Angular: messages.component.ts:1321 — msgType 11/13 = "you viewed their
+  // number", 12 = "they viewed yours". A separate axis from isOwnMessage/
+  // SenderId — only set/meaningful when kind==='viewed_number'.
+  youViewedThem?: boolean
   lastActive?:  number          // epoch ms — seeds the chat header before RESPBASIC confirms it
 }

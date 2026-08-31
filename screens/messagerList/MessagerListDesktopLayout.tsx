@@ -46,6 +46,9 @@ export interface MessagerListDesktopLayoutProps {
   emptySubtext:    string
   emptyButtonText: string
   langCode:        string
+  // Angular: getGenderPrefix_His_Her() — opposite-gender pronoun for
+  // YOUVIEWEDNUMBER's ##HIS_HER## placeholder.
+  oppGender:       'M' | 'F'
 
   onSwitchTab:     (tab: MessageTab) => void
   onLoadMore:      () => void
@@ -61,7 +64,7 @@ export default function MessagerListDesktopLayout({
   activeSection, sectionItems, onSwitchSection, isFree, onAllMessagesCta,
   conversations, conversationsLoaded, conversationsLoadingMore, onConversationPress, onConversationsEndReached,
   activeTab, tabLabel, tabUnreadCount, current, showPaywall,
-  emptyHeading, emptySubtext, emptyButtonText, langCode,
+  emptyHeading, emptySubtext, emptyButtonText, langCode, oppGender,
   onSwitchTab, onLoadMore, onPress, onEmptyAction, onLanguagePress, onTabPress, children,
 }: MessagerListDesktopLayoutProps) {
   const { t } = useTranslation()
@@ -107,7 +110,7 @@ export default function MessagerListDesktopLayout({
             style={ds.list}
             data={conversations}
             keyExtractor={item => item.matriId}
-            renderItem={({ item }) => <ConversationRow item={item} onPress={onConversationPress} />}
+            renderItem={({ item }) => <ConversationRow item={item} onPress={onConversationPress} oppGender={oppGender} />}
             ItemSeparatorComponent={() => <View style={ds.rowGap} />}
             onEndReached={onConversationsEndReached}
             onEndReachedThreshold={0.5}
@@ -151,7 +154,7 @@ export default function MessagerListDesktopLayout({
               style={ds.list}
               data={current.items}
               keyExtractor={item => item.matriId}
-              renderItem={({ item }) => <ConversationRow item={item} onPress={onPress} />}
+              renderItem={({ item }) => <ConversationRow item={item} onPress={onPress} oppGender={oppGender} />}
               ItemSeparatorComponent={() => <View style={ds.rowGap} />}
               onEndReached={onLoadMore}
               onEndReachedThreshold={0.5}

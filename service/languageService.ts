@@ -124,6 +124,38 @@ const REGIONAL_LANG_META: Record<string, LangOption> = {
 // APPTYPE unset — nothing has ever been persisted to LANGUAGEARRAY yet).
 const EMPTY_FALLBACK: LangOption[] = [REGIONAL_LANG_META.en, REGIONAL_LANG_META.tm]
 
+// ─── Full language list (Menu's "expandLanguage" popup) ───────────────────────
+// Angular: language-selection.component.ts's ngOnInit, actionType != 'mothertongue'
+// branch — this.languageArray = CONFIG.languageArray (all 11), then
+// getDynamicPopulateArrayList()'s hasArrayData?.LANGSELECTION overwrites it if
+// present. Same static-fallback + API-override shape as LanguageSelectionScreen.
+// tsx's FALLBACK_LANGUAGES/getRegistrationArrays(), duplicated here (not
+// imported from that screen) because that screen is intentionally left
+// untouched and pre-login (no user/session yet) — this helper is for the
+// logged-in Menu popup instead.
+export const FULL_LANGUAGE_LIST: LangOption[] = [
+  REGIONAL_LANG_META.en, REGIONAL_LANG_META.tm, REGIONAL_LANG_META.tl, REGIONAL_LANG_META.ml,
+  REGIONAL_LANG_META.kn, REGIONAL_LANG_META.mt, REGIONAL_LANG_META.or, REGIONAL_LANG_META.gj,
+  REGIONAL_LANG_META.bn, REGIONAL_LANG_META.hi, REGIONAL_LANG_META.pa,
+]
+
+export async function getAllLanguages(): Promise<LangOption[]> {
+  const data = await getRegistrationArrays().catch(() => null)
+  const raw = data?.LANGSELECTION
+  if (Array.isArray(raw) && raw.length > 0) {
+    const mapped: LangOption[] = raw
+      .map((item: any) => ({
+        id:      String(item.ID ?? item.id ?? ''),
+        native:  String(item.TITLE ?? item.title ?? ''),
+        english: String(item.TEXT ?? item.text ?? ''),
+      }))
+      .filter(l => l.id && l.native && l.english)
+    if (mapped.length > 0) return mapped
+    return EMPTY_FALLBACK
+  }
+  return FULL_LANGUAGE_LIST
+}
+
 // Angular: language-selection.component.ts's filterLanguage() (lines 148-181)
 // — the APPTYPE->regional-language whitelist used to seed the FIRST-EVER
 // domain fetch (before any LANGUAGEARRAY exists yet, mirroring ngOnInit's

@@ -32,7 +32,7 @@ import {
   type AfterLikeCtx,
 } from '../../components/matches/matchesCard.shared'
 import MatchesDesktopLayout from './MatchesDesktopLayout'
-import LanguagePillSheet from '../../components/language-pill-sheet/LanguagePillSheet'
+import LanguagePillSheet from '../../components/language-pill/LanguagePillSheet'
 import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import MembershipBanner from '../../components/matches/MembershipBanner'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
@@ -2285,7 +2285,6 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         langCode={i18n.language}
         selectedChip={selectedChip}
         onChipSelect={applyQuickFilter}
-        onLanguagePress={() => setShowLanguageSheet(true)}
         onEditPreferences={() => goToEditPreferences(navigation)}
         onHeaderLayout={handleHeaderLayout}
         onTitleLayout={handleTitleLayout}
@@ -2454,7 +2453,6 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         onSecondaryPress={handlePhoneInfoSecondaryPress}
         onLinkPress={handlePhoneInfoClose}
       />
-      <LanguagePillSheet visible={showLanguageSheet} onClose={() => setShowLanguageSheet(false)} />
       {/* AppFooter's tab bar is 56px tall (+ its own safe-area padding) — the
           Toast's default 24px clearance alone left it overlapping the footer. */}
       <Toast request={toastRequest} bottomOffset={56 + 16} />
