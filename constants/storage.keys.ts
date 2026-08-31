@@ -129,6 +129,10 @@ export const StorageKeys = {
     CUSTOMER_CARE: 'CUSTOMER-CARE',
     BIODATA_THEME_ID: 'THEMEID',
     TEST: 'TEST',
+    // A page_id captured from an inbound deep link (App Link / custom scheme /
+    // AppsFlyer OneLink) tapped before the user was authenticated — consumed
+    // once by AuthContext.tsx's post-auth landing calls. See deepLinkService.ts.
+    PENDING_DEEPLINK_PAGE_ID: 'PENDINGDEEPLINKPAGEID',
   },
 
 } as const
