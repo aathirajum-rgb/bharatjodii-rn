@@ -12,14 +12,18 @@
 // AppsFlyer mirrors the Android native app's NBAppApplication.appsFlyerCheck()
 // (devKey, INR currency, IMEI/AndroidID collection off, "h0rB" invite OneLink,
 // setCustomerUserId) — see the Android source for the exact reference. The
-// conversion-data/deep-link listeners it also wired are deliberately NOT ported
-// here: nothing downstream in this RN app consumes that attribution data yet
-// (unlike Android's HomeScreenActivity, which fed it to the webview), so wiring
-// the listeners now would just be dead data with nowhere to flow.
+// conversion-data listener is deliberately NOT ported: nothing downstream in
+// this RN app consumes that attribution data yet (unlike Android's
+// HomeScreenActivity, which fed it to the webview), so wiring it now would
+// just be dead data with nowhere to flow. The deep-link listener IS wired
+// (see initAnalytics()) — OneLink resolution feeds deepLinkService.ts's
+// resolvePageId(), the same page_id landing path App Links/custom-scheme
+// links use.
 import Constants, { ExecutionEnvironment } from 'expo-constants'
 import { Platform } from 'react-native'
 import { getItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
+import { resolvePageId } from './deepLinkService'
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient
 
@@ -141,9 +145,20 @@ export async function initAnalytics(): Promise<void> {
       devKey,
       isDebug: __DEV__,
       onInstallConversionDataListener: false,
-      onDeepLinkListener: false,
+      onDeepLinkListener: true,
     })
     appsFlyerInitialized = true
+
+    // OneLink resolution (deferred or direct, "h0rB" invite template below) —
+    // marketing configures the OneLink's `deep_link_value` to carry our
+    // page_id contract (deepLinkService.ts). Anything else (old marketing
+    // links with no page_id, or deepLinkStatus != 'FOUND') is a no-op fallback
+    // to the normal registration/Matches landing, same graceful-degradation
+    // pattern pageLandingService.ts uses everywhere else.
+    appsFlyer.onDeepLink((res: any) => {
+      const pageId = res?.deepLinkStatus === 'FOUND' ? res?.data?.deep_link_value : undefined
+      if (pageId) resolvePageId(String(pageId))
+    })
 
     appsFlyer.setCurrencyCode('INR')
     appsFlyer.setCollectIMEI(false)

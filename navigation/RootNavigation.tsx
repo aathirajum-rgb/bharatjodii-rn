@@ -1,32 +1,28 @@
 import { NavigationContainer } from '@react-navigation/native'
-import Constants from 'expo-constants'
 import * as Linking from 'expo-linking'
 import { useCallback, useEffect } from 'react'
 import { ActivityIndicator, BackHandler, Platform, View } from 'react-native'
-import FLAVORS from '../constants/flavorConfig'
 import { useAuth } from '../contexts/AuthContext'
 import { useExitConfirm } from '../hooks/useExitConfirm'
 import type { ProfileDeactivateInfo } from '../components/auth/ProfileDeactivatedModal'
 import { refreshSession } from '../service/homeService'
 import { getItem, setItem } from '../service/storageService'
+import { getLinkingPrefixes, handleResolverURL } from '../service/deepLinkService'
 import { handleBack, navigationRef } from '../utils/navigationRef'
 import AppStack from './AppStack'
 import AuthStack from './AuthStack'
 
 // ─── Deep-link config ─────────────────────────────────────────────────────────
-// Each build only declares an App Links / Associated Domains intent filter for
-// its OWN flavor's domain (app.config.js: `f.domain`) — so only that domain can
-// ever arrive here verified. Resolving it from flavorConfig via the current
-// build's `appFlavor` (also injected by app.config.js) covers all 55 flavors
-// instead of a fixed 3-domain list that only worked for jodii/tamil/malayalam.
-
-function getLinkingPrefixes() {
-  const appFlavor = Constants.expoConfig?.extra?.appFlavor ?? 'jodii'
-  const domain    = (FLAVORS as Record<string, { domain: string }>)[appFlavor]?.domain ?? FLAVORS.jodii.domain
-  const base = [`https://${domain}/jodii`]
-  try { base.unshift(Linking.createURL('/')) } catch {}
-  return base
-}
+// getLinkingPrefixes() resolves this build's own flavor domain (each build
+// only declares an App Links / Associated Domains intent filter for its OWN
+// domain, app.config.js: `f.domain`) — see deepLinkService.ts for the per-
+// flavor resolution, shared with its `dl?page_id=` resolver-link parsing.
+//
+// getInitialURL/subscribe are overridden (React Navigation's documented
+// escape hatch for pre-processing links) so a `dl?page_id=` resolver link —
+// see deepLinkService.ts's header comment — is fully handled there instead
+// of being matched against `config.screens` below, which only knows about
+// semantic paths.
 
 const linking = {
   prefixes: getLinkingPrefixes(),
@@ -42,7 +38,29 @@ const linking = {
       recharge:          'recharge',
       'payment-success': 'payment-success',
       ComponentShowcase: 'components',
+      // Semantic deep-link paths (share/marketing links the app itself
+      // generates) — screen names verified against AppStack.tsx's actual
+      // registered Stack.Screen names, not copied from the ENavigation enum
+      // (several enum values don't match, e.g. 'notification' vs 'Notification').
+      viewProfile:        'viewprofile/:matriId',
+      Activity:           'activity',
+      Notification:       'notification',
+      'verify-id':        'verify-id',
+      'my-membership':    'my-membership',
+      EditProfile:        'edit-profile',
+      Matches:            'matches',
     },
+  },
+  async getInitialURL() {
+    const url = await Linking.getInitialURL()
+    if (url && (await handleResolverURL(url))) return null
+    return url
+  },
+  subscribe(listener: (url: string) => void) {
+    const sub = Linking.addEventListener('url', ({ url }) => {
+      handleResolverURL(url).then(handled => { if (!handled) listener(url) })
+    })
+    return () => sub.remove()
   },
 }
 

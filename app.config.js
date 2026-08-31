@@ -6,6 +6,19 @@ const f = FLAVORS[flavor] || FLAVORS.jodii;
 const appEnv = process.env.EXPO_PUBLIC_APP_ENV || 'dev';
 const channelSuffix = process.env.CHANNEL_SUFFIX || 'production';
 
+// Mirrors constants/env/env.*.ts's `api` field — app.config.js can't import
+// the .ts env files, so this is kept in sync manually. Needed so App Links
+// under the API host (e.g. registration/linksms/v1 — see deepLinkService.ts's
+// handleApiHostLink) actually reach the app; update both if a host changes.
+const API_HOSTS = {
+  dev: 'stgoapi.jodii.app',
+  stg: 'stgoapi.jodii.app',
+  uat: 'stgoapi.jodii.app',
+  preprod: 'ppoapi.jodii.app',
+  prod: 'oapi.jodii.app',
+};
+const apiHost = API_HOSTS[appEnv] || API_HOSTS.dev;
+
 module.exports = ({ config }) => ({
   ...config,
   name: f.appName,
@@ -59,12 +72,18 @@ module.exports = ({ config }) => ({
         data: [{ scheme: 'https', host: f.domain }],
         category: ['BROWSABLE', 'DEFAULT'],
       },
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: [{ scheme: 'https', host: apiHost }],
+        category: ['BROWSABLE', 'DEFAULT'],
+      },
     ],
   },
   ios: {
     ...config.ios,
     bundleIdentifier: f.applicationId,
-    associatedDomains: [`applinks:${f.domain}`],
+    associatedDomains: [`applinks:${f.domain}`, `applinks:${apiHost}`],
     // Unlike android/ (one Gradle tree hosts all 3 flavors via productFlavors),
     // ios/ is regenerated per-flavor by prebuild, so a single active file is correct here.
     googleServicesFile: `./firebase/GoogleService-Info.${flavor}.plist`,

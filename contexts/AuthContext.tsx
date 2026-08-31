@@ -7,6 +7,7 @@ import { getSessionValue } from '../service/registrationService'
 import { loadDrProfiles } from '../service/drService'
 import { refreshSession } from '../service/homeService'
 import { handlePageLanding } from '../service/pageLandingService'
+import { consumePendingDeepLinkPageId } from '../service/deepLinkService'
 import { waitForNavigationReady, resetTo } from '../utils/navigationRef'
 import { requestPermissionAndGetToken } from '../service/notificationService'
 import { getInitialWebviewHandoff, applyWebviewHandoff } from '../service/webviewHandoffService'
@@ -151,7 +152,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         } else {
           // Web-only: check for stored landing pageId from webview URL (e.g., 28 → recharge)
           const storedPageId = Platform.OS === 'web' ? await getItem('WEBVIEW_PAGE_ID') : undefined
-          const landingPageId = pageId || storedPageId || undefined
+          // A deep link tapped before this session-refresh resolved (or while
+          // logged out) takes priority over the backend's own suggestion for
+          // this one landing decision — see deepLinkService.ts.
+          const pendingDeepLinkPageId = await consumePendingDeepLinkPageId()
+          const landingPageId = pendingDeepLinkPageId || pageId || storedPageId || undefined
           await handlePageLanding(landingPageId, userId)
         }
       }
@@ -177,9 +182,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!goToOnboarding) {
       const ready = await waitForNavigationReady()
       if (ready) {
-        if (pageId) {
-          // Real page_id available (OTP-verify's own WEBVIEWURL) — full dispatch.
-          await handlePageLanding(pageId, userId)
+        // A deep link tapped before login completed takes priority over
+        // OTP-verify's own suggested pageId — see deepLinkService.ts.
+        const pendingDeepLinkPageId = await consumePendingDeepLinkPageId()
+        const landingPageId = pendingDeepLinkPageId || pageId
+        if (landingPageId) {
+          // Real page_id available (OTP-verify's own WEBVIEWURL, or a pending
+          // deep link) — full dispatch.
+          await handlePageLanding(landingPageId, userId)
         } else {
           // No page_id captured — fall back to the DR-only check (the dominant
           // real-world outcome for most page_ids anyway; see pageLandingService.ts).
