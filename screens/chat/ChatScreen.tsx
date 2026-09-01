@@ -18,17 +18,19 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, Image, KeyboardAvoidingView, Platform, Pressable,
-  ScrollView, StyleSheet, Text, TextInput, View,
+  ActivityIndicator, Image, KeyboardAvoidingView, Linking, Platform, Pressable,
+  ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAudioRecorder, useAudioRecorderState, RecordingPresets } from 'expo-audio'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import { getOppGenderAvatarUrl } from '../../utils/avatar'
 import ChatBubble from '../../components/chat/ChatBubble'
 import AttachmentPreviewModal from '../../components/chat/AttachmentPreviewModal'
 import ChatMediaViewerModal from '../../components/chat/ChatMediaViewerModal'
 import ThreeDotMenu from '../../components/matches/ThreeDotMenu'
 import ReportProfileModal from '../../components/matches/ReportProfileModal'
+import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
 import { adaptChatMessageRecord, adaptSendResponse, dedupeMessages, groupMessagesByDate } from '../../adapters/chatMessage.adapter'
@@ -36,7 +38,7 @@ import {
   socketConnection, emitBasicView, onBasicView, emitChatMessages, onChatMessages,
   emitSendMessage, onSendResponse, emitMessageStatus, onReceiver,
 } from '../../service/socketService'
-import { blockChatProfile, unblockChatProfile } from '../../service/communicationService'
+import { blockChatProfile, unblockChatProfile, communicationBtnOnClick } from '../../service/communicationService'
 import { handleBack } from '../../utils/navigationRef'
 import {
   getChatCount, consumeChatCount, checkChatLimit, fetchChatPaymentPromo,
@@ -93,6 +95,12 @@ type Props = { navigation: any; route: any }
 export default function ChatScreen({ navigation, route }: Props) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
+  // Angular: .chat-avatar-profile { width/height: 11.12vmin } — vmin is 1% of
+  // the SMALLER viewport dimension, so the avatar grows with the device
+  // (~40px on a 360pt phone, ~48px on a 430pt one) rather than sitting at a
+  // fixed size. Mirrored here instead of hard-coding 40.
+  const { width: winW, height: winH } = useWindowDimensions()
+  const avatarSize = (Math.min(winW, winH) * 11.12) / 100
   const scrollRef = useRef<ScrollView>(null)
 
   const partnerId = String(route.params?.partnerId ?? '')
@@ -100,6 +108,16 @@ export default function ChatScreen({ navigation, route }: Props) {
   const [partnerPhoto, setPartnerPhoto] = useState(String(route.params?.partnerPhoto ?? ''))
   const [partnerOnline, setPartnerOnline] = useState(Boolean(route.params?.partnerOnline))
   const [partnerLastActive, setPartnerLastActive] = useState<number | null>(route.params?.partnerLastActive ?? null)
+  // Angular never renders a blank avatar: messages.component.html binds
+  // (error)="onImgErrorHandler($event, true)", which swaps in a gender-based
+  // silhouette (common.ts's getAvatarImg). `true` = opposite profile, so a
+  // female user sees a male placeholder for her chat partner and vice versa.
+  const [fallbackAvatar, setFallbackAvatar] = useState('')
+  useEffect(() => { getOppGenderAvatarUrl().then(setFallbackAvatar) }, [])
+  // Set when the real photo 404s, so the placeholder takes over.
+  const [photoFailed, setPhotoFailed] = useState(false)
+  useEffect(() => { setPhotoFailed(false) }, [partnerPhoto])
+  const avatarUri = (!photoFailed && partnerPhoto) || fallbackAvatar
   // Angular: oppositeIdDetails.Reported (JODII-453 fix) — the row's own Reported
   // flag carried through nav params, not refreshed from BasicView. A reported
   // chat is read only: it opens like any other, but the footer swaps to a
@@ -107,6 +125,9 @@ export default function ChatScreen({ navigation, route }: Props) {
   const reported = Boolean(route.params?.partnerReported)
 
   const ownIdRef = useRef('')
+  // Angular: ion-avatar.chat-avatar-profile on the sent side — loginUserPhoto
+  // read from localStorage, not tied to this specific conversation.
+  const [ownPhoto, setOwnPhoto] = useState('')
   const [messages, setMessages] = useState<ChatMessageItem[]>([])
   const [loaded, setLoaded] = useState(false)
   const [message, setMessage] = useState('')
@@ -131,6 +152,15 @@ export default function ChatScreen({ navigation, route }: Props) {
   const [showPaymentPromo, setShowPaymentPromo] = useState(false)
   const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
   const phoneInfo = usePhoneInfoSheet()
+
+  // ── Call / WhatsApp (the "viewed number" system card's two CTAs) ─────────
+  // Angular: messages.component.ts's callWhatsApp() — goes straight through
+  // communicationBtnOnClick, no confirm-popup step first (that two-step
+  // confirm→reveal flow is Matches-card-specific; this chat screen already
+  // knows the partner via BasicView, same as Matches' direct-reveal path).
+  const [contactDetails, setContactDetails] = useState<{
+    name: string; mobile?: string | undefined; dialNumber?: string | undefined; whatsappNumber?: string | undefined
+  } | null>(null)
   // Set right before emitting a send, read inside the long-lived onSendResponse
   // socket listener (a ref survives that closure's staleness; state wouldn't).
   const pendingFirstMessageRef = useRef(false)
@@ -159,10 +189,11 @@ export default function ChatScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     let cancelled = false
-    Promise.all([getSessionValue('ENTRYTYPE'), getItem(StorageKeys.User.LOGIN_GENDER)]).then(([entryType, gender]) => {
+    Promise.all([getSessionValue('ENTRYTYPE'), getItem(StorageKeys.User.LOGIN_GENDER), getSessionValue('PHOTOURL')]).then(([entryType, gender, photo]) => {
       if (cancelled) return
       setOwnEntryType(entryType ?? '')
       setOwnGender(gender ?? '')
+      setOwnPhoto(photo ?? '')
     })
     return () => { cancelled = true }
   }, [])
@@ -276,10 +307,18 @@ export default function ChatScreen({ navigation, route }: Props) {
       // level exclusively, since a real capture showed NAME at the top level.
       const view = data.VIEW ?? {}
       const name       = view.NAME ?? data.NAME
-      const photo      = view.PHOTOURL ?? view.PHOTO ?? data.PHOTOURL ?? data.PHOTO
-      const onlineNow  = view.ONLINENOW ?? data.ONLINENOW
+      // Angular (messages.component.ts:313) reads the photo from the TOP level
+      // of RESPBASIC — `this.oppositeIdDetails.Photourl = check.PHOTO` — not
+      // from VIEW. Checking VIEW first meant a response carrying only the
+      // top-level PHOTO still resolved, but any VIEW.PHOTOURL-shaped payload
+      // took precedence over the field Angular actually trusts. Top level is
+      // now preferred, with the VIEW variants kept as fallbacks.
+      const photo      = data.PHOTO ?? data.PHOTOURL ?? view.PHOTOURL ?? view.PHOTO
+      // Angular (:316-318) uses VIEW.ONLINE, not ONLINENOW.
+      const onlineNow  = view.ONLINE ?? view.ONLINENOW ?? data.ONLINENOW
       const lastLogin  = view.LASTLOGIN ?? data.LASTLOGIN
-      const blocked    = view.BLOCKED ?? data.BLOCKED
+      // Angular (:309) checks BLOCKED at the TOP level of the response.
+      const blocked    = data.BLOCKED ?? view.BLOCKED
       if (name) setPartnerName(name)
       if (photo) setPartnerPhoto(photo)
       if (onlineNow != null) setPartnerOnline(Number(onlineNow) === 1)
@@ -393,6 +432,39 @@ export default function ChatScreen({ navigation, route }: Props) {
       setPaymentPromo(promo)
       setShowPaymentPromo(true)
     }
+  }
+
+  // Angular: messages.component.ts's callWhatsApp('call'/'whatsapp', 'opposite')
+  // — both the "viewed number" system card's Call Now and WhatsApp buttons
+  // route through this (Angular literally hardcodes 'call' as the action for
+  // BOTH buttons in its own template, but that only affects which contact
+  // field is preferred server-side — showContactDetails() already returns the
+  // same dialNumber for both, see communicationService.ts, so calling with
+  // the real 'call'/'whatsapp' action here is equivalent and more correct).
+  async function handleCallOrWhatsApp(action: 'call' | 'whatsapp') {
+    const result = await communicationBtnOnClick('message', action, { MATRIID: partnerId })
+    if (result.type === 'show_contact') {
+      setContactDetails({
+        name: partnerName,
+        mobile: result.mobile,
+        dialNumber: result.dialNumber,
+        whatsappNumber: result.whatsappNumber,
+      })
+      return
+    }
+    if (await phoneInfo.handleResult(result)) return
+    if (result.type === 'payment_promo') {
+      navigation.navigate('recharge')
+    }
+  }
+
+  function handleContactDetailsCall() {
+    if (contactDetails?.dialNumber) Linking.openURL(`tel:${contactDetails.dialNumber}`)
+  }
+
+  function handleContactDetailsWhatsApp() {
+    const num = contactDetails?.whatsappNumber?.replace(/\D/g, '')
+    if (num) Linking.openURL(`https://wa.me/${num}`)
   }
 
   async function handleSend() {
@@ -591,18 +663,35 @@ export default function ChatScreen({ navigation, route }: Props) {
       {/* ── Header ── */}
       <View style={styles.header}>
         <Pressable onPress={() => handleBack()} hitSlop={12} style={styles.backBtn}>
-          <CdnSvg uri={BACK_ICON_URI} width={20} height={20} />
+          <CdnSvg uri={BACK_ICON_URI} width={24} height={48} />
         </Pressable>
-        <View style={styles.avatarWrap}>
-          {!!partnerPhoto && <Image source={{ uri: partnerPhoto }} style={styles.avatar} />}
+        <View style={[styles.avatarWrap, { width: avatarSize, height: avatarSize }]}>
+          {avatarUri
+            ? <Image
+                source={{ uri: avatarUri }}
+                onError={() => setPhotoFailed(true)}
+                style={[styles.avatar, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]}
+              />
+            : <View style={[styles.avatar, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]} />}
           {partnerOnline && <View style={styles.onlineDot} />}
         </View>
         <View style={styles.headerText}>
           <Text style={styles.headerName} numberOfLines={1}>{partnerName}</Text>
           {!!lastActiveText && <Text style={styles.headerStatus} numberOfLines={1}>{lastActiveText}</Text>}
         </View>
+        {/* Angular: call-message.svg — a direct call icon sits before the
+            3-dot menu, both routing through callWhatsApp('call', 'opposite').
+            Angular's .moreEvent class (shared by both icons) has NO CSS size
+            override at all — confirmed against the live CDN asset (it's
+            missing from Angular's own local repo checkout, but does exist on
+            the deployed CDN, 200 OK) — so both render at their own intrinsic
+            SVG size: call-message.svg is a 44x44 viewBox, jodii-chat-3dot-img
+            is 16x25 (a tall, narrow glyph, not square). */}
+        <Pressable onPress={() => handleCallOrWhatsApp('call')} hitSlop={12} style={styles.callBtn}>
+          <CdnSvg uri={CDN + 'call-message.svg'} width={44} height={44} />
+        </Pressable>
         <Pressable onPress={() => setMenuOpen(v => !v)} hitSlop={12} style={styles.moreBtn}>
-          <CdnSvg uri={CDN + 'jodii-chat-3dot-img.svg'} width={18} height={18} />
+          <CdnSvg uri={CDN + 'jodii-chat-3dot-img.svg'} width={16} height={25} />
         </Pressable>
         {menuOpen && (
           <ThreeDotMenu
@@ -617,10 +706,14 @@ export default function ChatScreen({ navigation, route }: Props) {
         )}
       </View>
 
+      {/* The header above is a normal layout sibling inside a container that
+          already applies insets.top as paddingTop — RN's automatic frame
+          measurement already knows this view starts below it, so an explicit
+          keyboardVerticalOffset here double-counts that offset and leaves a
+          large gap above the keyboard on iOS. */}
       <KeyboardAvoidingView
         style={styles.flex1}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
       >
         {/* ── Thread ── */}
         {!loaded ? (
@@ -648,6 +741,11 @@ export default function ChatScreen({ navigation, route }: Props) {
                     key={item.id}
                     item={item}
                     onPressMedia={(kind, uri) => setMediaViewer({ kind, uri })}
+                    oppGender={ownGender === 'F' ? 'M' : 'F'}
+                    onCallPress={() => handleCallOrWhatsApp('call')}
+                    onWhatsAppPress={() => handleCallOrWhatsApp('whatsapp')}
+                    ownPhoto={ownPhoto}
+                    partnerPhoto={partnerPhoto}
                   />
                 ))}
               </View>
@@ -688,7 +786,7 @@ export default function ChatScreen({ navigation, route }: Props) {
           <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
             {!isRecording && !recordedAttachment && (
               <Pressable onPress={handleAttachmentPress} hitSlop={8} style={styles.attachBtn}>
-                <CdnSvg uri={CDN + 'jodii-chat-attachment-img.svg'} width={22} height={22} />
+                <CdnSvg uri={CDN + 'jodii-chat-attachment-img.svg'} width={20} height={21} />
               </Pressable>
             )}
 
@@ -758,6 +856,18 @@ export default function ChatScreen({ navigation, route }: Props) {
         onClose={() => setShowReportModal(false)}
         onSubmitted={() => setShowReportModal(false)}
       />
+      {/* Angular: modalpopup.component.html's viewProfileContactNo popup —
+          shown after the "viewed number" card's Call Now/WhatsApp buttons
+          resolve to a real phone number. */}
+      <ContactDetailsSheet
+        visible={!!contactDetails}
+        name={contactDetails?.name ?? ''}
+        mobile={contactDetails?.mobile}
+        whatsappNumber={contactDetails?.whatsappNumber}
+        onClose={() => setContactDetails(null)}
+        onCall={handleContactDetailsCall}
+        onWhatsApp={handleContactDetailsWhatsApp}
+      />
       {/* Angular: becomePaidMemberPopUp() */}
       <BottomSheet
         visible={showPaymentPromo}
@@ -809,19 +919,34 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 10,
     backgroundColor: Colors.surface,
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.divider,
+    // ThreeDotMenu.tsx's dropdown is `position: absolute` INSIDE this header —
+    // its own zIndex:9999 only ranks it among header's children, not against the
+    // ScrollView thread below, which paints on top of header (Android sibling
+    // paint order) without this. Elevation is required for Android; zIndex alone
+    // (RN's iOS/Fabric stacking) isn't enough there.
+    zIndex: 10, elevation: 10,
   },
   backBtn: { padding: 4 },
-  avatarWrap: { width: 40, height: 40 },
-  avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: Colors.surfaceAlt },
+  // Angular: .chat-avatar-profile is 11.12vmin (messages.component.scss:92) —
+  // it scales with the viewport rather than sitting at a fixed px. Sizes are
+  // applied inline from avatarSize below; only the non-dimensional bits live
+  // here.
+  avatarWrap: {},
+  avatar: { backgroundColor: Colors.surfaceAlt },
   onlineDot: {
     position: 'absolute', right: -1, bottom: -1,
     width: 10, height: 10, borderRadius: 5,
     backgroundColor: Colors.iOSGreen, borderWidth: 2, borderColor: Colors.surface,
   },
   headerText: { flex: 1, gap: 1 },
-  headerName: { fontFamily: Fonts.poppinsSemiBold, fontSize: 15, color: Colors.textDark },
+  headerName: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.textDark },
   headerStatus: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textSecondary },
-  moreBtn: { padding: 4 },
+  callBtn: { padding: 4 },
+  // Angular's header row (ion-row) has no explicit gap/column-gap — the call
+  // icon's column zeroes its padding (padd0) while the 3-dot's column keeps
+  // Ionic's own tighter default column padding, so the two icons sit closer
+  // together than the row's general 10px gap. Pull the 3-dot in to match.
+  moreBtn: { padding: 4, marginLeft: -4 },
   // ThreeDotMenu.tsx defaults to top:48/right:12 (anchored to a full-width photo
   // card) — this header is much shorter, so anchor just under the 3-dot button.
   menuPosition: { top: 44, right: 8 },
@@ -837,16 +962,24 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surfaceAlt, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3,
   },
 
+  // Angular: .messages-bottom-block — background #FFF, border-top 1px solid
+  // #E6E6E6, pb-16/pt-16 (16px top/bottom padding, not 8).
   inputBar: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 8,
-    paddingHorizontal: 12, paddingTop: 8,
+    paddingHorizontal: 12, paddingTop: 16, paddingBottom: 16,
     backgroundColor: Colors.surface,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.divider,
+    borderTopWidth: 1, borderTopColor: '#E6E6E6',
   },
+  // Angular: .jodii-chat-attachment-img — width:20px (no CSS override on
+  // height, but the icon itself is square) — was 22x22.
   attachBtn: { padding: 8, marginBottom: 2 },
+  // Angular: .jodii-chat-textarea (empty state) — border 1px solid #808080,
+  // border-radius 52px (pill), background #F0F0F0. Not a borderless 20px-
+  // radius bubble on a flat surfaceAlt fill.
   input: {
     flex: 1, maxHeight: 100, minHeight: 40,
-    backgroundColor: Colors.surfaceAlt, borderRadius: 20,
+    backgroundColor: '#F0F0F0', borderRadius: 52,
+    borderWidth: 1, borderColor: '#808080',
     paddingHorizontal: 16, paddingVertical: 10,
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textPrimary,
   },

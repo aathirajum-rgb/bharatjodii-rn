@@ -156,6 +156,11 @@ export default function SearchablePicker({
           style={[
             styles.panel,
             {
+              // statusBarTranslucent (below) draws this Modal behind the status
+              // bar/notch — nothing pushes the panel's content down from there
+              // automatically, so the close icon sat under the status bar
+              // without this.
+              paddingTop:    insets.top,
               paddingBottom: Platform.OS === 'ios' ? insets.bottom : 16,
               transform: [{ translateX: panelTranslateX }],
             },

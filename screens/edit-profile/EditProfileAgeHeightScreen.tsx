@@ -503,7 +503,10 @@ export default function EditProfileAgeHeightScreen({ navigation: _navigation }: 
       <Modal transparent visible={heightPanelVisible} animationType="none" onRequestClose={closeHeightPanel} statusBarTranslucent>
         <View style={h.panelContainer}>
           <Pressable style={h.backdrop} onPress={closeHeightPanel} />
-          <Animated.View style={[h.panel, { paddingBottom: Platform.OS === 'ios' ? insets.bottom : 16, transform: [{ translateX: panelTranslateX }] }]}>
+          {/* statusBarTranslucent draws this Modal behind the status bar/notch —
+              without an explicit top inset here, the panel's close icon/header
+              sat under it. Same fix as SearchablePicker.tsx/HeightScreen.tsx. */}
+          <Animated.View style={[h.panel, { paddingTop: insets.top, paddingBottom: Platform.OS === 'ios' ? insets.bottom : 16, transform: [{ translateX: panelTranslateX }] }]}>
             <View style={h.panelHeader}>
               <Text style={h.panelTitle}>Select height</Text>
               <TouchableOpacity onPress={closeHeightPanel} hitSlop={8}>

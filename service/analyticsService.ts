@@ -50,7 +50,17 @@ function getFirebaseAnalytics() {
     // Lazy require — native module, must never be touched in Expo Go/web.
     firebaseAnalyticsModule = require('@react-native-firebase/analytics')
   }
-  return firebaseAnalyticsModule.getAnalytics()
+  try {
+    // Throws SYNCHRONOUSLY (not a rejected promise) when no native Firebase
+    // app has been initialized — e.g. a local build with no
+    // GoogleService-Info.plist/google-services.json. That throw happened
+    // before either caller's own .catch() could attach, surfacing as an
+    // uncaught promise rejection on every screen view / event. Analytics
+    // must degrade to a no-op here the same as any other analytics failure.
+    return firebaseAnalyticsModule.getAnalytics()
+  } catch {
+    return null
+  }
 }
 
 function getAppsFlyer(): any {

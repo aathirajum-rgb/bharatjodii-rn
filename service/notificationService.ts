@@ -240,6 +240,11 @@ export function registerBackgroundHandler(): void {
     setBackgroundMessageHandler(getMessaging(), async remoteMessage => {
       await handleRemoteMessage(remoteMessage.data)
     })
+  }).catch(() => {
+    // getMessaging() throws synchronously (not just rejects) when no native
+    // Firebase app is initialized (e.g. a local build with no
+    // GoogleService-Info.plist/google-services.json) — surfaced as an
+    // uncaught promise rejection at cold start with no .catch() here.
   })
 }
 
@@ -386,6 +391,10 @@ export function setupNotificationHandlers(
 
     // App was killed, then cold-started by tapping the notification.
     getInitialNotification(messaging).then(onNotificationTap)
+  }).catch(() => {
+    // Same synchronous-throw-from-getMessaging() gap as registerBackgroundHandler()
+    // above — no native Firebase app initialized must degrade to a no-op here,
+    // not an uncaught rejection every time this runs at app startup.
   })
 
   return () => {

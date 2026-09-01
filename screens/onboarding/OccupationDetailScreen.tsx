@@ -12,8 +12,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -21,7 +19,6 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import {
   getRegValue,
@@ -67,7 +64,6 @@ type Props = {
 
 export default function OccupationDetailScreen({ navigation }: Props) {
   const { t, i18n } = useTranslation()
-  const insets = useSafeAreaInsets()
   const langFonts = useLanguageFonts()
 
   const [value,      setValue]      = useState('')
@@ -184,60 +180,60 @@ export default function OccupationDetailScreen({ navigation }: Props) {
 
   return (
     <View style={os.screen}>
-      <KeyboardAvoidingView
+      {/* No KeyboardAvoidingView here — this screen only ever renders as
+          OnboardingRouter's `renderContent()` output (navigation/AppStack.tsx),
+          inside a shell that already wraps header + content + the persistent
+          footer CTA in its OWN KeyboardAvoidingView. Nesting a second one here
+          double-applied the keyboard compensation and left a large gap above
+          the keyboard on iOS. */}
+      <ScrollView
         style={os.flex1}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
+        contentContainerStyle={os.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          style={os.flex1}
-          contentContainerStyle={os.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
-          <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
+        <Image source={{ uri: CDN_PAGE_ICON }} style={os.pageIcon} contentFit="contain" />
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
-          <View style={styles.inputOuter}>
-            <TextInput
-              ref={inputRef}
-              style={[styles.inputBox, { borderColor, fontFamily: langFonts.medium }, webOutlineReset]}
-              value={value}
-              onChangeText={text => { setValue(text); if (error) setError('') }}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              cursorColor={Colors.textPrimary}
-              selectionColor={Colors.textPrimary}
-              placeholder={t('REGISTRATION.JOBDETAILPLACEHOLDER', 'Eg: Sales manager')}
-              placeholderTextColor={Colors.inputBorder}
-              autoCapitalize="sentences"
-              autoCorrect={false}
-              returnKeyType="done"
-              onSubmitEditing={handleNext}
-            />
-            {/* Floating label chip — same treatment as NameScreen. Angular:
-                JOBDETAILLABEL's <span class='body3-regular-12 color-808080'>
-                keeps "(Optional)" muted grey, not the label's primary color. */}
-            {(() => {
-              const { primary, secondary } = splitOptionalLabel(
-                t('REGISTRATION.JOBDETAILLABEL', "Job details <span class='body3-regular-12 color-808080'>(Optional)</span>"),
-              )
-              return (
-                <View style={styles.labelWrap} pointerEvents="none">
-                  <Text style={{ fontFamily: langFonts.regular }}>
-                    <Text style={styles.labelText}>{primary}</Text>
-                    {secondary != null && (
-                      <Text style={[styles.labelText, styles.labelTextSecondary]}> {secondary}</Text>
-                    )}
-                  </Text>
-                </View>
-              )
-            })()}
-          </View>
+        <View style={styles.inputOuter}>
+          <TextInput
+            ref={inputRef}
+            style={[styles.inputBox, { borderColor, fontFamily: langFonts.medium }, webOutlineReset]}
+            value={value}
+            onChangeText={text => { setValue(text); if (error) setError('') }}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            cursorColor={Colors.textPrimary}
+            selectionColor={Colors.textPrimary}
+            placeholder={t('REGISTRATION.JOBDETAILPLACEHOLDER', 'Eg: Sales manager')}
+            placeholderTextColor={Colors.inputBorder}
+            autoCapitalize="sentences"
+            autoCorrect={false}
+            returnKeyType="done"
+            onSubmitEditing={handleNext}
+          />
+          {/* Floating label chip — same treatment as NameScreen. Angular:
+              JOBDETAILLABEL's <span class='body3-regular-12 color-808080'>
+              keeps "(Optional)" muted grey, not the label's primary color. */}
+          {(() => {
+            const { primary, secondary } = splitOptionalLabel(
+              t('REGISTRATION.JOBDETAILLABEL', "Job details <span class='body3-regular-12 color-808080'>(Optional)</span>"),
+            )
+            return (
+              <View style={styles.labelWrap} pointerEvents="none">
+                <Text style={{ fontFamily: langFonts.regular }}>
+                  <Text style={styles.labelText}>{primary}</Text>
+                  {secondary != null && (
+                    <Text style={[styles.labelText, styles.labelTextSecondary]}> {secondary}</Text>
+                  )}
+                </Text>
+              </View>
+            )
+          })()}
+        </View>
 
-          {!!error && <Text style={[os.errorText, { fontFamily: langFonts.regular }]}>{error}</Text>}
-        </ScrollView>
-      </KeyboardAvoidingView>
+        {!!error && <Text style={[os.errorText, { fontFamily: langFonts.regular }]}>{error}</Text>}
+      </ScrollView>
     </View>
   )
 }

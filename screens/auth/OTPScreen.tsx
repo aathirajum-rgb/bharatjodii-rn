@@ -288,10 +288,14 @@ export default function OTPScreen({ navigation, route }: Props) {
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />
 
+      {/* AppHeader above is a normal layout sibling (not a react-navigation
+          native header), so RN's automatic frame measurement already knows
+          this view starts below it — an explicit keyboardVerticalOffset here
+          double-counts that header height and left a large gap above the
+          keyboard on iOS. */}
       <KeyboardAvoidingView
         style={styles.flex1}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
       >
         <ScrollView
           style={styles.flex1}
