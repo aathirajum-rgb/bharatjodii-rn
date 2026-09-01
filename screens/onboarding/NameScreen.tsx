@@ -1,8 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  KeyboardAvoidingView,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,7 +8,6 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import {
   OTHER_GENDER_KEYS,
@@ -54,7 +51,6 @@ type Props = {
 
 export default function NameScreen({ navigation }: Props) {
   const { t }  = useTranslation()
-  const insets = useSafeAreaInsets()
   const langFonts = useLanguageFonts()
 
   const [name,       setName]       = useState('')
@@ -207,53 +203,53 @@ export default function NameScreen({ navigation }: Props) {
 
   return (
     <View style={os.flex1}>
-      <KeyboardAvoidingView
+      {/* No KeyboardAvoidingView here — this screen only ever renders as
+          OnboardingRouter's `renderContent()` output (navigation/AppStack.tsx),
+          inside a shell that already wraps header + content + the persistent
+          footer CTA in its OWN KeyboardAvoidingView. Nesting a second one here
+          double-applied the keyboard compensation and left a large gap above
+          the keyboard on iOS. */}
+      <ScrollView
         style={os.flex1}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
+        contentContainerStyle={os.scrollContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          style={os.flex1}
-          contentContainerStyle={os.scrollContent}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Page illustration — Angular: ICONTYPE = son-name.svg */}
-          <Image
-            source={{ uri: CDN_ICON }}
-            style={os.pageIcon}
-            contentFit="contain"
+        {/* Page illustration — Angular: ICONTYPE = son-name.svg */}
+        <Image
+          source={{ uri: CDN_ICON }}
+          style={os.pageIcon}
+          contentFit="contain"
+        />
+
+        {/* Dynamic title — "Enter your name" / "Enter your son's name" etc. */}
+        <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
+
+        {/* Outlined name input — Figma: 48px height, 8px radius, #b0b0b0 border */}
+        <View style={styles.inputOuter}>
+          <TextInput
+            ref={inputRef}
+            style={[styles.inputBox, { borderColor }, webOutlineReset]}
+            value={name}
+            onChangeText={handleChangeText}
+            onFocus={() => setIsFocused(true)}
+            onBlur={() => setIsFocused(false)}
+            cursorColor={Colors.textPrimary}
+            selectionColor={Colors.textPrimary}
+            autoCapitalize="words"
+            autoCorrect={false}
+            returnKeyType="done"
+            onSubmitEditing={handleNext}
           />
-
-          {/* Dynamic title — "Enter your name" / "Enter your son's name" etc. */}
-          <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
-
-          {/* Outlined name input — Figma: 48px height, 8px radius, #b0b0b0 border */}
-          <View style={styles.inputOuter}>
-            <TextInput
-              ref={inputRef}
-              style={[styles.inputBox, { borderColor }, webOutlineReset]}
-              value={name}
-              onChangeText={handleChangeText}
-              onFocus={() => setIsFocused(true)}
-              onBlur={() => setIsFocused(false)}
-              cursorColor={Colors.textPrimary}
-              selectionColor={Colors.textPrimary}
-              autoCapitalize="words"
-              autoCorrect={false}
-              returnKeyType="done"
-              onSubmitEditing={handleNext}
-            />
-            {/* Floating label overlapping top border — Figma: top:-8 left:12, white bg, 12px Regular */}
-            <View style={styles.labelWrap} pointerEvents="none">
-              <Text style={[styles.labelText, { fontFamily: langFonts.regular }]}>{t('REGISTRATION.NAMETXT', 'Name')}</Text>
-            </View>
+          {/* Floating label overlapping top border — Figma: top:-8 left:12, white bg, 12px Regular */}
+          <View style={styles.labelWrap} pointerEvents="none">
+            <Text style={[styles.labelText, { fontFamily: langFonts.regular }]}>{t('REGISTRATION.NAMETXT', 'Name')}</Text>
           </View>
+        </View>
 
-          {/* Inline error */}
-          {!!error && <Text style={os.errorText}>{error}</Text>}
-        </ScrollView>
-      </KeyboardAvoidingView>
+        {/* Inline error */}
+        {!!error && <Text style={os.errorText}>{error}</Text>}
+      </ScrollView>
 
       {/* AI name validation sheet — Angular: onboarding3EditSheet, gender hidden */}
       <ConfirmNameGenderSheet
