@@ -62,6 +62,13 @@ const SCREEN_H = Dimensions.get('window').height
 const ITEM_H        = 40   // Figma: each dropdown row is 40px tall
 const MAX_LIST_ITEMS = 7   // how many rows visible before scroll
 
+// Plain KeyboardAvoidingView can't take an Animated.Value directly in its
+// `transform` style (only components wrapped by Animated.createAnimatedComponent
+// can) — passing ageSlideAnim into a plain KeyboardAvoidingView's style crashed
+// with "Transform with key of translateY must be number or a percentage" the
+// moment the sheet mounted, since RN read the node's un-animated snapshot value.
+const AnimatedKeyboardAvoidingView = Animated.createAnimatedComponent(KeyboardAvoidingView)
+
 // Removes the browser's default black focus outline on web — TextInput renders
 // as <input> there, and the outline would sit on top of our custom borderColor.
 // Same fix as NameScreen.tsx.
@@ -776,7 +783,7 @@ export default function DOBScreen({ navigation }: Props) {
           <View style={StyleSheet.absoluteFill} />
         </TouchableWithoutFeedback>
 
-        <KeyboardAvoidingView
+        <AnimatedKeyboardAvoidingView
           style={[
             styles.ageSheet,
             { paddingBottom: insets.bottom + 20 },
@@ -830,7 +837,7 @@ export default function DOBScreen({ navigation }: Props) {
               onPress={handleAgeSubmit}
             />
           </View>
-        </KeyboardAvoidingView>
+        </AnimatedKeyboardAvoidingView>
       </Modal>
     </View>
   )

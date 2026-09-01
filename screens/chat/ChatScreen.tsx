@@ -617,10 +617,14 @@ export default function ChatScreen({ navigation, route }: Props) {
         )}
       </View>
 
+      {/* The header above is a normal layout sibling inside a container that
+          already applies insets.top as paddingTop — RN's automatic frame
+          measurement already knows this view starts below it, so an explicit
+          keyboardVerticalOffset here double-counts that offset and leaves a
+          large gap above the keyboard on iOS. */}
       <KeyboardAvoidingView
         style={styles.flex1}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
       >
         {/* ── Thread ── */}
         {!loaded ? (
@@ -809,6 +813,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 10,
     backgroundColor: Colors.surface,
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.divider,
+    // ThreeDotMenu.tsx's dropdown is `position: absolute` INSIDE this header —
+    // its own zIndex:9999 only ranks it among header's children, not against the
+    // ScrollView thread below, which paints on top of header (Android sibling
+    // paint order) without this. Elevation is required for Android; zIndex alone
+    // (RN's iOS/Fabric stacking) isn't enough there.
+    zIndex: 10, elevation: 10,
   },
   backBtn: { padding: 4 },
   avatarWrap: { width: 40, height: 40 },

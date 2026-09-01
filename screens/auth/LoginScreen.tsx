@@ -40,10 +40,6 @@ const COUNTRIES = [
 
 type Country = (typeof COUNTRIES)[number]
 
-// Same URLs MenuScreen links to (Angular/Android: terms.html / privacy-policy.html)
-const PRIVACY_POLICY_URL   = 'https://www.jodii.com/privacy-policy.html'
-const TERMS_CONDITIONS_URL = 'https://www.jodii.com/terms.html'
-
 // Angular signin.page.ts validateMobileNumber() — exact regex match
 function isValidMobile(mobile: string, country: Country): boolean {
   if (mobile.length < country.minLen || mobile.length > country.maxLen) return false
@@ -219,10 +215,14 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />
 
+      {/* AppHeader above is a normal layout sibling (not a react-navigation
+          native header), so RN's automatic frame measurement already knows
+          this view starts below it — an explicit keyboardVerticalOffset here
+          double-counts that header height and left a large gap above the
+          keyboard on iOS. */}
       <KeyboardAvoidingView
         style={styles.flex1}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 56 : 0}
       >
         <ScrollView
           style={styles.flex1}
@@ -323,24 +323,6 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
               {error || t('LOGIN_PAGE.VALID_MOBILENO')}
             </Text>
           )}
-
-          {/* Terms/Privacy consent notice — Android: registration_frm_txt_click_accept_condition */}
-          <Text style={styles.consentText}>
-            {t('LOGIN_PAGE.AGREE_PREFIX')}
-            <Text
-              style={styles.consentLink}
-              onPress={() => navigation.navigate('ExternalPage', { url: TERMS_CONDITIONS_URL, title: t('ACCOUNT.TERMS_CONDITIONS') })}
-            >
-              {t('LOGIN_PAGE.AGREE_TERMS')}
-            </Text>
-            {t('LOGIN_PAGE.AGREE_AND')}
-            <Text
-              style={styles.consentLink}
-              onPress={() => navigation.navigate('ExternalPage', { url: PRIVACY_POLICY_URL, title: t('ACCOUNT.PRIVACY_POLICY') })}
-            >
-              {t('LOGIN_PAGE.AGREE_PRIVACY')}
-            </Text>
-          </Text>
         </ScrollView>
 
         {/* Sticky "Get OTP" CTA — rises above keyboard via KeyboardAvoidingView */}
@@ -491,21 +473,6 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     fontSize:   12,
     color:      Colors.inputError,
-  },
-
-  // ── Terms/Privacy consent notice ───────────────────────────────────────────
-  consentText: {
-    fontFamily: Fonts.poppinsRegular,
-    fontSize:   12,
-    color:      Colors.textSecondary,
-    marginTop:  16,
-    lineHeight: 18,
-  },
-  consentLink: {
-    fontFamily:      Fonts.poppinsMedium,
-    fontWeight:      '500',
-    color:           Colors.textPrimary,
-    textDecorationLine: 'underline',
   },
 
   // ── Footer CTA ──────────────────────────────────────────────────────────────

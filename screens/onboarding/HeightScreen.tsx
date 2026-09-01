@@ -395,6 +395,10 @@ export default function HeightScreen({ navigation }: Props) {
             style={[
               styles.panel,
               {
+                // statusBarTranslucent draws this Modal behind the status bar/
+                // notch — without an explicit top inset here, the panel's own
+                // close icon/header sat under it. Same fix as SearchablePicker.tsx.
+                paddingTop:    insets.top,
                 paddingBottom: Platform.OS === 'ios' ? insets.bottom : 16,
                 transform: [{ translateX: panelTranslateX }],
               },

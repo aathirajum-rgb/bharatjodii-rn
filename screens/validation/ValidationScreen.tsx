@@ -875,8 +875,16 @@ export default function ValidationScreen({ route }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <CdnSvg uri={CDN_ALERT_ICON} width={48} height={48} />
-        <Text style={[s.title, { fontFamily: langFonts.semiBold }]}>{screenTitle}</Text>
+        {/* isFollowUp renders this SAME icon+title itself, inside the BottomSheet's
+            followUpContent below — showing it here too just left a ghost copy of
+            it visible behind the sheet's dark scrim, since this ScrollView never
+            unmounts while the sheet is layered on top of it. */}
+        {!isFollowUp && (
+          <>
+            <CdnSvg uri={CDN_ALERT_ICON} width={48} height={48} />
+            <Text style={[s.title, { fontFamily: langFonts.semiBold }]}>{screenTitle}</Text>
+          </>
+        )}
 
         {phase === 'form' && (
           <>
@@ -963,7 +971,7 @@ export default function ValidationScreen({ route }: Props) {
       {/* Angular: registration-modal-popup's religionDetailsSheet/dependentSheet
           action — a non-dismissable modal sheet (Angular passes no close/backdrop-
           dismiss here) layered over the confirm screen once it's been submitted. */}
-      <BottomSheet visible={isFollowUp} showClose={false} onClose={() => {}}>
+      <BottomSheet visible={isFollowUp} showClose={false} onClose={() => {}} dismissOnBackdrop={false}>
         <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" style={s.followUpScroll}>
           {followUpContent}
         </ScrollView>
