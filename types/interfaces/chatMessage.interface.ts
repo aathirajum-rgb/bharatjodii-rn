@@ -51,4 +51,8 @@ export interface ChatMessageItem {
   // "Attachment" placeholder rather than crashing on real history that
   // already has them.
   kind:         'text' | 'viewed_number' | 'image' | 'video' | 'audio' | 'other'
+  // Angular: messages.component.html:137/317 — MessageType 11/13 = "you
+  // viewed their number" (YOUVIEWEDNUMBER), 12 = "they viewed yours"
+  // (VIEWEDYOURNUMBER). Only meaningful when kind==='viewed_number'.
+  youViewedThem?: boolean
 }

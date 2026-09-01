@@ -13,7 +13,8 @@ function _diffDays(timestamp: number): number {
 export function formatClockTime(timestamp: number): string {
   const date = new Date(timestamp)
   const hours24 = date.getHours()
-  const amOrPm = hours24 >= 12 ? 'pm' : 'am'
+  // Angular: date:'shortTime' pipe — uppercase AM/PM (e.g. "4:27 PM").
+  const amOrPm = hours24 >= 12 ? 'PM' : 'AM'
   const hours12 = hours24 % 12 || 12
   const minutes = date.getMinutes().toString().padStart(2, '0')
   return `${hours12}:${minutes} ${amOrPm}`

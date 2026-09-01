@@ -514,7 +514,10 @@ export default function MessagerListScreen({ navigation }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.background },
+  // Angular: no ion-content background override on this page — Ionic's
+  // default content background (white) applies throughout, not the app's
+  // usual grey page background.
+  screen: { flex: 1, backgroundColor: Colors.surface },
   flex1:  { flex: 1 },
 
   header: {

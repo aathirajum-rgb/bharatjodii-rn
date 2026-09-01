@@ -21,17 +21,25 @@ function resolveKind(messageType: ChatMessageRecord['MessageType']): ChatMessage
   return 'other'
 }
 
+// Angular: "11 is viewed by me, 12 is viewed your mobile number, 13 is both
+// are viewed" (messages.component.ts:1321) — same rule as chatList.adapter.ts's
+// youViewedThem, independent of SenderId/MatriId (messages.component.html:137
+// routes MessageType 13 to the sent-side YOUVIEWEDNUMBER text unconditionally).
+const YOU_VIEWED_TYPES: (number | string)[] = [11, 13, '11', '13']
+
 export function adaptChatMessageRecord(record: ChatMessageRecord, ownUserId: string): ChatMessageItem {
   const senderId = record.SenderId ?? record.MatriId ?? ''
+  const kind = resolveKind(record.MessageType)
   const item: ChatMessageItem = {
     id:           String(record.MessageTime),
     text:         record.Message ?? '',
     timestamp:    Number(record.MessageTime) || 0,
     isOwnMessage: String(senderId) === String(ownUserId),
     readStatus:   Number(record.RStatus) || 0,
-    kind:         resolveKind(record.MessageType),
+    kind,
   }
   if (record.Duration) item.duration = record.Duration
+  if (kind === 'viewed_number') item.youViewedThem = YOU_VIEWED_TYPES.includes(record.MessageType)
   return item
 }
 
