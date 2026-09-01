@@ -2,12 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Dimensions,
   FlatList,
   Modal,
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
@@ -30,9 +30,18 @@ const ICON_BACK    = CDN_REACT + '/menu_back_arrow.svg'
 const HERO_GIF     = CDN_REACT + '/success_stories.gif'
 const FALLBACK_IMG = CDN_REVAMP + 'not-available.svg'
 
-const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window')
-const CARD_W     = SCREEN_W - 48   // 24px padding each side
+// NOTE there is deliberately no module-level Dimensions.get() here any more.
+// It read the window ONCE at import and every derived size (card width, square
+// photo height, photo-viewer page width) froze at that value — so on any device
+// whose width differed from the first measurement, or after a rotation /
+// split-screen / web resize, cards were the wrong width and their text was
+// clipped. Sizes are now either relative ('100%' + aspectRatio) or read at
+// render time via useWindowDimensions().
 const PAGE_LIMIT = 10
+
+// Side padding of cardWrap, kept as a constant only so the two places that need
+// it agree.
+const CARD_SIDE_PAD = 24
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -76,13 +85,18 @@ function StoryCard({ story, onPress }: StoryCardProps) {
         contentFit="cover"
       />
 
-      {/* Text below photo — centered */}
+      {/* Text below photo — centered.
+          Both were numberOfLines={1}, which is what "hid" content on narrower
+          phones: a two-name pairing ("Kannan & Deepika Srinivasan") or a
+          district + month/year ran past the card and got ellipsised away.
+          Allowed to wrap to 2 lines instead — the card grows to fit rather
+          than the text disappearing. */}
       <View style={c.cardInfo}>
         {!!name && (
-          <Text style={c.cardName} numberOfLines={1}>{name}</Text>
+          <Text style={c.cardName} numberOfLines={2}>{name}</Text>
         )}
         {!!location && (
-          <Text style={c.cardLocation} numberOfLines={1}>{location}</Text>
+          <Text style={c.cardLocation} numberOfLines={2}>{location}</Text>
         )}
       </View>
     </Pressable>
@@ -118,6 +132,12 @@ interface PhotoViewerProps {
 
 function PhotoViewer({ photos, onClose, insets }: PhotoViewerProps) {
   const [activeIndex, setActiveIndex] = useState(0)
+  // Read at render time. A paging FlatList only lands cleanly when the item
+  // width equals the list width EXACTLY — with a module-level snapshot, any
+  // device that wasn't the one measured at import (or any rotation) left the
+  // pages misaligned and cut the next photo in half. The modal is
+  // statusBarTranslucent, so the window dimensions are the full screen.
+  const { width: viewportWidth, height: viewportHeight } = useWindowDimensions()
 
   const displayPhotos = photos.length > 0 ? photos : [{ IMG: '' }]
 
@@ -138,20 +158,20 @@ function PhotoViewer({ photos, onClose, insets }: PhotoViewerProps) {
         showsHorizontalScrollIndicator={false}
         keyExtractor={(_, i) => String(i)}
         onMomentumScrollEnd={e => {
-          const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_W)
+          const idx = Math.round(e.nativeEvent.contentOffset.x / viewportWidth)
           setActiveIndex(idx)
         }}
         renderItem={({ item }) => (
           <Image
             source={{ uri: item.IMG || FALLBACK_IMG }}
-            style={{ width: SCREEN_W, height: SCREEN_H }}
+            style={{ width: viewportWidth, height: viewportHeight }}
             contentFit="contain"
           />
         )}
         style={pv.list}
         getItemLayout={(_, index) => ({
-          length: SCREEN_W,
-          offset: SCREEN_W * index,
+          length: viewportWidth,
+          offset: viewportWidth * index,
           index,
         })}
       />
@@ -276,7 +296,10 @@ export default function SuccessStoriesScreen({ navigation }: Props) {
         >
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
-        <Text style={c.headerTitle} numberOfLines={1}>{title}</Text>
+        {/* 2 lines, not 1: MENU.SUCCESS_STORIES is much longer in ta/ml/kn than
+            in en, and a 1-line clamp inside a fixed-height bar cut it off on
+            narrow phones. The bar is minHeight now, so it grows instead. */}
+        <Text style={c.headerTitle} numberOfLines={2}>{title}</Text>
       </View>
 
       {/* List */}
@@ -285,9 +308,15 @@ export default function SuccessStoriesScreen({ navigation }: Props) {
           <ActivityIndicator color={PRIMARY} size="large" />
         </View>
       ) : stories.length === 0 ? (
-        <View style={c.center}>
+        // The hero used to sit directly inside c.center, whose
+        // alignItems:'center' collapsed the gradient block to its own content
+        // width instead of spanning the screen. Hero pinned to the top at full
+        // width; only the message is centered in what's left.
+        <View style={c.flex1}>
           <HeroSection title={heroTitle} sub={heroSub} />
-          <Text style={c.emptyText}>No stories yet</Text>
+          <View style={c.center}>
+            <Text style={c.emptyText}>No stories yet</Text>
+          </View>
         </View>
       ) : (
         <FlatList
@@ -344,6 +373,7 @@ const c = StyleSheet.create({
     flex:            1,
     backgroundColor: Colors.white,
   },
+  flex1: { flex: 1 },
   center: {
     flex:           1,
     alignItems:     'center',
@@ -357,7 +387,7 @@ const c = StyleSheet.create({
 
   // ── Header ──
   header: {
-    height:          56,
+    minHeight:       56,
     flexDirection:   'row',
     alignItems:      'center',
     backgroundColor: Colors.white,
@@ -408,14 +438,16 @@ const c = StyleSheet.create({
     color:      '#000',
   },
 
-  // ── Card wrapper (provides 24px side padding) ──
+  // ── Card wrapper (provides the side padding) ──
   cardWrap: {
-    paddingHorizontal: 24,
+    paddingHorizontal: CARD_SIDE_PAD,
   },
 
   // ── Card ──
+  // No explicit width: it stretches to fill cardWrap, so it is always exactly
+  // (viewport - 2 * CARD_SIDE_PAD) wide with no arithmetic that can go stale.
   card: {
-    width:           CARD_W,
+    alignSelf:       'stretch',
     backgroundColor: Colors.white,
     borderRadius:    12,
     overflow:        'hidden',
@@ -425,9 +457,11 @@ const c = StyleSheet.create({
     shadowRadius:    16,
     elevation:       6,
   },
+  // Square via aspectRatio rather than height === width-in-pixels, so it stays
+  // square at every width without being recomputed.
   cardPhoto: {
-    width:        CARD_W,
-    height:       CARD_W,   // square
+    width:        '100%',
+    aspectRatio:  1,
     borderRadius: 0,
   },
   cardInfo: {
