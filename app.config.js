@@ -1,10 +1,27 @@
+const fs = require('fs');
+const path = require('path');
 const FLAVORS = require('./constants/flavorConfig');
+
+// Load .env.ota (gitignored) so the OTA manifest URL below isn't hardcoded —
+// same loading approach as scripts/deploy-ota.js, kept in sync with it.
+const envOtaPath = path.join(__dirname, '.env.ota');
+if (fs.existsSync(envOtaPath)) {
+  fs.readFileSync(envOtaPath, 'utf-8').split('\n').forEach(line => {
+    const [key, ...rest] = line.split('=');
+    if (key && rest.length && !process.env[key.trim()]) process.env[key.trim()] = rest.join('=').trim();
+  });
+}
 
 const flavor = process.env.APP_FLAVOR || 'jodii';
 const f = FLAVORS[flavor] || FLAVORS.jodii;
 
 const appEnv = process.env.EXPO_PUBLIC_APP_ENV || 'dev';
 const channelSuffix = process.env.CHANNEL_SUFFIX || 'production';
+
+if (!process.env.OTA_MANIFEST_URL) {
+  throw new Error('OTA_MANIFEST_URL is not set — add it to .env.ota (see envs/.env.template for reference).');
+}
+const otaManifestUrl = process.env.OTA_MANIFEST_URL;
 
 // Mirrors constants/env/env.*.ts's `api` field — app.config.js can't import
 // the .ts env files, so this is kept in sync manually. Needed so App Links
@@ -27,7 +44,7 @@ module.exports = ({ config }) => ({
   icon: f.icon,
   runtimeVersion: '1.0.0',
   updates: {
-    url: 'https://stgimg.jodii.app/jodii-ota-server/jodii-ota-server/manifest.php',
+    url: otaManifestUrl,
     fallbackToCacheTimeout: 0,
     checkAutomatically: 'ON_LOAD',
     requestHeaders: {

@@ -8,8 +8,9 @@
  *   SFTP_HOST      — e.g. stgmobile.jodii.app
  *   SFTP_USER      — e.g. ionic
  *   SFTP_PASSWORD  — your server password
- *   SFTP_OTA_PATH  — remote folder e.g. /home/ionic/www/JodiiReact/jodii-ota-server/ota-files
- *   OTA_SERVER_URL — public URL  e.g. https://stgmobile.jodii.app/jodiiReact/jodii-ota-server/ota-files
+ *   SFTP_OTA_PATH    — remote folder e.g. /home/ionic/www/JodiiReact/jodii-ota-server/ota-files
+ *   OTA_SERVER_URL   — public URL for uploaded bundles/assets, e.g. https://stgmobile.jodii.app/jodiiReact/jodii-ota-server/ota-files
+ *   OTA_MANIFEST_URL — public URL of manifest.php, e.g. https://stgmobile.jodii.app/jodiiReact/jodii-ota-server/manifest.php
  *
  * Optional:
  *   CHANNEL_SUFFIX — defaults to "production"
@@ -58,17 +59,19 @@ const SFTP_USER = process.env.SFTP_USER;
 const SFTP_PASSWORD = process.env.SFTP_PASSWORD;
 const SFTP_OTA_PATH = process.env.SFTP_OTA_PATH;
 const SERVER_URL = process.env.OTA_SERVER_URL;
+const MANIFEST_URL = process.env.OTA_MANIFEST_URL;
 const DIST_DIR = path.join(__dirname, '..', 'dist');
 const RUNTIME_VERSION = require('../package.json').version;
 
-if (!SFTP_HOST || !SFTP_USER || !SFTP_PASSWORD || !SFTP_OTA_PATH || !SERVER_URL) {
+if (!SFTP_HOST || !SFTP_USER || !SFTP_PASSWORD || !SFTP_OTA_PATH || !SERVER_URL || !MANIFEST_URL) {
   console.error(`
-Missing required env vars. Set all of these:
-  SFTP_HOST      = ${SFTP_HOST || '❌ missing'}
-  SFTP_USER      = ${SFTP_USER || '❌ missing'}
-  SFTP_PASSWORD  = ${SFTP_PASSWORD ? '✓ set' : '❌ missing'}
-  SFTP_OTA_PATH  = ${SFTP_OTA_PATH || '❌ missing'}
-  OTA_SERVER_URL = ${SERVER_URL || '❌ missing'}
+Missing required env vars. Set all of these in .env.ota:
+  SFTP_HOST        = ${SFTP_HOST || '❌ missing'}
+  SFTP_USER        = ${SFTP_USER || '❌ missing'}
+  SFTP_PASSWORD    = ${SFTP_PASSWORD ? '✓ set' : '❌ missing'}
+  SFTP_OTA_PATH    = ${SFTP_OTA_PATH || '❌ missing'}
+  OTA_SERVER_URL   = ${SERVER_URL || '❌ missing'}
+  OTA_MANIFEST_URL = ${MANIFEST_URL || '❌ missing'}
   `);
   process.exit(1);
 }
@@ -179,7 +182,7 @@ async function deploy() {
             slug: 'jodii',
             scheme: FLAVOR_CONFIGS[flavor].scheme,
             updates: {
-              url: 'https://stgimg.jodii.app/jodii-ota-server/jodii-ota-server/manifest.php',
+              url: MANIFEST_URL,
             },
             extra: {
               appType: FLAVOR_CONFIGS[flavor].appType,

@@ -669,7 +669,8 @@
     "ota:preview": "CHANNEL_SUFFIX=preview node scripts/deploy-ota.js",
     "ota:production:all": "CHANNEL_SUFFIX=production FLAVOR=all node scripts/deploy-ota.js",
     "ota:preview:all": "CHANNEL_SUFFIX=preview FLAVOR=all node scripts/deploy-ota.js",
-    "ota:server": "node ../jodii-ota-server/server.js"
+    "ota:server": "node ../jodii-ota-server/server.js",
+    "ota:server:create": "node scripts/create-ota-server.js"
   },
   "private": true
 }
