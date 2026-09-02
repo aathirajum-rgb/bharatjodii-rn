@@ -2,9 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTranslation } from 'react-i18next'
 import {
+  ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,9 +19,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import { StorageKeys } from '../../constants/storage.keys'
-import { getItem } from '../../service/storageService'
+import { getItem, setItem } from '../../service/storageService'
 import { getSession, getSessionValue } from '../../service/registrationService'
 import { fetchMenuPromo } from '../../service/homeService'
+import { uploadFile } from '../../service/apiClient'
+import { Endpoints } from '../../service/api.endpoints'
+import { managePhotos } from '../../service/profileService'
 import { paymentTrack, redirectToIntermediatePage } from '../../service/paymentService'
 import { checkFreeTrialCondition } from '../../service/payWallService'
 import { stripAndDecodeHtml } from '../../utils/htmlEntities'
@@ -27,6 +33,7 @@ import { handleBack } from '../../utils/navigationRef'
 import { disconnectSocket } from '../../service/socketService'
 import { logEvent, dispatchNativeEvent } from '../../service/analyticsService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CustomGalleryScreen from '../onboarding/CustomGalleryScreen'
 import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import LanguagePillSheet from '../../components/language-pill/LanguagePillSheet'
@@ -218,6 +225,16 @@ export default function MenuScreen({ navigation }: Props) {
   const [membershipExp, setMembershipExp] = useState('')
   const [appVersion,    setAppVersion]    = useState('')
   const [logoutSheetVisible, setLogoutSheetVisible] = useState(false)
+
+  // ── Photo picker (camera badge on the avatar) ───────────────────────────────
+  // Same mechanism as EditProfileScreen's photo grid: on native, a full-screen
+  // Modal over CustomGalleryScreen; on web, a hidden <input type="file"> that
+  // IS the picker, because browsers only open a file dialog from a direct
+  // synchronous click — there is no intermediate screen to route through.
+  const [galleryVisible, setGalleryVisible] = useState(false)
+  const [webUploading,   setWebUploading]   = useState(false)
+  const [photoCount,     setPhotoCount]     = useState(0)
+  const webFileInputRef = useRef<HTMLInputElement | null>(null)
   // Angular's PROMO_CONT — payment/nbmenu/v1's RESPONSE, carrying CONTENT1
   // (the offer copy), CTA_TXT (button label), PAYMENTID, and a HOMEPAGE object
   // whose MENUTITLE/CTA drive the expired variant of the banner.
@@ -239,11 +256,16 @@ export default function MenuScreen({ navigation }: Props) {
       getItem(StorageKeys.User.PHOTO_URL),
       getItem(StorageKeys.App.APP_VERSION),
       getItem(StorageKeys.Verification.EKYC_STATUS),
-    ]).then(([session, id, photo, ver, ekyc]) => {
+      // Written by managePhotos(). Feeds the picker's existingCount so the
+      // MAX_PHOTOS cap counts photos the member already has — passing 0 would
+      // let them add a full set on top of an existing one.
+      getItem('PHOTOCOUNT'),
+    ]).then(([session, id, photo, ver, ekyc, photoCnt]) => {
       if (cancelled) return
       setUserName(String(session['NAME'] ?? ''))
       setUserId(id ?? '')
       setPhotoUrl(photo ?? '')
+      setPhotoCount(Number(photoCnt ?? 0) || 0)
       // A newly arrived photo clears any earlier load failure, otherwise the
       // placeholder would stick for the life of the mount.
       setPhotoFailed(false)
@@ -272,6 +294,49 @@ export default function MenuScreen({ navigation }: Props) {
   useEffect(() => {
     getOwnGenderAvatarUrl().then(setGenderAvatarUrl)
   }, [])
+
+  // ── Photo picker handlers ───────────────────────────────────────────────────
+
+  function openGalleryPicker() {
+    if (Platform.OS === 'web') {
+      webFileInputRef.current?.click()
+    } else {
+      setGalleryVisible(true)
+    }
+  }
+
+  // managePhotos() is what actually writes PHOTO_URL to storage from the
+  // photo list; the avatar here reads that key, so it has to run before the
+  // re-read or the badge would upload a photo the menu never shows. The modal
+  // doesn't blur this screen, so useFocusEffect above won't fire on its own.
+  const refreshAfterUpload = useCallback(async () => {
+    await managePhotos()
+    loadProfileSummary()
+  }, [loadProfileSummary])
+
+  async function handleWebFiles(e: any) {
+    const files: File[] = Array.from(e.target.files ?? [])
+    if (!files.length) return
+    setWebUploading(true)
+    try {
+      const uid = (await getItem(StorageKeys.Auth.USER_ID)) ?? ''
+      for (const file of files) {
+        const formData = new FormData()
+        formData.append('ID', uid)
+        formData.append('UPLOADPHOTO', file, file.name)
+        const res = await uploadFile(Endpoints.media.addProfilePic, formData)
+        if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
+          await setItem(StorageKeys.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
+        }
+      }
+      await refreshAfterUpload()
+    } catch {
+      Alert.alert('Error', 'Upload failed. Please try again.')
+    } finally {
+      setWebUploading(false)
+      if (webFileInputRef.current) webFileInputRef.current.value = ''
+    }
+  }
 
   const isPaid = entryType !== '' && !['B', 'F'].includes(entryType)
 
@@ -354,8 +419,17 @@ export default function MenuScreen({ navigation }: Props) {
         {/* ── Card 1: Profile ── */}
         <View style={s.card}>
           <View style={s.profileRow}>
-            {/* Avatar with camera badge */}
-            <View style={s.avatarContainer}>
+            {/* Avatar with camera badge — the WHOLE circle is the tap target
+                for the photo picker, not just the badge. The badge is only the
+                affordance; it sits inside the container's 70x70 bounds, so one
+                Pressable on the container covers both. */}
+            <Pressable
+              style={s.avatarContainer}
+              onPress={openGalleryPicker}
+              disabled={webUploading}
+              accessibilityRole="button"
+              accessibilityLabel={t('EDITPROFILE.ADDPHOTO')}
+            >
               <View style={s.avatarWrap}>
                 {photoUrl && !photoFailed ? (
                   <Image
@@ -371,10 +445,15 @@ export default function MenuScreen({ navigation }: Props) {
                   !!genderAvatarUrl && <CdnSvg uri={genderAvatarUrl} width={70} height={70} />
                 )}
               </View>
-              <View style={s.cameraBadge}>
-                <CdnSvg uri={ICON.camera} width={13} height={13} />
+              {/* Purely decorative now — pointerEvents:'none' so it can't
+                  swallow a tap that belongs to the avatar Pressable above. */}
+              <View style={s.cameraBadge} pointerEvents="none">
+                {webUploading
+                  ? <ActivityIndicator color={Colors.primary} size="small" />
+                  : <CdnSvg uri={ICON.camera} width={13} height={13} />
+                }
               </View>
-            </View>
+            </Pressable>
 
             {/* Info */}
             <View style={s.profileInfo}>
@@ -558,6 +637,36 @@ export default function MenuScreen({ navigation }: Props) {
         onClose={() => setShowLanguageSheet(false)}
         allLanguages
       />
+
+      {/* Native photo picker — embedded, not a navigate(), so finishing an
+          upload just dismisses this modal and refreshes the avatar in place.
+          Mirrors EditProfileScreen's own mount of the same screen. */}
+      <Modal
+        visible={galleryVisible}
+        animationType="slide"
+        onRequestClose={() => setGalleryVisible(false)}
+        presentationStyle="fullScreen"
+      >
+        <CustomGalleryScreen
+          navigation={navigation}
+          route={{ params: { existingCount: photoCount } }}
+          onClose={() => setGalleryVisible(false)}
+          onUploaded={() => { setGalleryVisible(false); refreshAfterUpload() }}
+        />
+      </Modal>
+
+      {/* Web only — this hidden input IS the picker (see openGalleryPicker) */}
+      {Platform.OS === 'web' && (
+        // @ts-ignore — raw DOM element, react-native-web only
+        <input
+          ref={webFileInputRef}
+          type="file"
+          accept="image/*"
+          multiple
+          style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden' }}
+          onChange={handleWebFiles}
+        />
+      )}
     </View>
   )
 }
@@ -591,7 +700,7 @@ const s = StyleSheet.create({
   card: {
     backgroundColor: Colors.white,
     borderRadius:    12,
-    overflow:        'hidden',
+    overflow:        'hidden'
   },
 
   // ── Buy-membership promo band ──
@@ -670,7 +779,7 @@ const s = StyleSheet.create({
   profileRow: {
     flexDirection: 'row',
     alignItems:    'center',
-    padding:       16,
+    padding:       20,
     gap:           12,
   },
   avatarContainer: {
