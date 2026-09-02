@@ -146,6 +146,11 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
     // Angular: uploadPhotoSuccess() routes through getFewMoreDetailsNext('20'),
     // so a completed photo upload enters the same conditional 34/35 chain.
     onNext:       () => {
+      // Angular: registration-revamp.component.ts's clickOnNext('20') has no
+      // PHOTOSTATUS check at all — Confirm always proceeds, even with a photo
+      // still pending. (Angular also auto-advances this same page itself,
+      // straight from the upload-verdict callback, without waiting for a tap
+      // — a separate, bigger behavior gap this RN port doesn't close yet.)
       if (standalone) { handleBack(); return }
       getFewMoreDetailsNextPage('20').then(next =>
         navigation.push('onboarding', { pageNo: next }))
@@ -207,13 +212,20 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
   // popup shows the UNDERVALIDATE/TAKEHOURS message instead.
   function handlePhotoPress(photo: Photo) {
     if (photo.PHOTOSTATUS === 0) {
-      Alert.alert(
-        'Photo under validation',
-        'Your photo is being validated. This may take a few hours.',
-      )
+      showUnderValidationAlert()
       return
     }
     setAsMain(photo)
+  }
+
+  // Reused by both the per-photo guard above and the Confirm-button guard
+  // below — same Angular UNDERVALIDATE/TAKEHOURS copy (modalpopup.component.html),
+  // already translated in all 11 locale files.
+  function showUnderValidationAlert() {
+    Alert.alert(
+      t('MATCHES.UNDERVALIDATE', 'Your photo is getting validated'),
+      t('MATCHES.TAKEHOURS', 'This will take around 1 hour. We will notify you when its done'),
+    )
   }
 
   async function setAsMain(photo: Photo) {
