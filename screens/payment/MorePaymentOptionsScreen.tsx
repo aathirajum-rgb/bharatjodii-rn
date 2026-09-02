@@ -9,8 +9,9 @@
 
 import { useEffect, useRef, useState } from 'react'
 import {
-  Alert, Linking, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View,
+  Alert, Image, Linking, Platform, Pressable, ScrollView, Share, StyleSheet, Text, View,
 } from 'react-native'
+import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import QRCode from 'react-native-qrcode-svg'
 import { File, Paths } from 'expo-file-system'
@@ -30,6 +31,9 @@ const ICON_BACK    = CDN_REACT + '/menu_back_arrow.svg'
 const ICON_CHEVRON = CDN_REACT + '/menu_right_arrow.svg'
 const ICON_WHATSAPP = CDN + 'assets/images/svg/whatsapp-green-icon.svg'
 const QR_LOGO       = CDN + 'assets/images/png/logo-icon.png'
+// Angular: .bottom-right-design (global.scss:5842) — same rangoli decoration
+// as CardPaymentScreen's footer, position fixed/right 0/bottom 0/z-index -1.
+const ICON_BOTTOM_DESIGN = CDN + 'assets/images/svg/reg-btm-img.svg'
 
 // Angular: delayQR() — checked once, 2 minutes after the QR is shown.
 const QR_OUTCOME_DELAY_MS = 120000
@@ -43,6 +47,7 @@ function resolveIcon(path: string): string {
 type Props = { navigation: any; route: any }
 
 export default function MorePaymentOptionsScreen({ navigation, route }: Props) {
+  const { t, i18n } = useTranslation()
   const insets = useSafeAreaInsets()
   const selectedPackage: SelectedPackage | undefined = route.params?.selectedPackage
   const amountLabel: string | undefined = route.params?.amountLabel
@@ -146,30 +151,44 @@ export default function MorePaymentOptionsScreen({ navigation, route }: Props) {
         <Pressable onPress={handleBack} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
-        <Text style={s.headerTitle} numberOfLines={1}>More Payment Options</Text>
+        <Text style={s.headerTitle} numberOfLines={1}>{t('RECHARGE.MOREOPTION')}</Text>
       </View>
 
       <ScrollView contentContainerStyle={s.content}>
-        {methods.map((item, idx) => (
+        {methods.map(item => (
           <Pressable
             key={item.KEY}
-            style={[s.row, idx === methods.length - 1 && s.rowLast]}
+            style={s.row}
             onPress={() => handlePress(item)}
             accessibilityRole="button"
           >
-            <View style={s.rowLeft}>
-              <View style={s.iconBox}>
-                <CdnSvg uri={resolveIcon(item.IMG)} width={24} height={24} />
-              </View>
-              <Text style={s.rowLabel}>{item.NAME}</Text>
+            <View style={s.iconBox}>
+              <CdnSvg uri={resolveIcon(item.IMG)} width={24} height={24} />
             </View>
-            <CdnSvg uri={ICON_CHEVRON} width={20} height={20} />
+            {/* Angular: the divider border lives on <ion-item> (payment-mode-
+                labels col), which wraps only the label + chevron — the icon is
+                a separate column outside it — so the line starts at the text,
+                not under the icon. Angular never strips the border on the
+                last row (no last-child rule on .payment-mode-labels ion-item),
+                so it shows on every row including the final one. */}
+            <View style={s.rowText}>
+              {/* Angular: more-payment-option.page.html (unlike payment-mode.
+                  page.html's PAGE_ID==1 rows) labels via pageContent[item?.KEY]
+                  — the local i18n string keyed by KEY — not item.NAME from the
+                  API. i18nExists guards KEY values without a RECHARGE.<KEY>
+                  translation, falling back to the API's own NAME so nothing
+                  renders blank. */}
+              <Text style={s.rowLabel}>
+                {i18n.exists(`RECHARGE.${item.KEY}`) ? t(`RECHARGE.${item.KEY}`) : item.NAME}
+              </Text>
+              <CdnSvg uri={ICON_CHEVRON} width={20} height={20} />
+            </View>
           </Pressable>
         ))}
 
         {!!helpline && (
           <LinkCTA
-            text="Need help in making payment?"
+            text={t('RECHARGE.NEED_HELP_CONTENT')}
             contact={helpline}
             onPress={() => Linking.openURL(`tel:${helpline}`)}
             style={s.helpline}
@@ -178,26 +197,40 @@ export default function MorePaymentOptionsScreen({ navigation, route }: Props) {
 
         {!!qrData?.qrValue && (
           <View style={s.qrCard}>
-            <Text style={s.qrTitle}>Request a family member or friend to pay for you?</Text>
+            <Text style={s.qrTitle}>{t('RECHARGE.PAY_AMT_FOR_YOU')}</Text>
 
             <View style={s.qrImageWrap}>
               <QRCode value={qrData.qrValue} size={220} logo={{ uri: QR_LOGO }} logoSize={44} logoBorderRadius={22} />
             </View>
 
+            {/* Angular: [innerHTML]="pageContent['SHARE_QR_CODE']" — the string
+                carries literal <br> tags; split them into RN line breaks. */}
             <Text style={s.qrNote}>
-              Share the payment link & QR code with your family member/friend{'\n'}or{'\n'}
-              Scan the QR code to pay for your Jodii membership
+              {t('RECHARGE.SHARE_QR_CODE').split(/<br\s*\/?>/i).map((line, i, arr) => (
+                <Text key={i}>
+                  {line.trim()}
+                  {i < arr.length - 1 ? '\n' : ''}
+                </Text>
+              ))}
             </Text>
 
             {!!qrData.whatsappMsg && (
               <Pressable style={s.whatsappBtn} onPress={shareQrOnWhatsApp}>
                 <CdnSvg uri={ICON_WHATSAPP} width={20} height={20} />
-                <Text style={s.whatsappLabel}>Share profile on WhatsApp</Text>
+                <Text style={s.whatsappLabel}>{t('RECHARGE.WHATSAPP_CTA')}</Text>
               </Pressable>
             )}
           </View>
         )}
       </ScrollView>
+
+      {/* Angular: .bottom-right-design (global.scss:5842) — position fixed,
+          right 0, bottom 0, z-index -1; same rangoli as CardPaymentScreen. */}
+      <Image
+        source={{ uri: ICON_BOTTOM_DESIGN }}
+        style={s.bottomDesign}
+        resizeMode="contain"
+      />
     </View>
   )
 }
@@ -205,29 +238,48 @@ export default function MorePaymentOptionsScreen({ navigation, route }: Props) {
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.white },
 
+  // Angular: .hide-header-bar.header-md::after { height: 0 } (global.scss:
+  // 2737) — this page explicitly zeroes Ionic's default header shadow/border,
+  // so no shadow here.
   header: {
     height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
     backgroundColor: Colors.white,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
-  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, marginLeft: 16, flex: 1 },
+  // Angular: .hide-header-bar .header-title (global.scss:2741) — english-
+  // regular-poppins at font20 (20px), color gray-color1 #1f1e1b (not semibold
+  // 16px black).
+  headerTitle: {
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 20, color: '#1f1e1b',
+    marginLeft: 16, flex: 1,
+  },
 
   content: { padding: 16 },
 
   row: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           16,
+    minHeight:     64,
+  },
+  // Angular: the border lives on <ion-item> (payment-mode-labels column),
+  // which wraps only the label + chevron — the icon is a separate column
+  // outside it — so the divider starts at the text, not under the icon.
+  rowText: {
+    flex: 1,
     flexDirection:  'row',
     alignItems:     'center',
     justifyContent: 'space-between',
     minHeight:      64,
-    borderBottomWidth: 1,
+    // ADJUSTABLE — divider thickened past Angular's Ionic-default hairline
+    // border per user request.
+    borderBottomWidth: 1.35,
     borderBottomColor: Colors.divider,
   },
-  rowLast: { borderBottomWidth: 0 },
-  rowLeft:  { flexDirection: 'row', alignItems: 'center', gap: 16, flexShrink: 1 },
   iconBox: {
     width: 32, height: 32, alignItems: 'center', justifyContent: 'center',
   },
-  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 16, color: Colors.black },
+  // Angular: .payment-mode-labels ion-label — color #1F1F1F (not pure black).
+  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 16, color: '#1F1F1F' },
 
   helpline: { marginTop: 32 },
 
@@ -249,4 +301,16 @@ const s = StyleSheet.create({
     paddingVertical: 10, paddingHorizontal: 20,
   },
   whatsappLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.black },
+
+  // Angular: .bottom-right-design — position fixed, right 0, bottom 0,
+  // z-index -1. Same SVG/treatment as CardPaymentScreen's footer rangoli.
+  bottomDesign: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    width: 149,
+    height: 162,
+    opacity: 1,
+    zIndex: -1,
+  },
 })

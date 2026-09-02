@@ -36,6 +36,7 @@ import {
   StyleSheet,
   Switch,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -52,11 +53,11 @@ import { getJson } from '../../service/storageService'
 import { getPPSetData } from '../../service/profileService'
 import { handleBack } from '../../utils/navigationRef'
 import { getSessionValue } from '../../service/registrationService'
-import { updateAutoRenewal, requestAutopayRefund, stripHtml, parseAmount, formatAmount } from '../../service/paymentService'
+import { updateAutoRenewal, requestAutopayRefund, stripHtml, getMenuPromo } from '../../service/paymentService'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { getMembershipTierTheme } from './membershipTierTheme'
 import MenuContactsDesktopLayout from './MenuContactsDesktopLayout'
-import type { FooterTab } from '../../components/app-footer/AppFooter'
+import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ICONS = {
@@ -88,10 +89,21 @@ type TxnRow = { packname?: string; packduration?: string; amount?: string; payda
 
 type MissingBenefit = { icon?: string; value?: string }
 
-export default function MenuContactsScreen({ navigation }: { navigation: any }) {
+export default function MenuContactsScreen({ navigation, route }: { navigation: any; route?: any }) {
   const { t, i18n } = useTranslation()
   const insets = useSafeAreaInsets()
   const isDesktop = useIsDesktopWeb()
+  const { height: winH } = useWindowDimensions()
+  // Angular: .membership-payment-successful-img { width: 4vh } — 4% of the
+  // VIEWPORT HEIGHT (menu-contacts.page.scss:175), an unusual unit for an
+  // icon but that is what ships. RN has no vh, so it is computed here.
+  const paymentIconSize = Math.round(winH * 0.04)
+
+  // Angular: menu-contacts.page.ts:95 — router state header 1/3 (i.e. arrived
+  // from the bottom nav) sets BACK_ICON:'0', and the template's
+  // *ngIf="[1,3].includes(header)" is what renders <app-footer>. So the back
+  // arrow and the tab bar are two faces of the same flag, never both shown.
+  const fromTab = !!route?.params?.fromTab
 
   function handleTabPress(tab: FooterTab) {
     switch (tab) {
@@ -99,8 +111,24 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
       case 1: navigation.navigate('Matches');  break
       case 2: navigation.navigate('Activity'); break
       case 4: navigation.navigate('MessagerList'); break
+      // case 3 (Membership) — already here, no-op.
     }
   }
+
+  // Angular: footer.component.ts:97-100 — upgradeTag = getMenuPromo()'s
+  // MENUDISCOUNT ('' when absent), the "₹1200 OFF" chip over the Membership
+  // tab. It is server-rendered copy (symbol, amount and "OFF" all come from
+  // nbmenu), so it is never built or translated client-side. getMenuPromo
+  // caches, so fetching it here costs nothing extra.
+  const [upgradeTag, setUpgradeTag] = useState('')
+  useEffect(() => {
+    if (!fromTab) return
+    let cancelled = false
+    getMenuPromo().then(promo => {
+      if (!cancelled) setUpgradeTag(String(promo?.MENUDISCOUNT ?? ''))
+    })
+    return () => { cancelled = true }
+  }, [fromTab])
 
   const [loading, setLoading] = useState(true)
   const [contactDetail, setContactDetail] = useState<Record<string, any> | null>(null)
@@ -163,7 +191,16 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
   const emiSteps: EmiStep[] = Array.isArray(paymentInfo?.emidetails) ? paymentInfo.emidetails : []
   const txnRows: TxnRow[] = Array.isArray(transactions?.DATA) ? transactions.DATA : []
 
-  const showRenewPlan = String(paymentInfo?.emicomplete ?? '1') === '0'
+  // Angular: menu-contacts.page.ts:325-328 showRenewalButton() — BOTH
+  // emicomplete == '0' AND RENEWALENABLEKEY == '1'. The renewal key is read
+  // from session storage the same way getMenuPromo()/getPromotionDetails()
+  // already do, so the second half of the gate no longer has to be skipped.
+  const [renewalEnabled, setRenewalEnabled] = useState(false)
+  useEffect(() => {
+    getSessionValue('RENEWALENABLEKEY').then(v => setRenewalEnabled(String(v ?? '0') === '1'))
+  }, [])
+  const showRenewalButton = String(paymentInfo?.emicomplete ?? '1') === '0' && renewalEnabled
+  const showRenewPlan = showRenewalButton
 
   function rowIsWarning(row: UsageRow): boolean {
     const balance = Number(row.balance ?? row.value ?? 0)
@@ -318,11 +355,17 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
+      {/* Angular: header.component.html:107-120 (the TYPE 'header2' branch) —
+          the back button is hidden (BACK_ICON '0') whenever the page was
+          reached from the bottom nav, leaving the title flush at the row's
+          own pl-16. */}
       <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
-          <CdnSvg uri={ICONS.back} width={24} height={24} />
-        </Pressable>
-        <Text style={s.headerTitle} numberOfLines={1}>{t('GENERAL.MEMBERSHIP_HEADER', 'My Membership')}</Text>
+        {!fromTab && (
+          <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
+            <CdnSvg uri={ICONS.back} width={24} height={24} />
+          </Pressable>
+        )}
+        <Text style={[s.headerTitle, fromTab && s.headerTitleNoBack]} numberOfLines={1}>{t('GENERAL.MEMBERSHIP_HEADER', 'My Membership')}</Text>
       </View>
 
       {loading ? (
@@ -346,30 +389,52 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
               end={{ x: 0, y: 1 }}
               style={s.heroTop}
             >
-              <View style={[s.statusBadge, isExpired || isExpiring ? s.statusBadgeWarn : s.statusBadgeActive]}>
-                <Text style={[s.statusBadgeText, isExpired || isExpiring ? s.statusBadgeTextWarn : s.statusBadgeTextActive]} numberOfLines={1}>
-                  {isExpired
-                    ? 'Membership Expired'
-                    : isExpiring
-                      ? `Expiring in ${expiryDays} day${expiryDays === 1 ? '' : 's'}`
-                      : 'Active'}
-                </Text>
-              </View>
+              {/* Angular: menu-contacts.page.html:12 — the label is bound
+                  straight from MEMBERSHIPDETAILS.membershipStatus and rendered
+                  only when that field is present; membershipExpiryDays <= 5
+                  picks the styling class alone, never the wording. RN was
+                  building this string client-side in English ("Expiring in 3
+                  days" / "Membership Expired" / "Active"), which every
+                  non-English user would have seen untranslated. */}
+              {!!membership.membershipStatus && (
+                <View style={[s.statusBadge, isExpired || isExpiring ? s.statusBadgeWarn : s.statusBadgeActive]}>
+                  <Text style={[s.statusBadgeText, isExpired || isExpiring ? s.statusBadgeTextWarn : s.statusBadgeTextActive]} numberOfLines={1}>
+                    {stripHtml(membership.membershipStatus)}
+                  </Text>
+                </View>
+              )}
 
               <View style={s.heroRow}>
                 <View style={s.heroTextCol}>
+                  {/* Angular: menu-contacts.page.html:303 — the expired-state
+                      heading is bound straight to packageName, which the API
+                      already returns as the full sentence ("Your Basic
+                      Membership has expired!"). RN was assembling that
+                      sentence in English around the plan name instead. */}
                   <Text style={s.planTitle} numberOfLines={2}>
                     {isExpired
-                      ? `Your ${planTitle || 'membership'} has expired!`
+                      ? stripHtml(String(membership.packageName ?? ''))
                       : (planTitle || membership.packageName || '')}
                   </Text>
                   {isExpired
                     ? !!membership.packexpirytext && <Text style={s.planDuration}>{stripHtml(membership.packexpirytext)}</Text>
                     : !!planDuration && <Text style={s.planDuration}>{planDuration}</Text>}
                 </View>
-                <View style={[s.crownBadge, { backgroundColor: isExpired ? Colors.primaryDark : tierTheme.crownBadgeBg }]}>
-                  <CdnSvg uri={isExpired ? ICONS.alert : ICONS.crown} width={28} height={28} />
-                </View>
+                {/* Angular: menu-contacts.page.html:19 and :307 — both hero
+                    states render MEMBERSHIPDETAILS.headericon as a bare
+                    <ion-img> with NO circular wrapper; the coloured disc is
+                    baked into the API-supplied artwork itself. RN was drawing
+                    its own tinted circle around a local crown/alert asset,
+                    which double-draws the disc and ignores whatever icon the
+                    backend picked for the tier. Falls back to the local pair
+                    only if the API omits the field. */}
+                {membership.headericon ? (
+                  <CdnSvg uri={String(membership.headericon)} width={48} height={48} />
+                ) : (
+                  <View style={[s.crownBadge, { backgroundColor: isExpired ? Colors.primaryDark : tierTheme.crownBadgeBg }]}>
+                    <CdnSvg uri={isExpired ? ICONS.alert : ICONS.crown} width={28} height={28} />
+                  </View>
+                )}
               </View>
             </LinearGradient>
 
@@ -419,17 +484,15 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
                   </View>
                 )}
 
-                {showRenewPlan && (
-                  <ButtonRevamp
-                    label={t('MENU.RENEW_PLAN', 'Renew Plan')}
-                    variant="primary" size="standard" fullWidth
-                    onPress={goToRecharge}
-                    style={s.renewPlanBtn}
-                  />
-                )}
-
+                {/* Angular: menu-contacts.page.html:48-56 — the strip leads
+                    with MEMBERSHIPDETAILS.timericon (an API URL), which RN
+                    omitted, and its background is hardcoded to the -basic
+                    variant rather than following packagetype. */}
                 {!!membership.packexpirytext && (
-                  <View style={[s.footerStrip, { backgroundColor: tierTheme.footerBg }]}>
+                  <View style={s.footerStrip}>
+                    {!!membership.timericon && (
+                      <CdnSvg uri={String(membership.timericon)} width={12} height={12} />
+                    )}
                     <Text style={s.expiryText}>{stripHtml(membership.packexpirytext)}</Text>
                   </View>
                 )}
@@ -437,76 +500,138 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
             )}
           </View>
 
-          {/* ── Payment / EMI status ── */}
-          {!isExpired && !!paymentInfo && (!!paymentInfo.content || emiSteps.length > 0) && (
-            <View style={s.card}>
-              {!!paymentInfo.title && <Text style={s.sectionTitle}>{paymentInfo.title}</Text>}
-
-              {emiSteps.length > 0 && (
-                <View style={s.emiStepper}>
-                  {emiSteps.map((step, idx) => (
-                    <View key={idx} style={s.emiStep}>
-                      {!!step.icon && <CdnSvg uri={step.icon} width={20} height={20} />}
-                      <Text style={s.emiKey} numberOfLines={1}>{step.key}</Text>
-                      {String(step.cta) === '1' ? (
-                        <ButtonRevamp label={step.value ?? 'Pay'} variant="primary" size="small" onPress={goToRecharge} />
-                      ) : (
-                        <Text style={s.emiValue}>{step.value}</Text>
-                      )}
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {!!paymentInfo.content && <Text style={s.paymentContent}>{paymentInfo.content}</Text>}
-              {!!paymentInfo.content2 && <Text style={s.paymentContent2}>{paymentInfo.content2}</Text>}
-            </View>
-          )}
-
-          {/* ── Package usage details ── */}
+          {/* ── Package usage details ──
+              Angular: menu-contacts.page.html:61-62 — the heading is a SIBLING
+              ABOVE the card (mt-40), not a row inside it, and it uses
+              font-14-semibold (14px) while the two headings further down use
+              heading3-semibold-16 (16px). The three section headings are
+              genuinely inconsistent in Angular; this reproduces that. */}
           {!isExpired && usageRows.length > 0 && (
-            <View style={s.card}>
-              <Text style={s.sectionTitle}>{membership.content ?? 'Package Usage Details'}</Text>
-              {usageRows.map((row, idx) => {
-                const warning = rowIsWarning(row)
-                return (
-                  <View key={idx} style={s.usageRow}>
-                    {!!row.icon && <CdnSvg uri={row.icon} width={24} height={24} />}
-                    <View style={s.usageTextCol}>
-                      <Text style={s.usageTitle}>{row.title}</Text>
-                      {!!row.subcontent && <Text style={s.usageSub}>{row.subcontent}</Text>}
+            <>
+              <Text style={s.sectionTitleUsage}>{membership.content ?? ''}</Text>
+              <View style={s.usageCard}>
+                {usageRows.map((row, idx) => {
+                  const warning = rowIsWarning(row)
+                  // Angular: .bottom-border-e5e5e5 on every row, suppressed by
+                  // :last-child — but the Renew Plan row, when present, IS the
+                  // real last child, so the final usage row keeps its divider.
+                  const isLast = idx === usageRows.length - 1 && !showRenewalButton
+                  return (
+                    <View key={idx} style={[s.usageRow, !isLast && s.usageRowDivided]}>
+                      {!!row.icon && <CdnSvg uri={row.icon} width={24} height={24} />}
+                      <View style={s.usageTextCol}>
+                        <Text style={s.usageTitle}>{row.title}</Text>
+                        {!!row.subcontent && <Text style={s.usageSub}>{row.subcontent}</Text>}
+                      </View>
+                      {warning && (
+                        <Pressable onPress={() => handleAttentionPress(row)} hitSlop={8} style={s.infoBtn}>
+                          <CdnSvg uri={ICONS.info} width={16} height={16} />
+                        </Pressable>
+                      )}
+                      {/* Angular: menu-contacts.page.html:81-82 — two spans at
+                          DIFFERENT sizes: the count is heading3-semibold-16
+                          (16px/600) and the "/total" is body1-medium-14
+                          (14px/500), with the slash prepended in the template.
+                          RN rendered the whole thing at one size. */}
+                      <Text style={[s.usageBalance, warning && s.usageBalanceWarn]}>
+                        {row.balance ?? row.value ?? 0}
+                        {row.total != null && (
+                          <Text style={[s.usageTotal, warning && s.usageBalanceWarn]}>{`/${row.total}`}</Text>
+                        )}
+                      </Text>
                     </View>
-                    <Text style={[s.usageBalance, warning && s.usageBalanceWarn]}>
-                      {row.balance ?? row.value ?? 0}{row.total != null ? `/${row.total}` : ''}
-                    </Text>
-                    {warning && (
-                      <Pressable onPress={() => handleAttentionPress(row)} hitSlop={8} style={s.infoBtn}>
-                        <CdnSvg uri={ICONS.info} width={16} height={16} />
-                      </Pressable>
-                    )}
+                  )
+                })}
+
+                {/* Angular: menu-contacts.page.html:91-103 — the Renew Plan CTA
+                    is the LAST ROW INSIDE this card (mt-16 mb-8), gated on
+                    showRenewalButton() = emicomplete === '0' && RENEWALENABLEKEY
+                    === '1'. This is Angular's only active-state Renew Plan; the
+                    one this port previously had in the hero card had no
+                    equivalent there. */}
+                {showRenewalButton && (
+                  <View style={s.renewRowInCard}>
+                    <ButtonRevamp
+                      label={t('MENU.RENEW_PLAN', 'Renew Plan')}
+                      variant="primary" size="standard" fullWidth
+                      icon="forward-icon-white" iconPosition="end"
+                      onPress={goToRecharge}
+                    />
                   </View>
-                )
-              })}
-            </View>
+                )}
+              </View>
+            </>
           )}
 
-          {/* ── Payment transaction history ── */}
+          {/* ── Payment / EMI status ──
+              Angular: menu-contacts.page.html:114-183 — heading OUTSIDE the
+              card (mt-32 + mt-12), then a radius-16 card whose content row is
+              the API's status icon beside the two text lines. */}
+          {!isExpired && !!paymentInfo && (!!paymentInfo.content || emiSteps.length > 0) && (
+            <>
+              {!!paymentInfo.title && <Text style={s.sectionTitlePayment}>{paymentInfo.title}</Text>}
+              <View style={s.paymentCard}>
+                {emiSteps.length > 0 && (
+                  <View style={s.emiStepper}>
+                    {emiSteps.map((step, idx) => (
+                      <View key={idx} style={s.emiStep}>
+                        {!!step.icon && <CdnSvg uri={step.icon} width={20} height={20} />}
+                        <Text style={s.emiKey} numberOfLines={1}>{step.key}</Text>
+                        {String(step.cta) === '1' ? (
+                          <ButtonRevamp label={step.value ?? 'Pay'} variant="primary" size="small" onPress={goToRecharge} />
+                        ) : (
+                          <Text style={s.emiValue}>{step.value}</Text>
+                        )}
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {!!paymentInfo.content && (
+                  <View style={s.paymentRow}>
+                    {/* Angular: menu-contacts.page.html:177 — the green check is
+                        PAYMENTDETAILS.icon (an API URL), sized 4vh by
+                        .membership-payment-successful-img. RN omitted it
+                        entirely. vh has no RN equivalent, so it's computed off
+                        the window height the same way the CSS would resolve. */}
+                    {!!paymentInfo.icon && (
+                      <CdnSvg uri={String(paymentInfo.icon)} width={paymentIconSize} height={paymentIconSize} />
+                    )}
+                    <View style={s.paymentTextCol}>
+                      <Text style={s.paymentContent}>{paymentInfo.content}</Text>
+                      {!!paymentInfo.content2 && <Text style={s.paymentContent2}>{paymentInfo.content2}</Text>}
+                    </View>
+                  </View>
+                )}
+              </View>
+            </>
+          )}
+
+          {/* ── Payment transaction history ──
+              Angular: menu-contacts.page.html:253-267 — the heading sits ABOVE
+              (mt-32), and each transaction is its OWN bordered card with a
+              12px gap, not a row inside one shared card. */}
           {txnRows.length > 0 && (
-            <View style={s.card}>
-              <Text style={s.sectionTitle}>{transactions?.title ?? 'All Transactions'}</Text>
+            <>
+              <Text style={s.sectionTitle}>{transactions?.title ?? ''}</Text>
               {txnRows.map((txn, idx) => (
-                <View key={idx} style={s.txnRow}>
+                <View key={idx} style={s.txnCard}>
                   <View style={s.usageTextCol}>
-                    <Text style={s.usageTitle}>{txn.packname}</Text>
-                    {!!txn.packduration && <Text style={s.usageSub}>{txn.packduration}</Text>}
+                    <Text style={s.txnName}>{txn.packname}</Text>
+                    {!!txn.packduration && <Text style={s.txnSub}>{txn.packduration}</Text>}
                   </View>
                   <View style={s.txnRightCol}>
-                    <Text style={s.txnAmount}>{`-${formatAmount(parseAmount(txn.amount))}`}</Text>
-                    {!!txn.paydate && <Text style={s.usageSub}>{txn.paydate}</Text>}
+                    {/* Angular: [innerHTML]="'-'+transData?.amount" — the minus
+                        is prepended to the API's already-formatted amount
+                        string, which carries its own ₹. Re-parsing and
+                        re-formatting it (as RN did) round-trips through a
+                        number and drops any formatting the backend applied. */}
+                    <Text style={s.txnAmount}>{`-${txn.amount ?? ''}`}</Text>
+                    {!!txn.paydate && <Text style={s.txnSub}>{txn.paydate}</Text>}
                   </View>
                 </View>
               ))}
-            </View>
+            </>
           )}
         </ScrollView>
       )}
@@ -551,45 +676,105 @@ export default function MenuContactsScreen({ navigation }: { navigation: any }) 
         gotItLabel={t('GENERAL.GOT_IT', 'Got it')}
         onClose={() => setAttentionInfo(null)}
       />
+
+      {/* Angular: menu-contacts.page.html:509 — <app-footer *ngIf="[1,3]
+          .includes(header)">, i.e. the tab bar shows only when the page was
+          reached from the bottom nav. footer.component.ts:79-83 marks
+          '/my-membership' as select 3 (Membership). */}
+      {fromTab && (
+        <AppFooter activeTab={3} upgradeTag={upgradeTag || undefined} onTabPress={handleTabPress} />
+      )}
     </View>
   )
 }
 
-const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.background },
+// Angular scales its ROOT font-size with the viewport — global.scss:334 sets
+// html { font-size: calc(13px + 1vw) } (theme/variables.scss:15) — so every
+// --fontNN token, which is a rem value, renders larger than its name suggests.
+// At the 412px width these screens are compared at the root is ~17.1px, making
+// --font16 (1rem) ≈ 17.1, --font14 (0.875rem) ≈ 15.0 and --font12 (0.75rem)
+// ≈ 12.8. RN has no root-relative unit, so the nominal 16/14/12 read visibly
+// smaller than Angular; these are the resolved sizes instead.
+const FS16 = 17
+const FS14 = 15
+const FS12 = 13
 
+const s = StyleSheet.create({
+  // Angular: no --ion-background-color override exists for this page, so
+  // ion-content falls through to Ionic's white default (RN had a grey tint).
+  screen: { flex: 1, backgroundColor: Colors.white },
+
+  // Angular: the header row carries .border-bottom-search (global.scss:26409)
+  // — a 1px #f1f5f9 bottom border — and Ionic's md header shadow is explicitly
+  // zeroed out by .hide-header-bar.header-md::after { height: 0 }
+  // (global.scss:2737), so there is NO box-shadow here. RN had the inverse:
+  // a drop shadow and no border.
   header: {
     height: 56, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
+    borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  headerTitle: { flex: 1, fontSize: 16, fontFamily: SemanticFontsEnglish.headingEnglishMedium, color: '#333333', marginLeft: 6, marginRight: 16 },
+  // Angular: .heading4-medium-16 (global.scss:2217) — 16px, Poppins-Medium,
+  // weight 500, #333333.
+  headerTitle: { flex: 1, fontSize: FS16, fontFamily: SemanticFontsEnglish.headingEnglishMedium, color: '#333333', marginLeft: 6, marginRight: 16 },
+  // Angular: with the back button hidden its column collapses to size 0 and
+  // the row itself takes .pl-16 (global.scss:877) instead.
+  headerTitleNoBack: { marginLeft: 16 },
 
   loaderContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   emptyText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
 
-  content: { padding: 16, gap: 16 },
+  // Angular: the body is .pl-24 .pr-24 (--ion-cust-padding = 24px) on a plain
+  // white ion-content, with .mt-24 above the hero card and .mb-24 at the end.
+  // The `gap` is gone: every section below carries its own Angular margin
+  // (mt-40 / mt-32 / mt-12), and a container gap would stack on top of those.
+  content: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 24 },
 
+  // Angular: .membership-package-block (menu-contacts.page.scss:90) — radius
+  // 10 (RN had 16) and shadow 0 4px 12px rgba(0,0,0,.08). overflow hidden
+  // keeps the gradient inside the rounded corners.
   card: {
     backgroundColor: Colors.white,
-    borderRadius: 16,
+    borderRadius: 10,
     overflow: 'hidden',
-    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.08, shadowRadius: 6, elevation: 3,
+    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
   },
 
-  heroTop: { padding: 16, gap: 12 },
+  // Angular: menu-contacts.page.html:13 — .pl-16 .pr-16 .pt-24 .pb-24, i.e.
+  // 24px top/bottom and 16px left/right (RN had a flat 16 all round). The
+  // status pill is absolutely positioned over the card's top-left corner, so
+  // the clearance beneath it is this top padding — ADJUSTABLE: raise
+  // paddingTop to push "Basic membership" further below the pill.
+  heroTop: { paddingHorizontal: 16, paddingTop: 36, paddingBottom: 24 },
   heroRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   heroTextCol: { flex: 1 },
 
-  statusBadge: { alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 },
-  statusBadgeActive: { backgroundColor: '#10B981' },
-  statusBadgeWarn: { backgroundColor: '#C70038' },
-  statusBadgeText: { fontSize: 11, fontFamily: Fonts.poppinsMedium, color: Colors.white },
+  // Angular: .membership-expiring-membership / .active-membership
+  // (menu-contacts.page.scss:94-115) — absolutely pinned to the card's
+  // top-left, with only the top-left and bottom-right corners rounded (10px)
+  // and a 2px white ring. RN had it in normal flow with a uniform 12px
+  // radius, so it sat below the corner instead of over it.
+  statusBadge: {
+    position: 'absolute', top: 0, left: 0, zIndex: 2,
+    borderTopLeftRadius: 10, borderBottomRightRadius: 10,
+    borderTopRightRadius: 0, borderBottomLeftRadius: 0,
+    borderWidth: 2, borderColor: Colors.white,
+    paddingVertical: 4,
+  },
+  // Angular: the green "active" variant is padded 4px 24px, the red expiring
+  // variant 4px 8px — the two are not interchangeable.
+  statusBadgeActive: { backgroundColor: '#10B981', paddingHorizontal: 24 },
+  statusBadgeWarn: { backgroundColor: '#EF4444', paddingHorizontal: 8 },
+  statusBadgeText: { fontSize: FS12, fontFamily: Fonts.poppinsMedium, color: Colors.white },
   statusBadgeTextActive: {},
   statusBadgeTextWarn: {},
 
-  planTitle: { fontSize: 16, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
-  planDuration: { fontSize: 13, color: '#4C4C4C', marginTop: 2 },
+  // Angular: .heading3-semibold-16 .color-1f1e1b .margin-0 .pt-20
+  // (menu-contacts.page.html:15) — 16px Poppins-SemiBold, #1f1e1b.
+  planTitle: { fontSize: FS16, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
+  // Angular: .body2-regular-14 .black-color .mt-4 (menu-contacts.page.html:16)
+  // — 14px Poppins-Regular, #000, 4px above. RN had 13px/#4C4C4C/2px.
+  planDuration: { fontSize: FS14, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black, marginTop: 4 },
 
   crownBadge: {
     width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', flexShrink: 0,
@@ -611,34 +796,117 @@ const s = StyleSheet.create({
 
   renewPlanBtn: { marginHorizontal: 16, marginBottom: 16 },
 
-  footerStrip: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12 },
-  expiryText: { fontSize: 12, color: '#1F1E1B' },
+  // Angular: .subscription-expiring-time-membership-basic (scss:159) — the
+  // template hardcodes the -basic variant regardless of packagetype, so this
+  // strip is always #F7FAFF. Padding is pl-24/pr-12/pt-8/pb-8 — asymmetric,
+  // not the flat 12 RN used — and there is NO top border: the separation is
+  // purely the background-colour change from the gradient above.
+  footerStrip: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    paddingLeft: 24, paddingRight: 12, paddingVertical: 8,
+    backgroundColor: '#F7FAFF',
+  },
+  // Angular: .body3-regular-12 .black-color — 12px Poppins-Regular, #000.
+  expiryText: { flex: 1, fontSize: FS12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black },
 
-  sectionTitle: { fontSize: 15, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B', padding: 16, paddingBottom: 12 },
+  // Angular has THREE different section-heading styles, not one:
+  //  - "Package Usage Details" — .font-14-semibold .clr0 .mt-40 → 14px/600/#000
+  //  - "Payment status"        — .heading3-semibold-16 .clr0    → 16px/600/#000
+  //  - "All Transactions"      — .heading3-semibold-16 .color-1f1e1b → 16px/600/#1f1e1b
+  // All sit OUTSIDE their cards, so none carry the card's inner padding.
+  sectionTitle: { fontSize: FS16, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B', marginTop: 32 },
+  sectionTitleUsage: { fontSize: FS14, fontFamily: Fonts.poppinsSemiBold, color: Colors.black, marginTop: 40 },
+  sectionTitlePayment: { fontSize: FS16, fontFamily: Fonts.poppinsSemiBold, color: Colors.black, marginTop: 32 },
 
   emiStepper: { gap: 12, paddingHorizontal: 16, marginBottom: 12 },
   emiStep: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   emiKey: { flex: 1, fontSize: 13, color: Colors.textSecondary },
   emiValue: { fontSize: 13, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
 
-  paymentContent: { fontSize: 14, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B', paddingHorizontal: 16 },
-  paymentContent2: { fontSize: 12, color: Colors.textSecondary, marginTop: 4, paddingHorizontal: 16, paddingBottom: 16 },
+  // Angular: .payment-status-block-membership (menu-contacts.page.scss:179) —
+  // radius 16 (vs 8 on the usage card and 10 on the hero: three different
+  // radii on one page), shadow 0 3px 12px rgba(0,0,0,.08), padding-top 16
+  // only. No background is declared there — it only looks white because the
+  // page is — so it is set explicitly here or the shadow renders wrong.
+  paymentCard: {
+    backgroundColor: Colors.white, borderRadius: 16, paddingTop: 16, marginTop: 24,
+    shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08, shadowRadius: 12, elevation: 3,
+  },
+  // Angular: menu-contacts.page.html:174 — the content row is inset 16px each
+  // side and carries .bottom-border-e5e5e5, a divider with nothing beneath it
+  // (every following row is *ngIf="false"). Reproduced because it is visible.
+  paymentRow: {
+    flexDirection: 'row', alignItems: 'flex-start', gap: 8,
+    marginHorizontal: 16, paddingBottom: 12,
+    borderBottomWidth: 1, borderBottomColor: '#e5e5e5',
+  },
+  paymentTextCol: { flex: 1 },
+  // Angular: .body1-medium-14 .color-1e1e1e — 14px Poppins-Medium, #1e1e1e
+  // (RN had SemiBold/#1F1E1B).
+  paymentContent: { fontSize: FS14, fontFamily: Fonts.poppinsMedium, color: '#1e1e1e' },
+  // Angular: .body3-regular-12 .poppins-family .mt-6 — 12px, 6px above, and
+  // NO color class, so it inherits black (RN had textSecondary grey).
+  paymentContent2: { fontSize: FS12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black, marginTop: 6 },
 
+  // Angular: .payment-revamp-intermediate-block (menu-contacts.page.scss:320)
+  // — radius 8 (not 16), white, shadow -1px 3px 6px 1px rgba(64,67,67,.267)
+  // (#40434343 is 8-digit hex: #404343 at 0x43 = 26.7% alpha). Padding is
+  // 16px on three sides; the top falls to Ionic's default ion-col 5px.
+  usageCard: {
+    backgroundColor: Colors.white, borderRadius: 8,
+    paddingTop: 5, paddingHorizontal: 16, paddingBottom: 16,
+    // Angular: menu-contacts.page.html:62 — the card carries .mt-12, which
+    // this was missing entirely (the heading's own mt-40 was the only gap).
+    // ADJUSTABLE — raise for more space under "Package Usage Details".
+    marginTop: 12,
+    shadowColor: '#404343', shadowOffset: { width: -1, height: 3 },
+    shadowOpacity: 0.267, shadowRadius: 6, elevation: 3,
+  },
+
+  // Angular: .bottom-border-e5e5e5 (menu-contacts.page.scss:132) — 1px #e5e5e5
+  // under each row; the row's own 16px padding comes from the card, so the
+  // divider spans the full inner width.
   usageRow: {
     flexDirection: 'row', alignItems: 'center', gap: 12,
-    paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.borderSubtle,
+    paddingVertical: 16,
   },
+  usageRowDivided: { borderBottomWidth: 1, borderBottomColor: '#e5e5e5' },
   usageTextCol: { flex: 1 },
-  usageTitle: { flex: 1, fontSize: 14, fontFamily: Fonts.poppinsMedium, color: '#1F1E1B' },
-  usageSub: { fontSize: 11, color: Colors.textSecondary, marginTop: 2 },
-  usageBalance: { fontSize: 16, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
-  usageBalanceWarn: { color: Colors.inputError },
+  // Angular: the label's `semibold-14-font` class has NO definition outside
+  // per-language scopes, so in English it contributes nothing and the text
+  // renders as the inherited ion-label default — Poppins-Regular 400, not the
+  // 14px medium the class name suggests. Matching what actually renders.
+  usageTitle: { flex: 1, fontSize: FS16, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black },
+  // Angular: .body3-regular-12 .black-color .line-height-16.
+  usageSub: { fontSize: FS12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black, lineHeight: 16 },
+  // Angular: .heading3-semibold-16 — 16px Poppins-SemiBold.
+  usageBalance: { fontSize: FS16, fontFamily: Fonts.poppinsSemiBold, color: Colors.black },
+  // Angular: .body1-medium-14 — the "/total" half is 14px Poppins-Medium.
+  usageTotal: { fontSize: FS14, fontFamily: Fonts.poppinsMedium, color: Colors.black },
+  // Angular: .color-ef4444 applies to BOTH spans when balance <= warningcnt.
+  usageBalanceWarn: { color: '#ef4444' },
   infoBtn: { paddingLeft: 4 },
 
-  txnRow: {
+  // Angular: menu-contacts.page.html:91 — <ion-row class="mt-16 mb-8">.
+  renewRowInCard: { marginTop: 16, marginBottom: 8 },
+
+  // Angular: .standard-membership-payment-block (menu-contacts.page.scss:197)
+  // — each transaction is its own 1px #e5e5e5 bordered card, radius 10,
+  // padding 10px 16px, NO shadow, with a 12px gap between cards (mt-12).
+  txnCard: {
     flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingVertical: 10, borderTopWidth: 1, borderTopColor: Colors.borderSubtle,
+    borderWidth: 1, borderColor: '#e5e5e5', borderRadius: 10,
+    paddingVertical: 10, paddingHorizontal: 16,
   },
   txnRightCol: { alignItems: 'flex-end' },
-  txnAmount: { fontSize: 14, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
+  // Angular: .body1-medium-14 .black-color — 14px Poppins-Medium, #000.
+  txnName:   { fontSize: FS14, fontFamily: Fonts.poppinsMedium, color: Colors.black },
+  // Angular: .color-545454 .body3-regular-12 .mt-4 — 12px regular, #545454.
+  txnSub:    { fontSize: FS12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: '#545454', marginTop: 4 },
+  // Angular: .body1-medium-14 .poppins-family .f-500 .black-color — but
+  // .poppins-family maps to Roboto-Regular (--english-poppins, _variable.scss:24,
+  // applied !important and declared later than the medium class), so the ₹
+  // amount renders in a REGULAR face, not Poppins-Medium.
+  txnAmount: { fontSize: FS14, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black },
 })

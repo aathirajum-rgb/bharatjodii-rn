@@ -14,6 +14,7 @@
 // treatment for it, and it already renders as a centered overlay.
 
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
@@ -53,6 +54,7 @@ export default function RechargeDesktopLayout({
   payLabel, onPay, sheetPayLabel, onSheetPay,
   langCode, onTabPress, onLanguagePress,
 }: RechargeDesktopLayoutProps) {
+  const { t } = useTranslation()
   const selectedPlan = data?.plans.find(p => p.productid === selectedId)
 
   return (
@@ -79,6 +81,7 @@ export default function RechargeDesktopLayout({
               <PlanCard
                 key={plan.productid}
                 plan={plan}
+                topSellText={data?.topSellText}
                 selected={selectedId === plan.productid}
                 onPress={() => onSelect(plan.productid)}
               />
@@ -134,7 +137,7 @@ export default function RechargeDesktopLayout({
 
             {!!data.helpline && (
               <View style={s.needHelpRow}>
-                <Text style={s.needHelpText}>Need help? </Text>
+                <Text style={s.needHelpText}>{t('REGISTRATION.NEEDHELPCALL')}</Text>
                 <Pressable style={s.needHelpContact} onPress={() => Linking.openURL(`tel:${data.helpline}`)} hitSlop={8}>
                   <CdnSvg uri={ICON_CALL} width={16} height={16} />
                   <Text style={s.needHelpNumber}>{data.helpline}</Text>
@@ -147,12 +150,13 @@ export default function RechargeDesktopLayout({
 
       <BottomSheet visible={showAllPlans} onClose={onCloseAllPlans}>
         <View style={s.sheetInner}>
-          <Text style={s.sheetTitle}>{data?.viewAllText ?? 'All packages'}</Text>
+          <Text style={s.sheetTitle}>{data?.viewAllText ?? ''}</Text>
           <ScrollView style={s.sheetList} contentContainerStyle={s.sheetListContent}>
             {data?.allPlans.map(plan => (
               <PlanCard
                 key={plan.productid}
                 plan={plan}
+                topSellText={data?.topSellText}
                 selected={sheetSelectedId === plan.productid}
                 onPress={() => onSheetSelect(plan.productid)}
               />

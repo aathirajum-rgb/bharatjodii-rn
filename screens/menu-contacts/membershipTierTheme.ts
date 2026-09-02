@@ -18,24 +18,33 @@ export interface MembershipTierTheme {
   footerBg:       string
 }
 
+// Gradients are taken verbatim from Angular's .basic- / .standard- /
+// .super-membership-package-block (menu-contacts.page.scss:116-130). The
+// previous values were approximations — BASIC and STANDARD ended a shade too
+// light, and SUPER was an invented purple (its own comment admitted borrowing
+// the "Most Sold" ribbon's midpoint) where Angular is actually PINK.
+//
+// footerBg is retained per tier for the desktop layout, but note the mobile
+// template hardcodes the -basic strip colour (#F7FAFF) for every tier — see
+// MenuContactsScreen.tsx's footerStrip.
 const TIER_THEME: Record<MembershipTier, MembershipTierTheme> = {
+  // Angular: linear-gradient(#DCEBFE, #F1F7FF 100%)
   BASIC: {
-    gradientColors: ['#DCEBFE', '#F8FBFF'],
+    gradientColors: ['#DCEBFE', '#F1F7FF'],
     crownBadgeBg:   '#4797D9',
     footerBg:       '#F7FAFF',
   },
+  // Angular: linear-gradient(#FFFAEB, #FFFAE8 100%)
   STANDARD: {
-    gradientColors: ['#FFF9E3', '#FFFCF3'],
+    gradientColors: ['#FFFAEB', '#FFFAE8'],
     crownBadgeBg:   '#D4A017',
     footerBg:       '#FFFCF1',
   },
-  // Purple accent matches the "Most Sold" ribbon gradient's midpoint already
-  // used on RechargeScreen.tsx's plan cards — the closest existing purple in
-  // the app's palette, reused rather than inventing an unrelated new one.
+  // Angular: linear-gradient(#FFA9C6, #FFE8F0 100%)
   SUPER: {
-    gradientColors: ['#DFD9FF', '#FFFFFF'],
-    crownBadgeBg:   '#7347CB',
-    footerBg:       '#F7F5FF',
+    gradientColors: ['#FFA9C6', '#FFE8F0'],
+    crownBadgeBg:   '#D9478F',
+    footerBg:       '#FFF8FA',
   },
 }
 

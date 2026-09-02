@@ -1483,6 +1483,7 @@
     },
 
      "RECHARGE":{
+        "ONLY_FOR_YOU": "Only for you",
         "RECHARGE":"Become a paid member",
         "RECHARGETITLE":"To call/WhatsApp matches you like and to view their horoscope, become a paid member",
         "CHOOSEMODE":"Choose Payment Mode",

@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN_SVG } from '../../constants/cdn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -48,8 +49,11 @@ const styles = StyleSheet.create({
     alignItems:  'center',
     gap:         4,
   },
-  // Angular: body3-regular-12, line-height 18, black-color, margin-right 8
+  // Angular: .body3-regular-12 .line-height-18 .black-color .mr-8 — 12px
+  // Poppins-Regular. Neither text here declared a fontFamily at all, so both
+  // fell back to the platform system font instead of Poppins.
   message: {
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   12,
     lineHeight: 18,
     color:      Colors.textPrimary,
@@ -66,8 +70,10 @@ const styles = StyleSheet.create({
   callIcon: {
     flexShrink: 0,
   },
-  // Angular: color-29339B, body1-medium-14, line-height 18, margin-left 4
+  // Angular: .body1-medium-14-all .line-height-18 .color-29339B .ml-4 — 14px
+  // Poppins-Medium, weight 500, #29339B.
   contactText: {
+    fontFamily: Fonts.poppinsMedium,
     fontSize:   14,
     fontWeight: '500',
     lineHeight: 18,

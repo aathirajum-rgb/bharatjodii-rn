@@ -10,9 +10,10 @@
 
 import { Fragment, useEffect, useState } from 'react'
 import {
-  ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useTranslation } from 'react-i18next'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN, CDN_REACT } from '../../constants/cdn'
@@ -20,10 +21,9 @@ import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import FloatingLabelInput from '../../components/input/FloatingLabelInput'
-import LinkCTA from '../../components/link-cta/LinkCTA'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
 import {
-  getCheckoutDetails, getFinalAmount, getPaymentConfig, getRechargeHelpline, getRetryRemainingMs,
+  getCheckoutDetails, getFinalAmount, getPaymentConfig, getRetryRemainingMs,
   getUpiAppList, handlePaymentSuccess, initPayUNative, initRazorpayNative, initUPIPayment,
   recordPaymentFailure, stringifyPaymentResponse, toPaise, verifyPayUPaymentSuccess,
   verifyPaymentSuccess, type SelectedPackage, type UpiAppInfo,
@@ -52,6 +52,7 @@ function iconForApp(packageName: string): string {
 type Props = { navigation: any; route: any }
 
 export default function UpiAddressScreen({ navigation, route }: Props) {
+  const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const selectedPackage: SelectedPackage | undefined = route.params?.selectedPackage
   const amountLabel: string | undefined = route.params?.amountLabel
@@ -59,10 +60,8 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
   const [vpa, setVpa]       = useState('')
   const [touched, setTouched] = useState(false)
   const [paying, setPaying]   = useState(false)
-  const [helpline, setHelpline] = useState('')
   const [restrictedMinutes, setRestrictedMinutes] = useState<number | null>(null)
 
-  useEffect(() => { getRechargeHelpline().then(setHelpline) }, [])
 
   // Detected installed UPI apps (Android only) — GPay/Paytm/PhonePe shown
   // directly, everything else (CRED, iMobile, PayZapp, etc.) tucked under an
@@ -245,34 +244,45 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
+      {/* Angular: upi-payment.page.html:1-36 — the header is a THREE-ROW
+          stack inside ion-toolbar: the back arrow alone on row 1, then the
+          title on its own row as .heading1-semibold-20 (20px, not 16), then
+          the "Enter existing UPI address" line as a third row. RN had the
+          title inline beside the arrow at 16px and the subtitle down in the
+          scroll body. Both strings were hardcoded English; the keys already
+          existed (RECHARGE.UPIPAY_TITLE / UPIPAY_TXT). */}
       <View style={s.header}>
-        <Pressable onPress={handleBack} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back">
+        <Pressable style={s.backRow} onPress={handleBack} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
-        <Text style={s.headerTitle} numberOfLines={1}>Pay using UPI apps</Text>
+        <Text style={s.headerTitle}>{t('RECHARGE.UPIPAY_TITLE')}</Text>
+        <Text style={s.headerSubtitle}>{t('RECHARGE.UPIPAY_TXT')}</Text>
       </View>
 
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 24 }]}>
-        <Text style={s.subtitle}>Enter existing UPI address</Text>
 
         <FloatingLabelInput
-          label="e.g. abcd@okxyzbank"
+          label={`${t('RECHARGE.EG')} abcd@okxyzbank`}
           value={vpa}
           onChangeText={handleVpaChange}
           errorMessage={errorMessage}
           variant="text"
+          shape="underline"
           autoCapitalize="none"
           style={s.field}
         />
-        <Text style={s.note}>You will receive a request in your UPI app</Text>
+        <Text style={s.note}>{t('RECHARGE.UPIPAY_NOTE')}</Text>
+        {/* Angular: a default-size ion-button (~40px tall) with
+            body1-medium-14 text; RN's "medium" is 32px with 12px text, which
+            read noticeably smaller than Angular's. */}
         <ButtonRevamp
-          label="Submit"
+          label={t('GENERAL.SUBMIT')}
           variant="primary"
-          size="medium"
+          size="large"
           disabled={!isValid}
           loading={paying && !selectedApp}
           onPress={handlePay}
-          style={[s.submitBtn, s.squareBtn]}
+          style={[s.submitBtn, s.squareBtn, !isValid && s.submitBtnDisabled]}
         />
 
         {loadingApps && <ActivityIndicator color={Colors.primaryDark} style={{ marginTop: 24 }} />}
@@ -363,14 +373,9 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
           </View>
         )}
 
-        {!!helpline && (
-          <LinkCTA
-            text="Need help in making payment?"
-            contact={helpline}
-            onPress={() => Linking.openURL(`tel:${helpline}`)}
-            style={s.helpLink}
-          />
-        )}
+        {/* Angular: upi-payment.page.html has NO app-link-cta — the only
+            "need help" reference is inside a commented-out header block, so
+            this page never shows the helpline row. */}
       </ScrollView>
 
       <PaymentRestrictedSheet
@@ -385,20 +390,53 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.white },
 
+  // Angular: plain ion-toolbar with no border and no shadow (Ionic's md
+  // shadow is zeroed by .hide-header-bar.header-md::after, global.scss:2737).
+  // Rows are indented by .ion-cust-padding-start = 24px.
   header: {
-    height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
     backgroundColor: Colors.white,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
+    paddingHorizontal: 24, paddingBottom: 8,
   },
-  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, marginLeft: 16, flex: 1 },
+  // Angular: the arrow is an ion-button with inline margin-left:-18px inside
+  // an ion-col, so it sits close to the row's left edge. ADJUSTABLE — marginLeft
+  // shifts it horizontally, marginTop/paddingVertical set the gap above.
+  // ADJUSTABLE — marginLeft shifts the arrow horizontally, marginTop/padding
+  // set the gap above it.
+  backRow: { alignSelf: 'flex-start', marginLeft: 4, marginTop: 12, paddingVertical: 8 },
+  // Angular: .heading1-semibold-20 .black-color (global.scss:2166) — 20px
+  // Poppins-SemiBold. The rem scale resolves ~20 → ~21 at 412px width.
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 21, color: Colors.black, marginTop: 4 },
+  // Angular: .existing-upi has NO definition anywhere in the codebase, so this
+  // line inherits the Ionic default — Poppins-Regular at the base size, black —
+  // not the grey medium this port used.
+  headerSubtitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 17, color: Colors.black, marginTop: 8 },
 
   content:  { padding: 16 },
   subtitle: { fontFamily: Fonts.poppinsMedium, fontSize: 14, color: Colors.textSecondary, marginBottom: 16 },
+  // The underline shape itself comes from shape="underline" — these border
+  // overrides would land on the outer wrapper, not the field, so they're not
+  // set here.
   field:    { marginBottom: 8 },
-  note:     { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textTertiary },
-  submitBtn: { alignSelf: 'flex-start', marginTop: 12 },
-  squareBtn: { borderRadius: 4 },
-  helpLink:  { marginTop: 24 },
+  // Angular: .you-will-receive-request inherits the body default — black at
+  // the base size, not a 12px grey.
+  note:     { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 15, color: Colors.black },
+  // Angular: .primary-cta-jodii-small-pay / .primary-disabled-cta-jodii
+  // (global.scss:26281 / 26353) with .width-auto .pt-6 .pb-6 .pl-6 .pr-6 —
+  // radius 8 (RN had 4), 6px padding all round, sized to its label rather
+  // than stretched. The disabled state is #F0F0F0 with #B0B0B0 text; enabled
+  // is #B50033 with white — both handled by ButtonRevamp's own variants.
+  // ButtonRevamp applies `style` LAST, so any paddingHorizontal here silently
+  // replaces the size token's own 16px and squeezes the label — which is what
+  // an earlier 6px value here was doing. Angular's .pl-6/.pr-6 are Ionic CSS
+  // vars applied INSIDE the button's padding, not a replacement for it, so the
+  // width is left to the size token.
+  submitBtn: { alignSelf: 'flex-start', marginTop: 12, minWidth: 96 },
+  squareBtn: { borderRadius: 8 },
+  // Angular: .primary-disabled-cta-jodii (global.scss:26353) — #F0F0F0
+  // background with #B0B0B0 text, lighter than ButtonRevamp's shared disabled
+  // default (#dddddd / #888888). Only the background is overridable here;
+  // ButtonRevamp exposes no textStyle prop, so the label keeps its own grey.
+  submitBtnDisabled: { backgroundColor: '#F0F0F0' },
 
   appCard: {
     marginTop: 24, backgroundColor: Colors.white, borderRadius: 16, paddingHorizontal: 16,

@@ -844,7 +844,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       // once, feeds both the assist banner (ASSISTEDPROMO) and the footer's
       // membership upgrade tag (MENUDISCOUNT) below. Cached by getMenuPromo
       // itself, so this doesn't duplicate the assist-banner-specific fetch.
-      const menuPromo = await getMenuPromo('MENU')
+      const menuPromo = await getMenuPromo()
       if (ctrl.cancelled) return
 
       // ── Assist ("breather") banner — Angular: takes precedence over the hero

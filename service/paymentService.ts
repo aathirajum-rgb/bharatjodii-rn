@@ -144,7 +144,11 @@ export function getAutoRenewalBenefits(packagesData?: any): AutoRenewalSheetData
 // ─── Storage key constants ─────────────────────────────────────────────────────
 
 const PAYMENT_CACHE_KEYS = {
-  MENU_PROMO:              'MENU_PROMO',
+  // v2: the pre-fix cache holds responses fetched with the wrong nbmenu
+  // params (TYPE=MENU), which came back without MENUDISCOUNT. Those entries
+  // never expire, so any device that cached one would keep the "₹1200 OFF"
+  // chip hidden forever — the renamed key retires them.
+  MENU_PROMO:              'MENU_PROMO_V2',
   PAYCONFIG:               'PAYCONFIG',
   HERO_BANNER:             'HERO_BANNER',
   PAYMENT_FAILED:          'PAYMENT_FAILED',
@@ -279,7 +283,12 @@ export async function requestAutopayRefund(): Promise<{ accepted: boolean; usedC
 export async function openMembershipTab(): Promise<void> {
   const entryType = String((await getSessionValue('ENTRYTYPE')) ?? '')
   if (entryType === 'P') {
-    navigate(ENavigation.MY_MEMBERSHIP)
+    // Angular: footer.component.ts:207 passes router state header:3 for
+    // 'my-membership' (1 for other footer targets), and menu-contacts.page.ts:95
+    // turns [1,3] into BACK_ICON:'0' — no back arrow — while the template's
+    // *ngIf="[1,3].includes(header)" is what renders the tab bar. Both hang off
+    // "did this come from the footer", which fromTab carries here.
+    navigate(ENavigation.MY_MEMBERSHIP, { fromTab: true })
   } else {
     await paymentTrack('31')
     navigate(ENavigation.RECHARGE, { fromTab: true })
@@ -550,14 +559,39 @@ export async function getHeroBannerDetails(force = false, bannerType?: number): 
 
 // ─── Menu promo ───────────────────────────────────────────────────────────────
 
-export async function getMenuPromo(type = 'MENU'): Promise<any> {
-  const cached = await getJson(PAYMENT_CACHE_KEYS.MENU_PROMO)
-  if (cached) return cached
-  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-  const result = await apiCall(Endpoints.payment.nbMenu, 'POST', `ID=${userId}&TYPE=${type}`)
-  if (result?.RESPONSECODE === '1') {
-    await setJson(PAYMENT_CACHE_KEYS.MENU_PROMO, result.RESPONSE)
-    return result.RESPONSE
+export async function getMenuPromo(forceRefresh = false): Promise<any> {
+  if (!forceRefresh) {
+    const cached = await getJson(PAYMENT_CACHE_KEYS.MENU_PROMO)
+    if (cached) return cached
+  }
+  // Angular: payment.service.ts:631-648 getMenuPromo() — the real nbmenu
+  // contract is ID/RENEWALFLAG/AUTOUPIFLAG/PAYAPITYPE, plus COMMONKEY only
+  // when RENEWALPROMOKEY is '1' or '2'. This previously sent `TYPE=MENU`,
+  // which is not a parameter this endpoint takes at all — the numeric arg in
+  // Angular is a local force-refresh flag, never a request field — so the
+  // response came back without MENUDISCOUNT and the "₹1200 OFF" chip over the
+  // Membership tab never rendered.
+  const [userId, renewalKey, renewalPromo] = await Promise.all([
+    getItem(SK.Auth.USER_ID),
+    getSessionValue('RENEWALENABLEKEY'),
+    getSessionValue('RENEWALPROMOKEY'),
+  ])
+  // Angular derives AUTOUPIFLAG from a detected installed-UPI-app list, which
+  // RN has no equivalent for — same '0' default getPromotionDetails() uses.
+  let params =
+    `ID=${userId ?? ''}&RENEWALFLAG=${renewalKey ?? '0'}&AUTOUPIFLAG=0&PAYAPITYPE=2`
+  if (['1', '2'].includes(String(renewalPromo ?? ''))) params += `&COMMONKEY=${renewalPromo}`
+
+  const result = await apiCall(Endpoints.payment.nbMenu, 'POST', params)
+  // Angular checks ERRCODE == 0 here, not RESPONSECODE — nbmenu returns the
+  // former, so the old check could reject a valid response outright.
+  if ((String(result?.ERRCODE) === '0' || result?.RESPONSECODE === '1') && result?.RESPONSE) {
+    const content = { ...result.RESPONSE }
+    // Angular: payment.service.ts:664 — IMAGEPATH comes back as a bare
+    // filename and is prefixed to a full CDN URL before being cached.
+    if (content.IMAGEPATH) content.IMAGEPATH = CDN_SVG + content.IMAGEPATH
+    await setJson(PAYMENT_CACHE_KEYS.MENU_PROMO, content)
+    return content
   }
   return null
 }
@@ -581,7 +615,12 @@ export async function getPromotionDetails(promotionId: string): Promise<any> {
     `&IPCOUNTRYCODE=${ipCountryCode}&AUTOUPIFLAG=0&PAYAPITYPE=2` +
     `&RENEWALFLAG=${renewalFlag ?? '0'}`
   const result = await apiCall(Endpoints.payment.nbPromotion, 'POST', params)
-  return result?.RESPONSECODE === '1' ? result.RESPONSE : null
+  if (result?.RESPONSECODE !== '1') return null
+  // Angular: recharge.page.ts:379-383 reads resultData['NUMBER'] and
+  // resultData['WSNUMBER'] from the TOP LEVEL of the response — siblings of
+  // RESPONSE, not fields inside it. Returning bare RESPONSE dropped them, so
+  // the "Need help?" number was always empty and its row never rendered.
+  return { ...result.RESPONSE, NUMBER: result.NUMBER, WSNUMBER: result.WSNUMBER }
 }
 
 export async function getRechargeHelpline(): Promise<string> {
@@ -619,6 +658,11 @@ export interface MembershipPlansData {
   plans:            MembershipPlan[]     // INTERMEDIATEPACK-filtered subset shown on the main screen
   allPlans:         MembershipPlan[]     // full, unfiltered promotion.CONTENT — Angular's "View other packages" sheet shows this
   viewAllText?:     string | undefined   // e.g. "View other packages" — button label; hidden if absent
+  // Angular: recharge.page.html:143 passes [TOPSELLTEXT]="promotion?.TOPSELLTEXT"
+  // into benefits-card, which renders it via [innerHTML] as the "Most Sold"
+  // badge. It is API copy, not a fixed string — the template's own literal
+  // reads "most popular" and is only ever the pre-bind placeholder.
+  topSellText?:     string | undefined
   defaultProductId: string
   payCtaTemplate:   string  // e.g. "Pay ₹<367>" — the literal substring '₹<367>' gets replaced with the amount
   helpline:         string
@@ -682,15 +726,20 @@ export async function getMembershipPlans(): Promise<MembershipPlansData | null> 
   // (payment-mode, more-payment-option, netbanking, ...) can read it without
   // re-fetching nbpromotion — same contract, ported to AsyncStorage.
   if (promotion.NUMBER) await setItem(SK.Payment.RECHARGE_HELPLINE, String(promotion.NUMBER))
+  // Angular: recharge.page.ts:103 seeds needHelpContact from that same cached
+  // key, so a response without NUMBER still shows the last known number
+  // rather than dropping the "Need help?" row entirely.
+  const helpline = String(promotion.NUMBER ?? (await getItem(SK.Payment.RECHARGE_HELPLINE)) ?? '')
 
   return {
     title:            promotion.TITLE2 ?? 'Membership plans',
     plans,
     allPlans,
     viewAllText:      promotion.VIEWALLTEXT,
+    topSellText:      promotion.TOPSELLTEXT,
     defaultProductId: promotion.DEFAULTPRODUCTID ?? plans[0]?.productid ?? '',
     payCtaTemplate:   promotion.CTA3 ?? 'Pay ₹<367>',
-    helpline:         promotion.NUMBER ?? '',
+    helpline,
     offerBannerText:  promotion.PROMOTYPE === '20' ? promotion.AADIPROMO?.NOTE : undefined,
   }
 }

@@ -16,7 +16,7 @@ import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
-import { CDN, CDN_REACT, CDN_SVG } from '../../constants/cdn'
+import { CDN, CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
@@ -35,7 +35,6 @@ import {
 
 const ICON_BACK   = CDN_REACT + '/menu_back_arrow.svg'
 const ICON_CHEVRON = CDN_REACT + '/menu_right_arrow.svg'
-const ICON_EDIT_PENCIL = CDN_SVG + 'revamp/primary-edit-pencil.svg'
 
 // Angular: payment-mode.page.html gates the auto-renewal checkbox on
 // item.KEY being one of these three recurring-capable methods.
@@ -146,11 +145,24 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
     )
   }
 
-  const recommended = methods.filter(m => m.RECOMMEND === '1')
-  // On web (PWA), the "Other payment modes" section (netbanking/NEFT/pay-at-
-  // store/doorstep, reached via the OTHERMODES row) isn't shown at all —
-  // those flows depend on native bridges/screens this build doesn't have.
-  const otherModes = Platform.OS === 'web' ? [] : methods.filter(m => m.RECOMMEND !== '1')
+  // Angular: filterPaymentMethod() (payment-mode.page.ts:855-868) computes a
+  // FLAG per method and the template renders on FLAG==1 && PAGE_ID==1. The
+  // three UPI-app rows (PhonePe/GPay/Paytm) get FLAG=0 unless that app is
+  // actually INSTALLED — detected from the nbapplicationpay response's
+  // AppPkgName list — so on a device/browser without them they vanish, and
+  // showTitle() (:1255) hides the "Recommended" heading with them.
+  //
+  // This port has no installed-app detection, so those rows can never be
+  // legitimately shown; rendering them (with radios and an inline Proceed to
+  // Pay) was pure invention. Everything else keeps FLAG=1 via Angular's else
+  // branch, which is why "Pay using other UPI apps" DOES show.
+  const UPI_APP_KEYS = ['PAY_PHONEPE', 'PAY_GPAY', 'PAY_PAYTM']
+  const recommended = methods.filter(m => m.RECOMMEND === '1' && !UPI_APP_KEYS.includes(m.KEY))
+  // Angular gates this whole section on !isEmiFlow() && !isPwaApp() — not on
+  // the platform. The previous `Platform.OS === 'web' ? []` blanked out
+  // Credit/Debit card and Other payment modes entirely on web, which is why
+  // that card was missing from this port.
+  const otherModes = methods.filter(m => m.RECOMMEND !== '1')
 
   const value1 = selectedPackage.value1
   const planName     = value1?.[0] ?? selectedPackage.value
@@ -369,9 +381,10 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
             <View style={s.planNameRow}>
               <Text style={s.planName}>{planName}</Text>
               {!!planDuration && <Text style={s.planDuration}>{planDuration}</Text>}
-              <Pressable onPress={() => navigation.navigate('recharge')} hitSlop={8}>
-                <CdnSvg uri={ICON_EDIT_PENCIL} width={16} height={16} />
-              </Pressable>
+              {/* Angular: the edit pencil is COMMENTED OUT (payment-mode.page
+                  .html:52-56) — it does not render at all, and its would-be
+                  gate (packEditOption == '1' && ...) is dead alongside a
+                  showEditOption() helper that never returns a value. */}
             </View>
             <Text style={s.planPrice}>{formatAmount(priceNum)}</Text>
           </View>
@@ -398,10 +411,17 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
           <ActivityIndicator color={Colors.primaryDark} style={{ marginTop: 32 }} />
         ) : (
           <>
-            {/* Recommended */}
+            {/* Recommended — Angular: payment-mode.page.html:189 gates the
+                HEADING on showTitle() (payment-mode.page.ts:1255), which is
+                `isPhonePe || isGPay || isPaytm`, i.e. an installed UPI app was
+                detected. It is NOT gated on the rows existing: PAY_UPI ("Pay
+                using other UPI apps") also carries RECOMMEND==1 and renders in
+                this same card, but on its own it leaves the heading hidden.
+                Since this port has no installed-app detection, showTitle() is
+                always false here and the heading never shows — the card of
+                rows still does. */}
             {recommended.length > 0 && (
               <View style={s.section}>
-                <Text style={s.sectionLabel}>{t('RECHARGE.RECOMMENDED')}</Text>
                 <View style={s.card}>
                   {recommended.map((item, idx) => (
                     <Fragment key={item.KEY}>
@@ -536,15 +556,30 @@ function PaymentMethodRow({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.background },
+  // Angular: no --ion-background-color override and no page-level ion-content
+  // background rule exists, so the page falls through to Ionic's white
+  // default. The card/page separation comes from each card's own box-shadow,
+  // not from a grey canvas (RN had Colors.background, a grey tint).
+  screen: { flex: 1, backgroundColor: Colors.white },
 
+  // Angular: .payment-header (payment-mode.page.scss:108-111) — padding
+  // 0.375rem (6px) vertical / 24px horizontal, with a 1px #f1f5f9 bottom
+  // border and NO shadow (Ionic's md toolbar shadow is zeroed by
+  // .hide-header-bar.header-md::after { height: 0 }, global.scss:2737). RN had
+  // the inverse: a drop shadow, no border, 16px gutters and a fixed height.
   header: {
-    height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,
+    flexDirection: 'row', alignItems: 'center',
+    paddingHorizontal: 24, paddingVertical: 6,
     backgroundColor: Colors.white,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
+    borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
   },
-  backBtn:     { padding: 4, marginRight: 16 },
-  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, flex: 1 },
+  // Angular: the back button sits in a size="1.5" column with the icon pulled
+  // left by margin-left:-18px, so the arrow itself lands close to the 24px
+  // gutter rather than a further 16px in.
+  backBtn:     { padding: 4, marginRight: 4 },
+  // Angular: .heading3-semibold-16 .line-height-20 — 16px Poppins-SemiBold,
+  // line-height 20. The rem scale here resolves ~16 → ~17 at 412px width.
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 17, lineHeight: 20, color: Colors.black, flex: 1 },
 
   content: { padding: 16, gap: 24 },
 
@@ -552,14 +587,17 @@ const s = StyleSheet.create({
   emptyText:  { fontSize: 14, color: Colors.textSecondary, textAlign: 'center' },
 
   // ── Plan summary card ────────────────────────────────────────────────────
+  // Angular: .payment-revamp-intermediate-block (payment-mode.page.scss:39-44)
+  // — box-shadow: -1px 3px 6px 1px #40434343. That 8-digit hex is #404343 at
+  // alpha 0x43 = 26.7%, and the offset is -1px on X, not 0.
   summaryCard: {
     backgroundColor: Colors.white,
     borderRadius:    8,
     padding:         16,
-    shadowColor:     Colors.shadow,
-    shadowOffset:    { width: 0, height: 6 },
-    shadowOpacity:   0.08,
-    shadowRadius:    8,
+    shadowColor:     '#404343',
+    shadowOffset:    { width: -1, height: 3 },
+    shadowOpacity:   0.267,
+    shadowRadius:    6,
     elevation:       4,
   },
   summaryTopRow: {
@@ -570,7 +608,9 @@ const s = StyleSheet.create({
   planNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
   planName:     { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
   planDuration: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textSecondary, marginRight: 4 },
-  planPrice:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#4C4C4C' },
+  // Angular: .body3-regular-12 .poppins-family .black-color .line-height-16
+  // (payment-mode.page.html:56) — 12px, #000. RN had #4C4C4C, a grey.
+  planPrice:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black, lineHeight: 16 },
 
   discountRow: {
     flexDirection:  'row',
@@ -594,23 +634,34 @@ const s = StyleSheet.create({
   // ── Sections / cards ─────────────────────────────────────────────────────
   section:      { gap: 16 },
   sectionLabel: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  // Angular: .payment-revamp-intermediate-block (payment-mode.page.scss:39-44)
+  // — radius 8 (RN had 16) and shadow -1px 3px 6px 1px #40434343 (an 8-digit
+  // hex = #404343 at 26.7% alpha). Inner gutters are 16px on the Recommended
+  // card and 8px on the Other-modes card; rows supply their own vertical
+  // padding, so the card no longer adds 16px of its own on top.
   card: {
     backgroundColor: Colors.white,
-    borderRadius:    16,
-    paddingVertical: 16,
+    borderRadius:    8,
+    paddingVertical: 0,
     paddingHorizontal: 16,
-    shadowColor:     Colors.shadow,
-    shadowOffset:    { width: 0, height: 6 },
-    shadowOpacity:   0.08,
-    shadowRadius:    8,
-    elevation:       4,
+    // Same .payment-revamp-intermediate-block shadow as the summary card —
+    // these values were 0/6px at 8% opacity, a softer drop than Angular's.
+    shadowColor:     '#404343',
+    shadowOffset:    { width: -1, height: 3 },
+    shadowOpacity:   0.267,
+    shadowRadius:    6,
+    elevation:       3,
   },
 
+  // Angular: .payment-list (payment-mode.page.scss:254-258) — padding-top 6px
+  // only, with the row's height coming from its 32px icon. RN's minHeight 52
+  // plus the card's own 16px vertical padding made every row noticeably
+  // taller than Angular's.
   row: {
     flexDirection:  'row',
     alignItems:     'center',
     justifyContent: 'space-between',
-    minHeight:      52,
+    paddingVertical: 12,
   },
   rowLeft:  { flexDirection: 'row', alignItems: 'center', gap: 16, flexShrink: 1 },
   iconBox: {
@@ -629,7 +680,11 @@ const s = StyleSheet.create({
 
   chevronTouch: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
 
-  rowDivider: { height: 1, backgroundColor: Colors.borderSubtle, marginVertical: 16 },
+  // Angular: .border-bottom-upi-apps (payment-mode.page.scss:337-339) — a 1px
+  // #f4f5f8 bottom border sitting directly under the row with NO vertical
+  // margin of its own (RN added 16px above and below), suppressed on the last
+  // row.
+  rowDivider: { height: 1, backgroundColor: '#f4f5f8' },
 
   // ── Inline pay block (button + renew checkbox, sits under the first row) ──
   inlinePayBlock: { gap: 8, marginTop: 16 },

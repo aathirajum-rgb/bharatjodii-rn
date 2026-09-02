@@ -17,6 +17,7 @@ import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import LottieView from 'lottie-react-native'
+import { LinearGradient } from 'expo-linear-gradient'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   useSharedValue, useAnimatedStyle, withTiming, runOnJS, Easing,
@@ -700,8 +701,18 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
                   <LottieView source={{ uri: LOTTIE.success }} autoPlay loop style={styles.endLottie} />
                   <Text style={styles.endTitle}>{t('DAILYRECOMMENDATIONS.END_CARD_TXT_1')}</Text>
                   <Text style={styles.endSub}>{t('DAILYRECOMMENDATIONS.END_CARD_TXT_2')}</Text>
+                  {/* Angular: .progress-bar (daily-recommendation.component
+                      .scss:132-138) fills with linear-gradient(90deg, #fff,
+                      #B50033) — it fades in from white on the left to the
+                      brand red at the leading edge, not the flat block of
+                      colour this port drew. */}
                   <View style={styles.progressTrack}>
-                    <View style={[styles.progressFill, { width: `${progressPct}%` }]} />
+                    <LinearGradient
+                      colors={['#ffffff', '#B50033']}
+                      start={{ x: 0, y: 0.5 }}
+                      end={{ x: 1, y: 0.5 }}
+                      style={[styles.progressFill, { width: `${progressPct}%` }]}
+                    />
                   </View>
                 </View>
               )}
@@ -858,10 +869,11 @@ const styles = StyleSheet.create({
     width:            '100%',
     backgroundColor:  Colors.surface,
   },
+  // Angular: height 100%, border-radius 10, gradient fill (applied inline via
+  // LinearGradient above — RN styles can't express a gradient background).
   progressFill: {
-    height:          '100%',
-    borderRadius:    10,
-    backgroundColor: Colors.primaryDark,
+    height:       '100%',
+    borderRadius: 10,
   },
   tooltipOverlay: {
     position:          'absolute',

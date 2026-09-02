@@ -1,7 +1,7 @@
 // Home screen's "assist" / breather banner — Angular: <app-breather>, shown instead
 // of (takes precedence over) the regular hero banner when PPSET's ASSISTEDFLAG=='1'
 // and the user hasn't locally dismissed it this session (homeGating.ts's
-// computeShowAssistBanner). Content comes from paymentService.getMenuPromo('MENU')'s
+// computeShowAssistBanner). Content comes from paymentService.getMenuPromo()'s
 // ASSISTEDPROMO fields.
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../../constants/colors'

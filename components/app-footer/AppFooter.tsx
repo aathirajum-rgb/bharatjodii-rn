@@ -116,24 +116,16 @@ export default function AppFooter({
               accessibilityState={{ selected: isActive }}
               accessibilityLabel={label}
             >
-              {/* ── Upgrade tag above Membership icon (e.g. "₹200 OFF") ── */}
-              {tab === 3 && !!upgradeTag && (
-                <LinearGradient
-                  colors={['#33258C', '#751246']}
-                  start={{ x: 0, y: 0.5 }}
-                  end={{ x: 1, y: 0.5 }}
-                  style={styles.upgradeTag}
-                >
-                  <Text style={styles.upgradeTagText} numberOfLines={1}>{upgradeTag}</Text>
-                </LinearGradient>
-              )}
-
               {/* ── Icon area ── */}
               <View style={styles.iconWrap}>
+                {/* Angular: footer.component.html:48-49 — the Membership icon
+                    swaps class by whether the tag is present: .membership-off-size
+                    (15x12, footer.component.scss:165) shrinks it to make room for
+                    the chip, otherwise .height100 fills the ~25px icon box. */}
                 <CdnSvg
                   uri={isActive ? TAB_ICONS[tab][1] : TAB_ICONS[tab][0]}
-                  width={24}
-                  height={tab === 3 && !upgradeTag ? 28 : 24}
+                  width={tab === 3 && !!upgradeTag ? 15 : 24}
+                  height={tab === 3 ? (upgradeTag ? 12 : 25) : 24}
                 />
 
                 {/* Count badge (Home / Likes / Messages) */}
@@ -144,6 +136,21 @@ export default function AppFooter({
                   <View style={styles.redDot} />
                 )}
               </View>
+
+              {/* ── Upgrade tag (e.g. "₹200 OFF") ──
+                  Angular: footer.component.html:57-59 — the .membership-off
+                  div is a SIBLING sitting BETWEEN the icon <span> and the
+                  <ion-label>, not above the icon. */}
+              {tab === 3 && !!upgradeTag && (
+                <LinearGradient
+                  colors={['#33258C', '#751246']}
+                  start={{ x: 0, y: 0.5 }}
+                  end={{ x: 1, y: 0.5 }}
+                  style={styles.upgradeTag}
+                >
+                  <Text style={styles.upgradeTagText} numberOfLines={1}>{upgradeTag}</Text>
+                </LinearGradient>
+              )}
 
               {/* ── Label ── */}
               {/* Angular: two-word labels (Liked profiles / Contacted profiles) wrap
@@ -232,11 +239,14 @@ const styles = StyleSheet.create({
     lineHeight: 12,
   },
   // "₹200 OFF" upgrade pill above Membership icon — gradient: #33258C → #751246
+  // Angular: .membership-off (footer.component.scss:152-163) — padding 1px 5px,
+  // radius 2, min-width 60, gradient #33258c → #751246. It sits in normal flow
+  // between the icon and the label here rather than Angular's absolute
+  // top:20px, which measures from the tab button and lands in the same gap.
   upgradeTag: {
     borderRadius:      2,
     paddingVertical:   1,
     paddingHorizontal: 5,
-    marginBottom:      2,
     minWidth:          60,
     alignItems:        'center',
     justifyContent:    'center',
