@@ -188,7 +188,7 @@ const styles = StyleSheet.create({
   // "Viewed your/his/her mobile number" caption — matches Angular's own row,
   // which leaves this plain black (no pink/primary color rule exists there).
   viewedNumberText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textPrimary,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textPrimary,
     flexShrink: 1, overflow: 'hidden',
   },
 
@@ -199,7 +199,7 @@ const styles = StyleSheet.create({
   // column had only a floor, not a ceiling, on its width).
   trailing: { alignItems: 'flex-end', gap: 6, minWidth: 44, maxWidth: 72, flexShrink: 0 },
   time: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 11, color: Colors.textTertiary,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 11, color: Colors.textPrimary,
     textAlign: 'right',
   },
   unreadBadge: {

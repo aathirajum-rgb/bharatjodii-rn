@@ -39,7 +39,8 @@ import {
   emitSendMessage, onSendResponse, emitMessageStatus, onReceiver,
 } from '../../service/socketService'
 import { blockChatProfile, unblockChatProfile, communicationBtnOnClick } from '../../service/communicationService'
-import { handleBack } from '../../utils/navigationRef'
+import { handleBack, navigate } from '../../utils/navigationRef'
+import { ENavigation } from '../../types/enums/navigation.enum'
 import {
   getChatCount, consumeChatCount, checkChatLimit, fetchChatPaymentPromo,
   type ChatCountResult, type ChatPaymentPromo,
@@ -101,6 +102,25 @@ export default function ChatScreen({ navigation, route }: Props) {
   // fixed size. Mirrored here instead of hard-coding 40.
   const { width: winW, height: winH } = useWindowDimensions()
   const avatarSize = (Math.min(winW, winH) * 11.12) / 100
+  // Angular: .jodii-chat-mic-img/.jodii-chat-send-img — width:11vmin IS the
+  // total circular button size (confirmed: both Ionic's structure.css and the
+  // app's own global.scss set `* { box-sizing: border-box }`, so padding is
+  // subtracted FROM the 11vmin box, not added on top of it). Padding is NOT
+  // uniform between states, so the icon isn't perfectly centered in Angular
+  // either — mic: 8px all sides (button-revamp.component.scss:200-205);
+  // send-active: 12px top/bottom, 13px left, 9px right (:225-230); send-
+  // deactive: 11px top/bottom, 11px left, 8px right (:214-219).
+  const sendBtnSize = (Math.min(winW, winH) * 11) / 100
+  // Angular's <img> only sets `width` (no explicit `height`), so the browser
+  // scales height automatically from the SVG's own intrinsic aspect ratio —
+  // record-message-white.svg's real viewBox is 24×25 (not square), so
+  // forcing width===height here squishes the glyph and visibly shifts it
+  // off-center within the circle. Deriving height from the true ratio
+  // instead keeps it centered exactly like Angular's unconstrained <img>.
+  const micIconWidth = sendBtnSize - 16
+  const micIconHeight = micIconWidth * (25 / 24)
+  const sendIconWidth = sendBtnSize - 13 - 9
+  const sendIconHeight = sendBtnSize - 12 - 12
   const scrollRef = useRef<ScrollView>(null)
 
   const partnerId = String(route.params?.partnerId ?? '')
@@ -617,6 +637,19 @@ export default function ChatScreen({ navigation, route }: Props) {
     setShowReportModal(true)
   }
 
+  // Angular: messages.component.ts's viewProfileRedirect() — html:43's "View
+  // #HIS_HER# profile" row, always shown.
+  function handleMenuView() {
+    setMenuOpen(false)
+    navigate(ENavigation.VIEW_PROFILE, { matriId: partnerId, fromPage: 'chat' })
+  }
+
+  // Angular: selectSelction('safety-tips') → router.navigate(['/safety-tips']).
+  function handleMenuSafetyTips() {
+    setMenuOpen(false)
+    navigate(ENavigation.SAFETY_TIPS)
+  }
+
   async function confirmBlockOrUnblock() {
     if (!confirmAction || blockActionBusy) return
     setBlockActionBusy(true)
@@ -696,12 +729,17 @@ export default function ChatScreen({ navigation, route }: Props) {
         {menuOpen && (
           <ThreeDotMenu
             positionStyle={styles.menuPosition}
+            showView
+            onView={handleMenuView}
+            viewGender={ownGender === 'F' ? 'M' : 'F'}
             showBlock={blockedState === 'none' && !reported}
             onBlock={handleMenuBlock}
             showUnblock={blockedState === 'by_me'}
             onUnblock={handleMenuUnblock}
             showReport
             onReport={handleMenuReport}
+            showSafetyTips
+            onSafetyTips={handleMenuSafetyTips}
           />
         )}
       </View>
@@ -784,57 +822,71 @@ export default function ChatScreen({ navigation, route }: Props) {
           </View>
         ) : (
           <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
-            {!isRecording && !recordedAttachment && (
-              <Pressable onPress={handleAttachmentPress} hitSlop={8} style={styles.attachBtn}>
-                <CdnSvg uri={CDN + 'jodii-chat-attachment-img.svg'} width={20} height={21} />
-              </Pressable>
-            )}
-
-            {isRecording ? (
-              <Pressable style={styles.input} onPress={stopRecordingAndFinalize}>
-                <View style={styles.recordingRow}>
-                  <CdnSvg uri={CDN + 'jodii-chat-mic-img-red.svg'} width={18} height={18} />
-                  <View style={styles.recordingDot} />
-                  <Text style={styles.recordingTimer}>{formatVoiceDuration(recorderState.durationMillis / 1000)}</Text>
+            {/* Angular: messages.component.html:642-649 — the attachment icon
+                is a CHILD of the textarea itself (position: absolute; right:
+                5%; top: 25%), overlapping the pill from the inside, not a
+                separate button before it. */}
+            <View style={styles.inputWrap}>
+              {isRecording ? (
+                <Pressable style={styles.input} onPress={stopRecordingAndFinalize}>
+                  <View style={styles.recordingRow}>
+                    <CdnSvg uri={CDN + 'jodii-chat-mic-img-red.svg'} width={18} height={18} />
+                    <View style={styles.recordingDot} />
+                    <Text style={styles.recordingTimer}>{formatVoiceDuration(recorderState.durationMillis / 1000)}</Text>
+                  </View>
+                </Pressable>
+              ) : recordedAttachment ? (
+                <View style={styles.input}>
+                  <View style={styles.recordingRow}>
+                    <Pressable onPress={handleCancelRecording} hitSlop={8}>
+                      <CdnSvg uri={CDN + 'jodii-chat-cross-img-red.svg'} width={16} height={16} />
+                    </Pressable>
+                    <Text style={styles.recordingTimer}>{recordedDurationLabel}</Text>
+                  </View>
                 </View>
-              </Pressable>
-            ) : recordedAttachment ? (
-              <View style={styles.input}>
-                <View style={styles.recordingRow}>
-                  <Pressable onPress={handleCancelRecording} hitSlop={8}>
-                    <CdnSvg uri={CDN + 'jodii-chat-cross-img-red.svg'} width={16} height={16} />
-                  </Pressable>
-                  <Text style={styles.recordingTimer}>{recordedDurationLabel}</Text>
-                </View>
-              </View>
-            ) : (
-              <TextInput
-                style={styles.input}
-                value={message}
-                onChangeText={setMessage}
-                placeholder={t('MESSAGES.TYPE_TEXT')}
-                placeholderTextColor={Colors.textPlaceholder}
-                multiline
-              />
-            )}
+              ) : (
+                <TextInput
+                  style={styles.input}
+                  value={message}
+                  onChangeText={setMessage}
+                  placeholder={t('MESSAGES.TYPE_TEXT')}
+                  placeholderTextColor={Colors.textPlaceholder}
+                  multiline
+                />
+              )}
+              {!isRecording && !recordedAttachment && (
+                <Pressable onPress={handleAttachmentPress} hitSlop={8} style={styles.attachBtn}>
+                  <CdnSvg uri={CDN + 'jodii-chat-attachment-img.svg'} width={20} height={21} />
+                </Pressable>
+              )}
+            </View>
 
             {message.trim() || recordedAttachment ? (
+              // Angular: .jodii-chat-send-img — padding: 12px 9px 12px 13px
+              // (top/right/bottom/left), not centered — the icon sits
+              // slightly left-and-up of true center. Explicit padding here
+              // (not alignItems/justifyContent: center) reproduces that,
+              // since the icon's own box fills exactly what's left over.
               <Pressable
-                style={[styles.sendBtn, (sending || voiceSending) && styles.sendBtnDisabled]}
+                style={[
+                  styles.sendBtn, styles.sendBtnPadded,
+                  { width: sendBtnSize, height: sendBtnSize, borderRadius: sendBtnSize / 2 },
+                  (sending || voiceSending) && styles.sendBtnDisabled,
+                ]}
                 onPress={message.trim() ? handleSend : handleSendVoice}
                 disabled={sending || voiceSending}
               >
                 {voiceSending
                   ? <ActivityIndicator size="small" color={Colors.white} />
-                  : <CdnSvg uri={CDN + 'send-message-white.svg'} width={18} height={18} />}
+                  : <CdnSvg uri={CDN + 'send-message-white.svg'} width={sendIconWidth} height={sendIconHeight} />}
               </Pressable>
             ) : (
               <Pressable
-                style={[styles.sendBtn, isRecording && styles.sendBtnRecording]}
+                style={[styles.sendBtn, { width: sendBtnSize, height: sendBtnSize, borderRadius: sendBtnSize / 2, marginBottom: 10 }, isRecording && styles.sendBtnRecording]}
                 onPressIn={handleMicPressIn}
                 onPressOut={stopRecordingAndFinalize}
               >
-                <CdnSvg uri={CDN + 'record-message-white.svg'} width={18} height={18} />
+                <CdnSvg uri={CDN + 'record-message-white.svg'} width={micIconWidth} height={micIconHeight} style={{ marginBottom: 5 }} />
               </Pressable>
             )}
           </View>
@@ -911,7 +963,9 @@ export default function ChatScreen({ navigation, route }: Props) {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.background },
+  // Angular: no background rule anywhere for ion-content/.chat-section — falls
+  // back to Ionic's default #ffffff, not the app's usual grey/lavender page bg.
+  screen: { flex: 1, backgroundColor: Colors.white },
   flex1: { flex: 1 },
 
   header: {
@@ -949,17 +1003,33 @@ const styles = StyleSheet.create({
   moreBtn: { padding: 4, marginLeft: -4 },
   // ThreeDotMenu.tsx defaults to top:48/right:12 (anchored to a full-width photo
   // card) — this header is much shorter, so anchor just under the 3-dot button.
-  menuPosition: { top: 44, right: 8 },
+  // Angular's own `right: 31%` resolves against Ionic's internal grid
+  // context, not this screen's actual full-width header row — using that
+  // percentage literally here overshot far to the left. Anchored to the
+  // 3-dot button's own position instead (a fixed inset from the right edge,
+  // matching where the button visually sits), which is what actually lines
+  // the menu up under it.
+  menuPosition: { top: 70, right: 16 },
 
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   emptyTitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary, textAlign: 'center' },
 
-  threadContent: { paddingVertical: 12, flexGrow: 1 },
-  dateSeparatorWrap: { alignItems: 'center', marginVertical: 10 },
+  // Angular: ion-grid.chat-section has no top/bottom padding of its own — the
+  // date-divider's pt-8 is the only top spacing before the first message, and
+  // the last message's own mb-4 (or its bubble's implicit bottom edge) is the
+  // only spacing before the input bar's own bordered/padded surface below.
+  threadContent: { flexGrow: 1 },
+  // Angular: messages.component.html:115-120 — plain centered ion-label, NO
+  // background/border/shadow/card of any kind (confirmed: no matching CSS
+  // rule anywhere for this row). pt-8/pb-8 (8px top/bottom on the row) plus
+  // the next message row's own mt-16 gives ~24px total gap to the next bubble.
+  // Angular: pt-8/pb-8 on the divider row itself; the FIRST message row below
+  // supplies its own mt-16 (ChatBubble.tsx's `row` style), so this only needs
+  // its own 8/8 — the 16 comes from the message row, not doubled here.
+  dateSeparatorWrap: { alignItems: 'center', paddingTop: 8, paddingBottom: 8 },
   dateSeparatorText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 11, color: Colors.textSecondary,
-    backgroundColor: Colors.surfaceAlt, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 3,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#1f1e1b',
   },
 
   // Angular: .messages-bottom-block — background #FFF, border-top 1px solid
@@ -970,23 +1040,35 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderTopWidth: 1, borderTopColor: '#E6E6E6',
   },
-  // Angular: .jodii-chat-attachment-img — width:20px (no CSS override on
-  // height, but the icon itself is square) — was 22x22.
-  attachBtn: { padding: 8, marginBottom: 2 },
+  // Angular: ion-textarea.posrelative — the textarea itself is the
+  // positioning context for the absolutely-positioned attachment icon inside
+  // it (messages.component.scss:312-317: position:absolute; right:5%; top:25%).
+  inputWrap: { flex: 1, position: 'relative', justifyContent: 'center' },
+  // Angular: .jodii-chat-attachment-img — width:20px, position:absolute,
+  // right:5%, top:25% — overlapping the pill from inside, not a sibling
+  // button before it.
+  attachBtn: { position: 'absolute', right: '5%', top: '25%' },
   // Angular: .jodii-chat-textarea (empty state) — border 1px solid #808080,
-  // border-radius 52px (pill), background #F0F0F0. Not a borderless 20px-
-  // radius bubble on a flat surfaceAlt fill.
+  // border-radius 52px (pill), background #F0F0F0. --padding-end:14% reserves
+  // room on the right for the overlapping icon; text is TOP-aligned (global
+  // rule: padding-top:16px!important, padding-bottom:0!important on the
+  // native textarea), not vertically centered, despite how a pill input
+  // usually looks — confirmed, not a guess.
   input: {
     flex: 1, maxHeight: 100, minHeight: 40,
     backgroundColor: '#F0F0F0', borderRadius: 52,
     borderWidth: 1, borderColor: '#808080',
-    paddingHorizontal: 16, paddingVertical: 10,
+    paddingLeft: 16, paddingRight: 44, paddingTop: 16, paddingBottom: 0,
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textPrimary,
   },
   sendBtn: {
-    width: 40, height: 40, borderRadius: 20,
     backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
   },
+  // Angular: .jodii-chat-send-img — padding: 12px 9px 12px 13px. Combined
+  // with sendIconWidth/Height (which exactly fill what's left of sendBtnSize
+  // after this padding), the icon ends up shifted slightly left-and-up of
+  // true center rather than dead center, matching Angular exactly.
+  sendBtnPadded: { paddingTop: 12, paddingRight: 9, paddingBottom: 12, paddingLeft: 13 },
   sendBtnDisabled: { opacity: 0.5 },
   sendBtnRecording: { backgroundColor: Colors.inputError },
 

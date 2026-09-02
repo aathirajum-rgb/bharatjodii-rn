@@ -88,6 +88,7 @@ import StarMatchingScreen          from '../screens/star-matching/StarMatchingSc
 import ActivityScreen               from '../screens/activity/ActivityScreen'
 import MessagerListScreen           from '../screens/messagerList/MessagerListScreen'
 import ChatScreen                   from '../screens/chat/ChatScreen'
+import SafetyTipsScreen             from '../screens/safety-tips/SafetyTipsScreen'
 import LanguageSelectionScreen     from '../screens/LanguageSelectionScreen'
 import MenuScreen                  from '../screens/menu/MenuScreen'
 import BiodataScreen                from '../screens/menu/BiodataScreen'
@@ -674,6 +675,7 @@ export default function AppStack() {
       <Stack.Screen name="Activity" component={ActivityScreen} />
       <Stack.Screen name="MessagerList" component={MessagerListScreen} />
       <Stack.Screen name="chat-window" component={ChatScreen} />
+      <Stack.Screen name="safety-tips" component={SafetyTipsScreen} />
       <Stack.Screen name="Menu" component={MenuScreen} />
       <Stack.Screen name="Biodata" component={BiodataScreen} />
       <Stack.Screen name="Settings" component={SettingsScreen} />

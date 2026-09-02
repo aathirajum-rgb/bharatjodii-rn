@@ -20,6 +20,10 @@ const UNBLOCK_ICON_URI = CDN_SVG + 'unblock-jodii-chat-img.svg'
 // Angular: button.component.html's blockProfileBtn case — confirmed real asset,
 // reused rather than a dedicated "block" icon (Angular's own menu item does this too).
 const BLOCK_ICON_URI   = CDN_SVG + 'revamp/close-icon.svg'
+// Angular: messages.component.html:43's phoneViewBtn case — view-profile-message.svg.
+const VIEW_ICON_URI    = CDN_SVG + 'view-profile-message.svg'
+// Angular: messages.component.html:64-67's safetyTipBtn case — safety-tips-message.svg.
+const SAFETY_TIPS_ICON_URI = CDN_SVG + 'safety-tips-message.svg'
 
 export interface ThreeDotMenuProps {
   // Angular: report-remove-profile.component.ts's @Input IsShowRemoveProfile/
@@ -38,58 +42,117 @@ export interface ThreeDotMenuProps {
   // no existing block relationship (mutually exclusive with showUnblock there).
   showBlock?: boolean | undefined
   onBlock?:   (() => void) | undefined
+  // Angular: messages.component.html:43 — "View #HIS_HER# profile", always
+  // shown (no *ngIf), first item in the chat overflow menu. Text is gendered
+  // to the profile being viewed (the chat partner), not the logged-in user.
+  showView?:  boolean | undefined
+  onView?:    (() => void) | undefined
+  viewGender?: 'M' | 'F' | undefined
+  // Angular: messages.component.html:64-67 — "Safety tips", always shown,
+  // last item (lines="none" — no divider under it).
+  showSafetyTips?: boolean | undefined
+  onSafetyTips?:   (() => void) | undefined
   // Desktop cards anchor this button inline in the icon row (relatively
   // positioned wrapper), not floating over the whole card's photo like
   // mobile does — override top/right to anchor to that smaller wrapper.
   positionStyle?: StyleProp<ViewStyle>
 }
 
+// Angular: ion-item's default `lines="inset"` — a thin bottom border that
+// starts/ends INSET from the row's own edges (not full-bleed edge-to-edge),
+// under every row except the last (`lines="none"`). A border directly on the
+// Pressable ignores its own paddingHorizontal and spans edge-to-edge in RN,
+// so the divider is a separate inset View sitting below the row's content
+// instead of a border on the row itself.
+function MenuItem({ onPress, isLast, children }: { onPress?: (() => void) | undefined; isLast: boolean; children: React.ReactNode }) {
+  return (
+    <View>
+      <Pressable style={s.item} onPress={onPress}>{children}</Pressable>
+      {!isLast && <View style={s.itemDivider} />}
+    </View>
+  )
+}
+
 export default function ThreeDotMenu({
-  showRemove, showReport, onRemove, onReport, showUnblock, onUnblock, showBlock, onBlock, positionStyle,
+  showRemove, showReport, onRemove, onReport, showUnblock, onUnblock, showBlock, onBlock,
+  showView, onView, viewGender = 'M', showSafetyTips, onSafetyTips, positionStyle,
 }: ThreeDotMenuProps) {
   const { t } = useTranslation()
+
+  // Which row ends up last varies by which flags the caller passes (e.g.
+  // showSafetyTips is chat-only), so this computes it from the same order the
+  // rows render in below, rather than hardcoding one.
+  const order = [
+    ['view', showView], ['remove', showRemove], ['block', showBlock],
+    ['unblock', showUnblock], ['report', showReport], ['safetyTips', showSafetyTips],
+  ] as const
+  const visible = order.filter(([, show]) => show).map(([key]) => key)
+  const lastKey = visible[visible.length - 1]
+
   return (
     <View style={[s.dropdown, positionStyle]}>
+      {/* Angular: messages.component.html:39-68 — chat overflow menu order is
+          View profile → Block/Unblock profile → Report profile → Safety tips. */}
+      {showView && (
+        <MenuItem onPress={onView} isLast={lastKey === 'view'}>
+          <CdnSvg uri={VIEW_ICON_URI} width={20} height={20} />
+          <Text style={s.itemText}>{t('MESSAGES.VIEW_CONTACT').replace(/#HER_HIS#/gi, t(`PRONOUN.${viewGender}.hisher`))}</Text>
+        </MenuItem>
+      )}
       {showRemove && (
-        <Pressable style={s.item} onPress={onRemove}>
+        <MenuItem onPress={onRemove} isLast={lastKey === 'remove'}>
           <CdnSvg uri={REMOVE_ICON_URI} width={20} height={20} />
           <Text style={s.itemText}>{t('MATCHES.REMOVEPROFILE')}</Text>
-        </Pressable>
+        </MenuItem>
       )}
       {showBlock && (
-        <Pressable style={s.item} onPress={onBlock}>
+        <MenuItem onPress={onBlock} isLast={lastKey === 'block'}>
           <CdnSvg uri={BLOCK_ICON_URI} width={20} height={20} />
           <Text style={s.itemText}>{t('MESSAGES.BLOCK_PROFILE', 'Block this profile')}</Text>
-        </Pressable>
-      )}
-      {showReport && (
-        <Pressable style={s.item} onPress={onReport}>
-          <CdnSvg uri={REPORT_ICON_URI} width={20} height={20} />
-          <Text style={s.itemText}>{t('MATCHES.MORE_OPT_2')}</Text>
-        </Pressable>
+        </MenuItem>
       )}
       {showUnblock && (
-        <Pressable style={s.item} onPress={onUnblock}>
+        <MenuItem onPress={onUnblock} isLast={lastKey === 'unblock'}>
           <CdnSvg uri={UNBLOCK_ICON_URI} width={20} height={20} />
           <Text style={s.itemText}>{t('PROFILES.UNBLOCK')}</Text>
-        </Pressable>
+        </MenuItem>
+      )}
+      {showReport && (
+        <MenuItem onPress={onReport} isLast={lastKey === 'report'}>
+          <CdnSvg uri={REPORT_ICON_URI} width={20} height={20} />
+          <Text style={s.itemText}>{t('MATCHES.MORE_OPT_2')}</Text>
+        </MenuItem>
+      )}
+      {showSafetyTips && (
+        <MenuItem onPress={onSafetyTips} isLast={lastKey === 'safetyTips'}>
+          <CdnSvg uri={SAFETY_TIPS_ICON_URI} width={20} height={20} />
+          <Text style={s.itemText}>{t('MESSAGES.SAFETY_TIPS')}</Text>
+        </MenuItem>
       )}
     </View>
   )
 }
 
 const s = StyleSheet.create({
-  // Angular: .report-remove-profile { position: absolute; right: 12px;
-  // top: 48px; z-index: 9999 } / .report-text { box-shadow: 0px 1px 8px -4px
-  // #888; border-radius: 6px; padding: 0 } — no backdrop/overlay in the real
-  // component; dismissal is purely the parent toggling visibility.
+  // Angular: .jodii-chat-report-block { position:absolute; right:31%; top:50px;
+  // border:1px solid #e5e5e5; border-radius:8px; z-index:99 } — confirmed NO
+  // box-shadow/elevation anywhere in this SCSS file, just the 1px border.
   dropdown: {
     position: 'absolute', top: 48, right: 12, zIndex: 9999,
-    backgroundColor: Colors.white, borderRadius: 6, minWidth: 190,
-    shadowColor: '#888888', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 1, shadowRadius: 4,
-    elevation: 6,
+    backgroundColor: Colors.white, borderRadius: 8, minWidth: 190,
+    borderWidth: 1, borderColor: '#e5e5e5',
   },
-  // Angular: .report-bg { --inner-padding-start: 16px } + ion-img mr-4.
-  item: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 12, paddingHorizontal: 16 },
+  // Angular: .jodii-chat-report-block ion-item — inner-padding-top/bottom 8px,
+  // inner-padding-start 0, padding-end 16px; row content div is d-flex
+  // align-center-item with ml-4 (4px) gap between icon and label text.
+  item: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8, paddingHorizontal: 16 },
+  // Angular: ion-item's default `lines="inset"` — a thin line inset from
+  // BOTH the left and right edges (not full-bleed edge-to-edge), matching the
+  // row's own 16px horizontal padding. Ionic's default border color is a
+  // very light gray (--ion-border-color) — lightened from an earlier, too-
+  // dark #e0e0e0 guess. A little extra vertical breathing room around the
+  // line itself (rather than changing the row's own Angular-matched 8px
+  // padding) so rows don't feel cramped against it.
+  itemDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#f0f0f0', marginHorizontal: 16, marginVertical: 4 },
   itemText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
 })

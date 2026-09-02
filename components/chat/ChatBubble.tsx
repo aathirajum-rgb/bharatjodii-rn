@@ -6,7 +6,7 @@
 // rich player Angular has for those — not sendable yet in this port, but
 // existing ones must still render, not crash.
 import { useEffect } from 'react'
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -61,7 +61,7 @@ function AudioBubble({ item, isOwnMessage, readStatus, avatarUri, avatarFallback
         <View style={styles.audioTrack}>
           <View style={[styles.audioProgress, { width: `${progress * 100}%` }]} />
         </View>
-        <Text style={[styles.audioTime, isOwnMessage ? styles.textOwn : styles.textPartner]}>{label}</Text>
+        <Text style={styles.audioTime}>{label}</Text>
         {isOwnMessage && <ReadTick readStatus={readStatus} />}
       </View>
       {isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} />}
@@ -104,6 +104,15 @@ function Avatar({ uri, fallbackGender }: { uri?: string | undefined; fallbackGen
 
 export default function ChatBubble({ item, onPressMedia, oppGender = 'M', onCallPress, onWhatsAppPress, ownPhoto, partnerPhoto }: Props) {
   const { t } = useTranslation()
+  // Angular's ion-col[size=auto] + width:90% chain renders narrower than a
+  // plain 90%-of-available-space would in RN (Ionic's auto column doesn't
+  // grow to fill the row) — narrow enough that "You viewed his mobile
+  // number" wraps to 2 lines. A literal 90%-of-remaining-space in RN leaves
+  // too much room and the heading stays on 1 line, so this targets a width
+  // that reproduces Angular's actual visual result (2-line wrap) directly,
+  // rather than the exact (unreproducible) CSS percentage chain.
+  const { width: winW } = useWindowDimensions()
+  const systemCardWidth = winW * 0.62
   const avatarUri = item.isOwnMessage ? ownPhoto : partnerPhoto
   // getAvatarFallbackUri's param is "which gender's avatar to show" — for the
   // own-message side that's the LOGGED-IN user's own gender (opposite of
@@ -128,11 +137,17 @@ export default function ChatBubble({ item, onPressMedia, oppGender = 'M', onCall
         <View style={item.isOwnMessage ? styles.systemColOwn : styles.systemColPartner}>
           <View style={[styles.systemRow, item.isOwnMessage && styles.systemRowOwn]}>
             {!item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} />}
+            {/* Angular: linear-gradient(251deg, #EAEBF5 0%, #FFF 100%) — CSS
+                angles run clockwise from north (pointing toward the 100%/white
+                end); 251deg's direction vector is (-0.946, 0.326) in screen
+                space, so the light lavender (0%) sits near the top-right
+                corner and fades to white toward the bottom-left, not a plain
+                diagonal corner-to-corner (0,0)->(1,1). */}
             <LinearGradient
               colors={['#EAEBF5', '#FFFFFF']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={[styles.systemCard, item.isOwnMessage ? styles.systemCardOwn : styles.systemCardPartner]}
+              start={{ x: 0.973, y: 0.337 }}
+              end={{ x: 0.027, y: 0.663 }}
+              style={[styles.systemCard, { width: systemCardWidth }, item.isOwnMessage ? styles.systemCardOwn : styles.systemCardPartner]}
             >
               <Text style={styles.systemTitle}>
                 {item.youViewedThem
@@ -154,7 +169,11 @@ export default function ChatBubble({ item, onPressMedia, oppGender = 'M', onCall
             </LinearGradient>
             {item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} />}
           </View>
-          <View style={[styles.systemTimeRow, item.isOwnMessage ? styles.systemTimeRowOwn : styles.systemTimeRowPartner]}>
+          <View style={[
+            styles.systemTimeRow,
+            { width: systemCardWidth },
+            item.isOwnMessage ? styles.systemTimeRowOwn : styles.systemTimeRowPartner,
+          ]}>
             <Text style={styles.systemTime}>{formatClockTime(item.timestamp)}</Text>
             {item.isOwnMessage && <ReadTick readStatus={item.readStatus} />}
           </View>
@@ -197,85 +216,162 @@ export default function ChatBubble({ item, onPressMedia, oppGender = 'M', onCall
 
   const bodyText = item.kind === 'other' ? t('MESSAGES.ATTACHMENT') : item.text
 
+  // Angular: .send-msg-time-block/.received-msg-time-block (messages.component.
+  // html:278/456) is a SIBLING of the bubble+avatar row, not a child inside the
+  // bubble — it sits below and outside the bubble's border/background, offset
+  // by margin-right/margin-left: calc(11.12vmin + 6px) (the avatar's own width
+  // + 6px gap), not nested inside the bubble's padding box. Same outer
+  // row→column→(content row + timestamp row) shape as the viewed_number
+  // branch above: `row` is the true per-message wrapper (marginTop:16,
+  // paddingHorizontal:12), `systemColOwn/Partner` stacks the content row and
+  // the timestamp row, `bubbleRow` is just the bubble+avatar horizontal pair.
   return (
     <View style={[styles.row, item.isOwnMessage ? styles.rowOwn : styles.rowPartner]}>
-      {!item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} />}
-      <View style={[styles.bubble, item.isOwnMessage ? styles.bubbleOwn : styles.bubblePartner]}>
-        <Text style={[styles.text, item.isOwnMessage ? styles.textOwn : styles.textPartner]}>{bodyText}</Text>
-        <View style={styles.meta}>
+      <View style={item.isOwnMessage ? styles.systemColOwn : styles.systemColPartner}>
+        <View style={[styles.bubbleRow, item.isOwnMessage && styles.bubbleRowOwn]}>
+          {!item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} />}
+          <View style={[styles.bubble, item.isOwnMessage ? styles.bubbleOwn : styles.bubblePartner]}>
+            <Text style={[styles.text, item.isOwnMessage ? styles.textOwn : styles.textPartner]}>{bodyText}</Text>
+          </View>
+          {item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} />}
+        </View>
+        <View style={[styles.meta, item.isOwnMessage ? styles.metaOwn : styles.metaPartner]}>
           <Text style={[styles.time, item.isOwnMessage ? styles.timeOwn : styles.timePartner]}>
             {formatClockTime(item.timestamp)}
           </Text>
           {item.isOwnMessage && <ReadTick readStatus={item.readStatus} />}
         </View>
       </View>
-      {item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} />}
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, marginVertical: 3, gap: 6 },
+  // Angular: ion-row's own mt-16 (messages.component.html:126/300) — 16px
+  // TOP-only margin per message row, giving 16px between consecutive
+  // same-day messages. Used two ways: as the sole row for audio/media
+  // messages (bubble+avatar, timestamp still inside those bubbles — not
+  // restructured, unconfirmed against Angular for those two kinds), and as
+  // the OUTER wrapper for text/viewed_number messages (which nest a further
+  // `bubbleRow`/`systemRow` inside for the bubble+avatar pairing, with the
+  // timestamp as a separate sibling below) — `gap:6` only matters for the
+  // former case since the latter's inner rows carry their own gap.
+  row: { flexDirection: 'row', paddingHorizontal: 12, marginTop: 16, gap: 6 },
   rowOwn: { justifyContent: 'flex-end' },
   rowPartner: { justifyContent: 'flex-start' },
 
+  // Angular: neither .d-flex row wrapper (html:135 sent / html:308 received)
+  // sets align-items, so it's flexbox's default `stretch` — the avatar sits
+  // flush with the TOP of the row, not bottom-anchored. This is the inner
+  // bubble+avatar pairing (was called `row` before the timestamp got moved
+  // out to its own sibling row below).
+  bubbleRow: { flexDirection: 'row', gap: 6 },
+  bubbleRowOwn: { justifyContent: 'flex-end' },
+
   // Angular: ion-avatar.chat-avatar-profile — 11.12vmin (~42px on a common
   // 375pt-wide phone) circle beside every bubble/card.
-  avatar: { width: 32, height: 32, borderRadius: 16, backgroundColor: Colors.surfaceAlt },
+  avatar: { width: 45, height: 45, borderRadius: 22.5, backgroundColor: Colors.surfaceAlt },
 
-  bubble: { maxWidth: '72%', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 8 },
-  bubbleOwn: { backgroundColor: Colors.primary, borderBottomRightRadius: 4 },
-  bubblePartner: { backgroundColor: Colors.surfaceAlt, borderBottomLeftRadius: 4 },
+  // Angular: .send-msg-block/.received-msg-block (messages.component.scss:379-
+  // 384/486-491) — BOTH sides are white with a #E6E6E6 border; they're
+  // distinguished only by which corner is squared off (the "tail"), not by
+  // background color. padding: 14px all sides (not 12h/8v). bubbleOwn/
+  // bubblePartner carry background+border directly (not just on `bubble`) so
+  // they still apply when combined with mediaBubble/audioBubble instead.
+  bubble: { maxWidth: '72%', paddingHorizontal: 14, paddingVertical: 14 },
+  bubbleOwn: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E6E6E6', borderRadius: 12, borderTopRightRadius: 0 },
+  bubblePartner: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E6E6E6', borderRadius: 12, borderTopLeftRadius: 0 },
 
-  text: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 19 },
-  textOwn: { color: Colors.white },
-  textPartner: { color: Colors.textPrimary },
+  // Angular: sent text is 12px (--font12), received is 14px (--font14) —
+  // genuinely different sizes, both Poppins-Regular, color #000 on both sides
+  // (no white-on-color text since neither bubble is colored anymore).
+  text: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, lineHeight: 19, color: '#000000' },
+  textOwn: { fontSize: 12 },
+  textPartner: { fontSize: 14 },
 
-  meta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, alignSelf: 'flex-end' },
-  time: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 10 },
-  timeOwn: { color: 'rgba(255,255,255,0.8)' },
-  timePartner: { color: Colors.textTertiary },
+  // Angular: .send-msg-time-block p / .received-msg-time-block p — both sides
+  // use the same #777777, since neither bubble is colored anymore. This row
+  // is now a SIBLING of `bubbleRow`, inside the systemColOwn/Partner wrapper.
+  // That wrapper shrink-wraps to its widest child, which for the OWN side is
+  // avatar+gap+bubble (avatar comes AFTER the bubble there) — so plain
+  // `alignItems: flex-end` right-aligns this row to the wrapper's full edge,
+  // past the avatar, not to the bubble's own edge. marginRight compensates,
+  // same fix as systemTimeRowOwn above; the received side has no such offset
+  // since its avatar comes first, already outside this row's own box.
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
+  metaOwn: { marginRight: 45 + 6 },
+  metaPartner: {},
+  time: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 10, color: '#777777' },
+  timeOwn: {},
+  timePartner: {},
 
   // Angular: the viewed-number row's outer column — bubble/avatar row plus
   // the timestamp row stacked underneath, each end-aligned to their side.
-  systemColOwn: { alignItems: 'flex-end', maxWidth: '82%' },
-  systemColPartner: { alignItems: 'flex-start', maxWidth: '82%' },
-  systemRow: { flexDirection: 'row', alignItems: 'flex-end', gap: 6 },
+  // No width cap needed here — systemCardWidth (computed per-instance from
+  // window width) already sizes the card itself in real pixels.
+  systemColOwn: { alignItems: 'flex-end' },
+  systemColPartner: { alignItems: 'flex-start' },
+  // Angular: same shared .d-flex/.d-flex.float-right wrapper as plain text
+  // rows — no align-items set, so the avatar is top-aligned here too, not
+  // bottom (this was still flex-end, missed in the earlier avatar-position fix).
+  systemRow: { flexDirection: 'row', gap: 6 },
   systemRowOwn: { justifyContent: 'flex-end' },
 
-  // Angular: .viewed-number-send/.viewed-number-received — a light purple-
-  // tinted gradient card (linear-gradient(251deg, #EAEBF5 0%, #FFF 100%))
-  // with a hairline #BDC0E0 border and an asymmetric "notch" corner facing
-  // the avatar, not a flat grey fill with uniform corners.
+  // Angular: .viewed-number-send/.viewed-number-received — width:90% (applied
+  // as a real pixel value via systemCardWidth above, not this percentage,
+  // since RN can't resolve a percentage against a shrink-wrapped parent),
+  // padding:16px 20px (not 14h/12v) — this larger padding plus the narrower
+  // width is what forces the heading to wrap onto 2 lines, matching Angular.
+  // A light purple-tinted gradient card (linear-gradient(251deg, #EAEBF5 0%,
+  // #FFF 100%)) with a hairline #BDC0E0 border and an asymmetric "notch"
+  // corner facing the avatar, not a flat grey fill with uniform corners.
   systemCard: {
-    flexShrink: 1, borderWidth: 1, borderColor: '#BDC0E0',
-    paddingHorizontal: 14, paddingVertical: 12, gap: 4,
+    borderWidth: 1, borderColor: '#BDC0E0',
+    paddingHorizontal: 20, paddingVertical: 16,
   },
-  systemCardOwn: { borderRadius: 14, borderTopRightRadius: 0 },
-  systemCardPartner: { borderRadius: 14, borderTopLeftRadius: 0 },
+  systemCardOwn: { borderRadius: 12, borderTopRightRadius: 0 },
+  systemCardPartner: { borderRadius: 12, borderTopLeftRadius: 0 },
+  // Angular: heading has no explicit line-height (browser default); mt-12
+  // (12px) gap to the first button below, not 8.
   systemTitle: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 19,
-    color: Colors.textPrimary, marginBottom: 8,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14,
+    color: Colors.textPrimary, marginBottom: 12,
   },
   // Angular: app-button-revamp [buttonSize]='msgBtn' [border]='primaryBorder'
-  // [background]='whiteBg' [textColor]='lightBlack' — white fill, outlined,
-  // full width, stacked. .msgBtn: height 32px (not 40), border-radius 4px
-  // (not 8) (button-revamp.component.scss:100-103,159-165).
+  // [background]='whiteBg' [textColor]='lightBlack' [hasFullWidth]='true' —
+  // white fill, outlined, FULL WIDTH of the card's content box, stacked.
+  // .msgBtn: height 32px (not 40), border-radius 4px (not 8)
+  // (button-revamp.component.scss:100-103,159-165).
   systemBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 3,
     height: 32, borderRadius: 4, borderWidth: 1, borderColor: Colors.primary,
-    backgroundColor: Colors.white,
+    backgroundColor: Colors.white, width: '100%',
   },
+  // Angular: mt-8 (8px) gap between the two stacked buttons.
   systemBtnSpaced: { marginTop: 8 },
   // Angular: no ctaFontSize passed → falls back to body2-regular-14, then the
   // .msgBtn size variant overrides it to 12px/weight 400 (still Poppins-
   // Regular) — NOT medium/14 as this had before.
   systemBtnText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 12, color: Colors.textPrimary },
   // Angular: .send-msg-time-block/.received-msg-time-block — the timestamp
-  // (+ read tick, sent side only) sits BELOW the card, not inside it.
+  // (+ read tick, sent side only) sits BELOW the card, not inside it. This
+  // row is given the SAME fixed width as the card itself (systemCardWidth,
+  // passed inline) so the time can align to the card's own right/left edge
+  // via justifyContent, rather than relying on flex shrink-wrap alignSelf —
+  // which doesn't reliably size against a sibling on RN Web, and was pinning
+  // the timestamp to the screen edge instead of the card edge.
   systemTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  systemTimeRowOwn: { alignSelf: 'flex-end' },
-  systemTimeRowPartner: { alignSelf: 'flex-start', marginLeft: 38 },
+  // Angular: sent side's card ends 45px avatar + 6px gap BEFORE the column's
+  // true right edge (the avatar sits after the card on that side) — without
+  // this offset the timestamp row (width:systemCardWidth, justify:flex-end)
+  // right-aligns to the column's full edge, past the avatar, landing outside
+  // the card's actual right border instead of flush with it.
+  systemTimeRowOwn: { justifyContent: 'flex-end', marginRight: 45 + 6 },
+  // Angular: received side's card starts right after the 45px avatar + 6px
+  // gap (same as systemRow's own avatar+card layout) — offset to match,
+  // since this row is a separate sibling below the avatar+card row, not
+  // nested inside it.
+  systemTimeRowPartner: { justifyContent: 'flex-start', marginLeft: 45 + 6 },
   systemTime: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 10, color: Colors.textTertiary },
 
   // Angular: .image-video-send-receive — a borderless media box; kept inside
@@ -293,5 +389,5 @@ const styles = StyleSheet.create({
   },
   audioTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.35)', overflow: 'hidden' },
   audioProgress: { height: '100%', backgroundColor: Colors.primary },
-  audioTime: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 11 },
+  audioTime: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 11, color: Colors.textPrimary },
 })

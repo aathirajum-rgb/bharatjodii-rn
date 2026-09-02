@@ -71,4 +71,5 @@ export enum ENavigation {
   PHOTO_REJECTION        = 'photo-rejection',
   VALIDATION             = 'Validation',
   DISCOVER_MATCHES       = 'DiscoverMatches',
+  SAFETY_TIPS            = 'safety-tips',
 }
