@@ -1,10 +1,27 @@
+const fs = require('fs');
+const path = require('path');
 const FLAVORS = require('./constants/flavorConfig');
+
+// Load .env.ota (gitignored) so the OTA manifest URL below isn't hardcoded —
+// same loading approach as scripts/deploy-ota.js, kept in sync with it.
+const envOtaPath = path.join(__dirname, '.env.ota');
+if (fs.existsSync(envOtaPath)) {
+  fs.readFileSync(envOtaPath, 'utf-8').split('\n').forEach(line => {
+    const [key, ...rest] = line.split('=');
+    if (key && rest.length && !process.env[key.trim()]) process.env[key.trim()] = rest.join('=').trim();
+  });
+}
 
 const flavor = process.env.APP_FLAVOR || 'jodii';
 const f = FLAVORS[flavor] || FLAVORS.jodii;
 
 const appEnv = process.env.EXPO_PUBLIC_APP_ENV || 'dev';
 const channelSuffix = process.env.CHANNEL_SUFFIX || 'production';
+
+if (!process.env.OTA_MANIFEST_URL) {
+  throw new Error('OTA_MANIFEST_URL is not set — add it to .env.ota (see envs/.env.template for reference).');
+}
+const otaManifestUrl = process.env.OTA_MANIFEST_URL;
 
 // Mirrors constants/env/env.*.ts's `api` field — app.config.js can't import
 // the .ts env files, so this is kept in sync manually. Needed so App Links
@@ -27,7 +44,7 @@ module.exports = ({ config }) => ({
   icon: f.icon,
   runtimeVersion: '1.0.0',
   updates: {
-    url: 'https://stgimg.jodii.app/jodii-ota-server/jodii-ota-server/manifest.php',
+    url: otaManifestUrl,
     fallbackToCacheTimeout: 0,
     checkAutomatically: 'ON_LOAD',
     requestHeaders: {
@@ -133,6 +150,14 @@ module.exports = ({ config }) => ({
     // wiring. Its Android mods also run (harmless, see withFirebaseAndroid.js).
     '@react-native-firebase/app',
     ['expo-camera', { barcodeScannerEnabled: false }],
+    // NOTE: @infinitered/react-native-mlkit-face-detection is deliberately NOT
+    // listed here. It ships no app.plugin.js and no expo config-plugin export —
+    // it's a plain native module (autolinking handles it on its own). Adding it
+    // to `plugins` makes Expo fall back to requiring its `main` entry
+    // (build/index.js, untranspiled JSX) as a plugin function, which crashes
+    // `expo start`/prebuild with "PluginError: Unexpected token '<'".
+    // See service/photoValidationService.ts for the on-device face-detection
+    // usage (photo AI validation pre-upload gate).
     // Default options only (no purchase connector, no backup-rules override) —
     // both are documented no-ops on Android with these defaults. Its iOS half
     // (AppDelegate deep-link injection) is a known no-op on Swift AppDelegates

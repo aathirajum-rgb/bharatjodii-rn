@@ -6,9 +6,10 @@
 // its own Submit) → a picker reusing onboarding's SearchablePicker/
 // MultiSelectPicker components.
 //
-// Photo management is fully embedded on this screen: adding opens the
-// gallery picker directly (CustomGalleryScreen as a modal, or a hidden file
-// input on web — see openGalleryPicker), and tapping an existing photo opens
+// Photo management is fully embedded on this screen: adding requests the OS
+// photo-library permission and launches the native picker directly (a hidden
+// file input on web — see openGalleryPicker), NOT the onboarding wizard's
+// own hand-built CustomGalleryScreen UI — and tapping an existing photo opens
 // PhotoAlbumViewerMobile (the swipeable view/delete/set-main/replace flow,
 // ported from Angular's managephoto.page.ts `showAlbum` state) — no
 // navigation to the onboarding wizard's own routes for either case.
@@ -29,12 +30,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, StyleSheet, Text,
+  ActivityIndicator, Alert, Platform, Pressable, ScrollView, StyleSheet, Text,
   useWindowDimensions, View,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
+import * as ImagePicker from 'expo-image-picker'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
@@ -42,9 +44,12 @@ import { getItem, setItem } from '../../service/storageService'
 import { Endpoints } from '../../service/api.endpoints'
 import { uploadFile } from '../../service/apiClient'
 import { managePhotos } from '../../service/profileService'
+import {
+  getPhotoConfig, validatePhotoAsset, normalizeWebFile, getRejectReasons, describeRejection,
+  type PhotoRejectionCode,
+} from '../../service/photoValidationService'
 import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import { fetchEditProfileInfo, type EditProfileInfo } from '../../service/editProfileService'
-import CustomGalleryScreen from '../onboarding/CustomGalleryScreen'
 import PhotoAlbumViewerMobile from '../../components/edit-profile/PhotoAlbumViewerMobile'
 import {
   CHILDREN_OPTIONS,
@@ -300,7 +305,6 @@ export default function EditProfileScreen({ navigation }: Props) {
   // be changed" popup, opened from showDisableToast() when a one-time-editable
   // field has already been used up. See `restrictedNav` below.
   const [fieldRestrictedVisible, setFieldRestrictedVisible] = useState(false)
-  const [galleryVisible, setGalleryVisible] = useState(false)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const [genderAvatarUrl, setGenderAvatarUrl] = useState('')
   // Photo failed to load (broken URL / still processing) — fall back to the
@@ -310,7 +314,7 @@ export default function EditProfileScreen({ navigation }: Props) {
   useEffect(() => {
     getOwnGenderAvatarUrl().then(setGenderAvatarUrl)
   }, [])
-  const [webUploading, setWebUploading] = useState(false)
+  const [photoUploading, setPhotoUploading] = useState(false)
   // Web only — see EditProfileDesktopScreen.tsx for the same pattern. Browsers
   // only allow a file picker to open from a direct, synchronous user click, so
   // there's no "landing screen" step to skip on web: this hidden input IS the
@@ -320,12 +324,22 @@ export default function EditProfileScreen({ navigation }: Props) {
   async function handleWebFiles(e: any) {
     const files: File[] = Array.from(e.target.files ?? [])
     if (!files.length) return
-    setWebUploading(true)
+    setPhotoUploading(true)
     try {
       const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+      const config = await getPhotoConfig()
+      const rejections: PhotoRejectionCode[] = []
       for (const file of files) {
+        const input = await normalizeWebFile(file)
+        const validation = await validatePhotoAsset(input, config)
+        URL.revokeObjectURL(input.uri)
+        if (!validation.ok) {
+          rejections.push(validation.code)
+          continue
+        }
         const formData = new FormData()
         formData.append('ID', userId)
+        formData.append('AIVALIDATE', config.isNativeFaceDetectionEnabled ? '1' : '0')
         formData.append('UPLOADPHOTO', file, file.name)
         const res = await uploadFile(Endpoints.media.addProfilePic, formData)
         if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
@@ -333,10 +347,14 @@ export default function EditProfileScreen({ navigation }: Props) {
         }
       }
       await load()
+      if (rejections.length) {
+        const reasons = await getRejectReasons()
+        Alert.alert('Some photos were not added', rejections.map(code => describeRejection(code, reasons)).join('\n\n'))
+      }
     } catch {
       Alert.alert('Error', 'Upload failed. Please try again.')
     } finally {
-      setWebUploading(false)
+      setPhotoUploading(false)
       if (webFileInputRef.current) webFileInputRef.current.value = ''
     }
   }
@@ -404,11 +422,72 @@ export default function EditProfileScreen({ navigation }: Props) {
   // wizard's own routes, so there's nothing to "come back from". On web this
   // has to be the file input's own .click() call, right here, so it stays a
   // trusted user gesture; on native it opens the embedded gallery modal.
-  function openGalleryPicker() {
+  // Same cap CustomGalleryScreen's own "You can select up to N more photos"
+  // enforced — this screen no longer routes through that custom in-app
+  // gallery UI (see openGalleryPicker below), so the limit is kept here.
+  const MAX_PHOTOS = 10
+
+  async function openGalleryPicker() {
     if (Platform.OS === 'web') {
       webFileInputRef.current?.click()
-    } else {
-      setGalleryVisible(true)
+      return
+    }
+    // Native: request the OS photo-library permission and go straight into
+    // the system picker — same permission → launchImageLibraryAsync pattern
+    // PhotoAlbumViewerMobile.tsx's handleReplace() already uses, instead of
+    // detouring through CustomGalleryScreen's hand-built in-app gallery UI.
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Allow photo library access in Settings to add photos.')
+      return
+    }
+    const remaining = Math.max(0, MAX_PHOTOS - photos.length)
+    if (remaining <= 0) return
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsMultipleSelection: remaining > 1,
+      selectionLimit: remaining,
+      quality: 0.85,
+    })
+    if (result.canceled || !result.assets.length) return
+
+    setPhotoUploading(true)
+    try {
+      const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+      const config = await getPhotoConfig()
+      const rejections: PhotoRejectionCode[] = []
+      for (const asset of result.assets) {
+        const validation = await validatePhotoAsset({
+          uri: asset.uri,
+          mimeType: asset.mimeType,
+          fileSize: asset.fileSize,
+          width: asset.width,
+          height: asset.height,
+        }, config)
+        if (!validation.ok) {
+          rejections.push(validation.code)
+          continue
+        }
+        const formData = new FormData()
+        formData.append('ID', userId)
+        formData.append('AIVALIDATE', config.isNativeFaceDetectionEnabled ? '1' : '0')
+        formData.append('UPLOADPHOTO', {
+          uri: asset.uri, type: asset.mimeType ?? 'image/jpeg', name: asset.fileName ?? 'photo.jpg',
+        } as any)
+        const res = await uploadFile(Endpoints.media.addProfilePic, formData)
+        if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
+          await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
+        }
+      }
+      await load()
+      if (rejections.length) {
+        const reasons = await getRejectReasons()
+        Alert.alert('Some photos were not added', rejections.map(code => describeRejection(code, reasons)).join('\n\n'))
+      }
+    } catch {
+      Alert.alert('Error', 'Upload failed. Please try again.')
+    } finally {
+      setPhotoUploading(false)
     }
   }
 
@@ -513,8 +592,8 @@ export default function EditProfileScreen({ navigation }: Props) {
             // gender-avatar placeholder Angular falls back to (common.ts's
             // getAvatarImg(false)), not a generic "+" icon.
             return (
-              <Pressable key={i} style={[s.photoAddSlot, pos, { width: size, height: size }]} onPress={openGalleryPicker} disabled={webUploading}>
-                {webUploading
+              <Pressable key={i} style={[s.photoAddSlot, pos, { width: size, height: size }]} onPress={openGalleryPicker} disabled={photoUploading}>
+                {photoUploading
                   ? <ActivityIndicator color={Colors.textTertiary} size="small" />
                   : !!genderAvatarUrl && <CdnSvg uri={genderAvatarUrl} width={size} height={size} />
                 }
@@ -651,23 +730,6 @@ export default function EditProfileScreen({ navigation }: Props) {
         visible={fieldRestrictedVisible}
         onClose={() => setFieldRestrictedVisible(false)}
       />
-
-      {/* Photo picker — embedded directly (no navigation to the onboarding
-          wizard's own routes): closing or finishing an upload just dismisses
-          this modal and refreshes the grid below, in place. */}
-      <Modal
-        visible={galleryVisible}
-        animationType="slide"
-        onRequestClose={() => setGalleryVisible(false)}
-        presentationStyle="fullScreen"
-      >
-        <CustomGalleryScreen
-          navigation={navigation}
-          route={{ params: { existingCount: photos.length } }}
-          onClose={() => setGalleryVisible(false)}
-          onUploaded={() => { setGalleryVisible(false); load() }}
-        />
-      </Modal>
 
       {/* Web only — hidden file input IS the picker (see openGalleryPicker) */}
       {Platform.OS === 'web' && (

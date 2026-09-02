@@ -1,0 +1,20 @@
+diff --git a/node_modules/lottie-react-native/android/build.gradle b/node_modules/lottie-react-native/android/build.gradle
+index a0dc14f..451ea90 100644
+--- a/node_modules/lottie-react-native/android/build.gradle
++++ b/node_modules/lottie-react-native/android/build.gradle
+@@ -8,7 +8,14 @@ buildscript {
+     }
+ 
+     dependencies {
+-        classpath("com.android.tools.build:gradle:7.2.2")
++        // AGP classpath deliberately NOT pinned here (was hardcoded 7.2.2,
++        // incompatible with this project's Gradle 9.3.1 — "Cannot snapshot
++        // output property 'outputDirectory'" during :lottie-react-native
++        // configuration). The host app resolves AGP centrally via Expo's
++        // version catalog (android/settings.gradle's
++        // expoAutolinking.useExpoVersionCatalog()), so `apply plugin:
++        // 'com.android.library'` below picks that up instead of introducing
++        // a second, older AGP on the classpath. See patches/lottie-react-native+*.patch.
+         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version")
+     }
+ }

@@ -7,6 +7,10 @@
 // - Excluding Google ML Kit's barcode-scanning stack (pulled in transitively by
 //   expo-camera) since this app never scans barcodes — drops libbarhopper_v3.so
 //   (several MB per ABI) from the packaged app.
+// - Splitting `assemble<Flavor>Release` (APK) output by ABI, dropping emulator-only
+//   x86/x86_64 slices, so internal/preview APKs aren't ~4x their needed size.
+//   Does not affect `bundle<Flavor>Release` (.aab) — AGP ignores splits.abi for Bundle
+//   tasks, so Play Store production output is unchanged.
 const { withAppBuildGradle, withDangerousMod } = require('@expo/config-plugins');
 const fs = require('fs');
 
@@ -62,6 +66,23 @@ const MLKIT_PROGUARD_RULE = `
 -dontwarn com.google.mlkit.vision.**
 `;
 
+const ABI_SPLIT_BLOCK = `    // Only affects the \`assemble<Flavor>Release\` (APK) tasks used by internal/preview
+    // builds — the App Bundle task (\`bundle<Flavor>Release\`, used for Play Store
+    // production releases) ignores \`splits.abi\` entirely and always lets Play do
+    // per-device ABI delivery on its own, so production output is unchanged.
+    // x86/x86_64 are emulator-only architectures; excluding them from the per-ABI
+    // APKs (while still emitting a universal APK as a fallback) cuts a typical
+    // internal-testing APK to roughly a quarter of its previous size.
+    splits {
+        abi {
+            enable true
+            reset()
+            include "armeabi-v7a", "arm64-v8a"
+            universalApk true
+        }
+    }
+`;
+
 function withReleaseSigningConfig(config) {
   return withAppBuildGradle(config, modConfig => {
     let contents = modConfig.modResults.contents;
@@ -109,9 +130,21 @@ function withMlkitProguardRule(config) {
   ]);
 }
 
+function withAbiSplit(config) {
+  return withAppBuildGradle(config, modConfig => {
+    let contents = modConfig.modResults.contents;
+    if (!contents.includes('splits {')) {
+      contents = contents.replace(/(\n\s*packagingOptions\s*\{)/, `\n${ABI_SPLIT_BLOCK}$1`);
+    }
+    modConfig.modResults.contents = contents;
+    return modConfig;
+  });
+}
+
 module.exports = function withAndroidBuildCustomizations(config) {
   config = withReleaseSigningConfig(config);
   config = withMlkitExclusions(config);
   config = withMlkitProguardRule(config);
+  config = withAbiSplit(config);
   return config;
 };

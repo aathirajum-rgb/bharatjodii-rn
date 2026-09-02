@@ -80,6 +80,7 @@ import ViewProfileScreen           from '../screens/viewprofile/ViewProfileScree
 import BlockerScreen               from '../screens/verify/BlockerScreen'
 import VerifyIdScreen               from '../screens/verify/VerifyIdScreen'
 import SelfieVerificationScreen     from '../screens/verify/SelfieVerificationScreen'
+import PhotoMismatchSelfieScreen    from '../screens/verify/PhotoMismatchSelfieScreen'
 import MenuContactsScreen           from '../screens/menu-contacts/MenuContactsScreen'
 import ValidationScreen            from '../screens/validation/ValidationScreen'
 import DiscoverMatchesScreen       from '../screens/discover-matches/DiscoverMatchesScreen'
@@ -248,6 +249,12 @@ export type AppStackParamList = {
   // Angular: pages/selfie-verification (see screens/verify/SelfieVerificationScreen.tsx)
   // — reached from BlockerScreen.tsx's selfie row.
   'selfie-verification': undefined
+  // AI photo validation's selfie-verification sub-flow (see
+  // screens/verify/PhotoMismatchSelfieScreen.tsx) — reached when
+  // pollPhotoValidation() returns isSelfieRequired after an onboarding photo
+  // upload (suspected AI-generated/celebrity photo). Distinct from
+  // 'selfie-verification' above, which is the unrelated EKYC flow.
+  'photo-mismatch-selfie': { onDonePageNo?: string; standalone?: boolean } | undefined
   // Angular: '/my-membership' route → pages/menu-contacts (see
   // screens/menu-contacts/MenuContactsScreen.tsx + MenuContactsDesktopLayout.tsx).
   'my-membership': undefined
@@ -637,6 +644,7 @@ export default function AppStack() {
       />
       <Stack.Screen name="verify-id" component={VerifyIdScreen} />
       <Stack.Screen name="selfie-verification" component={SelfieVerificationScreen} />
+      <Stack.Screen name="photo-mismatch-selfie" component={PhotoMismatchSelfieScreen} />
       <Stack.Screen name="my-membership" component={MenuContactsScreen} />
       <Stack.Screen name="Notification" component={NotificationScreen} />
       <Stack.Screen name="DiscoverMatches" component={DiscoverMatchesScreen} />

@@ -5,11 +5,13 @@
   "dependencies": {
     "@ebrimasamba/react-native-sms-retriever": "^2.1.1",
     "@expo/metro-runtime": "~57.0.10",
+    "@infinitered/react-native-mlkit-face-detection": "^5.0.0",
+    "@lottiefiles/dotlottie-react": "^0.13.5",
     "@notifee/react-native": "^9.1.8",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "@react-native-firebase/analytics": "26.2.0",
-    "@react-native-firebase/app": "^26.2.0",
-    "@react-native-firebase/messaging": "^26.2.0",
+    "@react-native-firebase/analytics": "26.3.3",
+    "@react-native-firebase/app": "26.3.3",
+    "@react-native-firebase/messaging": "26.3.3",
     "@react-navigation/native": "^7.3.1",
     "@react-navigation/native-stack": "^7.17.3",
     "axios": "^1.18.0",
@@ -66,11 +68,13 @@
     "eslint-config-expo": "~57.0.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.6",
+    "patch-package": "^8.0.1",
     "prettier": "^3.8.4",
     "ssh2-sftp-client": "^12.1.1",
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "postinstall": "patch-package",
     "start": "expo start",
     "start:dev": "node scripts/setup-env.js dev && cross-env EXPO_PUBLIC_APP_ENV=dev expo start",
     "start:stg": "node scripts/setup-env.js stg && cross-env EXPO_PUBLIC_APP_ENV=stg expo start",
@@ -665,7 +669,8 @@
     "ota:preview": "CHANNEL_SUFFIX=preview node scripts/deploy-ota.js",
     "ota:production:all": "CHANNEL_SUFFIX=production FLAVOR=all node scripts/deploy-ota.js",
     "ota:preview:all": "CHANNEL_SUFFIX=preview FLAVOR=all node scripts/deploy-ota.js",
-    "ota:server": "node ../jodii-ota-server/server.js"
+    "ota:server": "node ../jodii-ota-server/server.js",
+    "ota:server:create": "node scripts/create-ota-server.js"
   },
   "private": true
 }

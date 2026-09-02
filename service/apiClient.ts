@@ -254,6 +254,40 @@ export async function clearSession(): Promise<void> {
     StorageKeys.User.PHOTO_URL,
     StorageKeys.User.MEMBERSHIP_TYPE,
     StorageKeys.User.LOGIN_GENDER,
+    StorageKeys.User.TIME_CREATED,
+    StorageKeys.User.DATE_OF_BIRTH,
+    StorageKeys.User.LAST_LOGIN,
+    StorageKeys.User.CREATED_BY,
+    StorageKeys.User.MOTHER_TONGUE,
+    StorageKeys.User.OCCUPATION,
+    StorageKeys.User.INCOME,
+    StorageKeys.User.BROTHERS,
+    StorageKeys.User.SISTERS,
+    StorageKeys.User.FAMILY_PROPERTY,
+    StorageKeys.Profile.PHOTO_PRIVACY,
+    StorageKeys.Profile.MOBILE_PRIVACY,
+    StorageKeys.Profile.PHOTO_STATUS_ARRAY,
+    StorageKeys.Profile.PROFILE_VERIFIED,
+    StorageKeys.Profile.HOROSCOPE_AVAILABLE,
+    StorageKeys.Profile.STAR,
+    StorageKeys.Profile.RAASI,
+    StorageKeys.Profile.DOSHAM,
+    StorageKeys.Profile.NRI_WHATSAPP,
+    StorageKeys.Profile.NON_IDV_USER_TYPE,
+    StorageKeys.Verification.EKYC_STATUS,
+    StorageKeys.Verification.PHONE_VERIFIED,
+    StorageKeys.Verification.ID_PROOF_UPDATE,
+    StorageKeys.Verification.TRUECALL_VERIFY,
+    StorageKeys.Verification.ID_VERIFY_CS_NUMBER,
+    StorageKeys.Verification.SIGNZY_KEY,
+    StorageKeys.Verification.DEFERRED_ID_USER,
+    // Onboarding-in-progress cache (registrationService.ts's REG_STORE_KEY /
+    // resetRegValues()) and the post-login field cache (SESSION_STORE_KEY) —
+    // left uncleared, these leak a previous user's answers (e.g. NAME) as
+    // prefill into the next signup's onboarding screens on the same device.
+    'REGISTRATION_VALUES',
+    'REGISTERURL',
+    'USER_SESSION',
   ])
 
   if (Object.keys(entries).length > 0) {

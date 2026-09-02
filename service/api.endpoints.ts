@@ -198,6 +198,8 @@ export const Endpoints = {
     faqPayment:          `${img}nbphoto/faqpayment.php`,
     addProfilePic:       `${img}nbphoto/addprofilepic.php`,
     uploadHoroscope:     `${img}nbphoto/uploadhoroscope.php`,
+    // AI photo validation poll — see service/photoValidationService.ts.
+    validatePhotos:      `${img}nbphoto/profilepicval.php`,
   },
 
 } as const

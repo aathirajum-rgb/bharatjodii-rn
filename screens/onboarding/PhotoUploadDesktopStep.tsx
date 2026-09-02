@@ -23,6 +23,10 @@ import { apiCall, uploadFile } from '../../service/apiClient'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem, setItem } from '../../service/storageService'
 import { getRegValue } from '../../service/registrationService'
+import {
+  getPhotoConfig, validatePhotoAsset, normalizeWebFile, getRejectReasons, describeRejection,
+  type PhotoRejectionCode,
+} from '../../service/photoValidationService'
 
 const PLACEHOLDER = CDN_SVG + 'add-photo.svg'
 const MAX_PHOTOS = 10
@@ -65,9 +69,19 @@ export default function PhotoUploadDesktopStep({ navigation }: Props) {
     setUploading(true)
     try {
       const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+      const config = await getPhotoConfig()
+      const rejections: PhotoRejectionCode[] = []
       for (const file of files) {
+        const input = await normalizeWebFile(file)
+        const validation = await validatePhotoAsset(input, config)
+        URL.revokeObjectURL(input.uri)
+        if (!validation.ok) {
+          rejections.push(validation.code)
+          continue
+        }
         const formData = new FormData()
         formData.append('ID', userId)
+        formData.append('AIVALIDATE', config.isNativeFaceDetectionEnabled ? '1' : '0')
         formData.append('UPLOADPHOTO', file, file.name)
         const res = await uploadFile(Endpoints.media.addProfilePic, formData)
         if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
@@ -75,6 +89,10 @@ export default function PhotoUploadDesktopStep({ navigation }: Props) {
         }
       }
       await loadPhotos()
+      if (rejections.length) {
+        const reasons = await getRejectReasons()
+        Alert.alert('Some photos were not added', rejections.map(code => describeRejection(code, reasons)).join('\n\n'))
+      }
     } catch {
       Alert.alert('Error', 'Upload failed. Please try again.')
     } finally {

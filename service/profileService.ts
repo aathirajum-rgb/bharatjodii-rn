@@ -3,6 +3,7 @@ import { Endpoints } from './api.endpoints'
 import { getItem, setItem, getJson, setJson } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { getSessionValue } from './registrationService'
+import { isAiValidationEnabled } from './photoValidationService'
 
 // ─── getPPSetData ─────────────────────────────────────────────────────────────
 // Angular's getPPSETData — single source of truth for profile + paywall state.
@@ -124,7 +125,11 @@ export async function managePhotos(): Promise<{ count: string; photos: any[] }> 
 
 export async function deletePhoto(photoId: string): Promise<any> {
   const userId = await getItem(SK.Auth.USER_ID)
-  return apiCall(Endpoints.profile.deletePhoto, 'POST', `ID=${userId}&PHOTOID=${photoId}`)
+  // Angular: api-params-functions.ts's ERegQueryModuleName.deletephoto case
+  // (added alongside managephoto.page.ts's deletePhoto()) now sends this same
+  // session flag on delete, not just add/upload.
+  const aiValidate = await isAiValidationEnabled() ? '1' : '0'
+  return apiCall(Endpoints.profile.deletePhoto, 'POST', `ID=${userId}&PHOTOID=${photoId}&AIVALIDATE=${aiValidate}`)
 }
 
 // ─── setMainPhoto ─────────────────────────────────────────────────────────────

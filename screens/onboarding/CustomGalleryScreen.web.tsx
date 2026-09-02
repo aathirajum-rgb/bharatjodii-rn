@@ -10,12 +10,20 @@ import {
   Text,
   View,
 } from 'react-native'
+import { useTranslation } from 'react-i18next'
 import { Colors } from '../../constants/colors'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { Endpoints } from '../../service/api.endpoints'
 import { uploadFile } from '../../service/apiClient'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem, setItem } from '../../service/storageService'
+import {
+  getPhotoConfig, validatePhotoAsset, normalizeWebFile, getRejectReasons, describeRejection,
+  pollPhotoValidation,
+  type PhotoRejectionCode,
+} from '../../service/photoValidationService'
+import PhotoVerdictSheet, { type VerdictPhoto } from '../../components/photo-validation/PhotoVerdictSheet'
+import VerificationSuccessSheet from '../../components/bottom-sheet/VerificationSuccessSheet'
 import { os } from './onboardingStyles'
 
 const MAX_PHOTOS = 10
@@ -23,11 +31,19 @@ const MAX_PHOTOS = 10
 type Props = { navigation: any; route: any }
 
 export default function CustomGalleryScreen({ navigation, route }: Props) {
+  const { t } = useTranslation()
   const existingCount = (route?.params?.existingCount as number | undefined) ?? 0
   const remaining     = Math.max(0, MAX_PHOTOS - existingCount)
 
   const [uploading, setUploading] = useState(false)
   const inputRef   = useRef<HTMLInputElement | null>(null)
+
+  // AI photo-validation verdict — see CustomGalleryScreen.tsx (native) for the
+  // same state machine; kept in sync with that file.
+  const [verdictPhase, setVerdictPhase] = useState<'idle' | 'uploading' | 'approved' | 'rejected' | 'mixed'>('idle')
+  const [verdictApproved, setVerdictApproved] = useState<VerdictPhoto[]>([])
+  const [verdictRejected, setVerdictRejected] = useState<VerdictPhoto[]>([])
+  const continueAfterVerdict = useRef<() => void>(() => {})
 
   useOnboardingFooter({ nextHidden: true, showSkip: false, onNext: () => {} }, [])
 
@@ -50,11 +66,23 @@ export default function CustomGalleryScreen({ navigation, route }: Props) {
     setUploading(true)
     try {
       const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+      const config = await getPhotoConfig()
+      const rejections: PhotoRejectionCode[] = []
+      const uploadedPhotoIds: string[] = []
       let firstUri: string | undefined
 
       for (const file of files) {
+        const input = await normalizeWebFile(file)
+        const validation = await validatePhotoAsset(input, config)
+        if (!validation.ok) {
+          URL.revokeObjectURL(input.uri)
+          rejections.push(validation.code)
+          continue
+        }
+
         const formData = new FormData()
         formData.append('ID', userId)
+        formData.append('AIVALIDATE', config.isNativeFaceDetectionEnabled ? '1' : '0')
         formData.append('UPLOADPHOTO', file, file.name)
 
         const res = await uploadFile(Endpoints.media.addProfilePic, formData)
@@ -62,17 +90,81 @@ export default function CustomGalleryScreen({ navigation, route }: Props) {
           if (res?.RESPONSE?.PHOTOURL) {
             await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
           }
-          if (!firstUri) firstUri = URL.createObjectURL(file)
+          if (res?.RESPONSE?.PHOTOID) {
+            uploadedPhotoIds.push(String(res.RESPONSE.PHOTOID))
+          }
+          if (!firstUri) firstUri = input.uri
+        } else {
+          URL.revokeObjectURL(input.uri)
         }
       }
 
-      navigation.push('onboarding', { pageNo: '21', pendingUri: firstUri })
+      if (rejections.length) {
+        const reasons = await getRejectReasons()
+        Alert.alert(
+          rejections.length === files.length ? 'Photo not added' : 'Some photos were not added',
+          rejections.map(code => describeRejection(code, reasons)).join('\n\n'),
+        )
+      }
+
+      if (rejections.length === files.length) return
+
+      continueAfterVerdict.current = () => {
+        navigation.push('onboarding', { pageNo: '21', pendingUri: firstUri })
+      }
+
+      if (config.isNativeFaceDetectionEnabled && uploadedPhotoIds.length > 0) {
+        setVerdictPhase('uploading')
+        const verdict = await pollPhotoValidation(uploadedPhotoIds)
+
+        if (!verdict) {
+          setVerdictPhase('idle')
+          continueAfterVerdict.current()
+          return
+        }
+
+        if (verdict.isSelfieRequired) {
+          setVerdictPhase('idle')
+          navigation.push('photo-mismatch-selfie', { onDonePageNo: '21' })
+          return
+        }
+
+        const approved: VerdictPhoto[] = []
+        const rejected: VerdictPhoto[] = []
+        for (const r of verdict.results) {
+          const entry: VerdictPhoto = {
+            photoId:  r.photoId,
+            photoUrl: r.photoUrl,
+            ...(r.reason?.title    ? { reasonTitle: r.reason.title }       : {}),
+            ...(r.reason?.subtitle ? { reasonSubtitle: r.reason.subtitle } : {}),
+          }
+          if (r.status.toLowerCase() === 'approve') approved.push(entry)
+          else rejected.push(entry)
+        }
+
+        setVerdictApproved(approved)
+        setVerdictRejected(rejected)
+        setVerdictPhase(rejected.length === 0 ? 'approved' : approved.length === 0 ? 'rejected' : 'mixed')
+        return
+      }
+
+      continueAfterVerdict.current()
     } catch {
       Alert.alert('Error', 'Upload failed. Please try again.')
+      setVerdictPhase('idle')
     } finally {
       setUploading(false)
       e.target.value = ''
     }
+  }
+
+  function dismissVerdict() {
+    setVerdictPhase('idle')
+    continueAfterVerdict.current()
+  }
+
+  function retryFromVerdict() {
+    setVerdictPhase('idle')
   }
 
   return (
@@ -108,6 +200,23 @@ export default function CustomGalleryScreen({ navigation, route }: Props) {
           }
         </Pressable>
       </View>
+
+      <VerificationSuccessSheet
+        visible={verdictPhase === 'approved'}
+        title={verdictApproved.length > 1
+          ? t('AI_PHOTO_VALIDATION.PHOTOS_APPROVED_MULTI', '#COUNT Photos approved successfully!').replace('#COUNT', String(verdictApproved.length))
+          : t('AI_PHOTO_VALIDATION.PHOTO_APPROVED_SINGLE', 'Photo approved successfully!')}
+        subtitle=""
+        onDismiss={dismissVerdict}
+      />
+      <PhotoVerdictSheet
+        visible={verdictPhase === 'uploading' || verdictPhase === 'rejected' || verdictPhase === 'mixed'}
+        phase={verdictPhase === 'uploading' ? 'uploading' : verdictPhase === 'mixed' ? 'mixed' : 'rejected'}
+        approved={verdictApproved}
+        rejected={verdictRejected}
+        onAddNewPhoto={retryFromVerdict}
+        onDismiss={dismissVerdict}
+      />
     </View>
   )
 }
