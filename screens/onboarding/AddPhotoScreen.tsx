@@ -28,6 +28,10 @@ import { getItem, setItem } from '../../service/storageService'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { Endpoints } from '../../service/api.endpoints'
 import { uploadFile } from '../../service/apiClient'
+import {
+  getPhotoConfig, validatePhotoAsset, normalizeWebFile, getRejectReasons, describeRejection,
+  type PhotoRejectionCode,
+} from '../../service/photoValidationService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -210,16 +214,38 @@ export default function AddPhotoScreen({ navigation }: Props) {
     setWebUploading(true)
     try {
       const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+      const config = await getPhotoConfig()
+      const rejections: PhotoRejectionCode[] = []
       let firstUri: string | undefined
       for (const file of files) {
+        const input = await normalizeWebFile(file)
+        const validation = await validatePhotoAsset(input, config)
+        if (!validation.ok) {
+          URL.revokeObjectURL(input.uri)
+          rejections.push(validation.code)
+          continue
+        }
         const formData = new FormData()
         formData.append('ID', userId)
+        formData.append('AIVALIDATE', config.isNativeFaceDetectionEnabled ? '1' : '0')
         formData.append('UPLOADPHOTO', file, file.name)
         const res = await uploadFile(Endpoints.media.addProfilePic, formData)
         if (res?.RESPONSECODE == 1 && !firstUri) {
-          firstUri = URL.createObjectURL(file)
+          firstUri = input.uri
+        } else {
+          URL.revokeObjectURL(input.uri)
         }
       }
+
+      if (rejections.length) {
+        const reasons = await getRejectReasons()
+        Alert.alert(
+          rejections.length === files.length ? 'Photo not added' : 'Some photos were not added',
+          rejections.map(code => describeRejection(code, reasons)).join('\n\n'),
+        )
+      }
+      if (rejections.length === files.length) return
+
       navigation.push('onboarding', { pageNo: '21', pendingUri: firstUri })
     } catch {
       Alert.alert('Error', 'Upload failed. Please try again.')

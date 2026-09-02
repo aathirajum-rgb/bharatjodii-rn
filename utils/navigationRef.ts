@@ -2,10 +2,41 @@ import { createNavigationContainerRef, ParamListBase } from '@react-navigation/n
 
 export const navigationRef = createNavigationContainerRef<ParamListBase>()
 
-export function navigate(name: string, params?: Record<string, unknown>): void {
-  if (navigationRef.isReady()) {
-    navigationRef.navigate(name, params)
+// RootNavigation.tsx keeps ONE <NavigationContainer> mounted and only swaps
+// its child between AuthStack/AppStack on login/logout — isReady() reports
+// the CONTAINER is mounted, which is already true before that swap (it was
+// ready while showing the old stack), not that the NEW stack's screens are
+// registered yet. A navigate()/resetTo() dispatched right after the
+// isAuthenticated flip (loginUpdate → handlePageLanding, etc.) can race
+// ahead of AppStack actually mounting, hitting "was not handled by any
+// navigator" for a screen (e.g. EditProfileAgeHeight) that only exists on
+// the stack still in the middle of swapping in. Polling for the route name
+// itself, not just isReady(), closes that race for every caller here.
+function isRouteKnown(name: string): boolean {
+  if (!navigationRef.isReady()) return false
+  return !!navigationRef.getRootState()?.routeNames?.includes(name)
+}
+
+function dispatchWhenRouteReady(dispatch: () => void, name: string, timeoutMs = 2000): void {
+  if (isRouteKnown(name)) { dispatch(); return }
+  const start = Date.now()
+  const attempt = () => {
+    if (isRouteKnown(name)) { dispatch(); return }
+    if (Date.now() - start >= timeoutMs) {
+      // Timed out waiting for that specific route — still attempt the
+      // dispatch if the container itself is at least ready, so a genuinely
+      // unknown screen name surfaces React Navigation's own dev warning
+      // instead of silently vanishing.
+      if (navigationRef.isReady()) dispatch()
+      return
+    }
+    setTimeout(attempt, 50)
   }
+  setTimeout(attempt, 50)
+}
+
+export function navigate(name: string, params?: Record<string, unknown>): void {
+  dispatchWhenRouteReady(() => navigationRef.navigate(name, params), name)
 }
 
 // Root fallback for handleBack() below — invoked only once there is truly no
@@ -34,9 +65,10 @@ export function handleBack(): boolean {
 
 // Replaces router with replaceUrl:true — clears back stack
 export function resetTo(name: string, params?: Record<string, unknown>): void {
-  if (navigationRef.isReady()) {
-    navigationRef.reset({ index: 0, routes: [{ name, params }] })
-  }
+  dispatchWhenRouteReady(
+    () => navigationRef.reset({ index: 0, routes: [{ name, params }] }),
+    name,
+  )
 }
 
 // Waits until the NavigationContainer has mounted and navigationRef.isReady()

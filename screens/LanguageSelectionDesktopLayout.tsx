@@ -30,12 +30,83 @@ export interface LanguageSelectionDesktopLayoutProps {
   onSelect:     (langId: string) => void
   onNext:       () => void
   onTabPress:   (tab: FooterTab) => void
+  // Mirrors LanguageSelectionScreen.tsx's own mobile-branch flag: mid-app
+  // reuse (onboarding, HomeSidebar, Settings) is already authenticated, so
+  // DesktopPageShell's nav/sidebar chrome (and the Home/Matches/Activity/
+  // MessagerList tab targets it wires up) are valid there. AuthStack's own
+  // pre-login, first-run instance of this screen is NOT authenticated and
+  // has none of those routes registered — rendering that chrome there let a
+  // tab tap dispatch navigate('Home') etc. against AuthStack's navigator,
+  // which doesn't know those screens ("was not handled by any navigator"),
+  // same failure class as a mount-timing race but structural instead of
+  // timing-based. Default false — the header comment above only documented
+  // the authenticated call sites, missing this pre-login one entirely.
+  presentedAsModal?: boolean
+}
+
+function LanguageCard({
+  languages, selected, submitting, onSelect, onNext, t,
+}: Pick<LanguageSelectionDesktopLayoutProps, 'languages' | 'selected' | 'submitting' | 'onSelect' | 'onNext'> & { t: any }) {
+  return (
+    <View style={s.card}>
+      <Text style={s.heading}>{t('LOGIN_PAGE.SELECT_LANG')}</Text>
+
+      <View style={s.grid}>
+        {languages.map(lang => {
+          const isSelected = selected === lang.id
+          return (
+            <Pressable
+              key={lang.id}
+              style={[s.langCard, isSelected && s.langCardSelected]}
+              onPress={() => onSelect(lang.id)}
+              accessibilityRole="radio"
+              accessibilityState={{ selected: isSelected }}
+              accessibilityLabel={`${lang.native} ${lang.english}`}
+            >
+              <View style={s.langText}>
+                <Text style={s.nativeName} numberOfLines={1}>{lang.native}</Text>
+                <Text style={s.englishName} numberOfLines={1}>{lang.english}</Text>
+              </View>
+              <View style={[s.radio, isSelected && s.radioSelected]}>
+                {isSelected && <View style={s.radioDot} />}
+              </View>
+            </Pressable>
+          )
+        })}
+      </View>
+
+      {/* Angular: language-selection.component.html's button uses
+          REGISTRATION.SELECT ("Select"), not a "Next" label. */}
+      <ButtonRevamp
+        label={t('REGISTRATION.SELECT', 'Select')}
+        variant="primary"
+        disabled={!selected}
+        loading={submitting}
+        onPress={onNext}
+        style={s.nextBtn}
+      />
+    </View>
+  )
 }
 
 export default function LanguageSelectionDesktopLayout({
-  navigation, userName, languages, selected, submitting, onSelect, onNext, onTabPress,
+  navigation, userName, languages, selected, submitting, onSelect, onNext, onTabPress, presentedAsModal = false,
 }: LanguageSelectionDesktopLayoutProps) {
   const { t } = useTranslation()
+
+  if (!presentedAsModal) {
+    // First-run, pre-login — no authenticated shell, no tab targets to wire.
+    return (
+      <View style={s.standaloneScreen}>
+        <View style={s.main}>
+          <LanguageCard
+            languages={languages} selected={selected} submitting={submitting}
+            onSelect={onSelect} onNext={onNext} t={t}
+          />
+        </View>
+      </View>
+    )
+  }
 
   // No sidebar row maps to "change language" in the Figma-matched sidebar
   // (that's the top nav's language selector instead) — no activeItem to highlight.
@@ -49,44 +120,10 @@ export default function LanguageSelectionDesktopLayout({
           </Pressable>
         </View>
 
-        <View style={s.card}>
-          <Text style={s.heading}>{t('LOGIN_PAGE.SELECT_LANG')}</Text>
-
-          <View style={s.grid}>
-            {languages.map(lang => {
-              const isSelected = selected === lang.id
-              return (
-                <Pressable
-                  key={lang.id}
-                  style={[s.langCard, isSelected && s.langCardSelected]}
-                  onPress={() => onSelect(lang.id)}
-                  accessibilityRole="radio"
-                  accessibilityState={{ selected: isSelected }}
-                  accessibilityLabel={`${lang.native} ${lang.english}`}
-                >
-                  <View style={s.langText}>
-                    <Text style={s.nativeName} numberOfLines={1}>{lang.native}</Text>
-                    <Text style={s.englishName} numberOfLines={1}>{lang.english}</Text>
-                  </View>
-                  <View style={[s.radio, isSelected && s.radioSelected]}>
-                    {isSelected && <View style={s.radioDot} />}
-                  </View>
-                </Pressable>
-              )
-            })}
-          </View>
-
-          {/* Angular: language-selection.component.html's button uses
-              REGISTRATION.SELECT ("Select"), not a "Next" label. */}
-          <ButtonRevamp
-            label={t('REGISTRATION.SELECT', 'Select')}
-            variant="primary"
-            disabled={!selected}
-            loading={submitting}
-            onPress={onNext}
-            style={s.nextBtn}
-          />
-        </View>
+        <LanguageCard
+          languages={languages} selected={selected} submitting={submitting}
+          onSelect={onSelect} onNext={onNext} t={t}
+        />
       </View>
     </DesktopPageShell>
   )
@@ -96,6 +133,9 @@ const CARD_W = 148
 const CARD_H = 64
 
 const s = StyleSheet.create({
+  standaloneScreen: {
+    flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background,
+  },
   main: { width: 360 },
   titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
   pageTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.textDark },

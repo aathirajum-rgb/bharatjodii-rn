@@ -202,6 +202,20 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
 
   // ─── Set main ─────────────────────────────────────────────────────────────
 
+  // Angular: managephoto.page.ts's makeMainPhoto() — a photo still pending AI
+  // validation (PHOTOSTATUS===0) can't be set as main; the "more options"
+  // popup shows the UNDERVALIDATE/TAKEHOURS message instead.
+  function handlePhotoPress(photo: Photo) {
+    if (photo.PHOTOSTATUS === 0) {
+      Alert.alert(
+        'Photo under validation',
+        'Your photo is being validated. This may take a few hours.',
+      )
+      return
+    }
+    setAsMain(photo)
+  }
+
   async function setAsMain(photo: Photo) {
     try {
       const res = await setMainPhoto(photo.PHOTOID)
@@ -262,7 +276,7 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
     return (
       <Pressable
         style={[styles.photoCard, style, isMain && styles.mainPhotoCard]}
-        onPress={isMain ? undefined : () => setAsMain(item)}
+        onPress={isMain ? undefined : () => handlePhotoPress(item)}
         onLongPress={() => confirmDelete(item)}
       >
         <Image

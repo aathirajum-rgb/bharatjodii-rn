@@ -56,6 +56,10 @@ import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import { Endpoints } from '../../service/api.endpoints'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { getItem, setItem } from '../../service/storageService'
+import {
+  getPhotoConfig, validatePhotoAsset, normalizeWebFile, getRejectReasons, describeRejection,
+  type PhotoRejectionCode,
+} from '../../service/photoValidationService'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { openMembershipTab } from '../../service/paymentService'
 import { fetchEditProfileInfo, submitFieldChanges, type FieldChange } from '../../service/editProfileService'
@@ -444,17 +448,33 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
       // Replace targets exactly one photo — only the first picked file
       // applies even if the browser's file picker allowed multi-select.
       const filesToUpload = replacing ? files.slice(0, 1) : files
+      const config = await getPhotoConfig()
+      const rejections: PhotoRejectionCode[] = []
       for (const file of filesToUpload) {
+        const input = await normalizeWebFile(file)
+        const validation = await validatePhotoAsset(input, config)
+        URL.revokeObjectURL(input.uri)
+        if (!validation.ok) {
+          rejections.push(validation.code)
+          continue
+        }
         const formData = new FormData()
         formData.append('ID', userId)
+        formData.append('AIVALIDATE', config.isNativeFaceDetectionEnabled ? '1' : '0')
         formData.append('UPLOADPHOTO', file, file.name)
         const res = await uploadFile(Endpoints.media.addProfilePic, formData)
         if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
           await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
         }
       }
-      if (replacing) await deletePhoto(replacing.PHOTOID)
+      // Replacing sends exactly one file — if it's the one that got rejected,
+      // don't delete the original, or the user is left with no photo at all.
+      if (replacing && rejections.length === 0) await deletePhoto(replacing.PHOTOID)
       await loadPhotos()
+      if (rejections.length) {
+        const reasons = await getRejectReasons()
+        Alert.alert('Some photos were not added', rejections.map(code => describeRejection(code, reasons)).join('\n\n'))
+      }
       // "Profile photo updated successfully" is specifically about the MAIN
       // photo changing — only fires here when the replaced photo was the
       // current main. No Undo: unlike delete, there's no deferred-call trick

@@ -162,6 +162,7 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
         onSelect={setSelected}
         onNext={handleNext}
         onTabPress={handleTabPress}
+        presentedAsModal={presentedAsModal}
       />
     );
   }

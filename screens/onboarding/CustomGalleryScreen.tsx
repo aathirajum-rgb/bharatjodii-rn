@@ -24,6 +24,7 @@ import {
 } from 'react-native'
 import Svg, { Path, Circle } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useTranslation } from 'react-i18next'
 import AppHeader from '../../components/app-header/AppHeader'
 import { Colors } from '../../constants/colors'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
@@ -31,7 +32,26 @@ import { Endpoints } from '../../service/api.endpoints'
 import { uploadFile } from '../../service/apiClient'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem, setItem } from '../../service/storageService'
+import {
+  getPhotoConfig, validatePhotoAsset, getRejectReasons, describeRejection,
+  pollPhotoValidation,
+  type PhotoRejectionCode,
+} from '../../service/photoValidationService'
+import PhotoVerdictSheet, { type VerdictPhoto } from '../../components/photo-validation/PhotoVerdictSheet'
+import VerificationSuccessSheet from '../../components/bottom-sheet/VerificationSuccessSheet'
 import { os } from './onboardingStyles'
+
+// expo-media-library's Asset has no mimeType getter (unlike expo-image-picker
+// assets) — derive it from the filename extension, same fallback Android's own
+// PhotoUtils.resolveMimeType uses when the content resolver can't determine it.
+const EXTENSION_MIME_MAP: Record<string, string> = {
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+  heic: 'image/heic', heif: 'image/heif', gif: 'image/gif', bmp: 'image/bmp', avif: 'image/avif',
+}
+function mimeTypeFromFilename(filename: string): string | null {
+  const ext = filename.split('.').pop()?.toLowerCase()
+  return ext ? (EXTENSION_MIME_MAP[ext] ?? null) : null
+}
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -111,6 +131,7 @@ function CheckBadge() {
 
 export default function CustomGalleryScreen({ navigation, route, onClose, onUploaded }: Props) {
   const insets        = useSafeAreaInsets()
+  const { t }         = useTranslation()
   const existingCount = (route.params?.existingCount as number | undefined) ?? 0
   const remaining     = Math.max(0, MAX_PHOTOS - existingCount)
 
@@ -123,6 +144,16 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
   const [albums,            setAlbums]             = useState<AlbumInfo[]>([])
   const [activeAlbum,       setActiveAlbum]        = useState<AlbumInfo | null>(null)
   const [albumPickerOpen,   setAlbumPickerOpen]    = useState(false)
+
+  // AI photo-validation verdict — shown after upload, once
+  // pollPhotoValidation() (service/photoValidationService.ts) resolves.
+  // Android: PhotoUploadProcessViewModel.startUpload()'s UploadState
+  // classification (Approved / Rejected / mixed), minus the pending/timeout
+  // buckets — see PhotoVerdictSheet.tsx's header comment.
+  const [verdictPhase, setVerdictPhase] = useState<'idle' | 'uploading' | 'approved' | 'rejected' | 'mixed'>('idle')
+  const [verdictApproved, setVerdictApproved] = useState<VerdictPhoto[]>([])
+  const [verdictRejected, setVerdictRejected] = useState<VerdictPhoto[]>([])
+  const continueAfterVerdict = useRef<() => void>(() => {})
 
   const page    = useRef(0)
   const hasMore = useRef(true)
@@ -231,38 +262,65 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
     })
     if (!result.canceled) {
       const a = result.assets[0]
-      await uploadAndNavigate([{ uri: a.uri, filename: a.fileName ?? 'photo.jpg' }])
+      await uploadAndNavigate([{
+        uri: a.uri, filename: a.fileName ?? 'photo.jpg',
+        mimeType: a.mimeType, fileSize: a.fileSize, width: a.width, height: a.height,
+      }])
     }
   }
 
   // ─── Upload & navigate ────────────────────────────────────────────────────
 
+  type PendingPhoto = {
+    uri: string; filename: string
+    mimeType?: string | null | undefined; fileSize?: number | null | undefined
+    width?: number | null | undefined; height?: number | null | undefined
+  }
+
   async function handleNext() {
     const selectedAssets = assets.filter(a => selected.has(a.id))
-    const photos: { uri: string; filename: string }[] = []
+    const photos: PendingPhoto[] = []
 
     for (const asset of selectedAssets) {
       const uri      = await asset.getUri()
       const filename = await asset.getFilename()
-      photos.push({ uri, filename })
+      const shape    = await asset.getShape().catch(() => null)
+      photos.push({
+        uri, filename,
+        mimeType: mimeTypeFromFilename(filename),
+        width: shape?.width, height: shape?.height,
+      })
     }
 
     await uploadAndNavigate(photos)
   }
 
-  async function uploadAndNavigate(photos: { uri: string; filename: string }[]) {
+  async function uploadAndNavigate(photos: PendingPhoto[]) {
     if (photos.length === 0) return
     setUploading(true)
     try {
       const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+      const config = await getPhotoConfig()
+      const rejections: PhotoRejectionCode[] = []
+      const uploadedPhotoIds: string[] = []
       let firstPendingUri: string | undefined
 
       for (const photo of photos) {
+        const validation = await validatePhotoAsset({
+          uri: photo.uri, mimeType: photo.mimeType, fileSize: photo.fileSize,
+          width: photo.width, height: photo.height,
+        }, config)
+        if (!validation.ok) {
+          rejections.push(validation.code)
+          continue
+        }
+
         const formData = new FormData()
         formData.append('ID', userId)
+        formData.append('AIVALIDATE', config.isNativeFaceDetectionEnabled ? '1' : '0')
         formData.append('UPLOADPHOTO', {
           uri:  photo.uri,
-          type: 'image/jpeg',
+          type: photo.mimeType ?? 'image/jpeg',
           name: photo.filename,
         } as any)
 
@@ -271,20 +329,96 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
           if (res?.RESPONSE?.PHOTOURL) {
             await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
           }
+          // Angular: common.ts's uploadWhatsapp() reads response.PHOTOID off
+          // this same addprofilepic response to build the profilepicval poll's
+          // PHOTOIDS array — same field, read here for the same purpose.
+          if (res?.RESPONSE?.PHOTOID) {
+            uploadedPhotoIds.push(String(res.RESPONSE.PHOTOID))
+          }
           if (!firstPendingUri) firstPendingUri = photo.uri
         }
       }
 
-      if (onUploaded) {
-        onUploaded()
-      } else {
-        navigation.push('onboarding', { pageNo: '21', pendingUri: firstPendingUri, standalone: route.params?.standalone })
+      if (rejections.length) {
+        const reasons = await getRejectReasons()
+        Alert.alert(
+          rejections.length === photos.length ? 'Photo not added' : 'Some photos were not added',
+          rejections.map(code => describeRejection(code, reasons)).join('\n\n'),
+        )
       }
+
+      // Every picked photo was rejected — stay on the picker instead of
+      // advancing/closing on nothing having actually uploaded.
+      if (rejections.length === photos.length) return
+
+      continueAfterVerdict.current = () => {
+        if (onUploaded) {
+          onUploaded()
+        } else {
+          navigation.push('onboarding', { pageNo: '21', pendingUri: firstPendingUri, standalone: route.params?.standalone })
+        }
+      }
+
+      // Android/Angular: the verdict poll only ever runs when AI validation is
+      // on for this session (AIVALIDATE), and only against photos that just
+      // uploaded successfully — fires immediately after upload, not as a
+      // background/interval poll (PhotoUploadWorker.doWork()).
+      if (config.isNativeFaceDetectionEnabled && uploadedPhotoIds.length > 0) {
+        setVerdictPhase('uploading')
+        const verdict = await pollPhotoValidation(uploadedPhotoIds)
+
+        if (!verdict) {
+          // Poll failed (network/timeout) — fail open, same as every other
+          // best-effort fetch in this codebase, rather than blocking the user.
+          setVerdictPhase('idle')
+          continueAfterVerdict.current()
+          return
+        }
+
+        if (verdict.isSelfieRequired) {
+          setVerdictPhase('idle')
+          navigation.push('photo-mismatch-selfie', {
+            onDonePageNo: '21',
+            standalone:   route.params?.standalone,
+          })
+          return
+        }
+
+        const approved: VerdictPhoto[] = []
+        const rejected: VerdictPhoto[] = []
+        for (const r of verdict.results) {
+          const entry: VerdictPhoto = {
+            photoId:  r.photoId,
+            photoUrl: r.photoUrl,
+            ...(r.reason?.title    ? { reasonTitle: r.reason.title }       : {}),
+            ...(r.reason?.subtitle ? { reasonSubtitle: r.reason.subtitle } : {}),
+          }
+          if (r.status.toLowerCase() === 'approve') approved.push(entry)
+          else rejected.push(entry)
+        }
+
+        setVerdictApproved(approved)
+        setVerdictRejected(rejected)
+        setVerdictPhase(rejected.length === 0 ? 'approved' : approved.length === 0 ? 'rejected' : 'mixed')
+        return
+      }
+
+      continueAfterVerdict.current()
     } catch {
       Alert.alert('Error', 'Upload failed. Please try again.')
+      setVerdictPhase('idle')
     } finally {
       setUploading(false)
     }
+  }
+
+  function dismissVerdict() {
+    setVerdictPhase('idle')
+    continueAfterVerdict.current()
+  }
+
+  function retryFromVerdict() {
+    setVerdictPhase('idle')
   }
 
   // ─── Render item ──────────────────────────────────────────────────────────
@@ -431,6 +565,24 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
           </View>
         </Pressable>
       </Modal>
+
+      {/* AI photo-validation verdict — see verdictPhase state above. */}
+      <VerificationSuccessSheet
+        visible={verdictPhase === 'approved'}
+        title={verdictApproved.length > 1
+          ? t('AI_PHOTO_VALIDATION.PHOTOS_APPROVED_MULTI', '#COUNT Photos approved successfully!').replace('#COUNT', String(verdictApproved.length))
+          : t('AI_PHOTO_VALIDATION.PHOTO_APPROVED_SINGLE', 'Photo approved successfully!')}
+        subtitle=""
+        onDismiss={dismissVerdict}
+      />
+      <PhotoVerdictSheet
+        visible={verdictPhase === 'uploading' || verdictPhase === 'rejected' || verdictPhase === 'mixed'}
+        phase={verdictPhase === 'uploading' ? 'uploading' : verdictPhase === 'mixed' ? 'mixed' : 'rejected'}
+        approved={verdictApproved}
+        rejected={verdictRejected}
+        onAddNewPhoto={retryFromVerdict}
+        onDismiss={dismissVerdict}
+      />
     </View>
   )
 }

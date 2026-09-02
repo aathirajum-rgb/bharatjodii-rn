@@ -118,10 +118,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
 
-    const [token, userId] = await Promise.all([
+    const [token, userId, registerUrl] = await Promise.all([
       getItem(StorageKeys.Auth.TOKEN),
       getItem(StorageKeys.Auth.USER_ID),
+      getItem('REGISTERURL'),
     ])
+
+    // Angular: webview.page.ts's goToRegistrationPage() — REGISTERURL wins over
+    // "go to signin" even with no token yet. Registration only mints ATN/NBID
+    // at the Caste/Gothra step (registrationService.ts's submitFullRegistration
+    // → autoLogin); killing the app on any earlier step (Name, DOB, Height, ...)
+    // leaves REGISTERURL/REGISTRATION_VALUES intact but no token, so without this
+    // branch isAuthenticated would be false and RootNavigation would mount
+    // AuthStack, bouncing the user back to the login screen and losing their
+    // in-progress registration.
+    if (!token && registerUrl) {
+      setState({
+        isAuthenticated: true,
+        userId: null,
+        loading: false,
+        isNewUser: true,
+        initialRoute: 'onboarding',
+      })
+      const ready = await waitForNavigationReady()
+      if (ready) resetTo(ENavigation.ONBOARDING, { pageNo: registerUrl })
+      return
+    }
+
     const initialRoute = token ? await resolveInitialRoute(false) : 'Matches'
     setState({
       isAuthenticated: !!token,

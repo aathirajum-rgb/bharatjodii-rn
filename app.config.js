@@ -133,6 +133,14 @@ module.exports = ({ config }) => ({
     // wiring. Its Android mods also run (harmless, see withFirebaseAndroid.js).
     '@react-native-firebase/app',
     ['expo-camera', { barcodeScannerEnabled: false }],
+    // NOTE: @infinitered/react-native-mlkit-face-detection is deliberately NOT
+    // listed here. It ships no app.plugin.js and no expo config-plugin export —
+    // it's a plain native module (autolinking handles it on its own). Adding it
+    // to `plugins` makes Expo fall back to requiring its `main` entry
+    // (build/index.js, untranspiled JSX) as a plugin function, which crashes
+    // `expo start`/prebuild with "PluginError: Unexpected token '<'".
+    // See service/photoValidationService.ts for the on-device face-detection
+    // usage (photo AI validation pre-upload gate).
     // Default options only (no purchase connector, no backup-rules override) —
     // both are documented no-ops on Android with these defaults. Its iOS half
     // (AppDelegate deep-link injection) is a known no-op on Swift AppDelegates
