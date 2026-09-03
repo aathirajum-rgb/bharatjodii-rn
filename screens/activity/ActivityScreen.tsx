@@ -1,27 +1,47 @@
-// Liked Profile screen — Angular: activity.component.ts/.html (route `/activity`,
-// tabs `likedyou`/`likesent`). Figma "2026 - Design Enhancement" nodes 2036:2568
-// (paid) / 2036:2719 (unpaid), file NtASk18Qa7um4vjCvfMHEH.
+// Activity screen — Angular: pages/activity/activity.component.ts/.html (route
+// `/activity`). This is a 1:1 port of that page, including every mode it can be
+// opened in:
+//
+//   1. ACTIVITY mode (default) — the chip tabs built from
+//      core/config/activity.config.ts's ActivityHeaderList filtered to
+//      `flag === 1` (i.e. `likedyou` + `likesent` only), REVERSED for a male
+//      viewer (setSelectedType()'s `logInGender=='M'` branch), each chip
+//      labelled "<name> (totalCount)" with the red unread `newcount` badge that
+//      clears once the tab is opened (VIEWEDACTIVITYLIST).
+//   2. VIEWED-LIST mode — reached with `{ activityType: 'viewedbyme' | 'viewedyou' }`
+//      (Angular: router state / :module route param, e.g. from Home's
+//      "Profiles you viewed" / "View later" see-all). isViewedList() swaps the
+//      header for a back-button + title bar, hides the 3-dot menus and the
+//      liked-strip, and for `viewedbyme` adds the two sub-tabs
+//      (ViewedByMeTabs: "Profiles you viewed" / "Profiles you chose to view
+//      later") rendering the plainer <app-list-view-card> rows instead of the
+//      full match cards.
+//
+// Everything else on the Angular page is here too: the female-free top banner
+// (bindShortlistContent/bindTitle), the illustrated empty states with the
+// "Go to matches" CTA, deleted-profile (STATUS 1|2) placeholder rows, the
+// add-photo promotion that replaces the whole content area, and the
+// profile-validation / autopay payment stickies (checkProfileStatus →
+// getContactsData).
 //
 // Reuses the EXACT same card component MatchesScreen.tsx uses (MatchCard) —
 // confirmed against Angular's own source that /matches and /activity both
 // render the same `app-matches-card` component, so this isn't just DRY
-// cleanup, it matches Angular's real architecture. MatchCard's existing
-// after-like CTA logic (matchesCard.shared.tsx's getAfterLikeContentText/
-// getAfterLikeCtaLabel) already produces the exact paid/unpaid copy in both
-// Figma frames ("Talk to him/her directly"+"View phone number" vs "To contact
-// via Call/WhatsApp"+"Pay Now") and the liked-strip already renders the
-// pink "You liked ... on DATE" pill — reusing it gives us that design for free,
-// we only need to feed it correctly-adapted data.
+// cleanup, it matches Angular's real architecture.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator, FlatList, Linking, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { useFocusEffect } from '@react-navigation/native'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import LanguagePill from '../../components/language-pill/LanguagePill'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
+import CdnSvg, { CdnImage } from '../../components/cdn-svg/CdnSvg'
+import StickyBanner from '../../components/sticky-banner/StickyBanner'
+import PhotoPromoSticky from '../../components/sticky-banner/PhotoPromoSticky'
 import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
 import ReportProfileModal from '../../components/matches/ReportProfileModal'
 import ThreeDotMenu from '../../components/matches/ThreeDotMenu'
@@ -33,13 +53,23 @@ import { useContactGating } from '../../hooks/useContactGating'
 import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { fetchActivityListingPage } from '../../service/activityService'
-import { communicationBtnOnClick, shouldSkipPhoneConfirm, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
+import { communicationBtnOnClick, shouldSkipPhoneConfirm, fetchContactDetails, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
-import { openMembershipTab } from '../../service/paymentService'
-import { fetchNotifCount } from '../../service/homeService'
+import {
+  openMembershipTab, fetchUpgradePaymentPromo, redirectToIntermediatePage,
+  type UpgradePaymentPromo,
+} from '../../service/paymentService'
+import {
+  fetchNotifCount, fetchAndStorePPSetData, fetchProfileValidationBanner, fetchCustomerCare,
+  type ProfileValidationBanner,
+} from '../../service/homeService'
+import { getRegistrationArrays, getSessionValue } from '../../service/registrationService'
 import { logEvent, logScreen } from '../../service/analyticsService'
-import { getItem, getJson, setJson } from '../../service/storageService'
+import { getItem, getJson, setJson, removeItem } from '../../service/storageService'
+import { handleBack } from '../../utils/navigationRef'
+import { FEMALE_AVATAR_URL, MALE_AVATAR_URL } from '../../utils/avatar'
 import { StorageKeys } from '../../constants/storage.keys'
+import { CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
 import i18n from '../../i18n'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
@@ -48,7 +78,18 @@ import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type Props = { navigation: any; route?: any }
+
+// Angular: ActivityHeaderList entries with flag === 1 — the only two chips the
+// activity page itself ever renders.
 export type LikedTab = 'likedyou' | 'likesent'
+// Angular: ViewedByMeTabs (activity.config.ts).
+export type ViewedSubTab = 'viewedbyme' | 'viewinglater'
+// Angular: selectedType — includes the two drill-down types the page can be
+// opened with even though they have no chip of their own (flag === 0).
+export type ActivityType = LikedTab | 'viewedyou' | 'viewedbyme'
+// The key an actual listing is cached under: `viewedbyme` splits into its two
+// sub-tabs, everything else is its own type.
+type ListKey = LikedTab | 'viewedyou' | ViewedSubTab
 
 interface TabData {
   profiles:    MatchProfile[]
@@ -59,25 +100,73 @@ interface TabData {
   loaded:      boolean
 }
 
+interface CountEntry { newcount: number; totalCount: number }
+
 const LIMIT = 20
 const INITIAL_TAB_DATA: TabData = { profiles: [], total: 0, hasMore: true, loadingMore: false, start: 0, loaded: false }
 
+const EMPTY_TAB_DATA: Record<ListKey, TabData> = {
+  likedyou:     { ...INITIAL_TAB_DATA },
+  likesent:     { ...INITIAL_TAB_DATA },
+  viewedyou:    { ...INITIAL_TAB_DATA },
+  viewedbyme:   { ...INITIAL_TAB_DATA },
+  viewinglater: { ...INITIAL_TAB_DATA },
+}
+
+// Angular: ActivityHeaderList order (likedyou before likesent), reversed for a
+// male viewer by setSelectedType().
+const BASE_TAB_ORDER: LikedTab[] = ['likedyou', 'likesent']
+const VIEWED_SUB_TABS: ViewedSubTab[] = ['viewedbyme', 'viewinglater']
+
+// Angular: setCountListValue() matches notificationcount's COMCOUNT entries
+// against the header list by comtype; `likedbyme` is the API's own name for the
+// `likesent` tab and `viewlater`/`viewinglater` both feed the View-later count
+// (isViewLaterComType()).
+const COMTYPE_TO_KEY: Record<string, ListKey> = {
+  likedyou:     'likedyou',
+  likesent:     'likesent',
+  likedbyme:    'likesent',
+  viewedyou:    'viewedyou',
+  viewedbyme:   'viewedbyme',
+  viewlater:    'viewinglater',
+  viewinglater: 'viewinglater',
+}
+
+// Angular renders these content strings with [innerHTML] (they carry
+// <span class='font-bold'> / <br> markup) — RN <Text> needs them flattened.
+function stripHtml(value: string = ''): string {
+  return String(value ?? '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]*>/g, '').trim()
+}
+
+// Angular: isDeletedProfile() — STATUS 1 = deleted profile, 2 = skipped/hidden.
+// (toProfile() maps the raw STATUS onto dontShowStatus.)
+function isDeletedProfile(profile: MatchProfile): boolean {
+  return ['1', '2'].includes(String(profile.dontShowStatus ?? ''))
+}
+
 // ─── ActivityScreen ───────────────────────────────────────────────────────────
 
-export default function ActivityScreen({ navigation }: Props) {
+export default function ActivityScreen({ navigation, route }: Props) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const isDesktop = useIsDesktopWeb()
   const gating = useContactGating()
 
-  const [activeTab,   setActiveTab]   = useState<LikedTab>('likesent')
-  const [initialLoad, setInitialLoad] = useState(true)
-  const [tabData, setTabData] = useState<Record<LikedTab, TabData>>({
-    likedyou: { ...INITIAL_TAB_DATA },
-    likesent: { ...INITIAL_TAB_DATA },
-  })
+  // Angular: the constructor reads router state ({activityType, selectedSubTab})
+  // and ngOnInit reads the :module route param — both land in selectedType.
+  const routeType   = route?.params?.activityType as ActivityType | undefined
+  const routeSubTab = route?.params?.selectedSubTab as ViewedSubTab | undefined
+
+  const [selectedType,   setSelectedType]   = useState<ActivityType>(routeType ?? 'likesent')
+  const [selectedSubTab, setSelectedSubTab] = useState<ViewedSubTab>(routeSubTab ?? 'viewedbyme')
+  const [tabOrder,       setTabOrder]       = useState<LikedTab[]>(BASE_TAB_ORDER)
+  const [initialLoad,    setInitialLoad]    = useState(true)
+  const [tabData,        setTabData]        = useState<Record<ListKey, TabData>>(EMPTY_TAB_DATA)
 
   const userIdRef = useRef('')
+
+  const isViewedList  = selectedType === 'viewedyou' || selectedType === 'viewedbyme'
+  const listKey: ListKey = selectedType === 'viewedbyme' ? selectedSubTab : selectedType
 
   // ── Contact flow state (confirm → communicationBtnOnClick → result) ────────
   // Angular button.component.ts's two-step contact reveal: confirm → phoneviewed
@@ -89,6 +178,11 @@ export default function ActivityScreen({ navigation }: Props) {
     idVerified?: boolean | undefined
   } | null>(null)
   const [whatsappPaywallProfile, setWhatsappPaywallProfile] = useState<MatchProfile | null>(null)
+  // Angular: paymentPromoPopUp() → bottom-sheet.component's `paymentPromo` block.
+  // A FREE member tapping Call / WhatsApp / Message gets this upgrade sheet
+  // (title, content, "Paid membership benefits:" + the locked-perk rows) instead
+  // of being sent straight to the payment page.
+  const [paymentPromo, setPaymentPromo] = useState<UpgradePaymentPromo | null>(null)
   const [reportTarget, setReportTarget] = useState<{ id: string; name: string } | null>(null)
   // Angular: report-remove-profile.component's own visibility toggle — only
   // one card's dropdown is open at a time.
@@ -98,11 +192,29 @@ export default function ActivityScreen({ navigation }: Props) {
   // ID-verify prompt, female-free variants, etc.) — see usePhoneInfoSheet.ts.
   const phoneInfo = usePhoneInfoSheet()
 
-  // ── Unread "new" badge per tab — Angular: common.getNotificationCount(1) →
-  // notificationcount API's COMCOUNT array, persisted-viewed via localStorage
-  // VIEWEDACTIVITYLIST so the badge disappears once a tab's been opened. ──────
-  const [newCounts, setNewCounts] = useState<Record<LikedTab, number>>({ likedyou: 0, likesent: 0 })
+  // ── Counts — Angular: common.getNotificationCount(1) → notificationcount API's
+  // COMCOUNT array. `totalCount` drives the chip labels/banner count and is
+  // decremented client-side on remove/report (updateCount()); `newcount` is the
+  // red unread badge, cleared per tab through VIEWEDACTIVITYLIST. ─────────────
+  const [counts,     setCounts]     = useState<Partial<Record<ListKey, CountEntry>>>({})
   const [viewedTabs, setViewedTabs] = useState<Record<string, boolean>>({})
+
+  // ── Top banner — Angular: bindShortlistContent(), only for EntryType 'F' ────
+  const [regArrays, setRegArrays] = useState<Record<string, any>>({})
+
+  // ── Add-photo promotion — Angular: showPhotoPromotion, which REPLACES the
+  // whole ion-content with <app-add-photo> (never in viewed-list mode). ───────
+  const [showPhotoPromotion, setShowPhotoPromotion] = useState(false)
+  const [photoPromoBanner,   setPhotoPromoBanner]   = useState<Record<string, any> | null>(null)
+
+  // ── Stickies — Angular: checkProfileStatus() picks ONE of these two:
+  // PISTATUS 5|13 → profile-validation sticky, else getContactsData()'s
+  // paypendingflag autopay sticky. STICKYFLAG suppresses both once dismissed. ─
+  const [profileValidationBanner, setProfileValidationBanner] = useState<ProfileValidationBanner | null>(null)
+  const [profileValidationSheetVisible, setProfileValidationSheetVisible] = useState(false)
+  const [autopaySticky,   setAutopaySticky]   = useState<{ content: string; ctaLabel: string } | null>(null)
+  const [stickyDismissed, setStickyDismissed] = useState(false)
+  const [customerCare,    setCustomerCare]    = useState({ phone: '', whatsapp: '' })
 
   function showToast(message: string) {
     setToastRequest({ message, key: Date.now() })
@@ -110,47 +222,63 @@ export default function ActivityScreen({ navigation }: Props) {
 
   // ── Data helpers ─────────────────────────────────────────────────────────────
 
-  function updateTab(tab: LikedTab, patch: Partial<TabData>) {
-    setTabData(prev => ({ ...prev, [tab]: { ...prev[tab], ...patch } }))
+  function updateTab(key: ListKey, patch: Partial<TabData>) {
+    setTabData(prev => ({ ...prev, [key]: { ...prev[key], ...patch } }))
   }
 
-  function patchProfile(tab: LikedTab, profileId: string, patch: Partial<MatchProfile>) {
+  function patchProfile(key: ListKey, profileId: string, patch: Partial<MatchProfile>) {
     setTabData(prev => ({
       ...prev,
-      [tab]: {
-        ...prev[tab],
-        profiles: prev[tab].profiles.map(p => p.profileId === profileId ? { ...p, ...patch } : p),
+      [key]: {
+        ...prev[key],
+        profiles: prev[key].profiles.map(p => p.profileId === profileId ? { ...p, ...patch } : p),
       },
     }))
   }
 
-  function removeProfile(tab: LikedTab, profileId: string) {
+  // Angular: updateCount() — the removed profile is dropped from the list AND
+  // the tab's own totalCount (chip label + banner count) goes down by one.
+  function decrementCount(key: ListKey) {
+    setCounts(prev => {
+      const entry = prev[key]
+      if (!entry || entry.totalCount <= 0) return prev
+      return { ...prev, [key]: { ...entry, totalCount: entry.totalCount - 1 } }
+    })
+  }
+
+  function removeProfile(key: ListKey, profileId: string) {
     setTabData(prev => ({
       ...prev,
-      [tab]: {
-        ...prev[tab],
-        profiles: prev[tab].profiles.filter(p => p.profileId !== profileId),
-        total: Math.max(0, prev[tab].total - 1),
+      [key]: {
+        ...prev[key],
+        profiles: prev[key].profiles.filter(p => p.profileId !== profileId),
+        total: Math.max(0, prev[key].total - 1),
       },
     }))
+    decrementCount(key)
   }
 
   // ── API ──────────────────────────────────────────────────────────────────────
 
-  async function loadTab(tab: LikedTab, start: number, isFirst: boolean) {
-    if (isFirst) updateTab(tab, { loaded: false })
-    else         updateTab(tab, { loadingMore: true })
+  const countsRef = useRef<Partial<Record<ListKey, CountEntry>>>({})
+  countsRef.current = counts
+
+  async function loadTab(key: ListKey, start: number, isFirst: boolean) {
+    if (isFirst) updateTab(key, { loaded: false })
+    else         updateTab(key, { loadingMore: true })
 
     try {
-      const result = await fetchActivityListingPage(tab, userIdRef.current, start, LIMIT)
+      // Angular appends &LASTLOGIN only when that tab still carries unread items.
+      const hasNewCount = (countsRef.current[key]?.newcount ?? 0) > 0
+      const result  = await fetchActivityListingPage(key, userIdRef.current, start, LIMIT, hasNewCount)
       const adapted = result.items.map(matchProfileAdapter.adapt)
       const hasMore = result.items.length >= LIMIT
 
       setTabData(prev => {
-        const existing = prev[tab]
+        const existing = prev[key]
         return {
           ...prev,
-          [tab]: {
+          [key]: {
             profiles:    isFirst ? adapted : [...existing.profiles, ...adapted],
             total:       isFirst ? result.totalCount : existing.total,
             hasMore,
@@ -160,22 +288,54 @@ export default function ActivityScreen({ navigation }: Props) {
           },
         }
       })
+
+      // Angular: callApi()'s `resultData?.TOTAL > 0` branch keeps profileCount in
+      // sync when the notification-count API didn't carry an entry for this tab
+      // (true for viewedyou/viewedbyme/viewinglater on most accounts).
+      if (isFirst) {
+        setCounts(prev => prev[key]
+          ? prev
+          : { ...prev, [key]: { newcount: 0, totalCount: result.totalCount } })
+      }
     } catch {
-      updateTab(tab, { loaded: true, loadingMore: false })
+      updateTab(key, { loaded: true, loadingMore: false })
     }
   }
 
   // Angular: activity.component.ts's viewedActivitytList — a tab's unread badge
   // is cleared the moment it's actually opened, persisted so it stays cleared
   // across app restarts.
-  async function markTabViewed(tab: LikedTab) {
+  function markTabViewed(key: ListKey) {
     setViewedTabs(prev => {
-      if (prev[tab]) return prev
-      const next = { ...prev, [tab]: true }
+      if (prev[key]) return prev
+      const next = { ...prev, [key]: true }
       setJson('VIEWEDACTIVITYLIST', next).catch(() => {})
       return next
     })
   }
+
+  // Angular: setCountListValue() — maps COMCOUNT onto the header list.
+  const applyComCount = useCallback((comCount: Array<Record<string, any>>) => {
+    if (!Array.isArray(comCount) || comCount.length === 0) return
+    setCounts(prev => {
+      const next = { ...prev }
+      for (const entry of comCount) {
+        const key = COMTYPE_TO_KEY[String(entry?.['comtype'] ?? '')]
+        if (!key) continue
+        next[key] = {
+          newcount:   Number(entry?.['newcount']   ?? 0) || 0,
+          totalCount: Number(entry?.['totalCount'] ?? 0) || 0,
+        }
+      }
+      // Kept in a ref too: loadTab() reads the unread count to decide whether to
+      // append &LASTLOGIN, and it runs in the same tick as this state update —
+      // before any re-render could refresh the ref below.
+      countsRef.current = next
+      return next
+    })
+  }, [])
+
+  // ── Mount ─────────────────────────────────────────────────────────────────────
 
   useEffect(() => {
     logScreen('Activity')
@@ -186,25 +346,115 @@ export default function ActivityScreen({ navigation }: Props) {
       fetchNotifCount().catch(() => ({ newCount: 0, comCount: [] })),
     ]).then(async ([id, loginG, viewed, notif]) => {
       userIdRef.current = id ?? ''
-      const initialTab: LikedTab = loginG === 'F' ? 'likedyou' : 'likesent'
-      setActiveTab(initialTab)
       setViewedTabs(viewed ?? {})
+      applyComCount(notif.comCount)
 
-      const likedYouEntry = notif.comCount.find(c => c.comtype === 'likedyou')
-      const likeSentEntry = notif.comCount.find(c => c.comtype === 'likesent' || c.comtype === 'likedbyme')
-      setNewCounts({
-        likedyou: Number(likedYouEntry?.newcount ?? 0),
-        likesent: Number(likeSentEntry?.newcount ?? 0),
-      })
+      // Angular: setSelectedType() — the male viewer sees the chip list reversed
+      // ("Profiles you liked" first), and the default selectedType is the first
+      // chip of that (possibly reversed) list.
+      const order: LikedTab[] = loginG === 'M' ? [...BASE_TAB_ORDER].reverse() : [...BASE_TAB_ORDER]
+      setTabOrder(order)
 
-      await Promise.all([
-        loadTab('likedyou', 0, true),
-        loadTab('likesent', 0, true),
-      ])
+      const initialType: ActivityType = routeType ?? (order[0] as LikedTab)
+      setSelectedType(initialType)
+
+      if (initialType === 'viewedbyme') {
+        await loadTab(routeSubTab ?? 'viewedbyme', 0, true)
+      } else if (initialType === 'viewedyou') {
+        await loadTab('viewedyou', 0, true)
+      } else {
+        // Both chips are one tap apart, so both listings are primed up-front —
+        // switching a chip then never shows a spinner.
+        await Promise.all([loadTab('likedyou', 0, true), loadTab('likesent', 0, true)])
+      }
       setInitialLoad(false)
-      markTabViewed(initialTab)
+      markTabViewed(initialType === 'viewedbyme' ? (routeSubTab ?? 'viewedbyme') : initialType)
     })
   }, [])
+
+  // ── Add-photo promotion + stickies — Angular: ngOnInit()'s getPPSETData(0)
+  // and checkProfileStatus(). ────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false
+
+    const emptyRecord = (): Record<string, any> => ({})
+    Promise.all([
+      getRegistrationArrays().catch(emptyRecord),
+      fetchAndStorePPSetData().catch(emptyRecord),
+      getSessionValue('ENTRYTYPE').catch(() => ''),
+    ])
+      .then(async ([reg, ppSetData, entryType]) => {
+        if (cancelled) return
+        setRegArrays(reg ?? {})
+
+        // Angular: showPhotoPromotion = PROFILEPUBLISHEDFLAG=='0' &&
+        // PROFILEPUBLISHEDTYPE in ['1','2'] && ENTRYTYPE=='F'.
+        const flagOk = String(ppSetData?.['PROFILEPUBLISHEDFLAG']) === '0'
+        const typeOk = ['1', '2'].includes(String(ppSetData?.['PROFILEPUBLISHEDTYPE']))
+        const freeOk = entryType === 'F'
+        setShowPhotoPromotion(flagOk && typeOk && freeOk)
+        setPhotoPromoBanner(reg?.['PHOTOPUBLISHED']?.['Banner'] ?? null)
+
+        // Angular: checkProfileStatus() — profile-validation sticky wins,
+        // otherwise the autopay/payment-pending sticky from getContactsData().
+        if (['5', '13'].includes(String(ppSetData?.['PISTATUS']))) {
+          const banner = await fetchProfileValidationBanner().catch(() => null)
+          if (!cancelled && banner) {
+            setAutopaySticky(null)
+            setProfileValidationBanner(banner)
+          }
+        } else {
+          setProfileValidationBanner(null)
+          await fetchContactDetails().catch(() => {})
+          if (cancelled) return
+          const paymentDetails = (await getJson<Record<string, any>>('CONTACT_DETAIL'))?.['PAYMENTDETAILS']
+          if (!cancelled && paymentDetails?.['paypendingflag'] === '1' && paymentDetails?.['status']) {
+            setAutopaySticky({ content: String(paymentDetails['status']), ctaLabel: String(paymentDetails['cta2'] ?? '') })
+          }
+        }
+      })
+
+    fetchCustomerCare()
+      .then(result => { if (!cancelled && (result.phone || result.whatsapp)) setCustomerCare(result) })
+      .catch(() => {})
+
+    return () => { cancelled = true }
+  }, [])
+
+  // Angular: bindShortlistContent(selectedType) — recomputed on every changeTab(),
+  // and only ever populated for a female-free viewer (EntryType 'F'). The copy is
+  // server-driven off REGISTRATIONARRAYS.IDPRCONTENT.ACTIVITY except for the two
+  // liked tabs, which use the static LIKE_LIST translations.
+  const isFreeEntry = gating.ownEntryType === 'F'
+  const topBanner = (() => {
+    if (!isFreeEntry) return { title: '', subtitle: '', cta: '' }
+    const activity = regArrays?.['IDPRCONTENT']?.['ACTIVITY'] ?? {}
+    const title =
+      selectedType === 'likedyou'    ? t('LIKE_LIST.LIKEDYOU')
+      : selectedType === 'likesent'  ? t('LIKE_LIST.LIKESENT')
+      : selectedType === 'viewedyou' ? String(activity['CONTENT19'] ?? '')
+      : String(activity['CONTENT17'] ?? '')
+    return {
+      title,
+      subtitle: String(activity['CONTENT16'] ?? ''),
+      cta:      String(activity['CTA1'] ?? ''),
+    }
+  })()
+
+  // Angular: ionViewDidEnter()'s REFRESH_ACTIVITY_COUNT / isFromViewingLaterProfile
+  // check — coming back from a profile opened out of these lists re-pulls the
+  // counts so the chip labels/badges aren't stale. (Skips the very first focus,
+  // already covered by the mount effect above.)
+  const firstFocusRef = useRef(true)
+  useFocusEffect(useCallback(() => {
+    if (firstFocusRef.current) { firstFocusRef.current = false; return }
+    getItem('REFRESH_ACTIVITY_COUNT').then(async flag => {
+      if (flag !== 'true' && !isViewedList) return
+      if (flag === 'true') await removeItem('REFRESH_ACTIVITY_COUNT')
+      const notif = await fetchNotifCount().catch(() => ({ newCount: 0, comCount: [] }))
+      applyComCount(notif.comCount)
+    })
+  }, [isViewedList, applyComCount]))
 
   // Angular: changeLanguage() (activity.component.ts:1442-1459) — tears down and
   // re-fetches so server-rendered/translated content refreshes in the new
@@ -213,39 +463,62 @@ export default function ActivityScreen({ navigation }: Props) {
   useEffect(() => {
     if (i18n.language === mountedLangRef.current) return
     mountedLangRef.current = i18n.language
-    loadTab('likedyou', 0, true)
-    loadTab('likesent', 0, true)
+    loadTab(listKey, 0, true)
   }, [i18n.language])
 
+  // ── Tab switching ─────────────────────────────────────────────────────────────
+
+  // Angular: changeTab(type, true, true, index) — resets the list, marks the tab
+  // viewed, then re-fires the listing API for it.
   function switchTab(tab: LikedTab) {
-    if (tab === activeTab) return
-    setActiveTab(tab)
+    if (tab === selectedType) return
+    setSelectedType(tab)
     logEvent({ category: 'activity', action: 'tab_click', label: tab })
     markTabViewed(tab)
     if (!tabData[tab].loaded) loadTab(tab, 0, true)
   }
 
+  // Angular: changeSubTab(type, index) — same reset, but the parent type stays
+  // 'viewedbyme' and only the sub-tab (and hence the API) changes.
+  function switchSubTab(sub: ViewedSubTab) {
+    if (sub === selectedSubTab) return
+    setSelectedSubTab(sub)
+    logEvent({ category: 'activity', action: 'subtab_click', label: sub })
+    markTabViewed(sub)
+    if (!tabData[sub].loaded) loadTab(sub, 0, true)
+  }
+
   const handleEndReached = useCallback(() => {
-    const d = tabData[activeTab]
-    if (!d.loadingMore && d.hasMore && d.loaded) loadTab(activeTab, d.start, false)
-  }, [tabData, activeTab])
+    const d = tabData[listKey]
+    if (!d.loadingMore && d.hasMore && d.loaded) loadTab(listKey, d.start, false)
+  }, [tabData, listKey])
 
   // ── Card action handlers ──────────────────────────────────────────────────────
   // Angular: matches-card.component.ts's clickOn*() → communication.service.ts's
   // communicationBtnOnClick() — same dispatcher MatchesScreen.tsx uses, 'activity'
   // as fromPage (Angular's own variant string for this exact screen).
 
+  // Angular: clickOnViewProfile(moduleType, oppositeUserId, status) — a deleted
+  // profile only toasts, and the viewedbyme list passes its SUB-tab as the
+  // from-page module so the back-navigation lands on the right list.
   function handlePress(profile: MatchProfile) {
-    const ids = tabData[activeTab].profiles.map(p => p.profileId)
-    redirectToViewProfile('', profile.profileId, 'activity', ids)
+    if (isDeletedProfile(profile)) { showMessage(); return }
+    const fromPage = selectedType === 'viewedbyme' ? selectedSubTab : selectedType
+    const ids = tabData[listKey].profiles.map(p => p.profileId)
+    redirectToViewProfile('', profile.profileId, fromPage, ids)
+  }
+
+  // Angular: showMessage() — the deleted-profile toast.
+  function showMessage() {
+    showToast(t('LIKE_LIST.DELETED_PROFILE_TXT'))
   }
 
   async function handleLike(profile: MatchProfile) {
-    patchProfile(activeTab, profile.profileId, { likedStatus: '1' })
+    patchProfile(listKey, profile.profileId, { likedStatus: '1' })
     try {
       const result = await communicationBtnOnClick('activity', 'like', { MATRIID: profile.profileId })
       if (result.type === 'error') {
-        patchProfile(activeTab, profile.profileId, { likedStatus: '0' })
+        patchProfile(listKey, profile.profileId, { likedStatus: '0' })
         showToast(result.message)
       } else if (result.type === 'api_success' && result.message) {
         showToast(result.message)
@@ -254,7 +527,7 @@ export default function ActivityScreen({ navigation }: Props) {
   }
 
   async function handleDontShow(profile: MatchProfile) {
-    removeProfile(activeTab, profile.profileId)
+    removeProfile(listKey, profile.profileId)
     try {
       await communicationBtnOnClick('activity', 'dontshow', { MATRIID: profile.profileId })
       showToast(t('VIEWPROFILE.SKIP_PROFILE'))
@@ -262,7 +535,7 @@ export default function ActivityScreen({ navigation }: Props) {
   }
 
   async function handleViewLater(profile: MatchProfile) {
-    removeProfile(activeTab, profile.profileId)
+    removeProfile(listKey, profile.profileId)
     try {
       await communicationBtnOnClick('activity', 'viewlater', { MATRIID: profile.profileId })
       showToast(t('GENERAL.PROFILE_LATER'))
@@ -275,6 +548,22 @@ export default function ActivityScreen({ navigation }: Props) {
   // quota-left) — not unconditionally. Rendered via the same generic
   // BottomSheet(type="viewPhoneConfirm") MatchesScreen.tsx uses.
   function confirmThenContact(profile: MatchProfile, action: 'call' | 'whatsapp') {
+    // Angular communication.service.ts's showCallAndWhatsAppPromo(): the
+    // "view phone number?" CONFIRM popup lives inside showContactDetails(),
+    // which is only reached when the number can actually be revealed —
+    // entryType=='P', this profile's number was already viewed
+    // (checkingForShowPhoneNumberFreeUser: PHONEVIEWED '1'|'3'), or the
+    // female-free 3-contact promo applies. A FREE member goes straight to
+    // paymentPromoPopUp() instead, with no confirm step in between.
+    // handleContactConfirmYes() is used rather than showPaymentPromo() directly
+    // so the service still owns the decision — its female-free branches
+    // (photo pending / call verification / limit over) must keep winning over
+    // the paywall for a free female member who qualifies for them.
+    const alreadyViewed = ['1', '3'].includes(String(profile.phoneViewed ?? '0'))
+    if (gating.ownEntryType !== 'P' && !alreadyViewed) {
+      handleContactConfirmYes({ profile, action })
+      return
+    }
     if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, gating.indNumbersLeft, gating.ownEntryType)) {
       handleContactConfirmYes({ profile, action })
     } else {
@@ -305,17 +594,64 @@ export default function ActivityScreen({ navigation }: Props) {
           idVerified: profile.isIdVerified,
         })
       } else if (result.type === 'payment_promo') {
-        // Angular: same {type:'payment_promo'} MatchesScreen.tsx handles — WhatsApp
-        // gets a confirm modal first ("Pay now" inside it navigates), Call goes
-        // straight to recharge.
-        if (action === 'whatsapp') setWhatsappPaywallProfile(profile)
-        else navigation.navigate('recharge')
+        await showPaymentPromo(profile, action === 'whatsapp')
       } else if (result.type === 'error') {
         showToast(result.message)
       } else {
         await phoneInfo.handleResult(result)
       }
     } catch { /* silent — matches MatchesScreen's own convention */ }
+  }
+
+  // Angular: matches-card.component's message icon → communicationBtnOnClick's
+  // 'jodimessages' action (chatService's handleChat() navigates to the chat
+  // window itself on success). The SAME app-matches-card renders on /matches and
+  // /activity, so the icon belongs on both lists — MatchesScreen.tsx's own
+  // handleMessage(), with this screen's shared phoneInfo sheet covering the
+  // verify-id / female-free / FUP pre-flight results.
+  async function handleMessage(profile: MatchProfile) {
+    try {
+      const result = await communicationBtnOnClick('activity', 'jodimessages', { MATRIID: profile.profileId })
+      if (result.type === 'payment_promo') {
+        await showPaymentPromo(profile, false)
+      } else if (result.type === 'error') {
+        showToast(result.message)
+      } else if (result.type !== 'api_success') {
+        // 'api_success' means handleChat() already navigated to the chat window.
+        await phoneInfo.handleResult(result)
+      }
+    } catch { /* silent — matches MatchesScreen's own convention */ }
+  }
+
+  // Angular: button.component.ts's paymentPromoPopUp() — every paywalled action
+  // (Call, WhatsApp, Message) lands here. A FREE member (ENTRYTYPE 'F') gets the
+  // `paymentPromo` bottom sheet built from payment/nbcustomer/v1's content;
+  // anyone else falls through to the popup/payment page as before.
+  async function showPaymentPromo(profile: MatchProfile, isWhatsApp: boolean) {
+    if (gating.ownEntryType !== 'F') {
+      if (isWhatsApp) setWhatsappPaywallProfile(profile)
+      else navigation.navigate('recharge')
+      return
+    }
+    logEvent({ category: 'PaymentPopupPromo', action: 'activity', label: 'Popup-Served' })
+    const promo = await fetchUpgradePaymentPromo(profile.name).catch(() => null)
+    // No content served → don't strand the tap on a dead end; fall back to the
+    // payment page, which is where the sheet's own CTA goes anyway.
+    // Angular routes PROMOTYPE 7/11 to phnoLeftPopup() (the renewal /
+    // numbers-left popup) instead of this sheet — that popup isn't built in this
+    // port, so those land on the payment page rather than the wrong sheet.
+    if (!promo || ['7', '11'].includes(promo.promoType)) { navigation.navigate('recharge'); return }
+    setPaymentPromo(promo)
+  }
+
+  // Angular: dismissModal('upgradeNow') → paymentService.redirectToIntermediatePage(
+  // fromPage, PAYMENTID, type, true).
+  function handlePaymentPromoUpgrade() {
+    const promo = paymentPromo
+    setPaymentPromo(null)
+    if (!promo) return
+    logEvent({ category: 'PaymentPopupPromo', action: 'activity', label: 'Popup-Clicked' })
+    redirectToIntermediatePage('activity', promo.paymentId, promo.type, true)
   }
 
   function handleContactDetailsClose() { setContactDetails(null) }
@@ -343,6 +679,13 @@ export default function ActivityScreen({ navigation }: Props) {
     } catch { /* silent — matches this service's own convention elsewhere */ }
   }
 
+  // Angular: reportProfile() — a reported profile is dropped from the list and
+  // the tab's totalCount goes down, exactly like a removed one.
+  function handleReportSubmitted() {
+    if (reportTarget) removeProfile(listKey, reportTarget.id)
+    setReportTarget(null)
+  }
+
   // Angular: IsShowRemoveProfile — only true on the "Liked by you" tab, you
   // can't remove a profile from "Who liked you". Same dontshow action as the
   // swipe-style Don't Show CTA, just triggered from the 3-dot menu instead.
@@ -355,7 +698,19 @@ export default function ActivityScreen({ navigation }: Props) {
     setOpenMenuId(prev => prev === profile.profileId ? null : profile.profileId)
   }
 
-  // ── Footer nav ────────────────────────────────────────────────────────────────
+  // ── Navigation / CTAs ────────────────────────────────────────────────────────
+
+  // Angular: goToMatches() → navigatePage('matches').
+  function goToMatches() {
+    logEvent({ category: 'Menu', action: 'matches', label: 'Clicked' })
+    navigation.navigate('Matches')
+  }
+
+  // Angular: goToPayment() → paymentService.redirectToIntermediatePage(url,'','7').
+  function goToPayment() {
+    logEvent({ category: 'PaymentBannerPromo', action: 'Activity', label: 'Banner-Clicked' })
+    navigation.navigate('recharge')
+  }
 
   function handleTabPress(tab: FooterTab) {
     switch (tab) {
@@ -367,33 +722,110 @@ export default function ActivityScreen({ navigation }: Props) {
     }
   }
 
+  // Angular: stickiyBtnEmit() — 'close' sets STICKYFLAG=1 (hidden for the rest of
+  // the session), the payment sticky routes to /my-membership, the
+  // profile-validation one opens its bottom sheet.
+  const activeSticky: 'profileValidation' | 'autopay' | null =
+    stickyDismissed || isViewedList ? null
+      : profileValidationBanner ? 'profileValidation'
+      : autopaySticky ? 'autopay'
+      : null
+
+  function handleStickyPress() {
+    if (activeSticky === 'profileValidation') setProfileValidationSheetVisible(true)
+    else openMembershipTab()
+  }
+
+  function handleStickyClose() { setStickyDismissed(true) }
+
+  function handleProfileValidationCtaPress() {
+    setProfileValidationSheetVisible(false)
+    if (customerCare.phone) Linking.openURL(`tel:${customerCare.phone}`)
+  }
+
   // ── Computed ──────────────────────────────────────────────────────────────────
 
-  const current  = tabData[activeTab]
-  const isPaid   = !['B', 'F'].includes(gating.ownEntryType)
+  const current = tabData[listKey]
+  const isPaid  = !['B', 'F'].includes(gating.ownEntryType)
+  // Angular: profileCount — the header-list totalCount for the selected type,
+  // falling back to the listing API's own TOTAL.
+  const profileCount = counts[listKey]?.totalCount ?? current.total
 
+  function countFor(key: ListKey): number {
+    return counts[key]?.totalCount ?? tabData[key].total
+  }
+
+  // Angular: (Item?.name | translate) + bindValue(Item?.totalCount,'curlyBraces')
+  // — item.name is pageContent['<TYPE>_TITLE'] (setCountListValue()).
   function tabLabel(tab: LikedTab): string {
-    const count = tabData[tab].total
+    const count = countFor(tab)
     const base  = tab === 'likedyou' ? t('LIKE_LIST.LIKEDYOU_TITLE') : t('LIKE_LIST.LIKESENT_TITLE')
     return count > 0 ? `${base} (${count})` : base
   }
 
-  // Angular: app-chip's countShow — newcount!=0 && tab not yet opened this session/install.
-  function tabUnreadCount(tab: LikedTab): number {
-    return viewedTabs[tab] ? 0 : newCounts[tab]
+  // Angular: ViewedByMeTabs — name keys 'GENERAL.VIEWEDBYME' / 'HOME.VIEWLATER_SUB_TXT'.
+  function subTabLabel(sub: ViewedSubTab): string {
+    const count = countFor(sub)
+    const base  = sub === 'viewedbyme' ? t('GENERAL.VIEWEDBYME') : t('HOME.VIEWLATER_SUB_TXT')
+    return count > 0 ? `${base} (${count})` : base
   }
 
-  function bannerTitle(): string {
-    const key = activeTab === 'likedyou' ? 'LIKE_LIST.LIKEDYOU' : 'LIKE_LIST.LIKESENT'
-    return t(key).replace('#COUNT#', String(current.total))
+  // Angular: app-chip's countShow — newcount!=0 && tab not yet opened this session/install.
+  function tabUnreadCount(tab: ListKey): number {
+    return viewedTabs[tab] ? 0 : (counts[tab]?.newcount ?? 0)
   }
+
+  // Angular: getheaderTitle() — the viewed-list back-button header's title.
+  // 'viewedbyme' is a plain label; 'viewedyou' runs through updatePluralContent()
+  // (#PLURAL# → PROFILES.PLURALMEMBER once the count is > 1).
+  function viewedHeaderTitle(): string {
+    if (selectedType === 'viewedbyme') return t('GENERAL.VIEWEDBYME')
+    const raw = t('HOME.WHO_VIEWED_YOU_HEADER')
+    if (!raw.includes('#PLURAL#')) return raw
+    return raw.replace('#PLURAL#', profileCount > 1 ? t('PROFILES.PLURALMEMBER') : '')
+  }
+
+  // Angular: bindTitle(topBanner.title, profileCount) — "#COUNT#" becomes
+  // "<n> match/matches" for en/tm/tl (and the singular Tamil LIKEDYOU_ONE copy),
+  // a bare number everywhere else.
+  function bannerTitle(): string {
+    let title = topBanner.title || (selectedType === 'likedyou' ? t('LIKE_LIST.LIKEDYOU') : t('LIKE_LIST.LIKESENT'))
+    const lang  = i18n.language
+    const count = profileCount
+
+    if (lang === 'tm' && count === 1 && selectedType === 'likedyou') {
+      title = t('LIKE_LIST.LIKEDYOU_ONE')
+    }
+
+    let countTxt = count > 0 ? String(count) : ''
+    if (['en', 'tm', 'tl'].includes(lang)) {
+      const word = selectedType === 'likesent'
+        ? t(count === 1 ? 'LIKE_LIST.LIKESENT_MATCH' : 'LIKE_LIST.LIKESENT_MATCHES')
+        : t(count === 1 ? 'LIKE_LIST.MATCH' : 'LIKE_LIST.MATCHES')
+      countTxt = count > 0 ? `${count} ${word}` : ''
+    }
+
+    // Angular only replaces '#COUNT#', but the same count token is authored three
+    // ways across the content strings/locale files ('##COUNT#' in the VIEWEDYOU/
+    // VIEWEDBYME copy, and a stray '#COUNT' with no closing hash) — matching all
+    // three keeps a raw placeholder from ever reaching the screen.
+    return stripHtml(title.replace(/##?COUNT#?/g, countTxt))
+  }
+
+  const oppAvatar = gating.loginGender === 'F' ? MALE_AVATAR_URL : FEMALE_AVATAR_URL
 
   // ── Desktop ────────────────────────────────────────────────────────────────────
+  // The viewed-list drill-downs are a mobile navigation flow (Angular reaches
+  // them through the mobile Home see-all rows); on desktop only the two main
+  // chips render, so the desktop layout is used for that mode only.
 
-  if (isDesktop) {
+  // Desktop web is deliberately left as it was — this port's Angular-parity work
+  // (gender-ordered chips, server-driven banner copy, the empty-state CTA, the
+  // paid-member message CTA) is mobile-only by request.
+  if (isDesktop && !isViewedList) {
     return (
       <ActivityDesktopLayout
-        activeTab={activeTab}
+        activeTab={selectedType as LikedTab}
         tabLabel={tabLabel}
         tabUnreadCount={tabUnreadCount}
         current={current}
@@ -414,7 +846,7 @@ export default function ActivityScreen({ navigation }: Props) {
         openMenuId={openMenuId}
         onRemovePress={handleRemovePress}
         onReportPress={handleReportPress}
-        onGetPaidMembership={() => navigation.navigate('recharge')}
+        onGetPaidMembership={goToPayment}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
         onTabPress={handleTabPress}
       >
@@ -447,13 +879,27 @@ export default function ActivityScreen({ navigation }: Props) {
           onClose={() => setWhatsappPaywallProfile(null)}
           onPayNow={() => { setWhatsappPaywallProfile(null); navigation.navigate('recharge') }}
         />
+        {/* Angular: bottom-sheet.component's `action == 'paymentPromo'` block. */}
+        <BottomSheet
+          visible={!!paymentPromo}
+          type="paymentPromo"
+          data={{
+            title:      paymentPromo?.title,
+            content:    paymentPromo?.content,
+            subContent: paymentPromo?.subContent,
+            benefits:   paymentPromo?.benefits,
+            ctaLabel:   paymentPromo?.ctaLabel || t('GENERAL.BECOME_PAID'),
+          }}
+          onClose={() => setPaymentPromo(null)}
+          onPrimaryPress={handlePaymentPromoUpgrade}
+        />
         {reportTarget && (
           <ReportProfileModal
             visible
             partnerId={reportTarget.id}
             partnerName={reportTarget.name}
             onClose={() => setReportTarget(null)}
-            onSubmitted={() => setReportTarget(null)}
+            onSubmitted={handleReportSubmitted}
           />
         )}
         <BottomSheet
@@ -472,7 +918,47 @@ export default function ActivityScreen({ navigation }: Props) {
 
   // ── Render helpers (mobile) ────────────────────────────────────────────────────
 
+  // Angular: the #deletedProfile ng-template — a 145px-tall plain row with the
+  // profile's photo, name and "This profile has been deleted", tapping it toasts.
+  function renderDeletedProfile(item: MatchProfile) {
+    return (
+      <Pressable style={styles.deletedRow} onPress={showMessage}>
+        <CdnImage
+          uri={item.photos?.[0] || item.profileImg || oppAvatar}
+          width={84} height={84} style={styles.deletedImg} resizeMode="cover"
+        />
+        <View style={styles.deletedTextCol}>
+          <Text style={styles.deletedName} numberOfLines={1}>{item.name}</Text>
+          <Text style={styles.deletedNote}>{t('LIKE_LIST.DELETED_PROFILE_TXT')}</Text>
+        </View>
+      </Pressable>
+    )
+  }
+
+  // Angular: <app-list-view-card type="numberviewed"> with bindBasicView() —
+  // photo + name + "City • Age" / "Education • Occupation", no CTAs.
+  function renderViewedByMeCard(item: MatchProfile) {
+    const line1 = [item.location, item.age].filter(Boolean).join('  •  ')
+    const line2 = [item.education, item.occupation].filter(Boolean).join('  •  ')
+    return (
+      <Pressable style={styles.listCard} onPress={() => handlePress(item)}>
+        <CdnImage
+          uri={item.photos?.[0] || item.profileImg || oppAvatar}
+          width={88} height={88} style={styles.listCardImg} resizeMode="cover"
+        />
+        <View style={styles.listCardTextCol}>
+          <Text style={styles.listCardName} numberOfLines={1}>{item.name}</Text>
+          {!!line1 && <Text style={styles.listCardDetail} numberOfLines={1}>{line1}</Text>}
+          {!!line2 && <Text style={styles.listCardDetail} numberOfLines={2}>{line2}</Text>}
+        </View>
+      </Pressable>
+    )
+  }
+
   function renderItem({ item }: { item: MatchProfile }) {
+    if (isDeletedProfile(item)) return renderDeletedProfile(item)
+    if (selectedType === 'viewedbyme') return renderViewedByMeCard(item)
+
     return (
       <View style={styles.cardWrap}>
         <MatchCard
@@ -487,41 +973,44 @@ export default function ActivityScreen({ navigation }: Props) {
           onViewLater={() => handleViewLater(item)}
           onCall={() => confirmThenContact(item, 'call')}
           onWhatsApp={() => confirmThenContact(item, 'whatsapp')}
-          showLikedBadge
+          onMessage={() => handleMessage(item)}
+          showLikedBadge={!isViewedList}
         />
         {/* Figma: circular dark 3-dot menu, top-right of the photo — Angular's
-            IsShowThreeDots (Report always, Remove only on "Liked by you"). Not
-            part of MatchCard itself (plain Matches list never shows this), so
-            it's overlaid here rather than added to the shared component. */}
-        <Pressable style={styles.menuBtn} onPress={() => handleMenuPress(item)} hitSlop={8}>
-          <View style={styles.menuDot} />
-          <View style={styles.menuDot} />
-          <View style={styles.menuDot} />
-        </Pressable>
-        {openMenuId === item.profileId && (
-          <ThreeDotMenu
-            showRemove={activeTab === 'likesent'}
-            showReport
-            onRemove={() => handleRemovePress(item)}
-            onReport={() => handleReportPress(item)}
-          />
+            IsShowThreeDots = !isViewedList() (Report always, Remove only on the
+            "Liked by you" tab). Not part of MatchCard itself (the plain Matches
+            list never shows this), so it's overlaid here. */}
+        {!isViewedList && (
+          <>
+            <Pressable style={styles.menuBtn} onPress={() => handleMenuPress(item)} hitSlop={8}>
+              <View style={styles.menuDot} />
+              <View style={styles.menuDot} />
+              <View style={styles.menuDot} />
+            </Pressable>
+            {openMenuId === item.profileId && (
+              <ThreeDotMenu
+                showRemove={selectedType === 'likesent'}
+                showReport
+                onRemove={() => handleRemovePress(item)}
+                onReport={() => handleReportPress(item)}
+              />
+            )}
+          </>
         )}
       </View>
     )
   }
 
+  // Angular: the .shortlisted-header row — only for a female-free viewer
+  // (EntryType 'F'), never in viewed-list mode, and only when there's content.
   function renderListHeader() {
-    // Angular: female-free-user upsell banner — Figma shows this for ANY unpaid
-    // viewer though (the mock's own "You liked her..." caption implies a male
-    // viewer and still shows it), so gating this on ownEntryType rather than
-    // Angular's narrower EntryType=='F' condition.
-    if (isPaid || current.total === 0) return null
+    if (isViewedList || !isFreeEntry || !topBanner.title || current.profiles.length === 0) return null
     return (
       <View style={styles.banner}>
         <Text style={styles.bannerTitle}>{bannerTitle()}</Text>
-        <Text style={styles.bannerSub}>{t('VERIFY_ID_DOC.BECOMEPAIDMEMBER')}</Text>
-        <Pressable style={styles.bannerBtn} onPress={() => navigation.navigate('recharge')}>
-          <Text style={styles.bannerBtnLabel}>{t('GENERAL.BECOME_PAID')}</Text>
+        {!!topBanner.subtitle && <Text style={styles.bannerSub}>{stripHtml(topBanner.subtitle)}</Text>}
+        <Pressable style={styles.bannerBtn} onPress={goToPayment}>
+          <Text style={styles.bannerBtnLabel}>{stripHtml(topBanner.cta) || t('GENERAL.BECOME_PAID')}</Text>
         </Pressable>
       </View>
     )
@@ -536,17 +1025,35 @@ export default function ActivityScreen({ navigation }: Props) {
     )
   }
 
+  // Angular: the two "no profiles" blocks — illustration + title + sub-title +
+  // the secondary "Go to matches" CTA. `viewedbyme` uses its own pair of icons
+  // and copy per sub-tab.
   function renderEmpty() {
     if (!current.loaded) return null
-    const isLikeSent = activeTab === 'likesent'
+
+    const isViewedByMe = selectedType === 'viewedbyme'
+    const isViewLater  = selectedType === 'viewedbyme' && selectedSubTab === 'viewinglater'
+
+    const icon = isViewedByMe
+      ? `${CDN_SVG}${isViewLater ? 'viewlater_icon.svg' : 'viewedyou_icon.svg'}`
+      : `${CDN_SVG}liked_profiles_empty.svg`
+
+    const title = isViewedByMe
+      ? t(isViewLater ? 'LIKE_LIST.VIEWLATER_CONT' : 'LIKE_LIST.VIEWEDYOU_CONT')
+      : t(['likesent', 'viewedbyme'].includes(selectedType) ? 'LIKE_LIST.NOPROFILE_CONT' : 'LIKE_LIST.NOPROFILE_CONT_1')
+
+    const subtitle = isViewedByMe
+      ? (isViewLater ? '' : t('LIKE_LIST.VIEWEDYOU_SUBCONT'))
+      : t(['likesent', 'viewedbyme'].includes(selectedType) ? 'LIKE_LIST.NOPROFILE_CONT_SUB' : 'LIKE_LIST.NOPROFILE_CONT_1_SUB')
+
     return (
       <View style={styles.emptyState}>
-        <Text style={styles.emptyTitle}>
-          {t(isLikeSent ? 'LIKE_LIST.NOPROFILE_CONT' : 'LIKE_LIST.NOPROFILE_CONT_1')}
-        </Text>
-        <Text style={styles.emptySubtitle}>
-          {t(isLikeSent ? 'LIKE_LIST.NOPROFILE_CONT_SUB' : 'LIKE_LIST.NOPROFILE_CONT_1_SUB')}
-        </Text>
+        <CdnSvg uri={icon} width={160} height={160} />
+        <Text style={styles.emptyTitle}>{stripHtml(title)}</Text>
+        {!!subtitle && <Text style={styles.emptySubtitle}>{stripHtml(subtitle)}</Text>}
+        <Pressable style={styles.emptyCta} onPress={goToMatches}>
+          <Text style={styles.emptyCtaLabel}>{t('GENERAL.ACTIVITY_CTA')}</Text>
+        </Pressable>
       </View>
     )
   }
@@ -556,65 +1063,150 @@ export default function ActivityScreen({ navigation }: Props) {
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
 
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('GENERAL.ICON_3')}</Text>
-        <LanguagePill langCode={i18n.language} />
-      </View>
+      {/* ── Header — Angular renders the plain title+language row for the
+          activity tabs, and a back-button + title row in viewed-list mode. ── */}
+      {isViewedList ? (
+        <View style={styles.viewedHeader}>
+          <Pressable onPress={() => handleBack()} hitSlop={10} style={styles.backBtn}>
+            <CdnSvg uri={`${CDN_SVG}arrow-back-activity.svg`} width={24} height={24} />
+          </Pressable>
+          <Text style={styles.headerTitle} numberOfLines={1}>{viewedHeaderTitle()}</Text>
+        </View>
+      ) : (
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>{t('GENERAL.ICON_3')}</Text>
+          {/* Angular: *ngIf="FUNC.showLanguageList('activity')" — LANGLIST.activity is true. */}
+          <LanguagePill langCode={i18n.language} />
+        </View>
+      )}
 
-      {/* ── Tab chips ── */}
-      <View style={styles.tabBarWrap}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
-          {(['likedyou', 'likesent'] as LikedTab[]).map(tab => {
-            const isActive = activeTab === tab
-            const unread = tabUnreadCount(tab)
-            return (
-              <Pressable
-                key={tab}
-                style={[styles.chip, isActive && styles.chipActive]}
-                onPress={() => switchTab(tab)}
-              >
-                <Text style={[styles.chipLabel, isActive && styles.chipLabelActive]}>{tabLabel(tab)}</Text>
-                {unread > 0 && (
-                  <View style={styles.unreadBadge}>
-                    <Text style={styles.unreadBadgeText}>{unread}</Text>
-                  </View>
-                )}
-              </Pressable>
-            )
-          })}
-        </ScrollView>
-      </View>
+      {showPhotoPromotion && !isViewedList ? (
+        /* Angular: <ion-content *ngIf="showPhotoPromotion && !isViewedList()">
+           with <app-add-photo fromPage="activity"> — the promotion REPLACES the
+           tabs and the listing entirely until a photo is added. */
+        <View style={styles.photoPromoWrap}>
+          {!!photoPromoBanner?.['BANNERIMG'] && (
+            <CdnImage uri={String(photoPromoBanner['BANNERIMG'])} width={220} height={180} />
+          )}
+          <Text style={styles.photoPromoTitle}>
+            {stripHtml(String(photoPromoBanner?.['TITLE'] ?? t('GENERAL.ADD_PHOTO', 'Add your photo')))}
+          </Text>
+          {!!photoPromoBanner?.['BODY'] && (
+            <Text style={styles.photoPromoBody}>{stripHtml(String(photoPromoBanner['BODY']))}</Text>
+          )}
+          <Pressable style={styles.photoPromoCta} onPress={() => navigation.navigate('Gallery')}>
+            <Text style={styles.photoPromoCtaLabel}>
+              {stripHtml(String(photoPromoBanner?.['CTA'] ?? t('LIKE_LIST.PHOTO_REQ_CTA')))}
+            </Text>
+          </Pressable>
+        </View>
+      ) : (
+        <>
+          {/* ── Tab chips — the two activity chips, or the viewedbyme sub-tabs ── */}
+          {!isViewedList && (
+            <View style={styles.tabBarWrap}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
+                {tabOrder.map(tab => {
+                  const isActive = selectedType === tab
+                  const unread = tabUnreadCount(tab)
+                  return (
+                    <Pressable
+                      key={tab}
+                      style={[styles.chip, isActive && styles.chipActive]}
+                      onPress={() => switchTab(tab)}
+                    >
+                      <Text style={[styles.chipLabel, isActive && styles.chipLabelActive]}>{tabLabel(tab)}</Text>
+                      {unread > 0 && (
+                        <View style={styles.unreadBadge}>
+                          <Text style={styles.unreadBadgeText}>{unread}</Text>
+                        </View>
+                      )}
+                    </Pressable>
+                  )
+                })}
+              </ScrollView>
+            </View>
+          )}
 
-      {/* ── Content ── */}
-      <View style={styles.flex1}>
-        {initialLoad ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color={Colors.primary} />
+          {selectedType === 'viewedbyme' && (
+            <View style={styles.tabBarWrap}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabScroll}>
+                {VIEWED_SUB_TABS.map(sub => {
+                  const isActive = selectedSubTab === sub
+                  return (
+                    <Pressable
+                      key={sub}
+                      style={[styles.chip, isActive && styles.chipActive]}
+                      onPress={() => switchSubTab(sub)}
+                    >
+                      <Text style={[styles.chipLabel, isActive && styles.chipLabelActive]}>{subTabLabel(sub)}</Text>
+                    </Pressable>
+                  )
+                })}
+              </ScrollView>
+            </View>
+          )}
+
+          {/* ── Content ── */}
+          <View style={styles.flex1}>
+            {initialLoad ? (
+              <View style={styles.loadingWrap}>
+                <ActivityIndicator size="large" color={Colors.primary} />
+              </View>
+            ) : (
+              <FlatList
+                data={current.profiles}
+                keyExtractor={item => item.profileId}
+                renderItem={renderItem}
+                ListHeaderComponent={renderListHeader}
+                ListEmptyComponent={renderEmpty}
+                ListFooterComponent={renderFooter}
+                onEndReached={handleEndReached}
+                onEndReachedThreshold={0.4}
+                contentContainerStyle={styles.listContent}
+                showsVerticalScrollIndicator={false}
+                initialNumToRender={4}
+                maxToRenderPerBatch={4}
+                windowSize={7}
+                removeClippedSubviews
+              />
+            )}
           </View>
-        ) : (
-          <FlatList
-            data={current.profiles}
-            keyExtractor={item => item.profileId}
-            renderItem={renderItem}
-            ListHeaderComponent={renderListHeader}
-            ListEmptyComponent={renderEmpty}
-            ListFooterComponent={renderFooter}
-            onEndReached={handleEndReached}
-            onEndReachedThreshold={0.4}
-            contentContainerStyle={styles.listContent}
-            showsVerticalScrollIndicator={false}
-            initialNumToRender={4}
-            maxToRenderPerBatch={4}
-            windowSize={7}
-            removeClippedSubviews
-          />
-        )}
-      </View>
+        </>
+      )}
 
-      {/* ── Footer ── */}
-      <AppFooter activeTab={2} onTabPress={handleTabPress} />
+      {/* ── Payment stickies — Angular: <app-payment-stickey *ngIf="... && !isViewedList()"> ── */}
+      {activeSticky === 'profileValidation' && (
+        <PhotoPromoSticky
+          content={profileValidationBanner!.stickyContent}
+          imageUrl={profileValidationBanner!.stickyImg}
+          onPress={handleStickyPress}
+        />
+      )}
+      {activeSticky === 'autopay' && (
+        <StickyBanner
+          text={autopaySticky!.content}
+          ctaLabel={autopaySticky!.ctaLabel}
+          onPress={handleStickyPress}
+          onClose={handleStickyClose}
+        />
+      )}
 
+      {/* ── Footer — Angular: <app-footer *ngIf="!isViewedList()"> ── */}
+      {!isViewedList && <AppFooter activeTab={2} onTabPress={handleTabPress} />}
+
+      <BottomSheet
+        visible={profileValidationSheetVisible}
+        type="profileValidation"
+        data={{
+          title:    profileValidationBanner?.bottomTitle,
+          content:  profileValidationBanner?.bottomContent,
+          image:    profileValidationBanner?.bottomImg,
+          ctaLabel: customerCare.phone || profileValidationBanner?.bottomCtaLabel,
+        }}
+        onClose={() => setProfileValidationSheetVisible(false)}
+        onPrimaryPress={handleProfileValidationCtaPress}
+      />
       <BottomSheet
         visible={!!contactConfirm}
         type="viewPhoneConfirm"
@@ -644,13 +1236,28 @@ export default function ActivityScreen({ navigation }: Props) {
         onClose={() => setWhatsappPaywallProfile(null)}
         onPayNow={() => { setWhatsappPaywallProfile(null); navigation.navigate('recharge') }}
       />
+      {/* Angular: bottom-sheet.component's `action == 'paymentPromo'` block —
+          the free-member upgrade sheet behind Call / WhatsApp / Message. */}
+      <BottomSheet
+        visible={!!paymentPromo}
+        type="paymentPromo"
+        data={{
+          title:      paymentPromo?.title,
+          content:    paymentPromo?.content,
+          subContent: paymentPromo?.subContent,
+          benefits:   paymentPromo?.benefits,
+          ctaLabel:   paymentPromo?.ctaLabel || t('GENERAL.BECOME_PAID'),
+        }}
+        onClose={() => setPaymentPromo(null)}
+        onPrimaryPress={handlePaymentPromoUpgrade}
+      />
       {reportTarget && (
         <ReportProfileModal
           visible
           partnerId={reportTarget.id}
           partnerName={reportTarget.name}
           onClose={() => setReportTarget(null)}
-          onSubmitted={() => { setReportTarget(null); showToast(t('GENERAL.REPORT_SUBMITTED', 'Report submitted')) }}
+          onSubmitted={handleReportSubmitted}
         />
       )}
       <BottomSheet
@@ -680,7 +1287,15 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.divider,
   },
-  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textDark },
+  // Angular: the isViewedList() header row — back button + title, no language pill.
+  viewedHeader: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingHorizontal: 16, paddingVertical: 14,
+    backgroundColor: Colors.surface,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.divider,
+  },
+  backBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { flex: 1, fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textDark },
 
   // ── Tab bar — Figma: unselected border #b0b0b0, selected bg/border chip tokens ──
   tabBarWrap: { backgroundColor: Colors.surface },
@@ -712,6 +1327,30 @@ const styles = StyleSheet.create({
   },
   menuDot: { width: 4, height: 4, borderRadius: 2, backgroundColor: Colors.white },
 
+  // ── Viewed-by-me / view-later row (Angular: app-list-view-card) ───────────────
+  listCard: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: Colors.surface, borderRadius: 8,
+    marginHorizontal: 16, marginTop: 16, padding: 12,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.divider,
+  },
+  listCardImg: { borderRadius: 8, backgroundColor: Colors.background },
+  listCardTextCol: { flex: 1, gap: 4 },
+  listCardName: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.textDark },
+  listCardDetail: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textMedium, lineHeight: 18 },
+
+  // ── Deleted profile placeholder (Angular: .delete-div, fixed 145px) ──────────
+  deletedRow: {
+    height: 145, flexDirection: 'row', alignItems: 'center', gap: 12,
+    marginHorizontal: 16, marginTop: 16, padding: 12,
+    backgroundColor: Colors.surface, borderRadius: 8,
+    borderWidth: StyleSheet.hairlineWidth, borderColor: Colors.divider,
+  },
+  deletedImg: { borderRadius: 8, backgroundColor: Colors.background },
+  deletedTextCol: { flex: 1, gap: 6 },
+  deletedName: { fontFamily: Fonts.poppinsMedium, fontSize: 16, color: Colors.textDark },
+  deletedNote: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textMedium },
+
   // ── Unpaid upsell banner — Figma: bg rgba(181,0,51,0.05) ─────────────────────
   banner: { backgroundColor: 'rgba(181, 0, 51, 0.05)', padding: 16, gap: 6 },
   bannerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.textPrimary, lineHeight: 22 },
@@ -722,14 +1361,30 @@ const styles = StyleSheet.create({
   },
   bannerBtnLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.primary },
 
+  // ── Add-photo promotion (Angular: app-add-photo, fromPage="activity") ────────
+  photoPromoWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },
+  photoPromoTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textPrimary, textAlign: 'center' },
+  photoPromoBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textMedium, textAlign: 'center', lineHeight: 20 },
+  photoPromoCta: {
+    marginTop: 8, backgroundColor: Colors.primaryDark, borderRadius: 8,
+    paddingHorizontal: 24, paddingVertical: 12,
+  },
+  photoPromoCtaLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 15, color: Colors.white },
+
   // ── List ──────────────────────────────────────────────────────────────────────
-  listContent: { flexGrow: 1 },
+  listContent: { flexGrow: 1, paddingBottom: 16 },
   footerLoader: { paddingVertical: 20, alignItems: 'center' },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyState: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 32, paddingTop: 80, gap: 12,
+    paddingHorizontal: 24, paddingVertical: 40, gap: 8,
   },
-  emptyTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textPrimary, textAlign: 'center' },
+  emptyTitle: { marginTop: 8, fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.textPrimary, textAlign: 'center' },
   emptySubtitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  // Angular: SECONDARY_BTN — outlined pill, brand-red label ("Go to matches").
+  emptyCta: {
+    marginTop: 16, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 8,
+    paddingHorizontal: 24, paddingVertical: 12,
+  },
+  emptyCtaLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 15, color: Colors.primary },
 })

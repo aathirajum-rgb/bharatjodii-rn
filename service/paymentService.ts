@@ -596,6 +596,81 @@ export async function getMenuPromo(forceRefresh = false): Promise<any> {
   return null
 }
 
+// ─── Upgrade payment promo (free-user Call/WhatsApp/Message paywall sheet) ────
+// Angular: button.component.ts's paymentPromoPopUp() → payment/nbcustomer/v1,
+// whose RESPONSE feeds bottom-sheet.component's `action == 'paymentPromo'`
+// block (TITLE, CONTENT, SUBCONTENT + a BENEFITS list of icon/value/lockicon
+// rows, and a CTA that routes to the intermediate payment page with
+// PAYMENTID/type). Angular shows this bottom sheet only for a FREE member
+// (FUNC.getEnteryType() == 'F'); a paid member with no PROMOTYPE gets the
+// modal-popup variant instead.
+
+export interface PaymentPromoBenefit {
+  icon:      string
+  value:     string
+  lockIcon?: string
+}
+
+export interface UpgradePaymentPromo {
+  title:      string
+  content:    string
+  subContent: string
+  benefits:   PaymentPromoBenefit[]
+  ctaLabel:   string
+  paymentId:  string
+  type:       string
+  promoType:  string
+}
+
+export async function fetchUpgradePaymentPromo(profileName = ''): Promise<UpgradePaymentPromo | null> {
+  const [userId, renewalKey, renewalPromo, entryType] = await Promise.all([
+    getItem(SK.Auth.USER_ID),
+    getSessionValue('RENEWALENABLEKEY'),
+    getSessionValue('RENEWALPROMOKEY'),
+    getSessionValue('ENTRYTYPE'),
+  ])
+
+  // Angular derives AUTOUPIFLAG from a detected installed-UPI-app list
+  // (AUTOUPIAPPS), which RN has no equivalent for — same '0' default
+  // getMenuPromo()/getPromotionDetails() already use here.
+  //
+  // PAGETYPE=NEW selects the new bottom-sheet content shape — TITLE +
+  // "Paid membership benefits:" SUBCONTENT + per-perk BENEFITS rows carrying
+  // their own `icon`/`lockicon` (draft.page.ts:667, the page this sheet is
+  // developed against, sends exactly this). Without it the endpoint returns the
+  // older package-summary copy ("Pay now and enjoy the below benefits", plan
+  // rows with no icons), which is what this screen was rendering.
+  let params =
+    `ID=${userId ?? ''}&RENEWALFLAG=${renewalKey ?? '0'}&AUTOUPIFLAG=0` +
+    `&name=${encodeURIComponent(profileName)}&PAGETYPE=NEW`
+  if (String(entryType ?? '') === 'P') params += '&profileCount=0'
+  if (['1', '2'].includes(String(renewalPromo ?? ''))) params += `&COMMONKEY=${renewalPromo}`
+
+  const result = await apiCall(Endpoints.payment.customer, 'POST', params)
+  if (String(result?.ERRCODE) !== '0' || !result?.RESPONSE) return null
+
+  const r = result.RESPONSE
+  const benefits: PaymentPromoBenefit[] = Array.isArray(r.BENEFITS)
+    ? r.BENEFITS.map((b: Record<string, any>) => ({
+        icon:  String(b['icon'] ?? ''),
+        value: String(b['value'] ?? ''),
+        ...(b['lockicon'] ? { lockIcon: String(b['lockicon']) } : {}),
+      }))
+    : []
+
+  return {
+    title:      String(r.TITLE      ?? ''),
+    content:    String(r.CONTENT    ?? ''),
+    subContent: String(r.SUBCONTENT ?? ''),
+    benefits,
+    ctaLabel:   String(r.CTA ?? ''),
+    // Angular: `PAYMENTID` is passed straight through to redirectToIntermediatePage.
+    paymentId:  String(r.PAYMENTID ?? ''),
+    type:       String(r.type ?? r.TYPE ?? ''),
+    promoType:  String(r.PROMOTYPE ?? ''),
+  }
+}
+
 // ─── Promotion details ────────────────────────────────────────────────────────
 
 export async function getPromotionDetails(promotionId: string): Promise<any> {

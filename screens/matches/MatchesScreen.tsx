@@ -28,6 +28,7 @@ import {
   getBlurPhotoUri, NEWLY_JOINED_STAR_URI, RIGHT_ARROW_ANIMATION_URI, ProfileBadge,
   PhotoSwiper,
   getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showContactsLeftBanner, showFreeBadge,
+  showAfterLikeContentLine, showAfterLikeMessageCta, getMessageBtnText,
   disableDontShow, disableViewLater,
   type AfterLikeCtx,
 } from '../../components/matches/matchesCard.shared'
@@ -380,9 +381,13 @@ export const MatchCard = memo(function MatchCard({
         // Angular: matches-cta-bg-color (pink gradient bg) + getContentAfterLike() text +
         // Call Now/Pay Now CTA (#22) + FREE badge (#24) + contacts-left line (#23).
         <View style={c.afterLikeRow}>
-          <Text style={[c.afterLikeText, { fontFamily: langFonts.medium }]}>
-            {getAfterLikeContentText(ctaCtx, t)}
-          </Text>
+          {/* Angular hides this line for a paid member — the contact CTAs right
+              below already say it (matches-card.component.html:174-176). */}
+          {showAfterLikeContentLine(ctaCtx) && (
+            <Text style={[c.afterLikeText, { fontFamily: langFonts.medium }]}>
+              {getAfterLikeContentText(ctaCtx, t)}
+            </Text>
+          )}
           <View style={c.ctaSendInterestWrap}>
             {showFreeBadge(ctaCtx) && (
               <View style={c.freeBadge} pointerEvents="none">
@@ -396,6 +401,15 @@ export const MatchCard = memo(function MatchCard({
               <Text style={[c.ctaSendInterestText, { fontFamily: langFonts.medium }]}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
             </Pressable>
           </View>
+          {/* JODII-499: paid members get a second "Message him/her" CTA below the
+              primary one — outlined, brand-red label + message_red.svg icon
+              (CONFIG.MESSAGE_BTN). Free members get the Pay Now CTA alone. */}
+          {showAfterLikeMessageCta(ctaCtx) && !!onMessage && (
+            <Pressable style={c.ctaMessage} onPress={onMessage}>
+              <CdnSvg uri={CDN + 'message_red.svg'} width={18} height={18} />
+              <Text style={[c.ctaMessageText, { fontFamily: langFonts.medium }]}>{getMessageBtnText(ctaCtx, t)}</Text>
+            </Pressable>
+          )}
           {showContactsLeftBanner(ctaCtx) && (
             <Text style={[c.contactsLeftText, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
           )}
@@ -2762,6 +2776,24 @@ const c = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
     gap:             8,
+  },
+  // Angular CONFIG.MESSAGE_BTN: white background, primary border + primary text,
+  // full width, standard (44px) height, sat 12px below the primary CTA.
+  ctaMessage: {
+    flexDirection:   'row',
+    marginTop:       12,
+    height:          44,
+    backgroundColor: Colors.white,
+    borderWidth:     1,
+    borderColor:     Colors.primaryDark,
+    borderRadius:    8,
+    alignItems:      'center',
+    justifyContent:  'center',
+    gap:             8,
+  },
+  ctaMessageText: {
+    fontSize: 14,
+    color:    Colors.primaryDark,
   },
   ctaSendInterestIconBox: {
     width:          20,

@@ -11,7 +11,8 @@ import {
   type ViewStyle,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import CdnSvg from '../cdn-svg/CdnSvg'
+import { LinearGradient } from 'expo-linear-gradient'
+import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
@@ -59,6 +60,9 @@ export interface BottomSheetBenefit {
   icon:  string
   value: string
   info?: boolean  // Figma: trailing (i) marker, e.g. auto-renewal's "carry forward" row
+  // Angular bottom-sheet.component.html's paymentPromo block — each BENEFITS row
+  // is `icon | value | lockicon`, the trailing padlock marking a locked perk.
+  lockIcon?: string | undefined
 }
 
 // Structured data the sheet renders. Maps to Angular's `componentData` object.
@@ -66,6 +70,9 @@ export interface BottomSheetData {
   image?: string | undefined            // top illustration / icon URL
   title?: string | undefined            // bold heading
   content?: string | undefined          // body text
+  // Angular: componentData?.SUBCONTENT — the small heading directly above the
+  // benefits list ("Paid membership benefits:") in the paymentPromo sheet.
+  subContent?: string | undefined
   benefits?: BottomSheetBenefit[] | undefined // bulleted icon+text list (e.g. auto-renewal benefits)
   ctaLabel?: string | undefined         // primary button label
   secondaryCtaLabel?: string | undefined // secondary button label
@@ -195,6 +202,14 @@ export default function BottomSheet({
     ? (data?.content ?? '').split('\n\n')
     : []
 
+  // Angular bottom-sheet.component.html:317-348 — the `paymentPromo` block is a
+  // structurally different layout from every other sheet here, not just
+  // different copy: TITLE+CONTENT sit LEFT-aligned inside a gradient
+  // `.bottomsheet-header` card, the benefits sit in a bordered
+  // `.paid-membership-benefits-block` fused to its bottom edge, and the whole
+  // pair is inset only 8px (`pl-8 pr-8 pt-8 pb-8`) instead of the shared 24px.
+  const isPaymentPromo = type === 'paymentPromo'
+
   // Close button — Angular: mobile's `.bottomsheet-cross` is a bare
   // bottomsheet-cross.svg image floating ABOVE the sheet (top:-40px, left:45%)
   // with NO circular background behind it — bottomsheet.component.html/scss
@@ -256,6 +271,72 @@ export default function BottomSheet({
             <Text style={styles.phoneConfirmQuota}>{phoneConfirmQuota}</Text>
           )}
         </>
+      ) : isPaymentPromo ? (
+        /* Angular: <div class="pl-8 pr-8 pt-8 pb-8" *ngIf="action == 'paymentPromo'"> */
+        <>
+          {/* .bottomsheet-header — linear-gradient(#E6E8FF → #FFF0FC), 12px top
+              radius, pt-24 pb-24 pl-12 pr-12. TITLE is heading3-semibold-16 and
+              CONTENT is mt-6 body2-regular-14, both left-aligned. */}
+          <LinearGradient
+            colors={['#E6E8FF', '#FFF0FC']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={styles.promoHeader}
+          >
+            {!!data?.title   && <Text style={styles.promoTitle}>{data.title}</Text>}
+            {!!data?.content && <Text style={styles.promoContent}>{data.content}</Text>}
+          </LinearGradient>
+
+          {/* .paid-membership-benefits-block — 1px #E6E6E6 border with NO top
+              border (it fuses to the header above), 12px bottom radius, 12px
+              padding. SUBCONTENT is the body1-medium-14 heading; each BENEFITS
+              row is icon | value | lockicon with a divider on every row except
+              the last. */}
+          <View style={styles.promoBenefitsBlock}>
+            {!!data?.subContent && <Text style={styles.benefitsHeading}>{data.subContent}</Text>}
+            {data?.benefits?.map((b, i) => (
+              <View
+                key={i}
+                style={[
+                  styles.promoBenefitRow,
+                  i < (data.benefits!.length - 1) && styles.promoBenefitRowBorder,
+                ]}
+              >
+                {/* CdnImage, not CdnSvg — these icon URLs come straight from the
+                    API and aren't guaranteed to be SVGs. */}
+                {!!b.icon && <CdnImage uri={b.icon} width={24} height={24} />}
+                <Text style={styles.promoBenefitText}>{b.value}</Text>
+                {!!b.lockIcon && <CdnImage uri={b.lockIcon} width={20} height={20} />}
+              </View>
+            ))}
+          </View>
+
+          {/* Angular: app-button-revamp with iconType 'white-crown-icon'
+              (revamp/crown-white.svg), full width, inside a pl-24 pr-24 pt-24
+              pb-24 row. */}
+          {hasPrimary && (
+            // The inset MUST come from a padded wrapper row, not from margins on
+            // the button: ButtonRevamp's `fullWidth` is `width: '100%'`, and in
+            // RN a horizontal margin adds to that 100% instead of eating into
+            // it — so margins here made the button wider than the sheet and
+            // pushed it off the right edge.
+            <View style={styles.promoCtaRow}>
+              <ButtonRevamp
+                label={data!.ctaLabel!}
+                variant="primary"
+                // Angular PRIMARY_BTN.buttonSize = EButtonSize.standard → 44px
+                // tall / 8px radius. ButtonRevamp's own default ('large') is the
+                // 40px token, which rendered this CTA visibly short.
+                size="standard"
+                icon="crown-white"
+                iconPosition="start"
+                fullWidth
+                style={{ backgroundColor: Colors.primaryDark }}
+                onPress={onPrimaryPress}
+              />
+            </View>
+          )}
+        </>
       ) : children ? children : (
         <>
           {/* Top image — CdnSvg so CDN-hosted SVG icons (e.g. the "add your photo"
@@ -282,6 +363,9 @@ export default function BottomSheet({
               the last) */}
           {!!data?.benefits?.length && (
             <View style={styles.benefitsList}>
+              {/* Angular: the SUBCONTENT heading sits inside the same bordered
+                  benefits block, above the first row. */}
+              {!!data?.subContent && <Text style={styles.benefitsHeading}>{data.subContent}</Text>}
               {data.benefits.map((b, i) => (
                 <View key={i}>
                   {i > 0 && <View style={styles.benefitDivider} />}
@@ -291,6 +375,8 @@ export default function BottomSheet({
                       {b.value}
                       {b.info && <Text style={styles.benefitInfo}>{'  ⓘ'}</Text>}
                     </Text>
+                    {/* Angular: the row's trailing lockicon column. */}
+                    {!!b.lockIcon && <CdnSvg uri={b.lockIcon} width={16} height={16} />}
                   </View>
                 </View>
               ))}
@@ -386,6 +472,7 @@ export default function BottomSheet({
             <Animated.View
               style={[
                 styles.desktopCard,
+                isPaymentPromo && styles.desktopCardPaymentPromo,
                 { opacity: scrimAnim, transform: [{ scale: scaleAnim }] },
                 style,
               ]}
@@ -403,6 +490,9 @@ export default function BottomSheet({
           <Animated.View
             style={[
               styles.sheet,
+              // Angular: the paymentPromo block is wrapped in pl-8/pr-8/pt-8/pb-8,
+              // not the 24px side padding every other sheet body uses.
+              isPaymentPromo && styles.sheetPaymentPromo,
               { paddingBottom: insets.bottom + 20 },
               { transform: [{ translateY: slideAnim }] },
               style,
@@ -423,6 +513,10 @@ export default function BottomSheet({
 // card radius 16px (top only), side padding 24px, icon→title/title→CTA gap 16px,
 // title 18px Poppins-Semibold #1f1e1b, CTA #B50033 bg / 8px radius / 44px height.
 const styles = StyleSheet.create({
+  sheetPaymentPromo: {
+    paddingHorizontal: 8,
+    paddingTop:        8,
+  },
   sheet: {
     position:             'absolute',
     bottom:               0,
@@ -447,6 +541,14 @@ const styles = StyleSheet.create({
     flex:           1,
     alignItems:     'center',
     justifyContent: 'center',
+  },
+  // Same 8px inset the mobile sheet uses for this layout (see sheetPaymentPromo);
+  // the close-X row above it keeps its own spacing.
+  desktopCardPaymentPromo: {
+    paddingHorizontal: 8,
+    // 16 + promoCta's own 8 = Angular's pb-24 below the button (desktop has no
+    // safe-area inset to contribute the rest, unlike the mobile sheet).
+    paddingBottom:     16,
   },
   desktopCard: {
     width:            400,
@@ -555,6 +657,74 @@ const styles = StyleSheet.create({
   benefitsList: {
     width:        '100%',
     marginBottom: 16,
+  },
+  // ── paymentPromo (Angular bottom-sheet.component.scss) ──────────────────────
+  // .bottomsheet-header: gradient + 12px top radius + hairline white border.
+  promoHeader: {
+    borderTopLeftRadius:  12,
+    borderTopRightRadius: 12,
+    borderWidth:          1,
+    borderColor:          'rgba(255,255,255,0.1)',
+    paddingVertical:      24,
+    paddingHorizontal:    12,
+  },
+  // heading3-semibold-16 / body2-regular-14 — left-aligned, unlike the shared
+  // centered title/content used by every other sheet type.
+  promoTitle: {
+    fontFamily: Fonts.poppinsSemiBold,
+    fontSize:   16,
+    lineHeight: 22,
+    color:      '#1f1e1b',
+  },
+  promoContent: {
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize:   14,
+    lineHeight: 20,
+    color:      '#1f1e1b',
+    marginTop:  6,
+  },
+  promoBenefitsBlock: {
+    borderWidth:             1,
+    borderTopWidth:          0,
+    borderColor:             '#E6E6E6',
+    borderBottomLeftRadius:  12,
+    borderBottomRightRadius: 12,
+    padding:                 12,
+  },
+  promoBenefitRow: {
+    flexDirection:   'row',
+    alignItems:      'center',
+    gap:             4,
+    paddingVertical: 12,
+  },
+  promoBenefitRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#E6E6E6',
+  },
+  promoBenefitText: {
+    flex:       1,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize:   14,
+    lineHeight: 20,
+    color:      '#1f1e1b',
+    paddingLeft: 4,
+  },
+  // Angular: the CTA sits in its own `pl-24 pr-24 pt-24 pb-24` row — 16px more
+  // side inset than this sheet's own 8px padding in paymentPromo mode, so the
+  // button lands 24px in from the sheet edge. The rest of the bottom gap comes
+  // from the sheet's own safe-area padding.
+  promoCtaRow: {
+    paddingHorizontal: 16,
+    paddingTop:        24,
+    paddingBottom:     8,
+  },
+
+  // Angular: .paid-membership-benefits-block's body1-medium-14 heading.
+  benefitsHeading: {
+    fontFamily:   Fonts.poppinsMedium,
+    fontSize:     14,
+    color:        '#1f1e1b',
+    marginBottom: 4,
   },
   benefitRow: {
     flexDirection: 'row',

@@ -341,6 +341,32 @@ export function getAfterLikeContentText(ctx: AfterLikeCtx, t: (key: string) => s
   return raw.replace(/##HE_SHE##/g, heShe).replace(/#HIMHER#/g, himHer)
 }
 
+// Angular matches-card.component.html:174-176 — the "talk to him/her directly" /
+// "To contact via Call / Whatsapp" line is rendered under
+// `!showLikeCTA(likedStatus) && showAfterLikeContent(likedStatus) &&
+// getEnteryType() != 'P'`: a PAID member never sees it, because the contact CTAs
+// sit right below it and say the same thing. Only the free member is told how
+// the contact happens.
+export function showAfterLikeContentLine(ctx: AfterLikeCtx): boolean {
+  return !showLikeCTA(ctx.likedStatus) && showAfterLikeCTA(ctx.likedStatus) && ctx.entryType !== 'P'
+}
+
+// Angular matches-card.component.html:255 (JODII-499) — the second "Message
+// him/her" CTA under the primary one, shown ONLY to a paid member
+// (`showAfterLikeContent(likedStatus) && getEnteryType() == 'P'`); a free member
+// gets the Pay Now CTA alone.
+export function showAfterLikeMessageCta(ctx: AfterLikeCtx): boolean {
+  return showAfterLikeCTA(ctx.likedStatus) && ctx.entryType === 'P'
+}
+
+// Angular: FUNC.getMessageBtnText() = update_Her_Him(CONFIG.TEXT.msg /
+// 'GENERAL.MSG_CTA', 1) — "Message #HER_HIM#" with the opposite gender's
+// lowercase pronoun substituted ("Message her"). Languages whose own string
+// carries no placeholder are unaffected by the replace.
+export function getMessageBtnText(ctx: AfterLikeCtx, t: (key: string) => string): string {
+  return t('GENERAL.MSG_CTA').replace(/#HER_HIM#/g, t(`PRONOUN.${ctx.oppGender}.himhers`))
+}
+
 export function showContactsLeftBanner(ctx: AfterLikeCtx): boolean {
   return showIndirectContact(ctx) && ctx.indNumbersLeft !== '0' && !isPhoneAlreadyViewedFree(ctx.phoneViewed)
 }
