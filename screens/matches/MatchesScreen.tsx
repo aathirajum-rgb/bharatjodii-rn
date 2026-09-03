@@ -18,8 +18,10 @@ import {
   Text,
   View,
 } from 'react-native'
+import LottieView from 'lottie-react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CdnLottie from '../../components/CdnLottie'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import MatchesHeader from '../../components/matches-header/MatchesHeader'
 import {
@@ -39,7 +41,7 @@ import MembershipBanner from '../../components/matches/MembershipBanner'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG } from '../../constants/cdn'
+import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { isBanner, type MatchProfile, type BannerItem, type MatchListItem } from '../../types/interfaces/matches.interface'
 import { EEndCardText } from '../../types/enums/common.enum'
@@ -150,6 +152,13 @@ export const MatchCard = memo(function MatchCard({
   const { t } = useTranslation()
   const langFonts = useLanguageFonts()
   const { LinearGradient } = require('expo-linear-gradient')
+  // One-shot burst overlay played on top of the Like button on tap — Angular:
+  // like-matches-post-click.json, played over the button in button.component.html.
+  const [showLikeBurst, setShowLikeBurst] = useState(false)
+  function handleLikePress() {
+    setShowLikeBurst(true)
+    onLike()
+  }
   const hasRealPhoto      = profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0
   const isHiddenPhoto     = profile.isPhotoAvailable && profile.isPhotoProtect
   // Angular: photo-new.component.ts getHiddenPhotoContent() — once liked/shortlisted,
@@ -206,7 +215,7 @@ export const MatchCard = memo(function MatchCard({
                     .replace(/##he_she##/g, t(`PRONOUN.${oppGender}.heshe`).toLowerCase())}
                 </Text>
                 {!hiddenPhotoPending && (
-                  <Pressable onPress={onLike}>
+                  <Pressable onPress={handleLikePress}>
                     {/* Angular: EButtonBackground.whatsApp = --ion-color-whatsapp-bg =
                         linear-gradient(180deg, #4AC14B 0%, #06853A 100%) (theme/variables
                         .scss:63) — a gradient, not the flat WhatsApp-brand green (#25D366)
@@ -221,6 +230,19 @@ export const MatchCard = memo(function MatchCard({
                       <Text style={[c.waBtnText, { fontFamily: langFonts.medium }]}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
                     </LinearGradient>
                   </Pressable>
+                )}
+                {/* Burst kept OUTSIDE the `!hiddenPhotoPending &&` block above —
+                    that flag flips true (hiding the Like button) the instant this
+                    same tap's optimistic likedStatus update lands, which would
+                    unmount a burst nested inside it before it had a chance to play. */}
+                {showLikeBurst && (
+                  <LottieView
+                    source={{ uri: CDN_LOTTIE + 'like-matches-post-click.json' }}
+                    autoPlay
+                    loop={false}
+                    onAnimationFinish={() => setShowLikeBurst(false)}
+                    style={c.waBurst}
+                  />
                 )}
               </View>
             </View>
@@ -370,7 +392,7 @@ export const MatchCard = memo(function MatchCard({
               </Text>
             </Pressable>
           </View>
-          <Pressable style={c.ctaLike} onPress={onLike}>
+          <Pressable style={c.ctaLike} onPress={handleLikePress}>
             <LikeIcon width={24} height={24} />
             <Text style={[c.ctaLikeText, { fontFamily: langFonts.semiBold }]}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
           </Pressable>
@@ -414,6 +436,22 @@ export const MatchCard = memo(function MatchCard({
             <Text style={[c.contactsLeftText, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
           )}
         </View>
+      )}
+
+      {/* One-shot burst overlay for the Like CTA above — kept OUTSIDE the
+          showLikeCTA/showAfterLikeCTA conditionals (both are gated by the very
+          likedStatus this tap flips optimistically, so a burst nested inside
+          the Like button itself would unmount before it ever got to play). It
+          overlays the CTA area regardless of which of the two states is
+          currently rendered there. */}
+      {showLikeBurst && (
+        <LottieView
+          source={{ uri: CDN_LOTTIE + 'like-matches-post-click.json' }}
+          autoPlay
+          loop={false}
+          onAnimationFinish={() => setShowLikeBurst(false)}
+          style={c.likeBurst}
+        />
       )}
 
     </View>
@@ -702,6 +740,7 @@ function NoMatchesCard({ onPress }: { onPress: () => void }) {
   const langFonts = useLanguageFonts()
   return (
     <View style={n.card}>
+      <CdnLottie uri={CDN_LOTTIE + 'no-matches-animation.json'} width={100} height={100} />
       <Text style={[n.title, { fontFamily: langFonts.semiBold }]}>{t(EEndCardText.noMatches)}</Text>
       <Text style={[n.desc, { fontFamily: langFonts.regular }]}>{t(EEndCardText.modifyPreference)}</Text>
       <Pressable style={n.cta} onPress={onPress}>
@@ -2214,6 +2253,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           visible={showNotificationPopup}
           type="enableNotification"
           data={{
+            lottie:   CDN_LOTTIE + 'notification-bell-popup.json',
             title:    t('PN_SETTINGS.HEADER'),
             content:  t('PN_SETTINGS.BODY'),
             ctaLabel: t('PN_SETTINGS.CTA'),
@@ -2402,6 +2442,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         visible={showNotificationPopup}
         type="enableNotification"
         data={{
+          lottie:   CDN_LOTTIE + 'notification-bell-popup.json',
           title:    t('PN_SETTINGS.HEADER'),
           content:  t('PN_SETTINGS.BODY'),
           ctaLabel: t('PN_SETTINGS.CTA'),
@@ -2598,6 +2639,16 @@ const c = StyleSheet.create({
     marginTop:         8,
     gap:               6,
   },
+  // One-shot burst overlay for the hidden-photo "Like" CTA above — anchored to
+  // the bottom of overlayCard (where the button sits) rather than nested inside
+  // the button itself, since !hiddenPhotoPending flips false (unmounting the
+  // button) the instant this same tap's optimistic likedStatus update lands.
+  waBurst: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    height: 60,
+    pointerEvents: 'none',
+  },
   // fontFamily applied inline (langFonts.medium) — see MatchCard's Text usage.
   waBtnText: {
     fontSize:   13,
@@ -2754,6 +2805,17 @@ const c = StyleSheet.create({
     gap:             6,
   },
   ctaLikeIcon: { width: 24, height: 24 },
+  // One-shot burst overlay for the ctaLike button above — anchored to the
+  // bottom of the card (where the CTA section sits) rather than nested inside
+  // the button itself, since showLikeCTA flips false (unmounting the button in
+  // favor of showAfterLikeCTA's block) the instant this same tap's optimistic
+  // likedStatus update lands.
+  likeBurst: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    height: 70,
+    pointerEvents: 'none',
+  },
   // fontFamily applied inline (langFonts.semiBold) — see MatchCard's Text usage.
   ctaLikeText: { fontSize: 14, color: Colors.white },
 

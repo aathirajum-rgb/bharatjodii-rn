@@ -4,7 +4,7 @@
 // logic (same split MatchesDesktopLayout.tsx/MatchCardDesktop.tsx already use
 // for the Matches screen) and passes it down as props; this file only arranges
 // that data into the desktop two-column grid + sticky-on-scroll condensed bar.
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   FlatList, NativeScrollEvent, NativeSyntheticEvent,
@@ -12,6 +12,7 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
+import LottieView from 'lottie-react-native'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { LANG_LABELS } from '../../components/matches-header/MatchesHeader'
 import {
@@ -29,7 +30,7 @@ import {
 import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interface'
 import type { SimilarProfileCard, StarMatchResult } from '../../service/viewProfileService'
 import { Colors } from '../../constants/colors'
-import { CDN_REACT } from '../../constants/cdn'
+import { CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // Same back-icon asset ViewProfileScreen's own mobile header uses.
@@ -161,9 +162,23 @@ function CtaRow({
   t: (key: string) => string
 }) {
   const langFonts = useLanguageFonts()
+  // One-shot burst overlay played on top of the Like chip on tap — Angular:
+  // like-view-profile-post-click.json, played over the LIKEDCTA ion-chip in
+  // button.component.html. Kept in a wrapper OUTSIDE the showLikeCTA/
+  // showAfterLikeCTA branches below (both are gated by the very likedStatus
+  // this tap flips optimistically, so a burst nested inside the Like button
+  // itself would unmount before it ever got to play).
+  const [showLikeBurst, setShowLikeBurst] = useState(false)
+  function handleLikePress() {
+    setShowLikeBurst(true)
+    onLike()
+  }
+
   if (sameGender || ownProfile) return null
+
+  let content: ReactNode = null
   if (showLikeCTA(likedStatus)) {
-    return (
+    content = (
       <View style={ds.ctaRow}>
         <Pressable
           style={[ds.ctaDontShow, compact && ds.ctaCompact, disableDontShow(dontShowStatus) && ds.ctaDisabled]}
@@ -181,15 +196,14 @@ function CtaRow({
           <ViewLaterIcon width={16} height={16} />
           <Text style={[ds.ctaViewLaterText, { fontFamily: langFonts.regular }]}>{t('GENERAL.VIEWLATER')}</Text>
         </Pressable>
-        <Pressable style={[ds.ctaLike, compact && ds.ctaCompact]} onPress={onLike}>
+        <Pressable style={[ds.ctaLike, compact && ds.ctaCompact]} onPress={handleLikePress}>
           <LikeIcon width={16} height={17} />
           <Text style={[ds.ctaLikeText, { fontFamily: langFonts.semiBold }]}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
         </Pressable>
       </View>
     )
-  }
-  if (showAfterLikeCTA(likedStatus)) {
-    return (
+  } else if (showAfterLikeCTA(likedStatus)) {
+    content = (
       <View style={ds.afterLikeRow}>
         <Text style={[ds.afterLikeText, { fontFamily: langFonts.medium }]} numberOfLines={1}>{getAfterLikeContentText(ctaCtx, t)}</Text>
         <View style={ds.ctaSendInterestWrap}>
@@ -209,7 +223,23 @@ function CtaRow({
       </View>
     )
   }
-  return null
+
+  if (!content && !showLikeBurst) return null
+
+  return (
+    <View style={ds.ctaRowWrap}>
+      {content}
+      {showLikeBurst && (
+        <LottieView
+          source={{ uri: CDN_LOTTIE + 'like-view-profile-post-click.json' }}
+          autoPlay
+          loop={false}
+          onAnimationFinish={() => setShowLikeBurst(false)}
+          style={ds.likeBurst}
+        />
+      )}
+    </View>
+  )
 }
 
 function NeighborButton({
@@ -908,6 +938,16 @@ const ds = StyleSheet.create({
   // fontFamily applied inline (langFonts.medium) — see Text usage.
   starMatchTeaser: { fontSize: 13, color: Colors.link, marginTop: 8 },
 
+  // Wraps CtaRow's showLikeCTA/showAfterLikeCTA branches so the Like burst
+  // overlay (gated purely by local state) can sit alongside whichever branch
+  // is currently rendered without being unmounted by the branch swap itself.
+  ctaRowWrap: { position: 'relative' },
+  likeBurst: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    height: 60,
+    pointerEvents: 'none',
+  },
   ctaRow: { flexDirection: 'row', gap: 12, marginTop: 16 },
   ctaDontShow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,

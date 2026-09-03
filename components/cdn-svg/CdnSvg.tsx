@@ -1,21 +1,30 @@
 // Drop-in replacement for react-native-svg's <SvgUri> for CDN-hosted icons.
 //
-// SvgUri works by fetch()-ing the SVG file's raw text, then parsing it as XML.
-// On native that fetch goes through the OS networking layer, which doesn't
-// enforce CORS. On web it goes through the browser's fetch(), which DOES
-// enforce CORS — and our CDN doesn't send Access-Control-Allow-Origin, so
-// every SvgUri icon silently fails to load on web (visible as "CORS error"
-// in the Network tab).
+// SvgUri/SvgCssUri work by fetch()-ing the SVG file's raw text, then parsing
+// it as XML. On native that fetch goes through the OS networking layer, which
+// doesn't enforce CORS. On web it goes through the browser's fetch(), which
+// DOES enforce CORS — and our CDN doesn't send Access-Control-Allow-Origin,
+// so every SvgCssUri icon silently fails to load on web (visible as "CORS
+// error" in the Network tab).
 //
 // Angular never hit this because it renders these same CDN icons as plain
 // <img src="..."> tags — a browser <img> just displays a resource, it never
 // reads the file into JS, so CORS doesn't apply to it at all. We mirror that
 // on web via React Native's <Image>, which becomes a real <img> tag there.
-// Native keeps using <SvgUri>, since native <Image> can't decode remote SVGs
-// without extra native libraries, and native has no CORS restriction anyway.
+// Native keeps using <SvgCssUri>, since native <Image> can't decode remote
+// SVGs without extra native libraries, and native has no CORS restriction
+// anyway. SvgCssUri specifically (not the plain SvgUri) because several CDN
+// icons (e.g. whatsapp-green-icon.svg, and the Net Banking/NEFT payment-
+// method icons) are exported with a <style> block + class="x" selectors
+// rather than inline fill attributes — plain SvgUri's XML parser only
+// renames class->className (a no-op on native) and never applies the
+// <style> rules, so every classed shape — including "fill:none" background
+// rects — falls back to SVG's default black fill, rendering as a solid
+// black box. SvgCssUri pulls in css-tree/css-select to actually resolve
+// those rules, matching what a browser's <img> does on web.
 import { useState } from 'react'
 import { Image, Platform, StyleSheet, View, type LayoutChangeEvent } from 'react-native'
-import { SvgUri } from 'react-native-svg'
+import { SvgCssUri } from 'react-native-svg/css'
 
 type Props = {
   uri:    string
@@ -30,7 +39,7 @@ export default function CdnSvg({ uri, width, height, style }: Props) {
     // sources — no fetch/blob step, so no CORS involved, matching Angular.
     return <Image source={{ uri }} style={[{ width, height }, style]} resizeMode="contain" />
   }
-  return <SvgUri uri={uri} width={width} height={height} style={style} />
+  return <SvgCssUri uri={uri} width={width} height={height} style={style} />
 }
 
 // For server-supplied icon URLs whose file format isn't guaranteed (e.g. PCS
@@ -49,7 +58,7 @@ export function CdnImage({
 
 // For an SVG used the way CSS `background-image` would (Angular: e.g.
 // .liked-profile-bg { background:url(...); background-size:cover }) — an
-// ImageBackground-style wrapper, but SVG-aware. Native SvgUri needs an
+// ImageBackground-style wrapper, but SVG-aware. Native SvgCssUri needs an
 // explicit width/height (no "auto-fill the parent" mode), so this measures
 // the container via onLayout before drawing the SVG behind `children`.
 export function CdnSvgBackground({
@@ -92,7 +101,7 @@ export function CdnSvgBackground({
           // react-native-svg's default ("meet") is closer to contain/
           // letterbox, and would leave gaps instead of covering.
           : (
-            <SvgUri
+            <SvgCssUri
               uri={uri}
               width={size.width}
               height={size.height}

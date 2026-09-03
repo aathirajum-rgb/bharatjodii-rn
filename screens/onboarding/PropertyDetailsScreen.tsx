@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,7 +15,8 @@ import {
   setRegValue,
   submitPropertyDetails,
 } from '../../service/registrationService'
-import { CDN_REG } from '../../constants/cdn'
+import { CDN_REG, CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
@@ -165,7 +165,7 @@ export default function PropertyDetailsScreen({ navigation }: Props) {
         <Text style={[styles.subtitle, { fontFamily: langFonts.regular }]}>{subtitle}</Text>
 
         {fetching ? (
-          <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={[styles.loader, { alignSelf: 'center' }]} />
         ) : (
           // Full-width list — marginHorizontal: -24 bleeds out of scrollContent's padding
           <View style={styles.list}>

@@ -15,6 +15,7 @@ import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { StatusBar } from 'expo-status-bar'
 import * as WebBrowser from 'expo-web-browser'
+import LottieView from 'lottie-react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   Easing, runOnJS, useAnimatedRef, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue,
@@ -61,7 +62,7 @@ import { shouldShowCoachMark, markCoachMarkShown } from '../../service/coachMark
 import { StorageKeys } from '../../constants/storage.keys'
 import { Colors } from '../../constants/colors'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
-import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
+import { CDN_SVG, CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
 import i18n from '../../i18n'
 import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interface'
 
@@ -363,6 +364,10 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // view) is a single static <Image>, not PhotoSwiper, so it needs its own
   // load-failure flag rather than PhotoSwiper's internal per-index tracking.
   const [heroPhotoFailed, setHeroPhotoFailed] = useState(false)
+  // One-shot burst overlay played on top of the Like chip on tap — Angular:
+  // like-view-profile-post-click.json, played over the LIKEDCTA ion-chip in
+  // button.component.html.
+  const [showLikeBurst, setShowLikeBurst] = useState(false)
   useEffect(() => { setHeroPhotoFailed(false) }, [profile?.profileId])
   const [ownEntryType, setOwnEntryType] = useState('')
   const [femaleFreeEligible, setFemaleFreeEligible] = useState(false)
@@ -918,6 +923,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 
   async function handleLike() {
     if (!profile) return
+    setShowLikeBurst(true)
     setProfile(prev => prev && { ...prev, likedStatus: '1' })
     try {
       const result = await communicationBtnOnClick(fromPage, 'like', { MATRIID: profile.profileId })
@@ -1506,6 +1512,22 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               <Text style={[s.contactsLeftText, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
             )}
           </View>
+        )}
+
+        {/* One-shot burst overlay for the Like chip above — Angular:
+            like-view-profile-post-click.json, played over the LIKEDCTA ion-chip
+            in button.component.html. Kept OUTSIDE the showLikeCTA/showAfterLikeCTA
+            conditionals (both are gated by the very likedStatus handleLike flips
+            optimistically, so a burst nested inside the Like button itself would
+            unmount before it ever got to play). */}
+        {showLikeBurst && (
+          <LottieView
+            source={{ uri: CDN_LOTTIE + 'like-view-profile-post-click.json' }}
+            autoPlay
+            loop={false}
+            onAnimationFinish={() => setShowLikeBurst(false)}
+            style={s.likeBurst}
+          />
         )}
       </View>
     )
@@ -2584,6 +2606,17 @@ const s = StyleSheet.create({
   },
   // fontFamily applied inline (langFonts.semiBold) — see Text usage.
   ctaLikeText: { fontWeight: '600', fontSize: 14, color: Colors.white },
+  // One-shot burst overlay for the ctaLike button above — anchored to the
+  // bottom of ctaBlock (where the CTA section sits) rather than nested inside
+  // the button itself, since showLikeCTA flips false (unmounting the button in
+  // favor of showAfterLikeCTA's block) the instant this same tap's optimistic
+  // likedStatus update lands.
+  likeBurst: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    height: 70,
+    pointerEvents: 'none',
+  },
 
   // Feature 6 — same pill styling as ctaLike, standing in for the normal
   // Like/Contact CTA when viewing your own profile.

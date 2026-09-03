@@ -13,6 +13,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
+import CdnSvg from '../cdn-svg/CdnSvg'
+import CdnLottie from '../CdnLottie'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
@@ -68,6 +70,7 @@ export interface BottomSheetBenefit {
 // Structured data the sheet renders. Maps to Angular's `componentData` object.
 export interface BottomSheetData {
   image?: string | undefined            // top illustration / icon URL
+  lottie?: string | undefined           // top illustration as a looping Lottie CDN URL, takes precedence over `image`
   title?: string | undefined            // bold heading
   content?: string | undefined          // body text
   // Angular: componentData?.SUBCONTENT — the small heading directly above the
@@ -180,7 +183,8 @@ export default function BottomSheet({
   }, [visible, isDesktop, slideAnim, scaleAnim, scrimAnim])
 
   const showClose    = children ? (showCloseProp ?? true) : (data?.showClose ?? true)
-  const hasImage     = !!data?.image
+  const hasLottie    = !!data?.lottie
+  const hasImage     = !hasLottie && !!data?.image
   const hasPrimary   = !!data?.ctaLabel
   const hasSecondary = (data?.showSecondaryCta ?? false) && !!data?.secondaryCtaLabel
   const sideBySide   = (data?.sideBySideCtas ?? false) && hasSecondary && hasPrimary
@@ -343,6 +347,15 @@ export default function BottomSheet({
               alert icon) render correctly on native, not just web. Angular sets no
               explicit size on this image (it's the source asset's natural size) —
               64x64 here is a reasonable fixed stand-in. */}
+          {hasLottie && (
+            <CdnLottie
+              uri={data!.lottie!}
+              width={64}
+              height={64}
+              style={styles.sheetImage}
+            />
+          )}
+
           {hasImage && (
             <CdnSvg
               uri={data!.image!}

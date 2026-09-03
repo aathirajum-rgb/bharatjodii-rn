@@ -16,16 +16,17 @@
 
 import { useEffect, useState } from 'react'
 import {
-  ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View,
+  Alert, Linking, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
-import { CDN_SVG } from '../../constants/cdn'
+import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import { handleBack } from '../../utils/navigationRef'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CdnLottie from '../../components/CdnLottie'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
@@ -205,7 +206,7 @@ export default function RechargeScreen({ navigation, route }: Props) {
       </View>
 
       {loading ? (
-        <ActivityIndicator color={Colors.primaryDark} style={{ marginTop: 40 }} />
+        <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={{ alignSelf: 'center', marginTop: 40 }} />
       ) : !data || data.plans.length === 0 ? (
         <View style={s.emptyState}>
           <Text style={s.emptyText}>No plans available.</Text>

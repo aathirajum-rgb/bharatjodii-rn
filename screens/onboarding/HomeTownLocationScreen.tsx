@@ -18,7 +18,8 @@ import {
   getRegValues,
   setRegValues,
 } from '../../service/registrationService'
-import { CDN_REG } from '../../constants/cdn'
+import { CDN_REG, CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
@@ -148,7 +149,7 @@ export default function HomeTownLocationScreen({ navigation }: Props) {
         <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {loadingStates ? (
-          <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={styles.loader} />
         ) : (
           <View style={styles.fieldsContainer}>
             <FloatField
@@ -247,7 +248,7 @@ function FloatField({ label, value, placeholder, onPress, hasValue, disabled, lo
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  loader: { marginTop: 32 },
+  loader: { alignSelf: 'center', marginTop: 32 },
   // 32px between every field, including title-to-first-field (matches Figma exactly)
   fieldsContainer: { gap: 32 },
 })

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator,
   Animated,
   Dimensions,
   Modal,
@@ -27,7 +26,8 @@ import {
   getRegValue,
   setRegValues,
 } from '../../service/registrationService'
-import { CDN_REG, CDN_SVG } from '../../constants/cdn'
+import { CDN_REG, CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
@@ -282,7 +282,7 @@ export default function HeightScreen({ navigation }: Props) {
         <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {fetching ? (
-          <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={styles.loader} />
         ) : (
           <>
             {/* "Select exact height" field — Angular: REGISTRATION.HEIGHTLINKTXT
@@ -458,7 +458,7 @@ export default function HeightScreen({ navigation }: Props) {
 
 
 const styles = StyleSheet.create({
-  loader: { marginTop: 48 },
+  loader: { marginTop: 48, alignSelf: 'center' },
 
   // Row — negative margin cancels scroll padding so the pink selection bg
   // stretches edge-to-edge (matches Figma full-width highlight).

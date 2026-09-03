@@ -89,7 +89,9 @@ export default function PhotoVerdictSheet({
         <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 24) }]}>
           {phase === 'uploading' ? (
             <View style={styles.uploadingBlock}>
-              <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={56} height={56} loop />
+              {/* Angular: bottom-sheet.component.html action==='aiPhotoValidation'
+                  uses loader-new.json specifically, not the generic loader.json. */}
+              <CdnLottie uri={CDN_LOTTIE + 'loader-new.json'} width={56} height={56} loop />
               <Text style={styles.uploadingText}>{t('AI_PHOTO_VALIDATION.UPLOAD_IN_PROGRESS', 'Upload in Progress')}</Text>
             </View>
           ) : (

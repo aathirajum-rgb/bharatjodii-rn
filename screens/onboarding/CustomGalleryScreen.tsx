@@ -40,6 +40,8 @@ import {
 import PhotoVerdictSheet, { type VerdictPhoto } from '../../components/photo-validation/PhotoVerdictSheet'
 import VerificationSuccessSheet from '../../components/bottom-sheet/VerificationSuccessSheet'
 import { os } from './onboardingStyles'
+import { CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 
 // expo-media-library's Asset has no mimeType getter (unlike expo-image-picker
 // assets) — derive it from the filename extension, same fallback Android's own
@@ -494,7 +496,7 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
 
       {/* Photo grid */}
       {loading ? (
-        <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
+        <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={styles.loader} />
       ) : (
         <FlatList
           data={listData}
@@ -617,7 +619,7 @@ const styles = StyleSheet.create({
     color:      Colors.textSecondary,
   },
 
-  loader: { marginTop: 60 },
+  loader: { marginTop: 60, alignSelf: 'center' },
 
   cameraCell: {
     width:           CELL_SIZE,

@@ -23,6 +23,8 @@ import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { isBanner, type MatchProfile, type BannerItem, type MatchListItem } from '../../types/interfaces/matches.interface'
 import { EEndCardText } from '../../types/enums/common.enum'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import CdnLottie from '../../components/CdnLottie'
+import { CDN_LOTTIE } from '../../constants/cdn'
 
 export interface MatchesDesktopLayoutProps {
   langCode:          string
@@ -180,6 +182,7 @@ export default function MatchesDesktopLayout({
               ListEmptyComponent={
                 totalCount === 0 ? (
                   <View style={s.emptyBox}>
+                    <CdnLottie uri={CDN_LOTTIE + 'no-matches-animation.json'} width={100} height={100} />
                     <Text style={s.emptyTitle}>{t(EEndCardText.noMatches)}</Text>
                     <Text style={s.emptyDesc}>{t(EEndCardText.modifyPreference)}</Text>
                     <Pressable style={s.emptyCta} onPress={onEditPreferences}>

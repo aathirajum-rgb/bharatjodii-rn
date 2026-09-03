@@ -23,6 +23,8 @@ import { getItem } from '../../service/storageService'
 import { handleBack } from '../../utils/navigationRef'
 import { getRegValue } from '../../service/registrationService'
 import { deletePhoto, setMainPhoto } from '../../service/profileService'
+import { CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
@@ -343,7 +345,7 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
 
         {/* Loading state (no pending URI) */}
         {loading && !pendingUri ? (
-          <ActivityIndicator color={Colors.primary} size="large" style={{ marginTop: 40 }} />
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={{ alignSelf: 'center', marginTop: 40 }} />
         ) : displayPhotos.length === 0 ? (
           <Text style={styles.emptyHint}>No photos yet. Go back and add one.</Text>
         ) : (

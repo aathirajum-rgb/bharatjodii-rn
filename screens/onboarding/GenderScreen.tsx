@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -23,7 +22,8 @@ import {
   setRegValues,
   validateNameGender,
 } from '../../service/registrationService'
-import { CDN_SVG, CDN_REVAMP } from '../../constants/cdn'
+import { CDN_SVG, CDN_REVAMP, CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import ConfirmNameGenderSheet from '../../components/bottom-sheet/ConfirmNameGenderSheet'
 import { os } from './onboardingStyles'
@@ -205,7 +205,7 @@ export default function GenderScreen({ navigation }: Props) {
 
         {/* Gender cards — Figma node 3-336: 1px #b0b0b0 border, 16px radius, gap:32 */}
         {fetching ? (
-          <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={[styles.loader, { alignSelf: 'center' }]} />
         ) : (
           <View style={styles.cardList}>
             {options.map(opt => {

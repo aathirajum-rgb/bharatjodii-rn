@@ -9,13 +9,14 @@
 // Customer Support" are all fully functional.
 
 import { useCallback, useState } from 'react'
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CdnLottie from '../../components/CdnLottie'
 import { Colors } from '../../constants/colors'
-import { CDN, CDN_SVG } from '../../constants/cdn'
+import { CDN, CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem, setItem } from '../../service/storageService'
 import { apiCall } from '../../service/apiClient'
@@ -138,7 +139,7 @@ export default function BlockerScreen({ navigation }: { navigation: any }) {
   if (loading) {
     return (
       <View style={styles.loaderContainer}>
-        <ActivityIndicator color={Colors.primary} size="large" />
+        <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} />
       </View>
     )
   }

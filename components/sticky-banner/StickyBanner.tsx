@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import CdnLottie from '../CdnLottie'
 
 // Angular: matches.page.ts:2317 / home-banner.component.ts:108 / recharge.page.ts:739 —
 // the real PAYMENTFAILEDCONTENT string from the content API uses this literal token.
@@ -21,13 +22,17 @@ function formatRemaining(deadlineMs: number): string {
 }
 
 export default function StickyBanner({
-  text, ctaLabel, onPress, onClose, countdownDeadlineMs,
+  text, ctaLabel, onPress, onClose, countdownDeadlineMs, lottieUri,
 }: {
   text:                 string
   ctaLabel:             string
   onPress:              () => void
   onClose:              () => void
   countdownDeadlineMs?: number
+  // Optional small looping/decorative animation (e.g. Angular's
+  // stickyDetails.ANIMAT_URL autopay-renewal lottie) shown alongside the text.
+  // Omitted entirely when not passed — existing callers render unchanged.
+  lottieUri?:           string
 }) {
   const [remaining, setRemaining] = useState(() =>
     countdownDeadlineMs != null ? formatRemaining(countdownDeadlineMs) : ''
@@ -44,6 +49,9 @@ export default function StickyBanner({
 
   return (
     <View style={s.bar}>
+      {lottieUri != null && (
+        <CdnLottie uri={lottieUri} width={44} height={44} loop style={s.lottie} />
+      )}
       <Text style={s.text} numberOfLines={2}>{displayText}</Text>
       <Pressable style={s.cta} onPress={onPress}>
         <Text style={s.ctaText}>{ctaLabel}</Text>
@@ -63,6 +71,9 @@ const s = StyleSheet.create({
     paddingVertical:   10,
     paddingHorizontal: 12,
     gap:               10,
+  },
+  lottie: {
+    flexShrink: 0,
   },
   text: {
     flex:       1,

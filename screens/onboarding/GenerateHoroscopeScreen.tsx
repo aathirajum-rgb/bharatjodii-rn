@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator,
   Alert,
   Dimensions,
   Platform,
@@ -19,7 +18,8 @@ import { getRegValue, uploadHoroscopeFile } from '../../service/registrationServ
 import { requestStoragePermission } from '../../service/permissionService'
 import { getItem, setItem } from '../../service/storageService'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import { CDN_IMG } from '../../constants/cdn'
+import { CDN_IMG, CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
@@ -236,7 +236,7 @@ export default function GenerateHoroscopeScreen({ navigation }: Props) {
           picked file posts. */}
       {uploading && (
         <View style={styles.uploadingOverlay}>
-          <ActivityIndicator color={Colors.primaryDark} size="large" />
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} />
         </View>
       )}
 

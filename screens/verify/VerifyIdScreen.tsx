@@ -11,7 +11,6 @@
 //     this always lands on Matches on success, matching the majority-case path.
 import { useEffect, useRef, useState } from 'react'
 import {
-  ActivityIndicator,
   Alert,
   Linking,
   Pressable,
@@ -25,13 +24,14 @@ import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CdnLottie from '../../components/CdnLottie'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import RadioGroup, { type RadioOption } from '../../components/radio/RadioGroup'
 import FloatingLabelInput from '../../components/input/FloatingLabelInput'
 import VerificationSuccessSheet from '../../components/bottom-sheet/VerificationSuccessSheet'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { Colors } from '../../constants/colors'
-import { CDN, CDN_SVG, CDN_REACT } from '../../constants/cdn'
+import { CDN, CDN_SVG, CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem, setItem } from '../../service/storageService'
 import { apiCall, uploadFile } from '../../service/apiClient'
@@ -379,7 +379,7 @@ export default function VerifyIdScreen({ navigation }: { navigation: any }) {
   if (step === 'loading') {
     return (
       <View style={s.loaderContainer}>
-        <ActivityIndicator color={Colors.primaryDark} size="large" />
+        <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} />
       </View>
     )
   }
@@ -497,7 +497,7 @@ export default function VerifyIdScreen({ navigation }: { navigation: any }) {
             <Text style={s.rowLabel}>{t('VERIFY_ID.UPLOAD_GALLERY')}</Text>
           </Pressable>
 
-          {submitting && <ActivityIndicator color={Colors.primaryDark} style={{ marginTop: 16 }} />}
+          {submitting && <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={40} height={40} style={{ alignSelf: 'center', marginTop: 16 }} />}
 
           {typeAvailability(selectedType.type, apiFlags).textDisabled === false && selectedType.invoid && (
             <Pressable onPress={() => setStep('text')}>
@@ -527,6 +527,7 @@ export default function VerifyIdScreen({ navigation }: { navigation: any }) {
           )}
           {resultKind === 'pending' && (
             <>
+              <CdnLottie uri={CDN_LOTTIE + 'id-verify-success.json'} width={80} height={80} style={{ alignSelf: 'center' }} />
               <Text style={s.heading}>{t('VERIFY_ID.VERIFY_LOADING')}</Text>
               <Text style={s.body}>{resultMessage || t('VERIFY_ID.PENDING_NOTE1')}</Text>
               <ButtonRevamp

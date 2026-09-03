@@ -17,7 +17,8 @@ import MessageSectionTabs, { type MessageSectionTabItem } from '../../components
 import AllMessagesEmptyState from '../../components/messages/AllMessagesEmptyState'
 import ConversationRow from '../../components/messages/ConversationRow'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG } from '../../constants/cdn'
+import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 import type { ChatListItem } from '../../types/interfaces/chatList.interface'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import type { MessageTab, MessageSection, TabData } from './MessagerListScreen'
@@ -101,7 +102,7 @@ export default function MessagerListDesktopLayout({
       {activeSection === 'messages' ? (
         !conversationsLoaded ? (
           <View style={ds.loadingWrap}>
-            <ActivityIndicator size="large" color={Colors.primary} />
+            <CdnLottie uri={CDN_LOTTIE + 'like-list-loding-screen.json'} width={120} height={120} />
           </View>
         ) : conversations.length === 0 ? (
           <AllMessagesEmptyState variant={isFree ? 'paywall' : 'empty'} onCtaPress={onAllMessagesCta} iconSize={180} />
@@ -145,7 +146,7 @@ export default function MessagerListDesktopLayout({
 
           {!current.loaded ? (
             <View style={ds.loadingWrap}>
-              <ActivityIndicator size="large" color={Colors.primary} />
+              <CdnLottie uri={CDN_LOTTIE + 'like-list-loding-screen.json'} width={120} height={120} />
             </View>
           ) : current.items.length === 0 ? (
             renderEmptyOrPaywall()
