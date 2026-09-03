@@ -30,7 +30,6 @@
 //     real backend field ever built to drive it. Not building fake numbers.
 import { useEffect, useState } from 'react'
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -43,11 +42,12 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CdnLottie from '../../components/CdnLottie'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import BottomSheet, { type BottomSheetData } from '../../components/bottom-sheet/BottomSheet'
 import Popover from '../../components/popover/Popover'
 import { Colors } from '../../constants/colors'
-import { CDN, CDN_REACT, CDN_SVG } from '../../constants/cdn'
+import { CDN, CDN_REACT, CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import { fetchContactDetails } from '../../service/communicationService'
 import { getJson } from '../../service/storageService'
 import { getPPSetData } from '../../service/profileService'
@@ -273,7 +273,7 @@ export default function MenuContactsScreen({ navigation, route }: { navigation: 
   }
 
   const cancelSuccessSheet: BottomSheetData = {
-    image: ICONS.success,
+    lottie: CDN_LOTTIE + 'success-new.json',
     title: cancelData?.SUCCESS?.TITLE ?? 'Auto-renewal cancelled successfully!',
     content: cancelData?.SUCCESS?.CONTENT
       ?? `You can use your membership benefits till ${membership?.expiryTextVal ?? ''} and after that you won't be charged any more`,
@@ -290,7 +290,7 @@ export default function MenuContactsScreen({ navigation, route }: { navigation: 
     showSecondaryCta: true,
   }
   const refundSuccessSheet: BottomSheetData = {
-    image: ICONS.success,
+    lottie: CDN_LOTTIE + 'success-new.json',
     title: refundData?.SUCCESS?.TITLE ?? 'Refund initiated!',
     content: refundData?.SUCCESS?.CONTENT ?? 'Your amount will be credited into your bank account within 3-7 business days.',
     ctaLabel: refundData?.SUCCESS?.CTA ?? 'Got it',
@@ -370,7 +370,7 @@ export default function MenuContactsScreen({ navigation, route }: { navigation: 
 
       {loading ? (
         <View style={s.loaderContainer}>
-          <ActivityIndicator color={Colors.primaryDark} size="large" />
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} />
         </View>
       ) : !membership ? (
         <View style={s.loaderContainer}>

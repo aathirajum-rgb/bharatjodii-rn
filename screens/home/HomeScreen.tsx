@@ -38,6 +38,7 @@ import { getItem, setItem, removeItem, getJson } from '../../service/storageServ
 import { getRegistrationArrays, getSessionValue } from '../../service/registrationService'
 import { logScreen } from '../../service/analyticsService'
 import { StorageKeys } from '../../constants/storage.keys'
+import { CDN_LOTTIE } from '../../constants/cdn'
 import { APP_VERSION } from '../../constants/appVersion'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
@@ -1690,6 +1691,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           ctaLabel={autopaySticky!.ctaLabel}
           onPress={handleStickyPress}
           onClose={handleStickyClose}
+          lottieUri={CDN_LOTTIE + 'payment-via-autopay-img.json'}
         />
       )}
       {activeSticky === 'profileValidation' && showStickyOnScroll && (

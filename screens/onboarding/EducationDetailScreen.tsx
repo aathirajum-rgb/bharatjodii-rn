@@ -12,7 +12,7 @@
 
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import { SvgXml } from 'react-native-svg'
 import { Colors } from '../../constants/colors'
@@ -23,7 +23,8 @@ import {
   updateFewMoreDetail,
   type EducationGroupSection,
 } from '../../service/registrationService'
-import { CDN_REG } from '../../constants/cdn'
+import { CDN_REG, CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
@@ -172,7 +173,7 @@ export default function EducationDetailScreen({ navigation }: Props) {
         <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {fetching ? (
-          <ActivityIndicator color={Colors.primary} size="large" style={{ marginTop: 32 }} />
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={{ alignSelf: 'center', marginTop: 32 }} />
         ) : (
           // Angular: dropdown.component.html's floating label div is
           // *ngIf="isCheckValidValue() && showFloatingLabel" — the "Education

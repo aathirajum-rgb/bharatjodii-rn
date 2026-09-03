@@ -59,6 +59,14 @@ export default function DailyRecommendationDesktopLayout({
 }: DailyRecommendationDesktopLayoutProps) {
   const { t } = useTranslation()
 
+  // One-shot burst overlay played on top of the Like button on tap — Angular:
+  // like-matches-post-click.json, played over the button in button.component.html.
+  const [showLikeBurst, setShowLikeBurst] = useState(false)
+  function handleLikePress() {
+    setShowLikeBurst(true)
+    onLike()
+  }
+
   // Tapping a strip tile selects it (red border) and swaps the bottom card to
   // that profile, instead of the bottom card always being locked to profiles[0].
   // Resets whenever the profiles list itself changes (e.g. a like/skip/view-later
@@ -239,9 +247,18 @@ export default function DailyRecommendationDesktopLayout({
                         <ViewLaterIcon width={20} height={20} />
                         <Text style={s.secondaryBtnText}>{t('GENERAL.VIEWLATER', 'View later')}</Text>
                       </Pressable>
-                      <Pressable style={s.primaryBtn} onPress={onLike}>
+                      <Pressable style={s.primaryBtn} onPress={handleLikePress}>
                         <LikeIcon width={18} height={19} />
                         <Text style={s.primaryBtnText}>{t('GENERAL.LIKE_CTA', 'Like').replace('#HER_HIM#', '').trim()}</Text>
+                        {showLikeBurst && (
+                          <LottieView
+                            source={{ uri: CDN_LOTTIE + 'like-matches-post-click.json' }}
+                            autoPlay
+                            loop={false}
+                            onAnimationFinish={() => setShowLikeBurst(false)}
+                            style={[StyleSheet.absoluteFill, { pointerEvents: 'none' }]}
+                          />
+                        )}
                       </Pressable>
                     </View>
                   </View>

@@ -54,7 +54,8 @@ import { requestMicrophonePermission } from '../../service/permissionService'
 import { getItem, getJson, setJson } from '../../service/storageService'
 import { getSessionValue } from '../../service/registrationService'
 import { StorageKeys } from '../../constants/storage.keys'
-import { CDN_SVG } from '../../constants/cdn'
+import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 import { Colors } from '../../constants/colors'
 import { EnvConfig } from '../../constants/env'
 import { formatLastActive } from '../../utils/chatTime'
@@ -756,7 +757,7 @@ export default function ChatScreen({ navigation, route }: Props) {
         {/* ── Thread ── */}
         {!loaded ? (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color={Colors.primary} />
+            <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} />
           </View>
         ) : messages.length === 0 ? (
           <View style={styles.emptyWrap}>

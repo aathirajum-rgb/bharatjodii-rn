@@ -2,10 +2,11 @@
 // photo-left/info-right layout. Same props as the mobile MatchCard
 // (screens/matches/MatchesScreen.tsx) so MatchesDesktopLayout can pass the
 // exact same profile/handlers with zero adaptation.
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
+import LottieView from 'lottie-react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import {
   WhatsAppIcon, WhatsAppUnlockButton, CallIcon, MessageIcon, CloseIcon, ViewLaterIcon, LikeIcon,
@@ -16,7 +17,7 @@ import {
   type AfterLikeCtx,
 } from './matchesCard.shared'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG } from '../../constants/cdn'
+import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
@@ -63,6 +64,14 @@ export default function MatchCardDesktop({
   const { t } = useTranslation()
   const PHOTO_W = photoSize ?? DEFAULT_PHOTO_SIZE
   const PHOTO_H = photoSize ?? DEFAULT_PHOTO_SIZE
+
+  // One-shot burst overlay played on top of the Like button on tap — Angular:
+  // like-matches-post-click.json, played over the button in button.component.html.
+  const [showLikeBurst, setShowLikeBurst] = useState(false)
+  function handleLikePress() {
+    setShowLikeBurst(true)
+    onLike()
+  }
 
   // Same context mobile's MatchCard builds (MatchesScreen.tsx) — drives the after-like
   // CTA's dynamic content/label/icon/FREE-badge/contacts-left line below. Previously
@@ -231,7 +240,7 @@ export default function MatchCardDesktop({
               <ViewLaterIcon width={14} height={14} />
               <Text style={c.ctaViewLaterText}>{t('GENERAL.VIEWLATER')}</Text>
             </Pressable>
-            <Pressable style={c.ctaLike} onPress={onLike}>
+            <Pressable style={c.ctaLike} onPress={handleLikePress}>
               <LikeIcon width={16} height={17} />
               <Text style={c.ctaLikeText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
             </Pressable>
@@ -271,6 +280,21 @@ export default function MatchCardDesktop({
               <Text style={c.contactsLeftText}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
             )}
           </LinearGradient>
+        )}
+
+        {/* One-shot burst overlay for the ctaLike button above — kept OUTSIDE
+            the showLikeCTA/showAfterLikeCTA conditionals (both are gated by the
+            very likedStatus this tap flips optimistically, so a burst nested
+            inside the Like button itself would unmount before it ever got to
+            play). Anchored to the bottom of `info`, where the CTA row sits. */}
+        {showLikeBurst && (
+          <LottieView
+            source={{ uri: CDN_LOTTIE + 'like-matches-post-click.json' }}
+            autoPlay
+            loop={false}
+            onAnimationFinish={() => setShowLikeBurst(false)}
+            style={c.likeBurst}
+          />
         )}
       </View>
     </View>
@@ -490,6 +514,17 @@ const c = StyleSheet.create({
   },
   // Figma: "Like" text is Poppins-SemiBold (not Medium), 14px (not 13).
   ctaLikeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.white },
+  // One-shot burst overlay for the ctaLike button above — anchored to the
+  // bottom of `info` (where the CTA row sits) rather than nested inside the
+  // button itself, since showLikeCTA flips false (unmounting the button in
+  // favor of showAfterLikeCTA's block) the instant this same tap's optimistic
+  // likedStatus update lands.
+  likeBurst: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    height: 56,
+    pointerEvents: 'none',
+  },
 
   // Figma node 629:12230 ("Frame 1707482133"): full-width 52px-tall gradient
   // bar (#FCEAF0 fading toward transparent), rounded 8, pl-16/pr-4/py-4 — the

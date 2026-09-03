@@ -24,15 +24,16 @@
 // content/content2, confirmed live), even though it wasn't present on the
 // specific Active/no-upsell Figma node fetched for this layout.
 
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CdnLottie from '../../components/CdnLottie'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import BottomSheet, { type BottomSheetData } from '../../components/bottom-sheet/BottomSheet'
 import Popover from '../../components/popover/Popover'
 import MatchesDesktopNav from '../../components/matches-header/MatchesDesktopNav'
 import { Colors } from '../../constants/colors'
-import { CDN, CDN_SVG } from '../../constants/cdn'
+import { CDN, CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import { stripHtml, parseAmount, formatAmount } from '../../service/paymentService'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import type { MembershipTierTheme } from './membershipTierTheme'
@@ -147,7 +148,7 @@ export default function MenuContactsDesktopLayout({
         <Text style={s.pageTitle}>Membership details</Text>
 
         {loading ? (
-          <ActivityIndicator color={Colors.primaryDark} style={{ marginTop: 40 }} />
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={{ alignSelf: 'center', marginTop: 40 }} />
         ) : !membership ? (
           <Text style={s.emptyText}>We couldn't load your membership details. Please check your connection and try again.</Text>
         ) : (

@@ -29,7 +29,8 @@ import { getItem, getJson, setJson } from '../../service/storageService'
 import { socketConnection, emitChatList, onChatList, onLoginConfirmation } from '../../service/socketService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG } from '../../constants/cdn'
+import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 import { EnvConfig } from '../../constants/env'
 import i18n from '../../i18n'
 import type { ChatListItem, ChatListResponse } from '../../types/interfaces/chatList.interface'
@@ -428,7 +429,7 @@ export default function MessagerListScreen({ navigation }: Props) {
       {activeSection === 'messages' ? (
         !conversationsLoaded ? (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color={Colors.primary} />
+            <CdnLottie uri={CDN_LOTTIE + 'like-list-loding-screen.json'} width={120} height={120} />
           </View>
         ) : conversations.length === 0 ? (
           <AllMessagesEmptyState variant={isFree ? 'paywall' : 'empty'} onCtaPress={handleAllMessagesCta} />
@@ -482,7 +483,7 @@ export default function MessagerListScreen({ navigation }: Props) {
           <View style={styles.flex1}>
             {!current.loaded ? (
               <View style={styles.loadingWrap}>
-                <ActivityIndicator size="large" color={Colors.primary} />
+                <CdnLottie uri={CDN_LOTTIE + 'like-list-loding-screen.json'} width={120} height={120} />
               </View>
             ) : current.items.length === 0 ? (
               renderEmpty()

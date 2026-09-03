@@ -15,7 +15,8 @@ import {
   setRegValues,
 } from '../../service/registrationService'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
-import { CDN_REVAMP } from '../../constants/cdn'
+import { CDN_REVAMP, CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
@@ -331,7 +332,7 @@ export default function HoroscopeBirthDetailsScreen({ navigation }: Props) {
         <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {fetchingStates ? (
-          <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={[styles.loader, { alignSelf: 'center' }]} />
         ) : (
           <View style={styles.fieldsContainer}>
             <FloatField

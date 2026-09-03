@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,7 +18,8 @@ import {
   submitFullRegistration,
   resolvePostInsertAction,
 } from '../../service/registrationService'
-import { CDN_REG } from '../../constants/cdn'
+import { CDN_REG, CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { resetTo } from '../../utils/navigationRef'
 import { ENavigation } from '../../types/enums/navigation.enum'
@@ -141,7 +141,7 @@ export default function GothraScreen({ navigation }: Props) {
         <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {fetching ? (
-          <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={[styles.loader, { alignSelf: 'center' }]} />
         ) : (
           <View style={styles.fieldWrapper}>
             {/* Matches Religion/Caste: label only shows once a value is selected */}

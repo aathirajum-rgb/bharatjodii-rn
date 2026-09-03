@@ -10,14 +10,15 @@
 
 import { Fragment, useEffect, useState } from 'react'
 import {
-  ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View,
+  Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
-import { CDN, CDN_REACT } from '../../constants/cdn'
+import { CDN, CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CdnLottie from '../../components/CdnLottie'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
@@ -152,12 +153,11 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
   // AppPkgName list — so on a device/browser without them they vanish, and
   // showTitle() (:1255) hides the "Recommended" heading with them.
   //
-  // This port has no installed-app detection, so those rows can never be
-  // legitimately shown; rendering them (with radios and an inline Proceed to
-  // Pay) was pure invention. Everything else keeps FLAG=1 via Angular's else
-  // branch, which is why "Pay using other UPI apps" DOES show.
-  const UPI_APP_KEYS = ['PAY_PHONEPE', 'PAY_GPAY', 'PAY_PAYTM']
-  const recommended = methods.filter(m => m.RECOMMEND === '1' && !UPI_APP_KEYS.includes(m.KEY))
+  // loadMethods() above already performs that installed-app filtering
+  // (getUpiAppList() + findUpiPackageName()) on Android, so any UPI-app row
+  // still present in `methods` here has already been confirmed installed —
+  // it must NOT be filtered out again below, or GPay/PhonePe/Paytm never show.
+  const recommended = methods.filter(m => m.RECOMMEND === '1')
   // Angular gates this whole section on !isEmiFlow() && !isPwaApp() — not on
   // the platform. The previous `Platform.OS === 'web' ? []` blanked out
   // Credit/Debit card and Other payment modes entirely on web, which is why
@@ -408,7 +408,10 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
         </View>
 
         {loading ? (
-          <ActivityIndicator color={Colors.primaryDark} style={{ marginTop: 32 }} />
+          // Angular: payment-mode.page.html's loading state uses
+          // <lottie-player src="{{common.ImgDomain() + 'assets/jodii-lottie-files/loader.json'}}">,
+          // not a native spinner.
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={{ alignSelf: 'center', marginTop: 32 }} />
         ) : (
           <>
             {/* Recommended — Angular: payment-mode.page.html:189 gates the

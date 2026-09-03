@@ -7,12 +7,13 @@
 
 import { useEffect, useState } from 'react'
 import {
-  ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View,
+  Linking, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
-import { CDN, CDN_REACT } from '../../constants/cdn'
+import { CDN, CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CdnLottie from '../../components/CdnLottie'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import {
@@ -114,7 +115,9 @@ export default function PayAtStoreScreen({ navigation }: Props) {
           </Pressable>
         )}
 
-        {loadingStates && <ActivityIndicator color={Colors.primaryDark} style={{ marginTop: 24 }} />}
+        {loadingStates && (
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={{ alignSelf: 'center', marginTop: 24 }} />
+        )}
 
         {!loadingStates && pickingState && (
           <>
@@ -149,7 +152,9 @@ export default function PayAtStoreScreen({ navigation }: Props) {
           </Pressable>
         )}
 
-        {loadingCities && <ActivityIndicator color={Colors.primaryDark} style={{ marginTop: 24 }} />}
+        {loadingCities && (
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={{ alignSelf: 'center', marginTop: 24 }} />
+        )}
 
         {!loadingCities && !pickingState && pickingCity && cities.length > 0 && (
           <>
@@ -174,7 +179,9 @@ export default function PayAtStoreScreen({ navigation }: Props) {
         )}
 
         {/* ── Stores ── */}
-        {loadingStores && <ActivityIndicator color={Colors.primaryDark} style={{ marginTop: 24 }} />}
+        {loadingStores && (
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={{ alignSelf: 'center', marginTop: 24 }} />
+        )}
 
         {!loadingStores && !pickingCity && stores.map((store, idx) => {
           const expanded = expandedIdx === idx

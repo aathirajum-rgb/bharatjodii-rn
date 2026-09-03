@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,7 +17,8 @@ import {
   getRegValues,
   setRegValue,
 } from '../../service/registrationService'
-import { CDN_REG } from '../../constants/cdn'
+import { CDN_REG, CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
 import { Fonts } from '../../src/theme/fonts'
@@ -169,7 +169,7 @@ export default function MaritalStatusScreen({ navigation }: Props) {
 
         {/* Pill chip grid — TYPE=type-1, horizontal wrapping (same as CreatedByScreen) */}
         {fetching ? (
-          <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={[styles.loader, { alignSelf: 'center' }]} />
         ) : (
           <View style={styles.chipGrid}>
             {options.map(opt => {

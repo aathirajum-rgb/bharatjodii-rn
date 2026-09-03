@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -24,7 +23,8 @@ import {
   submitFullRegistration,
   resolvePostInsertAction,
 } from '../../service/registrationService'
-import { CDN_REG } from '../../constants/cdn'
+import { CDN_REG, CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { resetTo } from '../../utils/navigationRef'
 import { ENavigation } from '../../types/enums/navigation.enum'
@@ -262,7 +262,7 @@ export default function CasteScreen({ navigation }: Props) {
         <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
         {fetchingCaste ? (
-          <ActivityIndicator color={Colors.primary} size="large" style={styles.loader} />
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={styles.loader} />
         ) : (
           <View style={styles.fields}>
             {/* ── Caste / Division select field ──────────────────────── */}
@@ -300,9 +300,10 @@ export default function CasteScreen({ navigation }: Props) {
             {/* ── Sub caste field — only when available ─────────────── */}
             {selectedCaste && (
               fetchingSubcaste ? (
-                <ActivityIndicator
-                  color={Colors.primary}
-                  size="small"
+                <CdnLottie
+                  uri={CDN_LOTTIE + 'loader.json'}
+                  width={32}
+                  height={32}
                   style={styles.subcasteLoader}
                 />
               ) : hasSubcaste ? (
@@ -366,7 +367,7 @@ export default function CasteScreen({ navigation }: Props) {
 
 
 const styles = StyleSheet.create({
-  loader:       { marginTop: 48 },
+  loader:       { marginTop: 48, alignSelf: 'center' },
   subcasteLoader: { marginTop: 20, alignSelf: 'flex-start' },
 
   fields: { gap: 0 },

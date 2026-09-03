@@ -5,7 +5,7 @@
 
 import { useCallback, useState } from 'react'
 import {
-  ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text,
+  Linking, Pressable, ScrollView, StyleSheet, Text,
   useWindowDimensions, View,
 } from 'react-native'
 import { Image } from 'expo-image'
@@ -15,9 +15,10 @@ import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import { runOnJS } from 'react-native-reanimated'
 import { useTranslation } from 'react-i18next'
 import { Colors } from '../../constants/colors'
-import { CDN, CDN_REACT } from '../../constants/cdn'
+import { CDN, CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CdnLottie from '../../components/CdnLottie'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { getItem, setItem } from '../../service/storageService'
 import { handleBack as goBackCentral } from '../../utils/navigationRef'
@@ -236,7 +237,7 @@ export default function BiodataScreen({ navigation }: Props) {
   if (loading) {
     return (
       <View style={[s.screen, s.centered, { paddingTop: insets.top }]}>
-        <ActivityIndicator color={Colors.primaryDark} />
+        <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} />
       </View>
     )
   }

@@ -12,9 +12,11 @@
 // detail fetch) falls back to the plain payment-method radio-picker.
 
 import { useEffect, useRef, useState } from 'react'
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import { CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import PlainRetryFailureSheet from '../../components/payment/PlainRetryFailureSheet'
 import AutoRenewalFailureSheet from '../../components/payment/AutoRenewalFailureSheet'
@@ -176,7 +178,7 @@ export default function PaymentFailedScreen({ navigation, route }: Props) {
   if (polling) {
     return (
       <View style={[s.screen, { paddingTop: insets.top }]}>
-        <ActivityIndicator color={Colors.primaryDark} size="large" />
+        <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} />
         <Text style={s.title}>Confirming your payment…</Text>
         <Text style={s.subtitle}>This usually takes a few seconds. Please don't close the app.</Text>
       </View>
@@ -190,7 +192,7 @@ export default function PaymentFailedScreen({ navigation, route }: Props) {
     <BottomSheet visible onClose={handleClose}>
       {loadingDetail ? (
         <View style={s.sheetLoading}>
-          <ActivityIndicator color={Colors.primaryDark} size="large" />
+          <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} />
         </View>
       ) : (
         <>

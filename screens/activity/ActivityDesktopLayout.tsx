@@ -16,6 +16,8 @@ import type { MatchProfile } from '../../types/interfaces/matches.interface'
 import type { ContactGating } from '../../hooks/useContactGating'
 import type { LikedTab } from './ActivityScreen'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import { CDN_SVG } from '../../constants/cdn'
 
 interface TabData {
   profiles: MatchProfile[]
@@ -162,6 +164,7 @@ export default function ActivityDesktopLayout({
           ListFooterComponent={current.loadingMore ? <ActivityIndicator size="small" color={Colors.primary} style={ds.footerLoader} /> : null}
           ListEmptyComponent={current.loaded ? (
             <View style={ds.emptyBox}>
+              <CdnSvg uri={CDN_SVG + 'liked_profiles_empty.svg'} width={140} height={140} />
               <Text style={ds.emptyTitle}>
                 {t(activeTab === 'likesent' ? 'LIKE_LIST.NOPROFILE_CONT' : 'LIKE_LIST.NOPROFILE_CONT_1')}
               </Text>

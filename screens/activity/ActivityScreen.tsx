@@ -25,6 +25,7 @@ import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
 import ReportProfileModal from '../../components/matches/ReportProfileModal'
 import ThreeDotMenu from '../../components/matches/ThreeDotMenu'
+import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import { MatchCard } from '../matches/MatchesScreen'
 import ActivityDesktopLayout from './ActivityDesktopLayout'
@@ -44,6 +45,7 @@ import { Colors } from '../../constants/colors'
 import i18n from '../../i18n'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { CDN_SVG } from '../../constants/cdn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -541,6 +543,7 @@ export default function ActivityScreen({ navigation }: Props) {
     const isLikeSent = activeTab === 'likesent'
     return (
       <View style={styles.emptyState}>
+        <CdnSvg uri={CDN_SVG + 'liked_profiles_empty.svg'} width={140} height={140} />
         <Text style={styles.emptyTitle}>
           {t(isLikeSent ? 'LIKE_LIST.NOPROFILE_CONT' : 'LIKE_LIST.NOPROFILE_CONT_1')}
         </Text>

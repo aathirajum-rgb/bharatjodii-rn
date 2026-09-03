@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,7 +10,8 @@ import {
 import { Image } from 'expo-image'
 import { Colors } from '../../constants/colors'
 import { fetchProfileCreatedByOptions, getRegValue, setRegValues } from '../../service/registrationService'
-import { CDN_REG } from '../../constants/cdn'
+import { CDN_REG, CDN_LOTTIE } from '../../constants/cdn'
+import CdnLottie from '../../components/CdnLottie'
 import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
@@ -121,9 +121,10 @@ export default function CreatedByScreen({ navigation }: Props) {
 
         {/* Pill chip grid — TYPE=type-1, horizontal wrapping (Figma: node 11851-2413) */}
         {fetching ? (
-          <ActivityIndicator
-            color={Colors.primary}
-            size="large"
+          <CdnLottie
+            uri={CDN_LOTTIE + 'loader.json'}
+            width={80}
+            height={80}
             style={styles.loader}
           />
         ) : (
@@ -162,6 +163,7 @@ export default function CreatedByScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   loader: {
     marginTop: 48,
+    alignSelf: 'center',
   },
 
   // Horizontal wrapping chip grid — TYPE=type-1 (Figma: gap 16, flexWrap)

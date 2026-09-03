@@ -13,13 +13,14 @@
 //
 // Module-level constants (ICON, SCREEN_WIDTH, DetailRow, …) are imported from
 // ./ViewProfileScreen, mirroring how ViewProfileDesktopLayout.tsx already does.
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   FlatList, Platform, Pressable, StyleSheet, Text, View, Image as RNImage,
 } from 'react-native'
 import { Image } from 'expo-image'
 import { LinearGradient } from 'expo-linear-gradient'
 import { StatusBar } from 'expo-status-bar'
+import LottieView from 'lottie-react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
   runOnJS, useAnimatedRef, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue,
@@ -55,7 +56,7 @@ import type { SimilarProfileCard, StarMatchResult, BiodataTheme } from '../../se
 import { getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
-import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
+import { CDN_SVG, CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
 import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interface'
 
 // Same shape ViewProfileScreen.tsx declares for its phoneInfoSheet slot — the
@@ -243,6 +244,17 @@ export default function ViewProfileContent(props: ViewProfileContentProps) {
   // ── Instance-local refs (see file header — deliberately not props) ─────────
   const verifiedBadgeRef = useRef<View>(null)
   const cta2Ref = useRef<View>(null)
+
+  // One-shot burst overlay played on top of the Like chip on tap — Angular:
+  // like-view-profile-post-click.json, played over the LIKEDCTA ion-chip in
+  // button.component.html. `onLike` itself is owned by ViewProfileScreen.tsx
+  // (passed down as a prop) and optimistically flips likedStatus, so this local
+  // wrapper only adds the burst trigger without touching that existing logic.
+  const [showLikeBurst, setShowLikeBurst] = useState(false)
+  function handleLikePress() {
+    setShowLikeBurst(true)
+    onLike()
+  }
   const scrollViewRef = useAnimatedRef<Animated.ScrollView>()
   const similarListRef = useRef<FlatList<SimilarProfileCard>>(null)
 
@@ -506,7 +518,7 @@ export default function ViewProfileContent(props: ViewProfileContentProps) {
                 </Text>
               </Pressable>
             </View>
-            <Pressable style={s.ctaLike} onPress={onLike} disabled={!interactive}>
+            <Pressable style={s.ctaLike} onPress={handleLikePress} disabled={!interactive}>
               <LikeIcon width={24} height={24} />
               <Text style={s.ctaLikeText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
             </Pressable>
@@ -533,6 +545,16 @@ export default function ViewProfileContent(props: ViewProfileContentProps) {
               <Text style={s.contactsLeftText}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
             )}
           </View>
+        )}
+
+        {showLikeBurst && (
+          <LottieView
+            source={{ uri: CDN_LOTTIE + 'like-view-profile-post-click.json' }}
+            autoPlay
+            loop={false}
+            onAnimationFinish={() => setShowLikeBurst(false)}
+            style={s.likeBurst}
+          />
         )}
       </View>
     )
@@ -1402,6 +1424,17 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primaryDark, borderRadius: 8, gap: 6,
   },
   ctaLikeText: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 14, color: Colors.white },
+  // One-shot burst overlay for the ctaLike button above — anchored to the
+  // bottom of ctaBlock (where the CTA section sits) rather than nested inside
+  // the button itself, since showLikeCTA flips false (unmounting the button in
+  // favor of showAfterLikeCTA's block) the instant onLike's optimistic
+  // likedStatus update lands.
+  likeBurst: {
+    position: 'absolute',
+    left: 0, right: 0, bottom: 0,
+    height: 70,
+    pointerEvents: 'none',
+  },
 
   // Feature 6 — same pill styling as ctaLike, standing in for the normal
   // Like/Contact CTA when viewing your own profile.

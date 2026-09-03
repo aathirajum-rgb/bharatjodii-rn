@@ -18,16 +18,17 @@
 //   - Attempt-limit/cooldown UI — that lives entirely in BlockerScreen.tsx
 //     (SELFIEATTEMPT), nothing to add here.
 import { useState } from 'react'
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
 import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { handleBack } from '../../utils/navigationRef'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CdnLottie from '../../components/CdnLottie'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
-import { CDN_REACT } from '../../constants/cdn'
+import { CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
@@ -134,7 +135,7 @@ export default function SelfieVerificationScreen({ navigation: _navigation }: { 
 
           {step === 'uploading' ? (
             <View style={s.uploadingOverlay}>
-              <ActivityIndicator color={Colors.white} size="large" />
+              <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} />
               <Text style={s.uploadingText}>{t('VERIFY_ID.VERIFY_DETAILS_TXT', 'Please wait, We are verifying your details')}</Text>
             </View>
           ) : (
