@@ -13,7 +13,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
-import CdnSvg from '../cdn-svg/CdnSvg'
 import CdnLottie from '../CdnLottie'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'

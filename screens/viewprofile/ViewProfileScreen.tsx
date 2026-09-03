@@ -984,8 +984,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
       if (result.type === 'payment_promo') {
         navigation.navigate('recharge')
       } else if (result.type === 'verify_id') {
+        // photoUpload=true (verified male, no photo yet) reads a DIFFERENT
+        // registration-array config than the plain not-yet-verified case —
+        // see communicationService.ts's CommActionResult 'verify_id' doc.
         const arrays = await getRegistrationArrays()
-        const cfg = arrays?.PROFILEVERIFYPAID?.Shortlist ?? {}
+        const cfg = (result.photoUpload ? arrays?.PHOTOPUBLISHPAID?.Shortlist : arrays?.PROFILEVERIFYPAID?.Shortlist) ?? {}
         let cta = String(cfg.CTA ?? 'OK')
         if (cta.includes('##CSNUM##')) {
           const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
@@ -993,8 +996,8 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         }
         setPhoneInfoSheet({
           kind:     'verify_id',
-          title:    String(cfg.TITLE ?? 'Verify your profile'),
-          content:  String(cfg.CONTENT ?? 'Please complete ID verification to view phone numbers.'),
+          title:    String(cfg.TITLE ?? (result.photoUpload ? 'Add your photo to continue' : 'Verify your profile')),
+          content:  String(cfg.CONTENT ?? (result.photoUpload ? 'Please add your photo to view phone numbers.' : 'Please complete ID verification to view phone numbers.')),
           ctaLabel: cta,
         })
       } else if (result.type === 'female_free') {
@@ -1073,10 +1076,14 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         setPhoneInfoSheet({ kind: 'phone_number_left' })
       } else if (result.type === 'verify_id') {
         // Angular communication.service.ts's navigateToVerify() — content is
-        // server-driven from REGISTRATIONARRAYS.PROFILEVERIFYPAID.Shortlist, and
-        // the support-number placeholder `##CSNUM##` only ever appears in CTA.
+        // server-driven, from ONE of two registration-array configs depending
+        // on which gate fired: PROFILEVERIFYPAID.Shortlist for the plain
+        // not-yet-verified case, PHOTOPUBLISHPAID.Shortlist for the
+        // verified-but-no-photo case (result.photoUpload — check_Paid_Verified_
+        // Nophoto() in Angular). The support-number placeholder `##CSNUM##`
+        // only ever appears in CTA.
         const arrays = await getRegistrationArrays()
-        const cfg = arrays?.PROFILEVERIFYPAID?.Shortlist ?? {}
+        const cfg = (result.photoUpload ? arrays?.PHOTOPUBLISHPAID?.Shortlist : arrays?.PROFILEVERIFYPAID?.Shortlist) ?? {}
         let cta = String(cfg.CTA ?? 'OK')
         if (cta.includes('##CSNUM##')) {
           const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
@@ -1084,8 +1091,8 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         }
         setPhoneInfoSheet({
           kind:     'verify_id',
-          title:    String(cfg.TITLE ?? 'Verify your profile'),
-          content:  String(cfg.CONTENT ?? 'Please complete ID verification to view phone numbers.'),
+          title:    String(cfg.TITLE ?? (result.photoUpload ? 'Add your photo to continue' : 'Verify your profile')),
+          content:  String(cfg.CONTENT ?? (result.photoUpload ? 'Please add your photo to view phone numbers.' : 'Please complete ID verification to view phone numbers.')),
           ctaLabel: cta,
         })
       } else if (result.type === 'female_free') {
@@ -1810,9 +1817,14 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                     onError={() => setHeroPhotoFailed(true)}
                   />
                 ) : profile.isPhotoAvailable && profile.photos.length > 0 && heroPhotoFailed ? (
-                  <RNImage
-                    source={{ uri: getAvatarFallbackUri(oppGender) }}
-                    style={{ width: SCREEN_WIDTH, height: PHOTO_HEIGHT }}
+                  // Native <Image> can't decode a remote .svg (see CdnSvg.tsx) —
+                  // the fallback silhouette is one, so it needs CdnSvg. `cover`
+                  // matches the real photo's own contentFit="cover" above.
+                  <CdnSvg
+                    uri={getAvatarFallbackUri(oppGender)}
+                    width={SCREEN_WIDTH}
+                    height={PHOTO_HEIGHT}
+                    cover
                   />
                 ) : (
                   <CdnSvg uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} />

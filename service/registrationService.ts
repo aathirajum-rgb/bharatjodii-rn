@@ -1387,6 +1387,10 @@ export async function storeWebURLData(data: Record<string, any>): Promise<void> 
     // also missing from this list until now — without it, Home's photo-request
     // overlay had no server-driven eligibility signal to read at all.
     'WAPHOTOFLAG',
+    // Angular: shared/config.ts's localvalueArr — matches.page.ts's
+    // checkIncomeSheet() reads this to decide whether to prompt an
+    // income-not-specified user, also missing from this list until now.
+    'INCOME',
   ]
   SCALAR_KEYS.forEach(k => { if (data[k] !== undefined) session[k] = String(data[k]) })
 

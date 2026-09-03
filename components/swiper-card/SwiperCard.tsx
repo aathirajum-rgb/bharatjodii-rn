@@ -84,8 +84,9 @@ export interface SwiperItem {
   showReqPhotoElement?: boolean | undefined
   isNewlyJoined?:       boolean | undefined
 
-  // Like state
-  likedStatus?: '0' | '1' | '2' | '3' | undefined
+  // Like state — 5 is a documented alias of 0 in Angular's showLikeCTA(), see
+  // types/interfaces/matches.interface.ts's MatchProfile.likedStatus.
+  likedStatus?: '0' | '1' | '2' | '3' | '5' | undefined
   phoneViewed?: string | undefined   // raw '0'|'1'|'2'|'3' — drives after-like CTA label
 
   // Angular: FUNC.disableDontShow()/disableViewLater() — '1'/'3' = action already taken

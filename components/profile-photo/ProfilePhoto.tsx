@@ -14,7 +14,7 @@ import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
 import * as ImagePicker from 'expo-image-picker'
 import { useTranslation } from 'react-i18next'
-import CdnSvg from '../cdn-svg/CdnSvg'
+import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
 import { WhatsAppUnlockButton } from '../matches/matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
@@ -50,7 +50,7 @@ export interface ProfilePhotoProps {
   // ── Badge / action overlays ───────────────────────────────────────────────
   isNewlyJoined?: boolean | undefined
   isShortlisted?: boolean | undefined   // show shortlist pill (top-right)
-  likedStatus?:   '0' | '1' | '2' | '3' | undefined
+  likedStatus?:   '0' | '1' | '2' | '3' | '5' | undefined
   showDontShow?:  boolean | undefined   // show "Don't show this profile" pill
   dontShowLabel?: string | undefined
   showThreeDots?: boolean | undefined   // show 3-dot action menu button
@@ -194,7 +194,7 @@ export default function ProfilePhoto({
 
   const r = RADIUS[variant]
   const resolvedDefault = defaultImage ?? oppGenderAvatar
-  const imgSrc = (imgError || !profileImage) ? resolvedDefault : profileImage
+  const showFallback = imgError || !profileImage
 
   // Determine what state the photo block is in
   const showBlur        = isPhotoProtect && isPhotoAvailable
@@ -280,22 +280,44 @@ export default function ProfilePhoto({
         style,
       ]}
     >
-      {/* ── Base photo ── */}
-      <Image
-        source={{ uri: imgSrc }}
-        style={[
-          styles.image,
-          {
-            borderTopLeftRadius:     r.tl,
-            borderTopRightRadius:    r.tr,
-            borderBottomLeftRadius:  r.bl,
-            borderBottomRightRadius: r.br,
-          },
-        ]}
-        resizeMode="cover"
-        onError={() => setImgError(true)}
-        onLoad={onImageLoad}
-      />
+      {/* ── Base photo ──
+          Fallback (no photo / failed load) is the opposite-gender SVG
+          silhouette — native <Image> can't decode a remote .svg (see
+          CdnSvg.tsx), so that branch routes through CdnImage instead of
+          reusing the same <Image> the real photo uses. */}
+      {showFallback ? (
+        <CdnImage
+          uri={resolvedDefault}
+          width="100%"
+          height="100%"
+          style={[
+            styles.image,
+            {
+              borderTopLeftRadius:     r.tl,
+              borderTopRightRadius:    r.tr,
+              borderBottomLeftRadius:  r.bl,
+              borderBottomRightRadius: r.br,
+            },
+          ]}
+          resizeMode="cover"
+        />
+      ) : (
+        <Image
+          source={{ uri: profileImage }}
+          style={[
+            styles.image,
+            {
+              borderTopLeftRadius:     r.tl,
+              borderTopRightRadius:    r.tr,
+              borderBottomLeftRadius:  r.bl,
+              borderBottomRightRadius: r.br,
+            },
+          ]}
+          resizeMode="cover"
+          onError={() => setImgError(true)}
+          onLoad={onImageLoad}
+        />
+      )}
 
       {/* ── Blur overlay for protected photos (expo-blur) ── */}
       {showBlur && (

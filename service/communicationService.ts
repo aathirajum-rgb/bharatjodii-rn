@@ -48,7 +48,12 @@ export type CommActionResult =
       totalCount?: string | undefined
     }
   | { type: 'payment_promo';     action: string; profile: any }
-  | { type: 'verify_id';         fromPage: string; action: string }
+  // photoUpload=true — Angular's navigateToVerify('photoUpload') branch
+  // (check_Paid_Verified_Nophoto(): paid, eKYC-verified male with no photo
+  // published yet) — content comes from REGISTRATIONARRAYS.PHOTOPUBLISHPAID.
+  // Shortlist, not PROFILEVERIFYPAID.Shortlist (the plain not-yet-verified
+  // case, photoUpload absent/false) — two different prompts, same sheet shape.
+  | { type: 'verify_id';         fromPage: string; action: string; photoUpload?: boolean }
   | { type: 'female_free';       action: string; profile: any }
   | { type: 'chat_limit';        limitType: string }
   | { type: 'report_popup';      partnerId: string; profile: any }
@@ -243,6 +248,16 @@ async function showCallOrWhatsApp(
   // (Angular's own fallback for that exact combination — verified via source).
   if (entryType === 'P' && gender === 'M' && ekycStatus !== '1' && paidFlag === '1') {
     return { type: 'verify_id', fromPage, action }
+  }
+
+  // Angular communication.service.ts:184-185/208-209 check_Paid_Verified_Nophoto()
+  // — paid, eKYC-verified male with no photo published yet — checked for BOTH
+  // 'call' and 'whatsapp' right after the gate above, same order as handleChat()'s
+  // jodimessages branch. Missing this let a paid/verified/no-photo male fall
+  // straight through to showContactDetails() and see the real phone number,
+  // bypassing the add-photo prompt Angular shows instead.
+  if (entryType === 'P' && gender === 'M' && ekycStatus === '1' && paidFlag === '1' && ['P', 'N', 'R'].includes(photoStatus)) {
+    return { type: 'verify_id', fromPage, action, photoUpload: true }
   }
 
   // Free user → payment promo
@@ -478,7 +493,7 @@ async function handleChat(fromPage: string, oppProfile: any): Promise<CommAction
 
   // check_Paid_Verified_Nophoto() — paid male, verified, no photo published yet.
   if (isPaidMale && ekycStatus === '1' && ['P', 'N', 'R'].includes(photoStatus)) {
-    return { type: 'verify_id', fromPage, action: 'jodimessages' }
+    return { type: 'verify_id', fromPage, action: 'jodimessages', photoUpload: true }
   }
 
   if (entryType !== 'P') {

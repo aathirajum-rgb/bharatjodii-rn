@@ -3,7 +3,7 @@
 // only; free viewers get the existing recharge-redirect teaser instead, unchanged).
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Image as RNImage, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
@@ -36,6 +36,23 @@ const DEFAULT_PHOTO_RATIO = 0.8
 // The silhouette fallback icon's own canvas is roughly this shape — not
 // measured from a real photo, so this stays fixed rather than dynamic.
 const AVATAR_ICON_RATIO = 0.85
+
+// Native <Image>/expo-image can't decode a remote .svg (see CdnSvg.tsx) — the
+// fallback silhouette is one, so it needs CdnSvg, which (unlike Image) needs
+// concrete pixel dimensions rather than a percentage width + aspectRatio.
+// `style` still carries the percentage width + aspectRatio so the box reserves
+// its correct space immediately; this just measures that box via onLayout and
+// draws the SVG at the resulting pixel size once known.
+function AvatarSilhouette({ uri, style }: { uri: string; style?: object }) {
+  const [width, setWidth] = useState<number | null>(null)
+  return (
+    <View style={style} onLayout={e => setWidth(e.nativeEvent.layout.width)}>
+      {/* `cover` matches the real photo's own contentFit="cover" in the
+          sibling branch above. */}
+      {width != null && <CdnSvg uri={uri} width={width} height={width * AVATAR_ICON_RATIO} cover />}
+    </View>
+  )
+}
 
 // Angular: star-matching.component.ts's RESPONSE.COMPATIBILITY item shape.
 // Exported so StarMatchingDesktopLayout can share the same shape.
@@ -152,11 +169,7 @@ export default function StarMatchingScreen({ navigation, route }: { navigation: 
                       onError={() => setOwnPhotoFailed(true)}
                     />
                   ) : (
-                    // expo-image can't decode remote SVGs on native (see
-                    // CdnSvg.tsx) — the fallback silhouette is an .svg, so it
-                    // goes through plain RNImage, same as the tick/cross/star
-                    // icons elsewhere on this screen.
-                    <RNImage source={{ uri: ownAvatarFallback }} style={[s.avatar, { aspectRatio: AVATAR_ICON_RATIO }]} />
+                    <AvatarSilhouette uri={ownAvatarFallback} style={[s.avatar, { aspectRatio: AVATAR_ICON_RATIO }]} />
                   )}
                   <Text style={s.profileName} numberOfLines={1}>{ownName ?? '—'}</Text>
                   <Text style={s.profileMeta}>{t('STARMATCHING.RAASI')} {userProfile?.RAASI ?? '—'}</Text>
@@ -172,7 +185,7 @@ export default function StarMatchingScreen({ navigation, route }: { navigation: 
                       onError={() => setPartnerPhotoFailed(true)}
                     />
                   ) : (
-                    <RNImage source={{ uri: partnerAvatarFallback }} style={[s.avatar, { aspectRatio: AVATAR_ICON_RATIO }]} />
+                    <AvatarSilhouette uri={partnerAvatarFallback} style={[s.avatar, { aspectRatio: AVATAR_ICON_RATIO }]} />
                   )}
                   <Text style={s.profileName} numberOfLines={1}>{partnerProfile?.NAME ?? partnerName ?? '—'}</Text>
                   <Text style={s.profileMeta}>{t('STARMATCHING.RAASI')} {partnerProfile?.RAASI ?? '—'}</Text>
@@ -196,9 +209,12 @@ export default function StarMatchingScreen({ navigation, route }: { navigation: 
                   <Text style={s.ratioText}>{summary?.PORUTHAM_RATIO}</Text>
                   <View style={s.starsRow}>
                     {Array.from({ length: 10 }, (_, i) => (
-                      <RNImage
+                      // Native <Image> can't decode a remote .svg — needs CdnSvg.
+                      <CdnSvg
                         key={i}
-                        source={{ uri: i < activeStars ? ACTIVE_STAR_URI : INACTIVE_STAR_URI }}
+                        uri={i < activeStars ? ACTIVE_STAR_URI : INACTIVE_STAR_URI}
+                        width={24}
+                        height={24}
                         style={s.starIcon}
                       />
                     ))}
@@ -219,8 +235,11 @@ export default function StarMatchingScreen({ navigation, route }: { navigation: 
                 <View key={i} style={s.compatRow}>
                   <Text style={s.compatKey}>{i + 1}. {item.KEY}</Text>
                   <View style={s.compatValueCol}>
-                    <RNImage
-                      source={{ uri: item.COLOR === 'RED' ? CROSS_RED_URI : TICK_GREEN_URI }}
+                    {/* Native <Image> can't decode a remote .svg — needs CdnSvg. */}
+                    <CdnSvg
+                      uri={item.COLOR === 'RED' ? CROSS_RED_URI : TICK_GREEN_URI}
+                      width={16}
+                      height={16}
                       style={s.compatIcon}
                     />
                     <Text style={item.COLOR === 'RED' ? s.compatNo : s.compatYes}>{item.VALUE}</Text>
@@ -253,8 +272,11 @@ export default function StarMatchingScreen({ navigation, route }: { navigation: 
             <View key={i} style={[s.card, i > 0 && s.cardGap]}>
               <View style={s.detailItemHeader}>
                 <Text style={s.detailKey}>{i + 1}. {item.KEY}</Text>
-                <RNImage
-                  source={{ uri: item.COLOR === 'RED' ? CROSS_RED_URI : TICK_GREEN_URI }}
+                {/* Native <Image> can't decode a remote .svg — needs CdnSvg. */}
+                <CdnSvg
+                  uri={item.COLOR === 'RED' ? CROSS_RED_URI : TICK_GREEN_URI}
+                  width={16}
+                  height={16}
                   style={s.compatIcon}
                 />
                 <Text style={item.COLOR === 'RED' ? s.compatNo : s.compatYes}>{item.VALUE}</Text>

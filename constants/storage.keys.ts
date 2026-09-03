@@ -133,6 +133,10 @@ export const StorageKeys = {
     // AppsFlyer OneLink) tapped before the user was authenticated — consumed
     // once by AuthContext.tsx's post-auth landing calls. See deepLinkService.ts.
     PENDING_DEEPLINK_PAGE_ID: 'PENDINGDEEPLINKPAGEID',
+    // Angular common.ts's checkLimitFlowStatus() — the free-match-limit paywall's
+    // frozen "total profiles visible to this free user" ceiling, cached the first
+    // time it's seen so it doesn't keep growing across subsequent matches pages.
+    FREE_MATCHES_TOTAL_COUNT: 'FREEMATCHESTOTALCOUNT',
   },
 
 } as const

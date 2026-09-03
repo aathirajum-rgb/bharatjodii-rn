@@ -3,6 +3,7 @@
 // Card layout mirrors matches-card.component.html exactly.
 
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useFocusEffect } from '@react-navigation/native'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
@@ -57,6 +58,7 @@ import {
   fetchMenuPromo,
   fetchNotifCount,
   refreshSession,
+  checkLimitFlowStatus,
 } from '../../service/homeService'
 import {
   communicationBtnOnClick,
@@ -66,15 +68,19 @@ import {
 } from '../../service/communicationService'
 import { fetchBulkLikeMatches, getPPSetData } from '../../service/profileService'
 import { redirectToViewProfile } from '../../service/buttonService'
-import { setFilterEventType } from '../../service/filterService'
+import { setFilterEventType, buildSearchParams } from '../../service/filterService'
 import { getHeroBannerDetails, openMembershipTab } from '../../service/paymentService'
 import { shouldShowRatingPopup, markRatingPopupShown } from '../../service/appRatingService'
 import { requestPushNotificationPermission } from '../../service/permissionService'
 import { fetchSurveyPopup, type SurveyPopupData } from '../../service/surveyService'
+import { shouldShowIncomeSheet, saveIncome, snoozeIncomeSheet } from '../../service/incomeSheetService'
+import { checkProfileValidation, type ProfileValidationInfo } from '../../service/profileValidationService'
+import { fetchMonthlyIncomeOptions } from '../../service/registrationService'
 import { subscribeIdVerified } from '../../service/eventBus'
 import { getItem, setItem, getJson, removeItem } from '../../service/storageService'
 import { enablePaywall } from '../../service/payWallService'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
+import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
 import { StorageKeys } from '../../constants/storage.keys'
 import Constants from 'expo-constants'
 import { APP_VERSION } from '../../constants/appVersion'
@@ -125,7 +131,7 @@ function buildMergedList(
 export const MatchCard = memo(function MatchCard({
   profile, oppGender, ownEntryType, femaleFreeEligible, indNumbersLeft,
   onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp, onMessage,
-  showLikedBadge,
+  showLikedBadge, singlePhoto, hideVerifiedBadge, photoHeight,
 }: {
   profile:    MatchProfile
   oppGender:  'M' | 'F'
@@ -148,6 +154,20 @@ export const MatchCard = memo(function MatchCard({
   // passes this, so its stricter likedStatus==='1' gate (this profile is one
   // you've already liked) stays exactly as-is; only ActivityScreen opts in.
   showLikedBadge?: boolean | undefined
+  // Angular: daily-recommendation.component.ts's getImageArry() passes just
+  // [profile.PHOTO[0]] (or the avatar) into app-matches-card, never the full
+  // PHOTO array Matches itself passes — DR's card has no swipe-through-photos
+  // affordance at all. Only DailyRecommendationScreen opts in.
+  singlePhoto?: boolean | undefined
+  // Angular: daily-recommendation.component.html hardcodes [isIdVerifiedMember]="false"
+  // — DR cards never show the verified badge, unlike Matches' own
+  // FUNC.IsIDVerifiedMember(profile). Only DailyRecommendationScreen opts in.
+  hideVerifiedBadge?: boolean | undefined
+  // Angular: DR's own photoHeight = (scrWidth - 56) + 'px' vs Matches'
+  // (scrWidth - 32) + 'px' — DR's photo is shorter by the extra 24px of
+  // horizontal card padding its stacked-card layout reserves. Defaults to
+  // PHOTO_H (Matches' own height) when not passed.
+  photoHeight?: number | undefined
 }) {
   const { t } = useTranslation()
   const langFonts = useLanguageFonts()
@@ -159,6 +179,7 @@ export const MatchCard = memo(function MatchCard({
     setShowLikeBurst(true)
     onLike()
   }
+  const photoH = photoHeight ?? PHOTO_H
   const hasRealPhoto      = profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0
   const isHiddenPhoto     = profile.isPhotoAvailable && profile.isPhotoProtect
   // Angular: photo-new.component.ts getHiddenPhotoContent() — once liked/shortlisted,
@@ -181,7 +202,7 @@ export const MatchCard = memo(function MatchCard({
 
       {/* ── Photo section ──────────────────────────────────────────────────── */}
       {/* Angular: app-photo-new — top border radius 16px */}
-      <View style={[c.photoBox, { height: PHOTO_H }]}>
+      <View style={[c.photoBox, { height: photoH }]}>
         {hasRealPhoto ? (
           // Normal: actual photo(s) — swiper when >1, single Pressable image otherwise.
           // Angular: matches-card.component's Swiper. No lock/restriction on swiping
@@ -189,10 +210,12 @@ export const MatchCard = memo(function MatchCard({
           // previous pass here mistakenly gated photo 2+ behind an "add your own
           // photo" card, misattributing femaleFreeContactRestrict() (which actually
           // restricts CONTACT actions, not photo viewing — see femaleFreeEligible).
+          // `singlePhoto` (DR only) restricts this to just the first photo — see
+          // its own doc comment above.
           <PhotoSwiper
-            images={profile.photos}
+            images={singlePhoto ? profile.photos.slice(0, 1) : profile.photos}
             width={SW - 32}
-            height={PHOTO_H}
+            height={photoH}
             oppGender={oppGender}
             onPress={onPress}
           />
@@ -281,12 +304,12 @@ export const MatchCard = memo(function MatchCard({
           Verified badge is gated to female viewers only (matches-card.component.html:
           *ngIf="isIdVerifiedMember && FUNC.getLogInGender() == 'F'"). oppGender is the
           viewer's opposite gender, so oppGender === 'M' means the viewer herself is female. */}
-      {(profile.isPaidMember || (profile.isIdVerified && oppGender === 'M')) && (
+      {(profile.isPaidMember || (profile.isIdVerified && oppGender === 'M' && !hideVerifiedBadge)) && (
         <View style={c.badges}>
           {profile.isPaidMember && (
             <ProfileBadge variant="paid" text={t('MENU.PAID_BADGE')} />
           )}
-          {profile.isIdVerified && oppGender === 'M' && (
+          {profile.isIdVerified && oppGender === 'M' && !hideVerifiedBadge && (
             <ProfileBadge variant="verified" text={t('MATCHES.VERIFIED_ID')} />
           )}
         </View>
@@ -875,12 +898,28 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   const [facets,  setFacets]  = useState<ExploreFacet[]>([])
   const [qSearch, setQSearch] = useState('')
 
-  async function fetchList(start: number, limit: number, quickFilters?: QuickFilters) {
+  // `extended` overrides the extendedLoaded STATE read below — needed by callers
+  // that just called setExtendedLoaded(false) in the same tick (a plain state
+  // read here would still see the pre-update value, since the setState hasn't
+  // committed yet within this synchronous call chain).
+  async function fetchList(start: number, limit: number, quickFilters?: QuickFilters, opts?: { extended?: boolean }) {
+    // Angular getExtendedMatches() → routepage='extendedPage' → callMatchesApi()
+    // keeps hitting extendedmatches/v1 (not the regular matches/search/explore
+    // endpoint) for every subsequent page once "Continue seeing profiles" has
+    // been tapped — see extendedLoaded below and loadMore()'s matching branch.
+    if (opts?.extended ?? extendedLoaded) return fetchExtendedMatches(start, limit)
     if (searchParams) {
-      // Filtered search results aren't paginated past the first page yet — the
-      // params string is pre-built with its own START/LIMIT by SearchScreen.
-      if (start > 0) return { items: [], bannerSlots: [], totalCount: 0, newCount: 0 }
-      return fetchSearchResults(searchParams)
+      // Angular matches.page.ts:999-1003 — the searchPage route paginates just
+      // like plain matches, reusing the same filter selection with an
+      // incrementing START. `searchParams` (page 0) comes pre-built from
+      // SearchScreen's navigation params; buildSearchParams() reads the exact
+      // same persisted filter/PP/strict-filter storage it was built from, so
+      // rebuilding it here for start>0 with a fresh START/LIMIT reproduces the
+      // same query, not a different one.
+      if (start === 0) return fetchSearchResults(searchParams)
+      const userId = await getItem(StorageKeys.Auth.USER_ID)
+      const nextPageParams = await buildSearchParams(userId ?? '', start, limit)
+      return fetchSearchResults(nextPageParams)
     }
     return exploreType
       ? fetchExplore(exploreType, start, limit, qSearch)
@@ -929,10 +968,16 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   const [loadingExtended, setLoadingExtended] = useState(false)
   const [extendedLoaded,  setExtendedLoaded]  = useState(false)
 
-  // ── Sticky bottom banner (payment-failed retry / force-update) ─────────────
+  // ── Sticky bottom banner (profile-validation / payment-failed retry / force-update) ──
   const [forceUpdateInfo,   setForceUpdateInfo]   = useState<{ minVersion: string } | null>(null)
   const [paymentStickyInfo, setPaymentStickyInfo] = useState<{ content: string; ctaLabel: string; deadlineMs: number } | null>(null)
-  const [stickyDismissed,   setStickyDismissed]   = useState(false)
+  // Angular: matches.page.ts:2515-2557 checkProfileStatus() — "First Priority" sticky,
+  // shown ahead of payment-failed when the member's own profile was rejected/put on hold.
+  const [profileValidationInfo, setProfileValidationInfo] = useState<ProfileValidationInfo | null>(null)
+  const [showProfileValidationSheet, setShowProfileValidationSheet] = useState(false)
+  // Per-OCCURRENCE dismissal key — see stickyKeyFor()/activeSticky below for why
+  // this replaced a single blanket "was any sticky ever dismissed" boolean.
+  const [dismissedStickyKey, setDismissedStickyKey] = useState<string | null>(null)
 
   // ── Notification permission popup (~40s after landing on Matches) ──────────
   const [showNotificationPopup, setShowNotificationPopup] = useState(false)
@@ -942,6 +987,10 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
 
   // ── Survey popup ─────────────────────────────────────────────────────────────
   const [surveyData, setSurveyData] = useState<SurveyPopupData | null>(null)
+
+  // ── Income disclosure prompt (~1.2s after landing, once per 7-day snooze) ───
+  const [showIncomeSheet, setShowIncomeSheet] = useState(false)
+  const [incomeOptions,   setIncomeOptions]   = useState<PickerOption[]>([])
 
   // ── "Add your photo" action gate (Like/Don't-show) ──────────────────────────
   // Angular: button.service.ts checkAddPhotoPromotion() — blocks these two actions
@@ -1083,6 +1132,11 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
 
   // apiStart tracks the cursor for pagination (how many profiles we've fetched from API)
   const apiStartRef = useRef(0)
+  // Angular getExtendedMatches() resets `start` to 0 and repoints doInfinite()'s
+  // bound at extendedMatchesCount instead of totalCount once the user taps
+  // "Continue seeing profiles" — a SEPARATE cursor from apiStartRef (regular
+  // matches), not a continuation of it (extendedmatches/v1 is its own 0-based feed).
+  const extendedApiStartRef = useRef(0)
   // Guards loadMore against re-entrant calls — onEndReached can fire again before the
   // `loadingMore` state update from the first call has committed, re-fetching the same
   // page and appending duplicate profiles (duplicate FlatList keys).
@@ -1119,8 +1173,13 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         await refreshSession()
         if (ctrl.cancelled) return
 
-        // Step 2 — Angular: callMatchesApi() → listing/matches/v1 (or explore/v1 in explore mode)
-        const result = await fetchList(0, 20)
+        // Step 2 — Angular: callMatchesApi() → listing/matches/v1 (or explore/v1 in explore mode).
+        // Angular's changeLanguage() fully rebuilds the page (routepage reinitializes fresh),
+        // so a re-run of this (language change) must not still be pointed at the
+        // extendedmatches/v1 branch from a "Continue seeing profiles" tap before the switch.
+        extendedApiStartRef.current = 0
+        setExtendedLoaded(false)
+        const result = await fetchList(0, 20, undefined, { extended: false })
         if (ctrl.cancelled) return
 
         setProfiles(result.items.map(matchProfileAdapter.adapt))
@@ -1137,7 +1196,9 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         // Step 3 — Angular: parallel post-matches calls
         // newcount + extendedmatches + ppSetData + dailyRecommendations + menuPromo
         const [extCount, , promo, bulkLikeResult] = await Promise.all([
-          fetchExtendedMatchesCount(),
+          // Angular matches.page.ts:1089-1091 — skip the extended-matches-count
+          // check entirely once the free-match paywall is active for this user.
+          checkLimitFlowStatus().then(limited => limited ? 0 : fetchExtendedMatchesCount()),
           fetchAndStorePPSetData().then(async (ppSetData) => {
             // Populates CONTACT_DETAIL (Angular: common.ts's getContactDetails(),
             // called on every Matches-page load) BEFORE reading it below — this
@@ -1183,10 +1244,19 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             }
 
             // BANNERSLOT 1014 — paid-verified-no-photo promo, or legacy ADDPROPERTYS
-            // fallback (#26). Angular: check_Paid_Verified_Nophoto(). "No photo" here must
-            // match BANNERSLOT 1011's own definition of it two lines above — a photo pending
-            // approval ('P') already counts as having one, not just an approved one ('Y').
-            const isPaidVerifiedMale = entryType === 'P' && ekycStatus === '1' && lg === 'M' && !['P', 'Y'].includes(photoStatus)
+            // fallback (#26); also feeds the add-photo action gate and the hero-banner
+            // selection below. Angular: check_Paid_Verified_Nophoto() (common-funtions.ts:
+            // 385-387) is the ONE real condition behind all three — confirmed via
+            // matches.page.ts:1239 (server-list filtering strips BANNERSLOT 1014 unless
+            // this exact check passes) and :735 (hero banner). A previous pass here used a
+            // looser "not P or Y" photoStatus check with no PAYPFLAG requirement at all —
+            // rationalized at the time as "must match BANNERSLOT 1011's own definition",
+            // but that reasoning doesn't hold: 1011's own condition is a SEPARATE, simpler
+            // Angular flag (unrelated to this function) that only ever drives 1011's own
+            // banner, not 1014/the gate/the hero banner. The real condition requires the
+            // EXACT ['P','N','R'] whitelist (not everything outside {P,Y}) AND PAYPFLAG=='1'.
+            const isPaidVerifiedMale = entryType === 'P' && ekycStatus === '1' && lg === 'M'
+              && ['P', 'N', 'R'].includes(photoStatus) && paidFlag === '1'
             // Always recompute (never just set-and-leave) — otherwise a reload where this
             // account no longer qualifies can't clear a banner a PREVIOUS load already set,
             // since useState<any>(null) has no reset path other than an explicit null here.
@@ -1265,14 +1335,16 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
               // "Add your photo" action gate (Like/Don't-show) — Angular:
               // checkAddPhotoPromotion() = PROFILEPUBLISHEDFLAG=='0' && (checkPhotoPromotion()
               // || check_Paid_Verified_Nophoto() || isNonIdVerifyUser()).
-              // Angular common-funtions.ts:362-364 check_Paid_NonVerifyIdUser() requires
-              // PAYPFLAG=='1' too — a separate feature-enablement flag from ENTRYTYPE,
-              // not redundant with it. Missing this was a confirmed real bug (found via
-              // the identical gate in communicationService.ts's showCallOrWhatsApp):
-              // it made this fire — and the "Activate your paid membership / Call us to
-              // verify" hero banner below show — for real accounts whose PAYPFLAG isn't
-              // '1', where Angular's own condition doesn't trigger it at all.
-              const nonIdVerifyUserGate = entryType === 'P' && lg === 'M' && ekycStatus !== '1' && paidFlag === '1'
+              // isNonIdVerifyUser() (common.ts:2009-2013) is entryType=='P' && gender=='M'
+              // && ekycStatus!='1' — NO PAYPFLAG check. A previous pass here added one,
+              // apparently confusing this with the DIFFERENT check_Paid_NonVerifyIdUser()
+              // (common-funtions.ts:382-384, PAYPFLAG=='1' IS part of that one) — the
+              // gate communicationService.ts's showCallOrWhatsApp correctly uses for
+              // contact-reveal, not this add-photo promotion gate. Net effect of the
+              // bug: a paid, unverified male whose PAYPFLAG isn't '1' could Like/
+              // Don't-show freely here, where Angular's real isNonIdVerifyUser()
+              // condition (no PAYPFLAG involved at all) would still block him.
+              const nonIdVerifyUserGate = entryType === 'P' && lg === 'M' && ekycStatus !== '1'
               if (!ctrl.cancelled) {
                 setAddPhotoGateActive(flagOk && ((typeOk && freeOk) || isPaidVerifiedMale || nonIdVerifyUserGate))
                 setAddPhotoActionPromoContent(reg?.PHOTOPUBLISHED?.Call ?? null)
@@ -1318,71 +1390,12 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           await removeItem('bulklikechk')
         }
 
-        // One-time popups/stickies (rating, survey, notification-permission, payment-failed) —
-        // only on the initial mount, never re-armed by a language-change reload.
+        // One-time-per-mount bits + every-visit popups/stickies — see
+        // checkOnFocusPopups() below, shared with the useFocusEffect further down
+        // so a return visit (not just the very first landing) re-checks these,
+        // matching Angular's ionViewDidEnter() re-firing on every real re-entry.
         if (includePopups) {
-          // Payment-failed sticky (#6) — Angular: getContactsData() (matches.page.ts:2254-2310).
-          if (!ctrl.cancelled && (await getItem('PAYMENTFAILTYPE')) === '1') {
-            const banner  = await getHeroBannerDetails(true, 1)
-            const content = banner?.PAYMENTFAILEDCONTENT
-            const cta     = banner?.PAYMENTFAILEDCTA
-            if (!ctrl.cancelled && content && cta) {
-              const startMs = Date.parse(banner?.OFFSTTIME ?? '')
-              const endMs   = Date.parse(banner?.OFFEDTIME ?? '')
-              const deadlineMs = !Number.isNaN(startMs) && !Number.isNaN(endMs)
-                ? Date.now() + Math.max(0, endMs - startMs)
-                : Date.now() + 10 * 60 * 1000   // fallback: 10 min if OFFSTTIME/OFFEDTIME are missing
-              setPaymentStickyInfo({ content, ctaLabel: cta, deadlineMs })
-            }
-          }
-
-          // Angular: ionViewDidEnter() → getNotificationCount(). Feeds both the footer's
-          // live like-count badge (#12) and the rating-popup trigger (#9) below.
-          if (!ctrl.cancelled) {
-            const { comCount } = await fetchNotifCount()
-            if (!ctrl.cancelled) {
-              const likedYou = comCount.find(c => c.comtype === 'likedyou')
-              setLikesCount(Number(likedYou?.newcount ?? 0))
-            }
-
-            // "Rate our app" popup (#9) — Angular: passiveRatingPopup(). Skipped when the
-            // bulk-like modal already claimed this mount's one popup slot (no modal-stacking),
-            // mirroring Angular's SHOW_RATING_POPUP mutual-exclusion.
-            if (!ctrl.cancelled && !bulkLikeShown && await shouldShowRatingPopup(comCount)) {
-              setShowRatingPopup(true)
-              await markRatingPopupShown()
-            }
-          }
-
-          // Survey popup (#11) — Angular: matches.page.ts:740-743, getSurveydetails():2167-2178.
-          // One-time-consume: clear SURVEYPOPUP immediately so it won't fire again without a
-          // fresh server flag on a future login (Angular: removeStorageValue('1','SURVEYPOPUP','')).
-          if (!ctrl.cancelled && !bulkLikeShown) {
-            const [loginCount, surveyFlag, paywallType] = await Promise.all([
-              getItem(StorageKeys.Auth.LOGIN_COUNT),
-              getItem('SURVEYPOPUP'),
-              getItem('PAYWALLTYPE'),
-            ])
-            if (Number(loginCount ?? '0') > 3 && surveyFlag === '1' && paywallType === '0') {
-              await setItem('SURVEYPOPUP', '')
-              const survey = await fetchSurveyPopup()
-              if (!ctrl.cancelled && survey) setSurveyData(survey)
-            }
-          }
-
-          // Notification permission popup (#8) — Angular: notificationStatus(), 40s after
-          // ionViewDidEnter, gated to once per calendar day and stopped once NALLOW='1'.
-          ctrl.notifTimer = setTimeout(async () => {
-            if (ctrl.cancelled || bulkLikeShown) return
-            const [nallow, lastShown] = await Promise.all([
-              getItem(StorageKeys.App.NALLOW),
-              getItem('PN_LAST_SHOWN_DATE'),
-            ])
-            const today = new Date().toISOString().slice(0, 10)
-            if (ctrl.cancelled || nallow === '1' || lastShown === today) return
-            setShowNotificationPopup(true)
-            await setItem('PN_LAST_SHOWN_DATE', today)
-          }, 40000)
+          await checkOnFocusPopups(ctrl, bulkLikeShown)
         }
 
       } catch (e) {
@@ -1392,11 +1405,130 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
       }
   }
 
+  // Angular: ionViewDidEnter() (matches.page.ts:808-891) — bulkLike(), checkProfileStatus(),
+  // getNotificationCount()→passiveRatingPopup(), checkIncomeSheet(), notificationStatus()'s
+  // 40s timer. Re-runs on EVERY entry to Matches, not just the first (Ionic fires this
+  // lifecycle hook on every re-entry; a plain RN mount-only effect wouldn't, since pushing/
+  // popping ViewProfile etc. never unmounts Matches — see the useFocusEffect below). Split
+  // out from loadMatches() so the full list refetch stays mount/language-change-only while
+  // this piece re-arms every visit. `bulkLikeShown` defaults false for a refocus call — the
+  // 'bulklikechk' flag it gates on is consumed on its first (mount) read, so it can never be
+  // true again for the lifetime of this screen instance.
+  async function checkOnFocusPopups(
+    ctrl: { cancelled: boolean; notifTimer?: ReturnType<typeof setTimeout> | undefined },
+    bulkLikeShown = false,
+  ) {
+    // Profile-validation sticky — Angular's own "First Priority" (matches.page.ts:
+    // 3234-3235), checked ahead of payment-failed below; activeSticky's priority
+    // order (not this call order) is what actually enforces the precedence.
+    if (!ctrl.cancelled) {
+      const validation = await checkProfileValidation()
+      if (!ctrl.cancelled && validation) setProfileValidationInfo(validation)
+    }
+
+    // Payment-failed sticky (#6) — Angular: getContactsData() (matches.page.ts:2254-2310).
+    if (!ctrl.cancelled && (await getItem('PAYMENTFAILTYPE')) === '1') {
+      const banner  = await getHeroBannerDetails(true, 1)
+      const content = banner?.PAYMENTFAILEDCONTENT
+      const cta     = banner?.PAYMENTFAILEDCTA
+      if (!ctrl.cancelled && content && cta) {
+        const startMs = Date.parse(banner?.OFFSTTIME ?? '')
+        const endMs   = Date.parse(banner?.OFFEDTIME ?? '')
+        const deadlineMs = !Number.isNaN(startMs) && !Number.isNaN(endMs)
+          ? Date.now() + Math.max(0, endMs - startMs)
+          : Date.now() + 10 * 60 * 1000   // fallback: 10 min if OFFSTTIME/OFFEDTIME are missing
+        setPaymentStickyInfo({ content, ctaLabel: cta, deadlineMs })
+      }
+    }
+
+    // Angular: ionViewDidEnter() → getNotificationCount(). Feeds both the footer's
+    // live like-count badge (#12) and the rating-popup trigger (#9) below.
+    if (!ctrl.cancelled) {
+      const { comCount } = await fetchNotifCount()
+      if (!ctrl.cancelled) {
+        const likedYou = comCount.find(c => c.comtype === 'likedyou')
+        setLikesCount(Number(likedYou?.newcount ?? 0))
+      }
+
+      // "Rate our app" popup (#9) — Angular: passiveRatingPopup(). Skipped when the
+      // bulk-like modal already claimed this mount's one popup slot (no modal-stacking),
+      // mirroring Angular's SHOW_RATING_POPUP mutual-exclusion.
+      if (!ctrl.cancelled && !bulkLikeShown && await shouldShowRatingPopup(comCount)) {
+        setShowRatingPopup(true)
+        await markRatingPopupShown()
+      }
+    }
+
+    // Survey popup (#11) — Angular: matches.page.ts:740-743, getSurveydetails():2167-2178.
+    // One-time-consume: clear SURVEYPOPUP immediately so it won't fire again without a
+    // fresh server flag on a future login (Angular: removeStorageValue('1','SURVEYPOPUP','')).
+    if (!ctrl.cancelled && !bulkLikeShown) {
+      const [loginCount, surveyFlag, paywallType] = await Promise.all([
+        getItem(StorageKeys.Auth.LOGIN_COUNT),
+        getItem('SURVEYPOPUP'),
+        getItem('PAYWALLTYPE'),
+      ])
+      if (Number(loginCount ?? '0') > 3 && surveyFlag === '1' && paywallType === '0') {
+        await setItem('SURVEYPOPUP', '')
+        const survey = await fetchSurveyPopup()
+        if (!ctrl.cancelled && survey) setSurveyData(survey)
+      }
+    }
+
+    // Income disclosure prompt — Angular: checkIncomeSheet() (matches.page.ts:
+    // 2432-2456), its own 1.2s setTimeout ahead of showing. Gated the same way
+    // as survey/rating above (skip if the bulk-like modal already claimed this
+    // mount's one popup slot).
+    if (!bulkLikeShown) {
+      setTimeout(async () => {
+        if (ctrl.cancelled) return
+        if (!(await shouldShowIncomeSheet())) return
+        const options = await fetchMonthlyIncomeOptions()
+        if (ctrl.cancelled || options.length === 0) return
+        setIncomeOptions(options)
+        setShowIncomeSheet(true)
+      }, 1200)
+    }
+
+    // Notification permission popup (#8) — Angular: notificationStatus(), 40s after
+    // ionViewDidEnter, gated to once per calendar day and stopped once NALLOW='1'.
+    ctrl.notifTimer = setTimeout(async () => {
+      if (ctrl.cancelled || bulkLikeShown) return
+      const [nallow, lastShown] = await Promise.all([
+        getItem(StorageKeys.App.NALLOW),
+        getItem('PN_LAST_SHOWN_DATE'),
+      ])
+      const today = new Date().toISOString().slice(0, 10)
+      if (ctrl.cancelled || nallow === '1' || lastShown === today) return
+      setShowNotificationPopup(true)
+      await setItem('PN_LAST_SHOWN_DATE', today)
+    }, 40000)
+  }
+
   useEffect(() => {
     const ctrl = { cancelled: false, notifTimer: undefined as ReturnType<typeof setTimeout> | undefined }
     loadMatches(ctrl, true)
     return () => { ctrl.cancelled = true; clearTimeout(ctrl.notifTimer) }
   }, [])
+
+  // Angular: ionViewDidEnter() re-fires on every real re-entry to Matches (Ionic's
+  // navigation lifecycle), not just the first — pushing ViewProfile/Search/etc. and
+  // coming back never unmounts this screen in React Navigation's stack, so a plain
+  // mount-only effect (above) only ever ran this once. `hasFocusedOnceRef` skips the
+  // very first focus (the mount effect above already covers it via includePopups=true)
+  // and re-runs checkOnFocusPopups() on every subsequent focus.
+  const hasFocusedOnceRef = useRef(false)
+  useFocusEffect(
+    useCallback(() => {
+      if (!hasFocusedOnceRef.current) {
+        hasFocusedOnceRef.current = true
+        return
+      }
+      const ctrl = { cancelled: false, notifTimer: undefined as ReturnType<typeof setTimeout> | undefined }
+      checkOnFocusPopups(ctrl).catch(e => { if (__DEV__) console.error('[Matches] focus popup check error:', e) })
+      return () => { ctrl.cancelled = true; clearTimeout(ctrl.notifTimer) }
+    }, []),
+  )
 
   // Angular: matches.page.ts ngOnInit() calls getPPSETData(1) unconditionally
   // — matches is the default landing page after login, so this is the
@@ -1434,13 +1566,26 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   }, [])
 
   // ── Pagination ──────────────────────────────────────────────────────────────
-  // Angular: doInfinite() → calls callMatchesApi() when scroll reaches end
+  // Angular: doInfinite() → calls callMatchesApi() when scroll reaches end.
+  // Once extended-matches mode is active (extendedLoaded), doInfinite() compares
+  // `start` against extendedMatchesCount instead of totalCount (matches.page.ts:
+  // 1449-1454) — same infinite-scroll mechanism, different cursor/bound/source.
   async function loadMore() {
-    if (loadingMoreRef.current || apiStartRef.current >= totalCount) return
+    if (loadingMoreRef.current) return
+    const cursorRef = extendedLoaded ? extendedApiStartRef : apiStartRef
+    const bound      = extendedLoaded ? extendedCount : totalCount
+    if (cursorRef.current >= bound) return
+    // Angular doInfinite() (matches.page.ts:1458) — a hard stop once the
+    // free-match paywall has kicked in, on top of the totalCount comparison
+    // above (totalCount itself also gets frozen once this is true — see
+    // homeService.ts's applyFreeMatchLimit — this is belt-and-suspenders,
+    // matching Angular's own redundant guard). Angular's own check is
+    // unconditional across every routepage, extendedPage included.
+    if (await checkLimitFlowStatus()) return
     loadingMoreRef.current = true
     setLoadingMore(true)
     try {
-      const result = await fetchList(apiStartRef.current, 20)
+      const result = await fetchList(cursorRef.current, 20)
       if (result.items.length > 0) {
         setProfiles(prev => {
           const seen = new Set(prev.map(p => p.profileId))
@@ -1455,7 +1600,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           }
           return [...prev, ...fresh] as MatchProfile[]
         })
-        apiStartRef.current += result.items.length
+        cursorRef.current += result.items.length
       }
     } catch (e) {
       if (__DEV__) console.error('[Matches] load more error:', e)
@@ -1570,8 +1715,11 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
       if (result.type === 'payment_promo') {
         navigation.navigate('recharge')
       } else if (result.type === 'verify_id') {
+        // photoUpload=true (verified male, no photo yet) reads a DIFFERENT
+        // registration-array config than the plain not-yet-verified case —
+        // see communicationService.ts's CommActionResult 'verify_id' doc.
         const arrays = await getRegistrationArrays()
-        const cfg = arrays?.PROFILEVERIFYPAID?.Shortlist ?? {}
+        const cfg = (result.photoUpload ? arrays?.PHOTOPUBLISHPAID?.Shortlist : arrays?.PROFILEVERIFYPAID?.Shortlist) ?? {}
         let cta = String(cfg.CTA ?? 'OK')
         if (cta.includes('##CSNUM##')) {
           const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
@@ -1579,8 +1727,8 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         }
         setPhoneInfoSheet({
           kind:    'verify_id',
-          title:   String(cfg.TITLE ?? 'Verify your profile'),
-          content: String(cfg.CONTENT ?? 'Please complete ID verification to view phone numbers.'),
+          title:   String(cfg.TITLE ?? (result.photoUpload ? 'Add your photo to continue' : 'Verify your profile')),
+          content: String(cfg.CONTENT ?? (result.photoUpload ? 'Please add your photo to view phone numbers.' : 'Please complete ID verification to view phone numbers.')),
           ctaLabel: cta,
         })
       } else if (result.type === 'female_free') {
@@ -1808,10 +1956,13 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         setPhoneInfoSheet({ kind: 'phone_number_left' })
       } else if (result.type === 'verify_id') {
         // Angular communication.service.ts's navigateToVerify() — content is
-        // server-driven from REGISTRATIONARRAYS.PROFILEVERIFYPAID.Shortlist
-        // (a cached registration payload). The support-number placeholder is
-        // `##CSNUM##` (double-hash, confirmed against 5+ call sites) and it
-        // only ever appears in CTA, not CONTENT — communication.service.ts:640-642:
+        // server-driven, from ONE of two registration-array configs depending
+        // on which gate fired: PROFILEVERIFYPAID.Shortlist for the plain
+        // not-yet-verified case, PHOTOPUBLISHPAID.Shortlist for the
+        // verified-but-no-photo case (result.photoUpload — check_Paid_Verified_
+        // Nophoto() in Angular). The support-number placeholder is `##CSNUM##`
+        // (double-hash, confirmed against 5+ call sites) and it only ever
+        // appears in CTA, not CONTENT — communication.service.ts:640-642:
         //   if (data.CTA.includes('##CSNUM##')) data.CTA = data.CTA
         //     .replace(/##CSNUM##/g, localStorage['VERIFIEDBYCALLNUM'] || '')
         //     .replace('+91', '')
@@ -1819,7 +1970,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         // CONTENT instead of CTA, using a nonexistent cfg.CSNUM field instead
         // of the real VERIFIEDBYCALLNUM session value.)
         const arrays = await getRegistrationArrays()
-        const cfg = arrays?.PROFILEVERIFYPAID?.Shortlist ?? {}
+        const cfg = (result.photoUpload ? arrays?.PHOTOPUBLISHPAID?.Shortlist : arrays?.PROFILEVERIFYPAID?.Shortlist) ?? {}
         let cta = String(cfg.CTA ?? 'OK')
         if (cta.includes('##CSNUM##')) {
           const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
@@ -1827,8 +1978,8 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         }
         setPhoneInfoSheet({
           kind:    'verify_id',
-          title:   String(cfg.TITLE ?? 'Verify your profile'),
-          content: String(cfg.CONTENT ?? 'Please complete ID verification to view phone numbers.'),
+          title:   String(cfg.TITLE ?? (result.photoUpload ? 'Add your photo to continue' : 'Verify your profile')),
+          content: String(cfg.CONTENT ?? (result.photoUpload ? 'Please add your photo to view phone numbers.' : 'Please complete ID verification to view phone numbers.')),
           ctaLabel: cta,
         })
       } else if (result.type === 'female_free') {
@@ -1880,8 +2031,13 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   async function handleBulkLikeSent() {
     setShowBulkLike(false)
     apiStartRef.current = 0
+    // A full reload restarts the regular matches feed from page 0 — don't leave
+    // fetchList()/loadMore() pointed at the extendedmatches/v1 branch with a
+    // now-stale cursor from before this reload.
+    extendedApiStartRef.current = 0
+    setExtendedLoaded(false)
     try {
-      const result = await fetchList(0, 20)
+      const result = await fetchList(0, 20, undefined, { extended: false })
       setProfiles(result.items.map(matchProfileAdapter.adapt))
       setBannerSlots(result.bannerSlots)
       setTotalCount(result.totalCount)
@@ -1920,7 +2076,10 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         const introInsertAt = profiles.length
         setBannerSlots(existing => [...existing, { slot: 'EXTENDED_INTRO', insertAfter: introInsertAt }])
         setProfiles(prev => [...prev, ...result.items.map(matchProfileAdapter.adapt)])
-        apiStartRef.current += result.items.length
+        // Own 0-based cursor, separate from apiStartRef (regular matches) — see
+        // extendedApiStartRef's declaration. Setting extendedLoaded switches
+        // fetchList()/loadMore() over to the extendedmatches/v1 pagination branch.
+        extendedApiStartRef.current = result.items.length
         setExtendedLoaded(true)
       }
     } catch (e) {
@@ -1930,14 +2089,49 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     }
   }
 
-  // ── Sticky bottom banner (force-update takes priority over payment-failed —
-  // a judgment call, since Angular's two sticky slots don't establish a shared
-  // precedence to copy) ───────────────────────────────────────────────────────
-  const activeSticky: 'forceUpdate' | 'paymentFailed' | null =
-    stickyDismissed ? null : forceUpdateInfo ? 'forceUpdate' : paymentStickyInfo ? 'paymentFailed' : null
+  // ── Income disclosure prompt ─────────────────────────────────────────────────
+  // Angular: modalResponse() — 'update' saves the picked income and drops the
+  // snooze; any other dismissal (close-X, backdrop) re-arms the 7-day snooze.
+  async function handleIncomeSelect(opt: PickerOption) {
+    setShowIncomeSheet(false)
+    await saveIncome(opt.key)
+  }
+
+  async function handleIncomeSheetClose() {
+    setShowIncomeSheet(false)
+    await snoozeIncomeSheet()
+  }
+
+  // ── Sticky bottom banner — profileValidation is Angular's own "First Priority"
+  // (matches.page.ts:3234-3235); forceUpdate over paymentFailed below that is a
+  // judgment call, since Angular's own two sticky slots don't establish a shared
+  // precedence to copy for those two. ─────────────────────────────────────────
+  //
+  // Dismissal is keyed per OCCURRENCE, not a single blanket "any sticky was ever
+  // closed this session" flag — Angular's own ionViewWillLeave() (matches.page.ts:
+  // 910-937) lets a dismissed payment-failed sticky reappear once its
+  // PAYMENTFAILURE_STICKY_UNTIL deadline passes and a genuinely NEW occurrence
+  // starts (fresh deadline), rather than suppressing every future sticky —
+  // including a different TYPE of sticky — for the rest of the screen's
+  // lifetime. This matters now that checkOnFocusPopups() (see useFocusEffect)
+  // re-derives paymentStickyInfo/profileValidationInfo on every return visit,
+  // not just the first mount — a blanket one-way flag would have permanently
+  // hidden every sticky after the very first dismissal, including a real new
+  // profile-validation issue that only appeared on a later visit.
+  function stickyKeyFor(kind: 'profileValidation' | 'forceUpdate' | 'paymentFailed'): string {
+    return kind === 'paymentFailed' && paymentStickyInfo ? `paymentFailed:${paymentStickyInfo.deadlineMs}` : kind
+  }
+
+  const activeSticky: 'profileValidation' | 'forceUpdate' | 'paymentFailed' | null =
+    profileValidationInfo && stickyKeyFor('profileValidation') !== dismissedStickyKey ? 'profileValidation'
+    : forceUpdateInfo && stickyKeyFor('forceUpdate') !== dismissedStickyKey ? 'forceUpdate'
+    : paymentStickyInfo && stickyKeyFor('paymentFailed') !== dismissedStickyKey ? 'paymentFailed'
+    : null
 
   function handleStickyPress() {
-    if (activeSticky === 'forceUpdate') {
+    if (activeSticky === 'profileValidation') {
+      setShowProfileValidationSheet(true)
+    } else if (activeSticky === 'forceUpdate') {
       const url = String(Constants.expoConfig?.extra?.['playStoreUrl'] ?? 'https://play.google.com/store/apps/details?id=jodii.app')
       Linking.openURL(url)
     } else {
@@ -1949,7 +2143,17 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     if (activeSticky === 'forceUpdate') {
       setItem('PLAYSTOREUPDATE', '2')   // Angular: "show again next login"
     }
-    setStickyDismissed(true)
+    if (activeSticky) setDismissedStickyKey(stickyKeyFor(activeSticky))
+  }
+
+  // Angular: bottom-sheet.service.ts's showBtmSheet() overwrites the sheet's
+  // CTA with the CUSTOMER-CARE number when present, and its own onDidDismiss
+  // dials it (common.callNative('dial_pad', 'NeedHelp')) — tapping the CTA
+  // both closes the sheet and places the call, not one or the other.
+  async function handleProfileValidationCtaPress() {
+    setShowProfileValidationSheet(false)
+    const phone = await getItem(StorageKeys.App.CUSTOMER_CARE)
+    if (phone) Linking.openURL(`tel:${phone}`)
   }
 
   async function handleNotificationCta() {
@@ -1983,8 +2187,10 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     setSelectedChip(next)
     setLoading(true)
     apiStartRef.current = 0
+    extendedApiStartRef.current = 0
+    setExtendedLoaded(false)
     try {
-      const result = await fetchList(0, 20, quickFilterFor(next))
+      const result = await fetchList(0, 20, quickFilterFor(next), { extended: false })
       setProfiles(result.items.map(matchProfileAdapter.adapt))
       setBannerSlots(result.bannerSlots)
       setTotalCount(result.totalCount)
@@ -2221,8 +2427,16 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         />
         {activeSticky && (
           <StickyBanner
-            text={activeSticky === 'forceUpdate' ? t('APP_UPDATE.NOTE') : paymentStickyInfo!.content}
-            ctaLabel={activeSticky === 'forceUpdate' ? t('APP_UPDATE.CTA') : paymentStickyInfo!.ctaLabel}
+            text={
+              activeSticky === 'profileValidation' ? profileValidationInfo!.stickyContent
+              : activeSticky === 'forceUpdate'     ? t('APP_UPDATE.NOTE')
+              : paymentStickyInfo!.content
+            }
+            ctaLabel={
+              activeSticky === 'profileValidation' ? profileValidationInfo!.stickyCta
+              : activeSticky === 'forceUpdate'     ? t('APP_UPDATE.CTA')
+              : paymentStickyInfo!.ctaLabel
+            }
             onPress={handleStickyPress}
             onClose={handleStickyClose}
             {...(activeSticky === 'paymentFailed' ? { countdownDeadlineMs: paymentStickyInfo!.deadlineMs } : {})}
@@ -2263,6 +2477,15 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         />
         <AppRatingModal visible={showRatingPopup} onClose={() => setShowRatingPopup(false)} />
         <SurveyPopup visible={!!surveyData} data={surveyData} onClose={() => setSurveyData(null)} />
+        <SearchablePicker
+          visible={showIncomeSheet}
+          title={t('GENERAL.MONTHLYINCOME', 'Monthly income')}
+          placeholder={t('REGISTRATION.SELECTINCOME', 'Select income')}
+          options={incomeOptions}
+          selectedKey={null}
+          onSelect={handleIncomeSelect}
+          onClose={handleIncomeSheetClose}
+        />
         <BottomSheet
           visible={showAddPhotoActionPrompt}
           type="photoPopUp"
@@ -2318,6 +2541,18 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           onPrimaryPress={handlePhoneInfoPrimaryPress}
           onSecondaryPress={handlePhoneInfoSecondaryPress}
           onLinkPress={handlePhoneInfoClose}
+        />
+        <BottomSheet
+          visible={showProfileValidationSheet}
+          type="profileValidation"
+          data={{
+            image:    profileValidationInfo?.sheet.img,
+            title:    profileValidationInfo?.sheet.title,
+            content:  profileValidationInfo?.sheet.content,
+            ctaLabel: profileValidationInfo?.sheet.cta,
+          }}
+          onClose={() => setShowProfileValidationSheet(false)}
+          onPrimaryPress={handleProfileValidationCtaPress}
         />
         <LanguagePillSheet visible={showLanguageSheet} onClose={() => setShowLanguageSheet(false)} />
         <Toast request={toastRequest} />
@@ -2401,8 +2636,16 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
       {/* ── Sticky bottom banner (payment-failed retry / force-update) ──────── */}
       {activeSticky && (
         <StickyBanner
-          text={activeSticky === 'forceUpdate' ? t('APP_UPDATE.NOTE') : paymentStickyInfo!.content}
-          ctaLabel={activeSticky === 'forceUpdate' ? t('APP_UPDATE.CTA') : paymentStickyInfo!.ctaLabel}
+          text={
+            activeSticky === 'profileValidation' ? profileValidationInfo!.stickyContent
+            : activeSticky === 'forceUpdate'     ? t('APP_UPDATE.NOTE')
+            : paymentStickyInfo!.content
+          }
+          ctaLabel={
+            activeSticky === 'profileValidation' ? profileValidationInfo!.stickyCta
+            : activeSticky === 'forceUpdate'     ? t('APP_UPDATE.CTA')
+            : paymentStickyInfo!.ctaLabel
+          }
           onPress={handleStickyPress}
           onClose={handleStickyClose}
           {...(activeSticky === 'paymentFailed' ? { countdownDeadlineMs: paymentStickyInfo!.deadlineMs } : {})}
@@ -2452,6 +2695,15 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
       />
       <AppRatingModal visible={showRatingPopup} onClose={() => setShowRatingPopup(false)} />
       <SurveyPopup visible={!!surveyData} data={surveyData} onClose={() => setSurveyData(null)} />
+      <SearchablePicker
+        visible={showIncomeSheet}
+        title={t('GENERAL.MONTHLYINCOME', 'Monthly income')}
+        placeholder={t('REGISTRATION.SELECTINCOME', 'Select income')}
+        options={incomeOptions}
+        selectedKey={null}
+        onSelect={handleIncomeSelect}
+        onClose={handleIncomeSheetClose}
+      />
       <BottomSheet
         visible={showAddPhotoActionPrompt}
         type="photoPopUp"
@@ -2507,6 +2759,18 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         onPrimaryPress={handlePhoneInfoPrimaryPress}
         onSecondaryPress={handlePhoneInfoSecondaryPress}
         onLinkPress={handlePhoneInfoClose}
+      />
+      <BottomSheet
+        visible={showProfileValidationSheet}
+        type="profileValidation"
+        data={{
+          image:    profileValidationInfo?.sheet.img,
+          title:    profileValidationInfo?.sheet.title,
+          content:  profileValidationInfo?.sheet.content,
+          ctaLabel: profileValidationInfo?.sheet.cta,
+        }}
+        onClose={() => setShowProfileValidationSheet(false)}
+        onPrimaryPress={handleProfileValidationCtaPress}
       />
       {/* AppFooter's tab bar is 56px tall (+ its own safe-area padding) — the
           Toast's default 24px clearance alone left it overlapping the footer. */}

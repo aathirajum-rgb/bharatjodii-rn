@@ -10,7 +10,7 @@ import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'r
 import { useTranslation } from 'react-i18next'
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
 import { LinearGradient } from 'expo-linear-gradient'
-import CdnSvg from '../cdn-svg/CdnSvg'
+import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
 import { WhatsAppIcon, getAvatarFallbackUri } from '../matches/matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
@@ -99,7 +99,9 @@ interface Props {
 // as a flat, imageless grey circle.
 function Avatar({ uri, fallbackGender }: { uri?: string | undefined; fallbackGender: 'M' | 'F' }) {
   const src = uri || getAvatarFallbackUri(fallbackGender)
-  return <Image source={{ uri: src }} style={styles.avatar} />
+  // The fallback silhouette is a remote .svg — native <Image> can't decode
+  // that (see CdnSvg.tsx), so this needs CdnImage's format detection.
+  return <CdnImage uri={src} width={45} height={45} resizeMode="cover" style={styles.avatar} />
 }
 
 export default function ChatBubble({ item, onPressMedia, oppGender = 'M', onCallPress, onWhatsAppPress, ownPhoto, partnerPhoto }: Props) {

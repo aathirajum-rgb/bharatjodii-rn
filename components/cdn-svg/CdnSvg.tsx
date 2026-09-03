@@ -31,15 +31,36 @@ type Props = {
   width:  number | string
   height: number | string
   style?: object | undefined
+  // Crop-to-fill instead of the default fit-within-bounds — for an SVG used
+  // as a stand-in for a photo (e.g. the male/female avatar silhouette filling
+  // the same box a real photo would), matching Angular's object-fit-cover on
+  // that <img> (photo-new.component.html's .object-fit-cover class applies
+  // to the avatar fallback exactly the same as a real photo — same <img>
+  // tag, src just swaps on error). Default (false/omitted) keeps every other
+  // CdnSvg icon usage (chevrons, badges, …) showing in full, uncropped.
+  cover?: boolean | undefined
 }
 
-export default function CdnSvg({ uri, width, height, style }: Props) {
+export default function CdnSvg({ uri, width, height, style, cover }: Props) {
   if (Platform.OS === 'web') {
     // react-native-web's <Image> compiles to a plain <img> tag for remote
     // sources — no fetch/blob step, so no CORS involved, matching Angular.
-    return <Image source={{ uri }} style={[{ width, height }, style]} resizeMode="contain" />
+    return <Image source={{ uri }} style={[{ width, height }, style]} resizeMode={cover ? 'cover' : 'contain'} />
   }
-  return <SvgCssUri uri={uri} width={width} height={height} style={style} />
+  // react-native-svg's own default ("meet") is contain/letterbox; "slice" is
+  // its cover equivalent — scale to fill, crop overflow, centered. Same
+  // preserveAspectRatio CdnSvgBackground below already uses for the same
+  // reason. exactOptionalPropertyTypes forbids passing `undefined` for this
+  // prop explicitly, so it's only included in the spread when `cover` is set.
+  return (
+    <SvgCssUri
+      uri={uri}
+      width={width}
+      height={height}
+      style={style}
+      {...(cover ? { preserveAspectRatio: 'xMidYMid slice' } : {})}
+    />
+  )
 }
 
 // For server-supplied icon URLs whose file format isn't guaranteed (e.g. PCS
@@ -51,7 +72,7 @@ export function CdnImage({
   uri, width, height, style, onError, resizeMode = 'contain',
 }: Props & { onError?: () => void; resizeMode?: 'contain' | 'cover' | 'stretch' }) {
   if (/\.svg(\?|$)/i.test(uri)) {
-    return <CdnSvg uri={uri} width={width} height={height} style={style} />
+    return <CdnSvg uri={uri} width={width} height={height} style={style} cover={resizeMode === 'cover'} />
   }
   return <Image source={{ uri }} style={[{ width, height }, style]} resizeMode={resizeMode} onError={onError} />
 }

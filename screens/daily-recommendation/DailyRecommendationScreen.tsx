@@ -64,6 +64,11 @@ const FLYOFF_OUT_Y = SW * 0.2
 // the browser default root font-size (16px), never overridden anywhere in this app's
 // global CSS (confirmed: no `html { font-size }` override in theme/variables.scss).
 const REM_PX = 16
+// Angular: daily-recommendation.component.ts's ngOnInit() sets
+// photoHeight = (scrWidth - 56) + 'px' — 24px shorter than Matches' own
+// (scrWidth - 32), which is what the reused MatchCard defaults to. Passed
+// down as MatchCard's `photoHeight` override below.
+const DR_PHOTO_H = SW - 56
 
 type SwipeAction = 'like' | 'viewlater' | 'skip'
 
@@ -142,6 +147,11 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
   const [showLeftSwipe, setShowLeftSwipe] = useState(false)
   const [photoPopupSheet, setPhotoPopupSheet] = useState<BottomSheetData | null>(null)
   const [limitSheet, setLimitSheet] = useState<{ visible: boolean; body?: string | undefined }>({ visible: false })
+  // Message icon's non-success outcomes (verify-id / raw error) — 'jodimessages'
+  // never produces a 'female_free' result (see communicationService.ts's
+  // handleChat), so unlike MatchesScreen's own phoneInfoSheet this only ever
+  // needs the generic BottomSheetData shape, no per-kind switch.
+  const [messageInfoSheet, setMessageInfoSheet] = useState<BottomSheetData | null>(null)
   // Angular: matches-card.component's own swipeStatusText — 'Like' always maps to
   // the left-positioned green stamp, 'ViewLater'/'Skip' to the right-positioned
   // pink one (matches-card.component.scss's .swipe-text-overlay/.skip-background
@@ -352,6 +362,43 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
     const reg = await getRegistrationArrays()
     setPhotoPopupSheet(toBottomSheetData(reg?.PHOTOPUBLISHED?.Call))
   }, [])
+
+  // ─── Message icon (Angular: matches-card.component.html's message icon →
+  // clickingOnBtn(..., 'jodimessages', ...) → communication.service.ts's
+  // jodimessages branch). The icon itself sits in the card's name row —
+  // unconditional on like-state — but MatchCard only renders it when
+  // `onMessage` is actually passed, so it needs wiring here just like
+  // MatchesScreen's own handleMessage(). Mirrors that handler's mapping.
+  const handleMessage = useCallback(async (profile: DrProfile) => {
+    try {
+      const result = await communicationBtnOnClick('dailyrecommendations', 'jodimessages', { MATRIID: profile.profileId })
+      if (result.type === 'payment_promo') {
+        navigation.navigate('recharge')
+      } else if (result.type === 'verify_id') {
+        // photoUpload=true (verified male, no photo yet) reads a DIFFERENT
+        // registration-array config than the plain not-yet-verified case —
+        // see communicationService.ts's CommActionResult 'verify_id' doc.
+        const arrays = await getRegistrationArrays()
+        const cfg = (result.photoUpload ? arrays?.PHOTOPUBLISHPAID?.Shortlist : arrays?.PROFILEVERIFYPAID?.Shortlist) ?? {}
+        let cta = String(cfg.CTA ?? 'OK')
+        if (cta.includes('##CSNUM##')) {
+          const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
+          cta = cta.replace(/##CSNUM##/g, callNum).replace('+91', '')
+        }
+        setMessageInfoSheet({
+          title:     String(cfg.TITLE ?? (result.photoUpload ? 'Add your photo to continue' : 'Verify your profile')),
+          content:   String(cfg.CONTENT ?? (result.photoUpload ? 'Please add your photo to view phone numbers.' : 'Please complete ID verification to view phone numbers.')),
+          ctaLabel:  cta,
+          showClose: true,
+        })
+      } else if (result.type === 'error') {
+        setMessageInfoSheet({ content: result.message, ctaLabel: t('GENERAL.OK_CTA', 'OK'), showClose: true })
+      }
+      // result.type === 'api_success' — handleChat() already navigated to chat-window.
+    } catch (e) {
+      if (__DEV__) console.error('[DailyRecommendation] message error:', e)
+    }
+  }, [navigation, t])
 
   // ─── Shift to next card (Angular: handleShift()) ────────────────────────────
   const shiftToNextProfile = useCallback((shifted: DrProfile) => {
@@ -578,6 +625,10 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
           onViewLater={() => {}}
           onCall={() => {}}
           onWhatsApp={() => {}}
+          onMessage={() => {}}
+          singlePhoto
+          hideVerifiedBadge
+          photoHeight={DR_PHOTO_H}
         />
       </View>
     )
@@ -599,6 +650,10 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
             onViewLater={() => commitButtonSwipe('viewlater')}
             onCall={() => {}}
             onWhatsApp={() => {}}
+            onMessage={() => handleMessage(profile)}
+            singlePhoto
+            hideVerifiedBadge
+            photoHeight={DR_PHOTO_H}
           />
           <Animated.View style={[styles.stamp, styles.stampLike, likeStampStyle]} pointerEvents="none">
             <Text style={styles.stampText}>{t('GENERAL.LIKE_CTA').replace('#HER_HIM#', '').trim()}</Text>
@@ -757,6 +812,14 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
           }}
           onClose={() => setLimitSheet({ visible: false })}
           onPrimaryPress={() => setLimitSheet({ visible: false })}
+        />
+
+        <BottomSheet
+          visible={!!messageInfoSheet}
+          type="profileValidation"
+          data={messageInfoSheet ?? undefined}
+          onClose={() => setMessageInfoSheet(null)}
+          onPrimaryPress={() => setMessageInfoSheet(null)}
         />
       </SafeAreaView>
     </ScreenBackground>

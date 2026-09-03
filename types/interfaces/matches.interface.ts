@@ -15,7 +15,10 @@ export interface MatchProfile {
   isIdVerified:     boolean
   isPhotoAvailable: boolean                      // PHOTOSTATUS=1
   isPhotoProtect:   boolean                      // PHOTOPRIVACY=1
-  likedStatus:      '0' | '1' | '2' | '3'       // 0=none 1=liked 2=shortlisted 3=declined
+  // 0=none 1=liked 2=shortlisted 3=declined 5=another "not yet liked" variant —
+  // Angular's showLikeCTA()/common-funtions.ts:598-601 treats '5' the same as
+  // '0' (Like/Don't-show/View-later CTA), no further documented meaning found.
+  likedStatus:      '0' | '1' | '2' | '3' | '5'
   isNewlyJoined:    boolean
   isNewLabel:       boolean                      // activity label row visible
   labelContent:     string                       // "Viewed on 15 Jan" / "Shortlisted on …"

@@ -1,5 +1,5 @@
 import { apiCall } from './apiClient'
-import { getItem, setItem, setJson } from './storageService'
+import { getItem, setItem, setJson, getJson } from './storageService'
 import { getSession, parseAndStoreWebViewURL, getRegistrationArrays } from './registrationService'
 import { Endpoints } from './api.endpoints'
 import { StorageKeys } from '../constants/storage.keys'
@@ -363,6 +363,46 @@ export async function fetchAndStorePPSetData(): Promise<Record<string, any>> {
   return {}
 }
 
+// ─── Free-match-limit paywall gate ─────────────────────────────────────────────
+// Angular common.ts:1418-1430 checkLimitFlowStatus(type?) — PPSETDATA.FREEMATCHFLAG
+// enables a free-tier match-count cap for this user; once they've viewed more than
+// MINMATCHLIMIT matches (tracked client-side via FREE_MATCHES_TOTAL_COUNT, see
+// applyFreeMatchLimit below), the backend starts paywalling/blurring profiles
+// beyond that point once the client sends FREEMATCHFLAG=1 back on the request.
+// type='flagAlone' — just "is this feature enabled for this user at all", used
+// on its own where Angular calls checkLimitFlowStatus('flagAlone') (deciding
+// whether to freeze the cached total, independent of whether the cap has been
+// hit yet).
+export async function checkLimitFlowStatus(type?: 'flagAlone'): Promise<boolean> {
+  const ppSetRaw = await getJson<Record<string, any>>(StorageKeys.App.PP_SET_DATA)
+  const flagEnabled = String(ppSetRaw?.['FREEMATCHFLAG'] ?? '0') === '1'
+  if (type === 'flagAlone') return flagEnabled
+  if (!flagEnabled) return false
+  const minMatchLimit = Number(ppSetRaw?.['MINMATCHLIMIT'] ?? 0)
+  const cachedCount    = Number((await getItem(StorageKeys.App.FREE_MATCHES_TOTAL_COUNT)) ?? '0')
+  return cachedCount > minMatchLimit
+}
+
+// Angular matches.page.ts:1103-1104/1265-1277 — once the free-match gate is
+// enabled for this user, `totalCount` stops tracking each response's real TOTAL
+// and instead freezes at the first value seen (search: immediately; matches:
+// once the cap is actually hit), so pagination naturally stops there instead of
+// continuing to grow with every page. Returns the (possibly frozen) totalCount
+// to use, and updates the cache as a side effect.
+async function applyFreeMatchLimit(totalCount: number, opts: { isSearch: boolean }): Promise<number> {
+  const flagAlone = await checkLimitFlowStatus('flagAlone')
+  if (!flagAlone) return totalCount
+  const [limitReached, cached] = await Promise.all([
+    checkLimitFlowStatus(),
+    getItem(StorageKeys.App.FREE_MATCHES_TOTAL_COUNT),
+  ])
+  if ((limitReached && !cached) || (opts.isSearch && totalCount)) {
+    await setItem(StorageKeys.App.FREE_MATCHES_TOTAL_COUNT, String(totalCount))
+    return totalCount
+  }
+  return cached ? Number(cached) : totalCount
+}
+
 // ─── Complete Your Profile (PCS) cards ────────────────────────────────────────
 // Angular: getPPSETData()'s PCS array — each entry with FLAG===1 is an incomplete
 // profile-completion card. This is a pure mapper over fetchAndStorePPSetData()'s
@@ -504,15 +544,21 @@ export interface QuickFilters {
 }
 
 export async function fetchMatches(start = 0, limit = 20, quickFilters?: QuickFilters): Promise<ListingResult> {
-  const [session, userId, ekycStatus, gender] = await Promise.all([
+  const [session, userId, ekycStatus, gender, ppSetRaw, limitReached] = await Promise.all([
     getSession(),
     getItem(StorageKeys.Auth.USER_ID),
     getItem('EKYCSTATUS'),
     getItem(StorageKeys.User.LOGIN_GENDER),
+    getJson<Record<string, any>>(StorageKeys.App.PP_SET_DATA),
+    checkLimitFlowStatus(),
   ])
   const loginCount = session['LOGINCOUNT'] ?? '0'
   // Angular: EKYCFLAG=1 only for nonIdVerifyUser (EKYCSTATUS=="0" && LOGINGENDER=="M")
   const nonIdVerifyUser = ekycStatus === '0' && gender === 'M'
+  // Angular matches.page.ts:1031 — the REAL PPSETDATA.FREEMATCHFLAG value is only
+  // ever sent once checkLimitFlowStatus() (the user has actually exceeded
+  // MINMATCHLIMIT); before that, always 0 even if the feature flag is enabled.
+  const freeMatchFlag = limitReached ? String(ppSetRaw?.['FREEMATCHFLAG'] ?? '0') : '0'
   const parts = [
     `ID=${userId ?? ''}`,
     `START=${start}`,
@@ -525,14 +571,16 @@ export async function fetchMatches(start = 0, limit = 20, quickFilters?: QuickFi
     'SKIPED=1',
     'BANNERFLAG=1',
     `LOGINCOUNT=${loginCount}`,
-    'FREEMATCHFLAG=0',
+    `FREEMATCHFLAG=${freeMatchFlag}`,
   ]
   if (nonIdVerifyUser) parts.push('EKYCFLAG=1')
   if (quickFilters?.profileCreated)     parts.push('PROFILECREATED=1')
   if (quickFilters?.photoAvailable)     parts.push('PHOTOAVAILABLE=1')
   if (quickFilters?.horoscopeAvailable) parts.push('HOROSCOPEAVAILABLE=1')
   const res = await apiCall(Endpoints.listing.matches, 'POST', parts.join('&'))
-  return toListingResult(res)
+  const result = toListingResult(res)
+  result.totalCount = await applyFreeMatchLimit(result.totalCount, { isSearch: false })
+  return result
 }
 
 // ─── Home's "All Matches" preview ───────────────────────────────────────────────
@@ -607,8 +655,17 @@ export async function fetchNearbyMatches(start = 0, limit = 20): Promise<Listing
 // `searchParams` is the pre-built query string from filterService.buildSearchParams().
 
 export async function fetchSearchResults(searchParams: string): Promise<ListingResult> {
-  const res = await apiCall(Endpoints.search.form, 'POST', searchParams)
-  return toListingResult(res)
+  // Angular matches.page.ts:1003 — search route appends FREEMATCHFLAG the same
+  // way the plain matches route does (see fetchMatches).
+  const [ppSetRaw, limitReached] = await Promise.all([
+    getJson<Record<string, any>>(StorageKeys.App.PP_SET_DATA),
+    checkLimitFlowStatus(),
+  ])
+  const freeMatchFlag = limitReached ? String(ppSetRaw?.['FREEMATCHFLAG'] ?? '0') : '0'
+  const res = await apiCall(Endpoints.search.form, 'POST', `${searchParams}&FREEMATCHFLAG=${freeMatchFlag}`)
+  const result = toListingResult(res)
+  result.totalCount = await applyFreeMatchLimit(result.totalCount, { isSearch: true })
+  return result
 }
 
 // ─── Profiles who viewed me ───────────────────────────────────────────────────

@@ -18,12 +18,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, Image, KeyboardAvoidingView, Linking, Platform, Pressable,
+  ActivityIndicator, KeyboardAvoidingView, Linking, Platform, Pressable,
   ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAudioRecorder, useAudioRecorderState, RecordingPresets } from 'expo-audio'
-import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CdnSvg, { CdnImage } from '../../components/cdn-svg/CdnSvg'
 import { getOppGenderAvatarUrl } from '../../utils/avatar'
 import ChatBubble from '../../components/chat/ChatBubble'
 import AttachmentPreviewModal from '../../components/chat/AttachmentPreviewModal'
@@ -700,10 +700,16 @@ export default function ChatScreen({ navigation, route }: Props) {
           <CdnSvg uri={BACK_ICON_URI} width={24} height={48} />
         </Pressable>
         <View style={[styles.avatarWrap, { width: avatarSize, height: avatarSize }]}>
+          {/* fallbackAvatar is a remote .svg — native <Image> can't decode
+              that (see CdnSvg.tsx), so this needs CdnImage's format
+              detection rather than a plain Image. */}
           {avatarUri
-            ? <Image
-                source={{ uri: avatarUri }}
+            ? <CdnImage
+                uri={avatarUri}
+                width={avatarSize}
+                height={avatarSize}
                 onError={() => setPhotoFailed(true)}
+                resizeMode="cover"
                 style={[styles.avatar, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]}
               />
             : <View style={[styles.avatar, { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }]} />}

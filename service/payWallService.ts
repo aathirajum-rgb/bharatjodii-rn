@@ -67,7 +67,7 @@ export async function getPaywallType(): Promise<string | null> {
 // PAYWALLTYPE '4' is the EXPIRED wall (pay-wall.service.ts's own type map:
 // `4: "EXPIRED"`).
 
-async function getPaymentWallType(): Promise<string> {
+export async function getPaymentWallType(): Promise<string> {
   const raw = await getItem(SK.Payment.PAYMENT_WALL)
   if (raw) {
     try {

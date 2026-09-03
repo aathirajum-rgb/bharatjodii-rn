@@ -721,9 +721,14 @@ export default function ViewProfileContent(props: ViewProfileContentProps) {
                     onError={onHeroPhotoError}
                   />
                 ) : profile.isPhotoAvailable && profile.photos.length > 0 && heroPhotoFailed ? (
-                  <RNImage
-                    source={{ uri: getAvatarFallbackUri(oppGender) }}
-                    style={{ width: SCREEN_WIDTH, height: PHOTO_HEIGHT }}
+                  // Native <Image> can't decode a remote .svg (see CdnSvg.tsx) —
+                  // the fallback silhouette is one, so it needs CdnSvg. `cover`
+                  // matches the real photo's own contentFit="cover" above.
+                  <CdnSvg
+                    uri={getAvatarFallbackUri(oppGender)}
+                    width={SCREEN_WIDTH}
+                    height={PHOTO_HEIGHT}
+                    cover
                   />
                 ) : (
                   <CdnSvg uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} />

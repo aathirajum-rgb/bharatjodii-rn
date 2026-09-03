@@ -69,7 +69,7 @@ export interface ProfileCardProps {
   isNewlyJoined?:  boolean | undefined  // shows newly-joined badge
 
   // ── Like / label ────────────────────────────────────────────────────────────
-  likedStatus?: '0' | '1' | '2' | '3' | undefined
+  likedStatus?: '0' | '1' | '2' | '3' | '5' | undefined
   isNewLabel?:         boolean | undefined  // true → show labelContent; false → likedViewedDateText
   labelContent?:       string | undefined
   likedViewedDateText?: string | undefined

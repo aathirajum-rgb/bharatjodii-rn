@@ -45,7 +45,6 @@ import PhotoPromoSticky from '../../components/sticky-banner/PhotoPromoSticky'
 import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
 import ReportProfileModal from '../../components/matches/ReportProfileModal'
 import ThreeDotMenu from '../../components/matches/ThreeDotMenu'
-import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import { MatchCard } from '../matches/MatchesScreen'
 import ActivityDesktopLayout from './ActivityDesktopLayout'
@@ -75,7 +74,6 @@ import { Colors } from '../../constants/colors'
 import i18n from '../../i18n'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
-import { CDN_SVG } from '../../constants/cdn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

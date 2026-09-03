@@ -58,11 +58,14 @@ export function usePhoneInfoSheet() {
         setSheet({ kind: 'phone_number_left' }); return true
       case 'verify_id': {
         // Angular communication.service.ts's navigateToVerify() — content is
-        // server-driven (REGISTRATIONARRAYS.PROFILEVERIFYPAID.Shortlist); the
-        // ##CSNUM## support-number placeholder only ever appears in CTA, not
-        // CONTENT (communication.service.ts:640-642).
+        // server-driven, from ONE of two different registration-array configs
+        // depending on which gate fired: PROFILEVERIFYPAID.Shortlist for the
+        // plain not-yet-verified case, PHOTOPUBLISHPAID.Shortlist for the
+        // verified-but-no-photo case (result.photoUpload). The ##CSNUM##
+        // support-number placeholder only ever appears in CTA, not CONTENT
+        // (communication.service.ts:640-642).
         const arrays = await getRegistrationArrays()
-        const cfg = arrays?.PROFILEVERIFYPAID?.Shortlist ?? {}
+        const cfg = (result.photoUpload ? arrays?.PHOTOPUBLISHPAID?.Shortlist : arrays?.PROFILEVERIFYPAID?.Shortlist) ?? {}
         let cta = String(cfg.CTA ?? 'OK')
         if (cta.includes('##CSNUM##')) {
           const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
@@ -70,8 +73,8 @@ export function usePhoneInfoSheet() {
         }
         setSheet({
           kind: 'verify_id',
-          title: String(cfg.TITLE ?? 'Verify your profile'),
-          content: String(cfg.CONTENT ?? 'Please complete ID verification to view phone numbers.'),
+          title: String(cfg.TITLE ?? (result.photoUpload ? 'Add your photo to continue' : 'Verify your profile')),
+          content: String(cfg.CONTENT ?? (result.photoUpload ? 'Please add your photo to view phone numbers.' : 'Please complete ID verification to view phone numbers.')),
           ctaLabel: cta,
         })
         return true

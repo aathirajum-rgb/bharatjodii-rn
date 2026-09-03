@@ -10,7 +10,7 @@
 
 import { forwardRef, useRef, useState } from 'react'
 import {
-  Image as RNImage, Pressable, StyleSheet, Text, View,
+  Pressable, StyleSheet, Text, View,
 } from 'react-native'
 import { Image } from 'expo-image'
 import Carousel, { type ICarouselInstance } from 'react-native-reanimated-carousel'
@@ -251,9 +251,12 @@ export function buildBasicView(p: MatchProfile, loggedInFemale?: boolean): strin
   return buildBasicViewParts(p, loggedInFemale).join(' | ')
 }
 
-// Angular: FUNC.showLikeCTA(likedStatus) — show Like/Don't Show/View Later when not yet liked/declined
+// Angular: FUNC.showLikeCTA(likedStatus) = ['0','5'].includes(likeStatus) (common-
+// funtions.ts:598-601) — show Like/Don't Show/View Later when not yet liked/declined.
+// Missing '5' left those profiles with NEITHER this CTA nor showAfterLikeCTA (which
+// also excludes '5') — a blank action area.
 export function showLikeCTA(status: MatchProfile['likedStatus']): boolean {
-  return status === '0'
+  return status === '0' || status === '5'
 }
 
 // Angular: FUNC.showAfterLikeContent(likedStatus) — show Send Interest / chat CTA after like
@@ -557,7 +560,11 @@ export function PhotoSwiper({ images, width, height, oppGender, onPress, showArr
         renderItem={({ item, index }) => (
           <Pressable style={{ width, height }} onPress={() => onPress?.(index)}>
             {failedIndices[index] ? (
-              <RNImage source={{ uri: getAvatarFallbackUri(oppGender) }} style={swiperStyles.image} />
+              // Native <Image>/expo-image can't decode a remote .svg (see
+              // CdnSvg.tsx) — the fallback silhouette is one, so it needs
+              // CdnSvg, not a plain Image. `cover` matches the real photo's
+              // own contentFit="cover" below — same box, same fill behavior.
+              <CdnSvg uri={getAvatarFallbackUri(oppGender)} width={width} height={height} style={swiperStyles.image} cover />
             ) : (
               <Image
                 source={{ uri: item }}
