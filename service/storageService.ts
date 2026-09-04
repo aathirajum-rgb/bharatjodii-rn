@@ -1,3 +1,4 @@
+import { Platform } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import * as SecureStore from 'expo-secure-store'
 
@@ -15,9 +16,21 @@ import * as SecureStore from 'expo-secure-store'
 //  out of iCloud/iTunes backups (the default WHEN_UNLOCKED does migrate to a
 //  new device on backup restore) — see app.config.js's expo-secure-store
 //  plugin entry for the equivalent Android backup-exclusion config.
+//
+//  Web has no equivalent — expo-secure-store's web implementation is a
+//  literal empty stub (confirmed: node_modules/expo-secure-store/src/
+//  ExpoSecureStore.web.ts is `export default {}`), so calling it there
+//  throws "getValueWithKeyAsync is not a function" rather than degrading
+//  gracefully. Falls back to plain AsyncStorage on web — the same behavior
+//  this app had before this migration, since a browser has no OS-level
+//  Keychain/Keystore analog to route to anyway.
 // ─────────────────────────────────────────────────────────────
 
 const SECURE_KEYS = new Set(['ATN', 'RTN'])
+
+function isSecureKey(key: string): boolean {
+  return Platform.OS !== 'web' && SECURE_KEYS.has(key)
+}
 
 const secureStoreOptions: SecureStore.SecureStoreOptions = {
   keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
@@ -29,7 +42,7 @@ const secureStoreOptions: SecureStore.SecureStoreOptions = {
 
 /** Save a plain string value */
 export async function setItem(key: string, value: string): Promise<void> {
-  if (SECURE_KEYS.has(key)) {
+  if (isSecureKey(key)) {
     await SecureStore.setItemAsync(key, value, secureStoreOptions)
     return
   }
@@ -38,7 +51,7 @@ export async function setItem(key: string, value: string): Promise<void> {
 
 /** Get a plain string value — returns null if not found */
 export async function getItem(key: string): Promise<string | null> {
-  if (SECURE_KEYS.has(key)) return SecureStore.getItemAsync(key, secureStoreOptions)
+  if (isSecureKey(key)) return SecureStore.getItemAsync(key, secureStoreOptions)
   return AsyncStorage.getItem(key)
 }
 
@@ -50,7 +63,7 @@ export async function getItemOrDefault<T>(key: string, defaultValue: T): Promise
 
 /** Remove a single key */
 export async function removeItem(key: string): Promise<void> {
-  if (SECURE_KEYS.has(key)) {
+  if (isSecureKey(key)) {
     await SecureStore.deleteItemAsync(key, secureStoreOptions)
     return
   }
