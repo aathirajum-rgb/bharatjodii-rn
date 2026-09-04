@@ -235,7 +235,7 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
         }
       }
     } catch (error: any) {
-      console.error('DBG_PAYMENT_ERROR upi', error?.message, error)
+      if (__DEV__) console.error('[UpiAddress] payment error:', error?.message, error)
       Alert.alert('Error', error?.message || 'Something went wrong. Please try again.')
     } finally {
       setPaying(false)

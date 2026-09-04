@@ -33,7 +33,7 @@ const R = CDN_REACT + '/'
 const ICON_BACK  = R + 'menu_back_arrow.svg'
 const ICON_ARROW = R + 'menu_right_arrow.svg'
 
-type Props = { navigation: any; route: { params: { type: FaqType; itemId?: number } } }
+type Props = { navigation: any; route: { params?: { type: FaqType; itemId?: number } } }
 
 const HEADER_KEY: Record<FaqType, string> = {
   PROFILE:        'FAQ_DETAILS.HEADER_1',
@@ -74,7 +74,10 @@ function directRowAction(type: FaqType, id: number, navigation: any): boolean {
 }
 
 export default function FaqScreen({ navigation, route }: Props) {
-  const { type, itemId } = route.params
+  // route.params is undefined if this screen is ever reached with no
+  // navigation state (e.g. a future deep link) — nothing to show without a
+  // FaqType, so bail out below instead of crashing on the destructure.
+  const { type, itemId } = route.params ?? {} as Partial<NonNullable<Props['route']['params']>>
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
 
@@ -83,6 +86,7 @@ export default function FaqScreen({ navigation, route }: Props) {
   const [loading,  setLoading]  = useState(true)
 
   useEffect(() => {
+    if (!type) return
     let cancelled = false
     fetchFaqContent(type).then(data => {
       if (cancelled) return
@@ -93,6 +97,15 @@ export default function FaqScreen({ navigation, route }: Props) {
     return () => { cancelled = true }
   }, [type])
 
+  // No FaqType to show — reached with no navigation params.
+  useEffect(() => {
+    if (!type) handleBack()
+  }, [type])
+
+  // Redirecting back (see the effect above) — nothing to render, and lets
+  // every use of `type` below narrow from `FaqType | undefined` to `FaqType`.
+  if (!type) return null
+
   function callSupport() {
     if (payCs) Linking.openURL(`tel:${payCs}`)
   }
@@ -102,6 +115,7 @@ export default function FaqScreen({ navigation, route }: Props) {
   }
 
   function openDetail(rowIndex: number) {
+    if (!type) return
     const id = idForRow(type, rowIndex)
     if (directRowAction(type, id, navigation)) return
     navigation.navigate('Faq', { type, itemId: id })

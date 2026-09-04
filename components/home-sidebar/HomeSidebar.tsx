@@ -73,7 +73,9 @@ export default function HomeSidebar({ navigation, userName, userId, photoUrl, ac
   const [photoFailed, setPhotoFailed] = useState(false)
 
   useEffect(() => {
-    getOwnGenderAvatarUrl().then(setGenderAvatarUrl)
+    let cancelled = false
+    getOwnGenderAvatarUrl().then(url => { if (!cancelled) setGenderAvatarUrl(url) })
+    return () => { cancelled = true }
   }, [])
 
   return (

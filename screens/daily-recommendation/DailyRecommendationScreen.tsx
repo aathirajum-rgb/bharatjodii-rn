@@ -181,6 +181,12 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
   const tutorialTimer2Ref    = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const buttonFlyTimerRef    = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const nextVpTargetRef      = useRef<string | null>(null)
+  // runTutorial()'s getItem().then() below has its own async gap after the
+  // 1750ms delay that schedules it — if the screen unmounts during that gap,
+  // this is the only thing left to stop it from setting state and creating
+  // fresh timers that clearAllTimers()'s cleanup (already run by then) can
+  // never clear.
+  const mountedRef = useRef(true)
 
   // Top card's live transform — a single source of truth, matching Angular's own
   // approach of repeatedly overwriting ONE `transform` style rather than layering
@@ -272,6 +278,7 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
   // ─── Tutorial (Angular: showDRSwipes()) ─────────────────────────────────────
   const runTutorial = useCallback(() => {
     getItem('showDRSwipes').then(v => {
+      if (!mountedRef.current) return
       if (v !== '1') return
       setShowRightSwipe(true)
       setShowLeftSwipe(false)
@@ -351,6 +358,7 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
 
     return () => {
       cancelled = true
+      mountedRef.current = false
       clearAllTimers()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

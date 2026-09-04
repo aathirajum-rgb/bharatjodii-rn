@@ -698,13 +698,30 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         const failedBanner = await getHeroBannerDetails(true, 1)
         const text = failedBanner?.['PAYMENTFAILEDCONTENT']
         const cta  = failedBanner?.['PAYMENTFAILEDCTA']
-        if (text && cta) {
+        // Angular: home-banner.component.html's paymentFailedPromotion grid is
+        // itself gated on `heroBannerData?.PAGETYPE != '0'` — PAGETYPE=='0'
+        // renders nothing at all, previously unchecked here.
+        if (text && cta && String(failedBanner?.['PAGETYPE'] ?? '') !== '0') {
           const startMs = Date.parse(failedBanner?.['OFFSTTIME'] ?? '')
           const endMs   = Date.parse(failedBanner?.['OFFEDTIME'] ?? '')
           const deadlineMs = !Number.isNaN(startMs) && !Number.isNaN(endMs)
             ? Date.now() + Math.max(0, endMs - startMs)
             : Date.now() + 10 * 60 * 1000
-          paymentFailedContent = { title: '', body: String(text), ctaLabel: String(cta), countdownDeadlineMs: deadlineMs }
+          paymentFailedContent = {
+            title: '', body: String(text), ctaLabel: String(cta), countdownDeadlineMs: deadlineMs,
+            // Angular: .payment-failed-banner — a rounded, bordered, inset
+            // card (mt-24 ml-24 mr-24), not the full-bleed banner every other
+            // variant uses; text is black-color, not white.
+            insetCard:   true,
+            bgColor:     '#FCEAF0',
+            borderColor: '#F5BDD0',
+            textColor:   Colors.black,
+            // Angular: [background]="heroBannerData?.CTABGCOLOR" — previously
+            // unread here, so the CTA always fell back to HeroBanner's plain
+            // white default instead of the server-driven color.
+            ctaBgColor: String(failedBanner?.['CTABGCOLOR'] ?? '').startsWith('#') ? failedBanner['CTABGCOLOR'] : Colors.primaryDark,
+            ctaColor:   Colors.white,
+          }
         }
       }
 
@@ -1786,7 +1803,9 @@ const s = StyleSheet.create({
   screen:  { flex: 1, backgroundColor: Colors.white },
   scroll:  { flex: 1 },
   section: { paddingTop: 20, paddingBottom: 4 },
-  divider: { height: 8, backgroundColor: '#F5F5F5' },
+  // Angular: .explore-border-top { border-top: 3px solid #EBEBEB } — a thin
+  // top-border line between sections, not a filled band.
+  divider: { borderTopWidth: 3, borderTopColor: '#EBEBEB' },
   hList:   { paddingHorizontal: 16 },
 
   sectionTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 15, color: Colors.textPrimary, paddingHorizontal: 16, marginBottom: 12 },

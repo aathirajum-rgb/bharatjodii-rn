@@ -320,6 +320,11 @@ export default function EditProfileScreen({ navigation }: Props) {
   // there's no "landing screen" step to skip on web: this hidden input IS the
   // picker, triggered straight from the Pressable's own onPress.
   const webFileInputRef = useRef<HTMLInputElement | null>(null)
+  // Guards against a second openGalleryPicker() call firing (rapid double-tap
+  // on the add-photo slot) while the permission prompt/native picker from the
+  // first call is still in flight — before setPhotoUploading(true) below ever
+  // runs, so the disabled={photoUploading} prop can't catch it on its own.
+  const pickerBusyRef = useRef(false)
 
   async function handleWebFiles(e: any) {
     const files: File[] = Array.from(e.target.files ?? [])
@@ -432,62 +437,70 @@ export default function EditProfileScreen({ navigation }: Props) {
       webFileInputRef.current?.click()
       return
     }
-    // Native: request the OS photo-library permission and go straight into
-    // the system picker — same permission → launchImageLibraryAsync pattern
-    // PhotoAlbumViewerMobile.tsx's handleReplace() already uses, instead of
-    // detouring through CustomGalleryScreen's hand-built in-app gallery UI.
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Allow photo library access in Settings to add photos.')
-      return
-    }
-    const remaining = Math.max(0, MAX_PHOTOS - photos.length)
-    if (remaining <= 0) return
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsMultipleSelection: remaining > 1,
-      selectionLimit: remaining,
-      quality: 0.85,
-    })
-    if (result.canceled || !result.assets.length) return
-
-    setPhotoUploading(true)
+    if (pickerBusyRef.current) return
+    pickerBusyRef.current = true
     try {
-      const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-      const config = await getPhotoConfig()
-      const rejections: PhotoRejectionCode[] = []
-      for (const asset of result.assets) {
-        const validation = await validatePhotoAsset({
-          uri: asset.uri,
-          mimeType: asset.mimeType,
-          fileSize: asset.fileSize,
-          width: asset.width,
-          height: asset.height,
-        }, config)
-        if (!validation.ok) {
-          rejections.push(validation.code)
-          continue
-        }
-        const formData = new FormData()
-        formData.append('ID', userId)
-        formData.append('AIVALIDATE', config.isNativeFaceDetectionEnabled ? '1' : '0')
-        formData.append('UPLOADPHOTO', {
-          uri: asset.uri, type: asset.mimeType ?? 'image/jpeg', name: asset.fileName ?? 'photo.jpg',
-        } as any)
-        const res = await uploadFile(Endpoints.media.addProfilePic, formData)
-        if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
-          await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
-        }
+      // Native: request the OS photo-library permission and go straight into
+      // the system picker — same permission → launchImageLibraryAsync pattern
+      // PhotoAlbumViewerMobile.tsx's handleReplace() already uses, instead of
+      // detouring through CustomGalleryScreen's hand-built in-app gallery UI.
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Allow photo library access in Settings to add photos.')
+        return
       }
-      await load()
-      if (rejections.length) {
-        const reasons = await getRejectReasons()
-        Alert.alert('Some photos were not added', rejections.map(code => describeRejection(code, reasons)).join('\n\n'))
+      const remaining = Math.max(0, MAX_PHOTOS - photos.length)
+      if (remaining <= 0) return
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: remaining > 1,
+        selectionLimit: remaining,
+        quality: 0.85,
+      })
+      if (result.canceled || !result.assets.length) return
+
+      setPhotoUploading(true)
+      try {
+        const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+        const config = await getPhotoConfig()
+        const rejections: PhotoRejectionCode[] = []
+        for (const asset of result.assets) {
+          const validation = await validatePhotoAsset({
+            uri: asset.uri,
+            mimeType: asset.mimeType,
+            fileSize: asset.fileSize,
+            width: asset.width,
+            height: asset.height,
+          }, config)
+          if (!validation.ok) {
+            rejections.push(validation.code)
+            continue
+          }
+          const formData = new FormData()
+          formData.append('ID', userId)
+          formData.append('AIVALIDATE', config.isNativeFaceDetectionEnabled ? '1' : '0')
+          formData.append('UPLOADPHOTO', {
+            uri: asset.uri, type: asset.mimeType ?? 'image/jpeg', name: asset.fileName ?? 'photo.jpg',
+          } as any)
+          const res = await uploadFile(Endpoints.media.addProfilePic, formData)
+          if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
+            await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
+          }
+        }
+        await load()
+        if (rejections.length) {
+          const reasons = await getRejectReasons()
+          Alert.alert('Some photos were not added', rejections.map(code => describeRejection(code, reasons)).join('\n\n'))
+        }
+      } catch {
+        Alert.alert('Error', 'Upload failed. Please try again.')
+      } finally {
+        setPhotoUploading(false)
       }
-    } catch {
-      Alert.alert('Error', 'Upload failed. Please try again.')
+    } catch (e) {
+      if (__DEV__) console.error('[EditProfile] photo picker error:', e)
     } finally {
-      setPhotoUploading(false)
+      pickerBusyRef.current = false
     }
   }
 

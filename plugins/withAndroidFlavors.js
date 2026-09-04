@@ -21,15 +21,27 @@ const ADAPTIVE_ICON_XML =
 // Uses applicationId('...') with parentheses intentionally.
 // Expo's setPackageInBuildGradle regex is: /(applicationId|namespace) ['"].*['"]/g
 // It requires a SPACE then a QUOTE after applicationId — parentheses syntax bypasses it entirely.
+//
+// manifestPlaceholders here is what makes each flavor's deep-link scheme/host
+// actually flavor-specific: android/app/src/main/AndroidManifest.xml (via
+// app.config.js's intentFilters) references these as ${appScheme}/${appHost}
+// instead of a literal value, since that manifest is the ONE file shared by
+// every flavor in this Gradle tree (there's no per-flavor manifest override —
+// confirmed no android/app/src/<flavor>/AndroidManifest.xml exists for any
+// flavor, only resource/icon overrides). Without this, whichever flavor's
+// scheme/domain happened to be baked in by the last `expo prebuild` run
+// would silently ship in EVERY flavor's APK, breaking real App Links for
+// every other flavor.
 function buildFlavorsBlock() {
   const entries = Object.entries(FLAVORS)
     .map(
-      ([name, { appType, applicationId, appName }]) =>
+      ([name, { appType, applicationId, appName, scheme, domain }]) =>
         `        ${name} {\n` +
         `            dimension "appType"\n` +
         `            applicationId('${applicationId}')\n` +
         `            buildConfigField "int", "APP_TYPE", "${appType}"\n` +
         `            resValue "string", "app_name", "${appName}"\n` +
+        `            manifestPlaceholders = [appScheme: "${scheme}", appHost: "${domain}"]\n` +
         `        }`
     )
     .join('\n');

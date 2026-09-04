@@ -22,12 +22,6 @@ const RAZORPAY_GRADLE_DEP = `// Razorpay Custom Integration SDK — enables per-
     // — react-native-razorpay's Android autolinking is disabled in
     // react-native.config.js for exactly this reason; iOS still uses it.
     implementation "com.razorpay:customui:3.9.22"`;
-// TEMP: real test key stripped before push — restore the actual value here
-// before the next native build. Only used as a manifest placeholder (see
-// AndroidManifest.xml comment); real per-transaction keys come from the
-// backend at runtime via RazorpayWebView.kt, so this default isn't otherwise
-// load-bearing.
-const DEFAULT_RAZORPAY_API_KEY = 'rzp_test_PLACEHOLDER_RESTORE_ME';
 
 function copyNativeSources(projectRoot) {
   const javaDir = path.join(projectRoot, 'android', 'app', 'src', 'main', 'java', PACKAGE_PATH);
@@ -71,20 +65,19 @@ function withRazorpayPackageRegistration(config) {
   });
 }
 
-function withRazorpayManifestEntries(config, { razorpayApiKey }) {
+function withRazorpayManifestEntries(config) {
   return withAndroidManifest(config, modConfig => {
     const application = modConfig.modResults.manifest.application?.[0];
     if (!application) return modConfig;
 
-    // Not using AndroidConfig.Manifest.addMetaDataItemToMainApplication() here —
-    // against this project's manifest it serializes the meta-data tag as a
-    // sibling of <manifest> instead of a child of <application> (reproduced
-    // in isolation against a fresh prebuild output). Direct array manipulation,
-    // same as the activity entry below, avoids that bug.
-    const metaData = application['meta-data'] ?? (application['meta-data'] = []);
-    if (!metaData.some(m => m.$?.['android:name'] === 'com.razorpay.ApiKey')) {
-      metaData.push({ $: { 'android:name': 'com.razorpay.ApiKey', 'android:value': razorpayApiKey } });
-    }
+    // com.razorpay.ApiKey meta-data was previously injected here as a
+    // manifest placeholder, but confirmed (2026-09) that nothing reads it —
+    // not react-native-razorpay's SDK, not this project's own
+    // RazorpayBridgeModule.kt/RazorpayWebView.kt, and not even the legacy
+    // native Android app (which has the equivalent entry commented out in
+    // its own manifest). Real per-transaction keys come from the backend at
+    // runtime via RazorpayWebView.kt — removed rather than left as an
+    // always-a-placeholder value with no real consumer.
 
     const activities = application.activity ?? (application.activity = []);
     const alreadyPresent = activities.some(a => a.$?.['android:name'] === '.RazorpayWebView');
@@ -102,7 +95,7 @@ function withRazorpayManifestEntries(config, { razorpayApiKey }) {
   });
 }
 
-module.exports = function withRazorpayAndroidBridge(config, { razorpayApiKey = DEFAULT_RAZORPAY_API_KEY } = {}) {
+module.exports = function withRazorpayAndroidBridge(config) {
   config = withDangerousMod(config, [
     'android',
     modConfig => {
@@ -113,7 +106,7 @@ module.exports = function withRazorpayAndroidBridge(config, { razorpayApiKey = D
 
   config = withRazorpayGradleDependency(config);
   config = withRazorpayPackageRegistration(config);
-  config = withRazorpayManifestEntries(config, { razorpayApiKey });
+  config = withRazorpayManifestEntries(config);
 
   return config;
 };

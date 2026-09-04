@@ -654,7 +654,7 @@ export async function fetchNearbyMatches(start = 0, limit = 20): Promise<Listing
 // (LIMIT=1) purely to read back RESPONSE.TOTAL for the live "Show N matches" CTA.
 // `searchParams` is the pre-built query string from filterService.buildSearchParams().
 
-export async function fetchSearchResults(searchParams: string): Promise<ListingResult> {
+export async function fetchSearchResults(searchParams: string, signal?: AbortSignal): Promise<ListingResult> {
   // Angular matches.page.ts:1003 — search route appends FREEMATCHFLAG the same
   // way the plain matches route does (see fetchMatches).
   const [ppSetRaw, limitReached] = await Promise.all([
@@ -662,7 +662,7 @@ export async function fetchSearchResults(searchParams: string): Promise<ListingR
     checkLimitFlowStatus(),
   ])
   const freeMatchFlag = limitReached ? String(ppSetRaw?.['FREEMATCHFLAG'] ?? '0') : '0'
-  const res = await apiCall(Endpoints.search.form, 'POST', `${searchParams}&FREEMATCHFLAG=${freeMatchFlag}`)
+  const res = await apiCall(Endpoints.search.form, 'POST', `${searchParams}&FREEMATCHFLAG=${freeMatchFlag}`, signal)
   const result = toListingResult(res)
   result.totalCount = await applyFreeMatchLimit(result.totalCount, { isSearch: true })
   return result

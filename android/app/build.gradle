@@ -127,330 +127,385 @@ android {
             applicationId('jodii.app')
             buildConfigField "int", "APP_TYPE", "115"
             resValue "string", "app_name", "Jodii"
+            manifestPlaceholders = [appScheme: "jodii", appHost: "jodii.app"]
         }
         tamil {
             dimension "appType"
             applicationId('jodiiapp.android.tamil')
             buildConfigField "int", "APP_TYPE", "116"
             resValue "string", "app_name", "Tamil Jodii"
+            manifestPlaceholders = [appScheme: "tamilmatrimony", appHost: "tamil.jodii.app"]
         }
         malayalam {
             dimension "appType"
             applicationId('jodiiapp.android.malayalam')
             buildConfigField "int", "APP_TYPE", "118"
             resValue "string", "app_name", "Malayalam Jodii"
+            manifestPlaceholders = [appScheme: "malayalammatrimony", appHost: "malayalam.jodii.app"]
         }
         telugu {
             dimension "appType"
             applicationId('jodiiapp.android.telugu')
             buildConfigField "int", "APP_TYPE", "117"
             resValue "string", "app_name", "Telugu Jodii"
+            manifestPlaceholders = [appScheme: "telugujodii", appHost: "telugu.jodii.app"]
         }
         kannada {
             dimension "appType"
             applicationId('jodiiapp.android.kannada')
             buildConfigField "int", "APP_TYPE", "119"
             resValue "string", "app_name", "Kannada Jodii"
+            manifestPlaceholders = [appScheme: "kannadajodii", appHost: "kannada.jodii.app"]
         }
         oriya {
             dimension "appType"
             applicationId('jodiiapp.android.oriya')
             buildConfigField "int", "APP_TYPE", "120"
             resValue "string", "app_name", "Oriya Jodii"
+            manifestPlaceholders = [appScheme: "oriyajodii", appHost: "oriya.jodii.app"]
         }
         bengali {
             dimension "appType"
             applicationId('jodiiapp.android.bengali')
             buildConfigField "int", "APP_TYPE", "121"
             resValue "string", "app_name", "Bengali Jodii"
+            manifestPlaceholders = [appScheme: "bengalijodii", appHost: "bengali.jodii.app"]
         }
         marathi {
             dimension "appType"
             applicationId('jodiiapp.android.marathi')
             buildConfigField "int", "APP_TYPE", "122"
             resValue "string", "app_name", "Marathi Jodii"
+            manifestPlaceholders = [appScheme: "marathijodii", appHost: "marathi.jodii.app"]
         }
         gujarati {
             dimension "appType"
             applicationId('jodiiapp.android.gujarati')
             buildConfigField "int", "APP_TYPE", "123"
             resValue "string", "app_name", "Gujarati Jodii"
+            manifestPlaceholders = [appScheme: "gujarathijodii", appHost: "gujarati.jodii.app"]
         }
         hindi {
             dimension "appType"
             applicationId('jodiiapp.android.hindi')
             buildConfigField "int", "APP_TYPE", "124"
             resValue "string", "app_name", "Hindi Jodii"
+            manifestPlaceholders = [appScheme: "hindijodii", appHost: "hindi.jodii.app"]
         }
         punjabi {
             dimension "appType"
             applicationId('jodiiapp.android.punjabi')
             buildConfigField "int", "APP_TYPE", "125"
             resValue "string", "app_name", "Punjabi Jodii"
+            manifestPlaceholders = [appScheme: "punjabijodii", appHost: "punjabi.jodii.app"]
         }
         ninetysixkulimaratha {
             dimension "appType"
             applicationId('ninetysixkulimaratha.jodii.com')
             buildConfigField "int", "APP_TYPE", "301"
             resValue "string", "app_name", "Ninetysixkulimaratha Jodii"
+            manifestPlaceholders = [appScheme: "ninetysixkulimaratha", appHost: "ninetysixkulimaratha.jodii.com"]
         }
         ezhava {
             dimension "appType"
             applicationId('ezhava.jodii.com')
             buildConfigField "int", "APP_TYPE", "302"
             resValue "string", "app_name", "Ezhava Jodii"
+            manifestPlaceholders = [appScheme: "ezhavajodii", appHost: "ezhava.jodii.com"]
         }
         nair {
             dimension "appType"
             applicationId('nair.jodii.com')
             buildConfigField "int", "APP_TYPE", "303"
             resValue "string", "app_name", "Nair Jodii"
+            manifestPlaceholders = [appScheme: "nairjodii", appHost: "nair.jodii.com"]
         }
         kayastha {
             dimension "appType"
             applicationId('kayastha.jodii.com')
             buildConfigField "int", "APP_TYPE", "304"
             resValue "string", "app_name", "Kayastha Jodii"
+            manifestPlaceholders = [appScheme: "kayasthajodii", appHost: "kayastha.jodii.com"]
         }
         lingayath {
             dimension "appType"
             applicationId('lingayath.jodii.com')
             buildConfigField "int", "APP_TYPE", "305"
             resValue "string", "app_name", "Lingayath Jodii"
+            manifestPlaceholders = [appScheme: "lingayathjodii", appHost: "lingayath.jodii.com"]
         }
         khandayat {
             dimension "appType"
             applicationId('khandayat.jodii.com')
             buildConfigField "int", "APP_TYPE", "306"
             resValue "string", "app_name", "Khandayat Jodii"
+            manifestPlaceholders = [appScheme: "khandayatjodii", appHost: "khandayat.jodii.com"]
         }
         sc {
             dimension "appType"
             applicationId('sc.jodii.com')
             buildConfigField "int", "APP_TYPE", "307"
             resValue "string", "app_name", "SC Jodii"
+            manifestPlaceholders = [appScheme: "scjodii", appHost: "sc.jodii.com"]
         }
         vokkaliga {
             dimension "appType"
             applicationId('vokkaliga.jodii.com')
             buildConfigField "int", "APP_TYPE", "308"
             resValue "string", "app_name", "Vokkaliga Jodii"
+            manifestPlaceholders = [appScheme: "vokkaligajodii", appHost: "vokkaliga.jodii.com"]
         }
         vishwakarma {
             dimension "appType"
             applicationId('vishwakarma.jodii.com')
             buildConfigField "int", "APP_TYPE", "309"
             resValue "string", "app_name", "Vishwakarma Jodii"
+            manifestPlaceholders = [appScheme: "vishwakarmajodii", appHost: "vishwakarma.jodii.com"]
         }
         patel {
             dimension "appType"
             applicationId('patel.jodii.com')
             buildConfigField "int", "APP_TYPE", "310"
             resValue "string", "app_name", "Patel Jodii"
+            manifestPlaceholders = [appScheme: "pateljodii", appHost: "patel.jodii.com"]
         }
         adidravidar {
             dimension "appType"
             applicationId('adidravidar.jodii.com')
             buildConfigField "int", "APP_TYPE", "311"
             resValue "string", "app_name", "Adidravidar Jodii"
+            manifestPlaceholders = [appScheme: "adidravidarjodii", appHost: "adidravidar.jodii.com"]
         }
         teli {
             dimension "appType"
             applicationId('teli.jodii.com')
             buildConfigField "int", "APP_TYPE", "312"
             resValue "string", "app_name", "Teli Jodii"
+            manifestPlaceholders = [appScheme: "telijodii", appHost: "teli.jodii.com"]
         }
         vanniyar {
             dimension "appType"
             applicationId('vanniyar.jodii.com')
             buildConfigField "int", "APP_TYPE", "313"
             resValue "string", "app_name", "Vanniyar Jodii"
+            manifestPlaceholders = [appScheme: "vanniyarjodii", appHost: "vanniyar.jodii.com"]
         }
         reddy {
             dimension "appType"
             applicationId('reddy.jodii.com')
             buildConfigField "int", "APP_TYPE", "314"
             resValue "string", "app_name", "Reddy Jodii"
+            manifestPlaceholders = [appScheme: "reddyjodii", appHost: "reddy.jodii.com"]
         }
         kapu {
             dimension "appType"
             applicationId('kapu.jodii.com')
             buildConfigField "int", "APP_TYPE", "315"
             resValue "string", "app_name", "Kapu Jodii"
+            manifestPlaceholders = [appScheme: "kapujodii", appHost: "kapu.jodii.com"]
         }
         viswabrahmin {
             dimension "appType"
             applicationId('viswabrahmin.jodii.com')
             buildConfigField "int", "APP_TYPE", "316"
             resValue "string", "app_name", "Viswabrahmin Jodii"
+            manifestPlaceholders = [appScheme: "viswabrahminjodii", appHost: "viswabrahmin.jodii.com"]
         }
         thiyya {
             dimension "appType"
             applicationId('thiyya.jodii.com')
             buildConfigField "int", "APP_TYPE", "317"
             resValue "string", "app_name", "Thiyya Jodii"
+            manifestPlaceholders = [appScheme: "thiyyajodii", appHost: "thiyya.jodii.com"]
         }
         kuruba {
             dimension "appType"
             applicationId('kuruba.jodii.com')
             buildConfigField "int", "APP_TYPE", "318"
             resValue "string", "app_name", "Kuruba Jodii"
+            manifestPlaceholders = [appScheme: "kurubajodii", appHost: "kuruba.jodii.com"]
         }
         gowda {
             dimension "appType"
             applicationId('gowda.jodii.com')
             buildConfigField "int", "APP_TYPE", "319"
             resValue "string", "app_name", "Gowda Jodii"
+            manifestPlaceholders = [appScheme: "gowdajodii", appHost: "gowda.jodii.com"]
         }
         nadar {
             dimension "appType"
             applicationId('nadar.jodii.com')
             buildConfigField "int", "APP_TYPE", "320"
             resValue "string", "app_name", "Nadar Jodii"
+            manifestPlaceholders = [appScheme: "nadarjodii", appHost: "nadar.jodii.com"]
         }
         aryavysya {
             dimension "appType"
             applicationId('aryavysya.jodii.com')
             buildConfigField "int", "APP_TYPE", "321"
             resValue "string", "app_name", "Aryavysya Jodii"
+            manifestPlaceholders = [appScheme: "aryavysyajodii", appHost: "aryavysya.jodii.com"]
         }
         prajapati {
             dimension "appType"
             applicationId('prajapati.jodii.com')
             buildConfigField "int", "APP_TYPE", "322"
             resValue "string", "app_name", "Prajapati Jodii"
+            manifestPlaceholders = [appScheme: "prajapatijodii", appHost: "prajapati.jodii.com"]
         }
         konguvellalar {
             dimension "appType"
             applicationId('konguvellalar.jodii.com')
             buildConfigField "int", "APP_TYPE", "323"
             resValue "string", "app_name", "Konguvellalar Jodii"
+            manifestPlaceholders = [appScheme: "konguvellalarjodii", appHost: "konguvellalar.jodii.com"]
         }
         thevar {
             dimension "appType"
             applicationId('thevar.jodii.com')
             buildConfigField "int", "APP_TYPE", "324"
             resValue "string", "app_name", "Thevar Jodii"
+            manifestPlaceholders = [appScheme: "thevarjodii", appHost: "thevar.jodii.com"]
         }
         kshatriya {
             dimension "appType"
             applicationId('kshatriya.jodii.com')
             buildConfigField "int", "APP_TYPE", "325"
             resValue "string", "app_name", "Kshatriya Jodii"
+            manifestPlaceholders = [appScheme: "kshatriyajodii", appHost: "kshatriya.jodii.com"]
         }
         kamma {
             dimension "appType"
             applicationId('kamma.jodii.com')
             buildConfigField "int", "APP_TYPE", "326"
             resValue "string", "app_name", "Kamma Jodii"
+            manifestPlaceholders = [appScheme: "kammajodii", appHost: "kamma.jodii.com"]
         }
         rajput {
             dimension "appType"
             applicationId('rajput.jodii.com')
             buildConfigField "int", "APP_TYPE", "327"
             resValue "string", "app_name", "Rajput Jodii"
+            manifestPlaceholders = [appScheme: "rajputjodii", appHost: "rajput.jodii.com"]
         }
         agarwal {
             dimension "appType"
             applicationId('agarwal.jodii.com')
             buildConfigField "int", "APP_TYPE", "328"
             resValue "string", "app_name", "Agarwal Jodii"
+            manifestPlaceholders = [appScheme: "agarwaljodii", appHost: "agarwal.jodii.com"]
         }
         yadav {
             dimension "appType"
             applicationId('yadav.jodii.com')
             buildConfigField "int", "APP_TYPE", "329"
             resValue "string", "app_name", "Yadav Jodii"
+            manifestPlaceholders = [appScheme: "yadavjodii", appHost: "yadav.jodii.com"]
         }
         mali {
             dimension "appType"
             applicationId('mali.jodii.com')
             buildConfigField "int", "APP_TYPE", "330"
             resValue "string", "app_name", "Mali Jodii"
+            manifestPlaceholders = [appScheme: "malijodii", appHost: "mali.jodii.com"]
         }
         st {
             dimension "appType"
             applicationId('st.jodii.com')
             buildConfigField "int", "APP_TYPE", "331"
             resValue "string", "app_name", "ST Jodii"
+            manifestPlaceholders = [appScheme: "stjodii", appHost: "st.jodii.com"]
         }
         naidu {
             dimension "appType"
             applicationId('naidu.jodii.com')
             buildConfigField "int", "APP_TYPE", "332"
             resValue "string", "app_name", "Naidu Jodii"
+            manifestPlaceholders = [appScheme: "naidujodii", appHost: "naidu.jodii.com"]
         }
         mudaliyar {
             dimension "appType"
             applicationId('mudaliyar.jodii.com')
             buildConfigField "int", "APP_TYPE", "333"
             resValue "string", "app_name", "Mudaliyar Jodii"
+            manifestPlaceholders = [appScheme: "mudaliyarjodii", appHost: "mudaliyar.jodii.com"]
         }
         chettiyar {
             dimension "appType"
             applicationId('chettiyar.jodii.com')
             buildConfigField "int", "APP_TYPE", "334"
             resValue "string", "app_name", "Chettiyar Jodii"
+            manifestPlaceholders = [appScheme: "chettiyarjodii", appHost: "chettiyar.jodii.com"]
         }
         padmasali {
             dimension "appType"
             applicationId('padmasali.jodii.com')
             buildConfigField "int", "APP_TYPE", "335"
             resValue "string", "app_name", "Padmasali Jodii"
+            manifestPlaceholders = [appScheme: "padmasalijodii", appHost: "padmasali.jodii.com"]
         }
         jat {
             dimension "appType"
             applicationId('jat.jodii.com')
             buildConfigField "int", "APP_TYPE", "336"
             resValue "string", "app_name", "Jat Jodii"
+            manifestPlaceholders = [appScheme: "jatjodii", appHost: "jat.jodii.com"]
         }
         baniya {
             dimension "appType"
             applicationId('baniya.jodii.com')
             buildConfigField "int", "APP_TYPE", "337"
             resValue "string", "app_name", "Baniya Jodii"
+            manifestPlaceholders = [appScheme: "baniyajodii", appHost: "baniya.jodii.com"]
         }
         pillai {
             dimension "appType"
             applicationId('pillai.jodii.com')
             buildConfigField "int", "APP_TYPE", "338"
             resValue "string", "app_name", "Pillai Jodii"
+            manifestPlaceholders = [appScheme: "pillaijodii", appHost: "pillai.jodii.com"]
         }
         brahmin {
             dimension "appType"
             applicationId('brahmin.jodii.com')
             buildConfigField "int", "APP_TYPE", "504"
             resValue "string", "app_name", "Brahmin Jodii"
+            manifestPlaceholders = [appScheme: "brahminjodii", appHost: "brahmin.jodii.com"]
         }
         christian {
             dimension "appType"
             applicationId('christian.jodii.com')
             buildConfigField "int", "APP_TYPE", "501"
             resValue "string", "app_name", "Christian Jodii"
+            manifestPlaceholders = [appScheme: "christianjodii", appHost: "christian.jodii.com"]
         }
         muslim {
             dimension "appType"
             applicationId('muslim.jodii.com')
             buildConfigField "int", "APP_TYPE", "502"
             resValue "string", "app_name", "Muslim Jodii"
+            manifestPlaceholders = [appScheme: "muslimjodii", appHost: "muslim.jodii.com"]
         }
         divorcee {
             dimension "appType"
             applicationId('divorcee.jodii.com')
             buildConfigField "int", "APP_TYPE", "503"
             resValue "string", "app_name", "Divorcee Jodii"
+            manifestPlaceholders = [appScheme: "divorceejodii", appHost: "divorcee.jodii.com"]
         }
         jain {
             dimension "appType"
             applicationId('jain.jodii.com')
             buildConfigField "int", "APP_TYPE", "505"
             resValue "string", "app_name", "Jain Jodii"
+            manifestPlaceholders = [appScheme: "jainjodii", appHost: "jain.jodii.com"]
         }
         sikh {
             dimension "appType"
             applicationId('sikh.jodii.com')
             buildConfigField "int", "APP_TYPE", "506"
             resValue "string", "app_name", "Sikh Jodii"
+            manifestPlaceholders = [appScheme: "sikhjodii", appHost: "sikh.jodii.com"]
         }
     }
 

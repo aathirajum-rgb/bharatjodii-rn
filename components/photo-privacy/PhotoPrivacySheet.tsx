@@ -57,6 +57,7 @@ export default function PhotoPrivacySheet({ visible, onClose, onSaved }: Props) 
 
   useEffect(() => {
     if (!visible) return
+    let cancelled = false
     setStep('options')
     setLoading(true)
     Promise.all([
@@ -64,6 +65,7 @@ export default function PhotoPrivacySheet({ visible, onClose, onSaved }: Props) 
       getItem(SK.Auth.ENTRY_TYPE),
       getItem(SK.Profile.PHOTO_PRIVACY),
     ]).then(([gender, entryType, code]) => {
+      if (cancelled) return
       setIsFemale(gender === '0')
       setIsFreeMember(entryType === 'F')
       const c = code ?? '0'
@@ -71,6 +73,7 @@ export default function PhotoPrivacySheet({ visible, onClose, onSaved }: Props) 
       setSelected(VALUE_FOR_CODE[c] ?? '1')
       setLoading(false)
     })
+    return () => { cancelled = true }
   }, [visible])
 
   function handleSelect(value: UiValue) {

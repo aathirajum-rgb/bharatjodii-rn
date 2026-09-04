@@ -76,17 +76,26 @@ module.exports = ({ config }) => ({
       'RECORD_AUDIO',
       'POST_NOTIFICATIONS',
     ],
+    // ${appScheme}/${appHost} are Gradle manifest placeholders, NOT resolved
+    // here — every flavor shares this one generated AndroidManifest.xml (see
+    // withAndroidFlavors.js's productFlavors block), so baking in this one
+    // `f.scheme`/`f.domain` directly would ship the SAME scheme/host in every
+    // other flavor's APK regardless of which one was actually built,
+    // breaking their real App Links. Gradle substitutes the real per-flavor
+    // value from each productFlavor's own manifestPlaceholders at build time
+    // instead. apiHost is NOT flavor-specific (same per env for every
+    // flavor), so it stays a literal value.
     intentFilters: [
       {
         action: 'VIEW',
         autoVerify: true,
-        data: [{ scheme: f.scheme }],
+        data: [{ scheme: '${appScheme}' }],
         category: ['BROWSABLE', 'DEFAULT'],
       },
       {
         action: 'VIEW',
         autoVerify: true,
-        data: [{ scheme: 'https', host: f.domain }],
+        data: [{ scheme: 'https', host: '${appHost}' }],
         category: ['BROWSABLE', 'DEFAULT'],
       },
       {
@@ -131,6 +140,7 @@ module.exports = ({ config }) => ({
   plugins: [
     './plugins/withAndroidFlavors',
     './plugins/withAndroidBuildCustomizations',
+    './plugins/withAndroidManifestHardening',
     './plugins/withFirebaseAndroid',
     './plugins/withFirebaseIOS',
     './plugins/withRazorpayAndroidBridge',
@@ -138,6 +148,17 @@ module.exports = ({ config }) => ({
     'expo-audio',
     'expo-font',
     'expo-image',
+    // Stores ATN/RTN (access/refresh token) in the OS Keychain (iOS) /
+    // Keystore (Android) instead of AsyncStorage's plain unencrypted file —
+    // see service/storageService.ts. faceIDPermission disabled since this app
+    // never sets requireAuthentication (no biometric-gated reads), so the
+    // Info.plist Face ID usage string the plugin would otherwise add is
+    // unused. configureAndroidBackup stays at its default (true), which is
+    // the actual point of registering this plugin: it excludes SecureStore's
+    // own Android files from Auto Backup — the app's AndroidManifest already
+    // has allowBackup=true with no other exclusion rules, so without this the
+    // encrypted-but-backed-up value could still round-trip through a backup.
+    ['expo-secure-store', { faceIDPermission: false }],
     'expo-splash-screen',
     'expo-status-bar',
     'expo-video',

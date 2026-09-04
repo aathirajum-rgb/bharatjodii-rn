@@ -83,10 +83,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const handoff = getInitialWebviewHandoff()
       if (handoff) {
         try {
+          // Always scrub the token-bearing URL fragment, not just in dev —
+          // leaving it in production means the token sits visible in the
+          // browser's address bar and history indefinitely.
           const newUrl = window.location.pathname + window.location.search
-          if (__DEV__)
-            window.history.replaceState(null, '', newUrl)
-        } catch (e) {}
+          window.history.replaceState(null, '', newUrl)
+        } catch {}
         const result = await applyWebviewHandoff(handoff)
         if (result) {
           const isNewUser = handoff.buildparam?.REGISTER === '1'

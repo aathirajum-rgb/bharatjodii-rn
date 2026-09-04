@@ -21,10 +21,13 @@ import { handleBack } from '../../utils/navigationRef'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
-type Props = { navigation: any; route: { params: { url: string; title: string } } }
+type Props = { navigation: any; route: { params?: { url: string; title: string } } }
 
 export default function ExternalPageScreen({ navigation: _navigation, route }: Props) {
-  const { url, title } = route.params
+  // route.params is undefined if this screen is ever reached with no
+  // navigation state (e.g. a future deep link) — nothing to show without a
+  // url, so bail out below instead of crashing on the destructure.
+  const { url, title } = route.params ?? {} as Partial<NonNullable<Props['route']['params']>>
   const insets = useSafeAreaInsets()
 
   // react-native-webview has no web implementation — it renders an "unsupported
@@ -34,8 +37,19 @@ export default function ExternalPageScreen({ navigation: _navigation, route }: P
   // branches on Platform.OS. A new tab is the natural web equivalent of "open
   // this page without leaving the app flow."
   useEffect(() => {
-    if (Platform.OS === 'web') Linking.openURL(url)
+    if (Platform.OS === 'web' && url) {
+      Linking.openURL(url).catch(e => {
+        if (__DEV__) console.error('[ExternalPage] open url error:', e)
+      })
+    }
   }, [url])
+
+  // No url to show — reached with no navigation params.
+  useEffect(() => {
+    if (!url) handleBack()
+  }, [url])
+
+  if (!url) return null
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>

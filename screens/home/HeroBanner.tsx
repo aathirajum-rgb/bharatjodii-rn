@@ -23,6 +23,11 @@ const BANNER_ROW_MIN_HEIGHT = Math.round(42 * (140 / 38))
 // approximates that outer gutter closely enough for a fraction-of-width calc.
 const BANNER_IMAGE_WIDTH  = Math.round((SW - 32) * (4.5 / 12))
 const BANNER_IMAGE_HEIGHT = BANNER_ROW_MIN_HEIGHT
+// Angular: the paymentFailedPromotion grid's icon column is size="1.3" of 12
+// (not the main grid's 4.5/12) — a small square alert icon, not a big tile
+// image. Square, since the real column has no independent height rule beyond
+// filling its own (icon-sized) width.
+const INSET_ICON_SIZE = Math.round((SW - 32) * (1.3 / 12))
 
 // Angular: matches.page.ts:2317 / home-banner.component.ts:108 / recharge.page.ts:739 —
 // the real PAYMENTFAILEDCONTENT string uses this literal token for its live countdown.
@@ -104,6 +109,12 @@ export interface HeroBannerContent {
   countdownDeadlineMs?: number | undefined // replaces ##TIMER## inside `body`
   ownTimerContent?:    string | undefined  // Angular: CONTENT — a separate line, own countdown appended/embedded
   ownTimerDeadlineMs?: number | undefined
+  // Angular: the paymentFailedPromotion grid's own .payment-failed-banner
+  // class — a small rounded/bordered card with a 24px outer margin, unlike
+  // every other variant's full-bleed banner. `borderColor` only applies when
+  // this is set.
+  insetCard?:  boolean | undefined
+  borderColor?: string | undefined
 }
 
 // Angular binds TITLE/BODY/TITLE1/TITLE2/VALID via [innerHTML] — the CMS's
@@ -172,9 +183,14 @@ export default function HeroBanner({ content, onPress, onDismiss }: HeroBannerPr
         ...(content.gradientLocations ? { locations: content.gradientLocations } : {}),
       }
     : {}
-  const wrapStyle = content.gradient
-    ? s.wrap
-    : [s.wrap, content.bgColor ? { backgroundColor: content.bgColor } : null]
+  const wrapStyle = [
+    s.wrap,
+    content.gradient ? null : (content.bgColor ? { backgroundColor: content.bgColor } : null),
+    content.insetCard ? [s.insetCard, content.borderColor ? { borderColor: content.borderColor } : null] : null,
+  ]
+  const imageSize = content.insetCard
+    ? { width: INSET_ICON_SIZE, height: INSET_ICON_SIZE }
+    : { width: BANNER_IMAGE_WIDTH, height: BANNER_IMAGE_HEIGHT }
 
   return (
     <Wrap {...gradientProps} style={wrapStyle}>
@@ -183,12 +199,12 @@ export default function HeroBanner({ content, onPress, onDismiss }: HeroBannerPr
           <Text style={s.closeText}>✕</Text>
         </Pressable>
       )}
-      <Pressable style={s.row} onPress={onPress}>
+      <Pressable style={[s.row, content.insetCard ? s.insetRow : null]} onPress={onPress}>
         {!!content.imageUrl && (
           <CdnImage
             uri={content.imageUrl}
-            width={BANNER_IMAGE_WIDTH}
-            height={BANNER_IMAGE_HEIGHT}
+            width={imageSize.width}
+            height={imageSize.height}
             style={s.image}
             resizeMode="cover"
           />
@@ -237,6 +253,20 @@ const s = StyleSheet.create({
     top:      10,
     right:    12,
     zIndex:   1,
+  },
+  // Angular: .payment-failed-banner — border-radius: 8px; border: 1px solid
+  // #F5BDD0; plus the template's own mt-24 ml-24 mr-24 margins (a rounded,
+  // bordered inset card, not the full-bleed banner every other variant is).
+  insetCard: {
+    marginTop:         24,
+    marginHorizontal:  24,
+    paddingHorizontal: 12,
+    paddingVertical:   12,
+    borderRadius:      8,
+    borderWidth:        1,
+  },
+  insetRow: {
+    minHeight: 0,
   },
   closeText: {
     fontSize: 16,

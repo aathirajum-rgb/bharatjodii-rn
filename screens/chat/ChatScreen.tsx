@@ -463,19 +463,23 @@ export default function ChatScreen({ navigation, route }: Props) {
   // same dialNumber for both, see communicationService.ts, so calling with
   // the real 'call'/'whatsapp' action here is equivalent and more correct).
   async function handleCallOrWhatsApp(action: 'call' | 'whatsapp') {
-    const result = await communicationBtnOnClick('message', action, { MATRIID: partnerId })
-    if (result.type === 'show_contact') {
-      setContactDetails({
-        name: partnerName,
-        mobile: result.mobile,
-        dialNumber: result.dialNumber,
-        whatsappNumber: result.whatsappNumber,
-      })
-      return
-    }
-    if (await phoneInfo.handleResult(result)) return
-    if (result.type === 'payment_promo') {
-      navigation.navigate('recharge')
+    try {
+      const result = await communicationBtnOnClick('message', action, { MATRIID: partnerId })
+      if (result.type === 'show_contact') {
+        setContactDetails({
+          name: partnerName,
+          mobile: result.mobile,
+          dialNumber: result.dialNumber,
+          whatsappNumber: result.whatsappNumber,
+        })
+        return
+      }
+      if (await phoneInfo.handleResult(result)) return
+      if (result.type === 'payment_promo') {
+        navigation.navigate('recharge')
+      }
+    } catch (e) {
+      if (__DEV__) console.error('[Chat] call/whatsapp error:', e)
     }
   }
 

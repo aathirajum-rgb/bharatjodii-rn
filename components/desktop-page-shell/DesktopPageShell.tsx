@@ -25,13 +25,16 @@ export default function DesktopPageShell({ navigation, userName, activeItem, onT
   const [photoUrl, setPhotoUrl] = useState<string | undefined>(undefined)
 
   useEffect(() => {
+    let cancelled = false
     Promise.all([
       getItem(StorageKeys.Auth.USER_ID),
       getItem(StorageKeys.User.PHOTO_URL),
     ]).then(([id, photo]) => {
+      if (cancelled) return
       setUserId(id ?? '')
       setPhotoUrl(photo ?? undefined)
     })
+    return () => { cancelled = true }
   }, [])
 
   return (

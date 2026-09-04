@@ -68,19 +68,23 @@ export default function LanguagePillSheet({ visible, onClose, allLanguages = fal
   // up here, and so reverting to English/mother-tongue makes it disappear.
   useEffect(() => {
     if (!visible) return
+    let cancelled = false
     // Angular: ngOnInit:89-93 — `this.language = data.language ?? LANG` then
     // `selectLang(this.language)` pre-selects the CURRENT app language, not
     // an empty radio group (confirmed against the reference screenshot).
-    getCurrentLanguage().then(setSelected)
+    getCurrentLanguage().then(lang => { if (!cancelled) setSelected(lang) })
     if (allLanguages) {
-      getAllLanguages().then(setLanguages)
+      getAllLanguages().then(langs => { if (!cancelled) setLanguages(langs) })
     } else {
-      getMotherTongueLanguages().then(setLanguages)
+      getMotherTongueLanguages().then(langs => { if (!cancelled) setLanguages(langs) })
     }
+    return () => { cancelled = true }
   }, [visible, allLanguages])
 
   useEffect(() => {
-    Promise.all(languages.map(lang => loadFonts(lang.id))).then(() => setFontsReady(true))
+    let cancelled = false
+    Promise.all(languages.map(lang => loadFonts(lang.id))).then(() => { if (!cancelled) setFontsReady(true) })
+    return () => { cancelled = true }
   }, [languages])
 
   async function handleSubmit() {

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -201,59 +201,82 @@ export default function ProfilePhoto({
   const showAddRequest  = !isPhotoAvailable && showReqPhotoElement && !isPhotoProtect
   const showViewRequest = isPhotoProtect && showReqPhotoElement
 
+  // Guards against the camera/library picker being launched twice at once —
+  // requestXPermissionsAsync()/launchXAsync() can reject ("Different picker
+  // is already open") if invoked again before the first call's promise
+  // settles, and neither handler's own `uploading` state is set until after
+  // that point, so it can't catch this on its own.
+  const pickerBusyRef = useRef(false)
+
   // ── Own-photo upload (React Native replaces the old native Cordova handler) ──
   const handleUploadPress = useCallback(async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permission required',
-        'Allow photo library access in Settings to upload a photo.',
-      )
-      return
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [3, 4],     // portrait crop matching profile card ratio
-      quality: 0.85,
-    })
-
-    if (!result.canceled && result.assets[0]) {
-      const uri = result.assets[0].uri
-      setUploading(true)
-      try {
-        onPhotoUpload?.(uri)
-      } finally {
-        setUploading(false)
+    if (pickerBusyRef.current) return
+    pickerBusyRef.current = true
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission required',
+          'Allow photo library access in Settings to upload a photo.',
+        )
+        return
       }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        aspect: [3, 4],     // portrait crop matching profile card ratio
+        quality: 0.85,
+      })
+
+      if (!result.canceled && result.assets[0]) {
+        const uri = result.assets[0].uri
+        setUploading(true)
+        try {
+          onPhotoUpload?.(uri)
+        } finally {
+          setUploading(false)
+        }
+      }
+    } catch (e) {
+      if (__DEV__) console.error('[ProfilePhoto] photo library error:', e)
+    } finally {
+      pickerBusyRef.current = false
     }
   }, [onPhotoUpload])
 
   const handleCameraPress = useCallback(async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert(
-        'Permission required',
-        'Allow camera access in Settings to take a photo.',
-      )
-      return
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [3, 4],
-      quality: 0.85,
-    })
-
-    if (!result.canceled && result.assets[0]) {
-      const uri = result.assets[0].uri
-      setUploading(true)
-      try {
-        onPhotoUpload?.(uri)
-      } finally {
-        setUploading(false)
+    if (pickerBusyRef.current) return
+    pickerBusyRef.current = true
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync()
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission required',
+          'Allow camera access in Settings to take a photo.',
+        )
+        return
       }
+
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [3, 4],
+        quality: 0.85,
+      })
+
+      if (!result.canceled && result.assets[0]) {
+        const uri = result.assets[0].uri
+        setUploading(true)
+        try {
+          onPhotoUpload?.(uri)
+        } finally {
+          setUploading(false)
+        }
+      }
+    } catch (e) {
+      if (__DEV__) console.error('[ProfilePhoto] camera error:', e)
+    } finally {
+      pickerBusyRef.current = false
     }
   }, [onPhotoUpload])
 

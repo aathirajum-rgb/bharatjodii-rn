@@ -40,13 +40,17 @@ const webOutlineReset = { outlineStyle: 'none', outlineWidth: 0 } as any
 
 type Props = {
   navigation: any
-  route: { params: { mobile: string; countryCode: string; matriId: string; isNewUser?: boolean } }
+  route: { params?: { mobile: string; countryCode: string; matriId: string; isNewUser?: boolean } }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function OTPScreen({ navigation, route }: Props) {
-  const { mobile, countryCode, matriId, isNewUser: routeIsNewUser } = route.params
+  // route.params is undefined when this screen is reached via a bare deep
+  // link (e.g. a stale bookmark/notification link to just "/otp") with no
+  // navigation state — there's nothing to verify an OTP against in that
+  // case, so redirect to login instead of crashing on the destructure below.
+  const { mobile, countryCode, matriId, isNewUser: routeIsNewUser } = route.params ?? {} as Partial<NonNullable<Props['route']['params']>>
   // If caller explicitly passes isNewUser, use it; otherwise infer from empty matriId
   const isRegistrationFlow = routeIsNewUser ?? (matriId === '')
   const { t } = useTranslation()
@@ -84,6 +88,13 @@ export default function OTPScreen({ navigation, route }: Props) {
       handleVerify(digits)
     },
   })
+
+  // No mobile number to verify against — reached via a bare deep link with
+  // no navigation params. Bail out to login rather than rendering a form
+  // that can never succeed.
+  useEffect(() => {
+    if (!mobile) navigation.replace('login')
+  }, [mobile, navigation])
 
   // Retrieve pageId from stored webview handoff (web platform only)
   useEffect(() => {
@@ -272,6 +283,9 @@ export default function OTPScreen({ navigation, route }: Props) {
   function handleEdit() {
     handleBack()
   }
+
+  // Redirecting to login (see the effect above) — nothing to render.
+  if (!mobile) return null
 
   // Angular subtitle: 'LOGIN_PAGE.DIGITCODE' with ##NO## replaced by mobile
   const subtitle = t('LOGIN_PAGE.DIGITCODE', "We've sent 4 digit code to")

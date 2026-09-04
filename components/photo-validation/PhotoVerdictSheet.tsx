@@ -8,6 +8,7 @@
 // this only ports the visual result screen, not the WorkManager timeout/retry
 // machinery (that lives in the polling call site, CustomGalleryScreen.tsx).
 import { Image } from 'expo-image'
+import { useState } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import Svg, { Circle, Line } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -60,6 +61,14 @@ export default function PhotoVerdictSheet({
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
 
+  // A photo can 404/expire between upload and this verdict render (deleted
+  // server-side, CDN miss) — track failures per photoId and swap in a plain
+  // placeholder box instead of leaving expo-image's blank box on error.
+  const [failedPhotoIds, setFailedPhotoIds] = useState<Set<string>>(new Set())
+  function markPhotoFailed(photoId: string) {
+    setFailedPhotoIds(prev => (prev.has(photoId) ? prev : new Set(prev).add(photoId)))
+  }
+
   const title =
     phase === 'mixed'
       ? t('AI_PHOTO_VALIDATION.UPLOAD_RESULTS_TITLE', 'Photo upload results')
@@ -103,12 +112,20 @@ export default function PhotoVerdictSheet({
                   <Text style={styles.approvedHeader}>{approvedHeader}</Text>
                   <View style={styles.facepileRow}>
                     {approved.slice(0, 6).map((p, i) => (
-                      <Image
-                        key={p.photoId}
-                        source={{ uri: p.photoUrl }}
-                        style={[styles.facepileImg, i > 0 && styles.facepileOverlap]}
-                        contentFit="cover"
-                      />
+                      failedPhotoIds.has(p.photoId) ? (
+                        <View
+                          key={p.photoId}
+                          style={[styles.facepileImg, styles.imgPlaceholder, i > 0 && styles.facepileOverlap]}
+                        />
+                      ) : (
+                        <Image
+                          key={p.photoId}
+                          source={{ uri: p.photoUrl }}
+                          style={[styles.facepileImg, i > 0 && styles.facepileOverlap]}
+                          contentFit="cover"
+                          onError={() => markPhotoFailed(p.photoId)}
+                        />
+                      )
                     ))}
                   </View>
                 </View>
@@ -126,7 +143,16 @@ export default function PhotoVerdictSheet({
                   {rejected.map((p, i) => (
                     <View key={p.photoId} style={[styles.rejectRow, i > 0 && styles.rejectRowDivider]}>
                       <View style={styles.thumbWrap}>
-                        <Image source={{ uri: p.photoUrl }} style={styles.thumb} contentFit="cover" />
+                        {failedPhotoIds.has(p.photoId) ? (
+                          <View style={[styles.thumb, styles.imgPlaceholder]} />
+                        ) : (
+                          <Image
+                            source={{ uri: p.photoUrl }}
+                            style={styles.thumb}
+                            contentFit="cover"
+                            onError={() => markPhotoFailed(p.photoId)}
+                          />
+                        )}
                         <View style={styles.alertBadge}>
                           <AlertCircleIcon />
                         </View>
@@ -221,6 +247,9 @@ const styles = StyleSheet.create({
   },
   facepileOverlap: {
     marginLeft: -12,
+  },
+  imgPlaceholder: {
+    backgroundColor: Colors.surfaceDim,
   },
 
   rejectedHeader: {

@@ -46,7 +46,9 @@ export default function AppRatingModal({ visible, onClose }: { visible: boolean;
 
   function handleRateUs() {
     const url = String(Constants.expoConfig?.extra?.['playStoreUrl'] ?? DEFAULT_PLAYSTORE_URL)
-    Linking.openURL(url)
+    Linking.openURL(url).catch(e => {
+      if (__DEV__) console.error('[AppRatingModal] open store error:', e)
+    })
     onClose()
   }
 

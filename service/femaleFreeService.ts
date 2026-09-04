@@ -44,11 +44,15 @@ export async function getFemaleContactStatus(): Promise<{
   canViewContact: boolean
 }> {
   const raw = await getItem(SK.Promotions.FEMALE_FREE_CONTACT)
-  if (!raw) return { contactUsed: 0, contactTotal: 3, canViewContact: true }
+  const fallback = { contactUsed: 0, contactTotal: 3, canViewContact: true }
+  if (!raw) return fallback
 
-  const data = JSON.parse(raw)
-  const used  = Number(data.CONTACTUSED  ?? 0)
-  const total = Number(data.CONTACTTOTAL ?? 3)
-
-  return { contactUsed: used, contactTotal: total, canViewContact: used < total }
+  try {
+    const data  = JSON.parse(raw)
+    const used  = Number(data.CONTACTUSED  ?? 0)
+    const total = Number(data.CONTACTTOTAL ?? 3)
+    return { contactUsed: used, contactTotal: total, canViewContact: used < total }
+  } catch {
+    return fallback
+  }
 }

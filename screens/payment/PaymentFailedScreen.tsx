@@ -45,7 +45,7 @@ type Status = 'failure' | 'pending'
 type Props = {
   navigation: any
   route: {
-    params: {
+    params?: {
       selectedPackage?: SelectedPackage
       amountLabel?:     string
       status:           Status
@@ -66,7 +66,16 @@ function formatCountdown(ms: number): string {
 
 export default function PaymentFailedScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
-  const { selectedPackage, amountLabel, status, reason, orderId, retryRoute, retryParams } = route.params
+  // route.params is undefined if this screen is ever reached with no
+  // navigation state (e.g. a future deep link). status/retryRoute seed
+  // useState initializers below, before any effect could redirect away, so
+  // they get safe inline fallbacks here instead of the destructure throwing
+  // — worst case shows a generic "payment failed, retry from recharge"
+  // state rather than crashing.
+  const {
+    selectedPackage, amountLabel, reason, orderId, retryParams,
+    status = 'failure', retryRoute = 'recharge',
+  } = route.params ?? {} as Partial<NonNullable<Props['route']['params']>>
 
   const [resolvedStatus, setResolvedStatus] = useState<Status>(status)
   const [polling, setPolling]               = useState(status === 'pending')

@@ -14,7 +14,7 @@
 //   wired: registrationService.ts's submitFullRegistration() sets it, and
 //   MatchesScreen.tsx's load effect reads/consumes it — so this only shows
 //   once, right after registering, not on every Matches mount.
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -41,6 +41,11 @@ export default function BulkLikeModal({
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sending,  setSending]  = useState(false)
   const [sent,     setSent]     = useState(false)
+  // Tracks the "brief confirmation, then close" timer in handleSend so it
+  // can be cancelled — matching BulkLikeDesktopModal.tsx's own autoCloseRef
+  // pattern — instead of firing onSent() against an already-unmounted modal
+  // if the parent closes it within the ~1.2s window.
+  const autoCloseRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Reset selection (all pre-checked, matching Angular) whenever a fresh
   // candidate batch is shown.
@@ -50,7 +55,12 @@ export default function BulkLikeModal({
       setSending(false)
       setSent(false)
     }
+    if (autoCloseRef.current) clearTimeout(autoCloseRef.current)
   }, [visible, candidates])
+
+  useEffect(() => {
+    return () => { if (autoCloseRef.current) clearTimeout(autoCloseRef.current) }
+  }, [])
 
   function toggle(id: string) {
     setSelected(prev => {
@@ -71,7 +81,7 @@ export default function BulkLikeModal({
           onSentNeedsPhoto()   // caller shows the photo-upsell bottom sheet instead
         } else {
           setSent(true)
-          setTimeout(onSent, 1200)   // brief confirmation, then close + reload
+          autoCloseRef.current = setTimeout(onSent, 1200)   // brief confirmation, then close + reload
         }
       }
     } finally {

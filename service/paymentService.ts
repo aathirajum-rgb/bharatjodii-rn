@@ -340,6 +340,14 @@ export async function getPaymentConfig(mode = 'PAYCONFIG'): Promise<IPaymentConf
     payConfig.RAZORPAY_KEY_ID = decrypt(payConfig.RAZORPAY.keyId)
   }
 
+  // RAZORPAY.keySecret and GOOGLEPAY.saltkey are secrets the backend should
+  // never send to a client at all — neither is read anywhere in this app
+  // (only .keyId/.Key/.AUTOPAYFLAG are). Since they're never decrypted here,
+  // strip them before this object is cached so the encrypted ciphertext
+  // doesn't sit indefinitely in unencrypted device storage.
+  if (payConfig?.RAZORPAY) delete payConfig.RAZORPAY.keySecret
+  if (payConfig?.GOOGLEPAY) delete payConfig.GOOGLEPAY.saltkey
+
   // PAYSOURCE=='2' silently routes the whole UPI flow through PayU instead of
   // Razorpay for this account — see initPayUNative(). GOOGLEPAY.Key is PayU's
   // merchant key, passed through as-is (matching the old Android app).
@@ -394,7 +402,6 @@ export async function getNetBankingList(): Promise<NetBankingItem[]> {
   const result = await apiCall(Endpoints.payment.netBankingList, 'POST', `ID=${userId}`)
   if (result?.RESPONSECODE === '1' && result?.ERRCODE === '0') {
     const list = result.RESPONSE?.list ?? []
-    console.error('DBG_NETBANKING_LIST', JSON.stringify(list))
     return list
   }
   return []
@@ -857,7 +864,6 @@ export async function getCheckoutDetails(
   // field read off "checkout" downstream (orderId, amount, MOBILENO) was
   // silently undefined.
   if (result?.RESPONSECODE === '1') return result
-  console.error('DBG_CHECKOUT_RAW', method, JSON.stringify(result))
   const reason = typeof result?.RESPONSE === 'string'
     ? result.RESPONSE
     : (result?.RESPONSE?.MSG ?? result?.RESPONSE?.ERRMESSAGE ?? result?.RESULT?.ERRMESSAGE)
@@ -1361,11 +1367,10 @@ export function initPayUNative(options: PayUCheckoutOptions): Promise<{ success:
       siPaymentStartDate: si.paymentStartDate,
       siPaymentEndDate:   si.paymentEndDate,
     } : rest
-    console.error('DBG_PAYU_OPTIONS', JSON.stringify(nativeOptions))
     try {
       PayUBridge.openCheckout(nativeOptions)
     } catch (err: any) {
-      console.error('DBG_PAYU_OPENCHECKOUT_THROW', err?.message, err?.stack)
+      if (__DEV__) console.error('[PayU] openCheckout threw:', err?.message, err?.stack)
       settle({ success: false, response: { code: 0, description: err?.message || 'PayU bridge threw' } })
     }
   })

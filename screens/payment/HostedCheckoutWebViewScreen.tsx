@@ -14,11 +14,12 @@ import { useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, BackHandler, StyleSheet, Text, View } from 'react-native'
 import { WebView, type WebViewMessageEvent } from 'react-native-webview'
 import type {
-  WebViewErrorEvent, WebViewHttpErrorEvent, WebViewNavigation,
+  ShouldStartLoadRequest, WebViewErrorEvent, WebViewHttpErrorEvent, WebViewNavigation,
 } from 'react-native-webview/lib/WebViewTypes'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { SemanticFontsEnglish } from '../../src/theme/fonts'
+import { EnvConfig } from '../../constants/env'
 import {
   getHostedCheckoutRequest, handlePaymentSuccess, recordPaymentFailure,
   type SelectedPackage,
@@ -36,10 +37,35 @@ const BRIDGE_SCRIPT = `
   true;
 `
 
+// Only jodii's own payment hosts and Razorpay (the hosted-checkout processor
+// for this payment group — see the redirect-chain comment on
+// handleNavStateChange below) should ever be trusted to report a payment
+// outcome or receive navigation. Blocks a compromised/injected script
+// anywhere in that chain from forging a "success" postMessage, and blocks
+// navigation being hijacked to an arbitrary intent://, market://, or other
+// non-http(s) scheme — neither of which this flow ever legitimately needs.
+function getTrustedHostnames(): string[] {
+  const hosts = [EnvConfig.api, EnvConfig.paymentNg, EnvConfig.payment]
+    .map(u => { try { return new URL(u).hostname } catch { return null } })
+    .filter((h): h is string => !!h)
+  return [...new Set(hosts)]
+}
+
+function isTrustedOrigin(url: string): boolean {
+  try {
+    const { hostname, protocol } = new URL(url)
+    if (protocol !== 'https:') return false
+    if (hostname === 'razorpay.com' || hostname.endsWith('.razorpay.com')) return true
+    return getTrustedHostnames().some(h => hostname === h || hostname.endsWith(`.${h}`))
+  } catch {
+    return false
+  }
+}
+
 type Props = {
   navigation: any
   route: {
-    params: {
+    params?: {
       selectedPackage: SelectedPackage
       amountLabel?:    string
       method:          'netbanking' | 'card' | 'upi'
@@ -54,7 +80,13 @@ type Props = {
 
 export default function HostedCheckoutWebViewScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
-  const { selectedPackage, amountLabel, method, bank, card, amount, retryRoute, retryParams } = route.params
+  // route.params is undefined if this screen is ever reached with no
+  // navigation state (e.g. a future deep link) — there's no safe fallback
+  // package/amount to substitute, so the load effect below bails out to the
+  // same "couldn't start payment" path used when the checkout request itself
+  // fails, instead of crashing on selectedPackage.PACKAGEID.
+  const { selectedPackage, amountLabel, method, bank, card, amount, retryRoute, retryParams } =
+    route.params ?? {} as Partial<NonNullable<Props['route']['params']>>
 
   const [request, setRequest] = useState<{ uri: string; body: string } | null>(null)
   const [pageLoading, setPageLoading] = useState(true)
@@ -62,6 +94,11 @@ export default function HostedCheckoutWebViewScreen({ navigation, route }: Props
 
   useEffect(() => {
     let cancelled = false
+    if (!selectedPackage || !method || amount == null) {
+      Alert.alert('Error', 'Could not start payment. Please try again.')
+      handleBack()
+      return
+    }
     getHostedCheckoutRequest(selectedPackage.PACKAGEID, amount, method, bank, card).then(req => {
       if (cancelled) return
       if (!req) {
@@ -101,6 +138,10 @@ export default function HostedCheckoutWebViewScreen({ navigation, route }: Props
 
   async function handleBridgeMessage(event: WebViewMessageEvent) {
     if (settledRef.current) return
+    // Reject a bridge message posted from anywhere other than jodii's own
+    // payment pages or Razorpay's hosted checkout — the only origins that
+    // should ever be able to report a payment outcome here.
+    if (!isTrustedOrigin(event.nativeEvent.url)) return
     let data: any
     try {
       data = JSON.parse(event.nativeEvent.data)
@@ -133,6 +174,19 @@ export default function HostedCheckoutWebViewScreen({ navigation, route }: Props
   // as dead debug logging.
   function handleLoadError(_event: WebViewErrorEvent) {}
   function handleHttpError(_event: WebViewHttpErrorEvent) {}
+
+  // Bank/gateway redirects (netbanking OTP pages, card 3DS, UPI VPA
+  // verification) can land on virtually any bank's own https domain, so this
+  // can't be a host allowlist — only the scheme is restricted, blocking a
+  // hijack to intent://, market://, or other non-http(s) schemes that this
+  // flow never legitimately needs.
+  function handleShouldStartLoad(request: ShouldStartLoadRequest): boolean {
+    try {
+      return new URL(request.url).protocol === 'https:'
+    } catch {
+      return false
+    }
+  }
   async function handleNavStateChange(nav: WebViewNavigation) {
     if (settledRef.current) return
 
@@ -177,7 +231,7 @@ export default function HostedCheckoutWebViewScreen({ navigation, route }: Props
         onError={handleLoadError}
         onHttpError={handleHttpError}
         onNavigationStateChange={handleNavStateChange}
-        mixedContentMode="always"
+        onShouldStartLoadWithRequest={handleShouldStartLoad}
         style={s.webview}
       />
       {pageLoading && (

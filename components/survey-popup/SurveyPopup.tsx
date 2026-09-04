@@ -14,7 +14,11 @@ export default function SurveyPopup({
 }) {
   async function handleTakeSurvey() {
     if (!data) return
-    if (data.link) Linking.openURL(data.link)
+    if (data.link) {
+      Linking.openURL(data.link).catch(e => {
+        if (__DEV__) console.error('[SurveyPopup] open link error:', e)
+      })
+    }
     if (data.surveyId) await submitSurvey(data.surveyId)
     onClose()
   }

@@ -1,9 +1,9 @@
-import { Image } from 'expo-image'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Animated, Dimensions, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { SvgXml } from 'react-native-svg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
@@ -124,7 +124,7 @@ export default function GalleryAccessSheet({ visible, onAllow, onClose, variant 
 
         {/* Icon — Angular: add-photos-popup.svg, shown only for action='enableStorage' */}
         <View style={styles.iconWrapper}>
-          <Image source={{ uri: CDN_ICON }} style={styles.icon} contentFit="contain" />
+          <CdnSvg uri={CDN_ICON} width={56} height={56} />
         </View>
 
         {/* Header/Body — Angular: STORAGE_SETTINGS.HEADER/BODY, swapped to
@@ -196,10 +196,6 @@ const styles = StyleSheet.create({
     width:        56,
     height:       56,
     marginBottom: 24,
-  },
-  icon: {
-    width:  '100%',
-    height: '100%',
   },
 
   // Angular: heading1-semibold-22 — var(--font22) = 22px, no explicit

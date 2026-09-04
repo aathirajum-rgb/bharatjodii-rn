@@ -15,5 +15,10 @@ export interface GamBannerParams {
 }
 
 export function buildGamBannerUrl({ gender = '', caste = '', domain = '' }: GamBannerParams): string {
-  return `${GAM_BANNER_BASE_URL}&gender=${gender}&caste=${caste}&domain=${domain}`
+  // Angular (matches.page.ts/viewprofile.page.ts) interpolates these raw too
+  // — GENDER/CASTE/DOMAINID are short backend codes, never free text, so this
+  // has never broken in practice. encodeURIComponent is a no-op for any value
+  // seen today; only guards against one ever containing a URL-special
+  // character (&, =, #, ...) that would otherwise inject/break query params.
+  return `${GAM_BANNER_BASE_URL}&gender=${encodeURIComponent(gender)}&caste=${encodeURIComponent(caste)}&domain=${encodeURIComponent(domain)}`
 }

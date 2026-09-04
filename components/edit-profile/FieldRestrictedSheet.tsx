@@ -50,7 +50,11 @@ export default function FieldRestrictedSheet({ visible, onClose }: Props) {
   }, [visible])
 
   function callSupport() {
-    if (phone) Linking.openURL(`tel:${phone}`)
+    if (phone) {
+      Linking.openURL(`tel:${phone}`).catch(e => {
+        if (__DEV__) console.error('[FieldRestrictedSheet] call error:', e)
+      })
+    }
   }
 
   return (

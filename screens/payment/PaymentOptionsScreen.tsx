@@ -363,7 +363,7 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
         }
       }
     } catch (error: any) {
-      console.error('DBG_PAYMENT_ERROR payment-options', error?.message, error)
+      if (__DEV__) console.error('[PaymentOptions] payment error:', error?.message, error)
       Alert.alert('Error', error?.message || 'Something went wrong. Please try again.')
     } finally {
       setPaying(false)

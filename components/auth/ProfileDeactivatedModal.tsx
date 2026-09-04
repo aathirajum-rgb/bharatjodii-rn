@@ -34,10 +34,18 @@ export default function ProfileDeactivatedModal({ visible, info, onClose }: Prop
   if (!info) return null
 
   function handleCall() {
-    if (info!.callingNumber) Linking.openURL(`tel:${info!.callingNumber}`)
+    if (info!.callingNumber) {
+      Linking.openURL(`tel:${info!.callingNumber}`).catch(e => {
+        if (__DEV__) console.error('[ProfileDeactivatedModal] call error:', e)
+      })
+    }
   }
   function handleWhatsApp() {
-    if (info!.whatsappNumber) Linking.openURL(`https://wa.me/${info!.whatsappNumber.replace(/\D/g, '')}`)
+    if (info!.whatsappNumber) {
+      Linking.openURL(`https://wa.me/${info!.whatsappNumber.replace(/\D/g, '')}`).catch(e => {
+        if (__DEV__) console.error('[ProfileDeactivatedModal] whatsapp error:', e)
+      })
+    }
   }
 
   return (

@@ -120,20 +120,39 @@ function isApiHostLink(url: string): boolean {
   }
 }
 
-// Legacy backend-resolved link (see header comment) — any path under this
-// build's own API host. Always returns true once matched: this is never a
-// React Navigation screen path, so it must never fall through to
-// `config.screens` regardless of what happens inside.
+// The old Android app (SplashScreenActivity.kt's deepLink()) accepts ANY path
+// under the API host with no allowlist at all — confirmed directly against
+// its source. That's a genuine confused-deputy risk here too: since apiCall()
+// attaches the logged-in user's own ATN/RTN by default, a link an attacker
+// crafts to an arbitrary path+query under this host would be requested using
+// the victim's own session the moment they tap it. The only path this
+// mechanism is actually confirmed to be used for by the live backend today is
+// the SMS/WhatsApp registration-resume link (see header comment) — restrict
+// to exactly that instead of the whole host, unlike Android's unrestricted
+// original.
+const ALLOWED_API_HOST_PATHS = ['registration/linksms/v1']
+
+function isAllowedApiHostPath(path: string): boolean {
+  return ALLOWED_API_HOST_PATHS.includes(path)
+}
+
+// Legacy backend-resolved link (see header comment) — a path under this
+// build's own API host, restricted to ALLOWED_API_HOST_PATHS above. Always
+// returns true once matched (isApiHostLink): this is never a React
+// Navigation screen path, so it must never fall through to `config.screens`
+// regardless of what happens inside.
 async function handleApiHostLink(url: string): Promise<boolean> {
   if (!isApiHostLink(url)) return false
 
   try {
-    const userId = await getItem(SK.Auth.USER_ID)
-    if (!userId) return true // Android: not logged in → link silently ignored, same here
-
     const origin = new URL(EnvConfig.api).origin
     const relative = url.slice(origin.length + 1)
     const [path, query = ''] = relative.split('?')
+    if (!isAllowedApiHostPath(path)) return true // not a known real link — swallow without acting
+
+    const userId = await getItem(SK.Auth.USER_ID)
+    if (!userId) return true // Android: not logged in → link silently ignored, same here
+
     const result = await apiCall(`${EnvConfig.api}${path}`, 'GET', query)
     const { ID, MSGTYPE } = result?.RESPONSE ?? {}
 

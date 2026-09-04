@@ -107,14 +107,69 @@ function errorResponse(moduleName: string): ApiResult {
   }
 }
 
+// Every failure (timeout, offline, a real 4xx/5xx, a request-setup error, an
+// intentional AbortController cancellation) previously collapsed into the
+// exact same generic errorResponse with nothing logged, even in dev — making
+// "why does this call always fail" undiagnosable from client-side signals
+// alone. Purely additive: return value is unchanged for every caller, this
+// only adds dev-only visibility into which of those it actually was.
+function logApiError(method: string, url: string, error: any): void {
+  if (!__DEV__ || axios.isCancel(error)) return
+  if (error?.response) {
+    console.error(`[apiClient] ${method} ${url} → HTTP ${error.response.status}:`, error.response.data)
+  } else if (error?.request) {
+    console.error(`[apiClient] ${method} ${url} → no response (offline/timeout):`, error?.message)
+  } else {
+    console.error(`[apiClient] ${method} ${url} → request error:`, error?.message)
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 //  API CALL  (POST / GET)
 // ─────────────────────────────────────────────────────────────
 
-export async function apiCall(
+// De-dupes identical concurrent requests — e.g. a double-tap on Login/Send-OTP
+// firing twice before the first response lands (the UI's own `loading` state
+// isn't set until after the tap handler already started). A second call with
+// the exact same method+url+params while the first is still in flight gets
+// the same in-flight promise instead of firing a duplicate request; once it
+// settles, the key is freed immediately so a later legitimate re-request
+// (retry after an error, the next iteration of a polling loop) is unaffected.
+// Retries and any call carrying an explicit AbortSignal (a caller managing
+// its own cancellation/staleness — see SearchScreen's live-count preview) skip
+// this entirely: folding them into a shared promise would let one caller's
+// abort silently cancel a different caller's request.
+const inFlightRequests = new Map<string, Promise<ApiResult>>()
+
+export function apiCall(
   url: string,
   method: 'POST' | 'GET',
   params: string,
+  // Optional — lets a caller cancel a superseded in-flight request (e.g. a
+  // rapid-refire search/filter query) instead of it running to completion
+  // and racing a newer request for which response applies last. No existing
+  // caller passes this; every current call site is completely unaffected.
+  signal?: AbortSignal,
+  _retrying = false,
+): Promise<ApiResult> {
+  if (_retrying || signal) return doApiCall(url, method, params, signal, _retrying)
+
+  const key = `${method} ${url}?${params}`
+  const existing = inFlightRequests.get(key)
+  if (existing) return existing
+
+  const promise = doApiCall(url, method, params, signal, _retrying).finally(() => {
+    if (inFlightRequests.get(key) === promise) inFlightRequests.delete(key)
+  })
+  inFlightRequests.set(key, promise)
+  return promise
+}
+
+async function doApiCall(
+  url: string,
+  method: 'POST' | 'GET',
+  params: string,
+  signal?: AbortSignal,
   _retrying = false,
 ): Promise<ApiResult> {
   try {
@@ -131,6 +186,9 @@ export async function apiCall(
 
     const config: AxiosRequestConfig = {
       headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+      // exactOptionalPropertyTypes forbids an explicit `signal: undefined` —
+      // only include the key at all when a real signal was passed.
+      ...(signal ? { signal } : {}),
     }
 
     const res: ApiResult = method === 'POST'
@@ -151,13 +209,14 @@ export async function apiCall(
     if (errCode === '22' || errCode === '61' || errCode === '23') {
       if (_retrying) return errorResponse(url) // prevent infinite retry
       const result = await handleErrCode(errCode, res['RTN'], () =>
-        apiCall(url, method, params, true),
+        doApiCall(url, method, params, signal, true),
       )
       return result ?? res
     }
 
     return res
-  } catch {
+  } catch (error: any) {
+    logApiError(method, url, error)
     return errorResponse(url)
   }
 }
@@ -211,7 +270,8 @@ export async function uploadFile(
     }
 
     return res
-  } catch {
+  } catch (error: any) {
+    logApiError('POST', url, error)
     return errorResponse(url)
   }
 }
@@ -231,7 +291,6 @@ const PRESERVE_KEYS = [
   StorageKeys.Auth.APP_TYPE,
   'LANG_SELECTED',
   StorageKeys.Auth.LANG,
-  'MOBILENO',
   StorageKeys.User.MEMBER_CODE,
   StorageKeys.Auth.WEB_LOGIN,
 ] as const

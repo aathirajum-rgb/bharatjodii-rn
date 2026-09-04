@@ -177,6 +177,12 @@ export default function SearchScreen({ navigation }: Props) {
   const [multiEditor,  setMultiEditor]  = useState<FieldKey | null>(null)
   const [heightOptions, setHeightOptions] = useState<PickerOption[]>([])
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Guards the live match-count preview below against a stale response
+  // overwriting a fresher one — the 400ms debounce only delays when a new
+  // request FIRES, it doesn't stop an already-in-flight one from a previous
+  // firing finishing late and racing a newer request's response.
+  const countAbortRef = useRef<AbortController | null>(null)
+  const countGenRef    = useRef(0)
 
   // ── Load ──────────────────────────────────────────────────────────────────
 
@@ -218,20 +224,30 @@ export default function SearchScreen({ navigation }: Props) {
     if (loading || !matriId) return
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
+      countAbortRef.current?.abort()
+      const controller = new AbortController()
+      countAbortRef.current = controller
+      const myGen = ++countGenRef.current
+
       setCountLoading(true)
       try {
         await saveFilterState(selected, ppCheckBox, {})
         const params = await buildSearchParams(matriId, 0, 1)
-        const res = await fetchSearchResults(params)
+        const res = await fetchSearchResults(params, controller.signal)
+        // A newer request has since started — this one's result is stale,
+        // discard it instead of overwriting the count for the current filters.
+        if (myGen !== countGenRef.current) return
         setMatchCount(res.totalCount)
       } catch {
         // keep last known count on failure
       } finally {
-        setCountLoading(false)
+        if (myGen === countGenRef.current) setCountLoading(false)
       }
     }, 400)
-    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      countAbortRef.current?.abort()
+    }
   }, [selected, ppCheckBox, strictPrefs, loading, matriId])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
