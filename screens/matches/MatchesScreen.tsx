@@ -2653,10 +2653,12 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
       )}
 
       {/* ── Footer ─────────────────────────────────────────────────────────── */}
+      {/* No upgradeTag prop: AppFooter now loads the real MENUDISCOUNT itself
+          (Angular's footer.component.ts does the same), so this no longer ships
+          a hardcoded "₹200 OFF" to every user regardless of their real offer. */}
       <AppFooter
         activeTab={1}
         likesCount={likesCount}
-        upgradeTag="₹200 OFF"
         onTabPress={handleTabPress}
       />
 

@@ -1,11 +1,24 @@
+import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useTranslation } from 'react-i18next'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { getMenuPromo } from '../../service/paymentService'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+
+// ─── Icon sizes — footer.component.scss ───────────────────────────────────────
+// Every icon sits in a `.footer-icon-size` span: 1.57rem = 25.12px. Three tabs
+// deviate from it in Angular's own markup/SCSS:
+//   • Likes  — the span also gets `.small` (1.125rem = 18px) for EVERY language
+//              except Malayalam: [class]="['ml'].includes(language) ? '' : 'small'"
+//   • Message— `.message-icon` is 20x24 (applied to the inactive icon)
+//   • Membership — swaps to `.membership-off-size` (15x12) when the discount
+//              chip is present, so the chip has room; otherwise `.height100`.
+const ICON_DEFAULT = 25
+const ICON_SMALL   = 18
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 // Tab IDs match Figma bottom nav order exactly:
@@ -92,7 +105,35 @@ export default function AppFooter({
   onTabPress,
 }: AppFooterProps) {
   const insets = useSafeAreaInsets()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+
+  // Angular: footer.component.ts:97-100 — the FOOTER ITSELF loads the discount
+  // chip (paymentService.getMenuPromo(0) → MENUDISCOUNT), which is why it shows
+  // on every page there. This port had it as a prop only, so the chip appeared
+  // on Home/Membership and was hardcoded on Matches, while Activity/Messages
+  // showed none at all. Self-loaded here (getMenuPromo caches, so this is not a
+  // per-screen network hit); an explicit prop still wins when a caller passes one.
+  const [promoTag, setPromoTag] = useState('')
+  useEffect(() => {
+    if (upgradeTag !== undefined) return
+    let cancelled = false
+    getMenuPromo()
+      .then(promo => { if (!cancelled) setPromoTag(String(promo?.MENUDISCOUNT ?? '')) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [upgradeTag])
+
+  const tag = upgradeTag ?? (promoTag || undefined)
+  // Angular gives the Likes icon the `.small` class for every language but Malayalam.
+  const likesIconSize = i18n.language === 'ml' ? ICON_DEFAULT : ICON_SMALL
+
+  function iconSize(tab: FooterTab): { width: number; height: number } {
+    if (tab === 2) return { width: likesIconSize, height: likesIconSize }
+    // `.message-icon` — the only non-square icon in the bar.
+    if (tab === 4) return { width: 20, height: 24 }
+    if (tab === 3) return tag ? { width: 15, height: 12 } : { width: ICON_DEFAULT, height: ICON_DEFAULT }
+    return { width: ICON_DEFAULT, height: ICON_DEFAULT }
+  }
 
   return (
     <View style={[styles.container, { paddingBottom: insets.bottom }]}>
@@ -100,6 +141,7 @@ export default function AppFooter({
         {TAB_ORDER.map(tab => {
           const isActive = activeTab === tab
           const label = t(TAB_LABEL_KEYS[tab])
+          const size = iconSize(tab)
 
           // Count badge per tab (matches Figma: Likes shows 99+)
           let badgeCount: number | undefined
@@ -118,14 +160,10 @@ export default function AppFooter({
             >
               {/* ── Icon area ── */}
               <View style={styles.iconWrap}>
-                {/* Angular: footer.component.html:48-49 — the Membership icon
-                    swaps class by whether the tag is present: .membership-off-size
-                    (15x12, footer.component.scss:165) shrinks it to make room for
-                    the chip, otherwise .height100 fills the ~25px icon box. */}
                 <CdnSvg
                   uri={isActive ? TAB_ICONS[tab][1] : TAB_ICONS[tab][0]}
-                  width={tab === 3 && !!upgradeTag ? 15 : 24}
-                  height={tab === 3 ? (upgradeTag ? 12 : 25) : 24}
+                  width={size.width}
+                  height={size.height}
                 />
 
                 {/* Count badge (Home / Likes / Messages) */}
@@ -141,14 +179,14 @@ export default function AppFooter({
                   Angular: footer.component.html:57-59 — the .membership-off
                   div is a SIBLING sitting BETWEEN the icon <span> and the
                   <ion-label>, not above the icon. */}
-              {tab === 3 && !!upgradeTag && (
+              {tab === 3 && !!tag && (
                 <LinearGradient
                   colors={['#33258C', '#751246']}
                   start={{ x: 0, y: 0.5 }}
                   end={{ x: 1, y: 0.5 }}
                   style={styles.upgradeTag}
                 >
-                  <Text style={styles.upgradeTagText} numberOfLines={1}>{upgradeTag}</Text>
+                  <Text style={styles.upgradeTagText} numberOfLines={1}>{tag}</Text>
                 </LinearGradient>
               )}
 
@@ -156,7 +194,12 @@ export default function AppFooter({
               {/* Angular: two-word labels (Liked profiles / Contacted profiles) wrap
                   to 2 lines by design — numberOfLines=2 + centered text matches that. */}
               <Text
-                style={[styles.tabLabel, isActive && styles.tabLabelActive]}
+                style={[
+                  styles.tabLabel,
+                  // Angular: every label is `pt-4` except Message, which is `pt-2`.
+                  tab === 4 && styles.tabLabelMessage,
+                  isActive && styles.tabLabelActive,
+                ]}
                 numberOfLines={2}
               >
                 {label}
@@ -181,21 +224,30 @@ const styles = StyleSheet.create({
     shadowRadius:    8,
     elevation:       8,
   },
-  // Figma: bar height 56px
+  // Angular: `ion-tab-bar` is `min-height: 56px` (footer.component.scss:214) with
+  // the tab-bar's own `gap-footer pl-2 pr-2` → gap + 2px side padding. It was a
+  // FIXED 56px here, which clipped the second line of a wrapped label.
   tabBar: {
     flexDirection:     'row',
     justifyContent:    'space-around',
     alignItems:        'center',
-    paddingHorizontal: 4,
-    paddingTop:        6,
-    paddingBottom:     4,
-    height:            56,
+    paddingHorizontal: 2,
+    paddingVertical:   4,
+    minHeight:         56,
+    // Angular's gap is 12px, but its buttons are `flex: 0 0 auto; max-width:
+    // min-content`, so each one only takes the width of its widest word and the
+    // leftover space is spread by space-around. RN lays these out as five EQUAL
+    // flex:1 columns, so the same 12px would over-narrow them; 8px reproduces
+    // Angular's actual rendered column width (~58dp at 360dp) — which is what
+    // makes "Liked profiles" wrap onto two lines there and not here.
+    gap:               8,
   },
   tabBtn: {
     flex:           1,
+    // Angular: `ion-tab-button { min-width: 15% }`.
+    minWidth:       '15%',
     alignItems:     'center',
     justifyContent: 'center',
-    paddingBottom:  2,
     position:       'relative',
   },
   tabPressed: { opacity: 0.7 },
@@ -204,7 +256,9 @@ const styles = StyleSheet.create({
     alignItems:     'center',
     justifyContent: 'center',
   },
-  // Figma: inactive label #545454
+  // Angular: `.font-10-nav pt-4 line-height-12` — 10px, Poppins-Regular,
+  // 12px line-height, 4px above. Inactive `.footer-text-in-active` = gray-color1
+  // (#545454); active `.footer-text-active` = --pink.
   tabLabel: {
     fontFamily: SemanticFontsEnglish.bottomnavEnglishRegular,
     fontSize:   10,
@@ -213,6 +267,8 @@ const styles = StyleSheet.create({
     lineHeight: 12,
     textAlign:  'center',
   },
+  // The Message tab's own label is `pt-2`, not `pt-4`.
+  tabLabelMessage: { marginTop: 2 },
   tabLabelActive: {
     fontFamily: Fonts.poppinsMedium,
     color:      '#B50033',

@@ -580,27 +580,55 @@ export default function ActivityScreen({ navigation, route }: Props) {
     setContactConfirm(null)
   }
 
+  // React Native can only present ONE Modal at a time: opening the Contact
+  // Details sheet while the confirm sheet's own Modal is still animating out
+  // (BottomSheet unmounts its Modal ~220ms after visible flips to false)
+  // silently no-ops — the confirm popup closes and nothing follows it. Angular
+  // has no such constraint (both popups are plain DOM overlays stacked by
+  // Ionic), so this hand-off delay is a platform requirement of the port, not a
+  // behavior change. Only needed when the confirm step was actually on screen;
+  // the direct-reveal path (shouldSkipPhoneConfirm) opens nothing first.
+  function openAfterConfirmSheet(hadConfirmSheet: boolean, open: () => void) {
+    if (!hadConfirmSheet) { open(); return }
+    setTimeout(open, 320)
+  }
+
   async function handleContactConfirmYes(override?: { profile: MatchProfile; action: 'call' | 'whatsapp' }) {
-    const pending = override ?? contactConfirm
+    // Only treat the argument as a real override when it carries our payload —
+    // a UI callback that forwards its press event would otherwise be taken as
+    // one, leaving `profile` undefined (see the note in BottomSheet.tsx).
+    const realOverride = override?.profile ? override : undefined
+    const pending = realOverride ?? contactConfirm
     if (!pending) return
     const { profile, action } = pending
+    const hadConfirmSheet = !realOverride && !!contactConfirm
     setContactConfirm(null)
     try {
       const result = await communicationBtnOnClick('activity', action, { MATRIID: profile.profileId })
       if (result.type === 'show_contact') {
-        setContactDetails({
+        // Angular's Contact Details popup (modalpopup.component.html's
+        // `viewProfileContactNo`) shows Name/Mobile + WhatsApp + Call together
+        // regardless of which CTA was tapped — not one or the other.
+        openAfterConfirmSheet(hadConfirmSheet, () => setContactDetails({
           name: profile.name, mobile: result.mobile, dialNumber: result.dialNumber, whatsappNumber: result.whatsappNumber,
           showCounter: result.showCounter, viewedCount: result.viewedCount, totalCount: result.totalCount,
           idVerified: profile.isIdVerified,
-        })
+        }))
       } else if (result.type === 'payment_promo') {
         await showPaymentPromo(profile, action === 'whatsapp')
       } else if (result.type === 'error') {
         showToast(result.message)
       } else {
-        await phoneInfo.handleResult(result)
+        // The remaining pre-flight results (phone protected, FUP limit,
+        // verify-ID, female-free variants…) all open a sheet of their own, so
+        // they need the same hand-off.
+        openAfterConfirmSheet(hadConfirmSheet, () => { phoneInfo.handleResult(result).catch(() => {}) })
       }
-    } catch { /* silent — matches MatchesScreen's own convention */ }
+    } catch (e) {
+      // Was a bare silent catch — any throw in here looked exactly like the
+      // "confirm popup, then nothing" symptom with no trace of why.
+      if (__DEV__) console.error('[Activity] contact error:', e)
+    }
   }
 
   // Angular: matches-card.component's message icon → communicationBtnOnClick's

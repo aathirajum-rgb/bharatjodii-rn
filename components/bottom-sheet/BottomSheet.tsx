@@ -85,6 +85,19 @@ export interface BottomSheetData {
   showClose?: boolean | undefined         // show ✕ close button (default: true)
 }
 
+// NOTE on the callbacks below: they are all declared `() => void` and MUST be
+// invoked with no arguments. Every one of them is wired to a Pressable /
+// ButtonRevamp inside this component, and React Native forwards the
+// GestureResponderEvent as the first argument of `onPress` — so passing these
+// straight through (`onPress={onPrimaryPress}`) leaks that event into the
+// handler's first parameter. That silently broke every screen whose handler
+// takes an optional first argument: MatchesScreen/ActivityScreen/HomeScreen/
+// ViewProfile/ViewLater/IgnoredProfiles all pass
+// `onPrimaryPress={handleContactConfirmYes}`, whose optional `override`
+// parameter then received the event instead of undefined — the handler read
+// `override.profile` (undefined), threw on `profile.profileId`, and the throw
+// was swallowed by its catch. Symptom: tapping "Yes" on the view-phone confirm
+// popup did nothing at all. Always call them through an arrow wrapper here.
 export interface BottomSheetProps {
   visible: boolean
   type?: BottomSheetType | undefined
@@ -227,7 +240,7 @@ export default function BottomSheet({
   // body text whenever a sheet had no title/image to naturally push content
   // down first (most of them — many BottomSheet uses are content-only).
   const closeButton = showClose && !isViewPhoneConfirm && (
-    <Pressable onPress={onClose} hitSlop={10} style={isDesktop ? styles.desktopCloseBtn : styles.closeBtn}>
+    <Pressable onPress={() => onClose?.()} hitSlop={10} style={isDesktop ? styles.desktopCloseBtn : styles.closeBtn}>
       {isDesktop ? (
         <View style={styles.desktopCloseCircle}>
           <Text style={styles.closeX}>✕</Text>
@@ -250,7 +263,7 @@ export default function BottomSheet({
           <View style={styles.phoneConfirmTitleRow}>
             <Text style={styles.phoneConfirmTitle}>{phoneConfirmQuestion}</Text>
             {showClose && (
-              <Pressable onPress={onClose} hitSlop={10} style={styles.phoneConfirmCloseBtn}>
+              <Pressable onPress={() => onClose?.()} hitSlop={10} style={styles.phoneConfirmCloseBtn}>
                 <Text style={styles.phoneConfirmCloseX}>✕</Text>
               </Pressable>
             )}
@@ -263,7 +276,7 @@ export default function BottomSheet({
               variant="primary"
               fullWidth
               style={[styles.primaryBtn, { marginTop: 20, backgroundColor: Colors.primaryDark }]}
-              onPress={onPrimaryPress}
+              onPress={() => onPrimaryPress?.()}
             />
           )}
 
@@ -335,7 +348,7 @@ export default function BottomSheet({
                 iconPosition="start"
                 fullWidth
                 style={{ backgroundColor: Colors.primaryDark }}
-                onPress={onPrimaryPress}
+                onPress={() => onPrimaryPress?.()}
               />
             </View>
           )}
@@ -402,13 +415,13 @@ export default function BottomSheet({
                 label={data!.secondaryCtaLabel!}
                 variant="ghost"
                 style={{ flex: 1 }}
-                onPress={onSecondaryPress}
+                onPress={() => onSecondaryPress?.()}
               />
               <ButtonRevamp
                 label={data!.ctaLabel!}
                 variant="primary"
                 style={{ flex: 1 }}
-                onPress={onPrimaryPress}
+                onPress={() => onPrimaryPress?.()}
               />
             </View>
           )}
@@ -421,7 +434,7 @@ export default function BottomSheet({
               variant="primary"
               fullWidth
               style={[styles.primaryBtn, { backgroundColor: Colors.primaryDark }]}
-              onPress={onPrimaryPress}
+              onPress={() => onPrimaryPress?.()}
             />
           )}
 
@@ -432,7 +445,7 @@ export default function BottomSheet({
               variant="secondary"
               fullWidth
               style={styles.secondaryBtn}
-              onPress={onSecondaryPress}
+              onPress={() => onSecondaryPress?.()}
             />
           )}
 
@@ -441,7 +454,7 @@ export default function BottomSheet({
 
           {/* Link CTA */}
           {hasLinkCta && (
-            <Pressable onPress={onLinkPress} style={styles.linkCtaBtn} hitSlop={6}>
+            <Pressable onPress={() => onLinkPress?.()} style={styles.linkCtaBtn} hitSlop={6}>
               <Text style={styles.linkCtaText}>{data!.linkCtaLabel}</Text>
             </Pressable>
           )}
@@ -496,7 +509,7 @@ export default function BottomSheet({
       ) : (
         <>
           {/* Full-screen tap area to close (skipped when backdrop dismissal is off) */}
-          {dismissOnBackdrop && <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />}
+          {dismissOnBackdrop && <Pressable style={StyleSheet.absoluteFill} onPress={() => onClose?.()} />}
 
           {/* Sheet — rendered after Pressable so it sits on top and captures its own touches */}
           <Animated.View
