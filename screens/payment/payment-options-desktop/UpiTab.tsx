@@ -16,9 +16,9 @@ import ButtonRevamp from '../../../components/button-revamp/ButtonRevamp'
 import PaymentRestrictedSheet from '../../../components/payment/PaymentRestrictedSheet'
 import { navigate } from '../../../utils/navigationRef'
 import {
-  checkQrPaymentOutcome, getCheckoutDetails, getFinalAmount, getPaymentConfig, getRetryRemainingMs,
-  handlePaymentSuccess, initRazorpayWebCheckout, recordPaymentFailure, stringifyPaymentResponse, toPaise,
-  verifyPaymentSuccess, type QRPaymentData, type SelectedPackage,
+  checkQrPaymentOutcome, generatePaymentLink, getCheckoutDetails, getFinalAmount, getPaymentConfig,
+  getRetryRemainingMs, handlePaymentSuccess, initRazorpayWebCheckout, recordPaymentFailure,
+  stringifyPaymentResponse, toPaise, verifyPaymentSuccess, type QRPaymentData, type SelectedPackage,
 } from '../../../service/paymentService'
 import { Fonts, SemanticFontsEnglish } from '../../../src/theme/fonts'
 
@@ -83,6 +83,32 @@ export default function UpiTab({ selectedPackage, amountLabel, qrData }: Props) 
     const id = setInterval(() => setRemainingMs(prev => Math.max(0, prev - 1000)), 1000)
     return () => clearInterval(id)
   }, [revealed])
+
+  // Angular: promotions.component.ts confirmationPopUP() — a second "someone
+  // else can pay for me" option alongside the QR flow above, standalone here
+  // (not gated on the legacy RPAYFLAG browser-compatibility check the old app
+  // used it as a substitute for — see generatePaymentLink()'s header comment).
+  function handleSharePaymentLink() {
+    Alert.alert(
+      'Share a payment link',
+      'Generate a payment link so a family member or friend can pay for you.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Generate link',
+          onPress: async () => {
+            const ok = await generatePaymentLink(selectedPackage.PACKAGEID, getFinalAmount(selectedPackage))
+            Alert.alert(
+              ok ? 'Done' : 'Error',
+              ok
+                ? 'A payment link has been generated. The recipient will be notified to complete the payment.'
+                : 'Could not generate a payment link. Please try again.',
+            )
+          },
+        },
+      ],
+    )
+  }
 
   const isValid = VPA_REGEX.test(vpa.trim())
   const errorMessage = touched && !isValid ? 'Enter a valid UPI ID' : undefined
@@ -165,6 +191,10 @@ export default function UpiTab({ selectedPackage, amountLabel, qrData }: Props) 
         </Text>
       )}
 
+      <Pressable style={s.payLinkRow} onPress={handleSharePaymentLink}>
+        <Text style={s.payLinkLabel}>Ask someone to pay for you</Text>
+      </Pressable>
+
       <View style={s.orRow}>
         <View style={s.orLine} />
         <Text style={s.orText}>OR</Text>
@@ -224,6 +254,12 @@ const s = StyleSheet.create({
 
   countdown: { textAlign: 'center', fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.black, marginBottom: 8 },
   countdownBold: { fontFamily: Fonts.poppinsSemiBold, color: Colors.primaryDark },
+
+  payLinkRow: {
+    alignSelf: 'center', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 20,
+    borderWidth: 1, borderColor: Colors.primaryDark, marginBottom: 4,
+  },
+  payLinkLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 12, color: Colors.primaryDark },
 
   orRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginVertical: 8 },
   orLine: { flex: 1, height: 1, backgroundColor: Colors.divider },

@@ -28,8 +28,10 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import PaymentOptionsDesktopLayout from './payment-options-desktop/PaymentOptionsDesktopLayout'
 import {
   findUpiPackageName, formatAmount, getAutoRenewalBenefits, getCheckoutDetails, getFinalAmount,
-  getPaymentConfig, getRechargeHelpline, getRetryRemainingMs, getUpiAppList, handlePaymentSuccess,
-  initPayUNative, initRazorpayNative, initRazorpayPayment, parseAmount, recordPaymentFailure,
+  getPaymentConfig, getRechargeHelpline, getRetryRemainingMs, getServerFilteredUpiApps, getUpiAppList,
+  handlePaymentSuccess,
+  initPayUNative, initRazorpayNative, initRazorpayPayment, initRazorpayWebCheckout,
+  initRazorpayWebUpiAppPayment, parseAmount, razorpayWebAppId, recordPaymentFailure,
   stringifyPaymentResponse, toPaise, verifyPayUPaymentSuccess, verifyPaymentSuccess,
   type AutoRenewalSheetData, type PaymentMethodItem, type SelectedPackage, type UpiAppInfo,
 } from '../../service/paymentService'
@@ -106,8 +108,13 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
       // without this, the screen shows every configured UPI app row
       // regardless of whether it's really installed, which is misleading
       // (e.g. showing "Paytm" when Paytm isn't on the device at all).
+      // Angular: payment-mode.page.ts loadUPIApp() — the on-device list is
+      // never trusted directly; it's round-tripped through nbapplicationpay
+      // first (getServerFilteredUpiApps), since the backend can filter out an
+      // installed app the merchant/account doesn't actually support.
       if (Platform.OS === 'android') {
-        const apps = await getUpiAppList()
+        const detected = await getUpiAppList()
+        const apps = detected.length > 0 ? await getServerFilteredUpiApps(detected) : []
         setInstalledApps(apps)
         list = list.filter(m =>
           !AUTOPAY_CAPABLE_KEYS.has(m.KEY) || !!findUpiPackageName(apps, m.KEY),
@@ -119,6 +126,14 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
       // "More Payment Options" screen, reached via the OTHERMODES row below,
       // not shown inline here.
       list = list.filter(m => Number(m.PAGE_ID) !== 2)
+
+      // Angular: payment-mode.page.ts isEmiFlow() — EMI packages default to
+      // (and are restricted to) UPI-app checkout only; Card/Netbanking/Other
+      // payment modes/Doorstep collection aren't valid for a recurring
+      // autopay mandate.
+      if (selectedPackage?.isEmi) {
+        list = list.filter(m => AUTOPAY_CAPABLE_KEYS.has(m.KEY) || m.KEY === 'UPIPAY')
+      }
 
       setMethods(list)
       // A failed payment retried from PaymentFailedScreen arrives with the
@@ -202,8 +217,12 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
     )
   }
 
+  // Angular: payment-mode.page.html:31 — the renew-on-expiry row is hidden
+  // entirely for an EMI package (!isEmiFlow() in that *ngIf), since EMI
+  // checkout is already an unconditional recurring mandate — see handlePay()
+  // below, which forces RENEWALFLAG regardless of this checkbox's state.
   const showRenewalCheckbox =
-    selectedPackage.autopayflag === '1' && AUTOPAY_CAPABLE_KEYS.has(selectedKey)
+    !selectedPackage.isEmi && selectedPackage.autopayflag === '1' && AUTOPAY_CAPABLE_KEYS.has(selectedKey)
 
   const benefits: AutoRenewalSheetData = getAutoRenewalBenefits()
 
@@ -258,7 +277,12 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
       // API always receives a normalized method ('upi'), never the specific
       // app KEY (PAY_GPAY/PAY_PHONEPE/PAY_PAYTM) — that KEY only decides
       // which native UPI app to target, further down.
-      const checkout = await getCheckoutDetails(selectedPackage!.PACKAGEID, toRazorpayMethod(selectedKey), renewOnExpiry)
+      // Angular: payment-mode.page.ts:546 — RecurringFlag is forced for an
+      // EMI package regardless of the (hidden, for EMI) renew-on-expiry
+      // checkbox state.
+      const checkout = await getCheckoutDetails(
+        selectedPackage!.PACKAGEID, toRazorpayMethod(selectedKey), renewOnExpiry || !!selectedPackage!.isEmi,
+      )
 
       // PAYSOURCE=='2' silently routes this account's whole UPI flow through
       // PayU instead of Razorpay — see initPayUNative(). Only applies to the
@@ -327,6 +351,28 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
           razorpayKey: saltKey,
           upiAppPackageName,
         })
+      } else if (Platform.OS === 'web' && AUTOPAY_CAPABLE_KEYS.has(selectedKey)) {
+        // Web equivalent of the native-bridge app-targeting above — see
+        // initRazorpayWebUpiAppPayment()'s header comment. PAYSOURCE=='2'
+        // (PayU) has no web path in the legacy app either, so that case
+        // (usePayU false but still PAYSOURCE=='2') falls through to the
+        // generic Standard Checkout modal instead of a targeted deep link.
+        const appId = config.PAYSOURCE !== '2' ? razorpayWebAppId(selectedKey) : undefined
+        result = appId
+          ? await initRazorpayWebUpiAppPayment(
+              { ...checkout, amount: checkout.amount ?? toPaise(finalTotalNum) },
+              appId, methods.find(m => m.KEY === selectedKey)?.NAME ?? 'This', saltKey,
+            )
+          : await initRazorpayWebCheckout(
+              { ...checkout, amount: checkout.amount ?? toPaise(finalTotalNum) }, saltKey,
+            )
+      } else if (Platform.OS === 'web') {
+        // Generic web fallback (e.g. a recommended Card row) — was
+        // previously calling initRazorpayPayment(), which is react-native-
+        // razorpay's native module and throws on web (no web implementation).
+        result = await initRazorpayWebCheckout(
+          { ...checkout, amount: checkout.amount ?? toPaise(finalTotalNum) }, saltKey,
+        )
       } else {
         result = await initRazorpayPayment(
           { ...checkout, amount: checkout.amount ?? toPaise(finalTotalNum) },
@@ -349,6 +395,8 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
             retryRoute: 'payment-options', retryParams: route.params,
           })
         }
+      } else if (result.response?.noAppAvailable) {
+        Alert.alert('Payment', result.response.description)
       } else {
         const errCode: number = result.response?.code ?? 0
         if (errCode !== 0) {
