@@ -1,4 +1,8 @@
-import { NavigationContainer } from '@react-navigation/native'
+import {
+  NavigationContainer,
+  getPathFromState as defaultGetPathFromState,
+  getStateFromPath as defaultGetStateFromPath,
+} from '@react-navigation/native'
 import * as Linking from 'expo-linking'
 import { useCallback, useEffect } from 'react'
 import { ActivityIndicator, BackHandler, Platform, View } from 'react-native'
@@ -12,20 +16,44 @@ import { handleBack, navigationRef } from '../utils/navigationRef'
 import AppStack from './AppStack'
 import AuthStack from './AuthStack'
 
+// ─── Web hash-based URL routing ───────────────────────────────────────────────
+// Target format: https://stgmobile.jodii.app/jodii/#/daily-recommendations?frm_page=login
+//
+// IMPORTANT: NavigationContainer's own built-in web linking already writes to
+// the browser URL on every navigation (history.pushState), driven by
+// getPathFromState below. Do NOT also call history.pushState/replaceState
+// manually anywhere else (e.g. from onStateChange) — an earlier version of
+// this file did both, and the two writers raced, producing a mangled URL
+// like "/daily-recommendations?frm_page=login#/daily-recommendations?frm_page=login"
+// (RN's own plain-path write, immediately followed/preceded by a second,
+// independent hash write). getPathFromState/getStateFromPath are the single,
+// supported extension point for this — there must be exactly one writer.
+//
+// The server (nginx) serves everything from a fixed docroot at /jodii/ and
+// cannot be reconfigured with SPA fallback rewrite rules. Since browsers never
+// send the URL fragment (#...) to the server, the pathname must ALWAYS stay
+// exactly the base path ("/jodii/") — every route change may only ever change
+// the hash. That's what getPathFromState enforces below: whatever plain path
+// React Navigation would normally have written (e.g. "/daily-recommendations")
+// is folded into the hash instead, never left in the pathname.
+
+function getHashRoute(): string {
+  // window.location.hash includes the leading '#'. "#/daily-recommendations..." -> "/daily-recommendations..."
+  const hash = window.location.hash
+  return hash.startsWith('#/') ? hash.slice(1) : '/'
+}
+
 // ─── Deep-link config ─────────────────────────────────────────────────────────
 // getLinkingPrefixes() resolves this build's own flavor domain (each build
 // only declares an App Links / Associated Domains intent filter for its OWN
 // domain, app.config.js: `f.domain`) — see deepLinkService.ts for the per-
 // flavor resolution, shared with its `dl?page_id=` resolver-link parsing.
-//
-// getInitialURL/subscribe are overridden (React Navigation's documented
-// escape hatch for pre-processing links) so a `dl?page_id=` resolver link —
-// see deepLinkService.ts's header comment — is fully handled there instead
-// of being matched against `config.screens` below, which only knows about
-// semantic paths.
+// Native-only — see the NOTE further down for why web doesn't use these.
+
+const WEB_BASE_PATH = '/jodii/';
 
 const linking = {
-  prefixes: getLinkingPrefixes(),
+  prefixes: Platform.OS === 'web' ? [] : getLinkingPrefixes(),
   config: {
     screens: {
       // Auth screens
@@ -36,31 +64,117 @@ const linking = {
       Permissions:       'permissions',
       Gallery:           'gallery',
       recharge:          'recharge',
+      renewal:           'renewal',
       'payment-success': 'payment-success',
+      'payment-failed':  'payment-failed',
       ComponentShowcase: 'components',
+      LanguageSelection: 'language-selection',
       // Semantic deep-link paths (share/marketing links the app itself
       // generates) — screen names verified against AppStack.tsx's actual
       // registered Stack.Screen names, not copied from the ENavigation enum
       // (several enum values don't match, e.g. 'notification' vs 'Notification').
-      viewProfile:        'viewprofile/:matriId',
-      Activity:           'activity',
-      Notification:       'notification',
-      'verify-id':        'verify-id',
-      'my-membership':    'my-membership',
-      EditProfile:        'edit-profile',
-      Matches:            'matches',
+      viewProfile:            'viewprofile/:matriId',
+      Activity:               'activity',
+      Notification:           'notification',
+      'verify-id':            'verify-id',
+      'selfie-verification':  'selfie-verification',
+      'photo-mismatch-selfie': 'photo-mismatch-selfie',
+      'my-membership':        'my-membership',
+      'daily-recommendations': 'daily-recommendations',
+      'addphoto-intermediate': 'addphoto-intermediate',
+      BlockerPage:            'blocker-page',
+      Validation:             'validation',
+      DiscoverMatches:        'discover-matches',
+      'star-matching':        'star-matching',
+      Matches:                'matches',
+      'chat-window':          'chat-window/:partnerId',
+      Menu:                   'menu',
+      Biodata:                'biodata',
+      Settings:               'settings',
+      PhonePrivacy:           'phone-privacy',
+      EditProfile:            'edit-profile',
+      EditProfileReligious:   'edit-profile-religious',
+      EditProfileProfessional: 'edit-profile-professional',
+      EditProfileBasic:       'edit-profile-basic',
+      EditProfileLifestyle:   'edit-profile-lifestyle',
+      EditProfileFamily:      'edit-profile-family',
+      EditProfileProperty:    'edit-profile-property',
+      EditProfileAgeHeight:   'edit-profile-age-height',
+      EditProfileMarital:     'edit-profile-marital',
+      EditProfileHoroscope:   'edit-profile-horoscope',
+      DeleteProfile:          'delete-profile',
+      DeleteProfileMrgReason: 'delete-profile-mrg-reason',
+      DeleteProfileHide:      'delete-profile-hide',
+      DeleteProfileUnsatisfactory: 'delete-profile-unsatisfactory',
+      DeleteProfileWebsiteName: 'delete-profile-website-name',
+      DeleteProfileShareDetails: 'delete-profile-share-details',
+      DeleteProfileUploadPhoto: 'delete-profile-upload-photo',
+      DeleteProfileSuccess:   'delete-profile-success',
+      SuccessStories:         'success-stories',
+      HelpCenter:             'help-center',
+      Search:                 'search',
+      Faq:                    'faq',
+      IgnoredProfiles:        'ignored-profiles',
+      ViewLater:              'view-later',
+      SearchById:             'search-by-id',
+      MessagerList:           'messager-list',
+      ExternalPage:           'external-page',
+      'payment-options':      'payment-options',
+      'card-payment':         'card-payment',
+      'upi-address':          'upi-address',
+      'net-banking':          'net-banking',
+      'hosted-checkout':      'hosted-checkout',
+      'more-payment-options': 'more-payment-options',
+      'neft-rtgs':            'neft-rtgs',
+      'pay-at-store':         'pay-at-store',
+      'doorstep-collection':  'doorstep-collection',
+      dashboard:              'dashboard',
+      onboarding:             'onboarding',
     },
   },
+  // NOTE: getInitialURL/subscribe below are NATIVE-ONLY. On web, React
+  // Navigation's own useLinking.js (see node_modules/@react-navigation/native/
+  // lib/module/useLinking.js) never calls either of these — it reads
+  // `window.location.pathname + window.location.search` directly for the
+  // initial state and on every popstate. That's exactly why web routing here
+  // is driven entirely by getStateFromPath/getPathFromState below instead
+  // (the only extension points useLinking.js actually calls on web).
   async getInitialURL() {
+    if (Platform.OS === 'web') return undefined
     const url = await Linking.getInitialURL()
     if (url && (await handleResolverURL(url))) return null
     return url
   },
   subscribe(listener: (url: string) => void) {
+    if (Platform.OS === 'web') return () => {}
+
     const sub = Linking.addEventListener('url', ({ url }) => {
       handleResolverURL(url).then(handled => { if (!handled) listener(url) })
     })
     return () => sub.remove()
+  },
+  // Called by useLinking.js with `path = location.pathname + location.search`
+  // (see note above) — on web that's ALWAYS just the fixed base path (e.g.
+  // "/jodii/"), since the pathname never changes. So on web we ignore the
+  // given `path` entirely and derive the real route from the URL fragment
+  // instead — the only place the actual route ever lives.
+  getStateFromPath(path: string, options: any) {
+    if (Platform.OS === 'web') {
+      return defaultGetStateFromPath(getHashRoute(), options)
+    }
+    return defaultGetStateFromPath(path, options)
+  },
+  // The SINGLE writer of the browser URL on web: useLinking.js calls this on
+  // every navigation and passes the result straight to
+  // history.pushState/replaceState verbatim (see createMemoryHistory.js).
+  // Folding the plain path into the hash here — instead of writing it
+  // anywhere else — is what keeps the pathname pinned to the base path.
+  getPathFromState(state: any, options: any) {
+    const path = defaultGetPathFromState(state, options)
+    if (Platform.OS === 'web') {
+      return `${getWebBasePath()}#${path}`
+    }
+    return path
   },
 }
 
@@ -87,11 +201,15 @@ async function guardCheck(
     await setItem('LASTAPPLOGINAT', new Date().toISOString())
   }
 }
-
+ function getWebBasePath(): string {
+  return WEB_BASE_PATH;
+}
 export default function RootNavigation() {
   const { isAuthenticated, loading, handleDeactivation } = useAuth()
 
-  // onStateChange fires on every screen navigation — equivalent to canActivate
+  // onStateChange fires on every screen navigation — equivalent to canActivate.
+  // Browser URL syncing on web is handled entirely by linking's
+  // getPathFromState/getStateFromPath above — nothing to do for it here.
   const handleStateChange = useCallback(() => {
     guardCheck(isAuthenticated, handleDeactivation)
   }, [isAuthenticated, handleDeactivation])
@@ -127,7 +245,11 @@ export default function RootNavigation() {
   }
 
   return (
-    <NavigationContainer ref={navigationRef} linking={linking} onStateChange={handleStateChange}>
+    <NavigationContainer
+      ref={navigationRef}
+      linking={linking}
+      onStateChange={handleStateChange}
+    >
       {isAuthenticated ? <AppStack /> : <AuthStack />}
     </NavigationContainer>
   )

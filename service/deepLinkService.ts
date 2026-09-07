@@ -62,7 +62,7 @@ import { waitForNavigationReady } from '../utils/navigationRef'
 export function getLinkingPrefixes(): string[] {
   const appFlavor = Constants.expoConfig?.extra?.appFlavor ?? 'jodii'
   const domain = (FLAVORS as Record<string, { domain: string }>)[appFlavor]?.domain ?? FLAVORS.jodii.domain
-  const base = [`https://${domain}/jodii`]
+  const base = [`https://${domain}`]
   try { base.unshift(Linking.createURL('/')) } catch {}
   return base
 }
