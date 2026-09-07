@@ -16,6 +16,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import CdnLottie from '../../components/CdnLottie'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
+import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import {
   getPaymentCityList, getPaymentStateList, getPaymentStoreList,
   type PaymentCityItem, type PaymentStateItem, type PaymentStoreItem,
@@ -28,8 +29,10 @@ const ICON_EXPAND_MINUS = CDN + 'assets/images/svg/expand-minus-icon.svg'
 
 type Props = { navigation: any; route: any }
 
-export default function PayAtStoreScreen({ navigation }: Props) {
+export default function PayAtStoreScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
+  const selectedPackage = route.params?.selectedPackage
+  const amountLabel     = route.params?.amountLabel
 
   const [states, setStates]           = useState<PaymentStateItem[]>([])
   const [selectedState, setSelectedState] = useState<PaymentStateItem | null>(null)
@@ -218,6 +221,22 @@ export default function PayAtStoreScreen({ navigation }: Props) {
                   {!!store.OfficeTime && (
                     <Text style={s.storeText}>Office Time: {store.OfficeTime}</Text>
                   )}
+
+                  {/* Angular: branch-locator.page.ts's "Book an appointment"
+                      CTA → book-appointment.page.ts (the actual
+                      nbpayatretailstore submit) — the step this screen
+                      previously stopped short of. */}
+                  {!!selectedPackage && (
+                    <ButtonRevamp
+                      label="Book Appointment"
+                      variant="primary"
+                      size="medium"
+                      style={[s.bookBtn, { backgroundColor: Colors.primaryDark }]}
+                      onPress={() => navigation.navigate('book-appointment', {
+                        selectedPackage, amountLabel, branch: store.Title, address: store.Address,
+                      })}
+                    />
+                  )}
                 </View>
               )}
             </View>
@@ -278,4 +297,5 @@ const s = StyleSheet.create({
   storeBody: { padding: 16, paddingTop: 0, gap: 8 },
   storeText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary, lineHeight: 20 },
   storeLink: { color: Colors.link, fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium },
+  bookBtn:   { alignSelf: 'flex-start', marginTop: 4 },
 })

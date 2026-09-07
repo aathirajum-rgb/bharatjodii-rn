@@ -33,7 +33,7 @@ import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import RechargeDesktopLayout from './RechargeDesktopLayout'
 import {
-  checkAvailOffer, getMembershipPlans, getPaymentConfig, paymentTrack,
+  checkAvailOffer, claimNow, getMembershipPlans, getPaymentConfig, invalidateMenuPromoCache, paymentTrack,
   type MembershipPlan, type MembershipPlansData, type SelectedPackage,
 } from '../../service/paymentService'
 
@@ -89,6 +89,10 @@ export default function RechargeScreen({ navigation, route }: Props) {
   const [selectedId, setSelected] = useState('')
   const [loading, setLoading]     = useState(true)
 
+  // Angular: promotions.component.ts couponStatus — '0' unapplied, '1'
+  // applied, '2' dismissed/undone (visually identical to '0', re-appliable).
+  const [couponStatus, setCouponStatus] = useState<'0' | '1' | '2'>('0')
+
   // "View other packages" sheet — its own independent selection, seeded from
   // the main page's current selection when opened (matches Angular: the
   // popup's BottomsheetComponent keeps local state, separate from
@@ -114,11 +118,28 @@ export default function RechargeScreen({ navigation, route }: Props) {
       ])
       setData(result)
       if (result) setSelected(result.defaultProductId)
+      // Angular: promotions.component.ts — COUPONFLAG '1'/'3' auto-applies
+      // the coupon the moment the promotion loads, with no user tap needed.
+      if (result?.couponFlag === '1' || result?.couponFlag === '3') handleApplyCoupon()
     } catch {
       Alert.alert('Error', 'Could not load membership plans. Please try again.')
     } finally {
       setLoading(false)
     }
+  }
+
+  // Angular: promotions.component.ts clickedApply() — claimNow('0','3') is a
+  // literal, package-independent tracking call (not tied to the currently
+  // selected plan), matching Angular's own hardcoded packId/type constants.
+  async function handleApplyCoupon() {
+    setCouponStatus('1')
+    await Promise.all([claimNow('0', '3'), invalidateMenuPromoCache()])
+  }
+
+  // Angular: promotions.component.ts undoCouponApply().
+  async function handleUndoCoupon() {
+    setCouponStatus('2')
+    await Promise.all([claimNow('0', '4'), invalidateMenuPromoCache()])
   }
 
   const selectedPlan      = data?.plans.find(p => p.productid === selectedId)
@@ -153,6 +174,7 @@ export default function RechargeScreen({ navigation, route }: Props) {
       paidamt:        plan.paidamt,
       discountamount: plan.discountamount,
       autopayflag:    plan.autopayflag,
+      isEmi:          plan.isEmi,
     }
     setShowAllPlans(false)
     navigation.navigate('payment-options', { selectedPackage })
@@ -226,6 +248,32 @@ export default function RechargeScreen({ navigation, route }: Props) {
                 onPress={() => setSelected(plan.productid)}
               />
             ))}
+
+            {/* Angular: promotions.component.html:254-297 — a server-driven
+                "Apply Coupon" banner (not a user-typed code field). Hidden
+                entirely when COUPONFLAG=='0'. */}
+            {!!data.couponFlag && data.couponFlag !== '0' && !!data.couponCode && (
+              <Pressable
+                style={s.couponRow}
+                onPress={couponStatus === '1' ? handleUndoCoupon : handleApplyCoupon}
+              >
+                <CdnSvg uri={CDN_SVG + 'jodii-offer-img.svg'} width={20} height={20} />
+                <Text style={s.couponCode}>{data.couponCode}</Text>
+                {couponStatus === '1' ? (
+                  <>
+                    <Text style={s.couponApplied}>{data.couponAppliedLabel ?? 'Applied'}</Text>
+                    <View style={s.couponSpacer} />
+                    <Text style={s.couponUndo}>✕</Text>
+                  </>
+                ) : (
+                  <>
+                    <View style={s.couponSpacer} />
+                    <Text style={s.couponApplyLabel}>{data.couponApplyLabel ?? 'Apply Coupon'}</Text>
+                    <CdnSvg uri={ICON_FORWARD_GREY} width={16} height={16} />
+                  </>
+                )}
+              </Pressable>
+            )}
 
             {/* Angular: recharge.page.html:151 — the Aadi offer note and the
                 "View other packages" link are mutually exclusive siblings
@@ -563,6 +611,17 @@ const s = StyleSheet.create({
   // Angular: ctaFontSize regular14 + linkmedium's own span{font-weight:500},
   // textColor greyColor = --ion-color-grey-color (#545454, variables.scss:179).
   viewAllText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#545454', lineHeight: 20 },
+
+  couponRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    borderRadius: 8, paddingVertical: 12, paddingHorizontal: 16,
+    backgroundColor: Colors.membershipCardBg,
+  },
+  couponCode:       { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black, flexShrink: 1 },
+  couponApplied:    { fontFamily: Fonts.poppinsSemiBold, fontSize: 12, color: Colors.discountGreen },
+  couponApplyLabel: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: 12, color: Colors.primaryDark },
+  couponUndo:       { fontSize: 16, color: Colors.textSecondary, paddingHorizontal: 4 },
+  couponSpacer:     { flex: 1 },
 
   offerBanner: {
     borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16,

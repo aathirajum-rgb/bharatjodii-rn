@@ -333,12 +333,22 @@ const styles = StyleSheet.create({
     width:          48,
     height:         48,
     borderRadius:   24,
+    // Clip here, not just on the inner image: the fallback placeholder
+    // avatar is an SVG (CdnSvg/SvgCssUri), which ignores borderRadius on
+    // its own style, so relying on the child alone left the placeholder
+    // square on Android. Clipping this wrapper View works for both the SVG
+    // placeholder and a real photo, on every platform.
+    overflow:       'hidden',
     alignItems:     'center',
     justifyContent: 'center',
     position:       'relative',
   },
   h1AvatarRadius: {
     borderRadius: 24,
+    // Android's Image doesn't reliably clip its bitmap to borderRadius on
+    // its own (works fine on iOS/web) — needs an explicit overflow:'hidden'
+    // on the same style to actually crop the corners.
+    overflow:     'hidden',
   },
   // Name + edit profile block
   h1NameBlock: {

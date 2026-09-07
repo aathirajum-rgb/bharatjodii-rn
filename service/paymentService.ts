@@ -100,6 +100,10 @@ export interface SelectedPackage {
   paidamt?:          string | undefined
   autopayflag?:      string | undefined
   recurringdiscount?: string | undefined
+  // Angular: payment-mode.page.ts/recharge.page.ts/upi-payment.page.ts
+  // isEmiFlow() — EMIPRODUCTID.includes(productid), computed once in
+  // getMembershipPlans() below rather than re-deriving it per screen.
+  isEmi?:            boolean | undefined
 }
 
 // Angular: botton-sheet.config.ts AUTO_RENEWAL_BENEFITS — static fallback shown
@@ -486,6 +490,43 @@ export async function getPaymentStoreList(stateId: string, cityId: string): Prom
   return result?.ERRCODE === '0' ? (result.RESPONSE ?? []) : []
 }
 
+// Angular: book-appointment.page.ts bookAppoint() — the actual submit call
+// for "Pay at our store": confirms a visit slot at the chosen store.
+// visitingDate is 'YYYY-MM-DD', fromTime is 'HH:mm:ss'. PayAtStoreScreen.tsx
+// previously stopped at browsing stores — this is the missing booking step.
+export interface StoreAppointmentParams {
+  packageId:     string
+  branchAddress: string
+  visitingDate:  string
+  fromTime:      string
+}
+
+export async function submitStoreAppointment(params: StoreAppointmentParams): Promise<boolean> {
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const qs =
+    `ID=${userId}&productId=${params.packageId}&branchAddress=${encodeURIComponent(params.branchAddress)}` +
+    `&visitingDate=${encodeURIComponent(params.visitingDate)}&fromTime=${encodeURIComponent(params.fromTime)}`
+  const result = await apiCall(Endpoints.payment.payAtStore, 'POST', qs)
+  return result?.ERRCODE === '0'
+}
+
+// Angular: book-appointment.page.ts bookAppoint()'s onSuccess routing —
+// female members always land on Matches; male members go there too only once
+// fully verified (EKYC done + phone verified), otherwise to the verification
+// gate. Angular's male "EKYC done but phone not verified" sub-case targets a
+// dedicated '/mobileverify-inter/18' screen that has no RN equivalent yet —
+// falls back to 'verify-id' (the closest existing verification screen)
+// instead of navigating to a route that doesn't exist; revisit if/when that
+// screen is ported.
+export async function getPostBookingDestination(): Promise<'Matches' | 'verify-id'> {
+  const gender = String((await getItem(SK.User.LOGIN_GENDER)) ?? '')
+  if (gender === 'F') return 'Matches'
+
+  const ekycStatus     = String((await getItem(SK.Verification.EKYC_STATUS)) ?? '')
+  const phoneVerified  = String((await getItem(SK.Verification.PHONE_VERIFIED)) ?? '')
+  return ekycStatus === '1' && phoneVerified !== '0' ? 'Matches' : 'verify-id'
+}
+
 // ─── Free doorstep cash collection ─────────────────────────────────────────────
 // Angular: free-doorstep-collection.page.ts postData() — a plain scheduling
 // request, not a gateway checkout: no amount is charged here, a
@@ -552,6 +593,20 @@ export async function checkQrPaymentOutcome(
   return status === 'success' || status === 'failure' ? (status as 'success' | 'failure') : null
 }
 
+// ─── Share-a-payment-link (family/friend can pay remotely) ───────────────────
+// Angular: promotions.component.ts confirmationPopUP() — a second "someone
+// else can pay for me" option alongside the QR flow above (getQRPaymentData).
+// The success response carries no link/URL for the client to share
+// (confirmed via promotions.component.spec.ts's own mock: RESPONSE:{} on
+// success) — the backend handles delivering the payment request on its own
+// once confirmed; the client only needs to show a confirmation.
+export async function generatePaymentLink(packageId: string, amount: string | number): Promise<boolean> {
+  const [userId, name] = await Promise.all([getItem(SK.Auth.USER_ID), getItem(SK.User.NAME)])
+  const params = `name=${encodeURIComponent(name ?? '')}&amount=${amount}&productId=${packageId}&ID=${userId ?? ''}`
+  const result = await apiCall(Endpoints.payment.upiPayLink, 'POST', params)
+  return String(result?.RESPONSECODE) === '1' && String(result?.ERRCODE) === '0'
+}
+
 // ─── Hero banner ──────────────────────────────────────────────────────────────
 
 export async function getHeroBannerDetails(force = false, bannerType?: number): Promise<any> {
@@ -569,6 +624,24 @@ export async function getHeroBannerDetails(force = false, bannerType?: number): 
   return null
 }
 
+// Angular derives AUTOUPIFLAG from a separate native "which installed apps
+// support an autopay intent" list (AUTOUPIAPPS, from
+// Razorpay.getAppsWhichSupportAutoPayIntent() — HomeScreenActivity.java's
+// passUPIAppsToWebview()) — collapsed to a single '0'/'1' the backend uses to
+// decide whether to include autopay/renewal promo content at all (traced
+// through claimNow()/getHeroBannerDetails()/getPromotionDetails()/
+// getMenuPromo() — it never picks or filters a specific app). Approximated
+// here with the on-device UPI-app detection already wired for targeted
+// checkout (getUpiAppList()) rather than adding a second native bridge call —
+// every UPI app RN can detect (GPay/PhonePe/Paytm) supports autopay intents
+// in practice, so "has any UPI app" is a reasonable stand-in for "has an
+// autopay-capable app".
+async function getAutoUpiFlag(): Promise<string> {
+  if (Platform.OS !== 'android') return '0'
+  const apps = await getUpiAppList()
+  return apps.length > 0 ? '1' : '0'
+}
+
 // ─── Menu promo ───────────────────────────────────────────────────────────────
 
 export async function getMenuPromo(forceRefresh = false): Promise<any> {
@@ -583,15 +656,14 @@ export async function getMenuPromo(forceRefresh = false): Promise<any> {
   // Angular is a local force-refresh flag, never a request field — so the
   // response came back without MENUDISCOUNT and the "₹1200 OFF" chip over the
   // Membership tab never rendered.
-  const [userId, renewalKey, renewalPromo] = await Promise.all([
+  const [userId, renewalKey, renewalPromo, autoUpiFlag] = await Promise.all([
     getItem(SK.Auth.USER_ID),
     getSessionValue('RENEWALENABLEKEY'),
     getSessionValue('RENEWALPROMOKEY'),
+    getAutoUpiFlag(),
   ])
-  // Angular derives AUTOUPIFLAG from a detected installed-UPI-app list, which
-  // RN has no equivalent for — same '0' default getPromotionDetails() uses.
   let params =
-    `ID=${userId ?? ''}&RENEWALFLAG=${renewalKey ?? '0'}&AUTOUPIFLAG=0&PAYAPITYPE=2`
+    `ID=${userId ?? ''}&RENEWALFLAG=${renewalKey ?? '0'}&AUTOUPIFLAG=${autoUpiFlag}&PAYAPITYPE=2`
   if (['1', '2'].includes(String(renewalPromo ?? ''))) params += `&COMMONKEY=${renewalPromo}`
 
   const result = await apiCall(Endpoints.payment.nbMenu, 'POST', params)
@@ -635,17 +707,14 @@ export interface UpgradePaymentPromo {
 }
 
 export async function fetchUpgradePaymentPromo(profileName = ''): Promise<UpgradePaymentPromo | null> {
-  const [userId, renewalKey, renewalPromo, entryType] = await Promise.all([
+  const [userId, renewalKey, renewalPromo, entryType, autoUpiFlag] = await Promise.all([
     getItem(SK.Auth.USER_ID),
     getSessionValue('RENEWALENABLEKEY'),
     getSessionValue('RENEWALPROMOKEY'),
     getSessionValue('ENTRYTYPE'),
+    getAutoUpiFlag(),
   ])
 
-  // Angular derives AUTOUPIFLAG from a detected installed-UPI-app list
-  // (AUTOUPIAPPS), which RN has no equivalent for — same '0' default
-  // getMenuPromo()/getPromotionDetails() already use here.
-  //
   // PAGETYPE=NEW selects the new bottom-sheet content shape — TITLE +
   // "Paid membership benefits:" SUBCONTENT + per-perk BENEFITS rows carrying
   // their own `icon`/`lockicon` (draft.page.ts:667, the page this sheet is
@@ -653,7 +722,7 @@ export async function fetchUpgradePaymentPromo(profileName = ''): Promise<Upgrad
   // older package-summary copy ("Pay now and enjoy the below benefits", plan
   // rows with no icons), which is what this screen was rendering.
   let params =
-    `ID=${userId ?? ''}&RENEWALFLAG=${renewalKey ?? '0'}&AUTOUPIFLAG=0` +
+    `ID=${userId ?? ''}&RENEWALFLAG=${renewalKey ?? '0'}&AUTOUPIFLAG=${autoUpiFlag}` +
     `&name=${encodeURIComponent(profileName)}&PAGETYPE=NEW`
   if (String(entryType ?? '') === 'P') params += '&profileCount=0'
   if (['1', '2'].includes(String(renewalPromo ?? ''))) params += `&COMMONKEY=${renewalPromo}`
@@ -686,20 +755,20 @@ export async function fetchUpgradePaymentPromo(profileName = ''): Promise<Upgrad
 // ─── Promotion details ────────────────────────────────────────────────────────
 
 export async function getPromotionDetails(promotionId: string): Promise<any> {
-  const [userId, appVersion, renewalFlag] = await Promise.all([
+  const [userId, appVersion, renewalFlag, autoUpiFlag] = await Promise.all([
     getItem(SK.Auth.USER_ID),
     getItem('APPVERSION'),
     getSessionValue('RENEWALENABLEKEY'),
+    getAutoUpiFlag(),
   ])
   const ipCountryCode = (await getSessionValue('IPCOUNTRYCODE')) ?? 'IN'
   // Angular: payment.service.ts getPromotionDetails() — param is TYPE, not
   // PROMOTIONID (fixed here; the previous name would never have matched the
   // real nbpromotion contract). Defaults confirmed against Angular source:
-  // IPCOUNTRYCODE→'IN', AUTOUPIFLAG→'0' (no installed-UPI-apps detection in
-  // RN, so always '0'), PAYAPITYPE→'2', RENEWALFLAG→'0'.
+  // IPCOUNTRYCODE→'IN', PAYAPITYPE→'2', RENEWALFLAG→'0'.
   const params =
     `ID=${userId ?? ''}&TYPE=${promotionId}&APPVERSION=${appVersion ?? ''}` +
-    `&IPCOUNTRYCODE=${ipCountryCode}&AUTOUPIFLAG=0&PAYAPITYPE=2` +
+    `&IPCOUNTRYCODE=${ipCountryCode}&AUTOUPIFLAG=${autoUpiFlag}&PAYAPITYPE=2` +
     `&RENEWALFLAG=${renewalFlag ?? '0'}`
   const result = await apiCall(Endpoints.payment.nbPromotion, 'POST', params)
   if (result?.RESPONSECODE !== '1') return null
@@ -738,6 +807,10 @@ export interface MembershipPlan {
   pkgcost?:       string | undefined
   PACKAGEDURATION?: string | undefined
   autopayflag?:   string | undefined
+  // Angular: payment-mode.page.ts/recharge.page.ts/upi-payment.page.ts
+  // isEmiFlow() — EMIPRODUCTID.includes(productid), computed once in
+  // getMembershipPlans() below rather than re-deriving it per screen.
+  isEmi?:         boolean | undefined
 }
 
 export interface MembershipPlansData {
@@ -759,6 +832,15 @@ export interface MembershipPlansData {
   // a future campaign may introduce a differently-named sibling object
   // rather than reusing this one.
   offerBannerText?: string | undefined
+  // Angular: promotions.component.ts — a server-driven "apply this coupon"
+  // banner (NOT a user-typed code field). COUPONFLAG '0' hides the banner
+  // entirely; '1'/'3' auto-apply it on load (see RechargeScreen.tsx's mount
+  // effect). couponCode is JODIICOUPON.COUPONCODE.split('~')[1] (e.g.
+  // "JODII20"); couponApplyLabel/couponAppliedLabel are JODIICOUPON.CTA/CTA1.
+  couponFlag?:            string | undefined
+  couponCode?:            string | undefined
+  couponApplyLabel?:      string | undefined
+  couponAppliedLabel?:    string | undefined
 }
 
 // Strips a leading currency symbol/commas/whitespace and returns a plain
@@ -808,6 +890,16 @@ export async function getMembershipPlans(): Promise<MembershipPlansData | null> 
     ? allPlans.filter(p => intermediatePack.includes(p.productid))
     : allPlans
 
+  // Angular: payment-mode.page.ts/recharge.page.ts/promotions.component.ts —
+  // EMIPRODUCTID is a '~'-joined string of package ids on the promotion
+  // payload; those packages must checkout as a forced-recurring, UPI-only
+  // autopay mandate (see isEmiFlow() in those pages, and PaymentOptionsScreen
+  // here). Computed once here so every plan carries its own isEmi flag.
+  const emiProductIds = typeof promotion.EMIPRODUCTID === 'string' && promotion.EMIPRODUCTID
+    ? promotion.EMIPRODUCTID.split('~')
+    : []
+  for (const plan of allPlans) plan.isEmi = emiProductIds.includes(plan.productid)
+
   // Angular: recharge.page.ts / payment-mode.page.ts persist NUMBER to
   // localStorage('RECHARGEHELPLINE') here so every downstream payment screen
   // (payment-mode, more-payment-option, netbanking, ...) can read it without
@@ -817,6 +909,12 @@ export async function getMembershipPlans(): Promise<MembershipPlansData | null> 
   // key, so a response without NUMBER still shows the last known number
   // rather than dropping the "Need help?" row entirely.
   const helpline = String(promotion.NUMBER ?? (await getItem(SK.Payment.RECHARGE_HELPLINE)) ?? '')
+
+  // Angular: promotions.component.ts — couponObj = promotion.JODIICOUPON;
+  // couponCode = couponObj.COUPONCODE.split('~') (index [1] is the display
+  // code, e.g. "JODII20" — index [0] is unused elsewhere in that file).
+  const jodiiCoupon = promotion.JODIICOUPON
+  const couponCodeParts = typeof jodiiCoupon?.COUPONCODE === 'string' ? jodiiCoupon.COUPONCODE.split('~') : []
 
   return {
     title:            promotion.TITLE2 ?? 'Membership plans',
@@ -828,7 +926,19 @@ export async function getMembershipPlans(): Promise<MembershipPlansData | null> 
     payCtaTemplate:   promotion.CTA3 ?? 'Pay ₹<367>',
     helpline,
     offerBannerText:  promotion.PROMOTYPE === '20' ? promotion.AADIPROMO?.NOTE : undefined,
+    couponFlag:         promotion.COUPONFLAG,
+    couponCode:         couponCodeParts[1],
+    couponApplyLabel:   jodiiCoupon?.CTA,
+    couponAppliedLabel: jodiiCoupon?.CTA1,
   }
+}
+
+// Angular: clickedApply()/undoCouponApply() both clear the cached menu promo
+// (localStorage.removeItem('MENU_PROMO')) so the "₹X OFF" chip elsewhere in
+// the app picks up the coupon's new discount on next fetch, instead of
+// serving a stale cached value.
+export async function invalidateMenuPromoCache(): Promise<void> {
+  await removeItem(PAYMENT_CACHE_KEYS.MENU_PROMO)
 }
 
 // ─── Checkout ─────────────────────────────────────────────────────────────────
@@ -1134,6 +1244,98 @@ export async function initRazorpayWebCheckout(
   }
 }
 
+// ─── Web checkout — app-targeted UPI (GPay/PhonePe/Paytm) ────────────────────
+// Angular: payment.service.ts initCustomPayment() — the actual production
+// path when tapping a specific UPI app row on the web/PWA build (traced via
+// callNativeForUPIPayment(): the PAYSOURCE=='1' + FUNC.isPwaApp() branch
+// calls getCheckoutdetails(...,'upi',...) → initCustomPayment(), never the
+// native appNativeEvent bridge). Uses Razorpay JS SDK's "Custom Checkout"
+// createPayment(options, {app}) API, which redirects straight into the named
+// app's own UPI deep link — the web equivalent of the native bridges'
+// upiAppPackageName targeting (see initRazorpayNative/initPayUNative above).
+// Angular also has a separate, unused handleIOSPayment()/getIOSUPIApps() pair
+// that hand-rolls raw tez://\/phonepe:// scheme redirects — confirmed dead
+// code (no caller anywhere but its own spec test) and NOT ported here;
+// createPayment(options, {app}) already does this internally.
+// PAYSOURCE=='2' (PayU) has no web/PWA path at all in Angular either — that
+// branch unconditionally fires appNativeEvent with no isPwaApp() check, i.e.
+// PayU-via-GPay simply isn't available outside the native app. Callers here
+// should only reach this function for the PAYSOURCE=='1' case; PAYSOURCE=='2'
+// on web should fall back to the generic initRazorpayWebCheckout below.
+const RAZORPAY_WEB_APP_IDS: Record<string, string> = {
+  PAY_GPAY:    'gpay',
+  PAY_PHONEPE: 'phonepe',
+  PAY_PAYTM:   'paytm',
+}
+
+export function razorpayWebAppId(key: string): string | undefined {
+  return RAZORPAY_WEB_APP_IDS[key]
+}
+
+// Angular: triggerWithUserGesture() — createPayment()'s app-intent redirect
+// needs a real, synchronous user-gesture context; by the time this runs we're
+// several `await`s past the original button press, which some mobile
+// browsers no longer treat as "trusted" for a location redirect. A synthetic
+// click on a real, invisible DOM button re-establishes one immediately before
+// the call, matching Angular's own workaround exactly.
+function triggerWithUserGesture(callback: () => void): void {
+  const btn = document.createElement('button')
+  btn.style.cssText = 'position:fixed;opacity:0;pointer-events:none;z-index:99999;top:0;left:0;width:100%;height:100%;'
+  document.body.appendChild(btn)
+  btn.addEventListener('click', () => {
+    callback()
+    document.body.removeChild(btn)
+  }, { once: true })
+  btn.click()
+}
+
+export async function initRazorpayWebUpiAppPayment(
+  checkoutDetail: any,
+  appId: string,
+  appLabel: string,
+  saltKey: string,
+): Promise<{ success: boolean; response: any }> {
+  try {
+    await loadRazorpayCheckoutScript()
+    return await new Promise(resolve => {
+      const razorpay = new (window as any).Razorpay({ key: saltKey })
+      const options: Record<string, any> = {
+        amount:   checkoutDetail.amount,
+        currency: 'INR',
+        method:   'upi',
+        contact:  checkoutDetail.MOBILENO ?? '',
+        email:    'jodii@matrimony.com',
+        order_id: checkoutDetail.orderId ?? '',
+      }
+      // Angular: initCustomPayment() — recurring/customer_id are only added
+      // for an autopay-mandate order (RENEWALFLAG-driven), matching the
+      // native bridges' own `recurring`/`customerId` handling.
+      if (checkoutDetail.recurring === '1') {
+        options.recurring   = 1
+        options.customer_id = checkoutDetail.customerId
+      }
+      razorpay.on('payment.success', (response: any) => resolve({ success: true, response }))
+      // Angular: rzp.on('payment.error', ...) — 'intent_no_apps_error' means
+      // the named app isn't installed/reachable; Angular shows a plain toast
+      // for this case rather than routing through the normal payment-failed
+      // retry flow (showPaymentNoappError(), never showPaymentFailure()).
+      razorpay.on('payment.error', (resp: any) => {
+        if (resp?.error?.reason === 'intent_no_apps_error') {
+          resolve({
+            success: false,
+            response: { code: 0, description: `${appLabel} app is not available on your mobile.`, noAppAvailable: true },
+          })
+        } else {
+          resolve({ success: false, response: resp?.error ?? resp })
+        }
+      })
+      triggerWithUserGesture(() => razorpay.createPayment(options, { app: appId }))
+    })
+  } catch (error: any) {
+    return { success: false, response: error }
+  }
+}
+
 // ─── Native Razorpay Custom Integration bridge (Android only) ────────────────
 // Enables what Razorpay's Standard Checkout (react-native-razorpay, used
 // above for iOS) cannot: targeting one specific installed UPI app directly
@@ -1145,17 +1347,63 @@ export interface UpiAppInfo {
   packageName: string
 }
 
-// Angular has no equivalent (no installed-UPI-app detection in the old
-// hybrid webview) — this mirrors the sibling RN project's getUpiAppList().
+// Angular DOES have installed-UPI-app detection in the old hybrid webview —
+// HomeScreenActivity.java's passUPIAppsToWebview() calls
+// Razorpay.getAppsWhichSupportUpi() natively and hands the list to
+// index.html's sendUPIAppsList(), which stores it as localStorage['UPIAPPS']
+// (JSON [{AppName,AppPkgName}]) for payment-mode.page.ts's loadUPIApp() to
+// read — this mirrors that on-device detection step; getServerFilteredUpiApps()
+// below mirrors the round-trip through nbapplicationpay that Angular does
+// with this same list before trusting any of it.
 export function getUpiAppList(): Promise<UpiAppInfo[]> {
   if (!RazorpayBridge || !razorpayBridgeEmitter) return Promise.resolve([])
   return new Promise(resolve => {
-    const sub = razorpayBridgeEmitter.addListener('RazorpayUpiApps', (result: { apps?: UpiAppInfo[] }) => {
+    let settled = false
+    const settle = (apps: UpiAppInfo[]) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
       sub.remove()
-      resolve(result?.apps ?? [])
+      resolve(apps)
+    }
+    const sub = razorpayBridgeEmitter.addListener('RazorpayUpiApps', (result: { apps?: UpiAppInfo[] }) => {
+      settle(result?.apps ?? [])
     })
-    RazorpayBridge.getAppsWhichSupportUpi()
+    // getMenuPromo() (via getAutoUpiFlag()) now calls this on every plain
+    // Home-screen load, awaited inline — if the native 'RazorpayUpiApps'
+    // event never fires (missing Android 11+ <queries> package-visibility
+    // entry, an SDK-internal failure, etc.) this Promise previously hung
+    // forever with no timeout and no try/catch around the native call,
+    // freezing whatever screen awaited it. A stuck detection list is far
+    // less harmful than a stuck screen, so fail safe to [] instead.
+    const timer = setTimeout(() => settle([]), 4000)
+    try {
+      RazorpayBridge.getAppsWhichSupportUpi()
+    } catch {
+      settle([])
+    }
   })
+}
+
+// Angular: payment-mode.page.ts loadUPIApp()/allnbapplicationpay() — sends
+// the device-detected UPI app list to the backend and uses ONLY the
+// server-returned METHODOFPAY subset to decide which apps are actually
+// usable (isGPay/isPhonePe/isPaytm all derive from this response, never from
+// the raw on-device list directly) — a merchant/region-level filter beyond
+// "is it installed" that getUpiAppList() alone can't apply.
+export async function getServerFilteredUpiApps(installedApps: UpiAppInfo[]): Promise<UpiAppInfo[]> {
+  if (installedApps.length === 0) return []
+  const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+  const paymentApp = JSON.stringify(
+    installedApps.map(app => ({ AppName: app.appName, AppPkgName: app.packageName })),
+  )
+  const params = `ID=${userId}&paymentApp=${encodeURIComponent(paymentApp)}`
+  const result = await apiCall(Endpoints.payment.applicationPay, 'POST', params)
+  if (result?.ERRCODE !== '0' || !Array.isArray(result?.RESPONSE?.METHODOFPAY)) return []
+  return result.RESPONSE.METHODOFPAY.map((item: any) => ({
+    appName:     String(item?.AppName ?? ''),
+    packageName: String(item?.AppPkgName ?? ''),
+  }))
 }
 
 // Matches a detected UPI app's package name against our PAYMENTMETHODS KEY

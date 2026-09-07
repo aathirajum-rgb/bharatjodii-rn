@@ -71,6 +71,7 @@ import HostedCheckoutWebViewScreen from '../screens/payment/HostedCheckoutWebVie
 import MorePaymentOptionsScreen    from '../screens/payment/MorePaymentOptionsScreen'
 import NeftRtgsScreen               from '../screens/payment/NeftRtgsScreen'
 import PayAtStoreScreen             from '../screens/payment/PayAtStoreScreen'
+import BookAppointmentScreen        from '../screens/payment/BookAppointmentScreen'
 import RechargeScreen              from '../screens/payment/RechargeScreen'
 import type { SelectedPackage }    from '../service/paymentService'
 import PermissionDemoScreen        from '../screens/PermissionDemoScreen'
@@ -226,6 +227,9 @@ export type AppStackParamList = {
   'more-payment-options': { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
   'neft-rtgs':  { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
   'pay-at-store': { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
+  'book-appointment': {
+    selectedPackage?: SelectedPackage; amountLabel?: string; branch: string; address: string
+  } | undefined
   'doorstep-collection': { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
   ExternalPage: { url: string; title: string }
   // Angular: viewprofile.page.ts route params (:module/:id) — fromPage drives the
@@ -680,6 +684,7 @@ export default function AppStack() {
       <Stack.Screen name="more-payment-options" component={MorePaymentOptionsScreen} />
       <Stack.Screen name="neft-rtgs" component={NeftRtgsScreen} />
       <Stack.Screen name="pay-at-store" component={PayAtStoreScreen} />
+      <Stack.Screen name="book-appointment" component={BookAppointmentScreen} />
       <Stack.Screen name="payment-success" component={PaymentSuccessScreen} />
       <Stack.Screen name="payment-failed" component={PaymentFailedScreen} />
       <Stack.Screen name="doorstep-collection" component={DoorstepCollectionScreen} />

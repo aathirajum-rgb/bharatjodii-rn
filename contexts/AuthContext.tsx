@@ -147,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return
     }
 
-    const initialRoute = token ? await resolveInitialRoute(false) : 'Matches'
+    const initialRoute = token ? await resolveInitialRoute(false) : 'matches'
     setState({
       isAuthenticated: !!token,
       userId: userId ?? null,
@@ -230,7 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       userId: null,
       loading: false,
       isNewUser: false,
-      initialRoute: 'Matches',
+      initialRoute: 'matches',
     })
   }
 

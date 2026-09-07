@@ -227,6 +227,7 @@ export const MatchCard = memo(function MatchCard({
               uri={getBlurPhotoUri(oppGender)}
               width="100%" height="100%"
               style={StyleSheet.absoluteFill}
+              cover
             />
             <View style={c.photoOverlay}>
               <View style={c.overlayCard}>
@@ -277,6 +278,7 @@ export const MatchCard = memo(function MatchCard({
               uri={getBlurPhotoUri(oppGender)}
               width="100%" height="100%"
               style={StyleSheet.absoluteFill}
+              cover
             />
             <View style={c.photoOverlay}>
               <View style={c.overlayCard}>
