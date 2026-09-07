@@ -2457,7 +2457,6 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             title:         t('MATCHES.BULK_LIKE_TITLE_1').replace(/<br\s*\/?>/gi, ' '),
             ctaLabel:      t('MATCHES.ADD_PHOTO'),
             linkCtaLabel:  t('MATCHES.LATER_CTA'),
-            showClose:     false,
           }}
           onClose={handleBulkLikePhotoPromptDismiss}
           onPrimaryPress={() => { setShowPhotoBulkLikePrompt(false); navigation.navigate('Gallery'); handleBulkLikeSent() }}
@@ -2677,7 +2676,6 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           title:         t('MATCHES.BULK_LIKE_TITLE_1').replace(/<br\s*\/?>/gi, ' '),
           ctaLabel:      t('MATCHES.ADD_PHOTO'),
           linkCtaLabel:  t('MATCHES.LATER_CTA'),
-          showClose:     false,
         }}
         onClose={handleBulkLikePhotoPromptDismiss}
         onPrimaryPress={() => { setShowPhotoBulkLikePrompt(false); navigation.navigate('Gallery'); handleBulkLikeSent() }}

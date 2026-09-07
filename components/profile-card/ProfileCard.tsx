@@ -1,17 +1,18 @@
 import {
   Dimensions,
-  Image,
   Pressable,
   StyleSheet,
   Text,
   View,
 } from 'react-native'
+import { useEffect, useState } from 'react'
 import { LinearGradient } from 'expo-linear-gradient'
-import CdnSvg from '../cdn-svg/CdnSvg'
+import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import ProfilePhoto, { type PhotoVariant } from '../profile-photo/ProfilePhoto'
+import { getOppGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
 
 // Angular: core/config/button.config.ts's SEE_ALL — textColor: 'linkColor'
 // (--ion-color-link-color: #29339B), not the brand red.
@@ -103,7 +104,10 @@ const IMG_CDN   = CDN_SVG
 // in two cases, incorrectly) overrode it.
 export const PHOTO_HEIGHT: Record<CardSection, number> = {
   newmatches:           SCREEN_W * 0.7778,
-  dailyrecommendations: SCREEN_W * 0.8067,  // Angular: 80.667vmin (wider than ht1)
+  // Angular profile-card.component.ts's photoHt map: 'dailyrecommendations':
+  // '77.78vmin'. (80.667vmin — used here before — is `.dailyrecommendations.card-ht1`,
+  // the photo BLOCK's min-width/height, not the photo itself.)
+  dailyrecommendations: SCREEN_W * 0.7778,
   matches:              SCREEN_W * 0.5556,
   likedyou:             SCREEN_W * 0.7222,
   viewedyou:            SCREEN_W * 0.7222,
@@ -112,7 +116,44 @@ export const PHOTO_HEIGHT: Record<CardSection, number> = {
   similarprofiles:      SCREEN_W * 0.5556,
   viewlater:            SCREEN_W * 0.4556,
   likedprofile:         SCREEN_W * 0.7222,
-  successstory:         SCREEN_W * 0.9111,
+  // Angular: `.successStory.card-ht3 { height/width: 72.225vmin !important }`.
+  // card-ht4 (91.111vmin) is NOT this — profile-card.component.ts picks it only
+  // when `fromPage === 'success-story'` (the dedicated Success Story page), and
+  // app-swiper's success-story slide never binds fromPage at all, so Home always
+  // lands on card-ht3. 91.111vmin made the card ~26% too large here.
+  successstory:         SCREEN_W * 0.72225,
+}
+
+// ─── "See all" card avatar ────────────────────────────────────────────────────
+// Angular: each of the three <ion-avatar> images carries
+// (error)="onImgErrorHandler($event)", which swaps a missing/broken THUMBIMG for
+// the OPPOSITE-gender silhouette — that's why Angular's card shows three filled
+// circles even when the preview profiles have no photos. Mirrors ProfilePhoto's
+// own fallback resolution (utils/avatar's getOppGenderAvatarUrl).
+function SeeAllAvatar({ uri, fallbackUri }: { uri: string; fallbackUri?: string | undefined }) {
+  const [oppAvatar, setOppAvatar] = useState(FEMALE_AVATAR_URL)
+  const [failed, setFailed] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    getOppGenderAvatarUrl().then(url => { if (!cancelled) setOppAvatar(url) }).catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+
+  const fallback = fallbackUri || oppAvatar
+  const source   = !uri || failed ? fallback : uri
+
+  // The silhouette fallbacks are SVGs, which RN's <Image> can't decode on
+  // native — CdnImage picks the right renderer per file extension.
+  return (
+    <CdnImage
+      uri={source}
+      width="100%"
+      height="100%"
+      resizeMode="cover"
+      onError={() => setFailed(true)}
+    />
+  )
 }
 
 // ─── Section → PhotoVariant map ──────────────────────────────────────────────
@@ -129,6 +170,15 @@ const SECTION_VARIANT: Record<CardSection, PhotoVariant> = {
   viewlater:            'default',
   likedprofile:         'likedProfile',
   successstory:         'successStory',
+}
+
+// Angular: .see-all-card is a pink gradient (#FFF1FF → #FFFFFF), but
+// .likedprofile.see-all-card overrides it with a yellow one (#FFF6C1 → #FFFFFF)
+// so the ghost card sits in the Liked Profiles palette instead of the pink one
+// every other section uses.
+const SEE_ALL_GRADIENT_DEFAULT: readonly [string, string] = ['#FFF1FF', '#FFFFFF']
+const SEE_ALL_GRADIENT: Partial<Record<CardSection, readonly [string, string]>> = {
+  likedprofile: ['#FFF6C1', '#FFFFFF'],
 }
 
 // ─── InfoOverlay ──────────────────────────────────────────────────────────────
@@ -234,12 +284,26 @@ export default function ProfileCard({
           style={({ pressed }) => [styles.card, isDR && styles.cardDR, pressed && { opacity: 0.85 }]}
           onPress={onPress}
         >
-          <ProfilePhoto {...photoProps} height={photoH} showGradientScrim>
-            <InfoOverlay name={name} detail={basicDetail()} />
-          </ProfilePhoto>
+          {/* Angular: the DR card is `.card-type-2 .card-type-1-padding` —
+              padding: 4.444vmin (16px) around BOTH the photo and the button
+              below it, so the photo is inset with its own rounded corners
+              rather than bleeding to the card edges like every other variant. */}
+          {isDR ? (
+            <View style={styles.photoInsetDR}>
+              <ProfilePhoto {...photoProps} height={photoH} showGradientScrim>
+                <InfoOverlay name={name} detail={basicDetail()} />
+              </ProfilePhoto>
+            </View>
+          ) : (
+            <ProfilePhoto {...photoProps} height={photoH} showGradientScrim>
+              <InfoOverlay name={name} detail={basicDetail()} />
+            </ProfilePhoto>
+          )}
 
           {isDR && (
-            <View style={styles.cardBottom}>
+            // Angular: `.card-type-2-bottom.text-align-center` with an inner
+            // `mt-12` — the card's own 16px padding supplies the sides/bottom.
+            <View style={styles.cardBottomDR}>
               <Pressable style={styles.primaryBtn} onPress={onPress}>
                 {/* Angular: CTATXT.VIEWDETAILS translation key actually reads
                     "View profile" in English, not "View Details". */}
@@ -334,10 +398,10 @@ export default function ProfileCard({
       return (
         <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]} onPress={onPress}>
           <ProfilePhoto {...photoProps} height={photoH} variant="successStory" />
-          <View style={styles.cardInfo}>
-            {!!name     && <Text style={styles.nameText}   numberOfLines={1}>{name}</Text>}
-            {!!location && <Text style={styles.detailText}>{location}</Text>}
-            {!!date     && <Text style={styles.dateText}>{date}</Text>}
+          <View style={[styles.cardInfo, styles.cardInfo4]}>
+            {!!name     && <Text style={[styles.nameText, styles.nameText4]} numberOfLines={1}>{name}</Text>}
+            {!!location && <Text style={[styles.detailText, styles.detailText4]}>{location}</Text>}
+            {!!date     && <Text style={[styles.dateText, styles.dateText4]}>{date}</Text>}
           </View>
         </Pressable>
       )
@@ -350,18 +414,21 @@ export default function ProfileCard({
     // centered flex row, so it overlaps the seam between the other two rather
     // than being rendered larger.
     case 5: {
-      const avatars = viewMoreList.slice(0, 3)
+      // Angular: profile-card.component.html:176-186 renders THREE <ion-avatar>
+      // slots unconditionally — viewMoreList[0], [1] and [2]. When an entry is
+      // missing (or its THUMBIMG fails/is empty), the img's (error) handler
+      // swaps in the opposite-gender avatar, so the card ALWAYS shows three
+      // overlapping circles. Mapping over the array instead rendered only as
+      // many circles as there were leftover profiles — one blank circle when a
+      // section had a single profile behind the five on display.
+      const avatarSlots = [0, 1, 2].map(i => viewMoreList[i]?.THUMBIMG || '')
       return (
         <Pressable style={({ pressed }) => [styles.card, styles.seeAllCardOuter, pressed && { opacity: 0.85 }]} onPress={onViewMorePress}>
-          <LinearGradient colors={['#FFF1FF', '#FFFFFF']} style={styles.seeAllCard}>
+          <LinearGradient colors={SEE_ALL_GRADIENT[section] ?? SEE_ALL_GRADIENT_DEFAULT} style={styles.seeAllCard}>
             <View style={styles.avatarRow}>
-              {avatars.map((item, i) => (
+              {avatarSlots.map((uri, i) => (
                 <View key={i} style={[styles.avatarWrap, i === 1 && styles.avatarWrapAbsolute]}>
-                  <Image
-                    source={{ uri: item.THUMBIMG }}
-                    style={styles.avatarImg}
-                    resizeMode="cover"
-                  />
+                  <SeeAllAvatar uri={uri} fallbackUri={avatarImg} />
                 </View>
               ))}
             </View>
@@ -427,7 +494,7 @@ export default function ProfileCard({
 
           <View style={styles.cardInfo8}>
             {!!name         && <Text style={styles.nameText}   numberOfLines={1}>{name}</Text>}
-            {!!fullDetail() && <Text style={styles.detailText} numberOfLines={1}>{fullDetail()}</Text>}
+            {!!fullDetail() && <Text style={[styles.detailText, styles.detailText8]} numberOfLines={1}>{fullDetail()}</Text>}
           </View>
 
           {/* Angular: .liked-profile-card — peach-to-white gradient, only the
@@ -473,11 +540,33 @@ const styles = StyleSheet.create({
   // photo+button (unlike every other variant, where the card shell IS the
   // photo) — confirmed via get_design_context: box-shadow 0 0 7px rgba(0,0,0,0.15),
   // lighter/tighter than the shared shadow above.
+  // Angular: `.card-type-2` (radius 12, white, box-shadow 0 0 7px rgba(0,0,0,.15))
+  // + `.card-type-1-padding` (padding 4.444vmin = 16px).
   cardDR: {
     shadowOpacity: 0.15,
     shadowRadius: 3.5,
     shadowOffset: { width: 0, height: 0 },
     elevation: 2,
+    padding: 16,
+    // The shared `card` style sets overflow:'hidden' so a full-bleed photo gets
+    // clipped to the rounded corners. On iOS that also sets clipsToBounds, which
+    // suppresses the layer's shadow entirely — so this card had no shadow there.
+    // It doesn't need the clipping: its photo is inset and carries its own
+    // radius (photoInsetDR), so nothing reaches the card's corners.
+    overflow: 'visible',
+  },
+  // The inset photo keeps its own corner radius (Angular: the photo carries
+  // `profile-photo-revamp`; the card's own overflow:hidden no longer clips it
+  // now that there's padding between the two).
+  photoInsetDR: {
+    borderRadius: 12,
+    overflow: 'hidden',
+  },
+  // Angular: `.card-type-2-bottom` + `mt-12`; the 16px sides/bottom come from
+  // the card's own padding, so this only contributes the 12px above the button.
+  cardBottomDR: {
+    paddingTop: 12,
+    alignItems: 'center',
   },
   // viewedyou/viewedbyme/whoviewednumber's photo is inset within the card,
   // not full-bleed — confirmed via get_design_context (16px on every side).
@@ -488,12 +577,13 @@ const styles = StyleSheet.create({
   // radius than the shared 12px, and the padding wraps photo+name+footer
   // alike (not just the photo). Shadow is Figma-specific per explicit
   // direction — Angular's real CSS reuses the shared 0.34/12 shadow instead.
+  // Angular: .card-type-8's box-shadow is `0px 2px 12px rgba(0,0,0,0.34)` — the
+  // SAME shadow as the shared .card above, so no override belongs here. The
+  // 40px radius / 6px offset this used spread the shadow far past the card and
+  // read as a heavy black halo instead of Angular's tight drop shadow.
   card8: {
     borderRadius: 24,
     padding: 8,
-    shadowOpacity: 0.24,
-    shadowRadius: 40,
-    shadowOffset: { width: 0, height: 6 },
   },
 
   // ── Info overlay (types 1 & 2) ─────────────────────────────────────────────
@@ -551,8 +641,19 @@ const styles = StyleSheet.create({
   // left edge (both inherit only the outer card8's 8px padding) — confirmed
   // against the Figma render, not the extra indent a literal reading of the
   // Angular template's ml-8+cardPadding classes would otherwise suggest.
+  // Angular: the name/detail block is `mt-12 ml-8` — indented 8px from the
+  // card's own 8px padding, not flush with the photo's left edge.
   cardInfo8: {
     paddingTop: 12,
+    paddingLeft: 8,
+  },
+  // Angular: type='8's detail line is `body2-regular-14` + `.black-color` with
+  // `mt-6` — 14px black, not the shared style's 13px gray. nameText's own
+  // marginBottom:4 plus this 2 makes up that 6px gap.
+  detailText8: {
+    fontSize: 14,
+    color: Colors.black,
+    marginTop: 2,
   },
   // Angular: .heading3-semibold-16 { font-family: var(--english-semibold-poppins) }
   nameText: {
@@ -579,6 +680,16 @@ const styles = StyleSheet.create({
     color: Colors.textTertiary,
     marginTop: 6,
   },
+
+  // ── Success story (type 4) text block ─────────────────────────────────────
+  // Angular: the block is `pl-16 pr-16 pt-16 pb-16` (a flat 16, not the shared
+  // 12/10), the name is `heading4-medium-16` (Poppins-MEDIUM 16, not the shared
+  // semibold), the location is `body2-regular-14` + `.black-color` (14/#000, not
+  // 13/gray) and the date is `body3-regular-12` + `.color-545454` + `mt-8`.
+  cardInfo4:   { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
+  nameText4:   { fontFamily: Fonts.poppinsMedium },
+  detailText4: { fontSize: 14, color: Colors.black },
+  dateText4:   { color: '#545454', marginTop: 8 },
 
   // ── Primary action button ──────────────────────────────────────────────────
   // Angular: button.config.ts's PRIMARY_BTN.background → EButtonBackground.primary
@@ -742,7 +853,12 @@ const styles = StyleSheet.create({
   // exactly between Figma and Angular's live CSS. ──────────────────────────
   likedFooter: {
     alignSelf: 'flex-start',
-    marginTop: 6,   // detailText's own marginBottom:2 + this 6 = Figma's confirmed 8px gap
+    marginTop: 6,   // detailText's own marginBottom:2 + this 6 = Angular's mt-8
+    // Angular: the pill carries `ml-8 mr-8 mb-4` alongside its mt-8 — it sits
+    // inset from the card's own 8px padding, not flush against it.
+    marginLeft: 8,
+    marginRight: 8,
+    marginBottom: 4,
     paddingVertical: 10,
     paddingHorizontal: 10,
     borderTopLeftRadius: 24,

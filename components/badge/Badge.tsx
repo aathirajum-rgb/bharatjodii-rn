@@ -42,21 +42,31 @@ const VARIANT_STYLE: Record<Exclude<BadgeVariant, 'paid'>, { bg: string; textCol
 
 export default function Badge({ variant, text, imageUrl, hasInfo = false, style }: BadgeProps) {
   if (variant === 'paid') {
+    // Angular: .paid-tag-position { position:absolute; left:-10px; top:0; height:100% } — the
+    // crown deliberately OVERHANGS the pill's left edge, and .paid-member-block sets no
+    // overflow, so nothing clips it. CdnSvgBackground must set overflow:'hidden' to crop its
+    // own background SVG, so the crown cannot live inside it — nested there, the overhang was
+    // clipped away and only a sliver of the icon survived (it read as a check, not a crown).
+    // The wrapper reserves the 10px with padding and pulls it back with a negative margin, so
+    // the crown and pill land exactly where Angular puts them while the icon still sits inside
+    // its parent's bounds — Android clips absolutely-positioned children that escape those.
     return (
-      <CdnSvgBackground uri={PAID_BG} style={[styles.container, styles.paidContainer, style]}>
+      <View style={[styles.paidWrap, style]}>
+        <CdnSvgBackground uri={PAID_BG} style={[styles.container, styles.paidContainer]}>
+          {/* Angular: .color-006C48 { color: #006C48 } — a dark green, not the
+              generic amber Colors.badgePaidText (shared with an unrelated,
+              unreviewed badge elsewhere) was giving this. */}
+          <Text style={[styles.label, styles.paidLabel]} numberOfLines={1}>
+            {text}
+          </Text>
+          {hasInfo && (
+            <CdnSvg uri={INFO_ICON} width={14} height={14} style={styles.infoIcon} />
+          )}
+        </CdnSvgBackground>
         {!!imageUrl && (
           <CdnSvg uri={imageUrl} width={24} height={24} style={styles.paidIcon} />
         )}
-        {/* Angular: .color-006C48 { color: #006C48 } — a dark green, not the
-            generic amber Colors.badgePaidText (shared with an unrelated,
-            unreviewed badge elsewhere) was giving this. */}
-        <Text style={[styles.label, styles.paidLabel]} numberOfLines={1}>
-          {text}
-        </Text>
-        {hasInfo && (
-          <CdnSvg uri={INFO_ICON} width={14} height={14} style={styles.infoIcon} />
-        )}
-      </CdnSvgBackground>
+      </View>
     )
   }
 
@@ -103,11 +113,21 @@ const styles = StyleSheet.create({
   icon: {
     flexShrink: 0,
   },
+  // Non-clipping outer box for the paid pill: paddingLeft makes room for the crown's
+  // overhang so it stays within these bounds, marginLeft cancels it out again so the
+  // pill itself keeps the exact x Angular gives it.
+  paidWrap: {
+    alignSelf:   'flex-start',
+    position:    'relative',
+    paddingLeft: 10,
+    marginLeft:  -10,
+  },
   // Angular: .paid-tag-position { position:absolute; left:-10px; top:0;
   // height:100% } — the crown icon overlaps the badge's own left edge.
+  // left:0 here is that same -10px, measured from paidWrap's padded edge.
   paidIcon: {
     position: 'absolute',
-    left:     -10,
+    left:     0,
     top:      '50%',
     marginTop: -12,
   },

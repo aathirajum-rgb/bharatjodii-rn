@@ -102,6 +102,16 @@ const EXPLORE_ROW_PR    = 24
 const EXPLORE_GRID_UNIT = (SW - EXPLORE_ROW_PL - EXPLORE_ROW_PR) / 12
 export const EXPLORE_TILE_WIDTH = EXPLORE_GRID_UNIT * 5.4
 const EXPLORE_GRID_GAP  = EXPLORE_GRID_UNIT * 0.6
+// Angular: .discover-new-bg { height: 20vmin } — a FIXED height (20vmin ≈ 20vw
+// in portrait), so every tile is the same size and a two-line label centers
+// inside it. A min-height instead let one-line tiles collapse shorter and
+// two-line tiles grow taller than their neighbours.
+const EXPLORE_TILE_HEIGHT = SW * 0.20
+// Angular: the icon sits in an `ion-col size="2"` of the card's own 12-col grid,
+// and the label column that follows adds `pl-5`. A flat 32+8 box pushed the
+// label ~12px further right than Angular does, costing it that much width on an
+// already-narrow two-line tile.
+const EXPLORE_ICON_COL = (EXPLORE_TILE_WIDTH - 12) * 2 / 12
 // Angular: .success-story-image img { width: 35vw; height: 35vw }
 const HAND_SIZE = SW * 0.35
 
@@ -133,10 +143,28 @@ function comTotalFor(comCount: ComCountEntry[], type: string): number {
   return Number(comCount.find(c => c.comtype === type)?.totalCount ?? 0)
 }
 
+// Angular: app-swiper.component.ts's setHeader() — appends " (count)" to the
+// translated section title ONLY when count > 0, never a bare "(0)".
+// This matters most for the comTotalFor()-backed sections: their count comes
+// from the communication/newcount call, which resolves INDEPENDENTLY of each
+// section's own listing call. A section is gated on its listing (e.g.
+// profilesViewed.length > 0), so it can render its cards a beat before the
+// count arrives — and if the response carries no entry for that comtype, the
+// count stays 0 for good. Interpolating unconditionally put a literal
+// "Profiles you viewed (0)" above a swiper that visibly had profiles in it.
+function headerWithCount(label: string, count: number): string {
+  return count > 0 ? `${label} (${count})` : label
+}
+
 // Angular: cardMoreItemsData = cardMoreItems.splice(cap, 3) — the 3 items just
 // beyond the visible slice, previewed as thumbnails on the "view more" card.
+// Angular's card binds viewMoreList[i]?.THUMBIMG, so prefer the real thumbnail:
+// profileImg resolves to PHOTO[0].IMAGE first (the full-size photo), which for a
+// hidden/photo-protected profile is a different asset that renders blank in these
+// 56px circles instead of falling through to the silhouette. Empty string last so
+// SeeAllAvatar still sees a falsy uri and swaps in the opposite-gender avatar.
 function moreItemsFrom(list: SwiperItem[], cap: number): { THUMBIMG: string }[] {
-  return list.slice(cap, cap + 3).map(i => ({ THUMBIMG: i.profileImg ?? '' }))
+  return list.slice(cap, cap + 3).map(i => ({ THUMBIMG: i.thumbImg || i.profileImg || '' }))
 }
 
 // Angular: common-funtions.ts's updatePluralContent() — used ONLY for the
@@ -181,6 +209,11 @@ export function CompleteProfileSection({ cards, onCardPress }: CompleteProfileSe
         <Pressable key={card.type} onPress={() => onCardPress(card)}>
           <LinearGradient
             colors={['#E8EFFF', '#FFFFFF']}
+            // Angular: linear-gradient(104deg, #E8EFFF 0%, #FFF 19.54%) — the
+            // blue tint is confined to the leading ~20% of the card and it is
+            // plain white from there on. Without the stop positions this ramped
+            // across the whole card, tinting it far more heavily than Angular's.
+            locations={[0, 0.1954]}
             start={{ x: 0, y: 0.15 }}
             end={{ x: 1, y: 0 }}
             style={s.cpCard}
@@ -217,10 +250,14 @@ export interface LikedProfilesSectionProps {
   onLikePress:  (item: SwiperItem) => void
   // Photo-protected/no-photo overlay's WhatsApp CTA — see ProfilePhoto.tsx.
   onWhatsAppPress: (item: SwiperItem) => void
+  // Angular: app-swiper's see-all link — shown for this section too
+  // (showLinkCta defaults to true, showSeeAllButton = totalCount > 1).
+  onSeeAllPress?: (() => void) | undefined
 }
 
 export function LikedProfilesSection({
   likedTab, onTabChange, likedByMe, likedMe, likedByCount, likedMeCount, gender, onCardPress, onLikePress, onWhatsAppPress,
+  onSeeAllPress,
 }: LikedProfilesSectionProps) {
   const { t } = useTranslation()
 
@@ -246,7 +283,9 @@ export function LikedProfilesSection({
       {/* Angular: app-swiper.component.ts's setHeader() — swiperHeader is
           sectionTitle.likedprofile = 'GENERAL.ICON_3' ("Liked profiles"),
           suffixed with (likedYouCount + likedByMeCount) when > 0. */}
-      <Text style={s.sectionTitle}>{`${t('GENERAL.ICON_3')} (${likedByCount + likedMeCount})`}</Text>
+      <Text style={[s.sectionTitle, s.likedSectionTitle]}>
+        {headerWithCount(t('GENERAL.ICON_3'), likedByCount + likedMeCount)}
+      </Text>
       {showTabs ? (
         // Angular: app-swiper.component.html:42-55 — the segment's tab ORDER
         // is gender-dependent (female sees "Liked you" first, male sees
@@ -276,11 +315,20 @@ export function LikedProfilesSection({
       <SwiperCard
         cardVariant={8}
         cardSection="likedprofile"
-        items={items}
-        showSeeAll={false}
+        // Angular: setLikedProfileLists() — likedProfileContents is capped at
+        // slice(0, 5) and the rest goes to likedProfileMoreItems, which feeds the
+        // trailing "See all" ghost card. Passing the whole list as items rendered
+        // every liked profile in the carousel and, with no moreItems at all, that
+        // ghost card never appeared.
+        items={items.slice(0, 5)}
+        moreItems={moreItemsFrom(items, 5)}
+        // Angular: showSeeAllButton = totalCount > 1, where this section's
+        // totalCount is getLikedProfilesTotalCount() (both sides added).
+        showSeeAll={likedByCount + likedMeCount > 1}
         onCardPress={onCardPress}
         onLikePress={onLikePress}
         onWhatsAppPress={onWhatsAppPress}
+        {...(onSeeAllPress ? { onSeeAllPress } : {})}
       />
     </>
   )
@@ -320,7 +368,7 @@ export function ExploreCategoriesSection({
       {/* Angular: home.enum.ts's sectionTitle.exploreMatches = 'HOME.EXPLORE_MATCHES_TXT'
           ("Discover matches") — HOME.EXPLORE_MATCHES ("Explore matches based on")
           is a different, unused key. */}
-      <Text style={s.sectionTitle}>{t('HOME.EXPLORE_MATCHES_TXT')}</Text>
+      <Text style={[s.sectionTitle, s.exploreSectionTitle]}>{t('HOME.EXPLORE_MATCHES_TXT')}</Text>
       <View style={[s.catGrid, { paddingLeft: EXPLORE_ROW_PL + EXPLORE_GRID_GAP, paddingRight: EXPLORE_ROW_PR, gap: EXPLORE_GRID_GAP }]}>
         {categories.map(cat => (
           <Pressable key={cat.id} onPress={() => onCategoryPress(cat)} style={{ width: EXPLORE_TILE_WIDTH }}>
@@ -353,8 +401,8 @@ export function ExploreCategoriesSection({
 // ─── Success Stories ───────────────────────────────────────────────────────────
 
 export function SuccessStoriesSection({
-  stories, onCardPress,
-}: { stories: SwiperItem[]; onCardPress: (item: SwiperItem) => void }) {
+  stories, onCardPress, onSeeAllPress,
+}: { stories: SwiperItem[]; onCardPress: (item: SwiperItem) => void; onSeeAllPress: () => void }) {
   const { t } = useTranslation()
   const [headLine1, headLine2] = t('HOME.HAPPILY_MARRIED_HEAD').split('<br>').map(p => p.trim())
   const subtitle = t('HOME.HAPPILY_MARRIED_CONTENT').replace(/<br\s*\/?>/gi, '\n')
@@ -375,15 +423,22 @@ export function SuccessStoriesSection({
         </View>
         <CdnSvg uri={`${CDN}success-story-hand.svg`} width={HAND_SIZE} height={HAND_SIZE} style={s.storyHandImage} />
       </View>
-      {/* No cardWidth override — Angular: card-ht4 is 91.111vmin square, not
-          the previous guessed 68% width. Let SwiperCard's per-section default
-          (ProfileCard's PHOTO_HEIGHT['successstory']) apply. */}
+      {/* No cardWidth override — SwiperCard derives it from successStory's own
+          slidesPerView: 1.29, same as every other section. */}
       <SwiperCard
         cardVariant={4}
         cardSection="successstory"
-        items={stories}
-        showSeeAll={false}
+        // Angular: getSucessStories() sets jodiihappilyMarried = allStories.slice(0, 5)
+        // for [card-contents] and keeps the full list in [card-more-items], so the
+        // carousel is 5 cards then the "see all" slide.
+        items={stories.slice(0, 5)}
+        moreItems={moreItemsFrom(stories, 5)}
+        showSeeAll
+        // Angular's success-story ion-grid has the in-carousel slide but no
+        // "See all" link row under the dots — unlike every other section.
+        showSeeAllLink={false}
         onCardPress={onCardPress}
+        onSeeAllPress={onSeeAllPress}
       />
     </>
   )
@@ -451,23 +506,29 @@ export function HelpSection({
   onCallPress, phone,
 }: { onCallPress: () => void; phone: string }) {
   const { t } = useTranslation()
-  // Measured directly off the live Angular app's inline style on #helpBanner
-  // (matches FAQ_DETAILS.BANNER.BANNERBG exactly): linear-gradient(335deg,
-  // #FFEEE7 5.54%, #F5F5F5 93.82%) — peach starts near the bottom-right,
-  // grey ends near the top-left. 335deg converted to start/end fractions via
-  // the standard CSS-angle-to-corner-points formula (x=0.5+sin(θ)·0.5 etc.).
+  // Angular: getHelbBannerData() strips a leading '+91' from the customer-care
+  // number BEFORE substituting it into the CTA (cutomerCareNO.slice(3)) — the
+  // dialled number keeps the prefix, only the label drops it.
+  const ctaPhone = phone.includes('+91') ? phone.slice(3) : phone
+  // FAQ_DETAILS.BANNER.BANNERBG is `linear-gradient(335deg, #FFEEE7 5.54%,
+  // #F5F5F5 93.82%)` and the template binds it via [ngStyle] — but
+  // home-banner.component.scss's `.help-banner { background: linear-gradient(
+  // to right, rgb(245,245,245), rgb(255,238,231)) !important }` WINS over that
+  // inline style (author !important outranks a normal inline declaration). So
+  // the banner actually renders grey→peach left-to-right, not the diagonal
+  // peach→grey BANNERBG describes.
   return (
     <LinearGradient
-      colors={['#FFEEE7', '#F5F5F5']}
-      start={{ x: 0.71, y: 0.95 }}
-      end={{ x: 0.29, y: 0.05 }}
+      colors={['#F5F5F5', '#FFEEE7']}
+      start={{ x: 0, y: 0.5 }}
+      end={{ x: 1, y: 0.5 }}
       style={s.helpWrap}
     >
       <View style={s.helpTextCol}>
         <Text style={s.helpTitle}>{t('FAQ_DETAILS.BANNER.TITLE')}</Text>
         <Text style={s.helpSub}>{t('FAQ_DETAILS.BANNER.BODY')}</Text>
         <Pressable style={s.helpCta} onPress={onCallPress}>
-          <Text style={s.helpCtaText}>{t('FAQ_DETAILS.BANNER.CTA').replace('#CALL#', phone).trim()}</Text>
+          <Text style={s.helpCtaText}>{t('FAQ_DETAILS.BANNER.CTA').replace('#CALL#', ctaPhone).trim()}</Text>
           <Text style={s.helpCtaChevron}>{'›'}</Text>
         </Pressable>
       </View>
@@ -1475,12 +1536,14 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         {viewedMe.length > 3 && (
           <>
             <View style={s.divider} />
-            <LinearGradient colors={['#FFF1FF', '#FFFFFF']} style={s.section}>
-              <Image
-                source={{ uri: `${CDN}revamp/who-viewed-bg-color.svg` }}
-                style={StyleSheet.absoluteFill}
-                resizeMode="cover"
-              />
+            {/* Angular: .dot-img-bg = background-image: url(who-viewed-bg-color.svg),
+                linear-gradient(#FFF1FF → #FFFFFF) — the SVG sits ON TOP of the
+                gradient. The decorative layer was a plain <Image> here, which
+                renders nothing on iOS/Android (RN's Image can't decode a remote
+                SVG — that's exactly why CdnSvgBackground exists, as the Liked
+                Profiles section below already uses). It only ever showed on web. */}
+            <LinearGradient colors={['#FFF1FF', '#FFFFFF']}>
+              <CdnSvgBackground uri={`${CDN}revamp/who-viewed-bg-color.svg`} style={s.section}>
               <SwiperCard
                 swiperHeader={`${applyPluralToken(t, t('HOME.WHO_VIEWED_YOU_HEADER'), comTotalFor(comCount, 'viewedyou'))} (${comTotalFor(comCount, 'viewedyou')})`}
                 newCount={comCountFor(comCount, 'viewedyou')}
@@ -1491,9 +1554,15 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 showSeeAll
                 onCardPress={item => goToProfile(item, viewedMe, 'home_viewedyou')}
                 onLikePress={likeViewedMe}
-                onSeeAllPress={() => navigation.navigate('Activity')}
+                // Angular app-swiper.component.ts's onClickSeeAllCTA() case
+                // 'viewedyou' → router.navigate(['/activity/viewedyou'], { state:
+                // { activityType: 'viewedyou' } }) — the back-button "Who viewed
+                // your profile" drill-down, NOT the default liked-profiles tab
+                // this landed on before ActivityScreen took route params.
+                onSeeAllPress={() => navigation.navigate('Activity', { activityType: 'viewedyou' })}
                 onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_viewedyou')}
               />
+              </CdnSvgBackground>
             </LinearGradient>
           </>
         )}
@@ -1502,11 +1571,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         {completeCards.length > 0 && (
           <>
             <View style={s.divider} />
-            <View style={s.section}>
+            <View style={[s.section, s.cpSection]}>
               {/* Angular: complete-profile.component.html's header text is
                   .color-1f1e1b, not the generic textPrimary black every other
-                  section header here uses; wrapping row is mt-16 before the
-                  first card (not sectionTitle's shared 12px). */}
+                  section header here uses. */}
               <Text style={[s.sectionTitle, s.cpSectionTitle]}>{t('HOME.COMPLETE_PROFILE_HEADER')}</Text>
               <CompleteProfileSection cards={completeCards} onCardPress={handleCompleteProfileCard} />
             </View>
@@ -1531,7 +1599,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 moreItems={moreItemsFrom(todayMatches, 4)}
                 onCardPress={item => goToProfile(item, todayMatches, 'home_dailyrec')}
                 onLikePress={likeTodayMatches}
-                onSeeAllPress={() => navigation.navigate('Matches')}
+                // Angular: onClickSeeAllCTA() case 'dailyrecommendations' →
+                // router.navigate(['dailyrecommendations'], { queryParams:
+                // { frm_page } }) — the swipe-card DR screen, not the Matches list.
+                onSeeAllPress={() => navigation.navigate('daily-recommendations', { frm_page: 'home' })}
                 onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_dailyrec')}
               />
             </View>
@@ -1554,7 +1625,9 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <View style={s.divider} />
             <LinearGradient colors={['#FCEBFF', '#FFFFFF']} style={s.section}>
               <SwiperCard
-                swiperHeader={`${t('HOME.NEWLY_JOINED_HEADER')} (${newlyJoinedTotal})`}
+                // toListingResult() falls back to 0 when the response carries no
+                // TOTAL — see headerWithCount() for Angular's setHeader() rule.
+                swiperHeader={headerWithCount(t('HOME.NEWLY_JOINED_HEADER'), newlyJoinedTotal)}
                 cardVariant={1}
                 cardSection="newmatches"
                 items={newlyJoined.slice(0, 4)}
@@ -1562,7 +1635,18 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 showSeeAll
                 onCardPress={item => goToProfile(item, newlyJoined, 'home_newmatches')}
                 onLikePress={likeNewlyJoined}
-                onSeeAllPress={() => navigation.navigate('Matches')}
+                // Angular: onClickSeeAllCTA() case 'newmatches' → NEWMATCHESLANDING='1'
+                // then router.navigate(['/matches/bynewlyjoined']) — the Matches list
+                // filtered to newly joined, NOT the plain list. matches.page.ts's
+                // urlExploreObj maps the route name 'bynewlyjoined' to FILTERTYPE
+                // 'NEYLYJOINED' (backend typo, preserved) before it reaches the API,
+                // so the mapped value is what this passes — same as HelpCenterScreen.tsx
+                // and pageLandingService.ts's case "13". Navigating to a bare 'Matches'
+                // dropped the filter and landed the user on all matches.
+                onSeeAllPress={() => navigation.navigate('Matches', {
+                  exploreType: 'NEYLYJOINED',
+                  exploreLabel: t('HOME.NEWLY_JOINED_HEADER'),
+                })}
                 onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_newmatches')}
               />
             </LinearGradient>
@@ -1581,7 +1665,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 // Angular: home.enum.ts's sectionTitle.viewedbyme = 'GENERAL.VIEWEDBYME'
                 // ("Profiles you viewed"), the exact key this section's live
                 // template binds swiperHeader to.
-                swiperHeader={`${t('GENERAL.VIEWEDBYME')} (${comTotalFor(comCount, 'viewedbyme')})`}
+                swiperHeader={headerWithCount(t('GENERAL.VIEWEDBYME'), comTotalFor(comCount, 'viewedbyme'))}
                 newCount={comCountFor(comCount, 'viewedbyme')}
                 cardVariant={3}
                 cardSection="viewedbyme"
@@ -1590,7 +1674,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 showSeeAll
                 onCardPress={item => goToProfile(item, profilesViewed, 'home_viewedbyme')}
                 onLikePress={likeProfilesViewed}
-                onSeeAllPress={() => navigation.navigate('Activity')}
+                // Angular: onClickSeeAllCTA() case 'viewedbyme' → /activity/viewedbyme
+                // with state { activityType: 'viewedbyme', selectedSubTab: 'viewedbyme' }
+                // — the two-sub-tab ("Profiles you viewed" / "View later") list.
+                onSeeAllPress={() => navigation.navigate('Activity', { activityType: 'viewedbyme', selectedSubTab: 'viewedbyme' })}
                 onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_viewedbyme')}
               />
             </View>
@@ -1607,11 +1694,21 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             (the actual listing arrays), not the header's communication-count
             totals — matching that literally rather than trusting comCount to
             agree with these listing calls' own item counts. */}
+        {/* anchor="top-left": Angular's .liked-profile-bg sets background-size:cover
+            with NO background-position, so CSS anchors it top-left. Native was
+            centering the cover crop, which cut the artwork's top edge off. */}
         {(likedByMe.length > 0 || likedMe.length > 0) && (
-          <CdnSvgBackground uri={`${CDN}liked-profiles-bg.svg`} style={s.section}>
+          <CdnSvgBackground uri={`${CDN}liked-profiles-bg.svg`} anchor="top-left" style={s.likedSection}>
             <LikedProfilesSection
               likedTab={likedTab}
               onTabChange={setLikedTab}
+              // Angular: onClickSeeAllCTA() case 'likedprofile' → /activity/likedyou
+              // or /activity/likesent depending on which tab is selected. The
+              // section's see-all was disabled outright in this port; Angular
+              // shows it whenever the combined count is > 1 (showSeeAllButton).
+              onSeeAllPress={() => navigation.navigate('Activity', {
+                activityType: likedTab === 'likedbyme' ? 'likesent' : 'likedyou',
+              })}
               likedByMe={likedByMe}
               likedMe={likedMe}
               likedByCount={comTotalFor(comCount, 'likedbyme')}
@@ -1628,7 +1725,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         {categories.length > 0 && (
           <>
             <View style={s.divider} />
-            <View style={s.section}>
+            <View style={s.exploreSection}>
               <ExploreCategoriesSection
                 categories={categories}
                 onCategoryPress={cat => navigation.navigate('Matches', { exploreType: cat.id, exploreLabel: cat.label })}
@@ -1640,7 +1737,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         {/* ════════════ SUCCESS STORIES ════════════
             Angular: .success-story-section { background: #FEF2F6 } — a light
             pink section background, missing entirely before this fix. */}
-        {stories.length > 1 && (
+        {/* Angular: getSucessStories() assigns jodiihappilyMarried only when
+            allStories.length >= 4 (and [] otherwise), and the wrapper then
+            checks length > 1 — so the section needs FOUR stories, not two. */}
+        {stories.length >= 4 && (
           <>
             <View style={s.divider} />
             <View style={[s.section, s.successStorySection]}>
@@ -1652,6 +1752,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                 // own in-screen photo viewer, not a routable id). Tapping a
                 // preview card on Home opens that same list screen.
                 onCardPress={() => navigation.navigate('SuccessStories')}
+                // Angular: onClickSeeAllCTA() case 'successStory' → /success-story
+                onSeeAllPress={() => navigation.navigate('SuccessStories')}
               />
             </View>
           </>
@@ -1680,10 +1782,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             helpBannerData is static translation content (FAQ_DETAILS.BANNER),
             not an API-gated flag, so it's always truthy once the screen
             renders — the divider above Help is effectively unconditional. */}
+        {/* No section wrapper — Angular's explore-border-top div has no padding
+            of its own; the banner's own pt-24 / cust-padding-start supplies it. */}
         <View style={s.divider} />
-        <View style={s.section}>
-          <HelpSection onCallPress={handleCallPress} phone={customerCare.phone} />
-        </View>
+        <HelpSection onCallPress={handleCallPress} phone={customerCare.phone} />
 
         <View style={{ height: 16 }} />
       </ScrollView>
@@ -1803,17 +1905,29 @@ const s = StyleSheet.create({
   screen:  { flex: 1, backgroundColor: Colors.white },
   scroll:  { flex: 1 },
   section: { paddingTop: 20, paddingBottom: 4 },
+  // Angular: this section's ion-grid is `pt-0 pl-0 pr-0 pb-12` and its header
+  // ion-row supplies the `pt-32` — so 32 above and 12 below, not the generic
+  // section's 20/4. The background SVG fills this whole padded box.
+  likedSection: { paddingTop: 32, paddingBottom: 12 },
   // Angular: .explore-border-top { border-top: 3px solid #EBEBEB } — a thin
   // top-border line between sections, not a filled band.
   divider: { borderTopWidth: 3, borderTopColor: '#EBEBEB' },
   hList:   { paddingHorizontal: 16 },
 
-  sectionTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 15, color: Colors.textPrimary, paddingHorizontal: 16, marginBottom: 12 },
+  // Angular: every one of this style's four callers (Complete your profile,
+  // Liked profiles, Explore categories, Self-help videos) uses
+  // `heading2-semibold-18` for its section heading — 18px, not the 15 used here.
+  sectionTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textPrimary, paddingHorizontal: 16, marginBottom: 12 },
   // Angular: complete-profile.component.html's outer grid is pl-24 pr-0
   // (not the generic 16px every other section header uses), header color is
-  // the specific .color-1f1e1b (not textPrimary), and the cards-wrapping row
-  // is mt-16 below it (not the generic 12px).
-  cpSectionTitle: { paddingHorizontal: 24, color: '#1F1E1B', marginBottom: 16 },
+  // the specific .color-1f1e1b (not textPrimary).
+  // The title→first-card gap is 37: the heading's own mb-5, plus the cards
+  // ion-row's mt-16, plus each card's own mt-16.
+  cpSectionTitle: { paddingHorizontal: 24, color: '#1F1E1B', marginBottom: 37 },
+  // Angular: the grid is `pt-32 pb-24` and the cards row adds mb-16 below the
+  // last card — i.e. 32 above the heading and 40 under the last card, not the
+  // generic section's 20/4.
+  cpSection: { paddingTop: 32, paddingBottom: 40 },
 
   // Complete profile — Angular: .complete-profile-block (separate bordered/
   // gradient box per card, not one shared container with divider rows).
@@ -1835,14 +1949,50 @@ const s = StyleSheet.create({
   cpCtaText: { fontFamily: Fonts.poppinsRegular, fontSize: 14, color: '#29339B' },
 
   // Liked profiles tabs
-  tabRow:             { flexDirection: 'row', marginHorizontal: 16, marginBottom: 12, backgroundColor: '#F5F5F5', borderRadius: 8, padding: 3 },
-  tabPill:            { flex: 1, paddingVertical: 7, alignItems: 'center', borderRadius: 6 },
-  tabPillActive:      { backgroundColor: Colors.white, shadowColor: Colors.shadow, shadowOpacity: 0.08, shadowRadius: 4, elevation: 2 },
-  tabPillText:        { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textSecondary },
-  tabPillTextActive:  { fontFamily: Fonts.poppinsSemiBold, fontSize: 12, color: Colors.textPrimary },
+  // Angular: app-swiper.component.scss's `ion-segment` for this section —
+  // --background: #E5B582 (a tan track, not the neutral #F5F5F5 used here),
+  // border-radius: 12px, padding: 2px; and the wrapper div is
+  // `ml-24 mr-24 mb-32 mt-16`, not 16/12/0.
+  tabRow:             { flexDirection: 'row', marginHorizontal: 24, marginTop: 16, marginBottom: 32, backgroundColor: '#E5B582', borderRadius: 12, padding: 2 },
+  // Angular: ion-segment-button gets `padding: 5px` from the app, and
+  // ::part(native) { padding: 0 } strips Ionic's own 13px inline padding — so
+  // 5px all round is the real inset. The rest is Ionic's segment-button.ios.css:
+  // `min-height: 28px`, `--border-radius: 7px`, and the white pill is inset from
+  // the button slot on EVERY side, from two separate rules:
+  //   :host                        { margin-top: 2px; margin-bottom: 2px }
+  //   .segment-button-indicator    { padding-left: 2px; padding-right: 2px }
+  // (the indicator is the white background; it's absolutely positioned over the
+  // host at top/bottom 0, so only its horizontal 2px shows as an inset). Without
+  // that 2px on all four sides the pill filled its slot and looked cramped.
+  tabPill: {
+    flex: 1,
+    minHeight: 28,
+    margin: 2,
+    paddingVertical: 5,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 7,
+  },
+  // Angular: --indicator-box-shadow: 0 0 5px rgba(0, 0, 0, 0.16) — an even glow
+  // with no offset, not the softer offset shadow this used.
+  tabPillActive:      { backgroundColor: Colors.white, shadowColor: Colors.shadow, shadowOpacity: 0.16, shadowRadius: 5, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
+  // Angular: --color: #000000 (unselected) at body3-regular-12; --color-checked:
+  // #8B4800 (a brown) at body1-medium-14 — the selected tab is a size up, and
+  // neither color is the generic text token this used.
+  tabPillText:        { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 17, color: '#000000', textAlign: 'center' },
+  // global.scss's .body1-medium-14 is --english-medium-poppins @ 14/500, i.e.
+  // Poppins-Medium — SemanticFontsEnglish has no body-medium slot, so take the
+  // family straight from Fonts (same mapping SemanticFonts.en.medium uses).
+  tabPillTextActive:  { fontFamily: Fonts.poppinsMedium, fontSize: 14, lineHeight: 20, color: '#8B4800' },
+  // Angular: this section's header ion-row is `pt-32 pr-24 pl-24` with pb-8
+  // (every other section gets pb-24), and its ion-col adds mt-24 — so the title
+  // sits 24px lower and 24px in from the edge, with only 8px under it before the
+  // tab row. The generic sectionTitle's 16px inset / 12px gap is neither.
+  likedSectionTitle:  { paddingHorizontal: 24, marginTop: 24, marginBottom: 8 },
   // Angular: .body2-regular-14 line-height-24, ml-24 mr-24 mb-32 pt-8 — shown
   // instead of the tab row when only one of likedYou/likedByMe has data.
-  onlyOneLikedText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 24, color: Colors.textPrimary, paddingHorizontal: 16, marginBottom: 12 },
+  onlyOneLikedText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 24, color: Colors.textPrimary, paddingHorizontal: 24, paddingTop: 8, marginBottom: 32 },
 
   // Explore categories
   // Angular: .discover-new-bg — 12px radius, 1px #E6E6E6 border, compact
@@ -1852,33 +2002,52 @@ const s = StyleSheet.create({
   // tileWidth's own call-site comment for the exact math this approximates.
   // paddingLeft/paddingRight/gap are computed per-render from screen width —
   // see EXPLORE_TILE_WIDTH's header comment — and merged in at the call site.
+  // Angular: the title ion-row is `pl-24 pr-24 mt-32 mb-16` and the grid ion-row
+  // is `mt-16 pb-24 pr-24 pl-4`. So: 32 below the divider, then (16 collapsed
+  // between the two rows + 16 from each card's own `mt-16`) = 32 between the
+  // title and the first tile, and 24 under the last row. The generic section's
+  // 20/12/4 had the whole block sitting far too tight.
+  exploreSection:      { paddingTop: 32, paddingBottom: 24 },
+  exploreSectionTitle: { paddingHorizontal: 24, marginBottom: 32 },
   catGrid:      { flexDirection: 'row', flexWrap: 'wrap' },
   // Angular: .discover-new-bg { padding: 8px 4px 8px 8px } — tighter on the
   // right, where the chevron sits, not a flat 8px on every side.
-  catTile:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#E6E6E6', paddingTop: 8, paddingRight: 4, paddingBottom: 8, paddingLeft: 8, minHeight: 64 },
-  catIconWrap:  { width: 32, height: 32, marginRight: 8, alignItems: 'center', justifyContent: 'center' },
+  catTile:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#E6E6E6', paddingTop: 8, paddingRight: 4, paddingBottom: 8, paddingLeft: 8, height: EXPLORE_TILE_HEIGHT },
+  // marginRight is Angular's `pl-5` on the label column, not a rounded 8.
+  catIconWrap:  { width: EXPLORE_ICON_COL, marginRight: 5, alignItems: 'center', justifyContent: 'center' },
   catLabel:     { flex: 1, fontFamily: Fonts.poppinsMedium, fontSize: 12, color: Colors.textPrimary, lineHeight: 16 },
   catChevron:   { color: '#29339B', fontFamily: Fonts.poppinsSemiBold },
 
-  // Angular: .success-story-section { background: #FEF2F6 }
-  successStorySection: { backgroundColor: '#FEF2F6' },
+  // Angular: .success-story-section { background: #FEF2F6 } and its own pb-24,
+  // wrapped in an ion-grid that is `pt-0 pr-0 pl-0 pb-0` — so the heart
+  // animation starts flush at the top of the pink band and there's 24 under the
+  // cards. The generic section's 20/4 gave it a gap on top and none below.
+  successStorySection: { backgroundColor: '#FEF2F6', paddingTop: 0, paddingBottom: 24 },
 
   // Angular: ion-row wrapping the heart animation + text column and the
-  // absolutely-positioned hand image alongside it.
-  storyHeaderRow: { position: 'relative' },
-  // Angular: .success-story-image { position:absolute; right:6px } — no top
-  // offset in the source, so it stays flush with the row's top edge.
-  storyHandImage: { position: 'absolute', top: 0, right: 6 },
+  // absolutely-positioned hand image alongside it — the row's own mb-24 is the
+  // gap down to the cards row.
+  storyHeaderRow: { position: 'relative', marginBottom: 24 },
+  // Angular: .success-story-image { position:absolute; right:6px } with mt-6 on
+  // its container — no `top`, so it lands at its static position plus that 6px.
+  storyHandImage: { position: 'absolute', top: 6, right: 6 },
 
   // Success stories header — Angular: both lines of the translated header
   // ("Got married<br>through Jodii" — NOT the "Made with Love in Jodii" the
   // .html template shows, which is just static placeholder scaffolding the
   // live `| translate` pipe always overrides) share ONE style —
-  // heading2-semibold-18 + whiteColor — not a two-tone regular/bold split.
+  // heading2-semibold-18 — not a two-tone regular/bold split.
   // Angular: .negative-mt-18 pulls this block up to overlap the heart
-  // animation above it.
-  storyHeader:    { paddingHorizontal: 24, marginTop: -18, marginBottom: 12 },
-  storyTitle:     { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.white },
+  // animation above it. The header ion-row's own mb-24 (on storyHeaderRow)
+  // supplies the gap down to the cards, so no marginBottom here.
+  storyHeader:    { paddingHorizontal: 24, marginTop: -18 },
+  // succussStorySection.headerbgColor is 'whiteColor', but NO reachable rule
+  // defines that class: it exists only in button-revamp.component.scss (as
+  // `ion-button.whiteColor`) and profile-card.component.scss, both view-
+  // encapsulated, and app-swiper.component.scss defines only .blackColor /
+  // .purpleColor. So Angular's title falls back to the inherited dark text —
+  // painting it white here put it on #FEF2F6 pink and made it unreadable.
+  storyTitle:     { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, lineHeight: 24, color: Colors.black },
   // Angular: .body2-regular-14.black-color.line-height-20
   storySubtitle:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, marginTop: 8, lineHeight: 20 },
 
@@ -1892,12 +2061,24 @@ const s = StyleSheet.create({
   // Help section
   // Angular: FAQ_DETAILS.BANNER — title/body/link-CTA on a gradient card with
   // a decorative image, not two call/whatsapp buttons.
-  helpWrap:      { flexDirection: 'row', alignItems: 'center', marginHorizontal: 16, borderRadius: 12, padding: 16, gap: 12 },
+  // Angular: `.help-banner { min-height: 35vmin }` on an ion-grid that is
+  // `padd0`, inside a plain explore-border-top div — a FULL-BLEED band with no
+  // border radius and no horizontal margin. Its row is
+  // `ion-cust-padding-start pt-24 pr-24`, and --ion-cust-padding is 24px.
+  // Rendering it as a 16px-inset rounded card was the wrong shape entirely.
+  helpWrap:      { flexDirection: 'row', alignItems: 'center', minHeight: SW * 0.35, paddingLeft: 24, paddingRight: 24, paddingTop: 24, paddingBottom: 24 },
   helpTextCol:   { flex: 1 },
-  helpTitle:     { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.textPrimary, marginBottom: 6 },
-  helpSub:       { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary, marginBottom: 10, lineHeight: 20 },
-  helpCta:       { flexDirection: 'row', alignItems: 'center' },
-  helpCtaText:   { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 13, color: '#29339B' },
+  // Angular: `heading4-medium-16` (Poppins-MEDIUM 16, not semibold). TITLECOLOR
+  // isn't a key on FAQ_DETAILS.BANNER, so [ngStyle] sets nothing and the title
+  // keeps the default dark text.
+  helpTitle:     { fontFamily: Fonts.poppinsMedium, fontSize: 16, color: Colors.textPrimary },
+  // Angular: `body2-regular-14` + `mt-8`; CONTANTCOLOR is likewise absent from
+  // the translation object, so this is default dark at 14 — not 13 gray.
+  helpSub:       { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textPrimary, marginTop: 8, lineHeight: 20 },
+  // Angular: the CTA row is `mt-4`; its label is `textcta-medium-12` (12px
+  // Poppins-Medium) in .color-29339B, with the chevron at ml-4.
+  helpCta:       { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  helpCtaText:   { fontFamily: Fonts.poppinsMedium, fontSize: 12, color: '#29339B' },
   helpCtaChevron: { fontFamily: Fonts.poppinsSemiBold, fontSize: 15, color: '#29339B', marginLeft: 4 },
 
   // Self-help video modal

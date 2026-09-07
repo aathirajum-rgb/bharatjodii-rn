@@ -6,7 +6,7 @@ import { StorageKeys } from '../constants/storage.keys'
 import i18n from '../i18n'
 import type { SwiperItem } from '../components/swiper-card/SwiperCard'
 import type { ProfileDeactivateInfo } from '../components/auth/ProfileDeactivatedModal'
-import { stripAgeUnit, pickListingPhoto } from '../adapters/profileListing.adapter'
+import { pickListingPhoto } from '../adapters/profileListing.adapter'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -69,12 +69,14 @@ export function toProfile(p: Record<string, any>): SwiperItem {
     // Angular: profile.MATRIID is the primary ID in matches API response
     profileId:           p['MATRIID']  ?? p['NBID']  ?? p['ID'],
     name:                p['NAME'],
-    // Some listing endpoints (e.g. pagination/explore) send AGE already suffixed
-    // ("27 Yrs"), others send a bare number ("27") — strip any existing unit before
-    // appending our own, or a pre-suffixed value doubles up ("27 Yrs" + " Yrs").
-    age:                 p['AGE']   ? `${stripAgeUnit(p['AGE'])} Yrs` : undefined,
-    // Angular card receives profile.HEIGHTCATEGORY (formatted string like "5'4\"")
-    height:              p['HEIGHTCATEGORY'] ?? p['HEIGHT'],
+    // Angular's home swiper binds [age]="cardContent.AGE" raw — whatever unit the
+    // server sends ("28 years") is what shows. Stripping it and re-appending
+    // " Yrs" rendered "28 Yrs" where Angular renders "28 years".
+    age:                 p['AGE'] ? String(p['AGE']) : undefined,
+    // Angular binds [height]="cardContent.HEIGHT" — the profile's OWN height
+    // ("5'11\" feet"). HEIGHTCATEGORY is a banded range ("5.7 - 5.11 feet
+    // height"), so preferring it put a partner-preference band on the card.
+    height:              p['HEIGHT'] ?? p['HEIGHTCATEGORY'],
     education:           p['EDUCATION'],
     // Angular: bindBasicView() — NRI profiles show "{NRISTATE}, {NRICOUNTRY}" instead of
     // city/state when both are present; otherwise LOCATION first, then CITY+STATE.
@@ -82,6 +84,9 @@ export function toProfile(p: Record<string, any>): SwiperItem {
                             ? `${p['NRISTATE']}, ${p['NRICOUNTRY']}`
                             : p['LOCATION'] || [p['CITY'], p['STATE']].filter(Boolean).join(', ') || '',
     profileImg:          pickListingPhoto(p),
+    // Kept alongside profileImg (which prefers the full-size PHOTO[0].IMAGE) because
+    // Angular's "see all" preview circles bind THUMBIMG directly, not the big photo.
+    thumbImg:            p['THUMBIMG'],
     // Full photo array for the multi-photo swiper (Angular: matches-card.component's
     // profileImageArr). Falls back to a single-item array from profileImg/THUMBIMG so
     // callers can always treat `photos` as the source of truth.

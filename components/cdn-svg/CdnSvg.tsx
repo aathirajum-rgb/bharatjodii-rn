@@ -83,8 +83,19 @@ export function CdnImage({
 // explicit width/height (no "auto-fill the parent" mode), so this measures
 // the container via onLayout before drawing the SVG behind `children`.
 export function CdnSvgBackground({
-  uri, children, style,
-}: { uri: string; children?: React.ReactNode; style?: object }) {
+  uri, children, style, anchor = 'center',
+}: {
+  uri: string
+  children?: React.ReactNode
+  style?: object
+  // Where the cover-scaled background is anchored once it overflows, i.e. CSS
+  // `background-position`. 'center' matches Angular's explicit `center center`
+  // (e.g. .paid-member-block); 'top-left' matches the CSS DEFAULT (0% 0%) that
+  // a rule with no background-position gets — .liked-profile-bg is one of those,
+  // and centering it cropped the artwork's top off. The web branch below always
+  // renders top-left (backgroundPosition unset), so this only steers native.
+  anchor?: 'center' | 'top-left'
+}) {
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)
 
   function handleLayout(e: LayoutChangeEvent) {
@@ -113,9 +124,10 @@ export function CdnSvgBackground({
           // backgroundRepeat are react-native-web-only style keys, not in
           // React Native's own ViewStyle type.)
           ? <View style={[StyleSheet.absoluteFill, {
-              backgroundImage:  `url(${uri})`,
-              backgroundSize:   'cover',
-              backgroundRepeat: 'no-repeat',
+              backgroundImage:    `url(${uri})`,
+              backgroundSize:     'cover',
+              backgroundRepeat:   'no-repeat',
+              backgroundPosition: anchor === 'center' ? 'center' : '0% 0%',
             } as any]} />
           // "xMidYMid slice" is the SVG spec's own equivalent of CSS
           // background-size:cover (scale to fill, crop overflow, centered) —
@@ -126,7 +138,10 @@ export function CdnSvgBackground({
               uri={uri}
               width={size.width}
               height={size.height}
-              preserveAspectRatio="xMidYMid slice"
+              // "slice" is the SVG spec's background-size:cover; the xMin/xMid
+              // prefix is its background-position — xMinYMin pins the top-left
+              // corner (CSS's 0% 0% default), xMidYMid centers.
+              preserveAspectRatio={anchor === 'center' ? 'xMidYMid slice' : 'xMinYMin slice'}
               style={StyleSheet.absoluteFill}
             />
           )

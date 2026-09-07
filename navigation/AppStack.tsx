@@ -154,7 +154,11 @@ export type AppStackParamList = {
   // modal ON TOP of the current page (Matches, onboarding, etc.) — never a full-screen
   // push. AuthStack's own LanguageSelection route (pre-login, full-screen) is separate.
   LanguageSelection: undefined
-  Activity:          undefined
+  // Angular: activity.component reads BOTH the :module route param and the
+  // router state ({ activityType, selectedSubTab }) — Home's "see all" links for
+  // "Profiles who viewed you" / "Profiles you viewed" / "Liked profiles" open
+  // this screen already switched to that list (app-swiper's onClickSeeAllCTA).
+  Activity:          { activityType?: 'likedyou' | 'likesent' | 'viewedyou' | 'viewedbyme'; selectedSubTab?: 'viewedbyme' | 'viewinglater' } | undefined
   MessagerList:      undefined
   // partnerOnline/partnerLastActive are an immediate-render seed only — ChatScreen.tsx
   // re-confirms both via its own BasicView/RESPBASIC round-trip on mount, matching

@@ -1,17 +1,15 @@
-// Angular: home.config.ts's drmatches swiper config — the ONLY section on
-// Home with `coverflowEffect` (slidesPerView:1.133, centeredSlides:true,
-// coverflowEffect:{rotate:33, stretch:0, depth:100, modifier:1,
-// slideShadows:false}, pagination:{dynamicMainBullets:2}). Every other
-// section's config is a flat freeMode scroll (SwiperCard.tsx) — this is a
-// dedicated component rather than a SwiperCard variant because the layout
-// model (centered active slide, neighbors rotated/receded at the edges) is
-// fundamentally different, not just a style tweak.
+// Daily Recommendations' carousel — Angular: home.config.ts's `drmatches`
+// config (slidesPerView:1.133, centeredSlides:true, spaceBetween:16,
+// pagination:{dynamicMainBullets:2}).
 //
-// Swiper.js's real coverflow math projects each slide in true 3D (CSS
-// perspective + translateZ). RN has no cheap equivalent of translateZ-driven
-// depth stacking, so "depth:100" is approximated here with a scale shrink on
-// off-center slides instead — the same approximation most RN coverflow
-// implementations (e.g. react-native-snap-carousel's 'stack' layout) use.
+// The name is historical: that config also carries a `coverflowEffect` object,
+// but the `effect: 'coverflow'` line right above it is COMMENTED OUT, so Swiper
+// never loads the coverflow module and the object is dead config. Angular's DR
+// slides are FLAT and centered — no rotation, no depth scaling, no fade. This
+// component is still separate from SwiperCard because centeredSlides + snapping
+// is a genuinely different layout model from the other sections' freeMode
+// scroll, and because the card itself (padded white shell + "View profile"
+// button) is unique to this section.
 import { useEffect, useRef, useState } from 'react'
 import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
@@ -28,25 +26,16 @@ const FWD_ICON = `${CDN_SVG}revamp/forward-icon-link.svg`
 const CDN_ANIM = `${CDN_SVG}revamp/animation/`
 
 const { width: SW } = Dimensions.get('window')
-// ProfileCard's own case-1 "isDR" branch sizes the photo itself via
-// PHOTO_HEIGHT.dailyrecommendations (Angular: confirmed 80.667vmin, not a
-// Figma-drift case here) — the card's WIDTH must match that exactly, or the
-// photo stretches out of square inside a wrapper sized off a different ratio.
-const CARD_WIDTH  = PHOTO_HEIGHT.dailyrecommendations
-// Figma get_design_context on the card: 16px gap + 44px "View profile"
-// button + 16px bottom padding below the square photo.
-const CARD_HEIGHT = CARD_WIDTH + 76
+// Angular: `.card-type-1-padding { width: 86.667vmin; padding: 4.444vmin }` —
+// the DR card's width is declared outright on the card (not derived from the
+// slide), and it wraps the photo (PHOTO_HEIGHT.dailyrecommendations = 77.78vmin)
+// in 16px of padding on every side.
+const CARD_WIDTH  = SW * 0.86667
+// 16 card padding + photo + 12 (`mt-12`) + 44 button + 16 card padding.
+const CARD_HEIGHT = PHOTO_HEIGHT.dailyrecommendations + 88
 const CARD_GAP    = 16
 const SNAP         = CARD_WIDTH + CARD_GAP
 const SIDE_INSET   = (SW - CARD_WIDTH) / 2
-
-// Angular: coverflowEffect.rotate — max tilt in degrees for the immediate
-// neighbor slides.
-const ROTATE_DEG = 33
-// Approximates coverflowEffect.depth (real translateZ push-back) as a scale
-// shrink instead — RN has no cheap 3D depth-stacking equivalent.
-const DEPTH_SCALE = 0.88
-const OVERLAP_PX  = 18
 
 export interface CoverflowSwiperProps {
   swiperHeader?: string | undefined
@@ -85,41 +74,20 @@ export default function CoverflowSwiper({
     { useNativeDriver: true },
   )
 
+  // Flat slides, deliberately. home.config.ts's drmatches block has
+  // `// effect: 'coverflow',` COMMENTED OUT — without that line Swiper never
+  // activates the coverflow module, so its `coverflowEffect: {rotate: 33,
+  // depth: 100, ...}` object is inert config and Angular renders plain
+  // centeredSlides. This component previously read that dead config as live and
+  // applied a rotateY/scale/opacity/overlap treatment Angular never shows.
   function renderCard(index: number, node: React.ReactNode) {
-    const center = index * SNAP
-    const inputRange = [center - SNAP, center, center + SNAP]
-    const rotateY = scrollX.interpolate({
-      inputRange, outputRange: [`${ROTATE_DEG}deg`, '0deg', `-${ROTATE_DEG}deg`], extrapolate: 'clamp',
-    })
-    const scale = scrollX.interpolate({
-      inputRange, outputRange: [DEPTH_SCALE, 1, DEPTH_SCALE], extrapolate: 'clamp',
-    })
-    const translateX = scrollX.interpolate({
-      inputRange, outputRange: [-OVERLAP_PX, 0, OVERLAP_PX], extrapolate: 'clamp',
-    })
-    const opacity = scrollX.interpolate({
-      inputRange, outputRange: [0.85, 1, 0.85], extrapolate: 'clamp',
-    })
-
     return (
-      <Animated.View
+      <View
         key={index}
-        style={[
-          styles.card,
-          {
-            marginRight: index === slideCount - 1 ? 0 : CARD_GAP,
-            opacity,
-            transform: [
-              { perspective: 800 },
-              { translateX },
-              { rotateY },
-              { scale },
-            ],
-          },
-        ]}
+        style={[styles.card, { marginRight: index === slideCount - 1 ? 0 : CARD_GAP }]}
       >
         {node}
-      </Animated.View>
+      </View>
     )
   }
 
@@ -146,7 +114,11 @@ export default function CoverflowSwiper({
         showsHorizontalScrollIndicator={false}
         decelerationRate="fast"
         snapToInterval={SNAP}
-        contentContainerStyle={{ paddingHorizontal: SIDE_INSET }}
+        // The vertical padding is what lets the card's shadow render: a
+        // ScrollView clips content to its frame, and with the track exactly as
+        // tall as a card the shadow (Angular: box-shadow 0 0 7px) was cut off
+        // flush along the top and bottom edges.
+        contentContainerStyle={{ paddingHorizontal: SIDE_INSET, paddingVertical: 8 }}
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >

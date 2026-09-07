@@ -660,7 +660,7 @@
         "SEEINGMATCHES": "You are now seeing matches recommended by Jodii",
         "MORE": "more",
         "REMOVEPROFILE": "Remove profile",
-        "PROFILE_COUNT": "#COUNT profiles based on your preferences.",
+        "PROFILE_COUNT": "#COUNT# profiles based on your preferences.",
         "EDIT_PP": "Edit preferences",
         "NEW_MATCHES_TITLE": "New Matches (#COUNT)",
         "JODI_ID": "Jodi ID: #ID#",

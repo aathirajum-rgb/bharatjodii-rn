@@ -90,11 +90,18 @@ type Props = { navigation: any }
 // UI around it (LogoutSheet, also exported below) differs per caller.
 
 export async function performLogout(): Promise<void> {
-  // 1. Emit socket Logout event and disconnect
-  disconnectSocket()
-  // 2. Fire analytics events (matches Angular's pushfirebaseEvents + triggerAppNativeEvent)
-  logEvent({ category: 'ManageAccount', action: 'Logout', label: 'Submitted' })
-  dispatchNativeEvent({ event_name: 'logout' })
+  // Steps 1-2 are best-effort side effects — a socket/analytics failure here
+  // must never prevent step 3 (the actual session clear + navigation flip)
+  // from running, or the user taps "Yes" and just stays on this screen.
+  try {
+    // 1. Emit socket Logout event and disconnect
+    disconnectSocket()
+    // 2. Fire analytics events (matches Angular's pushfirebaseEvents + triggerAppNativeEvent)
+    logEvent({ category: 'ManageAccount', action: 'Logout', label: 'Submitted' })
+    dispatchNativeEvent({ event_name: 'logout' })
+  } catch (error) {
+    if (__DEV__) console.warn('[performLogout] pre-logout side effects failed, logging out anyway', error)
+  }
   // 3. Clear session storage and flip navigation to AuthStack
   await clearSession()
 }
