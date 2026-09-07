@@ -296,65 +296,75 @@ const PRESERVE_KEYS = [
 ] as const
 
 export async function clearSession(): Promise<void> {
-  const preserved = await getMultiple([...PRESERVE_KEYS])
-  const entries: Record<string, string> = {}
+  // Everything below is best-effort cleanup — a single failing AsyncStorage/
+  // SecureStore call (e.g. deleteItemAsync on a key the OS Keychain/Keystore
+  // already dropped) must never leave the user stuck logged in on the same
+  // screen. _onLogout in the finally block is what actually flips the
+  // navigator to AuthStack, so it has to run no matter what happens above it.
+  try {
+    const preserved = await getMultiple([...PRESERVE_KEYS])
+    const entries: Record<string, string> = {}
 
-  for (const key of PRESERVE_KEYS) {
-    if (preserved[key] != null) entries[key] = preserved[key] as string
+    for (const key of PRESERVE_KEYS) {
+      if (preserved[key] != null) entries[key] = preserved[key] as string
+    }
+
+    // Remove known user session keys instead of wiping everything
+    await removeMultiple([
+      StorageKeys.Auth.TOKEN,
+      StorageKeys.Auth.REFRESH_TOKEN,
+      StorageKeys.Auth.USER_ID,
+      StorageKeys.User.NAME,
+      StorageKeys.User.GENDER,
+      StorageKeys.User.PHOTO_URL,
+      StorageKeys.User.MEMBERSHIP_TYPE,
+      StorageKeys.User.LOGIN_GENDER,
+      StorageKeys.User.TIME_CREATED,
+      StorageKeys.User.DATE_OF_BIRTH,
+      StorageKeys.User.LAST_LOGIN,
+      StorageKeys.User.CREATED_BY,
+      StorageKeys.User.MOTHER_TONGUE,
+      StorageKeys.User.OCCUPATION,
+      StorageKeys.User.INCOME,
+      StorageKeys.User.BROTHERS,
+      StorageKeys.User.SISTERS,
+      StorageKeys.User.FAMILY_PROPERTY,
+      StorageKeys.Profile.PHOTO_PRIVACY,
+      StorageKeys.Profile.MOBILE_PRIVACY,
+      StorageKeys.Profile.PHOTO_STATUS_ARRAY,
+      StorageKeys.Profile.PROFILE_VERIFIED,
+      StorageKeys.Profile.HOROSCOPE_AVAILABLE,
+      StorageKeys.Profile.STAR,
+      StorageKeys.Profile.RAASI,
+      StorageKeys.Profile.DOSHAM,
+      StorageKeys.Profile.NRI_WHATSAPP,
+      StorageKeys.Profile.NON_IDV_USER_TYPE,
+      StorageKeys.Verification.EKYC_STATUS,
+      StorageKeys.Verification.PHONE_VERIFIED,
+      StorageKeys.Verification.ID_PROOF_UPDATE,
+      StorageKeys.Verification.TRUECALL_VERIFY,
+      StorageKeys.Verification.ID_VERIFY_CS_NUMBER,
+      StorageKeys.Verification.SIGNZY_KEY,
+      StorageKeys.Verification.DEFERRED_ID_USER,
+      // Onboarding-in-progress cache (registrationService.ts's REG_STORE_KEY /
+      // resetRegValues()) and the post-login field cache (SESSION_STORE_KEY) —
+      // left uncleared, these leak a previous user's answers (e.g. NAME) as
+      // prefill into the next signup's onboarding screens on the same device.
+      'REGISTRATION_VALUES',
+      'REGISTERURL',
+      'USER_SESSION',
+    ])
+
+    if (Object.keys(entries).length > 0) {
+      await setMultiple(entries)
+    }
+  } catch (error) {
+    if (__DEV__) console.warn('[clearSession] storage cleanup failed, logging out anyway', error)
+  } finally {
+    // Notify AuthContext → switches navigator to AuthStack. Must fire even if
+    // the storage cleanup above threw, or the user is stuck looking logged in.
+    _onLogout?.()
   }
-
-  // Remove known user session keys instead of wiping everything
-  await removeMultiple([
-    StorageKeys.Auth.TOKEN,
-    StorageKeys.Auth.REFRESH_TOKEN,
-    StorageKeys.Auth.USER_ID,
-    StorageKeys.User.NAME,
-    StorageKeys.User.GENDER,
-    StorageKeys.User.PHOTO_URL,
-    StorageKeys.User.MEMBERSHIP_TYPE,
-    StorageKeys.User.LOGIN_GENDER,
-    StorageKeys.User.TIME_CREATED,
-    StorageKeys.User.DATE_OF_BIRTH,
-    StorageKeys.User.LAST_LOGIN,
-    StorageKeys.User.CREATED_BY,
-    StorageKeys.User.MOTHER_TONGUE,
-    StorageKeys.User.OCCUPATION,
-    StorageKeys.User.INCOME,
-    StorageKeys.User.BROTHERS,
-    StorageKeys.User.SISTERS,
-    StorageKeys.User.FAMILY_PROPERTY,
-    StorageKeys.Profile.PHOTO_PRIVACY,
-    StorageKeys.Profile.MOBILE_PRIVACY,
-    StorageKeys.Profile.PHOTO_STATUS_ARRAY,
-    StorageKeys.Profile.PROFILE_VERIFIED,
-    StorageKeys.Profile.HOROSCOPE_AVAILABLE,
-    StorageKeys.Profile.STAR,
-    StorageKeys.Profile.RAASI,
-    StorageKeys.Profile.DOSHAM,
-    StorageKeys.Profile.NRI_WHATSAPP,
-    StorageKeys.Profile.NON_IDV_USER_TYPE,
-    StorageKeys.Verification.EKYC_STATUS,
-    StorageKeys.Verification.PHONE_VERIFIED,
-    StorageKeys.Verification.ID_PROOF_UPDATE,
-    StorageKeys.Verification.TRUECALL_VERIFY,
-    StorageKeys.Verification.ID_VERIFY_CS_NUMBER,
-    StorageKeys.Verification.SIGNZY_KEY,
-    StorageKeys.Verification.DEFERRED_ID_USER,
-    // Onboarding-in-progress cache (registrationService.ts's REG_STORE_KEY /
-    // resetRegValues()) and the post-login field cache (SESSION_STORE_KEY) —
-    // left uncleared, these leak a previous user's answers (e.g. NAME) as
-    // prefill into the next signup's onboarding screens on the same device.
-    'REGISTRATION_VALUES',
-    'REGISTERURL',
-    'USER_SESSION',
-  ])
-
-  if (Object.keys(entries).length > 0) {
-    await setMultiple(entries)
-  }
-
-  // Notify AuthContext → switches navigator to AuthStack
-  _onLogout?.()
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -338,6 +338,11 @@ export async function getPaymentConfig(mode = 'PAYCONFIG'): Promise<IPaymentConf
   // verification server-side needs it. Not used here.
   if (payConfig?.RAZORPAY?.keyId) {
     payConfig.RAZORPAY_KEY_ID = decrypt(payConfig.RAZORPAY.keyId)
+    // TEMP: verify AES decrypt round-trips correctly — remove after checking.
+    if (__DEV__) {
+      console.log('[PaymentConfig] decrypt check — ciphertext:', payConfig.RAZORPAY.keyId,
+        '→ decrypted:', payConfig.RAZORPAY_KEY_ID || '(EMPTY — decryption failed)')
+    }
   }
 
   // RAZORPAY.keySecret and GOOGLEPAY.saltkey are secrets the backend should
