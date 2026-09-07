@@ -104,6 +104,18 @@ export async function performLogout(): Promise<void> {
   }
   // 3. Clear session storage and flip navigation to AuthStack
   await clearSession()
+
+  // On web, land back on the marketing site instead of the in-app AuthStack.
+  // Deferred to a macrotask: clearSession()'s _onLogout callback flips
+  // AuthContext's isAuthenticated synchronously-ish, and RootNavigation's web
+  // linking then writes its own AuthStack route to the URL (history/hash) in
+  // that same tick — an immediate assignment here races that write and loses,
+  // leaving the SPA on its own login screen instead of actually navigating away.
+  if (Platform.OS === 'web' && typeof window !== 'undefined') {
+    setTimeout(() => {
+      window.location.href = 'https://devwww.jodii.com'
+    }, 10)
+  }
 }
 
 // ─── MenuRow ──────────────────────────────────────────────────────────────────
