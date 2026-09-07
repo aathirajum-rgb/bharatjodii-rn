@@ -22,9 +22,9 @@ import LinkCTA from '../../components/link-cta/LinkCTA'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import {
-  checkQrPaymentOutcome, getPaymentConfig, getQRPaymentData, getRechargeHelpline, getUpiAppList,
-  handlePaymentSuccess, recordPaymentFailure, type PaymentMethodItem, type QRPaymentData,
-  type SelectedPackage,
+  checkQrPaymentOutcome, generatePaymentLink, getFinalAmount, getPaymentConfig, getQRPaymentData,
+  getRechargeHelpline, getUpiAppList, handlePaymentSuccess, recordPaymentFailure,
+  type PaymentMethodItem, type QRPaymentData, type SelectedPackage,
 } from '../../service/paymentService'
 
 const ICON_BACK    = CDN_REACT + '/menu_back_arrow.svg'
@@ -133,6 +133,33 @@ export default function MorePaymentOptionsScreen({ navigation, route }: Props) {
     else navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
   }
 
+  // Angular: promotions.component.ts confirmationPopUP() — a second "someone
+  // else can pay for me" option alongside the QR flow above, standalone here
+  // (not gated on the legacy RPAYFLAG browser-compatibility check the old app
+  // used it as a substitute for — see generatePaymentLink()'s header comment).
+  function handleSharePaymentLink() {
+    if (!selectedPackage) return
+    Alert.alert(
+      'Share a payment link',
+      'Generate a payment link so a family member or friend can pay for you.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Generate link',
+          onPress: async () => {
+            const ok = await generatePaymentLink(selectedPackage.PACKAGEID, getFinalAmount(selectedPackage))
+            Alert.alert(
+              ok ? 'Done' : 'Error',
+              ok
+                ? 'A payment link has been generated. The recipient will be notified to complete the payment.'
+                : 'Could not generate a payment link. Please try again.',
+            )
+          },
+        },
+      ],
+    )
+  }
+
   // Angular: more-payment-option.page.ts onClickPaymentModes()
   function handlePress(item: PaymentMethodItem) {
     const params = { selectedPackage, amountLabel }
@@ -222,6 +249,13 @@ export default function MorePaymentOptionsScreen({ navigation, route }: Props) {
             )}
           </View>
         )}
+
+        {!!selectedPackage && (
+          <Pressable style={s.payLinkRow} onPress={handleSharePaymentLink}>
+            <Text style={s.payLinkLabel}>Ask someone to pay for you</Text>
+            <CdnSvg uri={ICON_CHEVRON} width={20} height={20} />
+          </Pressable>
+        )}
       </ScrollView>
 
       {/* Angular: .bottom-right-design (global.scss:5842) — position fixed,
@@ -301,6 +335,13 @@ const s = StyleSheet.create({
     paddingVertical: 10, paddingHorizontal: 20,
   },
   whatsappLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.black },
+
+  payLinkRow: {
+    marginTop: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 16, paddingHorizontal: 16, borderRadius: 12,
+    borderWidth: 1, borderColor: Colors.borderSubtle,
+  },
+  payLinkLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
 
   // Angular: .bottom-right-design — position fixed, right 0, bottom 0,
   // z-index -1. Same SVG/treatment as CardPaymentScreen's footer rangoli.

@@ -23,8 +23,9 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import FloatingLabelInput from '../../components/input/FloatingLabelInput'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
 import {
-  getCheckoutDetails, getFinalAmount, getPaymentConfig, getRetryRemainingMs,
-  getUpiAppList, handlePaymentSuccess, initPayUNative, initRazorpayNative, initUPIPayment,
+  getCheckoutDetails, getFinalAmount, getPaymentConfig, getRetryRemainingMs, getServerFilteredUpiApps,
+  getUpiAppList, handlePaymentSuccess, initPayUNative, initRazorpayNative,
+  initRazorpayWebCheckout, initUPIPayment,
   recordPaymentFailure, stringifyPaymentResponse, toPaise, verifyPayUPaymentSuccess,
   verifyPaymentSuccess, type SelectedPackage, type UpiAppInfo,
 } from '../../service/paymentService'
@@ -77,7 +78,10 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     if (Platform.OS !== 'android') return
-    getUpiAppList().then(apps => {
+    // Angular: upi-payment.page.ts loadUPIApp() — same server round-trip as
+    // PaymentOptionsScreen.tsx, never trusting the raw on-device list alone.
+    getUpiAppList().then(async detected => {
+      const apps = detected.length > 0 ? await getServerFilteredUpiApps(detected) : []
       const known = apps.filter(a => KNOWN_UPI_APPS.some(k => k.pkg === a.packageName))
       const other = apps.filter(a => !KNOWN_UPI_APPS.some(k => k.pkg === a.packageName))
       setTopApps(known)
@@ -199,6 +203,16 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
           upiAppPackageName: selectedApp?.packageName,
           vpa:               selectedApp ? undefined : vpa.trim(),
         })
+      } else if (Platform.OS === 'web') {
+        // Manual-VPA web path — was previously calling initUPIPayment(),
+        // react-native-razorpay's native module, which throws on web (no web
+        // implementation). This screen has no app-targeted rows on web (see
+        // the loadingApps effect above, Android-only), so this is always the
+        // manual-VPA case here — initRazorpayWebCheckout already accepts VPA.
+        result = await initRazorpayWebCheckout(
+          { ...checkout, amount: checkout.amount ?? toPaise(getFinalAmount(selectedPackage)), VPA: vpa.trim() },
+          saltKey,
+        )
       } else {
         result = await initUPIPayment(
           { ...checkout, amount: checkout.amount ?? toPaise(getFinalAmount(selectedPackage)), VPA: vpa.trim() },

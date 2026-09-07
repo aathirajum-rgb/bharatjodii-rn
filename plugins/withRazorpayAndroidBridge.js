@@ -67,8 +67,31 @@ function withRazorpayPackageRegistration(config) {
 
 function withRazorpayManifestEntries(config) {
   return withAndroidManifest(config, modConfig => {
-    const application = modConfig.modResults.manifest.application?.[0];
+    const manifest = modConfig.modResults.manifest;
+    const application = manifest.application?.[0];
     if (!application) return modConfig;
+
+    // Android 11+ (API 30+) package-visibility: without a <queries> entry for
+    // the 'upi' scheme, PackageManager can't see GPay/PhonePe/Paytm at all,
+    // so com.razorpay.Razorpay.getAppsWhichSupportUpi() (RazorpayBridgeModule.kt)
+    // can silently return nothing or never invoke its callback — and
+    // paymentService.ts's getUpiAppList() awaits that callback with no
+    // timeout, so getMenuPromo() (called from every Home-screen load via
+    // getAutoUpiFlag()) hung the whole screen waiting on a promise that
+    // would never resolve. This queries entry is the actual fix for the
+    // native detection; getUpiAppList()'s own timeout is the safety net.
+    const queriesBlocks = manifest.queries ?? (manifest.queries = []);
+    const hasUpiQuery = queriesBlocks.some(q =>
+      q.intent?.some(i => i.data?.some(d => d.$?.['android:scheme'] === 'upi')),
+    );
+    if (!hasUpiQuery) {
+      queriesBlocks.push({
+        intent: [{
+          action: [{ $: { 'android:name': 'android.intent.action.VIEW' } }],
+          data:   [{ $: { 'android:scheme': 'upi' } }],
+        }],
+      });
+    }
 
     // com.razorpay.ApiKey meta-data was previously injected here as a
     // manifest placeholder, but confirmed (2026-09) that nothing reads it —

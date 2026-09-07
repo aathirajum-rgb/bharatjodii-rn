@@ -83,7 +83,7 @@ export function CdnImage({
 // explicit width/height (no "auto-fill the parent" mode), so this measures
 // the container via onLayout before drawing the SVG behind `children`.
 export function CdnSvgBackground({
-  uri, children, style, anchor = 'center',
+  uri, children, style, anchor = 'center', viewBox,
 }: {
   uri: string
   children?: React.ReactNode
@@ -95,6 +95,13 @@ export function CdnSvgBackground({
   // and centering it cropped the artwork's top off. The web branch below always
   // renders top-left (backgroundPosition unset), so this only steers native.
   anchor?: 'center' | 'top-left'
+  // Overrides the source SVG's own viewBox before the cover/slice scaling
+  // below runs — e.g. "0 6 110 104" treats only that sub-rectangle as the
+  // source, cropping out a dead strip baked into one specific CDN asset
+  // (see MatchesScreen.tsx's female blur placeholder) instead of showing it.
+  // Space-separated "minX minY width height", same syntax as the SVG
+  // viewBox attribute. Omit to use the asset's own viewBox unchanged.
+  viewBox?: string
 }) {
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)
 
@@ -124,7 +131,16 @@ export function CdnSvgBackground({
           // backgroundRepeat are react-native-web-only style keys, not in
           // React Native's own ViewStyle type.)
           ? <View style={[StyleSheet.absoluteFill, {
-              backgroundImage:    `url(${uri})`,
+              // #svgView(viewBox(...)) is a standard SVG fragment identifier
+              // that browsers honor on an <img>/background-image source —
+              // lets the web path crop the same sub-rectangle as the native
+              // branch's `viewBox` override below, with no second asset.
+              // The url() value MUST be quoted here: unquoted CSS url()
+              // can't contain literal parentheses/commas, both of which
+              // #svgView(viewBox(...)) is made of — without quotes the
+              // browser fails to parse the fragment and silently falls back
+              // to the full, uncropped image.
+              backgroundImage: `url("${uri}${viewBox ? `#svgView(viewBox(${viewBox.trim().split(/\s+/).join(',')}))` : ''}")`,
               backgroundSize:     'cover',
               backgroundRepeat:   'no-repeat',
               backgroundPosition: anchor === 'center' ? 'center' : '0% 0%',
@@ -138,6 +154,7 @@ export function CdnSvgBackground({
               uri={uri}
               width={size.width}
               height={size.height}
+              {...(viewBox ? { viewBox } : {})}
               // "slice" is the SVG spec's background-size:cover; the xMin/xMid
               // prefix is its background-position — xMinYMin pins the top-left
               // corner (CSS's 0% 0% default), xMidYMid centers.
