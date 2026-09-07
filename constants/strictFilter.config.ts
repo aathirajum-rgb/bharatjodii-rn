@@ -16,6 +16,36 @@ export const STRICT_FIELD_ORDER: FieldKey[] = [
   'CASTE', 'PHYSICALSTATUS', 'EATINGHABITS',
 ]
 
+// Angular: filter.config.ts's `strictFilterFieldKeyMap` — which STRICKPP
+// position each *stored selection key* belongs to. Several keys share one
+// position because they're one field on screen: COUNTRY/STATE/CITY all sit
+// under LOCATION, and CASTE/SUBCASTE/GOTHRA/DIVISION all under CASTE. The
+// range fields are stored as STARTAGE/ENDAGE-style keys, so callers strip a
+// leading START/END before looking up (Angular does the same).
+export const STRICT_FIELD_KEY_MAP: Record<string, FieldKey> = {
+  AGE:            'AGE',
+  HEIGHT:         'HEIGHT',
+  MARITALSTATUS:  'MARITALSTATUS',
+  RELIGION:       'RELIGION',
+  STAR:           'STAR',
+  DOSHAM:         'DOSHAM',
+  EDUCATION:      'EDUCATION',
+  OCCUPATION:     'OCCUPATION',
+  MONTHLYINCOME:  'MONTHLYINCOME',
+  INCOME:         'MONTHLYINCOME',
+  LOCATION:       'LOCATION',
+  COUNTRY:        'LOCATION',
+  STATE:          'LOCATION',
+  CITY:           'LOCATION',
+  MOTHERTONGUE:   'MOTHERTONGUE',
+  CASTE:          'CASTE',
+  SUBCASTE:       'CASTE',
+  GOTHRA:         'CASTE',
+  DIVISION:       'CASTE',
+  PHYSICALSTATUS: 'PHYSICALSTATUS',
+  EATINGHABITS:   'EATINGHABITS',
+}
+
 // Angular: search.component.ts's `strictFilterExcludedFields = ['OCCUPATION']`,
 // used by isHiddenInStrictFilter() (hides the row from the manage list) AND
 // filter-popup.component.ts's showStrictFilter getter (hides the toggle on

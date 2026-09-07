@@ -61,9 +61,17 @@ export function useFilterDisplayValues(): [FilterDisplayResult | null, () => voi
       getItem(SK.User.LOGIN_GENDER),
     ])
 
-    const religion = selected.RELIGION?.[0] ?? '0'
-    const isIslam  = religion === '2'
-    const casteKeys = isIslam ? selected.DIVISION : selected.CASTE
+    // Religion '2' is CHRISTIAN — search.component.ts:100 ("For christian the
+    // division field is filled from the caste list") and CasteScreen.tsx's
+    // `isChristian = religion === '2'`. Previously named isIslam here, which
+    // mislabelled the branch (the behaviour it drove was already right).
+    // Caste/division only resolve under ONE religion: a multi-religion
+    // selection has neither, matching SearchScreen's own row-visibility rule.
+    const religionKeys   = (selected.RELIGION ?? []).filter((k: string) => k && k !== '0')
+    const singleReligion = religionKeys.length === 1 ? religionKeys[0] : null
+    const religion       = singleReligion ?? '0'
+    const isChristian    = singleReligion === '2'
+    const casteKeys      = singleReligion === null ? [] : (isChristian ? selected.DIVISION : selected.CASTE)
 
     const [
       religionOpts, casteOpts, occupationOpts, incomeOpts, educationOpts,
@@ -71,7 +79,7 @@ export function useFilterDisplayValues(): [FilterDisplayResult | null, () => voi
       heightOpts, starOpts, doshamOpts,
     ] = await Promise.all([
       isAny(selected.RELIGION) ? empty : fetchReligionOptions(),
-      isAny(casteKeys) ? empty : (isIslam ? fetchDivisionOptions() : fetchCasteOptions(religion, selected.MOTHERTONGUE?.[0] ?? '')),
+      isAny(casteKeys) ? empty : (isChristian ? fetchDivisionOptions() : fetchCasteOptions(religion, selected.MOTHERTONGUE?.[0] ?? '')),
       isAny(selected.OCCUPATION) ? empty : fetchOccupationOptions(),
       isAny(selected.MONTHLYINCOME) ? empty : fetchMonthlyIncomeOptions(),
       isAny(selected.EDUCATION) ? empty : fetchQualificationOptions(),

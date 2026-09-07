@@ -11,7 +11,8 @@
 // SearchDesktopLayout stages edits locally and only commits them to the real
 // filter state when Apply is pressed here, matching mobile's own
 // MultiSelectPicker/SearchablePicker "Apply" semantics.
-import { Modal, Pressable, StyleSheet, Text, View, Switch } from 'react-native'
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import Toggle from '../toggle/Toggle'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
@@ -59,10 +60,9 @@ export default function PreferenceFieldModal({
                 <Text style={s.strictTitle}>{strictLabel}</Text>
                 <Text style={s.strictDesc}>{strictDescription}</Text>
               </View>
-              <Switch
+              <Toggle
                 value={strictEnabled}
                 onValueChange={onToggleStrict}
-                trackColor={{ true: Colors.primaryDark, false: Colors.border }}
               />
             </View>
           )}

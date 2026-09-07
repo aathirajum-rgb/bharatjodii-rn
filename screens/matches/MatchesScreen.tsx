@@ -57,7 +57,6 @@ import {
   fetchAndStorePPSetData,
   fetchMenuPromo,
   fetchNotifCount,
-  refreshSession,
   checkLimitFlowStatus,
 } from '../../service/homeService'
 import {
@@ -1143,9 +1142,9 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   const loadingMoreRef = useRef(false)
 
   // ── Angular sequence: ionViewDidEnter → API calls ───────────────────────────
-  // 1. refreshSession()   → login/autologin/v1        (upgrades OTP token to Level-2)
-  // 2. fetchMatches()     → listing/matches/v1        (main matches list)
-  // 3. fetchNotifCount()  → communication/newcount/v1 (badge count)
+  // 1. fetchMatches()     → listing/matches/v1        (main matches list)
+  // 2. fetchNotifCount()  → communication/newcount/v1 (badge count)
+  // (login/autologin/v1 is NOT part of this screen — see the note in loadMatches.)
   //
   // Pulled out of the effect so a language change can re-run just the data-fetching
   // core — Angular: changeLanguage() (matches.page.ts:3179-3202) tears down and
@@ -1167,13 +1166,18 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           setLoginGender(lg === 'M' ? 'M' : 'F')
         }
 
-        // Step 1 — refreshSession() ensures Level-2 tokens before any listing API call.
-        // The 1hr gate lives in RootNavigation.tsx (centralized guard) — here we always
-        // call it so fetchMatches() is guaranteed to have a valid ATN.
-        await refreshSession()
-        if (ctrl.cancelled) return
+        // NO refreshSession() here. Angular calls autoLogin from exactly ONE
+        // place — authguarduser.service.ts's canActivate(), gated on
+        // `_diffHours >= 1`; matches.page.ts never calls it. RootNavigation's
+        // guardCheck() is that same guard and already runs on every navigation
+        // (onStateChange), so arriving on this screen has re-established the
+        // session when it was actually stale.
+        //
+        // Calling it unconditionally here re-ran login/autologin/v1 on EVERY
+        // visit — including each "Show matches" from the filter, which
+        // navigates straight to this screen.
 
-        // Step 2 — Angular: callMatchesApi() → listing/matches/v1 (or explore/v1 in explore mode).
+        // Angular: callMatchesApi() → listing/matches/v1 (or explore/v1 in explore mode).
         // Angular's changeLanguage() fully rebuilds the page (routepage reinitializes fresh),
         // so a re-run of this (language change) must not still be pointed at the
         // extendedmatches/v1 branch from a "Continue seeing profiles" tap before the switch.

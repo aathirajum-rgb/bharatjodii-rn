@@ -5,19 +5,22 @@
 // its own editor directly. Ported as a dedicated modal (matching this app's
 // existing local-modal-state convention for every other field editor in
 // SearchScreen.tsx) rather than a second full-screen mode of that screen.
-import { Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import Toggle from '../toggle/Toggle'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG, CDN_REG } from '../../constants/cdn'
+import { CDN_SVG } from '../../constants/cdn'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import {
   STRICT_FIELD_ORDER, STRICT_EXCLUDED_FIELDS, STRICT_FILTERS_TITLE, STRICT_FILTERS_NOTE, FILTER_CTA_NOTE,
 } from '../../constants/strictFilter.config'
 import type { FieldKey } from '../../screens/search/SearchScreen'
 
-// Same assets already used elsewhere: AppHeader.tsx's close icon, OTPScreen.tsx's edit-pencil.
+// Close icon is the same asset AppHeader.tsx uses. The edit icon is the grey
+// pencil under assets/images/svg/ — NOT registration-new/edit-pencil.svg, which
+// is OTPScreen's own (blue) edit affordance and was borrowed here by mistake.
 const ICON_CLOSE = CDN_SVG + 'revamp/close-icon.svg'
-const ICON_EDIT  = CDN_REG + 'edit-pencil.svg'
+const ICON_EDIT  = CDN_SVG + 'icon-edit-grey.svg'
 
 export interface StrictFilterManageModalProps {
   visible:      boolean
@@ -78,10 +81,9 @@ export default function StrictFilterManageModal({
                   <View style={s.rowRight}>
                     <CdnSvg uri={ICON_EDIT} width={24} height={24} />
                     {!isAny && (
-                      <Switch
+                      <Toggle
                         value={!!strictState[key]}
                         onValueChange={value => onToggle(key, value)}
-                        trackColor={{ true: Colors.primaryDark, false: Colors.border }}
                       />
                     )}
                   </View>

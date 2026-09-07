@@ -1,6 +1,6 @@
 import { getItem, setItem, getJson, setJson, removeItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
-import { STRICT_FIELD_ORDER } from '../constants/strictFilter.config'
+import { STRICT_FIELD_ORDER, STRICT_FIELD_KEY_MAP } from '../constants/strictFilter.config'
 import type { FieldKey } from '../screens/search/SearchScreen'
 
 // ─── Filter defaults ──────────────────────────────────────────────────────────
@@ -72,6 +72,37 @@ export async function setStrictFilterState(state: Record<FieldKey, boolean>): Pr
   await setJson(K.STRICT, state)
 }
 
+// Angular: common-funtions.ts's setStrictFilterStateFromPP() — seeds the strict
+// toggles from the STRICKPP the getpreference API answers with. That value is a
+// 14-position pipe string in STRICT_FIELD_ORDER
+// (AGE|HEIGHT|MARITALSTATUS|RELIGION|STAR|DOSHAM|EDUCATION|OCCUPATION|INCOME|
+//  LOCATION|MOTHERTONGUE|CASTE|PHYSICALSTATUS|EATINGHABITS), '1' = strict on.
+// It may also arrive as an array; an empty/absent value means "nothing to
+// apply" and is left alone rather than wiping the member's toggles.
+//
+// onlyWhenMissing mirrors Angular's second argument: the PP data can come back
+// from a local cache, so seeding from it must NOT clobber toggles the member
+// has changed but not yet applied. Pass true on any cached read, false only
+// where Angular overwrites (profile.service.ts's live getmemberPreference).
+export async function setStrictFilterStateFromPP(
+  strickPP: string | string[] | null | undefined,
+  onlyWhenMissing = false,
+): Promise<void> {
+  const ppValue = Array.isArray(strickPP) ? strickPP.join('|') : (strickPP ?? '')
+  if (String(ppValue).trim() === '') return
+
+  if (onlyWhenMissing && (await getJson<Record<string, boolean>>(K.STRICT))) return
+
+  const ppStates = String(ppValue).split('|')
+  const state = await getStrictFilterState()
+
+  STRICT_FIELD_ORDER.forEach((key, index) => {
+    state[key] = (ppStates[index] ?? '').trim() === '1'
+  })
+
+  await setStrictFilterState(state)
+}
+
 export async function saveFilterState(
   obj: Record<string, any>,
   ppCheckBox: string[],
@@ -128,17 +159,47 @@ function incomeParams(obj: Record<string, any>): string {
   return 'STARTINCOME=0&ENDINCOME='
 }
 
-// Angular: filter.service.ts's getStrictFilterParam() — builds the 14-flag
-// pipe-delimited STRICKPP string in STRICT_FIELD_ORDER. CASTE is forced to
-// '0' whenever RELIGION is unselected/"Any" (Angular: isSelectionAny() check),
-// since caste has no meaning without a religion chosen.
+// Angular: filter.service.ts's isSelectionAny() — a stored selection means
+// "no preference" when it's empty or every entry is the 0/'' sentinel.
+function isSelectionAny(val: any): boolean {
+  if (val === undefined || val === null) return true
+  const arr = Array.isArray(val) ? val : [val]
+  return arr.length === 0 || arr.every(x => x === '0' || x === '' || x === 0)
+}
+
+// Angular: filter.service.ts's getSelectedFilterStrictKeys() — in FILTER mode a
+// field the member actually narrowed counts as strict for this search, so its
+// STRICKPP position goes out as 1 on top of the saved state. Angular reads the
+// touched-field flags it keeps while the temporary filter is open; this derives
+// the same set from the selection itself (a field holding a real, non-"Any"
+// value is one the member narrowed), which needs no extra bookkeeping.
+function selectedFilterStrictKeys(obj: Record<string, any>): Set<FieldKey> {
+  const keys = new Set<FieldKey>()
+  Object.keys(obj ?? {}).forEach(field => {
+    if (isSelectionAny(obj[field])) return
+    // Range fields are stored as STARTAGE/ENDAGE etc. — the field name is what
+    // follows that prefix (Angular strips the same /^(START|END)/).
+    const mapped = STRICT_FIELD_KEY_MAP[field] ?? STRICT_FIELD_KEY_MAP[field.replace(/^(START|END)/, '')]
+    if (mapped) keys.add(mapped)
+  })
+  return keys
+}
+
 export function getStrictFilterParam(
   strictState: Record<FieldKey, boolean>,
   obj: Record<string, any>,
+  isFilterMode = false,
 ): string {
-  const religionIsAny = !obj.RELIGION?.length || obj.RELIGION[0] === '0'
+  const religionIsAny = isSelectionAny(obj?.RELIGION)
+  const selectedKeys  = isFilterMode ? selectedFilterStrictKeys(obj) : new Set<FieldKey>()
+
   return STRICT_FIELD_ORDER
-    .map(key => (key === 'CASTE' && religionIsAny) ? '0' : (strictState[key] ? '1' : '0'))
+    .map(key => {
+      if (selectedKeys.has(key)) return '1'
+      // Caste only means anything once a specific religion is chosen.
+      if (key === 'CASTE' && religionIsAny) return '0'
+      return strictState[key] ? '1' : '0'
+    })
     .join('|')
 }
 
@@ -156,7 +217,7 @@ export async function buildSearchParams(matriId: string, start = 0, limit = 20):
     setPP = [...DEFAULT_PP_CHECKBOX, '0', '0', '0']
   }
 
-  const params = `ID=${matriId}&START=${start}&LIMIT=${limit}&LIKED=1&VIEWED=1&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&BANNERFLAG=0&${baseParams(obj)}&${incomeParams(obj)}${extra}&SETPP=${setPP.join('|')}&FILTERPP=${ppCheckBox.join('|')}&STRICKPP=${getStrictFilterParam(strictState, obj)}`
+  const params = `ID=${matriId}&START=${start}&LIMIT=${limit}&LIKED=1&VIEWED=1&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&BANNERFLAG=0&${baseParams(obj)}&${incomeParams(obj)}${extra}&SETPP=${setPP.join('|')}&FILTERPP=${ppCheckBox.join('|')}&STRICKPP=${getStrictFilterParam(strictState, obj, isFilter)}`
   await setItem(K.PARAMS, params)
   return params
 }

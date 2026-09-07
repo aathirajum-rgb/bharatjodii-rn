@@ -9,8 +9,9 @@
 // touches them, it just sits around a tap-target that opens them).
 import { useEffect, useRef, useState } from 'react'
 import {
-  Modal, Pressable, ScrollView, StyleSheet, Switch, Text, View,
+  Modal, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
+import Toggle from '../toggle/Toggle'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
@@ -80,10 +81,9 @@ export default function StrictFieldEditorScreen({
                   <Text style={s.strictTitle}>{copy.label}</Text>
                   <Text style={s.strictDesc}>{copy.description}</Text>
                 </View>
-                <Switch
+                <Toggle
                   value={strictEnabled}
                   onValueChange={onToggleStrict}
-                  trackColor={{ true: Colors.primaryDark, false: Colors.border }}
                 />
               </View>
 

@@ -39,12 +39,13 @@ import { handleBack } from '../../utils/navigationRef'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import SearchDesktopLayout from './SearchDesktopLayout'
 import { fetchSearchResults } from '../../service/homeService'
-import { resolveFilterLabel } from '../../adapters/filterPreference.adapter'
+import { resolveFilterLabel, isAnySelection } from '../../adapters/filterPreference.adapter'
 import {
   getSelectedObject, saveFilterState, getSearchPPCheckBox,
   getFilterEventType, resetFilter, buildSearchParams, DEFAULT_FILTER,
   getStrictFilterState, setStrictFilterState,
 } from '../../service/filterService'
+import { getPPSetData } from '../../service/profileService'
 import StrictFilterManageModal from '../../components/search/StrictFilterManageModal'
 import {
   MANAGE_FILTER_CTA, STRICT_FILTERS_TITLE, STRICT_FILTERS_NOTE,
@@ -135,6 +136,28 @@ export const AGE_OPTIONS: PickerOption[] = Array.from({ length: 53 }, (_, i) => 
   return { key: String(age), label: `${age} yrs` }
 })
 
+// ─── Modal stacking ───────────────────────────────────────────────────────────
+// react-native-web's Modal portals into a <div> it appends to document.body the
+// moment the component MOUNTS (ModalPortal.js), and ModalContent styles it
+// `position: fixed` with NO z-index — so which modal sits on top is decided
+// purely by document order, i.e. by mount order.
+//
+// StrictFieldEditorScreen is mounted lazily (`{fieldEditorOpen && ...}`), so its
+// div is always appended last and covers anything mounted with the screen. The
+// pickers below open FROM inside it, so they have to mount after it too.
+// Gating each on its own open state does that: the div is created on open and
+// therefore lands last. The short unmount delay keeps the picker alive through
+// its own slide-out animation instead of ripping it out mid-transition.
+function useModalMounted(visible: boolean, exitMs = 300): boolean {
+  const [mounted, setMounted] = useState(visible)
+  useEffect(() => {
+    if (visible) { setMounted(true); return }
+    const id = setTimeout(() => setMounted(false), exitMs)
+    return () => clearTimeout(id)
+  }, [visible, exitMs])
+  return mounted
+}
+
 // ─── SearchScreen ─────────────────────────────────────────────────────────────
 
 export default function SearchScreen({ navigation }: Props) {
@@ -146,7 +169,6 @@ export default function SearchScreen({ navigation }: Props) {
   const [eventType,  setEventType]  = useState<'filter' | 'pp'>('pp')
   const [selected,   setSelected]   = useState<Record<string, any>>(DEFAULT_FILTER)
   const [ppCheckBox, setPpCheckBox] = useState<string[]>([])
-  const [religion,   setReligion]   = useState('0')
   const [gender,     setGender]     = useState('1')
   const [matriId,    setMatriId]    = useState('')
   const [userName,   setUserName]   = useState('')
@@ -176,6 +198,18 @@ export default function SearchScreen({ navigation }: Props) {
   const [starStep,     setStarStep]     = useState<'raasi' | 'star' | null>(null)
   const [multiEditor,  setMultiEditor]  = useState<FieldKey | null>(null)
   const [heightOptions, setHeightOptions] = useState<PickerOption[]>([])
+
+  // Mount gates for the picker modals — see useModalMounted. Every field row
+  // except PROFILECREATED opens StrictFieldEditorScreen first and the picker on
+  // top of it, so the pickers MUST mount after it to be visible at all.
+  const ageMinMounted    = useModalMounted(ageEditor === 'min')
+  const ageMaxMounted    = useModalMounted(ageEditor === 'max')
+  const heightMinMounted = useModalMounted(heightEditor === 'min')
+  const heightMaxMounted = useModalMounted(heightEditor === 'max')
+  const stateMounted     = useModalMounted(locationStep === 'state')
+  const cityMounted      = useModalMounted(locationStep === 'city')
+  const raasiMounted     = useModalMounted(starStep === 'raasi')
+  const starMounted      = useModalMounted(starStep === 'star')
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   // Guards the live match-count preview below against a stale response
   // overwriting a fresher one — the 400ms debounce only delays when a new
@@ -188,6 +222,22 @@ export default function SearchScreen({ navigation }: Props) {
 
   useEffect(() => {
     (async () => {
+      // Opening this screen (every "Edit preferences" entry point navigates
+      // here) HITS editprofile/getpreference/v1 — force=true, so a warm
+      // PP_SET_DATA cache doesn't skip the call. That response's STRICKPP is
+      // what drives the strict toggles, and the live branch of getPPSetData
+      // seeds them with overwrite semantics (Angular: profile.service.ts —
+      // "Keep the strict filter toggles of the PP page in sync with the
+      // STRICKPP of the response"), so the server's saved prefs always win here.
+      //
+      // Must finish BEFORE getStrictFilterState() below, or the toggles render
+      // from whatever was in storage before the fetch.
+      //
+      // Note: Angular's own search.component.ts calls getPPSETData(0) — the
+      // cache-first flag. Forcing is the deliberate difference, so the toggles
+      // can't show a stale STRICKPP.
+      await getPPSetData(true).catch(() => null)
+
       const [obj, pp, evType, id, gen, name, strict] = await Promise.all([
         getSelectedObject(),
         getSearchPPCheckBox(),
@@ -204,7 +254,6 @@ export default function SearchScreen({ navigation }: Props) {
       setGender(gen ?? '1')
       setUserName(name ?? '')
       setStrictPrefs(strict)
-      setReligion(obj.RELIGION?.[0] ?? '0')
       setLoading(false)
     })()
   }, [])
@@ -273,7 +322,121 @@ export default function SearchScreen({ navigation }: Props) {
 
   // ── Row value display ────────────────────────────────────────────────────
 
-  const isIslam = religion === '2'
+  // ── Caste / Division row visibility ──────────────────────────────────────
+  // Angular: search.component.ts:1429-1446 (JA-104) filters searchInputLists —
+  //   CASTE    → RELIGION.key !== '0' && RELIGION.key !== '2' && filterDataList.CASTE non-empty
+  //   DIVISION → RELIGION.key !== '0' && RELIGION.key === '2' && filterDataList.CASTE non-empty
+  // RELIGION.key is the whole selection joined (multi-select is comma-joined,
+  // cf. filter-popup.component.ts's `relgval.replace(/,/g,'~')`), so `=== '2'`
+  // means Christian ALONE. The "several religions → show neither" case falls
+  // out of the second clause: the caste fetch for a mixed religion returns no
+  // list, so filterDataList.CASTE stays empty and both rows drop out. That
+  // list-emptiness check is the real gate, not an "exactly one religion" rule —
+  // two caste-bearing religions still show CASTE if the server returns options.
+  //
+  // Religion '2' is CHRISTIAN, not Islam: search.component.ts:100 ("For
+  // christian the division field is filled from the caste list") and
+  // CasteScreen.tsx's `isChristian = religion === '2'`. The old `isIslam` name
+  // here (and in useFilterDisplayValues.ts) mislabelled it — the behaviour it
+  // drove was right, the name wasn't.
+  const religionKey  = (selected.RELIGION ?? []).filter((k: string) => k && k !== '0').join(',')
+  const isChristian  = religionKey === '2'
+  const religionIsAny = religionKey === ''
+
+  // Angular keeps filterDataList.CASTE populated by re-fetching on every
+  // religion change; this is the same fetch, kept only as "did it return
+  // anything", which is all the visibility rule needs.
+  const [casteListAvailable, setCasteListAvailable] = useState(false)
+  const motherTongue = selected.MOTHERTONGUE?.[0] ?? ''
+
+  useEffect(() => {
+    if (religionIsAny) { setCasteListAvailable(false); return }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const opts = isChristian
+          ? await fetchDivisionOptions()
+          : await fetchCasteOptions(religionKey, motherTongue)
+        if (cancelled) return
+        setCasteListAvailable(opts.length > 0)
+        // The row's own value resolves against this same list — cache it here
+        // rather than making the prefetch above fetch it a second time.
+        if (opts.length > 0) {
+          setLabelCache(prev => ({ ...prev, [isChristian ? 'DIVISION' : 'CASTE']: opts }))
+        }
+      } catch {
+        if (!cancelled) setCasteListAvailable(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [religionKey, isChristian, religionIsAny, motherTongue])
+
+  const showCasteRow = !religionIsAny && casteListAvailable
+
+  // ── Resolve saved selections to labels ───────────────────────────────────
+  // Option lists load lazily (only when a field's own editor opens), so on a
+  // fresh mount labelCache is empty and resolveFilterLabel falls back to the
+  // raw code (`opts.find(...)?.label ?? k`) — the rows rendered "2, 4, 1"
+  // instead of the real values. Prefetch the list for every field that HOLDS a
+  // selection, so each row can show labels; fields still at "Any" need no list
+  // and are skipped, the same non-default-only rule useFilterDisplayValues uses.
+  useEffect(() => {
+    if (loading) return
+    let cancelled = false
+
+    const wanted: Array<[string, () => Promise<MultiSelectOption[]>]> = []
+    const want = (key: string, sel: any, loader: () => Promise<MultiSelectOption[]>) => {
+      if (!isAnySelection(sel) && !labelCache[key]) wanted.push([key, loader])
+    }
+
+    want('RELIGION',       selected.RELIGION,       fetchReligionOptions)
+    want('OCCUPATION',     selected.OCCUPATION,     fetchOccupationOptions)
+    want('MONTHLYINCOME',  selected.MONTHLYINCOME,  fetchMonthlyIncomeOptions)
+    want('EDUCATION',      selected.EDUCATION,      fetchQualificationOptions)
+    want('MOTHERTONGUE',   selected.MOTHERTONGUE,   fetchMotherTongueOptions)
+    want('MARITALSTATUS',  selected.MARITALSTATUS,  () => fetchMaritalStatusOptions(gender))
+    want('EATINGHABITS',   selected.EATINGHABITS,   fetchEatingHabitOptions)
+    want('PHYSICALSTATUS', selected.PHYSICALSTATUS, fetchPhysicalStatusOptions)
+    want('STATE',          selected.STATE,          fetchStates)
+    want('DOSHAM',         selected.DOSHAM,
+      async () => (await fetchDoshamOptions(selected.STAR?.[0] ?? '', '', selected.MOTHERTONGUE?.[0])).dosham)
+    if (!isAnySelection(selected.STATE)) {
+      want('CITY', selected.CITY, () => fetchCities(selected.STATE[0]))
+    }
+    // Height rows read labelCache.HEIGHT for both bounds; DEFAULT_FILTER's
+    // 1..5 is the "Any" case, so only fetch once it's been narrowed.
+    if (selected.STARTHEIGHT?.[0] !== DEFAULT_FILTER.STARTHEIGHT[0]
+      || selected.ENDHEIGHT?.[0] !== DEFAULT_FILTER.ENDHEIGHT[0]) {
+      want('HEIGHT', selected.STARTHEIGHT, () => fetchExactHeightOptions(gender))
+    }
+    // STAR codes aren't grouped by raasi in storage, so resolving one means
+    // flattening every raasi's star list (same approach useFilterDisplayValues
+    // takes) — only worth it when STAR actually differs from "Any".
+    want('STAR', selected.STAR, async () => {
+      const raasis = await fetchRaasiOptions()
+      const groups = await Promise.all(raasis.map(r => fetchStarOptions(r.key)))
+      return groups.flat()
+    })
+
+    if (wanted.length === 0) return
+
+    ;(async () => {
+      const loaded = await Promise.all(wanted.map(async ([key, loader]) => {
+        try { return { key, opts: await loader() } } catch { return { key, opts: [] as MultiSelectOption[] } }
+      }))
+      if (cancelled) return
+      setLabelCache(prev => {
+        const next = { ...prev }
+        loaded.forEach(({ key, opts }) => { if (!next[key]) next[key] = opts })
+        return next
+      })
+    })()
+
+    return () => { cancelled = true }
+    // labelCache is deliberately not a dep: `want` already skips anything
+    // cached, and including it would re-run this on every cache write.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, selected, gender])
 
   const rowValue = useMemo(() => {
     return {
@@ -282,7 +445,7 @@ export default function SearchScreen({ navigation }: Props) {
                         ? labelsFor('CITY', selected.CITY ?? [])
                         : labelsFor('STATE', selected.STATE ?? []),
       RELIGION:       labelsFor('RELIGION', selected.RELIGION ?? []),
-      CASTE:          isIslam ? labelsFor('DIVISION', selected.DIVISION ?? []) : labelsFor('CASTE', selected.CASTE ?? []),
+      CASTE:          isChristian ? labelsFor('DIVISION', selected.DIVISION ?? []) : labelsFor('CASTE', selected.CASTE ?? []),
       STAR:           labelsFor('STAR', selected.STAR ?? []),
       DOSHAM:         labelsFor('DOSHAM', selected.DOSHAM ?? []),
       OCCUPATION:     labelsFor('OCCUPATION', selected.OCCUPATION ?? []),
@@ -298,7 +461,7 @@ export default function SearchScreen({ navigation }: Props) {
       PROFILECREATED: labelsFor('PROFILECREATED', selected.PROFILECREATED ?? []),
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }
-  }, [selected, labelCache, isIslam])
+  }, [selected, labelCache, isChristian])
 
   // ── Field open handlers ──────────────────────────────────────────────────
 
@@ -322,10 +485,14 @@ export default function SearchScreen({ navigation }: Props) {
   }
 
   async function openCaste() {
-    const key = isIslam ? 'DIVISION' : 'CASTE'
-    const opts = isIslam
+    const key = isChristian ? 'DIVISION' : 'CASTE'
+    const opts = isChristian
       ? await ensureOptions('DIVISION', fetchDivisionOptions)
-      : await ensureOptions('CASTE', () => fetchCasteOptions(religion, selected.MOTHERTONGUE?.[0] ?? ''))
+      // religionKey, not the single `religion` state — Angular sends the WHOLE
+      // selection to the caste fetch (filter-popup.component.ts joins a
+      // multi-select with '~'), which is exactly why a mixed religion comes
+      // back with no list and the row disappears.
+      : await ensureOptions('CASTE', () => fetchCasteOptions(religionKey, selected.MOTHERTONGUE?.[0] ?? ''))
     if (opts.length === 0) return
     setMultiEditor(key as FieldKey)
   }
@@ -411,7 +578,7 @@ export default function SearchScreen({ navigation }: Props) {
   const rows: Array<{ key: FieldKey; label: string; hidden?: boolean }> = [
     { key: 'AGE',            label: t('FILTER.AGE') },
     { key: 'LOCATION',       label: t('FILTER.LOCATION') },
-    { key: 'CASTE',          label: isIslam ? t('FILTER.DIVISION') : t('FILTER.CASTE') },
+    { key: 'CASTE',          label: isChristian ? t('FILTER.DIVISION') : t('FILTER.CASTE'), hidden: !showCasteRow },
     { key: 'STAR',           label: t('FILTER.STAR') },
     { key: 'DOSHAM',         label: t('FILTER.DOSHAM') },
     { key: 'OCCUPATION',     label: t('FILTER.OCCUPATION') },
@@ -494,11 +661,11 @@ export default function SearchScreen({ navigation }: Props) {
       </View>
 
       <ScrollView style={s.flex1} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
-        {eventType !== 'filter' && (
+        {/* {eventType !== 'filter' && (
           <View style={s.subHeader}>
             <Text style={s.subHeaderText}>{t('FILTER.FILTER_SUB_HEADER')}</Text>
           </View>
-        )}
+        )} */}
 
         {/* Strict Filter entry point (Figma node 1364:1711) — Partner-
             Preference mode only (same gate as the sub-header above). */}
@@ -575,8 +742,14 @@ export default function SearchScreen({ navigation }: Props) {
         </Pressable>
       </View>
 
+      {/* Every picker below is wrapped in `{...Mounted && ...}` — see
+          useModalMounted's header comment. Without it they mount with the
+          screen, so their portal <div>s sit BEFORE StrictFieldEditorScreen's in
+          document.body and it covers them: the picker opened from inside that
+          screen was rendering, just underneath it. */}
+
       {/* ── AGE: bounded min/max via SearchablePicker ── */}
-      <SearchablePicker
+      {ageMinMounted && <SearchablePicker
         visible={ageEditor === 'min'}
         title={t('FILTER.LBL_MIN_AGE')}
         placeholder={t('FILTER.PLACEHOLDER_MIN_AGE')}
@@ -584,8 +757,8 @@ export default function SearchScreen({ navigation }: Props) {
         selectedKey={selected.STARTAGE}
         onSelect={opt => { updateField('STARTAGE', opt.key); setAgeEditor('max') }}
         onClose={() => setAgeEditor(null)}
-      />
-      <SearchablePicker
+      />}
+      {ageMaxMounted && <SearchablePicker
         visible={ageEditor === 'max'}
         title={t('FILTER.LBL_MAX_AGE')}
         placeholder={t('FILTER.PLACEHOLDER_MAX_AGE')}
@@ -593,10 +766,10 @@ export default function SearchScreen({ navigation }: Props) {
         selectedKey={selected.ENDAGE}
         onSelect={opt => { updateField('ENDAGE', opt.key); setAgeEditor(null) }}
         onClose={() => setAgeEditor(null)}
-      />
+      />}
 
       {/* ── HEIGHT: bounded min/max via SearchablePicker ── */}
-      <SearchablePicker
+      {heightMinMounted && <SearchablePicker
         visible={heightEditor === 'min'}
         title={t('FILTER.LBL_MIN_HEIGHT')}
         placeholder={t('FILTER.PLACEHOLDER_MIN_HEIGHT')}
@@ -604,8 +777,8 @@ export default function SearchScreen({ navigation }: Props) {
         selectedKey={selected.STARTHEIGHT?.[0]}
         onSelect={opt => { updateField('STARTHEIGHT', [opt.key]); openHeight('max') }}
         onClose={() => setHeightEditor(null)}
-      />
-      <SearchablePicker
+      />}
+      {heightMaxMounted && <SearchablePicker
         visible={heightEditor === 'max'}
         title={t('FILTER.LBL_MAX_HEIGHT')}
         placeholder={t('FILTER.PLACEHOLDER_MAX_HEIGHT')}
@@ -613,10 +786,10 @@ export default function SearchScreen({ navigation }: Props) {
         selectedKey={selected.ENDHEIGHT?.[0]}
         onSelect={opt => { updateField('ENDHEIGHT', [opt.key]); setHeightEditor(null) }}
         onClose={() => setHeightEditor(null)}
-      />
+      />}
 
       {/* ── LOCATION: State → City ── */}
-      <SearchablePicker
+      {stateMounted && <SearchablePicker
         visible={locationStep === 'state'}
         title={t('FILTER.SELECT_STATE')}
         placeholder={t('FILTER.SEARCH_STATE')}
@@ -624,8 +797,8 @@ export default function SearchScreen({ navigation }: Props) {
         selectedKey={selected.STATE?.[0]}
         onSelect={selectState}
         onClose={() => setLocationStep(null)}
-      />
-      <MultiSelectPicker
+      />}
+      {cityMounted && <MultiSelectPicker
         visible={locationStep === 'city'}
         title={t('FILTER.SELECT_CITY')}
         placeholder={t('FILTER.SEARCH_CITY')}
@@ -634,10 +807,10 @@ export default function SearchScreen({ navigation }: Props) {
         anyLabel={t('SEARCH.ANY')}
         onApply={keys => updateField('CITY', keys)}
         onClose={() => setLocationStep(null)}
-      />
+      />}
 
       {/* ── STAR: Raasi → Star ── */}
-      <SearchablePicker
+      {raasiMounted && <SearchablePicker
         visible={starStep === 'raasi'}
         title={t('FILTER.SUBTITLE_STAR')}
         placeholder=""
@@ -645,8 +818,8 @@ export default function SearchScreen({ navigation }: Props) {
         selectedKey={undefined}
         onSelect={selectRaasi}
         onClose={() => setStarStep(null)}
-      />
-      <MultiSelectPicker
+      />}
+      {starMounted && <MultiSelectPicker
         visible={starStep === 'star'}
         title={t('FILTER.SELECT_STAR')}
         placeholder={t('FILTER.SEARCH_STAR')}
@@ -655,7 +828,7 @@ export default function SearchScreen({ navigation }: Props) {
         anyLabel={t('SEARCH.ANY')}
         onApply={keys => updateField('STAR', keys)}
         onClose={() => setStarStep(null)}
-      />
+      />}
 
       {/* ── Generic multi-select fields (Religion, Caste/Division, Dosham, Occupation,
            Income, Education, Mother Tongue, Marital Status, Eating Habits, Physical Status) ── */}
@@ -673,7 +846,6 @@ export default function SearchScreen({ navigation }: Props) {
           onApply={keys => {
             updateField(multiEditor, keys)
             if (multiEditor === 'RELIGION') {
-              setReligion(keys[0] ?? '0')
               // Religion changed — stale caste/subcaste cache must be dropped.
               updateField('CASTE', ['0'])
               updateField('DIVISION', ['0'])

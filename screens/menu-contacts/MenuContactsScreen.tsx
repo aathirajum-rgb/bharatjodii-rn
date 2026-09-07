@@ -33,11 +33,11 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   useWindowDimensions,
   View,
 } from 'react-native'
+import Toggle from '../../components/toggle/Toggle'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -464,10 +464,9 @@ export default function MenuContactsScreen({ navigation, route }: { navigation: 
                       <Text style={s.renewLabel}>{t('RECHARGE.AUTORENEWAL', 'Auto renewal')}</Text>
                       {!!membership.expiryTextVal && <Text style={s.renewSub}>{membership.expiryTextVal}</Text>}
                     </View>
-                    <Switch
+                    <Toggle
                       value={autoRenewOn}
                       onValueChange={handleToggleAutoRenew}
-                      trackColor={{ true: Colors.primaryDark, false: Colors.border }}
                     />
                   </View>
                 )}

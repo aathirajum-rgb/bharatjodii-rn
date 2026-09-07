@@ -4,6 +4,7 @@ import { getItem, setItem, getJson, setJson } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { getSessionValue } from './registrationService'
 import { isAiValidationEnabled } from './photoValidationService'
+import { setStrictFilterStateFromPP } from './filterService'
 
 // ─── getPPSetData ─────────────────────────────────────────────────────────────
 // Angular's getPPSETData — single source of truth for profile + paywall state.
@@ -12,8 +13,14 @@ import { isAiValidationEnabled } from './photoValidationService'
 
 export async function getPPSetData(force = false): Promise<any> {
   if (!force) {
-    const cached = await getJson(SK.App.PP_SET_DATA)
-    if (cached) return cached
+    const cached = await getJson<any>(SK.App.PP_SET_DATA)
+    if (cached) {
+      // Angular: filter.service.ts's getPPSetData() — seeds the strict toggles
+      // from a CACHED preference payload only when nothing is stored yet, so
+      // toggles the member changed but hasn't applied survive.
+      await setStrictFilterStateFromPP(cached?.STRICKPP, true)
+      return cached
+    }
   }
 
   const userId = await getItem(SK.Auth.USER_ID)
@@ -30,6 +37,11 @@ export async function getPPSetData(force = false): Promise<any> {
 
   const data = result.RESPONSE
   if (!data) return null
+
+  // Angular: profile.service.ts — "Keep the strict filter toggles of the PP page
+  // in sync with the STRICKPP of the response". A LIVE response overwrites
+  // (no onlyWhenMissing), so the server's saved strict prefs win on a real fetch.
+  await setStrictFilterStateFromPP(data.STRICKPP)
 
   // PAYMENTWALL lives in its own storage key
   if (data.PAYMENTWALL !== undefined) {

@@ -24,7 +24,8 @@
 // content/content2, confirmed live), even though it wasn't present on the
 // specific Active/no-upsell Figma node fetched for this layout.
 
-import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import Toggle from '../../components/toggle/Toggle'
 import { LinearGradient } from 'expo-linear-gradient'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import CdnLottie from '../../components/CdnLottie'
@@ -235,10 +236,9 @@ export default function MenuContactsDesktopLayout({
                         <Text style={s.renewLabel}>Auto renewal</Text>
                         {!!membership.expiryTextVal && <Text style={s.renewSub}>{membership.expiryTextVal}</Text>}
                       </View>
-                      <Switch
+                      <Toggle
                         value={autoRenewOn}
                         onValueChange={onToggleAutoRenew}
-                        trackColor={{ true: Colors.primaryDark, false: Colors.border }}
                       />
                     </View>
                   )}
