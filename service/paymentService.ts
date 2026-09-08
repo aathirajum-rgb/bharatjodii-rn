@@ -920,7 +920,14 @@ export async function getMembershipPlans(): Promise<MembershipPlansData | null> 
     title:            promotion.TITLE2 ?? 'Membership plans',
     plans,
     allPlans,
-    viewAllText:      promotion.VIEWALLTEXT,
+    // Angular: recharge.page.ts:721-723 isShowViewAllPack() gates the "View
+    // other packages" CTA on promotion.CONTENT.length > 3 — with only 3 (or
+    // fewer) packages there's nothing extra to reveal. That count check was
+    // dropped in this port, so the CTA showed whenever VIEWALLTEXT was
+    // present regardless of package count (QA #27). Gated here so both
+    // RechargeScreen and RechargeDesktopLayout, which just render
+    // data.viewAllText as-is, pick up the fix for free.
+    viewAllText:      allPlans.length > 3 ? promotion.VIEWALLTEXT : undefined,
     topSellText:      promotion.TOPSELLTEXT,
     defaultProductId: promotion.DEFAULTPRODUCTID ?? plans[0]?.productid ?? '',
     payCtaTemplate:   promotion.CTA3 ?? 'Pay ₹<367>',

@@ -50,6 +50,8 @@ import {
   type PickedChatAttachment,
 } from '../../service/chatMediaService'
 import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
+import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
+import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
 import { requestMicrophonePermission } from '../../service/permissionService'
 import { getItem, getJson, setJson } from '../../service/storageService'
 import { getSessionValue } from '../../service/registrationService'
@@ -173,6 +175,13 @@ export default function ChatScreen({ navigation, route }: Props) {
   const [showPaymentPromo, setShowPaymentPromo] = useState(false)
   const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
   const phoneInfo = usePhoneInfoSheet()
+  // Web/PWA "Add photo now" CTA (phoneInfo's female-free-photo variants) — see
+  // hooks/useAddPhotoPicker.ts for why this can't just navigate to the
+  // native-only 'Gallery' screen.
+  const addPhoto = useAddPhotoPicker({
+    onRejected: (msg) => setToastRequest({ message: msg, key: Date.now() }),
+    onError: (msg) => setToastRequest({ message: msg, key: Date.now() }),
+  })
 
   // ── Call / WhatsApp (the "viewed number" system card's two CTAs) ─────────
   // Angular: messages.component.ts's callWhatsApp() — goes straight through
@@ -951,10 +960,11 @@ export default function ChatScreen({ navigation, route }: Props) {
         data={phoneInfo.getData(t)}
         onClose={phoneInfo.close}
         onPrimaryPress={() => phoneInfo.primaryPress(navigation)}
-        onSecondaryPress={() => phoneInfo.secondaryPress(navigation)}
+        onSecondaryPress={() => phoneInfo.secondaryPress(addPhoto.openAddPhoto, navigation)}
         onLinkPress={phoneInfo.close}
       />
       <Toast request={toastRequest} bottomOffset={80} />
+      <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
 
       <AttachmentPreviewModal
         visible={!!pendingAttachment}

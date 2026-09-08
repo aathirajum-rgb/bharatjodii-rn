@@ -31,7 +31,6 @@ import {
   getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showContactsLeftBanner, showFreeBadge,
   type AfterLikeCtx,
 } from '../../components/matches/matchesCard.shared'
-import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import StickyBanner from '../../components/sticky-banner/StickyBanner'
 import MembershipBanner from '../../components/matches/MembershipBanner'
 import PhotoViewerModal from '../../components/matches/PhotoViewerModal'
@@ -44,6 +43,8 @@ import Popover, { type PopoverAnchor } from '../../components/popover/Popover'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import ViewProfileDesktopLayout from './ViewProfileDesktopLayout'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
+import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
 import {
   getViewProfile, markProfileViewed, getSimilarProfiles, viewHoroscope, getStarMatch,
   getBioDataLink, getEnlargedPhotos, getBiodataExtras, saveBiodataThemeId,
@@ -51,8 +52,11 @@ import {
   type SimilarProfileCard, type StarMatchResult, type BiodataTheme,
 } from '../../service/viewProfileService'
 import { viewProfileAdapter } from '../../adapters/viewProfile.adapter'
-import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
-import { getHeroBannerDetails } from '../../service/paymentService'
+import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
+import {
+  getHeroBannerDetails, fetchUpgradePaymentPromo, redirectToIntermediatePage,
+  type UpgradePaymentPromo,
+} from '../../service/paymentService'
 import { handleBack } from '../../utils/navigationRef'
 import { fetchMenuPromo } from '../../service/homeService'
 import { getItem, getJson } from '../../service/storageService'
@@ -372,7 +376,9 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   const [ownEntryType, setOwnEntryType] = useState('')
   const [femaleFreeEligible, setFemaleFreeEligible] = useState(false)
   const [indNumbersLeft, setIndNumbersLeft] = useState('0')
-  const [whatsappPaywallOpen, setWhatsappPaywallOpen] = useState(false)
+  // Angular: paymentPromoPopUp() → bottom-sheet.component's `paymentPromo` block —
+  // the real upgrade sheet shown for Call/WhatsApp/Message when the viewer is free.
+  const [paymentPromo, setPaymentPromo] = useState<UpgradePaymentPromo | null>(null)
   // ── Contact-reveal flow (Angular button.component.ts's two-step confirm →
   // phoneviewed API → Contact Details sheet) — mirrors MatchesScreen.tsx's own
   // fix for the exact same gap: this previously skipped straight to dialing on
@@ -444,6 +450,13 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     | { kind: 'female_free_call_verification' }
     | { kind: 'female_free_limit_over' }
   const [phoneInfoSheet, setPhoneInfoSheet] = useState<PhoneInfoSheet | null>(null)
+  // Web/PWA "Add photo" CTA (handlePhoneInfoSecondaryPress below) — see
+  // hooks/useAddPhotoPicker.ts for why this can't just navigate to the
+  // native-only 'Gallery' screen.
+  const addPhoto = useAddPhotoPicker({
+    onRejected: (msg) => Alert.alert('Some photos were not added', msg),
+    onError: (msg) => Alert.alert('Error', msg),
+  })
   const [paymentStickyInfo, setPaymentStickyInfo] = useState<{ content: string; ctaLabel: string; deadlineMs: number } | null>(null)
   const [stickyDismissed, setStickyDismissed] = useState(false)
   // Angular: the header transforms once the photo scrolls out of view — plain
@@ -954,9 +967,30 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // Angular communication.service.ts's showContactDetails() (lines 253-271) —
   // the confirm step is only shown when NEITHER direct-reveal condition is
   // met (already viewed this profile before, or mutual-like+paid+quota-left).
+  // Angular communication.service.ts's showContactDetails() FIRST check — a
+  // paid user whose mutual-like AND overall phone-view quotas are both
+  // exhausted sees the PHONENOLIMIT sheet instead of the confirm popup.
+  function checkPhoneNoLimit(): boolean {
+    if (!profile) return false
+    if (shouldShowPhoneNoLimit(profile.phoneViewed, profile.likedStatus, indNumbersLeft, contactQuota.left, ownEntryType)) {
+      setPhoneInfoSheet({ kind: 'female_free_limit_over' })
+      return true
+    }
+    return false
+  }
+
   function handleCall() {
     if (!profile) return
-    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType)) {
+    if (checkPhoneNoLimit()) return
+    // Angular: a free member who's never viewed this profile's number goes
+    // straight to paymentPromoPopUp(), no confirm step first — see
+    // ActivityScreen.tsx's confirmThenContact for the same fix.
+    const alreadyViewed = ['1', '3'].includes(String(profile.phoneViewed ?? '0'))
+    if (ownEntryType !== 'P' && !alreadyViewed) {
+      handleContactConfirmYes('call')
+      return
+    }
+    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType, profile.phoneProtected)) {
       handleContactConfirmYes('call')
     } else {
       setContactConfirm('call')
@@ -965,7 +999,13 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 
   function handleWhatsApp() {
     if (!profile) return
-    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType)) {
+    if (checkPhoneNoLimit()) return
+    const alreadyViewed = ['1', '3'].includes(String(profile.phoneViewed ?? '0'))
+    if (ownEntryType !== 'P' && !alreadyViewed) {
+      handleContactConfirmYes('whatsapp')
+      return
+    }
+    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType, profile.phoneProtected)) {
       handleContactConfirmYes('whatsapp')
     } else {
       setContactConfirm('whatsapp')
@@ -982,7 +1022,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     try {
       const result = await communicationBtnOnClick(fromPage, 'jodimessages', { MATRIID: profile.profileId })
       if (result.type === 'payment_promo') {
-        navigation.navigate('recharge')
+        await showPaymentPromo(false)
       } else if (result.type === 'verify_id') {
         // photoUpload=true (verified male, no photo yet) reads a DIFFERENT
         // registration-array config than the plain not-yet-verified case —
@@ -1057,11 +1097,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           }))
         }
       } else if (result.type === 'payment_promo') {
-        if (action === 'whatsapp') {
-          setWhatsappPaywallOpen(true)
-        } else {
-          navigation.navigate('recharge')
-        }
+        await showPaymentPromo(action === 'whatsapp')
       } else if (result.type === 'phone_protected') {
         setPhoneInfoSheet({ kind: 'phone_protected' })
       } else if (result.type === 'under_validation') {
@@ -1240,16 +1276,31 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     const kind = phoneInfoSheet?.kind
     setPhoneInfoSheet(null)
     if (kind === 'female_free_photo_add' || kind === 'female_free_photo_fail') {
-      navigation.navigate('Gallery')
+      addPhoto.openAddPhoto(navigation)
     }
     // "Call now" (female_free_call_verification) would dial app support in
     // Angular — no confirmed support number source exists in this port yet,
     // so this honestly just closes rather than pretending to place a call.
   }
 
-  function handleWhatsappPaywallPayNow() {
-    setWhatsappPaywallOpen(false)
-    navigation.navigate('recharge')
+  // Angular: button.component.ts's paymentPromoPopUp() — the real upgrade sheet
+  // built from payment/nbcustomer/v1's content, shown for a FREE member.
+  async function showPaymentPromo(_isWhatsApp: boolean) {
+    if (!profile) return
+    if (ownEntryType !== 'F') {
+      navigation.navigate('recharge')
+      return
+    }
+    const promo = await fetchUpgradePaymentPromo(profile.name).catch(() => null)
+    if (!promo || ['7', '11'].includes(promo.promoType)) { navigation.navigate('recharge'); return }
+    setPaymentPromo(promo)
+  }
+
+  function handlePaymentPromoUpgrade() {
+    const promo = paymentPromo
+    setPaymentPromo(null)
+    if (!promo) return
+    redirectToIntermediatePage(fromPage, promo.paymentId, promo.type, true)
   }
 
   function handleStickyPress() {
@@ -1607,12 +1658,20 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           onReportProfile={handleReportProfile}
         />
 
-        <WhatsAppPaywallModal
-          visible={whatsappPaywallOpen}
-          profile={profile}
-          oppGender={oppGender}
-          onClose={() => setWhatsappPaywallOpen(false)}
-          onPayNow={handleWhatsappPaywallPayNow}
+        {/* Angular: bottom-sheet.component's `action == 'paymentPromo'` block —
+            the same real upgrade sheet Angular shows for Call/WhatsApp/Message. */}
+        <BottomSheet
+          visible={!!paymentPromo}
+          type="paymentPromo"
+          data={{
+            title:      paymentPromo?.title,
+            content:    paymentPromo?.content,
+            subContent: paymentPromo?.subContent,
+            benefits:   paymentPromo?.benefits,
+            ctaLabel:   paymentPromo?.ctaLabel || t('GENERAL.BECOME_PAID'),
+          }}
+          onClose={() => setPaymentPromo(null)}
+          onPrimaryPress={handlePaymentPromoUpgrade}
         />
 
         {/* Angular button.component.ts's two-step contact reveal: confirm → phoneviewed
@@ -1652,6 +1711,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           onSecondaryPress={handlePhoneInfoSecondaryPress}
           onLinkPress={handlePhoneInfoClose}
         />
+        <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
 
         <PhotoViewerModalDesktop
           visible={photoViewerOpen}
@@ -2319,12 +2379,20 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         />
       )}
 
-      <WhatsAppPaywallModal
-        visible={whatsappPaywallOpen}
-        profile={profile}
-        oppGender={oppGender}
-        onClose={() => setWhatsappPaywallOpen(false)}
-        onPayNow={handleWhatsappPaywallPayNow}
+      {/* Angular: bottom-sheet.component's `action == 'paymentPromo'` block —
+          the same real upgrade sheet Angular shows for Call/WhatsApp/Message. */}
+      <BottomSheet
+        visible={!!paymentPromo}
+        type="paymentPromo"
+        data={{
+          title:      paymentPromo?.title,
+          content:    paymentPromo?.content,
+          subContent: paymentPromo?.subContent,
+          benefits:   paymentPromo?.benefits,
+          ctaLabel:   paymentPromo?.ctaLabel || t('GENERAL.BECOME_PAID'),
+        }}
+        onClose={() => setPaymentPromo(null)}
+        onPrimaryPress={handlePaymentPromoUpgrade}
       />
 
       <BottomSheet
@@ -2359,6 +2427,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         onSecondaryPress={handlePhoneInfoSecondaryPress}
         onLinkPress={handlePhoneInfoClose}
       />
+      <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
       {/* Angular: viewprofile.page.ts's presentPopover() — Verified badge info tap.
           content is API-supplied (PERSONALINFO.IDDET.BODY), no fallback text in
           Angular either, so an empty/missing verifiedInfoText just shows an empty

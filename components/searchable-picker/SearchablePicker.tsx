@@ -4,7 +4,6 @@ import {
   Animated,
   FlatList,
   Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -161,7 +160,12 @@ export default function SearchablePicker({
               // automatically, so the close icon sat under the status bar
               // without this.
               paddingTop:    insets.top,
-              paddingBottom: Platform.OS === 'ios' ? insets.bottom : 16,
+              // Edge-to-edge is mandatory on this Android/Expo SDK combo (can't be
+              // opted out of), so a hardcoded 16 here left the panel's bottom content
+              // sitting under the gesture/nav bar — use the real inset on both
+              // platforms, floored at 16 so devices with a near-zero inset keep the
+              // same minimum breathing room as before.
+              paddingBottom: Math.max(insets.bottom, 16),
               transform: [{ translateX: panelTranslateX }],
             },
           ]}

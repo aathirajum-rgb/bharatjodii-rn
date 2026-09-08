@@ -90,19 +90,44 @@ export type CommunicationAction =
 // the REAL entry point for "View phone number"/Call, decides whether to skip
 // the confirm popup and reveal contact details directly, or show the confirm
 // step first. A previous version of this port always showed the confirm step
-// unconditionally — this is the missing decision. Two of Angular's three
-// direct-reveal conditions are implemented (both use data already available
-// on MatchProfile/ContactGating); the third (PHONEPROTECTED != '0') isn't —
-// it needs a field this port doesn't otherwise track anywhere, and its exact
-// real-world trigger rate couldn't be confirmed against live data.
+// unconditionally — this is the missing decision. All three of Angular's
+// direct-reveal conditions are implemented — `phoneProtected` (PHONEPROTECTED
+// != '0', MatchProfile.phoneProtected — this profile has protected their own
+// number) skips straight to the API call, which then surfaces the "she has
+// protected her number" sheet (ERRCODE:14, already handled below in
+// showContactDetails) instead of asking "would you like to continue?" first,
+// a needless extra step for a number the API will refuse to reveal anyway.
 export function shouldSkipPhoneConfirm(
   phoneViewed: string, likedStatus: string, indNumbersLeft: string, entryType: string,
+  phoneProtected = '0',
 ): boolean {
   // Already viewed this specific profile's number before — no need to ask again.
   if (['1', '3'].includes(phoneViewed)) return true
   // Mutual-like/shortlisted, paid, with quota left.
   if ((['2', '3'].includes(likedStatus) || phoneViewed === '2') && Number(indNumbersLeft) > 0 && entryType === 'P') return true
+  // This profile has protected their own phone number.
+  if (phoneProtected !== '0') return true
   return false
+}
+
+// Angular: communication.service.ts's showContactDetails() FIRST check (lines
+// 259-263) — a PAID user with a mutual like/shortlist (or this profile's
+// PHONEVIEWED=='2') whose BOTH quota counters are exhausted (IndNumbersLeft —
+// the mutual-like quota — AND phoneNumbersLeft — the paid package's overall
+// quota) sees the PHONENOLIMIT sheet INSTEAD of the confirm popup, provided
+// they haven't already viewed this specific profile's number (already-viewed
+// always wins and reveals for free, same as shouldSkipPhoneConfirm's first
+// check). Reuses the same sheet copy as the female-free-contact quota-
+// exhausted case (usePhoneInfoSheet's 'female_free_limit_over') — Angular's
+// own CONFIG.PHONENOLIMIT is the identical object for both trigger paths
+// (femaleFreeContactFunc() and this one both call bottomSheetService.
+// freelimitover(componentData) with the same CONFIG.PHONENOLIMIT).
+export function shouldShowPhoneNoLimit(
+  phoneViewed: string, likedStatus: string, indNumbersLeft: string, phoneNumbersLeft: string, entryType: string,
+): boolean {
+  if (['1', '3'].includes(phoneViewed)) return false
+  const mutualOrViewed2 = ['2', '3'].includes(likedStatus) || phoneViewed === '2'
+  return mutualOrViewed2 && Number(indNumbersLeft) <= 0 && Number(phoneNumbersLeft || 0) <= 0 && entryType === 'P'
 }
 
 // Angular button.component.ts:524-583 (viewContactNoConfirmPopUp) — the
@@ -222,7 +247,17 @@ async function showCallOrWhatsApp(
 
   // Female free 3-contact promo
   if (entryType !== 'P' && femaleFreeData) {
-    if (femaleFreeData.FEMALEFREECONACT === '1') {
+    // Angular common-funtions.ts's getFree3Contact() reads localStorage
+    // FEMALEFREECONACT's own `FLAG` field — the session value fetched above
+    // (getSessionValue('FEMALEFREECONACT')) IS that object, it doesn't have a
+    // nested FEMALEFREECONACT field of its own. A previous version of this
+    // code checked `femaleFreeData.FEMALEFREECONACT === '1'`, a field that
+    // never exists, so this branch could never fire — every free female user
+    // fell straight through to the generic paid-upsell promo below, same as a
+    // free male, completely skipping the add-photo/ID-verify/free-contact-
+    // limit flow. useContactGating.ts's femaleFreeEligible reads `.FLAG`
+    // correctly (only the card-display value) — this is the click-dispatch fix.
+    if (String((femaleFreeData as any)?.FLAG) === '1') {
       const femaleFreeAction = await resolveFemaleFreeAction(photoStatus, ekycStatus ?? '0')
       if (femaleFreeAction) {
         return { type: 'female_free', action: femaleFreeAction, profile: oppProfile }
@@ -455,7 +490,7 @@ export async function fetchContactDetails(): Promise<void> {
   // reads it off the user's active-plan state, which isn't tracked client-side
   // here; '0' is a safe default (server treats missing/'0' as "not auto-renew").
   const params = `ID=${loginId ?? ''}&MEMBERSHIPTYPE=${entryType ?? ''}&LOGINGENDER=${gender ?? 'M'}` +
-    `&AUTORENEWALFLAG=0&FREECONTACTS=${femaleFreeData?.FEMALEFREECONACT === '1' ? '1' : '0'}`
+    `&AUTORENEWALFLAG=0&FREECONTACTS=${String((femaleFreeData as any)?.FLAG) === '1' ? '1' : '0'}`
   const result = await apiCall(Endpoints.payment.contacts, 'POST', params)
   if (result?.RESPONSECODE === '1' || result?.RESPONSECODE == 1) {
     await setJson('CONTACT_DETAIL', result.RESPONSE ?? {})

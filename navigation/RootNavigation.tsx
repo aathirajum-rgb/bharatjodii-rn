@@ -8,6 +8,7 @@ import { useCallback, useEffect } from 'react'
 import { ActivityIndicator, BackHandler, Platform, View } from 'react-native'
 import { useAuth } from '../contexts/AuthContext'
 import { useExitConfirm } from '../hooks/useExitConfirm'
+import ExitConfirmSheet from '../components/exit-confirm/ExitConfirmSheet'
 import type { ProfileDeactivateInfo } from '../components/auth/ProfileDeactivatedModal'
 import { refreshSession } from '../service/homeService'
 import { getItem, setItem } from '../service/storageService'
@@ -218,7 +219,7 @@ export default function RootNavigation() {
   // fallback, only for the authenticated app — AuthStack's root (Splash/
   // Login) keeps the OS default back behavior, same as before this hook
   // moved here from being wired into a single screen (MatchesScreen).
-  useExitConfirm(isAuthenticated)
+  const exitConfirm = useExitConfirm(isAuthenticated)
 
   // Single Android hardware-back listener for the whole app — the ONLY one,
   // registered once here rather than per-screen, so it can never race or
@@ -245,12 +246,19 @@ export default function RootNavigation() {
   }
 
   return (
-    <NavigationContainer
-      ref={navigationRef}
-      linking={linking}
-      onStateChange={handleStateChange}
-    >
-      {isAuthenticated ? <AppStack /> : <AuthStack />}
-    </NavigationContainer>
+    <>
+      <NavigationContainer
+        ref={navigationRef}
+        linking={linking}
+        onStateChange={handleStateChange}
+      >
+        {isAuthenticated ? <AppStack /> : <AuthStack />}
+      </NavigationContainer>
+      <ExitConfirmSheet
+        visible={exitConfirm.visible}
+        onYes={exitConfirm.onYes}
+        onNo={exitConfirm.onNo}
+      />
+    </>
   )
 }

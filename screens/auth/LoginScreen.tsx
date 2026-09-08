@@ -64,6 +64,12 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
 
   const inputRef  = useRef<TextInput>(null)
   const labelAnim = useRef(new Animated.Value(0)).current
+  // Measured width of the country-code Pressable (+91 chevron etc.) — the
+  // floating label's `left` is derived from this instead of sharing the same
+  // hardcoded offset as the code button, so the two never sit on top of each
+  // other (QA #49). Seeded with a rough guess matching the default "+91" so
+  // there's no visible jump before the first onLayout measurement lands.
+  const [codeWidth, setCodeWidth] = useState(50)
   // Guards against re-showing the picker on every re-focus — matches Android's
   // LoginActivity.kt `phoneHint` boolean (requestPhoneNoHint() only fires once).
   const phoneHintRequested = useRef(false)
@@ -185,9 +191,12 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
   // Border color: focused always wins (blue) regardless of value; unfocused
   // falls back to red when empty, grey when filled — same state machine as
   // NameScreen's Name input (Angular input-fields.component.scss precedence).
+  // Red also requires `touched` (same flag showValidationError above uses) —
+  // otherwise the box paints red on first mount / before the user has ever
+  // interacted with it, just because it starts out empty (QA #9).
   const borderColor = focused
     ? Colors.inputFocus
-    : mobile.length === 0
+    : touched && mobile.length === 0
       ? Colors.inputError
       : Colors.inputBorder
 
@@ -198,6 +207,14 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
       borderColor,
     ],
   })
+
+  // Label's left offset: inputRow's own left padding (12) + the measured
+  // country-code button width + the separator's width and right margin (1 +
+  // 12). Used for BOTH the resting and floated-up label positions (it's not
+  // part of the Animated interpolation — only top/fontSize/color animate) so
+  // the label never lands under the country-code box in either state (QA #49,
+  // and incidentally QA #4 / QA #10 which shared this same hardcoded offset).
+  const labelLeft = 12 + codeWidth + 13
 
   // Title from i18n — Angular stores it with <br /> tag (padded with stray spaces,
   // e.g. "Enter your <br /> mobile number"), so strip surrounding whitespace too —
@@ -244,7 +261,7 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
           {/* Mobile number input — floating label + country code prefix */}
           <View style={[styles.inputBox, { borderColor }]}>
             <Animated.Text
-              style={[styles.floatLabel, { top: labelTop, fontSize: labelSize, color: labelColor }]}
+              style={[styles.floatLabel, { top: labelTop, left: labelLeft, fontSize: labelSize, color: labelColor }]}
               pointerEvents="none"
             >
               {t('LOGIN_PAGE.MOBILE_NO')}
@@ -254,6 +271,7 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
               {/* Country code picker — tapping opens inline dropdown */}
               <Pressable
                 style={styles.codeBtn}
+                onLayout={e => setCodeWidth(e.nativeEvent.layout.width)}
                 onPress={() => {
                   setDropOpen(v => !v)
                   inputRef.current?.blur()
@@ -282,7 +300,16 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
                 onFocus={() => { setFocused(true); setDropOpen(false); requestPhoneHint() }}
                 onBlur={() => { setFocused(false); setTouched(true) }}
                 keyboardType="number-pad"
-                placeholder={focused ? t('LOGIN_PAGE.ENT_MOBILE') : ''}
+                // The floating label rests INSIDE the box (same slot this
+                // placeholder renders in) whenever it isn't floated up — i.e.
+                // whenever `!(focused || mobile.length > 0)`, see the labelAnim
+                // effect above. Gating on `focused` alone left this blank in
+                // that exact resting case (QA #7), but showing it there too
+                // would print "Enter your mobile number" right under/over the
+                // resting "Mobile Number" label, especially now that both sit
+                // at the same left offset (QA #49 fix). So this mirrors the
+                // label's own floated condition rather than dropping the gate.
+                placeholder={(focused || mobile.length > 0) ? t('LOGIN_PAGE.ENT_MOBILE') : ''}
                 placeholderTextColor={Colors.textPlaceholder}
                 maxLength={country.maxLen}
                 returnKeyType="done"
@@ -392,8 +419,10 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   floatLabel: {
+    // `left` is no longer a fixed value here — it's computed from the
+    // measured country-code box width and applied inline (see `labelLeft`)
+    // so the label can never land on top of the country-code button (QA #49).
     position:          'absolute',
-    left:              12,
     backgroundColor:   Colors.surface,
     paddingHorizontal: 4,
     zIndex:            10,

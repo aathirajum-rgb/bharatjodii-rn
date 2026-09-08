@@ -15,3 +15,8 @@ export const CDN_REACT  = `${BASE}assets/images/react`
 // Note the trailing slash (CDN_REACT deliberately has none — its callers write
 // CDN_REACT + '/name.svg').
 export const CDN_REACT_LOTTIE = `${BASE}assets/images/react/lottie-files/`
+// Per-flavor splash-screen Lottie animations (one file per app flavor, e.g.
+// 'adidravidar.json', 'jodii.json' — filename is the flavor key, no prefix).
+// Ported from the legacy Android app's per-flavor res/raw/splash_anim.json
+// (QA #2 — "By Matrimony.com" text missing from splash for the default flavor).
+export const CDN_SPLASH_LOTTIE = `${BASE}assets/splash-lottie-files/`

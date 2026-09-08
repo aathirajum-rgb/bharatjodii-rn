@@ -34,6 +34,15 @@ export function mapMembershipPlan(raw: any): any {
   return {
     ...raw,
     value1,
+    // Angular: benefits-card.component.html reads package.benefits (lowercase
+    // — unlike every other BENEFITS payload elsewhere in paymentService.ts,
+    // this one is NOT uppercase on the raw CONTENT item), so it already
+    // matches the MembershipPlan.benefits field 1:1. Still passed through a
+    // mapper (not left to the `...raw` spread above) so each entry's shape is
+    // normalized the same way as every other benefits list in this adapter.
+    benefits: Array.isArray(raw?.benefits)
+      ? raw.benefits.map((b: Record<string, any>) => ({ icon: String(b?.icon ?? ''), value: String(b?.value ?? '') }))
+      : [],
     discounttitle: typeof raw?.discounttitle === 'string' ? raw.discounttitle.trim() : raw?.discounttitle,
   }
 }

@@ -110,6 +110,7 @@ export function toProfile(p: Record<string, any>): SwiperItem {
     // Angular matches card: profile.LIKED (not LIKEDSTATUS) — fallback for other listing APIs
     likedStatus:         (p['LIKED'] ?? p['LIKEDSTATUS']) as SwiperItem['likedStatus'],
     phoneViewed:         p['PHONEVIEWED'],
+    phoneProtected:      p['PHONEPROTECTED'],
     // Angular: FUNC.disableDontShow()/disableViewLater() — '1'/'3' means the action
     // was already taken (from our side, or both sides) on a re-fetched profile.
     dontShowStatus:      p['STATUS'],

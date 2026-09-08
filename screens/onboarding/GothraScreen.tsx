@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
+import { SvgXml } from 'react-native-svg'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
 import RegistrationSuccessSheet from '../../components/registration-success-sheet/RegistrationSuccessSheet'
@@ -32,6 +33,14 @@ import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 const CDN_PAGE_ICON = CDN_REG + 'gothra.svg'
 const FOOTER_H      = 140
+
+// Angular's dropdown-field arrow is Ionic's "chevron-forward-outline" icon —
+// not a CDN-hosted image but a bundled Ionicons SVG (node_modules/ionicons/
+// dist/svg/chevron-forward-outline.svg), colored via its "black-color" CSS
+// class. Inlined here verbatim (stroke swapped from currentColor to a fixed
+// black, since SvgXml doesn't inherit CSS color) for a pixel-exact match —
+// same icon used on MotherTongueScreen's "select mother tongue" field.
+const CHEVRON_FORWARD_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M184 112l144 144-144 144"/></svg>`
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -71,8 +80,14 @@ export default function GothraScreen({ navigation }: Props) {
       fetchGothraOptions()
         .then(list => {
           setAllOptions(list)
-          if (savedGothra) {
-            const found = list.find(o => o.key === savedGothra)
+          // Prefer the persisted KEY (post-submit case), but fall back to the
+          // in-memory selection's key — a gothram picked this session but not
+          // yet submitted (handleNext() only writes GOTHRA on submit) has no
+          // persisted value, so without this fallback its stale English-labeled
+          // Option object never gets swapped for the newly translated one.
+          const keyToResolve = savedGothra ?? selected?.key
+          if (keyToResolve) {
+            const found = list.find(o => o.key === keyToResolve)
             if (found) setSelected(found)
           }
         })
@@ -166,7 +181,7 @@ export default function GothraScreen({ navigation }: Props) {
               >
                 {selected ? selected.label : t('REGISTRATION.SELECTGOTHRAM', 'Select gothram')}
               </Text>
-              <Text style={styles.selectFieldArrow}>›</Text>
+              <SvgXml xml={CHEVRON_FORWARD_XML} width={24} height={24} />
             </Pressable>
           </View>
         )}
@@ -239,10 +254,5 @@ const styles = StyleSheet.create({
   },
   selectFieldTextActive: {
     fontWeight: '500',
-  },
-  selectFieldArrow: {
-    fontSize:   22,
-    color:      Colors.textPrimary,
-    lineHeight: 26,
   },
 })

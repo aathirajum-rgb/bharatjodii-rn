@@ -4,6 +4,7 @@ import LanguageSelectionScreen from '../screens/LanguageSelectionScreen'
 import LoginScreen from '../screens/auth/LoginScreen'
 import OTPScreen from '../screens/auth/OTPScreen'
 import SplashAnimationScreen from '../screens/SplashAnimationScreen'
+import { getItem, removeItem } from '../service/storageService'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -25,7 +26,23 @@ export default function AuthStack() {
 
       <Stack.Screen name="Splash" options={{ animation: 'none' }}>
         {({ navigation }) => (
-          <SplashAnimationScreen onFinish={() => navigation.replace('LanguageSelection')} />
+          <SplashAnimationScreen
+            onFinish={async () => {
+              // Set by DeleteProfileSuccessScreen right before it clears the
+              // session — a user who just deleted their profile already has a
+              // language picked, so skip straight to the login screen instead
+              // of re-showing LanguageSelection. One-shot: consumed here so it
+              // never affects any other route into this screen (fresh install,
+              // plain logout, etc).
+              const skipLanguage = await getItem('POST_DELETE_SKIP_LANGUAGE')
+              if (skipLanguage) {
+                await removeItem('POST_DELETE_SKIP_LANGUAGE')
+                navigation.replace('login')
+              } else {
+                navigation.replace('LanguageSelection')
+              }
+            }}
+          />
         )}
       </Stack.Screen>
 

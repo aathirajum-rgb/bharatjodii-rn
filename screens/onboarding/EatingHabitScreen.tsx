@@ -204,7 +204,6 @@ const styles = StyleSheet.create({
     fontSize:   14,
     fontWeight: '400',
     color:      Colors.textPrimary,
-    lineHeight: 16,
   },
   chipLabelSelected: {
     fontWeight: '500',

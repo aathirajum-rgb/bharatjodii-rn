@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert,
   Dimensions,
@@ -17,7 +17,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTranslation } from 'react-i18next'
 import { useVideoPlayer, VideoView } from 'expo-video'
-import CdnSvg, { CdnImage, CdnSvgBackground } from '../../components/cdn-svg/CdnSvg'
+import CdnSvg, { CdnImage } from '../../components/cdn-svg/CdnSvg'
 import CdnLottie from '../../components/CdnLottie'
 import AppHeader, { type ToolbarItem } from '../../components/app-header/AppHeader'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
@@ -29,10 +29,12 @@ import PhotoPromoSticky from '../../components/sticky-banner/PhotoPromoSticky'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
 import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
-import { useContactGating } from '../../hooks/useContactGating'
+import { useContactGating, type ContactGating } from '../../hooks/useContactGating'
 import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
+import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
+import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
 import { openMembershipTab, paymentTrack, getHeroBannerDetails, getMenuPromo, redirectToIntermediatePage } from '../../service/paymentService'
-import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
+import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import { getItem, setItem, removeItem, getJson } from '../../service/storageService'
 import { getRegistrationArrays, getSessionValue } from '../../service/registrationService'
@@ -76,6 +78,62 @@ import {
 
 const CDN = 'https://imgs.jodii.app/assets/images/svg/'
 const FWD_ICON = `${CDN}revamp/forward-icon-link.svg`
+
+// Bundled locally instead of fetched from CDN as SVG (who-viewed-bg-color.svg,
+// liked-profiles-bg.svg): both turned out to be auto-traced art with
+// 700-1500+ <path> elements each (340KB/920KB of vector data for what's just
+// a faint watermark pattern). react-native-svg draws every path synchronously
+// on the UI thread via Canvas, plus a Canvas.saveLayer() per opacity group —
+// that much work blocked the main thread past Android's 5s input-dispatch
+// timeout, ANRing (and getting force-killed by the OS) on the Home screen.
+// Decoding a bitmap is orders of magnitude cheaper than drawing ~1000 paths.
+const WHO_VIEWED_BG = require('../../assets/images/home/who-viewed-bg-color.png')
+const WHO_VIEWED_BG_RATIO = 360 / 588 // source SVG's viewBox aspect ratio
+const LIKED_PROFILES_BG = require('../../assets/images/home/liked-profiles-bg.png')
+const LIKED_PROFILES_BG_RATIO = 360 / 624
+
+// Raster equivalent of CdnSvgBackground's cover+anchor behavior (CSS
+// background-size:cover + background-position) for the two local assets
+// above. RN's <Image resizeMode="cover"> always centers the crop, so
+// 'top-left' anchoring (liked-profiles-bg — centering cut its artwork's top
+// edge off, the same issue CdnSvgBackground's own anchor prop exists for)
+// needs the scale/position worked out manually against the measured
+// container box.
+function LocalCoverBackground({
+  source, aspectRatio, anchor = 'center', children, style,
+}: {
+  source: number
+  aspectRatio: number
+  anchor?: 'center' | 'top-left'
+  children?: React.ReactNode
+  style?: object
+}) {
+  const [size, setSize] = useState<{ width: number; height: number } | null>(null)
+
+  let imageStyle: object | null = null
+  if (size) {
+    const containerRatio = size.width / size.height
+    const renderWidth  = containerRatio > aspectRatio ? size.width : size.height * aspectRatio
+    const renderHeight = containerRatio > aspectRatio ? size.width / aspectRatio : size.height
+    imageStyle = {
+      position: 'absolute' as const,
+      width: renderWidth,
+      height: renderHeight,
+      top:  anchor === 'top-left' ? 0 : -(renderHeight - size.height) / 2,
+      left: anchor === 'top-left' ? 0 : -(renderWidth - size.width) / 2,
+    }
+  }
+
+  return (
+    <View
+      style={[style, { overflow: 'hidden' }]}
+      onLayout={e => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
+    >
+      {!!imageStyle && <Image source={source} style={imageStyle} />}
+      {children}
+    </View>
+  )
+}
 const { width: SW } = Dimensions.get('window')
 
 // Angular: services/common.ts's `showRedDot` — a singleton service property
@@ -167,6 +225,30 @@ function moreItemsFrom(list: SwiperItem[], cap: number): { THUMBIMG: string }[] 
   return list.slice(cap, cap + 3).map(i => ({ THUMBIMG: i.thumbImg || i.profileImg || '' }))
 }
 
+// Root cause of the Home-screen freeze on focus: loadHome() below fires ~15
+// independent API calls, each resolving at its own time and calling its own
+// setState. None of the ~10 sections rendered further down were memoized, so
+// EVERY one of those ~15 state updates re-rendered the entire section tree
+// (multiple image-heavy FlatList-based swipers), not just the section whose
+// own data actually changed — a burst of full-tree re-renders is what made
+// the screen briefly unresponsive. React.memo fixes this IF the section's
+// props are stable across unrelated re-renders — but every section's
+// onCardPress/onLikePress/onWhatsAppPress/onSeeAllPress prop here is a fresh
+// closure created on every HomeScreen render, which would defeat a normal
+// memo comparison regardless. This comparator ignores function-prop identity
+// instead: every such closure below closes ONLY over other props already
+// compared here (the section's own items array/gating) or over stable values
+// (navigation, setState setters), so a stale closure retained across a
+// skipped re-render is behaviorally identical to a fresh one.
+function propsEqualIgnoringFunctions<T extends Record<string, unknown>>(prev: T, next: T): boolean {
+  for (const key of Object.keys(next) as (keyof T)[]) {
+    const a = prev[key], b = next[key]
+    if (typeof a === 'function' && typeof b === 'function') continue
+    if (!Object.is(a, b)) return false
+  }
+  return true
+}
+
 // Angular: common-funtions.ts's updatePluralContent() — used ONLY for the
 // "Who Viewed You" header on Home (explore.component.html:44,
 // sectionTitle.profilesWhoviewedYou) — substitutes a locale-specific
@@ -201,7 +283,7 @@ export interface CompleteProfileSectionProps {
 // that same component's [swiper-config] input might suggest — that config
 // is only consumed by the *ngIf="selfVideo" branch (the FAQ-video carousel),
 // a different cardType entirely.
-export function CompleteProfileSection({ cards, onCardPress }: CompleteProfileSectionProps) {
+export const CompleteProfileSection = memo(function CompleteProfileSection({ cards, onCardPress }: CompleteProfileSectionProps) {
   if (cards.length === 0) return null
   return (
     <View style={s.cpList}>
@@ -234,7 +316,7 @@ export function CompleteProfileSection({ cards, onCardPress }: CompleteProfileSe
       ))}
     </View>
   )
-}
+}, propsEqualIgnoringFunctions)
 
 // ─── Liked Profiles (tab toggle + card list) ──────────────────────────────────
 
@@ -253,9 +335,13 @@ export interface LikedProfilesSectionProps {
   // Angular: app-swiper's see-all link — shown for this section too
   // (showLinkCta defaults to true, showSeeAllButton = totalCount > 1).
   onSeeAllPress?: (() => void) | undefined
+  // Not read directly by this component — onWhatsAppPress (passed in by
+  // HomeScreen) closes over this, so it must be a compared prop here too;
+  // see propsEqualIgnoringFunctions's header comment for why.
+  gating: ContactGating
 }
 
-export function LikedProfilesSection({
+export const LikedProfilesSection = memo(function LikedProfilesSection({
   likedTab, onTabChange, likedByMe, likedMe, likedByCount, likedMeCount, gender, onCardPress, onLikePress, onWhatsAppPress,
   onSeeAllPress,
 }: LikedProfilesSectionProps) {
@@ -332,7 +418,7 @@ export function LikedProfilesSection({
       />
     </>
   )
-}
+}, propsEqualIgnoringFunctions)
 
 // ─── Explore Categories ────────────────────────────────────────────────────────
 // Angular: explore-card.component.html's ACTIVE template (the big-image-tile
@@ -359,7 +445,7 @@ export interface ExploreCategoriesSectionProps {
   onCategoryPress: (cat: ExploreCategory) => void
 }
 
-export function ExploreCategoriesSection({
+export const ExploreCategoriesSection = memo(function ExploreCategoriesSection({
   categories, onCategoryPress,
 }: ExploreCategoriesSectionProps) {
   const { t } = useTranslation()
@@ -396,11 +482,11 @@ export function ExploreCategoriesSection({
       </View>
     </>
   )
-}
+}, propsEqualIgnoringFunctions)
 
 // ─── Success Stories ───────────────────────────────────────────────────────────
 
-export function SuccessStoriesSection({
+export const SuccessStoriesSection = memo(function SuccessStoriesSection({
   stories, onCardPress, onSeeAllPress,
 }: { stories: SwiperItem[]; onCardPress: (item: SwiperItem) => void; onSeeAllPress: () => void }) {
   const { t } = useTranslation()
@@ -442,7 +528,7 @@ export function SuccessStoriesSection({
       />
     </>
   )
-}
+}, propsEqualIgnoringFunctions)
 
 // ─── Self-help Videos ───────────────────────────────────────────────────────────
 // Angular: complete-profile.component.html's self-video swiper slide — the
@@ -451,7 +537,7 @@ export function SuccessStoriesSection({
 // row below the card; and the play button is the real CDN icon, not a
 // CSS-drawn triangle.
 
-export function SelfHelpVideosSection({
+export const SelfHelpVideosSection = memo(function SelfHelpVideosSection({
   videos, cardWidth, cardHeight, onVideoPress,
 }: { videos: HelpVideo[]; cardWidth: number; cardHeight: number; onVideoPress: (item: HelpVideo) => void }) {
   const { t } = useTranslation()
@@ -484,7 +570,7 @@ export function SelfHelpVideosSection({
       />
     </>
   )
-}
+}, propsEqualIgnoringFunctions)
 
 // Inline video player for the self-help video modal — same expo-video pattern
 // already used by screens/help-center/FaqScreen.tsx's FaqVideoPlayer.
@@ -502,7 +588,7 @@ export function SelfHelpVideoPlayer({ uri }: { uri: string }) {
 // title+body+a single "Call us #CALL#" LINK (chevron, no button styling),
 // with a decorative image on the right. There is no WhatsApp button at all
 // in Angular's real Home help section.
-export function HelpSection({
+export const HelpSection = memo(function HelpSection({
   onCallPress, phone,
 }: { onCallPress: () => void; phone: string }) {
   const { t } = useTranslation()
@@ -535,14 +621,250 @@ export function HelpSection({
       <CdnSvg uri={`${CDN}call-24-7.svg`} width={80} height={80} />
     </LinearGradient>
   )
+}, propsEqualIgnoringFunctions)
+
+// ─── Individually memoized listing sections (All Matches / Who Viewed Me /
+// Today's Matches / Newly Joined / Profiles You Viewed) ───────────────────────
+// These 5 sections used to be written directly inline in HomeScreen's return.
+// Moved into their own memoized components (same propsEqualIgnoringFunctions
+// pattern as the sections above) so that, say, fetchNotifCount resolving and
+// updating comCount doesn't force All Matches' or Newly Joined's own
+// FlatList-based swiper to re-render along with it — each section now only
+// re-renders when the data it actually reads changes. `gating` is threaded
+// through purely so onWhatsAppPress (which closes over it) is honored
+// correctly by that comparator — see its header comment above.
+
+interface AllMatchesSectionProps {
+  loaded: boolean
+  items: SwiperItem[]
+  total: number
+  navigation: any
+  gating: ContactGating
+  onCardPress: (item: SwiperItem) => void
+  onLikePress: (item: SwiperItem) => void
+  onWhatsAppPress: (item: SwiperItem) => void
 }
+
+const AllMatchesSection = memo(function AllMatchesSection({
+  loaded, items, total, navigation, onCardPress, onLikePress, onWhatsAppPress,
+}: AllMatchesSectionProps) {
+  const { t } = useTranslation()
+  return (
+    <View style={s.section}>
+      {!loaded ? (
+        <Loader variant="skeleton-dashboard" />
+      ) : items.length > 1 ? (
+        <SwiperCard
+          swiperHeader={`${t('HOME.ALLMATCH_HEADER')} (${total})`}
+          cardVariant={1}
+          // Angular: core/enums/home.enum.ts — allMatches maps to the section
+          // string 'matches', NOT 'newmatches' (Newly Joined's section) —
+          // ProfileCard.tsx's basicDetail() omits the education suffix only
+          // for section==='matches'.
+          cardSection="matches"
+          items={items.slice(0, 5)}
+          moreItems={moreItemsFrom(items, 5)}
+          showSeeAll
+          onCardPress={onCardPress}
+          onLikePress={onLikePress}
+          onSeeAllPress={() => navigation.navigate('Matches')}
+          onWhatsAppPress={onWhatsAppPress}
+        />
+      ) : null}
+    </View>
+  )
+}, propsEqualIgnoringFunctions)
+
+interface WhoViewedMeSectionProps {
+  items: SwiperItem[]
+  comCount: ComCountEntry[]
+  navigation: any
+  gating: ContactGating
+  onCardPress: (item: SwiperItem) => void
+  onLikePress: (item: SwiperItem) => void
+  onWhatsAppPress: (item: SwiperItem) => void
+}
+
+// Angular's *ngIf checks swiperViewedYouList.length (the viewedyou listing
+// call's own returned/displayed array, capped to 5), not a separate
+// total-count field.
+const WhoViewedMeSection = memo(function WhoViewedMeSection({
+  items, comCount, navigation, onCardPress, onLikePress, onWhatsAppPress,
+}: WhoViewedMeSectionProps) {
+  const { t } = useTranslation()
+  if (items.length <= 3) return null
+  return (
+    <>
+      <View style={s.divider} />
+      {/* Angular: .dot-img-bg = background-image: url(who-viewed-bg-color.svg),
+          linear-gradient(#FFF1FF → #FFFFFF) — the pattern sits ON TOP of the
+          gradient. Bundled locally as a raster — see WHO_VIEWED_BG above. */}
+      <LinearGradient colors={['#FFF1FF', '#FFFFFF']}>
+        <LocalCoverBackground source={WHO_VIEWED_BG} aspectRatio={WHO_VIEWED_BG_RATIO} style={s.section}>
+          <SwiperCard
+            swiperHeader={`${applyPluralToken(t, t('HOME.WHO_VIEWED_YOU_HEADER'), comTotalFor(comCount, 'viewedyou'))} (${comTotalFor(comCount, 'viewedyou')})`}
+            newCount={comCountFor(comCount, 'viewedyou')}
+            cardVariant={3}
+            cardSection="viewedyou"
+            items={items.slice(0, 5)}
+            moreItems={moreItemsFrom(items, 5)}
+            showSeeAll
+            onCardPress={onCardPress}
+            onLikePress={onLikePress}
+            // Angular app-swiper.component.ts's onClickSeeAllCTA() case
+            // 'viewedyou' → router.navigate(['/activity/viewedyou'], { state:
+            // { activityType: 'viewedyou' } }).
+            onSeeAllPress={() => navigation.navigate('Activity', { activityType: 'viewedyou' })}
+            onWhatsAppPress={onWhatsAppPress}
+          />
+        </LocalCoverBackground>
+      </LinearGradient>
+    </>
+  )
+}, propsEqualIgnoringFunctions)
+
+interface TodayMatchesSectionProps {
+  items: SwiperItem[]
+  total: number
+  navigation: any
+  gating: ContactGating
+  onCardPress: (item: SwiperItem) => void
+  onLikePress: (item: SwiperItem) => void
+  onWhatsAppPress: (item: SwiperItem) => void
+}
+
+// Angular: *ngIf="swiperDRContents?.length > 0" — unlike All Matches/Newly
+// Joined (>1), this section's threshold is just >0.
+const TodayMatchesSection = memo(function TodayMatchesSection({
+  items, total, navigation, onCardPress, onLikePress, onWhatsAppPress,
+}: TodayMatchesSectionProps) {
+  const { t } = useTranslation()
+  if (items.length === 0) return null
+  return (
+    <>
+      <View style={s.divider} />
+      <View style={s.section}>
+        {/* Angular: home.config.ts's drmatches is the only swiper config with
+            coverflowEffect — a centered, tilted-neighbor carousel. */}
+        <CoverflowSwiper
+          swiperHeader={`${t('DAILYRECOMMENDATIONS.DAILY_RECOMMENDATIONS')} (${total})`}
+          items={items.slice(0, 4)}
+          moreItems={moreItemsFrom(items, 4)}
+          onCardPress={onCardPress}
+          onLikePress={onLikePress}
+          // Angular: onClickSeeAllCTA() case 'dailyrecommendations' →
+          // router.navigate(['dailyrecommendations'], { queryParams: { frm_page } }).
+          onSeeAllPress={() => navigation.navigate('daily-recommendations', { frm_page: 'home' })}
+          onWhatsAppPress={onWhatsAppPress}
+        />
+      </View>
+    </>
+  )
+}, propsEqualIgnoringFunctions)
+
+interface NewlyJoinedSectionProps {
+  loaded: boolean
+  items: SwiperItem[]
+  total: number
+  navigation: any
+  gating: ContactGating
+  onCardPress: (item: SwiperItem) => void
+  onLikePress: (item: SwiperItem) => void
+  onWhatsAppPress: (item: SwiperItem) => void
+}
+
+// Angular: newlyJoinedSection.blockbgColor = 'pink-bg-block'. <app-loader
+// *ngIf="!nmContLoaded"> sits on plain white BEFORE the
+// *ngIf="nmContLoaded && swiperNewlyMatchContents?.length > 1" wrapper — the
+// pink background + divider only exist once there's real data.
+const NewlyJoinedSection = memo(function NewlyJoinedSection({
+  loaded, items, total, navigation, onCardPress, onLikePress, onWhatsAppPress,
+}: NewlyJoinedSectionProps) {
+  const { t } = useTranslation()
+  if (!loaded) {
+    return (
+      <View style={s.section}>
+        <Loader variant="skeleton-dashboard" />
+      </View>
+    )
+  }
+  if (items.length <= 1) return null
+  return (
+    <>
+      <View style={s.divider} />
+      <LinearGradient colors={['#FCEBFF', '#FFFFFF']} style={s.section}>
+        <SwiperCard
+          // toListingResult() falls back to 0 when the response carries no
+          // TOTAL — see headerWithCount() for Angular's setHeader() rule.
+          swiperHeader={headerWithCount(t('HOME.NEWLY_JOINED_HEADER'), total)}
+          cardVariant={1}
+          cardSection="newmatches"
+          items={items.slice(0, 4)}
+          moreItems={moreItemsFrom(items, 4)}
+          showSeeAll
+          onCardPress={onCardPress}
+          onLikePress={onLikePress}
+          // Angular: onClickSeeAllCTA() case 'newmatches' → NEWMATCHESLANDING='1'
+          // then router.navigate(['/matches/bynewlyjoined']) — matches.page.ts's
+          // urlExploreObj maps route name 'bynewlyjoined' to FILTERTYPE
+          // 'NEYLYJOINED' (backend typo, preserved) before it reaches the API.
+          onSeeAllPress={() => navigation.navigate('Matches', {
+            exploreType: 'NEYLYJOINED',
+            exploreLabel: t('HOME.NEWLY_JOINED_HEADER'),
+          })}
+          onWhatsAppPress={onWhatsAppPress}
+        />
+      </LinearGradient>
+    </>
+  )
+}, propsEqualIgnoringFunctions)
+
+interface ProfilesViewedSectionProps {
+  items: SwiperItem[]
+  comCount: ComCountEntry[]
+  navigation: any
+  gating: ContactGating
+  onCardPress: (item: SwiperItem) => void
+  onLikePress: (item: SwiperItem) => void
+  onWhatsAppPress: (item: SwiperItem) => void
+}
+
+const ProfilesViewedSection = memo(function ProfilesViewedSection({
+  items, comCount, navigation, onCardPress, onLikePress, onWhatsAppPress,
+}: ProfilesViewedSectionProps) {
+  const { t } = useTranslation()
+  if (items.length === 0) return null
+  return (
+    <>
+      <View style={s.divider} />
+      <View style={s.section}>
+        <SwiperCard
+          // Angular: home.enum.ts's sectionTitle.viewedbyme = 'GENERAL.VIEWEDBYME'
+          // ("Profiles you viewed").
+          swiperHeader={headerWithCount(t('GENERAL.VIEWEDBYME'), comTotalFor(comCount, 'viewedbyme'))}
+          newCount={comCountFor(comCount, 'viewedbyme')}
+          cardVariant={3}
+          cardSection="viewedbyme"
+          items={items.slice(0, 5)}
+          moreItems={moreItemsFrom(items, 5)}
+          showSeeAll
+          onCardPress={onCardPress}
+          onLikePress={onLikePress}
+          // Angular: onClickSeeAllCTA() case 'viewedbyme' → /activity/viewedbyme
+          // with state { activityType: 'viewedbyme', selectedSubTab: 'viewedbyme' }.
+          onSeeAllPress={() => navigation.navigate('Activity', { activityType: 'viewedbyme', selectedSubTab: 'viewedbyme' })}
+          onWhatsAppPress={onWhatsAppPress}
+        />
+      </View>
+    </>
+  )
+}, propsEqualIgnoringFunctions)
 
 // ─── HomeScreen ───────────────────────────────────────────────────────────────
 
 export default function HomeScreen({ navigation }: { navigation: any }) {
   const isDesktop = useIsDesktopWeb()
   const { t, i18n } = useTranslation()
-  const [contentLoaded, setContentLoaded] = useState(false)
 
   // ── WhatsApp "no photo" CTA (All Matches / New Matches / etc. cards) ──────
   // Angular: matches-card.component's handleWhatsApp() — same confirm →
@@ -550,6 +872,17 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   // Call/WhatsApp button already uses (ActivityScreen.tsx/MatchesScreen.tsx).
   const gating = useContactGating()
   const phoneInfo = usePhoneInfoSheet()
+  // Web/PWA "Add photo" CTAs — see hooks/useAddPhotoPicker.ts for why this can't
+  // just navigate to the native-only 'Gallery' screen. onUploaded refreshes
+  // completion%/banners the same way loadHome's other callers do — safe to
+  // reference loadHome here even though it's declared further down: this
+  // callback only ever runs after a full render (and loadHome's own
+  // initialization) has completed.
+  const addPhoto = useAddPhotoPicker({
+    onUploaded: () => loadHome({ cancelled: false }, false),
+    onRejected: (msg) => Alert.alert('Some photos were not added', msg),
+    onError: (msg) => Alert.alert('Error', msg),
+  })
   const [contactConfirm, setContactConfirm] = useState<{ item: SwiperItem; action: 'whatsappNudge'; fromPage: string } | null>(null)
   const [contactDetails, setContactDetails] = useState<{
     name: string; mobile?: string | undefined; dialNumber?: string | undefined; whatsappNumber?: string | undefined
@@ -994,24 +1327,55 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       }
     })
 
-    fetchHomeAllMatches().then(result => {
+    // These 8 listing calls used to all fire in parallel the instant focus
+    // fired. Firing that many requests at once means every one of them
+    // competes for the same limited mobile-network pipe simultaneously
+    // (bandwidth/connection-slot contention can make EACH one slower than if
+    // they weren't all fighting for it at once), and does nothing to
+    // prioritize whichever section the user actually scrolls to first.
+    // Chained sequentially instead, in the same top-to-bottom order the
+    // sections appear on screen (fetchNotifCount is pulled forward, just
+    // after All Matches, since its comCount result feeds 3 of the section
+    // headers below it — Who Viewed Me/Profiles You Viewed/Liked Profiles —
+    // rather than owning a section position of its own). A section now
+    // genuinely finishes (and renders) before the ones below it start
+    // loading, instead of everything arriving in an unpredictable burst —
+    // and if the user navigates away partway through, the remaining
+    // not-yet-started fetches in the chain never fire at all (ctrl.cancelled
+    // short-circuits it), where the old all-at-once version had already put
+    // every one of them on the wire.
+    // Not using InteractionManager.runAfterInteractions to also defer the
+    // start of this chain past the tab-switch transition: in this RN version
+    // (0.86, new architecture) it's a no-op compatibility stub that no longer
+    // tracks real touches/animations at all (createInteractionHandle() is a
+    // hardcoded no-op) — it would only add one setImmediate tick for no real
+    // benefit, so this starts immediately instead.
+    ;(async () => {
       if (ctrl.cancelled) return
-      if (result.items.length > 0) {
-        setAllMatches(applyWhatsAppPhotoRequestFlags(result.items, waPhotoFlag))
-        setAllMatchesTotal(result.totalCount)
+      const allMatchesResult = await fetchHomeAllMatches()
+      if (ctrl.cancelled) return
+      if (allMatchesResult.items.length > 0) {
+        setAllMatches(applyWhatsAppPhotoRequestFlags(allMatchesResult.items, waPhotoFlag))
+        setAllMatchesTotal(allMatchesResult.totalCount)
       }
       setAllMatchesLoaded(true)
-    })
-    fetchViewedYou().then(result => {
-      if (!ctrl.cancelled && result.items.length > 0) {
-        setViewedMe(applyWhatsAppPhotoRequestFlags(result.items, waPhotoFlag))
+
+      const notifResult = await fetchNotifCount()
+      if (ctrl.cancelled) return
+      setComCount(notifResult.comCount)
+
+      const viewedYouResult = await fetchViewedYou()
+      if (ctrl.cancelled) return
+      if (viewedYouResult.items.length > 0) {
+        setViewedMe(applyWhatsAppPhotoRequestFlags(viewedYouResult.items, waPhotoFlag))
       }
-    })
-    fetchDailyRec().then(result => {
-      if (!ctrl.cancelled && result.items.length > 0) {
+
+      const dailyRecResult = await fetchDailyRec()
+      if (ctrl.cancelled) return
+      if (dailyRecResult.items.length > 0) {
         // Full array kept in state (not sliced here) — display and the
         // "view more" card's thumbnail preview each slice it separately below.
-        setTodayMatches(applyWhatsAppPhotoRequestFlags(result.items, waPhotoFlag))
+        setTodayMatches(applyWhatsAppPhotoRequestFlags(dailyRecResult.items, waPhotoFlag))
         // Angular: explore.component.ts's setDRProfiles() — drTotalCount =
         // resultData.length, the count of items THIS call actually returned
         // (capped by the API's own LIMIT=15 param above), not a separate
@@ -1019,56 +1383,48 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         // TOTALCOUNT off the response, which on this endpoint is an unrelated
         // large number (a different total, not today's recommendation count) —
         // that's what was showing e.g. "977" instead of the real "15".
-        setTodayTotal(result.items.length)
+        setTodayTotal(dailyRecResult.items.length)
       }
-    })
-    fetchNewlyJoined().then(result => {
+
+      const newlyJoinedResult = await fetchNewlyJoined()
       if (ctrl.cancelled) return
-      if (result.items.length > 0) {
-        setNewlyJoined(applyWhatsAppPhotoRequestFlags(result.items, waPhotoFlag))
-        setNewlyJoinedTotal(result.totalCount)
+      if (newlyJoinedResult.items.length > 0) {
+        setNewlyJoined(applyWhatsAppPhotoRequestFlags(newlyJoinedResult.items, waPhotoFlag))
+        setNewlyJoinedTotal(newlyJoinedResult.totalCount)
       }
       setNewlyJoinedLoaded(true)
-    })
-    fetchViewedByMe().then(result => {
-      if (!ctrl.cancelled && result.items.length > 0) {
-        setProfilesViewed(applyWhatsAppPhotoRequestFlags(result.items, waPhotoFlag))
-      }
-    })
-    // Fetched together (rather than two independent .then()s) so the default-tab
-    // decision (Angular's "singlelikedlist" behavior) sees both real totals at
-    // once — computing it off either promise alone would race against whichever
-    // of the two resolves first.
-    Promise.all([fetchLikedByMe(), fetchLikedYou(), getItem(StorageKeys.User.LOGIN_GENDER)]).then(
-      ([likedByMeResult, likedYouResult, g]) => {
-        if (ctrl.cancelled) return
-        if (likedByMeResult.items.length > 0) {
-          setLikedByMe(applyWhatsAppPhotoRequestFlags(likedByMeResult.items, waPhotoFlag))
-        }
-        if (likedYouResult.items.length > 0) {
-          setLikedMe(applyWhatsAppPhotoRequestFlags(likedYouResult.items, waPhotoFlag))
-          setLikedMeTotal(likedYouResult.totalCount)
-        }
-        setLikedTab(computeDefaultLikedTab(g === 'M' ? 'M' : 'F', likedYouResult.totalCount, likedByMeResult.totalCount))
-      }
-    )
-    fetchSuccessStories().then(result => {
-      if (!ctrl.cancelled && result.length > 1) setStories(result)
-    })
-    fetchCustomerCare().then(result => {
-      if (!ctrl.cancelled && (result.phone || result.whatsapp)) setCustomerCare(result)
-    })
-    fetchNotifCount().then(result => {
-      if (!ctrl.cancelled) setComCount(result.comCount)
-    })
 
-    // Header/footer-critical data is ready once session+PPSET has resolved —
-    // Angular: contentLoaded gates the ENTIRE page (no header/footer) until
-    // this point; individual list sections keep their own mock-then-real /
-    // skeleton-loader treatment after that.
-    Promise.all([fetchHomeSession(), fetchAndStorePPSetData()]).finally(() => {
-      if (!ctrl.cancelled) setContentLoaded(true)
-    })
+      const viewedByMeResult = await fetchViewedByMe()
+      if (ctrl.cancelled) return
+      if (viewedByMeResult.items.length > 0) {
+        setProfilesViewed(applyWhatsAppPhotoRequestFlags(viewedByMeResult.items, waPhotoFlag))
+      }
+
+      // Fetched together (rather than two independent awaits) so the
+      // default-tab decision (Angular's "singlelikedlist" behavior) sees both
+      // real totals at once — computing it off either promise alone would
+      // race against whichever of the two resolves first.
+      const [likedByMeResult, likedYouResult, loginGender] = await Promise.all([
+        fetchLikedByMe(), fetchLikedYou(), getItem(StorageKeys.User.LOGIN_GENDER),
+      ])
+      if (ctrl.cancelled) return
+      if (likedByMeResult.items.length > 0) {
+        setLikedByMe(applyWhatsAppPhotoRequestFlags(likedByMeResult.items, waPhotoFlag))
+      }
+      if (likedYouResult.items.length > 0) {
+        setLikedMe(applyWhatsAppPhotoRequestFlags(likedYouResult.items, waPhotoFlag))
+        setLikedMeTotal(likedYouResult.totalCount)
+      }
+      setLikedTab(computeDefaultLikedTab(loginGender === 'M' ? 'M' : 'F', likedYouResult.totalCount, likedByMeResult.totalCount))
+
+      const storiesResult = await fetchSuccessStories()
+      if (ctrl.cancelled) return
+      if (storiesResult.length > 1) setStories(storiesResult)
+
+      const customerCareResult = await fetchCustomerCare()
+      if (ctrl.cancelled) return
+      if (customerCareResult.phone || customerCareResult.whatsapp) setCustomerCare(customerCareResult)
+    })()
   }, [assistDismissed, paymentFailedDismissed])
 
   // Angular: ionViewDidEnter() — re-runs every time Home regains focus (tab
@@ -1152,7 +1508,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         break
       case 'photo_promo_free_female':
       case 'paid_verified_no_photo':
-        navigation.navigate('Gallery')
+        addPhoto.openAddPhoto(navigation)
         break
       case 'non_id_verify_male':
         navigation.navigate('verify-id')
@@ -1212,7 +1568,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   function handleStickyPress() {
     if (activeSticky === 'photoPromo') {
       if (photoPromoSticky?.type === 'ADDPHOTO') {
-        navigation.navigate('Gallery')
+        addPhoto.openAddPhoto(navigation)
       } else {
         navigation.navigate('verify-id')
       }
@@ -1292,7 +1648,22 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   // own per-section fromPage argument below.
   function confirmThenWhatsApp(item: SwiperItem, fromPage: string) {
     if (!item.profileId) return
-    if (shouldSkipPhoneConfirm(item.phoneViewed ?? '', item.likedStatus ?? '0', gating.indNumbersLeft, gating.ownEntryType)) {
+    // Angular communication.service.ts's showContactDetails() FIRST check — a
+    // paid user whose mutual-like AND overall phone-view quotas are both
+    // exhausted sees the PHONENOLIMIT sheet instead of the confirm popup.
+    if (shouldShowPhoneNoLimit(item.phoneViewed ?? '', item.likedStatus ?? '0', gating.indNumbersLeft, gating.contactQuota.left, gating.ownEntryType)) {
+      phoneInfo.handleResult({ type: 'female_free', action: 'femaleFree-LimitOver', profile: item }).catch(() => {})
+      return
+    }
+    // Angular: a free member who's never viewed this profile's number goes
+    // straight to paymentPromoPopUp(), no confirm step first — see
+    // ActivityScreen.tsx's confirmThenContact for the same fix.
+    const alreadyViewed = ['1', '3'].includes(String(item.phoneViewed ?? '0'))
+    if (gating.ownEntryType !== 'P' && !alreadyViewed) {
+      handleContactConfirmYes({ item, action: 'whatsappNudge', fromPage })
+      return
+    }
+    if (shouldSkipPhoneConfirm(item.phoneViewed ?? '', item.likedStatus ?? '0', gating.indNumbersLeft, gating.ownEntryType, item.phoneProtected)) {
       handleContactConfirmYes({ item, action: 'whatsappNudge', fromPage })
     } else {
       setContactConfirm({ item, action: 'whatsappNudge', fromPage })
@@ -1357,7 +1728,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   // GenerateHoroscopeScreen.
   async function handleCompleteProfileCard(card: CompleteProfileCard) {
     switch (card.type) {
-      case 'PHOTO':       navigation.navigate('Gallery'); break
+      case 'PHOTO':       addPhoto.openAddPhoto(navigation); break
       case 'STAR_RAASI':  navigation.navigate('onboarding', { pageNo: '33', standalone: true }); break
       case 'PROPERTY':
       case 'VEHICLE':     navigation.navigate('onboarding', { pageNo: '28', standalone: true }); break
@@ -1389,6 +1760,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   // ── Desktop web layout (Figma "Jodii Desktop - Registration", 161:10324) ───
   if (isDesktop) {
     return (
+      <>
       <HomeDesktopLayout
         navigation={navigation}
         userName={userName}
@@ -1440,6 +1812,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         onCardPress={item => goToProfile(item, allMatches, 'home')}
         onTabPress={handleTabPress}
       />
+      <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
+      </>
     )
   }
 
@@ -1461,15 +1835,19 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         onToolbarItemPress={handleToolbarPress}
       />
 
-      {!contentLoaded ? (
-        // Angular: ionViewDidEnter() re-runs loadHome() on every focus, same
-        // as this screen's own useFocusEffect — but the header/footer never
-        // disappeared in Angular either. Keeping them mounted here (instead
-        // of gating the whole screen behind contentLoaded, which used to hide
-        // AppFooter too) matches MatchesScreen.tsx/ActivityScreen.tsx's own
-        // pattern of never re-blanking the footer on a refocus reload.
-        <Loader variant="spinner" fullPage />
-      ) : (
+      {/* Angular: ionViewDidEnter() re-runs loadHome() on every focus, same as
+          this screen's own useFocusEffect — header/footer never disappeared
+          in Angular either, and (deliberate deviation from Angular here) the
+          scrollable body doesn't either: Angular gates this entire body
+          behind a single contentLoaded flag (a full-page spinner until
+          session+PPSET data resolves), which meant nothing was visible or
+          scrollable for the whole first network round-trip on every focus.
+          Removed that gate — the ScrollView mounts immediately and each
+          section below fills in independently as its own fetch resolves
+          (All Matches/Newly Joined already show their own skeleton-dashboard
+          Loader via allMatchesLoaded/newlyJoinedLoaded; the rest simply
+          render once their own data/length check passes, same as Angular's
+          per-section conditionals). */}
       <ScrollView
         style={s.scroll}
         showsVerticalScrollIndicator={false}
@@ -1497,30 +1875,16 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             of its own is attached below it either — the divider that follows
             belongs to whichever next section renders (see below), not to this
             one. */}
-        <View style={s.section}>
-          {!allMatchesLoaded ? (
-            <Loader variant="skeleton-dashboard" />
-          ) : allMatches.length > 1 ? (
-            <SwiperCard
-              swiperHeader={`${t('HOME.ALLMATCH_HEADER')} (${allMatchesTotal})`}
-              cardVariant={1}
-              // Angular: core/enums/home.enum.ts — allMatches maps to the
-              // section string 'matches', NOT 'newmatches' (that's Newly
-              // Joined's section below). ProfileCard.tsx's basicDetail()
-              // specifically omits the education suffix for section==='matches'
-              // — this was wired to the wrong section, so All Matches always
-              // showed "age, education" instead of Angular's age-only line.
-              cardSection="matches"
-              items={allMatches.slice(0, 5)}
-              moreItems={moreItemsFrom(allMatches, 5)}
-              showSeeAll
-              onCardPress={item => goToProfile(item, allMatches, 'home_matches')}
-              onLikePress={likeAllMatches}
-              onSeeAllPress={() => navigation.navigate('Matches')}
-              onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_matches')}
-            />
-          ) : null}
-        </View>
+        <AllMatchesSection
+          loaded={allMatchesLoaded}
+          items={allMatches}
+          total={allMatchesTotal}
+          navigation={navigation}
+          gating={gating}
+          onCardPress={item => goToProfile(item, allMatches, 'home_matches')}
+          onLikePress={likeAllMatches}
+          onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_matches')}
+        />
 
         {/* ════════════ PROFILES WHO VIEWED ME ════════════
             Angular: profilesWhoviewedYouSection.blockbgColor = 'dot-img-bg' —
@@ -1529,43 +1893,15 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             Angular wraps this section in its own explore-border-top div — the
             divider above it is gated on THIS section's own visibility, not on
             whatever happens to render above it. */}
-        {/* Angular's *ngIf checks swiperViewedYouList.length (the viewedyou
-            listing call's own returned/displayed array, capped to 5), not a
-            separate total-count field — matching that literally instead of
-            trusting viewedMeTotal's TOTAL field to agree with it. */}
-        {viewedMe.length > 3 && (
-          <>
-            <View style={s.divider} />
-            {/* Angular: .dot-img-bg = background-image: url(who-viewed-bg-color.svg),
-                linear-gradient(#FFF1FF → #FFFFFF) — the SVG sits ON TOP of the
-                gradient. The decorative layer was a plain <Image> here, which
-                renders nothing on iOS/Android (RN's Image can't decode a remote
-                SVG — that's exactly why CdnSvgBackground exists, as the Liked
-                Profiles section below already uses). It only ever showed on web. */}
-            <LinearGradient colors={['#FFF1FF', '#FFFFFF']}>
-              <CdnSvgBackground uri={`${CDN}revamp/who-viewed-bg-color.svg`} style={s.section}>
-              <SwiperCard
-                swiperHeader={`${applyPluralToken(t, t('HOME.WHO_VIEWED_YOU_HEADER'), comTotalFor(comCount, 'viewedyou'))} (${comTotalFor(comCount, 'viewedyou')})`}
-                newCount={comCountFor(comCount, 'viewedyou')}
-                cardVariant={3}
-                cardSection="viewedyou"
-                items={viewedMe.slice(0, 5)}
-                moreItems={moreItemsFrom(viewedMe, 5)}
-                showSeeAll
-                onCardPress={item => goToProfile(item, viewedMe, 'home_viewedyou')}
-                onLikePress={likeViewedMe}
-                // Angular app-swiper.component.ts's onClickSeeAllCTA() case
-                // 'viewedyou' → router.navigate(['/activity/viewedyou'], { state:
-                // { activityType: 'viewedyou' } }) — the back-button "Who viewed
-                // your profile" drill-down, NOT the default liked-profiles tab
-                // this landed on before ActivityScreen took route params.
-                onSeeAllPress={() => navigation.navigate('Activity', { activityType: 'viewedyou' })}
-                onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_viewedyou')}
-              />
-              </CdnSvgBackground>
-            </LinearGradient>
-          </>
-        )}
+        <WhoViewedMeSection
+          items={viewedMe}
+          comCount={comCount}
+          navigation={navigation}
+          gating={gating}
+          onCardPress={item => goToProfile(item, viewedMe, 'home_viewedyou')}
+          onLikePress={likeViewedMe}
+          onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_viewedyou')}
+        />
 
         {/* ════════════ COMPLETE YOUR PROFILE ════════════ */}
         {completeCards.length > 0 && (
@@ -1586,28 +1922,15 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             Newly Joined (>1), this section's threshold is just >0. Missing
             this gate left a stray empty section + divider gap when there's no
             daily-rec data. */}
-        {todayMatches.length > 0 && (
-          <>
-            <View style={s.divider} />
-            <View style={s.section}>
-              {/* Angular: home.config.ts's drmatches is the only swiper config
-                  with coverflowEffect — a centered, tilted-neighbor carousel,
-                  not the flat scroll every other section uses. */}
-              <CoverflowSwiper
-                swiperHeader={`${t('DAILYRECOMMENDATIONS.DAILY_RECOMMENDATIONS')} (${todayTotal})`}
-                items={todayMatches.slice(0, 4)}
-                moreItems={moreItemsFrom(todayMatches, 4)}
-                onCardPress={item => goToProfile(item, todayMatches, 'home_dailyrec')}
-                onLikePress={likeTodayMatches}
-                // Angular: onClickSeeAllCTA() case 'dailyrecommendations' →
-                // router.navigate(['dailyrecommendations'], { queryParams:
-                // { frm_page } }) — the swipe-card DR screen, not the Matches list.
-                onSeeAllPress={() => navigation.navigate('daily-recommendations', { frm_page: 'home' })}
-                onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_dailyrec')}
-              />
-            </View>
-          </>
-        )}
+        <TodayMatchesSection
+          items={todayMatches}
+          total={todayTotal}
+          navigation={navigation}
+          gating={gating}
+          onCardPress={item => goToProfile(item, todayMatches, 'home_dailyrec')}
+          onLikePress={likeTodayMatches}
+          onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_dailyrec')}
+        />
 
         {/* ════════════ NEWLY JOINED ════════════
             Angular: newlyJoinedSection.blockbgColor = 'pink-bg-block' —
@@ -1616,73 +1939,30 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             sits on plain white BEFORE the *ngIf="nmContLoaded && swiperNewlyMatchContents?.length > 1"
             wrapper — the pink background + divider only exist once there's
             real data, not as an empty band while loading or when empty. */}
-        {!newlyJoinedLoaded ? (
-          <View style={s.section}>
-            <Loader variant="skeleton-dashboard" />
-          </View>
-        ) : newlyJoined.length > 1 ? (
-          <>
-            <View style={s.divider} />
-            <LinearGradient colors={['#FCEBFF', '#FFFFFF']} style={s.section}>
-              <SwiperCard
-                // toListingResult() falls back to 0 when the response carries no
-                // TOTAL — see headerWithCount() for Angular's setHeader() rule.
-                swiperHeader={headerWithCount(t('HOME.NEWLY_JOINED_HEADER'), newlyJoinedTotal)}
-                cardVariant={1}
-                cardSection="newmatches"
-                items={newlyJoined.slice(0, 4)}
-                moreItems={moreItemsFrom(newlyJoined, 4)}
-                showSeeAll
-                onCardPress={item => goToProfile(item, newlyJoined, 'home_newmatches')}
-                onLikePress={likeNewlyJoined}
-                // Angular: onClickSeeAllCTA() case 'newmatches' → NEWMATCHESLANDING='1'
-                // then router.navigate(['/matches/bynewlyjoined']) — the Matches list
-                // filtered to newly joined, NOT the plain list. matches.page.ts's
-                // urlExploreObj maps the route name 'bynewlyjoined' to FILTERTYPE
-                // 'NEYLYJOINED' (backend typo, preserved) before it reaches the API,
-                // so the mapped value is what this passes — same as HelpCenterScreen.tsx
-                // and pageLandingService.ts's case "13". Navigating to a bare 'Matches'
-                // dropped the filter and landed the user on all matches.
-                onSeeAllPress={() => navigation.navigate('Matches', {
-                  exploreType: 'NEYLYJOINED',
-                  exploreLabel: t('HOME.NEWLY_JOINED_HEADER'),
-                })}
-                onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_newmatches')}
-              />
-            </LinearGradient>
-          </>
-        ) : null}
+        <NewlyJoinedSection
+          loaded={newlyJoinedLoaded}
+          items={newlyJoined}
+          total={newlyJoinedTotal}
+          navigation={navigation}
+          gating={gating}
+          onCardPress={item => goToProfile(item, newlyJoined, 'home_newmatches')}
+          onLikePress={likeNewlyJoined}
+          onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_newmatches')}
+        />
 
         {/* ════════════ PROFILES YOU VIEWED ════════════
             Angular wraps this in its own explore-border-top div too — the
             divider above it is gated on profilesViewed's own length, not on
             Newly Joined's or Liked Profiles' visibility. */}
-        {profilesViewed.length > 0 && (
-          <>
-            <View style={s.divider} />
-            <View style={s.section}>
-              <SwiperCard
-                // Angular: home.enum.ts's sectionTitle.viewedbyme = 'GENERAL.VIEWEDBYME'
-                // ("Profiles you viewed"), the exact key this section's live
-                // template binds swiperHeader to.
-                swiperHeader={headerWithCount(t('GENERAL.VIEWEDBYME'), comTotalFor(comCount, 'viewedbyme'))}
-                newCount={comCountFor(comCount, 'viewedbyme')}
-                cardVariant={3}
-                cardSection="viewedbyme"
-                items={profilesViewed.slice(0, 5)}
-                moreItems={moreItemsFrom(profilesViewed, 5)}
-                showSeeAll
-                onCardPress={item => goToProfile(item, profilesViewed, 'home_viewedbyme')}
-                onLikePress={likeProfilesViewed}
-                // Angular: onClickSeeAllCTA() case 'viewedbyme' → /activity/viewedbyme
-                // with state { activityType: 'viewedbyme', selectedSubTab: 'viewedbyme' }
-                // — the two-sub-tab ("Profiles you viewed" / "View later") list.
-                onSeeAllPress={() => navigation.navigate('Activity', { activityType: 'viewedbyme', selectedSubTab: 'viewedbyme' })}
-                onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_viewedbyme')}
-              />
-            </View>
-          </>
-        )}
+        <ProfilesViewedSection
+          items={profilesViewed}
+          comCount={comCount}
+          navigation={navigation}
+          gating={gating}
+          onCardPress={item => goToProfile(item, profilesViewed, 'home_viewedbyme')}
+          onLikePress={likeProfilesViewed}
+          onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_viewedbyme')}
+        />
 
         {/* ════════════ LIKED PROFILES ════════════
             Angular: enums.likedprofile.blockbgColor = 'liked-profile-bg' — a
@@ -1696,10 +1976,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             agree with these listing calls' own item counts. */}
         {/* anchor="top-left": Angular's .liked-profile-bg sets background-size:cover
             with NO background-position, so CSS anchors it top-left. Native was
-            centering the cover crop, which cut the artwork's top edge off. */}
+            centering the cover crop, which cut the artwork's top edge off.
+            Bundled locally as a raster — see LIKED_PROFILES_BG above. */}
         {(likedByMe.length > 0 || likedMe.length > 0) && (
-          <CdnSvgBackground uri={`${CDN}liked-profiles-bg.svg`} anchor="top-left" style={s.likedSection}>
+          <LocalCoverBackground source={LIKED_PROFILES_BG} aspectRatio={LIKED_PROFILES_BG_RATIO} anchor="top-left" style={s.likedSection}>
             <LikedProfilesSection
+              gating={gating}
               likedTab={likedTab}
               onTabChange={setLikedTab}
               // Angular: onClickSeeAllCTA() case 'likedprofile' → /activity/likedyou
@@ -1718,7 +2000,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               onLikePress={likedTab === 'likedbyme' ? likeLikedByMe : likeLikedMe}
               onWhatsAppPress={item => confirmThenWhatsApp(item, 'home_liked')}
             />
-          </CdnSvgBackground>
+          </LocalCoverBackground>
         )}
 
         {/* ════════════ EXPLORE CATEGORIES ════════════ */}
@@ -1789,7 +2071,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
         <View style={{ height: 16 }} />
       </ScrollView>
-      )}
 
       {/* Angular: force-update's own *ngIf has no scroll-gating at all
           (contentLoaded && SHOWFLAG=='1' only) — independent of, and able to
@@ -1883,7 +2164,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         data={phoneInfo.getData(t)}
         onClose={phoneInfo.close}
         onPrimaryPress={() => phoneInfo.primaryPress(navigation)}
-        onSecondaryPress={() => phoneInfo.secondaryPress(navigation)}
+        onSecondaryPress={() => phoneInfo.secondaryPress(addPhoto.openAddPhoto, navigation)}
         onLinkPress={phoneInfo.close}
       />
 
@@ -1894,6 +2175,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         showMembershipDot={showMembershipDot}
         onTabPress={handleTabPress}
       />
+      <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
 
     </View>
   )

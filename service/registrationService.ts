@@ -1392,7 +1392,12 @@ export async function fetchStates(): Promise<Array<{ key: string; label: string 
     }
   }
 
-  return items.sort((a, b) => a.label.localeCompare(b.label))
+  // NOTE: no alphabetical sort here — Angular's loadStateList() (common.ts)
+  // stores the server response verbatim. The server's
+  // type=MOTHERTONGUE&MOTHERTONGUE=<key> response already returns the
+  // relevant state first (e.g. Bihar for Angika, Tamil Nadu for Tamil), and
+  // a .sort() here was clobbering that ordering (QA #39, #55).
+  return items
 }
 
 // Country list for NRI flow — Angular caches this as COUNTRYLIST inside the shared

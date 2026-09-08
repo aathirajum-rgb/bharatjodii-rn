@@ -144,9 +144,17 @@ type Props     = { navigation: any; route: { params?: { pageNo?: string } } }
 // linear-gradient(90deg, rgba(181,0,51,0) -13.43%, rgba(255,255,255,0.2) 50.2%).
 // Built as an outer gradient "border" layer with an inner gradient fill inset
 // by 1px on top/left/bottom (flush on the right, matching the 0px right border).
-const AGE_BADGE_BORDER_COLORS = ['rgba(181,0,51,0.1)', '#FFFFFF'] as const
-const AGE_BADGE_FILL_COLORS   = ['rgba(181,0,51,0.08)', 'rgba(255,255,255,0.2)'] as const
-const AGE_BADGE_LOCATIONS     = [0, 1] as const
+const AGE_BADGE_BORDER_COLORS    = ['rgba(181,0,51,0.1)', '#FFFFFF'] as const
+const AGE_BADGE_BORDER_LOCATIONS = [0, 1] as const
+// Figma's fill stops are rgba(181,0,51,0) at -13.43% and rgba(255,255,255,0.2)
+// at 50.2%. RN's LinearGradient can't take a negative/out-of-range location, so
+// the start is pinned to 0 with the real start alpha (0, not 0.08 — the old
+// value here didn't match the Figma spec at all), and the second stop is moved
+// from 1 to ~0.5 so the gradient still reaches full effect around the visual
+// midpoint of the badge, same as the documented 50.2% stop, instead of only at
+// the far right edge.
+const AGE_BADGE_FILL_COLORS      = ['rgba(181,0,51,0)', 'rgba(255,255,255,0.2)'] as const
+const AGE_BADGE_FILL_LOCATIONS   = [0, 0.5] as const
 
 function AgeBadge({ children }: { children: React.ReactNode }) {
   if (Platform.OS === 'web') {
@@ -171,14 +179,14 @@ function AgeBadge({ children }: { children: React.ReactNode }) {
   return (
     <LinearGradient
       colors={AGE_BADGE_BORDER_COLORS}
-      locations={AGE_BADGE_LOCATIONS}
+      locations={AGE_BADGE_BORDER_LOCATIONS}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 0 }}
       style={styles.ageBadgeBorder}
     >
       <LinearGradient
         colors={AGE_BADGE_FILL_COLORS}
-        locations={AGE_BADGE_LOCATIONS}
+        locations={AGE_BADGE_FILL_LOCATIONS}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={styles.ageBadge}
@@ -203,6 +211,11 @@ export default function DOBScreen({ navigation }: Props) {
   const [selDate,  setSelDate]  = useState('')
   const [selMonth, setSelMonth] = useState('')
   const [selYear,  setSelYear]  = useState('')
+  // Restored from a stored AGE registration value (see the Init effect below)
+  // when the user previously entered their age via the "enter age" sheet
+  // (handleAgeSubmit) instead of the DOB dropdowns, so the age badge re-populates
+  // instead of staying blank when navigating back to this screen.
+  const [directAge, setDirectAge] = useState<number | null>(null)
 
   const [months, setMonths] = useState(MONTH_FALLBACK)
   // API-sourced DATE/YEARS lists — null until fetched, so getOptions() can
@@ -292,7 +305,8 @@ export default function DOBScreen({ navigation }: Props) {
       getRegValue('CREATEDBY'),
       getRegValue('DATEOFBIRTH'),
       getRegValue('GENDER'),
-    ]).then(([cb, dob, g]) => {
+      getRegValue('AGE'),
+    ]).then(([cb, dob, g, age]) => {
       if (cb) setCreatedBy(cb)
       if (dob && dob !== '0000-00-00') {
         const p = dob.split('-')
@@ -301,6 +315,11 @@ export default function DOBScreen({ navigation }: Props) {
           setSelMonth(String(Number(p[1])))
           setSelDate(String(Number(p[2])))
         }
+      } else if (age) {
+        // No DOB stored, but an age was entered directly via the "enter age"
+        // sheet (handleAgeSubmit) — restore it so the age badge shows instead
+        // of a blank state.
+        setDirectAge(Number(age))
       }
       if (g) setGender(g)
     })
@@ -385,7 +404,11 @@ export default function DOBScreen({ navigation }: Props) {
 
   const selMonthLabel    = months.find(m => m.key === selMonth)?.label ?? ''
   const isAllSelected    = !!(selDate && selMonth && selYear)
-  const calculatedAge    = isAllSelected ? calculateAge(selYear, selMonth, selDate) : null
+  // Falls back to a directly-entered age (see directAge/Init effect above) when
+  // the DOB dropdowns aren't filled, so the badge/OR-block below still reflect
+  // an age entered via the "enter age" sheet on a previous visit.
+  const hasAgeInfo       = isAllSelected || directAge !== null
+  const calculatedAge    = isAllSelected ? calculateAge(selYear, selMonth, selDate) : directAge
 
   // Angular: registration-revamp.component.ts's setMinMaxAge() —
   // GENDER=='0' (female) → minAge 18, everything else (male/other) → 21.
@@ -671,7 +694,7 @@ export default function DOBScreen({ navigation }: Props) {
             the fill. Both gradients are near-transparent by design, so the fill layer
             sits on an opaque white base — without it the badge has no background at
             all and reads as a dark rectangle against the page. */}
-        {isAllSelected && calculatedAge !== null && calculatedAge > 0 && (
+        {hasAgeInfo && calculatedAge !== null && calculatedAge > 0 && (
           <AgeBadge>
             <Text style={[styles.ageBadgeText, { fontFamily: langFonts.regular }]}>{ageStatementBefore}
               <Text style={[styles.ageBadgeYears, { fontFamily: langFonts.semiBold }]}>{ageStatementYears}</Text>
@@ -680,8 +703,9 @@ export default function DOBScreen({ navigation }: Props) {
           </AgeBadge>
         )}
 
-        {/* OR divider + "Please enter age" — hidden once all 3 date fields are filled */}
-        {!isAllSelected && (
+        {/* OR divider + "Please enter age" — hidden once all 3 date fields are filled,
+            or once an age has been restored from a previous direct-entry visit */}
+        {!hasAgeInfo && (
           <>
             <View style={styles.orRow}>
               <Image source={{ uri: CDN_OR_LEFT }} style={styles.orLine} contentFit="contain" />
@@ -774,7 +798,7 @@ export default function DOBScreen({ navigation }: Props) {
         <Animated.View
           style={[
             StyleSheet.absoluteFill,
-            { backgroundColor: Colors.black, opacity: ageScrimAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 1] }) },
+            { backgroundColor: Colors.scrimStrong, opacity: ageScrimAnim },
           ]}
           pointerEvents="none"
         />
@@ -829,7 +853,7 @@ export default function DOBScreen({ navigation }: Props) {
 
           <View style={styles.ageConfirmBtn}>
             <ButtonRevamp
-              label="Confirm"
+              label={t('REGISTRATION.NEXTCTA', 'Next')}
               variant="primary"
               size="standard"
               fullWidth

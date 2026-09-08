@@ -23,6 +23,16 @@ import { useLanguageFonts } from '../hooks/useLanguageFonts'
 // by DOBScreen.tsx's "Please enter age" link, reused here for every screen's
 // footer link button instead of pulling in a GIF/Lottie player dependency.
 const CDN_FORWARD_ICON = CDN_SVG + 'revamp/forward-icon-link.svg'
+// "I'll do this later" skip CTA — de-emphasized action, so the grey forward
+// icon (same asset ButtonRevamp.tsx's 'forward-icon-grey' variant uses),
+// not the link-colored CDN_FORWARD_ICON above.
+const CDN_FORWARD_ICON_GREY = CDN_SVG + 'revamp/forward-icon-grey.svg'
+// Gallery screen's header-left. Not AppHeader.tsx's own closeIcon asset
+// (revamp/close-icon.svg) — that one is a dark #545454 stroke meant for a
+// white header background; Gallery's native-stack header is dark (#111,
+// see headerStyle below), so it needs the white variant ProfilePhoto.tsx
+// already uses for the same dark-background reason (its `closeWhite` icon).
+const CDN_CLOSE_ICON = CDN_SVG + 'revamp/close-white.svg'
 import ComponentShowcaseScreen    from '../screens/dev/ComponentShowcaseScreen'
 import HomeScreen                  from '../screens/home/HomeScreen'
 import GalleryScreen               from '../screens/GalleryScreen'
@@ -529,7 +539,7 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
               <Text style={[shell.skipText, { fontFamily: langFonts.medium }]}>
                 {footerState.skipLabel ?? t('REG.DO_LATER', "I'll do this later")}
               </Text>
-              <Text style={shell.skipArrow}> ›</Text>
+              <CdnSvg uri={CDN_FORWARD_ICON_GREY} width={10} height={10} style={shell.skipIcon} />
             </Pressable>
           )}
 
@@ -594,10 +604,8 @@ const shell = StyleSheet.create({
     fontWeight: '500',
     color:      Colors.textMedium,
   },
-  skipArrow: {
-    fontSize:   18,
-    color:      Colors.textMedium,
-    lineHeight: 22,
+  skipIcon: {
+    marginLeft: 4,
   },
   divider: {
     height:          StyleSheet.hairlineWidth,
@@ -669,7 +677,24 @@ export default function AppStack() {
       <Stack.Screen
         name="Gallery"
         component={GalleryScreen}
-        options={{ headerShown: true, title: 'Gallery', headerStyle: { backgroundColor: '#111' }, headerTintColor: Colors.white }}
+        options={({ navigation }) => ({
+          headerShown: true,
+          title: 'Gallery',
+          headerStyle: { backgroundColor: '#111' },
+          headerTintColor: Colors.white,
+          // QA #52: this screen is a cancel-out-of picker, not a drill-down —
+          // it should show a close "X", not the default back-chevron.
+          // native-stack's own headerLeft props don't include an onPress
+          // (unlike the classic JS stack navigator) — the default back
+          // button's tap handling is native, so a custom headerLeft has to
+          // supply its own via the closed-over `navigation` prop, same
+          // target (goBack()) the chevron would have used.
+          headerLeft: () => (
+            <Pressable onPress={() => navigation.goBack()} hitSlop={12} style={{ paddingHorizontal: 4 }}>
+              <CdnSvg uri={CDN_CLOSE_ICON} width={18} height={16} />
+            </Pressable>
+          ),
+        })}
       />
       <Stack.Screen
         name="recharge"
@@ -735,7 +760,7 @@ export default function AppStack() {
           LanguageSelectionScreen already self-dismisses via the centralized
           handleBack() once canGoBack() is true, so onSelect here is just the
           (unreachable) fallback. */}
-      <Stack.Screen name="LanguageSelection" options={{ presentation: 'modal', animation: 'slide_from_bottom' }}>
+      <Stack.Screen name="LanguageSelection" options={{ presentation: 'modal', animation: 'slide_from_right' }}>
         {({ navigation }) => (
           <LanguageSelectionScreen navigation={navigation} onSelect={() => centralizedHandleBack()} presentedAsModal />
         )}

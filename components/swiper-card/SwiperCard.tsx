@@ -102,6 +102,7 @@ export interface SwiperItem {
   // types/interfaces/matches.interface.ts's MatchProfile.likedStatus.
   likedStatus?: '0' | '1' | '2' | '3' | '5' | undefined
   phoneViewed?: string | undefined   // raw '0'|'1'|'2'|'3' — drives after-like CTA label
+  phoneProtected?: string | undefined   // raw PHONEPROTECTED — '0' = not protected
 
   // Angular: FUNC.disableDontShow()/disableViewLater() — '1'/'3' = action already taken
   dontShowStatus?:  string | undefined   // raw STATUS
@@ -439,16 +440,28 @@ export default function SwiperCard({
         }
       />
 
-      {/* ── Dots + "See all" row, below the card list ── */}
-      {(items.length > 1 || (linkVisible && !!onSeeAllPress)) && (
-        <View style={styles.bottomRow}>
+      {/* ── Pagination dots, below the card list, centered on their own row ──
+          Angular positions these absolutely (`.explore-pagination
+          .swiper-pagination { bottom: -25px }` in global.scss), independent
+          of the "See all" link below — they were previously forced into one
+          `space-between` row together, which let the link's width push the
+          dots off-center instead of centering them in their own right. */}
+      {items.length > 1 && (
+        <View style={styles.dotsWrapper}>
           <PaginationDots total={items.length} activeIndex={activeIndex} />
-          {linkVisible && !!onSeeAllPress && (
-            <Pressable onPress={onSeeAllPress} style={styles.seeAllBtn}>
-              <Text style={styles.seeAllText}>{t('HOME.SEE_ALL_CTA')}</Text>
-              <CdnSvg uri={FWD_ICON} width={12} height={12} />
-            </Pressable>
-          )}
+        </View>
+      )}
+
+      {/* ── "See all" link, its own row below the dots, right-aligned ──
+          Angular: app-swiper.component.html's CTA row is a sibling `d-flex
+          ion-justify-content-end` row below the pagination, not sharing a row
+          with it. */}
+      {linkVisible && !!onSeeAllPress && (
+        <View style={styles.seeAllRow}>
+          <Pressable onPress={onSeeAllPress} style={styles.seeAllBtn}>
+            <Text style={styles.seeAllText}>{t('HOME.SEE_ALL_CTA')}</Text>
+            <CdnSvg uri={FWD_ICON} width={12} height={12} />
+          </Pressable>
         </View>
       )}
     </View>
@@ -507,7 +520,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems:    'center',
     gap:           4,
-    paddingLeft:   12,
   },
   seeAllText: {
     fontSize:   13,
@@ -538,16 +550,15 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
 
-  // ── Bottom row: pagination dots (left) + "See all" link (right) ──────────
+  // ── Pagination dots row, centered, separate from the "See all" row ───────
   // Angular: swiper box has class="explore-pagination pb-16" (16px bottom
-  // padding) before the dots/CTA row starts — the dots themselves are
-  // absolutely offset -25px past that via Swiper.js's own pagination CSS
-  // (no clean RN equivalent), but the resulting card-to-row gap is that 16px.
-  bottomRow: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    justifyContent:    'space-between',
-    paddingHorizontal: CARD_PAD,
+  // padding) before the dots start — the dots themselves are absolutely
+  // offset -25px past that via Swiper.js's own pagination CSS (no clean RN
+  // equivalent), but the resulting card-to-row gap is that 16px. Centered
+  // (not space-between'd against the "See all" link, which lives in its own
+  // row below) to match Angular's independent absolute centering.
+  dotsWrapper: {
+    alignItems: 'center',
     // The 16px card→dots gap now comes from listContent's paddingBottom, which
     // has to live INSIDE the scroll view so the card shadow isn't clipped.
   },
@@ -555,6 +566,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems:    'center',
     gap:           4,
+  },
+  // ── "See all" row, right-aligned, below the dots ──────────────────────────
+  // Angular: app-swiper.component.html's CTA row — `d-flex
+  // ion-justify-content-end` — is a separate sibling row beneath the
+  // pagination, independently right-justified rather than sharing the dots'
+  // row.
+  seeAllRow: {
+    flexDirection:     'row',
+    justifyContent:    'flex-end',
+    paddingHorizontal: CARD_PAD,
+    marginTop:         8,
   },
   // Angular global.scss: .explore-pagination .swiper-pagination-bullet —
   // 5x5 circle, #F4CECE.
