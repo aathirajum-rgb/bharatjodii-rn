@@ -308,12 +308,13 @@ export default function CasteScreen({ navigation }: Props) {
                 />
               ) : hasSubcaste ? (
                 <View style={[styles.fieldWrapper, styles.fieldWrapperGap]}>
-                  <View style={styles.fieldLabelBadge}>
-                    <Text style={[styles.fieldLabelText, { fontFamily: langFonts.regular }]}>
-                      {subcasteLabelText}{' '}
-                      <Text style={styles.fieldLabelOptional}>(Optional)</Text>
-                    </Text>
-                  </View>
+                  {!!selectedSubcaste && (
+                    <View style={styles.fieldLabelBadge}>
+                      <Text style={[styles.fieldLabelText, { fontFamily: langFonts.regular }]}>
+                        {subcasteLabelText}
+                      </Text>
+                    </View>
+                  )}
                   <Pressable
                     style={styles.selectField}
                     onPress={() => setActivePanel('subcaste')}
@@ -396,13 +397,6 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color:      Colors.textPrimary,
   },
-  // Figma: "(Optional)" suffix is a distinct lighter gray, not Colors.textSecondary
-  fieldLabelOptional: {
-    fontSize:   12,
-    fontWeight: '400',
-    color:      'rgba(0,0,0,0.4)',
-  },
-
   selectField: {
     flexDirection:   'row',
     alignItems:      'center',

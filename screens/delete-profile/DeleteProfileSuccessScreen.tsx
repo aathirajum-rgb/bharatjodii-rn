@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import { clearSession } from '../../service/apiClient'
+import { setItem } from '../../service/storageService'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileSuccessDesktopLayout from './DeleteProfileSuccessDesktopLayout'
 
@@ -47,6 +48,11 @@ export default function DeleteProfileSuccessScreen({ route }: Props) {
     ]).start()
 
     const timer = setTimeout(() => {
+      // Flag consumed by AuthStack's Splash screen — post-delete, the user
+      // already has a language picked, so skip re-showing LanguageSelection
+      // and land straight on the mobile-number/login screen. Scoped to this
+      // one flow only (not e.g. plain logout) — see AuthStack.tsx.
+      setItem('POST_DELETE_SKIP_LANGUAGE', '1')
       clearSession()
     }, 2500)
 

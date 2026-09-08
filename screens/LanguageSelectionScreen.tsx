@@ -173,12 +173,13 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
 
       {/* First-run onboarding has nothing to go back to and no reason to show
           the (redundant) change-language header — only render it for the
-          mid-app modal switch, where the close icon is the only way to dismiss. */}
+          mid-app modal switch. Slides in right-to-left like a regular pushed
+          screen (not a bottom sheet), so it dismisses via the standard
+          back chevron/gesture, not a close icon. */}
       {presentedAsModal && (
         <AppHeader
           type="registration"
           showBackBtn={navigation?.canGoBack() ?? false}
-          closeIcon
           onBackPress={() => handleBack()}
         />
       )}
@@ -213,10 +214,16 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
                 accessibilityLabel={`${lang.native} ${lang.english}`}
               >
                 <View style={styles.cardText}>
+                  {/* Rendered invisible (rather than in the default system
+                      font) until scriptFontsReady — otherwise this briefly
+                      paints in the wrong font, then visibly swaps to the
+                      correct Noto Sans script font a moment after mount. */}
                   <Text
                     style={[
                       styles.nativeName,
-                      scriptFontsReady && { fontFamily: FontsByLanguage[lang.id]?.semiBold },
+                      scriptFontsReady
+                        ? { fontFamily: FontsByLanguage[lang.id]?.semiBold }
+                        : styles.nativeNameHidden,
                     ]}
                     numberOfLines={1}
                   >
@@ -322,8 +329,15 @@ const styles = StyleSheet.create({
   nativeName: {
     fontFamily: FontsByLanguage.en.semiBold,
     fontSize:   FontSizes.font18,
-  
+
     color:      Colors.textPrimary,
+  },
+  // Keeps the card's layout/height stable while the native-script text is
+  // hidden pre-scriptFontsReady (see the `nativeName` Text above) instead of
+  // conditionally omitting the text node, which would shift the English name
+  // and radio button during the brief loading window.
+  nativeNameHidden: {
+    opacity: 0,
   },
   englishName: {
     fontFamily: FontsByLanguage.en.regular,

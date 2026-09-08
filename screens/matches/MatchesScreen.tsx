@@ -37,7 +37,6 @@ import {
 } from '../../components/matches/matchesCard.shared'
 import MatchesDesktopLayout from './MatchesDesktopLayout'
 import LanguagePillSheet from '../../components/language-pill/LanguagePillSheet'
-import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import MembershipBanner from '../../components/matches/MembershipBanner'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
@@ -63,12 +62,16 @@ import {
   communicationBtnOnClick,
   fetchContactDetails,
   shouldSkipPhoneConfirm,
+  shouldShowPhoneNoLimit,
   getContactConfirmContent as getSharedContactConfirmContent,
 } from '../../service/communicationService'
 import { fetchBulkLikeMatches, getPPSetData } from '../../service/profileService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import { setFilterEventType, buildSearchParams } from '../../service/filterService'
-import { getHeroBannerDetails, openMembershipTab } from '../../service/paymentService'
+import {
+  getHeroBannerDetails, openMembershipTab, fetchUpgradePaymentPromo, redirectToIntermediatePage,
+  type UpgradePaymentPromo,
+} from '../../service/paymentService'
 import { shouldShowRatingPopup, markRatingPopupShown } from '../../service/appRatingService'
 import { requestPushNotificationPermission } from '../../service/permissionService'
 import { fetchSurveyPopup, type SurveyPopupData } from '../../service/surveyService'
@@ -79,6 +82,8 @@ import { subscribeIdVerified } from '../../service/eventBus'
 import { getItem, setItem, getJson, removeItem } from '../../service/storageService'
 import { enablePaywall } from '../../service/payWallService'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
+import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
+import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
 import { StorageKeys } from '../../constants/storage.keys'
 import Constants from 'expo-constants'
@@ -1013,8 +1018,13 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   // ── Live footer like-count badge ────────────────────────────────────────────
   const [likesCount, setLikesCount] = useState(0)
 
-  // ── WhatsApp "pay now" paywall modal (free/non-paid user tapped WhatsApp) ──
-  const [whatsappPaywallProfile, setWhatsappPaywallProfile] = useState<MatchProfile | null>(null)
+  // Angular: paymentPromoPopUp() → bottom-sheet.component's `paymentPromo` block —
+  // the real upgrade sheet shown for Call/WhatsApp/Message when the viewer is a
+  // free (entryType 'F') member. Previously WhatsApp used a bespoke "pay now"
+  // modal borrowed from Angular's unrelated whatsappNudge (photo-hidden) copy,
+  // and Call/Message just navigated to `recharge` with no popup at all — neither
+  // matches Angular, which shows this same sheet for all three actions.
+  const [paymentPromo, setPaymentPromo] = useState<UpgradePaymentPromo | null>(null)
 
   // ── Contact-reveal flow (Angular button.component.ts's two-step confirm →
   // phoneviewed API → Contact Details sheet) — previously this port skipped
@@ -1076,6 +1086,17 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   // Hero banner header (ListHeaderComponent) — extends the existing photo-promo
   // banner to Angular's other two variants. 'target' picks the onPress destination.
   const [heroBannerTarget, setHeroBannerTarget] = useState<'Gallery' | 'verifyid'>('Gallery')
+
+  // Web/PWA "Add photo" CTAs — see hooks/useAddPhotoPicker.ts for why this can't
+  // just navigate to the native-only 'Gallery' screen. onUploaded refreshes the
+  // PROFILEPUBLISHEDFLAG-driven banners/gates the same way a language change
+  // does (loadMatches is a hoisted function declaration, defined below — fine to
+  // reference here since this callback only runs after a full render completes).
+  const addPhoto = useAddPhotoPicker({
+    onUploaded: () => loadMatches({ cancelled: false, notifTimer: undefined }, false),
+    onRejected: showToast,
+    onError: () => showToast('Upload failed. Please try again.'),
+  })
 
   // ── Header hide-on-scroll ────────────────────────────────────────────────────
   // Angular: offsetHt = this.header?.el?.offsetHeight where #header = the TITLE ion-row only.
@@ -1695,8 +1716,38 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   // condition is met (already viewed this profile before, or mutual-like+paid+
   // quota-left) — it's not unconditional. A previous version of this port
   // always showed the confirm step regardless.
+  //
+  // Angular communication.service.ts's showCallAndWhatsAppPromo(): the "view
+  // phone number?" CONFIRM popup lives INSIDE showContactDetails(), which is
+  // only reached at all once entryType=='P', this profile's number was already
+  // viewed, or the female-free promo applies — a free member who's never viewed
+  // this profile goes straight to paymentPromoPopUp(), no confirm step first.
+  // A previous version of this port ran shouldSkipPhoneConfirm() unconditionally
+  // here, so a free member who'd never viewed this profile saw a spurious "Would
+  // you like to continue?" sheet before landing on the paywall anyway — a sheet
+  // Angular never shows in that state. handleContactConfirmYes() is called
+  // directly (not showPaymentPromo()) so the service still owns the decision —
+  // its female-free branches (photo pending / call verification / limit over)
+  // must keep winning over the paywall for a free female member who qualifies.
+  // Angular communication.service.ts's showContactDetails() FIRST check — a
+  // paid user whose mutual-like AND overall phone-view quotas are both
+  // exhausted sees the PHONENOLIMIT sheet instead of the confirm popup.
+  function checkPhoneNoLimit(profile: MatchProfile): boolean {
+    if (shouldShowPhoneNoLimit(profile.phoneViewed, profile.likedStatus, indNumbersLeft, contactQuota.left, ownEntryType)) {
+      setPhoneInfoSheet({ kind: 'female_free_limit_over' })
+      return true
+    }
+    return false
+  }
+
   function handleCall(profile: MatchProfile) {
-    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType)) {
+    if (checkPhoneNoLimit(profile)) return
+    const alreadyViewed = ['1', '3'].includes(String(profile.phoneViewed ?? '0'))
+    if (ownEntryType !== 'P' && !alreadyViewed) {
+      handleContactConfirmYes({ profile, action: 'call' })
+      return
+    }
+    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType, profile.phoneProtected)) {
       handleContactConfirmYes({ profile, action: 'call' })
     } else {
       setContactConfirm({ profile, action: 'call' })
@@ -1704,7 +1755,13 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
   }
 
   function handleWhatsApp(profile: MatchProfile) {
-    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType)) {
+    if (checkPhoneNoLimit(profile)) return
+    const alreadyViewed = ['1', '3'].includes(String(profile.phoneViewed ?? '0'))
+    if (ownEntryType !== 'P' && !alreadyViewed) {
+      handleContactConfirmYes({ profile, action: 'whatsapp' })
+      return
+    }
+    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType, profile.phoneProtected)) {
       handleContactConfirmYes({ profile, action: 'whatsapp' })
     } else {
       setContactConfirm({ profile, action: 'whatsapp' })
@@ -1719,7 +1776,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     try {
       const result = await communicationBtnOnClick('matches', 'jodimessages', { MATRIID: profile.profileId })
       if (result.type === 'payment_promo') {
-        navigation.navigate('recharge')
+        await showPaymentPromo(profile, false)
       } else if (result.type === 'verify_id') {
         // photoUpload=true (verified male, no photo yet) reads a DIFFERENT
         // registration-array config than the plain not-yet-verified case —
@@ -1895,7 +1952,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     const kind = phoneInfoSheet?.kind
     setPhoneInfoSheet(null)
     if (kind === 'female_free_photo_add' || kind === 'female_free_photo_fail') {
-      navigation.navigate('Gallery')
+      addPhoto.openAddPhoto(navigation)
     }
     // "Call now" (female_free_call_verification) would dial app support in
     // Angular — no confirmed support number source exists in this port yet,
@@ -1941,13 +1998,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           }))
         }
       } else if (result.type === 'payment_promo') {
-        if (action === 'whatsapp') {
-          // Confirmation modal first (Figma "Jodii Desktop" node 867:12515) — "Pay now"
-          // inside it is what actually navigates to recharge, not this tap.
-          setWhatsappPaywallProfile(profile)
-        } else {
-          navigation.navigate('recharge')
-        }
+        await showPaymentPromo(profile, action === 'whatsapp')
       } else if (result.type === 'phone_protected') {
         setPhoneInfoSheet({ kind: 'phone_protected' })
       } else if (result.type === 'under_validation') {
@@ -2021,9 +2072,32 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     if (num) Linking.openURL(`https://wa.me/${num}`)
   }
 
-  function handleWhatsappPaywallPayNow() {
-    setWhatsappPaywallProfile(null)
-    navigation.navigate('recharge')
+  // Angular: button.component.ts's paymentPromoPopUp() — every paywalled action
+  // (Call, WhatsApp, Message) lands here. A FREE member (ENTRYTYPE 'F') gets the
+  // `paymentPromo` bottom sheet built from payment/nbcustomer/v1's content;
+  // anyone else falls through to the payment page as before.
+  async function showPaymentPromo(profile: MatchProfile, _isWhatsApp: boolean) {
+    if (ownEntryType !== 'F') {
+      navigation.navigate('recharge')
+      return
+    }
+    const promo = await fetchUpgradePaymentPromo(profile.name).catch(() => null)
+    // No content served → don't strand the tap on a dead end; fall back to the
+    // payment page, which is where the sheet's own CTA goes anyway.
+    // Angular routes PROMOTYPE 7/11 to phnoLeftPopup() (the renewal /
+    // numbers-left popup) instead of this sheet — that popup isn't built in this
+    // port, so those land on the payment page rather than the wrong sheet.
+    if (!promo || ['7', '11'].includes(promo.promoType)) { navigation.navigate('recharge'); return }
+    setPaymentPromo(promo)
+  }
+
+  // Angular: dismissModal('upgradeNow') → paymentService.redirectToIntermediatePage(
+  // fromPage, PAYMENTID, type, true).
+  function handlePaymentPromoUpgrade() {
+    const promo = paymentPromo
+    setPaymentPromo(null)
+    if (!promo) return
+    redirectToIntermediatePage('matches', promo.paymentId, promo.type, true)
   }
 
   // ── Bulk-like modal ──────────────────────────────────────────────────────────
@@ -2274,7 +2348,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         return (
           <AddPhotoBanner
             data={addPhotoBannerMatches}
-            onPress={() => navigation.navigate('Gallery')}
+            onPress={() => addPhoto.openAddPhoto(navigation)}
           />
         )
       }
@@ -2295,7 +2369,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             cta={t('MATCHES.ADDPHOTOCTA')}
             ctaBg="#802000"
             gradientColors={['#FFF6F2', '#FFFFFF']}
-            onPress={() => navigation.navigate('Gallery')}
+            onPress={() => addPhoto.openAddPhoto(navigation)}
           />
         )
       }
@@ -2318,7 +2392,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         return paidNoPhotoBanner.dynamic ? (
           <AddPhotoBanner
             data={paidNoPhotoBanner.data}
-            onPress={() => navigation.navigate('Gallery')}
+            onPress={() => addPhoto.openAddPhoto(navigation)}
           />
         ) : (
           <SimplePromoBanner
@@ -2429,7 +2503,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           selectedChip={selectedChip}
           onChipSelect={applyQuickFilter}
           addPhotoBannerMatches={addPhotoBannerMatches}
-          onActivateProfile={() => navigation.navigate('Gallery')}
+          onActivateProfile={() => addPhoto.openAddPhoto(navigation)}
         />
         {activeSticky && (
           <StickyBanner
@@ -2465,7 +2539,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             linkCtaLabel:  t('MATCHES.LATER_CTA'),
           }}
           onClose={handleBulkLikePhotoPromptDismiss}
-          onPrimaryPress={() => { setShowPhotoBulkLikePrompt(false); navigation.navigate('Gallery'); handleBulkLikeSent() }}
+          onPrimaryPress={() => { setShowPhotoBulkLikePrompt(false); addPhoto.openAddPhoto(navigation); handleBulkLikeSent() }}
           onLinkPress={handleBulkLikePhotoPromptDismiss}
         />
         <BottomSheet
@@ -2501,14 +2575,22 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             ctaLabel: (addPhotoActionPromoContent?.CTA ?? '').replace(/<[^>]*>/g, '') || t('GENERAL.ADD_PHOTO_TXT'),
           }}
           onClose={() => setShowAddPhotoActionPrompt(false)}
-          onPrimaryPress={() => { setShowAddPhotoActionPrompt(false); navigation.navigate('Gallery') }}
+          onPrimaryPress={() => { setShowAddPhotoActionPrompt(false); addPhoto.openAddPhoto(navigation) }}
         />
-        <WhatsAppPaywallModal
-          visible={!!whatsappPaywallProfile}
-          profile={whatsappPaywallProfile}
-          oppGender={oppGender}
-          onClose={() => setWhatsappPaywallProfile(null)}
-          onPayNow={handleWhatsappPaywallPayNow}
+        {/* Angular: bottom-sheet.component's `action == 'paymentPromo'` block —
+            the same real upgrade sheet Angular shows for Call/WhatsApp/Message. */}
+        <BottomSheet
+          visible={!!paymentPromo}
+          type="paymentPromo"
+          data={{
+            title:      paymentPromo?.title,
+            content:    paymentPromo?.content,
+            subContent: paymentPromo?.subContent,
+            benefits:   paymentPromo?.benefits,
+            ctaLabel:   paymentPromo?.ctaLabel || t('GENERAL.BECOME_PAID'),
+          }}
+          onClose={() => setPaymentPromo(null)}
+          onPrimaryPress={handlePaymentPromoUpgrade}
         />
         {/* Angular button.component.ts's two-step contact reveal: confirm → phoneviewed
             API → Contact Details sheet — see handleCall/handleWhatsApp above. */}
@@ -2560,6 +2642,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           onPrimaryPress={handleProfileValidationCtaPress}
         />
         <LanguagePillSheet visible={showLanguageSheet} onClose={() => setShowLanguageSheet(false)} />
+        <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
         <Toast request={toastRequest} />
       </>
     )
@@ -2624,9 +2707,9 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
             showPhotoPromotion && photoBannerData ? (
               <PhotoPromotionBanner
                 data={photoBannerData}
-                onPress={() => navigation.navigate(heroBannerTarget)}
+                onPress={() => heroBannerTarget === 'Gallery' ? addPhoto.openAddPhoto(navigation) : navigation.navigate(heroBannerTarget)}
               />
-            ) : null
+          ) : null
           }
           ListFooterComponent={
             loadingMore || loadingExtended
@@ -2684,7 +2767,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           linkCtaLabel:  t('MATCHES.LATER_CTA'),
         }}
         onClose={handleBulkLikePhotoPromptDismiss}
-        onPrimaryPress={() => { setShowPhotoBulkLikePrompt(false); navigation.navigate('Gallery'); handleBulkLikeSent() }}
+        onPrimaryPress={() => { setShowPhotoBulkLikePrompt(false); addPhoto.openAddPhoto(navigation); handleBulkLikeSent() }}
         onLinkPress={handleBulkLikePhotoPromptDismiss}
       />
       <BottomSheet
@@ -2720,14 +2803,22 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           ctaLabel: (addPhotoActionPromoContent?.CTA ?? '').replace(/<[^>]*>/g, '') || t('GENERAL.ADD_PHOTO_TXT'),
         }}
         onClose={() => setShowAddPhotoActionPrompt(false)}
-        onPrimaryPress={() => { setShowAddPhotoActionPrompt(false); navigation.navigate('Gallery') }}
+        onPrimaryPress={() => { setShowAddPhotoActionPrompt(false); addPhoto.openAddPhoto(navigation) }}
       />
-      <WhatsAppPaywallModal
-        visible={!!whatsappPaywallProfile}
-        profile={whatsappPaywallProfile}
-        oppGender={oppGender}
-        onClose={() => setWhatsappPaywallProfile(null)}
-        onPayNow={handleWhatsappPaywallPayNow}
+      {/* Angular: bottom-sheet.component's `action == 'paymentPromo'` block —
+          the same real upgrade sheet Angular shows for Call/WhatsApp/Message. */}
+      <BottomSheet
+        visible={!!paymentPromo}
+        type="paymentPromo"
+        data={{
+          title:      paymentPromo?.title,
+          content:    paymentPromo?.content,
+          subContent: paymentPromo?.subContent,
+          benefits:   paymentPromo?.benefits,
+          ctaLabel:   paymentPromo?.ctaLabel || t('GENERAL.BECOME_PAID'),
+        }}
+        onClose={() => setPaymentPromo(null)}
+        onPrimaryPress={handlePaymentPromoUpgrade}
       />
       {/* Angular button.component.ts's two-step contact reveal: confirm → phoneviewed
           API → Contact Details sheet — see handleCall/handleWhatsApp above. */}
@@ -2780,6 +2871,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
       />
       {/* AppFooter's tab bar is 56px tall (+ its own safe-area padding) — the
           Toast's default 24px clearance alone left it overlapping the footer. */}
+      <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
       <Toast request={toastRequest} bottomOffset={56 + 16} />
     </View>
   )

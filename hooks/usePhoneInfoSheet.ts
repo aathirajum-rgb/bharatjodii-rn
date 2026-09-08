@@ -161,11 +161,14 @@ export function usePhoneInfoSheet() {
     }
   }
 
-  function secondaryPress(navigation: any) {
+  // openAddPhoto is hooks/useAddPhotoPicker.ts's trigger — passed in rather than
+  // called via navigation.navigate('Gallery') directly, since that route has no
+  // web implementation (see that hook's own header comment for why).
+  function secondaryPress(openAddPhoto: (navigation: any) => void, navigation: any) {
     const kind = sheet?.kind
     setSheet(null)
     if (kind === 'female_free_photo_add' || kind === 'female_free_photo_fail') {
-      navigation.navigate('Gallery')
+      openAddPhoto(navigation)
     }
   }
 

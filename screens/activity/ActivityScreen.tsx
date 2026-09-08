@@ -31,7 +31,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, FlatList, Linking, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, FlatList, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
@@ -51,9 +51,11 @@ import ActivityDesktopLayout from './ActivityDesktopLayout'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { useContactGating } from '../../hooks/useContactGating'
 import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
+import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
+import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { fetchActivityListingPage } from '../../service/activityService'
-import { communicationBtnOnClick, shouldSkipPhoneConfirm, fetchContactDetails, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
+import { communicationBtnOnClick, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, fetchContactDetails, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import {
   openMembershipTab, fetchUpgradePaymentPromo, redirectToIntermediatePage,
@@ -191,6 +193,12 @@ export default function ActivityScreen({ navigation, route }: Props) {
   // The ~10 other phoneviewed/pre-flight results (phone protected, FUP limit,
   // ID-verify prompt, female-free variants, etc.) — see usePhoneInfoSheet.ts.
   const phoneInfo = usePhoneInfoSheet()
+  // Web/PWA "Add photo" CTAs — see hooks/useAddPhotoPicker.ts for why this
+  // can't just navigate to the native-only 'Gallery' screen.
+  const addPhoto = useAddPhotoPicker({
+    onRejected: showToast,
+    onError: () => showToast('Upload failed. Please try again.'),
+  })
 
   // ── Counts — Angular: common.getNotificationCount(1) → notificationcount API's
   // COMCOUNT array. `totalCount` drives the chip labels/banner count and is
@@ -559,12 +567,19 @@ export default function ActivityScreen({ navigation, route }: Props) {
     // so the service still owns the decision — its female-free branches
     // (photo pending / call verification / limit over) must keep winning over
     // the paywall for a free female member who qualifies for them.
+    // Angular communication.service.ts's showContactDetails() FIRST check — a
+    // paid user whose mutual-like AND overall phone-view quotas are both
+    // exhausted sees the PHONENOLIMIT sheet instead of the confirm popup.
+    if (shouldShowPhoneNoLimit(profile.phoneViewed, profile.likedStatus, gating.indNumbersLeft, gating.contactQuota.left, gating.ownEntryType)) {
+      phoneInfo.handleResult({ type: 'female_free', action: 'femaleFree-LimitOver', profile }).catch(() => {})
+      return
+    }
     const alreadyViewed = ['1', '3'].includes(String(profile.phoneViewed ?? '0'))
     if (gating.ownEntryType !== 'P' && !alreadyViewed) {
       handleContactConfirmYes({ profile, action })
       return
     }
-    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, gating.indNumbersLeft, gating.ownEntryType)) {
+    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, gating.indNumbersLeft, gating.ownEntryType, profile.phoneProtected)) {
       handleContactConfirmYes({ profile, action })
     } else {
       setContactConfirm({ profile, action })
@@ -936,10 +951,11 @@ export default function ActivityScreen({ navigation, route }: Props) {
           data={phoneInfo.getData(t)}
           onClose={phoneInfo.close}
           onPrimaryPress={() => phoneInfo.primaryPress(navigation)}
-          onSecondaryPress={() => phoneInfo.secondaryPress(navigation)}
+          onSecondaryPress={() => phoneInfo.secondaryPress(addPhoto.openAddPhoto, navigation)}
           onLinkPress={phoneInfo.close}
         />
         <Toast request={toastRequest} />
+        <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
       </ActivityDesktopLayout>
     )
   }
@@ -1122,7 +1138,7 @@ export default function ActivityScreen({ navigation, route }: Props) {
           {!!photoPromoBanner?.['BODY'] && (
             <Text style={styles.photoPromoBody}>{stripHtml(String(photoPromoBanner['BODY']))}</Text>
           )}
-          <Pressable style={styles.photoPromoCta} onPress={() => navigation.navigate('Gallery')}>
+          <Pressable style={styles.photoPromoCta} onPress={() => addPhoto.openAddPhoto(navigation)}>
             <Text style={styles.photoPromoCtaLabel}>
               {stripHtml(String(photoPromoBanner?.['CTA'] ?? t('LIKE_LIST.PHOTO_REQ_CTA')))}
             </Text>
@@ -1196,7 +1212,10 @@ export default function ActivityScreen({ navigation, route }: Props) {
                 initialNumToRender={4}
                 maxToRenderPerBatch={4}
                 windowSize={7}
-                removeClippedSubviews
+                // react-native-web's FlatList doesn't support this correctly — same
+                // guard MatchesScreen.tsx's own list uses (removeClippedSubviews=
+                // {Platform.OS !== 'web'}) to avoid crashing on web.
+                removeClippedSubviews={Platform.OS !== 'web'}
               />
             )}
           </View>
@@ -1294,10 +1313,11 @@ export default function ActivityScreen({ navigation, route }: Props) {
         data={phoneInfo.getData(t)}
         onClose={phoneInfo.close}
         onPrimaryPress={() => phoneInfo.primaryPress(navigation)}
-        onSecondaryPress={() => phoneInfo.secondaryPress(navigation)}
+        onSecondaryPress={() => phoneInfo.secondaryPress(addPhoto.openAddPhoto, navigation)}
         onLinkPress={phoneInfo.close}
       />
       <Toast request={toastRequest} bottomOffset={56 + 16} />
+      <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
     </View>
   )
 }

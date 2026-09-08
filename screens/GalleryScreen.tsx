@@ -1,8 +1,10 @@
 import { Image } from 'expo-image';
+import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Dimensions,
   FlatList,
   Platform,
@@ -13,7 +15,19 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { Colors } from '../constants/colors';
+import { StorageKeys as SK } from '../constants/storage.keys';
+import { Endpoints } from '../service/api.endpoints';
+import { uploadFile } from '../service/apiClient';
+import {
+  describeRejection,
+  getPhotoConfig,
+  getRejectReasons,
+  validatePhotoAsset,
+  type PhotoRejectionCode,
+} from '../service/photoValidationService';
+import { getItem, setItem } from '../service/storageService';
 
 const NUM_COLUMNS = 3;
 const GAP = 2;
@@ -32,12 +46,52 @@ type AlbumItem = {
 
 const ALL_PHOTOS: AlbumItem = { id: '__all__', title: 'All Photos', assetCount: 0 };
 
+// A leading 'camera' entry alongside the picked-from-library Assets — same
+// grid shape screens/onboarding/CustomGalleryScreen.tsx's ListItem uses for
+// its own camera cell.
+type ListItem = 'camera' | Asset;
+
 type Props = {
+  navigation: { goBack: () => void };
   onDone?: (assets: Asset[]) => void;
   maxSelection?: number;
 };
 
-export default function GalleryScreen({ onDone, maxSelection }: Props) {
+// ─── Camera icon ──────────────────────────────────────────────────────────
+// Ported verbatim from CustomGalleryScreen.tsx's CameraIcon — same asset/
+// interaction pattern, reused rather than reinvented.
+function CameraIcon() {
+  return (
+    <Svg width={30} height={30} viewBox="0 0 24 24" fill="none">
+      <Path
+        d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"
+        stroke="#fff"
+        strokeWidth={1.8}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <Circle cx={12} cy={13} r={4} stroke="#fff" strokeWidth={1.8} />
+    </Svg>
+  );
+}
+
+// Guesses a MIME type from the asset's filename extension — expo-media-library's
+// legacy Asset shape has no mimeType/fileSize field of its own (unlike an
+// expo-image-picker asset), so this is the only format signal validatePhotoAsset
+// can be given here.
+function guessMimeType(filename: string): string | undefined {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  if (!ext) return undefined;
+  if (ext === 'jpg') return 'image/jpeg';
+  return `image/${ext}`;
+}
+
+// Same cap as the onboarding gallery's own MAX_PHOTOS
+// (screens/onboarding/CustomGalleryScreen.tsx) — a profile can hold at most
+// 10 photos total, not a UI-only limit.
+const DEFAULT_MAX_SELECTION = 10;
+
+export default function GalleryScreen({ navigation, onDone, maxSelection = DEFAULT_MAX_SELECTION }: Props) {
   const insets = useSafeAreaInsets();
 
   const [permission, setPermission]       = useState<'unknown' | 'granted' | 'denied'>('unknown');
@@ -49,6 +103,7 @@ export default function GalleryScreen({ onDone, maxSelection }: Props) {
   const [albums, setAlbums]               = useState<AlbumItem[]>([]);
   const [activeAlbum, setActiveAlbum]     = useState<AlbumItem>(ALL_PHOTOS);
   const [showDropdown, setShowDropdown]   = useState(false);
+  const [uploading, setUploading]         = useState(false);
   const endCursorRef = useRef<string | undefined>(undefined);
 
   // ─── Permission + initial load ────────────────────────────────────────────
@@ -60,7 +115,14 @@ export default function GalleryScreen({ onDone, maxSelection }: Props) {
         setLoading(false);
         return;
       }
-      const { status } = await MediaLibrary.requestPermissionsAsync();
+      // Explicit granularPermissions: ['photo'] — this screen only ever
+      // reads photo assets (loadPhotos() always passes mediaType: 'photo'),
+      // but on Android 13+ an unqualified requestPermissionsAsync() call
+      // defaults to requesting ALL granular permissions (photo, video, AND
+      // audio), which is what was surfacing as an unexpected "Allow Music
+      // and audio access" dialog. Same fix applied in the sibling
+      // CustomGalleryScreen.tsx.
+      const { status } = await MediaLibrary.requestPermissionsAsync(false, ['photo']);
       if (status === 'granted') {
         setPermission('granted');
         await Promise.all([loadPhotos(), loadAlbums()]);
@@ -126,31 +188,151 @@ export default function GalleryScreen({ onDone, maxSelection }: Props) {
   // ─── Selection logic ──────────────────────────────────────────────────────
 
   const toggleSelect = useCallback((id: string) => {
+    // Previously this silently no-opped once the cap was hit, with no
+    // feedback at all — reusing the same "Photo limit reached" alert pattern
+    // CustomGalleryScreen.web.tsx already uses for its own max-selection
+    // guard, worded to match the equivalent Android copy ("You cannot upload
+    // more than %1$s photos.").
+    if (!selected.has(id) && maxSelection && selected.size >= maxSelection) {
+      Alert.alert('Photo limit reached', `You cannot upload more than ${maxSelection} photos.`);
+      return;
+    }
     setSelected(prev => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
       } else {
-        if (maxSelection && next.size >= maxSelection) return prev;
         next.add(id);
       }
       return next;
     });
-  }, [maxSelection]);
+  }, [selected, maxSelection]);
 
-  const handleDone = useCallback(() => {
+  // Shared upload path for both the "Done" multi-select flow and the camera
+  // cell's single just-captured photo — factored out of what used to be
+  // handleDone's own body so the camera cell (added for QA #52) doesn't have
+  // to duplicate the validate/upload/reject-alert logic.
+  const uploadPhotos = useCallback(async (
+    items: { uri: string; filename: string; mimeType?: string | undefined; width?: number | undefined; height?: number | undefined }[],
+  ) => {
+    if (items.length === 0) return;
+
+    setUploading(true);
+    try {
+      const userId = (await getItem(SK.Auth.USER_ID)) ?? '';
+      const config = await getPhotoConfig();
+      const rejections: PhotoRejectionCode[] = [];
+
+      for (const item of items) {
+        const validation = await validatePhotoAsset({
+          uri: item.uri,
+          mimeType: item.mimeType,
+          width: item.width,
+          height: item.height,
+        }, config);
+        if (!validation.ok) {
+          rejections.push(validation.code);
+          continue;
+        }
+
+        const formData = new FormData();
+        formData.append('ID', userId);
+        formData.append('AIVALIDATE', config.isNativeFaceDetectionEnabled ? '1' : '0');
+        formData.append('UPLOADPHOTO', {
+          uri: item.uri,
+          type: item.mimeType ?? 'image/jpeg',
+          name: item.filename,
+        } as any);
+
+        const res = await uploadFile(Endpoints.media.addProfilePic, formData);
+        if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
+          await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL));
+        }
+      }
+
+      if (rejections.length) {
+        const reasons = await getRejectReasons();
+        Alert.alert(
+          'Some photos were not added',
+          rejections.map(code => describeRejection(code, reasons)).join('\n\n'),
+        );
+      }
+      if (rejections.length < items.length) {
+        navigation.goBack();
+      }
+    } catch {
+      Alert.alert('Error', 'Upload failed. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  }, [navigation]);
+
+  // Screen is mounted as a plain Stack.Screen (navigation.navigate('Gallery')) from
+  // many call sites, none of which pass params — React Navigation only ever injects
+  // navigation/route into a route component, never an arbitrary onDone prop. So the
+  // upload has to happen right here instead of being handed back to a caller.
+  const handleDone = useCallback(async () => {
     const selectedAssets = assets.filter(a => selected.has(a.id));
+    if (selectedAssets.length === 0) return;
+
     onDone?.(selectedAssets);
-  }, [assets, selected, onDone]);
+
+    await uploadPhotos(selectedAssets.map(asset => ({
+      uri: asset.uri,
+      filename: asset.filename,
+      mimeType: guessMimeType(asset.filename),
+      width: asset.width,
+      height: asset.height,
+    })));
+  }, [assets, selected, onDone, uploadPhotos]);
+
+  // ─── Camera ───────────────────────────────────────────────────────────────
+  // Ported from CustomGalleryScreen.tsx's openCamera() — same permission
+  // check + launchCameraAsync call, then routed through this screen's own
+  // uploadPhotos() above instead of that screen's uploadAndNavigate().
+  const openCamera = useCallback(async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permission required', 'Camera access is needed to take a photo.');
+      return;
+    }
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true, aspect: [3, 4], quality: 0.85,
+    });
+    if (!result.canceled) {
+      const captured = result.assets[0];
+      await uploadPhotos([{
+        uri: captured.uri,
+        filename: captured.fileName ?? 'photo.jpg',
+        mimeType: captured.mimeType,
+        width: captured.width,
+        height: captured.height,
+      }]);
+    }
+  }, [uploadPhotos]);
 
   // ─── Render tile ──────────────────────────────────────────────────────────
 
-  const renderItem = useCallback(({ item, index }: { item: Asset; index: number }) => {
-    const isSelected = selected.has(item.id);
-    const selectionIndex = isSelected ? [...selected].indexOf(item.id) + 1 : null;
+  const renderItem = useCallback(({ item, index }: { item: ListItem; index: number }) => {
     const col = index % NUM_COLUMNS;
     const marginLeft  = col === 0 ? GAP : GAP / 2;
     const marginRight = col === NUM_COLUMNS - 1 ? GAP : GAP / 2;
+
+    if (item === 'camera') {
+      return (
+        <TouchableOpacity
+          activeOpacity={0.8}
+          onPress={openCamera}
+          style={[styles.tile, styles.cameraTile, { marginLeft, marginRight, marginBottom: GAP }]}
+        >
+          <CameraIcon />
+          <Text style={styles.cameraLabel}>Camera</Text>
+        </TouchableOpacity>
+      );
+    }
+
+    const isSelected = selected.has(item.id);
+    const selectionIndex = isSelected ? [...selected].indexOf(item.id) + 1 : null;
 
     return (
       <TouchableOpacity
@@ -165,7 +347,7 @@ export default function GalleryScreen({ onDone, maxSelection }: Props) {
         </View>
       </TouchableOpacity>
     );
-  }, [selected, toggleSelect]);
+  }, [selected, toggleSelect, openCamera]);
 
   // ─── Early states ─────────────────────────────────────────────────────────
 
@@ -204,10 +386,18 @@ export default function GalleryScreen({ onDone, maxSelection }: Props) {
 
         {/* Done button */}
         {selected.size > 0 && (
-          <TouchableOpacity style={styles.doneButton} onPress={handleDone}>
-            <Text style={styles.doneText}>
-              Done{maxSelection ? ` (${selected.size}/${maxSelection})` : ` (${selected.size})`}
-            </Text>
+          <TouchableOpacity
+            style={[styles.doneButton, uploading && styles.doneButtonDisabled]}
+            onPress={handleDone}
+            disabled={uploading}
+          >
+            {uploading ? (
+              <ActivityIndicator size="small" color={Colors.white} />
+            ) : (
+              <Text style={styles.doneText}>
+                Done{maxSelection ? ` (${selected.size}/${maxSelection})` : ` (${selected.size})`}
+              </Text>
+            )}
           </TouchableOpacity>
         )}
       </View>
@@ -248,28 +438,30 @@ export default function GalleryScreen({ onDone, maxSelection }: Props) {
         </View>
       )}
 
-      {/* ── Photo grid ── */}
-      {assets.length === 0 && !loading ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyTitle}>No Photos</Text>
-          <Text style={styles.emptyDesc}>This album is empty.</Text>
-        </View>
-      ) : (
-        <FlatList
-          data={assets}
-          keyExtractor={item => item.id}
-          numColumns={NUM_COLUMNS}
-          renderItem={renderItem}
-          onEndReached={loadMore}
-          onEndReachedThreshold={0.4}
-          contentContainerStyle={styles.grid}
-          ListFooterComponent={
-            loadingMore
-              ? <ActivityIndicator style={styles.loadingMore} color={Colors.iOSBlue} />
-              : null
-          }
-        />
-      )}
+      {/* ── Photo grid ──
+          Camera cell (QA #52) is always the first item, same as
+          CustomGalleryScreen.tsx's listData — so it's still reachable even
+          when the active album has no photos, instead of that case fully
+          replacing the grid with a dead-end "No Photos" screen. */}
+      <FlatList
+        data={['camera' as const, ...assets]}
+        keyExtractor={item => item === 'camera' ? '__camera__' : item.id}
+        numColumns={NUM_COLUMNS}
+        renderItem={renderItem}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.4}
+        contentContainerStyle={styles.grid}
+        ListHeaderComponent={
+          assets.length === 0 && !loading
+            ? <Text style={[styles.emptyDesc, styles.emptyDescInGrid]}>This album is empty.</Text>
+            : null
+        }
+        ListFooterComponent={
+          loadingMore
+            ? <ActivityIndicator style={styles.loadingMore} color={Colors.iOSBlue} />
+            : null
+        }
+      />
     </View>
   );
 }
@@ -298,6 +490,9 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#888',
     textAlign: 'center',
+  },
+  emptyDescInGrid: {
+    paddingVertical: 24,
   },
 
   // Top bar
@@ -332,6 +527,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 8,
+    minWidth: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  doneButtonDisabled: {
+    opacity: 0.6,
   },
   doneText: {
     color: '#fff',
@@ -398,6 +599,20 @@ const styles = StyleSheet.create({
   tileImage: {
     width: '100%',
     height: '100%',
+  },
+  // Camera cell — same icon/label pattern as CustomGalleryScreen.tsx's own
+  // cameraCell, sized to this screen's own TILE_SIZE grid instead of that
+  // screen's CELL_SIZE.
+  cameraTile: {
+    backgroundColor: '#1a1a1a',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  cameraLabel: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#fff',
   },
   selectedOverlay: {
     ...StyleSheet.absoluteFill,

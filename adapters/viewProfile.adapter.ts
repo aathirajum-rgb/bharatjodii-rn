@@ -106,6 +106,7 @@ export class ViewProfileAdapter implements Adapter<ViewProfileModel> {
       isNewLabel:       false,
       labelContent:     '',
       phoneViewed:      String(comm['PHONEVIEWED'] ?? '0'),
+      phoneProtected:   String(comm['PHONEPROTECTED'] ?? '0'),
       dontShowStatus:   String(comm['SKIPPED'] ?? '0'),
       viewLaterStatus:  String(comm['VIEWLATER'] ?? '0'),
 

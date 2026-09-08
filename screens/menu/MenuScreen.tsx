@@ -17,7 +17,7 @@ import {
 import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
-import { CDN_REACT } from '../../constants/cdn'
+import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import { StorageKeys } from '../../constants/storage.keys'
 import { getItem, setItem } from '../../service/storageService'
 import { getSession, getSessionValue } from '../../service/registrationService'
@@ -68,6 +68,12 @@ export const ICON = {
   // Expired-membership banner glyph. Hyphenated, unlike the underscore names
   // above — that's how it is on the server (react/expired-alert.svg, 44x44).
   expiredAlert:  R + 'expired-alert.svg',
+  // Non-expired promo band's crown graphic (QA #65). No menu-specific crown
+  // asset exists on the react/ CDN path here — reusing the generic
+  // 'crown-white' glyph that menu-contacts's MenuContactsScreen/
+  // MenuContactsDesktopLayout already render for the same premium-membership
+  // concept (in a filled circular badge, since the glyph itself is plain white).
+  crown:         CDN_SVG + 'revamp/crown-white.svg',
 }
 
 // Angular: menu.page.html's buy-membership banner binds CONTENT1 with
@@ -538,15 +544,26 @@ export default function MenuScreen({ navigation }: Props) {
               )}
             </Pressable>
           ) : (
-            // OFFER variant: green ground, copy left, filled pill right.
+            // OFFER variant: green ground, vertical stack — crown badge on
+            // top, copy centered below it, filled pill button at the bottom
+            // (Angular: menu.page.html's buy-membership-banner-block renders
+            // the crown graphic, then the copy, then the "Buy Now" button as
+            // a top-to-bottom stack, not a side-by-side row). The crown glyph
+            // is plain white, so it needs the same filled-circle badge the
+            // EXPIRED variant's icon doesn't (expired-alert.svg is already a
+            // tinted glyph) — same CdnSvg component either way.
             <Pressable
               style={s.promoBand}
               onPress={handleBuyMembership}
               accessibilityRole="button"
             >
-              <View style={s.promoTextCol}>
-                <Text style={s.promoHeadline}>{promoHeadline}</Text>
-                {!!promoSub && <Text style={s.promoSub}>{promoSub}</Text>}
+              <View style={s.promoCrownBadge}>
+                <CdnSvg uri={ICON.crown} width={28} height={28} />
+              </View>
+
+              <View style={[s.promoTextCol, s.promoTextColCenter]}>
+                <Text style={[s.promoHeadline, s.promoTextCenter]}>{promoHeadline}</Text>
+                {!!promoSub && <Text style={[s.promoSub, s.promoTextCenter]}>{promoSub}</Text>}
               </View>
 
               {!!promoCta && (
@@ -723,16 +740,34 @@ const s = StyleSheet.create({
   },
 
   // ── Buy-membership promo band ──
-  // Bottom section of the profile card: pale-green ground, copy left, solid
-  // green pill right. No radius of its own — the parent card clips it.
+  // Bottom section of the profile card: pale-green ground, vertical stack —
+  // crown badge, then copy, then the solid green pill button. No radius of
+  // its own — the parent card clips it.
   promoBand: {
-    flexDirection:     'row',
     alignItems:        'center',
-    justifyContent:    'space-between',
-    gap:               12,
-    paddingVertical:   14,
+    gap:               10,
+    paddingVertical:   20,
     paddingHorizontal: 16,
     backgroundColor:   '#EAF7E7',
+  },
+  // Crown glyph is plain white — needs a filled circle behind it to read on
+  // the pale-green ground, same idea as menu-contacts's crownBadge.
+  promoCrownBadge: {
+    width:           44,
+    height:          44,
+    borderRadius:    22,
+    backgroundColor: '#1D8A34',
+    alignItems:      'center',
+    justifyContent:  'center',
+  },
+  // Stretches promoTextCol to the band's full width so multi-line copy wraps
+  // normally instead of sizing to its own content under alignItems:'center'.
+  promoTextColCenter: {
+    alignSelf:  'stretch',
+    alignItems: 'center',
+  },
+  promoTextCenter: {
+    textAlign: 'center',
   },
   // Expired variant: same band slot, pink ground, stacked (icon+copy row, then
   // the link row) rather than side-by-side.

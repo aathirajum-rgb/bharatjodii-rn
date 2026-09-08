@@ -26,6 +26,7 @@ export class MatchProfileAdapter implements Adapter<MatchProfile> {
       labelContent:     item.labelContent      ?? '',
       photos:           item.photos            ?? [],
       phoneViewed:      item.phoneViewed        ?? '0',
+      phoneProtected:   item.phoneProtected     ?? '0',
       dontShowStatus:   item.dontShowStatus     ?? '0',
       viewLaterStatus:  item.viewLaterStatus    ?? '0',
     }

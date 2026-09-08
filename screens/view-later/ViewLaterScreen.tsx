@@ -25,19 +25,23 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
-import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import { MatchCard } from '../matches/MatchesScreen'
 import ViewLaterDesktopLayout from './ViewLaterDesktopLayout'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { useContactGating } from '../../hooks/useContactGating'
 import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
+import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
+import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { fetchViewLaterProfiles } from '../../service/viewLaterService'
-import { communicationBtnOnClick, shouldSkipPhoneConfirm, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
+import { communicationBtnOnClick, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import { handleBack } from '../../utils/navigationRef'
 import { getItem } from '../../service/storageService'
-import { openMembershipTab } from '../../service/paymentService'
+import {
+  openMembershipTab, fetchUpgradePaymentPromo, redirectToIntermediatePage,
+  type UpgradePaymentPromo,
+} from '../../service/paymentService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { CDN_REACT } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
@@ -74,9 +78,18 @@ export default function ViewLaterScreen({ navigation }: Props) {
     showCounter?: boolean | undefined; viewedCount?: string | undefined; totalCount?: string | undefined
     idVerified?: boolean | undefined
   } | null>(null)
-  const [whatsappPaywallProfile, setWhatsappPaywallProfile] = useState<MatchProfile | null>(null)
+  // Angular: paymentPromoPopUp() → bottom-sheet.component's `paymentPromo` block —
+  // the real upgrade sheet shown for Call/WhatsApp when the viewer is free.
+  const [paymentPromo, setPaymentPromo] = useState<UpgradePaymentPromo | null>(null)
   const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
   const phoneInfo = usePhoneInfoSheet()
+  // Web/PWA "Add photo now" CTA (phoneInfo's female-free-photo variants) — see
+  // hooks/useAddPhotoPicker.ts for why this can't just navigate to the
+  // native-only 'Gallery' screen.
+  const addPhoto = useAddPhotoPicker({
+    onRejected: showToast,
+    onError: () => showToast('Upload failed. Please try again.'),
+  })
 
   function showToast(message: string) {
     setToastRequest({ message, key: Date.now() })
@@ -116,8 +129,25 @@ export default function ViewLaterScreen({ navigation }: Props) {
     redirectToViewProfile('', profile.profileId, FROM_PAGE, profiles.map(p => p.profileId))
   }
 
+  // Angular communication.service.ts's showCallAndWhatsAppPromo(): a free member
+  // who's never viewed this profile's number goes straight to paymentPromoPopUp(),
+  // no confirm step first — the confirm popup only lives inside showContactDetails(),
+  // reached once entryType=='P', the number was already viewed, or the female-free
+  // promo applies. See ActivityScreen.tsx's confirmThenContact for the same fix.
   function confirmThenContact(profile: MatchProfile, action: 'call' | 'whatsapp') {
-    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, gating.indNumbersLeft, gating.ownEntryType)) {
+    // Angular communication.service.ts's showContactDetails() FIRST check — a
+    // paid user whose mutual-like AND overall phone-view quotas are both
+    // exhausted sees the PHONENOLIMIT sheet instead of the confirm popup.
+    if (shouldShowPhoneNoLimit(profile.phoneViewed, profile.likedStatus, gating.indNumbersLeft, gating.contactQuota.left, gating.ownEntryType)) {
+      phoneInfo.handleResult({ type: 'female_free', action: 'femaleFree-LimitOver', profile }).catch(() => {})
+      return
+    }
+    const alreadyViewed = ['1', '3'].includes(String(profile.phoneViewed ?? '0'))
+    if (gating.ownEntryType !== 'P' && !alreadyViewed) {
+      handleContactConfirmYes({ profile, action })
+      return
+    }
+    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, gating.indNumbersLeft, gating.ownEntryType, profile.phoneProtected)) {
       handleContactConfirmYes({ profile, action })
     } else {
       setContactConfirm({ profile, action })
@@ -147,14 +177,32 @@ export default function ViewLaterScreen({ navigation }: Props) {
           idVerified: profile.isIdVerified,
         })
       } else if (result.type === 'payment_promo') {
-        if (action === 'whatsapp') setWhatsappPaywallProfile(profile)
-        else navigation.navigate('recharge')
+        await showPaymentPromo(profile)
       } else if (result.type === 'error') {
         showToast(result.message)
       } else {
         await phoneInfo.handleResult(result)
       }
     } catch { /* silent — matches MatchesScreen/ActivityScreen's own convention */ }
+  }
+
+  // Angular: button.component.ts's paymentPromoPopUp() — the real upgrade sheet
+  // built from payment/nbcustomer/v1's content, shown for a FREE member.
+  async function showPaymentPromo(profile: MatchProfile) {
+    if (gating.ownEntryType !== 'F') {
+      navigation.navigate('recharge')
+      return
+    }
+    const promo = await fetchUpgradePaymentPromo(profile.name).catch(() => null)
+    if (!promo || ['7', '11'].includes(promo.promoType)) { navigation.navigate('recharge'); return }
+    setPaymentPromo(promo)
+  }
+
+  function handlePaymentPromoUpgrade() {
+    const promo = paymentPromo
+    setPaymentPromo(null)
+    if (!promo) return
+    redirectToIntermediatePage(FROM_PAGE, promo.paymentId, promo.type, true)
   }
 
   function handleContactDetailsClose() { setContactDetails(null) }
@@ -206,12 +254,18 @@ export default function ViewLaterScreen({ navigation }: Props) {
           onWhatsApp={handleContactDetailsWhatsApp}
         />
       )}
-      <WhatsAppPaywallModal
-        visible={!!whatsappPaywallProfile}
-        profile={whatsappPaywallProfile}
-        oppGender={gating.oppGender}
-        onClose={() => setWhatsappPaywallProfile(null)}
-        onPayNow={() => { setWhatsappPaywallProfile(null); navigation.navigate('recharge') }}
+      <BottomSheet
+        visible={!!paymentPromo}
+        type="paymentPromo"
+        data={{
+          title:      paymentPromo?.title,
+          content:    paymentPromo?.content,
+          subContent: paymentPromo?.subContent,
+          benefits:   paymentPromo?.benefits,
+          ctaLabel:   paymentPromo?.ctaLabel || t('GENERAL.BECOME_PAID'),
+        }}
+        onClose={() => setPaymentPromo(null)}
+        onPrimaryPress={handlePaymentPromoUpgrade}
       />
       <BottomSheet
         visible={!!phoneInfo.sheet}
@@ -219,10 +273,11 @@ export default function ViewLaterScreen({ navigation }: Props) {
         data={phoneInfo.getData(t)}
         onClose={phoneInfo.close}
         onPrimaryPress={() => phoneInfo.primaryPress(navigation)}
-        onSecondaryPress={() => phoneInfo.secondaryPress(navigation)}
+        onSecondaryPress={() => phoneInfo.secondaryPress(addPhoto.openAddPhoto, navigation)}
         onLinkPress={phoneInfo.close}
       />
       <Toast request={toastRequest} />
+      <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
     </>
   )
 

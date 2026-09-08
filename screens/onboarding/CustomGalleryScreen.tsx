@@ -168,7 +168,12 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
   // ─── Boot ─────────────────────────────────────────────────────────────────
 
   async function boot() {
-    const { status } = await requestPermissionsAsync()
+    // Explicit granularPermissions: ['photo'] — this screen only ever reads
+    // photo assets (MediaType.IMAGE), but on Android 13+ an unqualified
+    // requestPermissionsAsync() call defaults to requesting ALL granular
+    // permissions (photo, video, AND audio), which is what was surfacing as
+    // an unexpected "Allow Music and audio access" dialog.
+    const { status } = await requestPermissionsAsync(false, ['photo'])
     if (status !== 'granted') {
       setPermissionGranted(false)
       setLoading(false)

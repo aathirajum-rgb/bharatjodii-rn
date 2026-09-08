@@ -82,11 +82,16 @@ export default function CreatedByScreen({ navigation }: Props) {
 
     // Persist CREATEDBY — matches Angular updateRegistrationValues('CREATEDBY', key)
     // Set LOGINGENDER for family-member profiles — matches Angular getNextUrlForPage1()
+    // Also set GENDER (registrationValues[GENDER] = isMale ? '1' : '0' in Angular) —
+    // NameScreen/validateNameGender() reads this to run AI name/gender validation,
+    // so it must be set here too, not just LOGINGENDER.
     const updates: Record<string, string> = { CREATEDBY: selected }
     if (MALE_GENDER.includes(selected)) {
       updates.LOGINGENDER = 'M'
+      updates.GENDER = '1'
     } else if (FEMALE_GENDER.includes(selected)) {
       updates.LOGINGENDER = 'F'
+      updates.GENDER = '0'
     }
     await setRegValues(updates)
 
@@ -218,7 +223,6 @@ const styles = StyleSheet.create({
     fontSize:   14,
     fontWeight: '400',
     color:      Colors.textPrimary,
-    lineHeight: 16,
   },
   chipLabelSelected: {
     fontWeight: '500',

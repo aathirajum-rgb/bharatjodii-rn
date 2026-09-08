@@ -4,13 +4,18 @@ import { useTranslation } from 'react-i18next'
 import { Animated, Dimensions, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
-import { CDN_LOTTIE } from '../../constants/cdn'
+import { CDN_LOTTIE, CDN_SVG } from '../../constants/cdn'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import CdnSvg from '../cdn-svg/CdnSvg'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SCREEN_H   = Dimensions.get('window').height
 const LOTTIE_URL = CDN_LOTTIE + 'success-new.json'
+// Same asset ButtonRevamp's ICON_URLS registers under 'forward-bold-icon-white'
+// (components/button-revamp/ButtonRevamp.tsx) — reused directly here since this
+// CTA hand-rolls its own Pressable rather than using ButtonRevamp.
+const CTA_ARROW_ICON_URL = CDN_SVG + 'revamp/forward-bold-icon-white.svg'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -113,7 +118,7 @@ export default function RegistrationSuccessSheet({ visible, onContinue }: Props)
           <Text style={[styles.ctaLabel, { fontFamily: langFonts.semiBold }]}>
             {t('REGISTRATION.CONTINUE', 'Continue')}
           </Text>
-          <Text style={styles.ctaArrow}> ›</Text>
+          <CdnSvg uri={CTA_ARROW_ICON_URL} width={16} height={16} style={styles.ctaArrow} />
         </Pressable>
       </Animated.View>
     </Modal>
@@ -169,14 +174,12 @@ const styles = StyleSheet.create({
     height:          52,
   },
   ctaLabel: {
-    fontSize:   16,
-    fontWeight: '600',
-    color:      Colors.surface,
+    fontSize:     16,
+    fontWeight:   '700',
+    color:        Colors.surface,
+    marginRight:  6,
   },
   ctaArrow: {
-    fontSize:   20,
-    fontWeight: '600',
-    color:      Colors.surface,
-    lineHeight: 22,
+    flexShrink: 0,
   },
 })

@@ -24,6 +24,11 @@ export interface MatchProfile {
   labelContent:     string                       // "Viewed on 15 Jan" / "Shortlisted on …"
   likedDateText?:   string                       // "You liked this profile on 16-Jan-2026"
   phoneViewed:      string                       // raw '0'|'1'|'2'|'3' — drives after-like CTA label
+  // Angular common-funtions.ts's isPhoneNumberProtected(): profile.PHONEPROTECTED != '0'
+  // — this profile has protected their number, so tapping Call/WhatsApp skips the
+  // confirm popup and goes straight to the API call (which then surfaces the
+  // "she has protected her number" sheet) instead of asking "would you like to continue?" first.
+  phoneProtected:   string
   // Angular: FUNC.disableDontShow()/disableViewLater() — '1'/'3' = action already taken
   dontShowStatus:   string
   viewLaterStatus:  string

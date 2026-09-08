@@ -91,9 +91,14 @@ function _logFirebaseEvent(name: string, params?: Record<string, any>): void {
   if (__DEV__) console.log('[GA Event]', name, params)
   const analytics = getFirebaseAnalytics()
   if (!analytics || !name) return
-  firebaseAnalyticsModule.logEvent(analytics, sanitizeEventName(name), params).catch(() => {
-    // non-fatal — analytics failures must never affect the calling flow
-  })
+  // @react-native-firebase/analytics@26's modular logEvent() discards the
+  // native call with `void analytics.logEvent(...)` and has no return
+  // statement, so it always yields undefined — chaining .catch() on that (as
+  // this used to) throws "Cannot read property 'catch' of undefined"
+  // synchronously inside the caller's onPress handler, crashing the JS
+  // thread on every tab switch. Nothing here is awaitable, so there's
+  // nothing to catch.
+  firebaseAnalyticsModule.logEvent(analytics, sanitizeEventName(name), params)
 }
 
 function _logFirebaseScreen(screenName: string): void {

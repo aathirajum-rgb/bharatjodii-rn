@@ -10,6 +10,8 @@ import i18n from './i18n'
 import { APP_VERSION } from './constants/appVersion'
 import { StorageKeys } from './constants/storage.keys'
 import { AuthProvider } from './contexts/AuthContext'
+import { ErrorBoundary } from './components/error-boundary/ErrorBoundary'
+import { initCrashLogger } from './utils/crashLogger'
 import { useOTAUpdate } from './hooks/useOTAUpdate'
 import { useNativeAppUpdate } from './hooks/useNativeAppUpdate'
 import RootNavigation from './navigation/RootNavigation'
@@ -20,6 +22,9 @@ import { loadFonts } from './src/config/fonts'
 
 // Keep native splash visible until SplashAnimationScreen mounts and calls hideAsync()
 SplashScreen.preventAutoHideAsync()
+
+// As early as possible, before anything else can throw.
+initCrashLogger()
 
 function makeRandomDeviceId(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
@@ -172,17 +177,19 @@ export default function App() {
     // Required by react-native-gesture-handler (used by the Matches photo carousel) —
     // must sit as close to the actual app root as possible, or gestures anywhere in
     // the tree silently fail to be recognized.
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        {/* Set once, centrally — dark icons on the app's white headers by default.
-            Screens with a dark/colored top area (e.g. Splash, LanguageSelection)
-            mount their own <StatusBar> to override; expo-status-bar restores this
-            root setting automatically once that screen unmounts. */}
-        <StatusBar style="dark" />
-        <AuthProvider>
-          <RootNavigation />
-        </AuthProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <ErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          {/* Set once, centrally — dark icons on the app's white headers by default.
+              Screens with a dark/colored top area (e.g. Splash, LanguageSelection)
+              mount their own <StatusBar> to override; expo-status-bar restores this
+              root setting automatically once that screen unmounts. */}
+          <StatusBar style="dark" />
+          <AuthProvider>
+            <RootNavigation />
+          </AuthProvider>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </ErrorBoundary>
   )
 }

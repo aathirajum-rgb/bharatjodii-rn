@@ -50,9 +50,10 @@ export default function OTPScreen({ navigation, route }: Props) {
   // link (e.g. a stale bookmark/notification link to just "/otp") with no
   // navigation state — there's nothing to verify an OTP against in that
   // case, so redirect to login instead of crashing on the destructure below.
-  const { mobile, countryCode, matriId, isNewUser: routeIsNewUser } = route.params ?? {} as Partial<NonNullable<Props['route']['params']>>
-  // If caller explicitly passes isNewUser, use it; otherwise infer from empty matriId
-  const isRegistrationFlow = routeIsNewUser ?? (matriId === '')
+  const { mobile, countryCode, matriId } = route.params ?? {} as Partial<NonNullable<Props['route']['params']>>
+  // The real new-vs-existing-user answer only exists after OTP verify
+  // succeeds (see pendingIsNew.current, set from the verify response below)
+  // — routing decisions must wait for that, not guess from route params.
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const { loginUpdate } = useAuth()
@@ -167,24 +168,46 @@ export default function OTPScreen({ navigation, route }: Props) {
     }
   }
 
+  // Minimal params for the resend-OTP call — resendotp is a distinct endpoint
+  // from otp-verify and doesn't need buildParams()'s verify-only fields (ID,
+  // APPVERSION, DEVICEDETAIL, DEVICEID, REGISTERID, NALLOW). Matches the legacy
+  // Angular app's api-params-functions.ts 'resendotp' case, and the same
+  // MOBILENO/MCODE/NEWREG field names LoginScreen already sends for the
+  // initial OTP-send call.
+  function buildResendParams() {
+    return {
+      MOBILENO: mobile,
+      MCODE:    countryCode,
+      NEWREG:   '1',
+    }
+  }
+
   // isOtpCompleteAndValid — matches Angular: every value is a single digit
   const isValid = otpValues.every(v => /^[0-9]$/.test(v))
 
   // ── OTP box handlers ───────────────────────────────────────────────────────
 
   function handleChange(text: string, index: number) {
-    // Paste support: distribute digits across boxes — matches Angular onPaste()
-    if (text.length > 1) {
-      const digits = text.replace(/\D/g, '').slice(0, OTP_LENGTH)
-      const next   = Array(OTP_LENGTH).fill('')
-      for (let i = 0; i < digits.length; i++) next[i] = digits[i]
+    const digits = text.replace(/\D/g, '')
+
+    // Paste support: a real paste/autofill delivers multiple digits in one
+    // event on a box that was still empty — matches Angular onPaste(). A
+    // normal single keystroke landing on an already-filled box (each box now
+    // holds at most 1 digit) never produces more than 1 digit here, so this
+    // branch no longer misfires on that case (previously: typing a second
+    // digit into a filled box combined old+new into a 2-char string, which
+    // this branch treated as a paste and redistributed across every box).
+    if (digits.length > 1 && !otpValues[index]) {
+      const next = Array(OTP_LENGTH).fill('')
+      for (let i = 0; i < digits.length && i < OTP_LENGTH; i++) next[i] = digits[i]
       setOtpValues(next)
       setError('')
       inputRefs.current[Math.min(digits.length, OTP_LENGTH - 1)]?.focus()
       return
     }
 
-    const digit   = text.replace(/\D/g, '')
+    // Normal single keystroke — replaces this box's digit even if already filled.
+    const digit   = digits.slice(-1)
     const updated = [...otpValues]
     updated[index] = digit
     setOtpValues(updated)
@@ -263,8 +286,7 @@ export default function OTPScreen({ navigation, route }: Props) {
     setResending(true)
     setError('')
     try {
-      const nallow = await getItem('NALLOW') ?? '0'
-      const res    = await resendOTP('resendotp', { ...(await buildParams()), NALLOW: nallow })
+      const res = await resendOTP('resendotp', buildResendParams())
       if (res?.RESPONSECODE == 1) {
         setOtpValues(Array(OTP_LENGTH).fill(''))
         setSeconds(TIMER_START)   // matches Angular clearIntervalTime + startCountdown
@@ -287,9 +309,12 @@ export default function OTPScreen({ navigation, route }: Props) {
   // Redirecting to login (see the effect above) — nothing to render.
   if (!mobile) return null
 
-  // Angular subtitle: 'LOGIN_PAGE.DIGITCODE' with ##NO## replaced by mobile
+  // Angular subtitle: 'LOGIN_PAGE.DIGITCODE' with ##NO## replaced by mobile.
+  // The number itself is shown once, in the phoneRow below (with the edit
+  // icon) — so it's stripped out of the subtitle sentence here rather than
+  // substituted in, to avoid showing the mobile number twice (QA #12).
   const subtitle = t('LOGIN_PAGE.DIGITCODE', "We've sent 4 digit code to")
-    .replace('##NO##', mobile)
+    .replace(/\s*##NO##/, '')
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -381,7 +406,7 @@ export default function OTPScreen({ navigation, route }: Props) {
                 // SMS Retriever hook above: both funnel into handleChange's existing
                 // multi-digit paste branch, so no separate handling is needed.
                 autoComplete="one-time-code"
-                maxLength={2}         // 2 to allow paste detection; trimmed in handleChange
+                maxLength={1}         // 1 digit per box; multi-digit paste is handled in handleChange
                 returnKeyType={i === OTP_LENGTH - 1 ? 'done' : 'next'}
                 onSubmitEditing={i === OTP_LENGTH - 1 ? () => handleVerify() : undefined}
                 selectTextOnFocus
@@ -437,7 +462,7 @@ export default function OTPScreen({ navigation, route }: Props) {
           Existing login    → AppStack opens at 'Home'. */}
       <OTPSuccessSheet
         visible={showSuccess}
-        onDismiss={() => loginUpdate(pendingUserId.current, isRegistrationFlow, pendingPageId.current)}
+        onDismiss={() => loginUpdate(pendingUserId.current, pendingIsNew.current, pendingPageId.current)}
       />
     </View>
   )

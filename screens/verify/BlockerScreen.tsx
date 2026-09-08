@@ -9,7 +9,7 @@
 // Customer Support" are all fully functional.
 
 import { useCallback, useState } from 'react'
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -21,7 +21,8 @@ import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem, setItem } from '../../service/storageService'
 import { apiCall } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
-import { navigate } from '../../utils/navigationRef'
+import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
+import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
 
 const ICONS = {
   header:   CDN_SVG + 'updated-images/verify-your-identity-img-updated.svg',
@@ -53,6 +54,13 @@ export default function BlockerScreen({ navigation }: { navigation: any }) {
   const [fupDocShow,     setFupDocShow]     = useState('0')  // RESPONSE.FUPSTATUS — read regardless of route, matching Angular
   const [idProofAttempt, setIdProofAttempt] = useState<IdProofAttempt>({})
   const [customerCare,   setCustomerCare]   = useState('')
+
+  // Web/PWA "Upload Photo" row — see hooks/useAddPhotoPicker.ts for why this
+  // can't just navigate to the native-only 'Gallery' screen.
+  const addPhoto = useAddPhotoPicker({
+    onRejected: (msg) => Alert.alert('Some photos were not added', msg),
+    onError: (msg) => Alert.alert('Error', msg),
+  })
 
   // useFocusEffect (not a plain mount-only effect) so returning here after a
   // selfie/govt-ID attempt — or after uploading a photo via Gallery —
@@ -133,7 +141,7 @@ export default function BlockerScreen({ navigation }: { navigation: any }) {
   }
 
   function uploadPhoto() {
-    navigate('Gallery')
+    addPhoto.openAddPhoto(navigation)
   }
 
   if (loading) {
@@ -257,6 +265,7 @@ export default function BlockerScreen({ navigation }: { navigation: any }) {
           <Text style={styles.helpLink}>{t('VERIFY_BLOCKER.CUSTOMER_SUPPORT')}</Text>
         </Text>
       </Pressable>
+      <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
     </View>
   )
 }

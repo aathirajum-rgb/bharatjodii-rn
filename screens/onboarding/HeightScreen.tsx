@@ -4,7 +4,6 @@ import {
   Animated,
   Dimensions,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   SectionList,
@@ -351,7 +350,7 @@ export default function HeightScreen({ navigation }: Props) {
                   </View>
 
                   <View style={[styles.radio, isSelected && styles.radioSelected]}>
-                    {isSelected && <View style={styles.radioDot} />}
+                    {isSelected && <Text style={styles.radioCheckmark}>✓</Text>}
                   </View>
                 </Pressable>
               )
@@ -399,7 +398,12 @@ export default function HeightScreen({ navigation }: Props) {
                 // notch — without an explicit top inset here, the panel's own
                 // close icon/header sat under it. Same fix as SearchablePicker.tsx.
                 paddingTop:    insets.top,
-                paddingBottom: Platform.OS === 'ios' ? insets.bottom : 16,
+                // Edge-to-edge is mandatory on this Android/Expo SDK combo (can't be
+                // opted out of), so a hardcoded 16 here left the panel's bottom content
+                // sitting under the gesture/nav bar — use the real inset on both
+                // platforms, floored at 16 so devices with a near-zero inset keep the
+                // same minimum breathing room as before.
+                paddingBottom: Math.max(insets.bottom, 16),
                 transform: [{ translateX: panelTranslateX }],
               },
             ]}
@@ -497,8 +501,8 @@ const styles = StyleSheet.create({
     marginTop:  2,
   },
 
-  // Radio — 22×22 unfilled ring; selection shows as a filled pink dot inside,
-  // not a checkmark, matching Angular's ion-radio control (radio.component.html).
+  // Radio — 22×22 unfilled ring; selection shows as a filled pink circle with
+  // a white checkmark inside (Figma), not Angular's ion-radio dot.
   radio: {
     width:           22,
     height:          22,
@@ -510,13 +514,12 @@ const styles = StyleSheet.create({
   },
   radioSelected: {
     borderColor:     Colors.primaryDark,
-    backgroundColor: Colors.surface,
-  },
-  radioDot: {
-    width:           12,
-    height:          12,
-    borderRadius:    6,
     backgroundColor: Colors.primaryDark,
+  },
+  radioCheckmark: {
+    color:      Colors.surface,
+    fontSize:   12,
+    fontWeight: '700',
   },
 
   // OR divider — same left/right fade image assets + text style as DOBScreen
