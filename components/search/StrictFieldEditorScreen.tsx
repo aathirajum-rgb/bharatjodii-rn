@@ -27,25 +27,42 @@ export interface StrictFieldEditorScreenProps {
   onClose:      () => void
   fieldKey:     FieldKey
   fieldLabel:   string
+  // Angular: filterRevampConfig's per-field `SUBTITLE` key, e.g.
+  // MONTHLYINCOME's "Select preferred monthly income" — not a "Select
+  // preferred " + label string, which produced "Select preferred income".
+  subtitle:     string
   fieldValue:   string
   strictEnabled: boolean
   onToggleStrict: (value: boolean) => void
-  anyLabel:     string   // e.g. "Any" — this screen's own "unset" sentinel text
+  // Angular: search.component.ts's isFieldSetToAny() — decided from the SAVED
+  // SELECTION ('0'), never from the displayed text. Was `fieldValue !==
+  // anyLabel`, which only worked while every unset field rendered the one
+  // generic "Any" string; the per-field labels Angular really shows ("Any
+  // caste", "Dosham doesn't matter", …) would all have read as "not Any".
+  isAny:        boolean
+  // Angular: the `manageStrictFilter` flag this page is navigated with —
+  // `manageStrictFilter || filterEventType != 'filter'` (search.component.ts's
+  // redirectToFilterPage). False on a plain FILTERS-mode field page, where
+  // none of the strict-filter UI belongs.
+  strictAllowed: boolean
   matchCount:   number
   countLoading: boolean
   children:     React.ReactNode
 }
 
 export default function StrictFieldEditorScreen({
-  visible, onClose, fieldKey, fieldLabel, fieldValue,
-  strictEnabled, onToggleStrict, anyLabel, matchCount, countLoading, children,
+  visible, onClose, fieldKey, fieldLabel, subtitle, fieldValue,
+  strictEnabled, onToggleStrict, isAny, strictAllowed, matchCount, countLoading, children,
 }: StrictFieldEditorScreenProps) {
   const insets = useSafeAreaInsets()
   const copy = STRICT_FIELD_COPY[fieldKey]
-  // Angular: filter-popup.component.ts's showStrictFilter getter — excluded
-  // fields (Occupation) never show the toggle here either, and any field
-  // left at "Any"/unset has nothing to strictly match against yet.
-  const showStrict = !STRICT_EXCLUDED_FIELDS.has(fieldKey) && fieldValue !== anyLabel
+  // Angular: filter-popup.component.ts's showStrictFilter getter —
+  //   manageStrictFilter && !excluded(action) && !!content && !isFieldValueAny
+  // Excluded fields (Occupation) never show the toggle, a field left at "Any"
+  // has nothing to strictly match against, and Filters mode doesn't show the
+  // strict block at all. (Angular's content check has no equivalent here:
+  // STRICT_FIELD_COPY is typed over every FieldKey, so copy always exists.)
+  const showStrict = strictAllowed && !STRICT_EXCLUDED_FIELDS.has(fieldKey) && !isAny
 
   // Baseline captured the moment this screen opens — "Matches reduced" only
   // reflects a change made *in this visit*, not just "less than the total".
@@ -70,7 +87,7 @@ export default function StrictFieldEditorScreen({
         </View>
 
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-          <Text style={s.title}>Select preferred {fieldLabel.toLowerCase()}</Text>
+          <Text style={s.title}>{subtitle}</Text>
 
           <View style={s.fieldsWrap}>{children}</View>
 
@@ -87,15 +104,26 @@ export default function StrictFieldEditorScreen({
                 />
               </View>
 
-              <Text style={[s.promptText, reduced && s.warningText]}>
-                {reduced ? copy.note : strictPromptText(fieldKey, fieldLabel, fieldValue)}
-              </Text>
+              {/* Angular splits these two: the reduced-matches NOTE sits with
+                  the toggle (`*ngIf="isMatchesReduced"`), while the "Turn on
+                  strict … filter" RANGE prompt is in the footer and shows only
+                  while the toggle is OFF (`showStrictFilter &&
+                  !isStrictFilterOn`). This rendered the prompt with the toggle
+                  already on. */}
+              {(reduced || !strictEnabled) && (
+                <Text style={[s.promptText, reduced && s.warningText]}>
+                  {reduced ? copy.note : strictPromptText(fieldKey, fieldLabel, fieldValue)}
+                </Text>
+              )}
             </>
           )}
         </ScrollView>
 
         <View style={[s.footer, { paddingBottom: insets.bottom + 16 }]}>
-          <View style={s.matchesCol}>
+          {/* Angular: the footer's matches column is `*ngIf="showStrictFilter"`
+              and Apply widens from `width-60` to `width100` without it — so a
+              Filters-mode field page is just a full-width Apply. */}
+          {showStrict && <View style={s.matchesCol}>
             <Text style={s.matchesLabel}>{reduced ? 'Matches reduced' : 'Matches'}</Text>
             {reduced ? (
               <View style={s.reducedRow}>
@@ -106,7 +134,7 @@ export default function StrictFieldEditorScreen({
             ) : (
               <Text style={s.matchesCount}>{countLoading ? '…' : matchCount.toLocaleString('en-IN')}</Text>
             )}
-          </View>
+          </View>}
           <Pressable style={s.applyBtn} onPress={onClose}>
             <Text style={s.applyText}>Apply</Text>
           </Pressable>
@@ -124,10 +152,15 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
+  // Angular `heading4-medium-16` = 16px / Poppins-Medium / 500. RN takes the
+  // weight from the font FILE, so every style below names a family and drops
+  // fontWeight — a bare fontWeight left these on the system font and let
+  // Android synthesize a fake bold on top of it.
+  headerTitle: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, color: '#333333', marginLeft: 6, marginRight: 16 },
 
   content: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 24, gap: 24 },
-  title: { fontSize: 16, fontWeight: '500', color: Colors.black },
+  // Angular: the "Select preferred X" subtitle is `heading4-medium-16` too.
+  title: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, color: Colors.black },
 
   fieldsWrap: { gap: 24 },
 
@@ -137,10 +170,16 @@ const s = StyleSheet.create({
     borderRadius: 8, padding: 12,
   },
   strictTextCol: { flex: 1, gap: 4 },
-  strictTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  // Angular `.setting-title body1-medium-14` — Poppins-MEDIUM 14/16, not
+  // SemiBold (SemiBold at 14 is `font-14-semibold`, used only by the PP page's
+  // own strict-filter card title and the pickers' group headers).
+  strictTitle: { fontFamily: Fonts.poppinsMedium, fontSize: 14, lineHeight: 16, color: Colors.black },
+  // Angular `.setting-description body3-regular-12` — 12/16 Poppins-Regular.
   strictDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 16, color: Colors.black },
 
-  promptText:  { fontSize: 12, lineHeight: 16, color: Colors.black },
+  // Angular: `line-height-16 body3-regular-12` on both the range prompt and
+  // the reduced-matches note.
+  promptText:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 16, color: Colors.black },
   warningText: { color: Colors.inputError },
 
   footer: {
@@ -148,17 +187,26 @@ const s = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border,
   },
   matchesCol: { gap: 4 },
-  matchesLabel: { fontSize: 12, color: Colors.black },
-  matchesCount: { fontSize: 14, fontWeight: '600', color: Colors.black },
+  // Angular `.strict-matches-count`: label `body3-regular-12` at 12/16; value
+  // `body2-regular-14` with the block's own `font-weight: 600` + 24 line-height
+  // override — expressed here as the SemiBold family, since RN can't add
+  // weight to Poppins-Regular the way the browser synthesizes it.
+  matchesLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 16, color: Colors.black },
+  matchesCount: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, lineHeight: 24, color: Colors.black },
   reducedRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  reducedOld: { fontSize: 14, color: Colors.black, textDecorationLine: 'line-through' },
-  reducedTo:  { fontSize: 14, color: Colors.black },
-  reducedNew: { fontSize: 14, fontWeight: '600', color: Colors.inputError },
+  // Angular `.matches-count-reduced` (14/20): the struck-out old count and the
+  // "to" keep weight 400 (`.matches-old`), the new count goes 600 (`.matches-new`).
+  reducedOld: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 20, color: Colors.black, textDecorationLine: 'line-through' },
+  reducedTo:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 20, color: Colors.black },
+  reducedNew: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, lineHeight: 20, color: Colors.inputError },
   applyBtn: {
     flex: 1, height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
   },
-  applyText: { fontSize: 14, fontWeight: '500', color: Colors.white },
+  // Angular button-revamp's default ctaFontSize is `body2-regular-14` (+
+  // `line-height-16`) — every CTA on the filter side is Poppins-REGULAR 14,
+  // not medium/semibold. None of the filter-side call sites overrides it.
+  applyText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.white },
 })
 
 // ─── Compact "input field" summary row (Figma's Input field component) ───────
@@ -168,10 +216,16 @@ const s = StyleSheet.create({
 // fields) or 2 (Age/Height min+max) of these as this screen's `children`.
 
 export function CompactFieldRow({
-  label, value, onPress,
-}: { label: string; value: string; onPress: () => void }) {
+  label, value, onPress, disabled,
+}: { label: string; value: string; onPress: () => void; disabled?: boolean }) {
   return (
-    <Pressable style={cs.box} onPress={onPress}>
+    <Pressable
+      style={[cs.box, disabled && cs.boxDisabled]}
+      onPress={onPress}
+      // Angular: filter.component.html puts `.disabled` on this row for
+      // Dosham/Monthly income until the "specific" radio option is picked.
+      disabled={disabled}
+    >
       <View style={cs.labelWrap} pointerEvents="none">
         <Text style={cs.label}>{label}</Text>
       </View>
@@ -186,9 +240,12 @@ const cs = StyleSheet.create({
     height: 48, borderWidth: 1, borderColor: Colors.inputBorder, borderRadius: 8,
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, gap: 8,
   },
+  boxDisabled: { opacity: 0.4 },
   labelWrap: {
     position: 'absolute', top: -9, left: 12, backgroundColor: Colors.white, paddingHorizontal: 4,
   },
-  label: { fontSize: 12, color: Colors.black },
-  value: { flex: 1, fontSize: 14, color: Colors.black },
+  // Angular `.right-popup-open`: the value line is `body2-regular-14` and the
+  // floating label `body3-regular-12` — both Poppins-Regular.
+  label: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
+  value: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
 })

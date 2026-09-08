@@ -116,7 +116,9 @@ const R_ICON = {
   education:      CDN_REACT + '/edit_education.svg',
   occupation:     CDN_REACT + '/edit_occupation.svg',
   income:         CDN_REACT + '/edit_monthlyincome.svg',
-  religion:       CDN_REACT + '/edit_religion.svg',
+  // Shared with the Filters/Partner-preferences religion row (SearchScreen's
+  // FIELD_ICON) so one asset covers both surfaces — was edit_religion.svg.
+  religion:       CDN_REACT + '/filter-religion.svg',
   caste:          CDN_REACT + '/edit_caste.svg',
   raasi:          CDN_REACT + '/edit_raasi.svg',
   star:           CDN_REACT + '/edit_star.svg',

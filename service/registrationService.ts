@@ -570,6 +570,152 @@ export async function fetchMotherTongueOptions(): Promise<Array<{ key: string; l
 
 // Fetches eating habit options from EATINGHABITS key in registrationArrays.
 // Angular: profileEatingHabits = apiResponse["EATINGHABITS"] — plain object {key: label}.
+// A parent row plus its children, for the filter's grouped side panels
+// (Angular: filter.service.ts's buildParentChild()).
+export type OptionGroup = {
+  key:     string
+  label:   string
+  options: Array<{ key: string; label: string }>
+}
+
+// Turns either response shape — a {id: name} map or an array of
+// {KEY/key/STATEID/CITYID, VALUE/value/STATE/CITY} — into key/label pairs.
+function toKeyLabelList(raw: any): Array<{ key: string; label: string }> {
+  if (Array.isArray(raw)) {
+    return raw
+      .map((item: any) => ({
+        key:   String(item.key ?? item.KEY ?? item.STATEID ?? item.CITYID ?? ''),
+        label: label(item.value ?? item.VALUE ?? item.STATE ?? item.CITY ?? ''),
+      }))
+      .filter(o => o.key !== '' && o.label !== '')
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw)
+      .filter(([, value]) => value != null && typeof value !== 'object')
+      .map(([key, value]) => ({ key, label: label(value) }))
+      .filter(o => o.label !== '')
+  }
+  return []
+}
+
+// States of EVERY given country, grouped under it. Angular asks for all of them
+// in one call — `type=state&country=<k1~k2>` (filter-popup.component.ts's
+// callAPIPoppulateData) — and the response's STATE is an array PARALLEL to the
+// requested countries, which is what buildParentChild()'s `childItems[i]`
+// indexes. A flat STATEOBJ carrying a country id is handled too.
+export async function fetchStateGroups(
+  countries: Array<{ key: string; label: string }>,
+): Promise<OptionGroup[]> {
+  if (countries.length === 0) return []
+  const lang = (await getItem(SK.Auth.LANG)) ?? 'en'
+  const keys = countries.map(c => c.key).join('~')
+  const res  = await apiCall(
+    Endpoints.registration.initialFetch, 'POST',
+    `type=state&country=${keys}&state=&LANG=${lang}`,
+  )
+
+  const perCountry = res?.RESPONSE?.STATE
+  const flat       = res?.RESPONSE?.STATEOBJ
+
+  return countries.map((country, index) => {
+    let options = toKeyLabelList(Array.isArray(perCountry) ? perCountry[index] : undefined)
+    if (options.length === 0 && Array.isArray(flat)) {
+      options = toKeyLabelList(
+        flat.filter((s: any) => String(s.COUNTRYID ?? s.COUNTRY ?? s.parentKey ?? '') === country.key),
+      )
+    }
+    // Single country asked for: an unkeyed response is unambiguously its list.
+    if (options.length === 0 && countries.length === 1) {
+      options = toKeyLabelList(flat ?? (Array.isArray(perCountry) ? perCountry[0] : perCountry))
+    }
+    return { key: country.key, label: country.label, options }
+  })
+}
+
+// Districts of EVERY given state, grouped under it — `type=city&state=<s1~s2>`.
+// Angular groups these by each city's own STATEID (buildParentChild's CITY
+// branch), with the parallel-array shape as the fallback.
+export async function fetchCityGroups(
+  states: Array<{ key: string; label: string }>,
+): Promise<OptionGroup[]> {
+  if (states.length === 0) return []
+  const lang = (await getItem(SK.Auth.LANG)) ?? 'en'
+  const keys = states.map(s => s.key).join('~')
+  const res  = await apiCall(
+    Endpoints.registration.initialFetch, 'POST',
+    `type=city&country=&state=${keys}&LANG=${lang}`,
+  )
+
+  const flat     = res?.RESPONSE?.CITYOBJ
+  const perState = res?.RESPONSE?.CITY
+
+  return states.map((state, index) => {
+    let options: Array<{ key: string; label: string }> = []
+    if (Array.isArray(flat)) {
+      options = toKeyLabelList(
+        flat.filter((c: any) => String(c.STATEID ?? c.stateid ?? c.parentKey ?? '') === state.key),
+      )
+    }
+    if (options.length === 0) {
+      options = toKeyLabelList(Array.isArray(perState) ? perState[index] : undefined)
+    }
+    if (options.length === 0 && states.length === 1) {
+      options = toKeyLabelList(flat ?? (Array.isArray(perState) ? perState[0] : perState))
+    }
+    return { key: state.key, label: state.label, options }
+  })
+}
+
+// Filter-side country options. Angular's country panel reads
+// `filterDataList['COUNTRY']` (filter-popup.component.ts's getArrayData) — the
+// initialfetch blob's COUNTRY map, keyed id -> name. COUNTRYLIST is a
+// DIFFERENT key: the registration/NRI list of {COUNTRYID, COUNTRY} objects,
+// which isn't always present in the cached blob — reading it left the filter's
+// country panel empty. COUNTRYLIST stays as a fallback for the shape that has
+// it populated, and both shapes are accepted.
+export async function fetchFilterCountries(): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  for (const raw of [data?.COUNTRY, data?.COUNTRYLIST]) {
+    if (Array.isArray(raw)) {
+      const items = raw
+        .map((item: any) => ({
+          key:   String(item.KEY ?? item.key ?? item.COUNTRYID ?? ''),
+          label: label(item.VALUE ?? item.value ?? item.COUNTRY ?? ''),
+        }))
+        .filter(o => o.key !== '' && o.label !== '')
+      if (items.length > 0) return items
+    } else if (raw && typeof raw === 'object') {
+      const items = Object.entries(raw)
+        .filter(([, value]) => value != null && typeof value !== 'object')
+        .map(([key, value]) => ({ key, label: label(value) }))
+        .filter(o => o.label !== '')
+      if (items.length > 0) return items
+    }
+  }
+  return []
+}
+
+// Filter-side "Profile created" options. Angular reads the SERVER list
+// (filter.component.ts's getArrayData('PROFILECREATED') -> filterDataList
+// ['PROFILECREATED'], i.e. the initialfetch blob), same as every other filter
+// facet. This port previously used four hardcoded English labels with GUESSED
+// day-count codes ('7'/'30'/'90'), which the search API can't be expected to
+// understand.
+export async function fetchProfileCreatedOptions(): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  const raw  = data?.PROFILECREATED
+  if (Array.isArray(raw)) {
+    return raw.map((item: any) => ({
+      key:   String(item.KEY   ?? item.key   ?? ''),
+      label: label(item.VALUE ?? item.value ?? ''),
+    })).filter(o => o.key !== '')
+  }
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
+  }
+  return []
+}
+
 export async function fetchEatingHabitOptions(): Promise<Array<{ key: string; label: string }>> {
   const data = await getRegistrationArrays()
   const raw  = data?.EATINGHABITS
@@ -866,6 +1012,33 @@ export async function fetchDivisionOptions(): Promise<Array<{ key: string; label
 
 // Fetches monthly income options from REGISTRATIONARRAYS.MONTHLYINCOME
 // Angular: apiResponse["MONTHLYINCOME"] → array of { CKEY, VALUE }
+// The FILTER's income-bracket panel. Angular reads a different list here than
+// the one a member picks their own income from: getSearchDataList()'s
+// `itemList = this.filterDataList['MONTHLYINCOMERANGE']` for MONTHLYINCOME,
+// where the registration/edit screens use MONTHLYINCOME. Falls back to
+// MONTHLYINCOME so the panel is never empty if the RANGE key is absent.
+export async function fetchIncomeRangeOptions(): Promise<Array<{ key: string; label: string }>> {
+  const data = await getRegistrationArrays()
+  for (const raw of [data?.MONTHLYINCOMERANGE, data?.MONTHLYINCOME]) {
+    if (Array.isArray(raw)) {
+      const items = raw
+        .map((item: any) => ({
+          key:   String(item.CKEY ?? item.key ?? item.KEY ?? ''),
+          label: label(item.VALUE ?? item.value ?? ''),
+        }))
+        .filter(o => o.key !== '' && o.label !== '')
+      if (items.length > 0) return items
+    } else if (raw && typeof raw === 'object') {
+      const items = Object.entries(raw)
+        .filter(([, value]) => value != null && typeof value !== 'object')
+        .map(([key, value]) => ({ key, label: label(value) }))
+        .filter(o => o.label !== '')
+      if (items.length > 0) return items
+    }
+  }
+  return []
+}
+
 export async function fetchMonthlyIncomeOptions(): Promise<Array<{ key: string; label: string }>> {
   const data = await getRegistrationArrays()
   const raw  = data?.MONTHLYINCOME
@@ -1528,10 +1701,27 @@ export async function fetchRaasiOptions(): Promise<Array<{ key: string; label: s
 // compiles unchanged. Angular never actually filters STAR by raasi (see
 // header comment above), so a raasi-scoped signature would misrepresent the
 // real behavior even though it's harmless to keep passing one in.
-export async function fetchStarOptions(_raasiId?: string): Promise<Array<{ key: string; label: string }>> {
+// Angular: initialfetch `type=stars&RAASIID=<raasi>` (api-params-functions.ts's
+// stars case / registration.page.ts's getStarDetail) returns just that raasi's
+// stars, while `RAASIID=` with no id returns ALL of them — and that all-stars
+// answer is exactly what gets written into the blob's STAR key
+// (registration-revamp's getStarDetail). So reading the blob for a specific
+// raasi handed back all 27 stars: the raasi argument was accepted and ignored.
+export async function fetchStarOptions(raasiId?: string): Promise<Array<{ key: string; label: string }>> {
+  if (raasiId && raasiId !== '0') {
+    const lang = (await getItem(SK.Auth.LANG)) ?? 'en'
+    const res  = await apiCall(
+      Endpoints.registration.initialFetch, 'POST',
+      `type=stars&RAASIID=${raasiId}&LANG=${lang}`,
+    )
+    const opts = objToOptions(res?.RESPONSE?.STAR ?? res?.RESPONSE)
+    // Angular falls back to the already-loaded list when the call fails.
+    if (opts.length > 0) return opts
+  }
   const data = await getRegistrationArrays()
   return objToOptions(data?.STAR)
 }
+
 
 // `star`/`raasi` params are kept only for signature compatibility with
 // existing callers — see below, neither is actually used anymore.

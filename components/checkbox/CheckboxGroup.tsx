@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -7,6 +8,19 @@ export interface CheckboxOption {
   key:      string
   value:    string
   checked?: boolean | undefined
+  // Row background, separate from the tick. Angular's `filter-selected-bg` is
+  // `item.checked && !isCheckAnyOption`: with the filter on "Any" every row is
+  // ticked but none is highlighted, since none is a real selection. Defaults
+  // to `checked` when not given.
+  highlighted?: boolean | undefined
+  // A group heading row (a country over its states, a state over its
+  // districts). Angular: right-side-panel's `type == 'parent'` item —
+  // `filter-heading-bg` #F0F0F0 background with a `font-14-semibold` label,
+  // `filter-heading-bg-active` once the group is (partly) selected.
+  parent?: boolean | undefined
+  // Some children selected, not all — rendered as a dash, matching Angular's
+  // `[indeterminate]` on a group heading.
+  indeterminate?: boolean | undefined
 }
 
 export interface CheckboxGroupProps {
@@ -25,19 +39,32 @@ function CheckboxItem({
   onToggle: (key: string, checked: boolean) => void
 }) {
   const checked = !!option.checked
+  // Option labels are server-translated, so the family follows the current
+  // language (same rule SearchablePicker/MultiSelectPicker apply) — Angular
+  // gets this from the per-language `.body2-regular-14` overrides in
+  // global.scss. Without it these rows rendered in the system font.
+  const langFonts = useLanguageFonts()
 
   return (
     <Pressable
       onPress={() => onToggle(option.key, !checked)}
-      style={[styles.row, checked && styles.rowChecked]}
+      style={[
+        styles.row,
+        option.parent && styles.rowParent,
+        (option.highlighted ?? checked) && (option.parent ? styles.rowParentActive : styles.rowChecked),
+      ]}
       accessibilityRole="checkbox"
       accessibilityState={{ checked }}
     >
-      <Text style={styles.label}>{option.value}</Text>
+      <Text style={[
+        styles.label,
+        { fontFamily: option.parent ? langFonts.semiBold : langFonts.regular },
+      ]}>{option.value}</Text>
 
       {/* Angular: ion-checkbox slot=end, --checkbox-background-checked #B50033 */}
-      <View style={[styles.box, checked && styles.boxChecked]}>
+      <View style={[styles.box, (checked || option.indeterminate) && styles.boxChecked]}>
         {checked && <Text style={styles.tick}>✓</Text>}
+        {!checked && option.indeterminate && <Text style={styles.tick}>–</Text>}
       </View>
     </Pressable>
   )
@@ -71,6 +98,9 @@ const styles = StyleSheet.create({
   rowChecked: {
     backgroundColor: Colors.selectionBg,
   },
+  // Angular right-side-panel.component.scss: .filter-heading-bg / -active
+  rowParent:       { backgroundColor: '#F0F0F0' },
+  rowParentActive: { backgroundColor: 'rgba(181,0,51,0.10)' },
   // Angular ion-label: margin-top 8, margin-bottom 8, margin-left 24
   label: {
     flex:       1,

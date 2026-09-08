@@ -18,7 +18,7 @@ import { StorageKeys as SK } from '../constants/storage.keys'
 import { isAnySelection, resolveFilterLabel, type FilterOption } from '../adapters/filterPreference.adapter'
 import {
   fetchReligionOptions, fetchCasteOptions, fetchDivisionOptions,
-  fetchRaasiOptions, fetchStarOptions, fetchDoshamOptions,
+  fetchStarOptions, fetchDoshamOptions,
   fetchOccupationOptions, fetchQualificationOptions, fetchMonthlyIncomeOptions,
   fetchMotherTongueOptions, fetchMaritalStatusOptions, fetchEatingHabitOptions,
   fetchPhysicalStatusOptions, fetchExactHeightOptions,
@@ -89,14 +89,17 @@ export function useFilterDisplayValues(): [FilterDisplayResult | null, () => voi
       isAny(selected.PHYSICALSTATUS) ? empty : fetchPhysicalStatusOptions(),
       isAny(selected.STATE) ? empty : fetchStates(),
       (isAny(selected.STATE) || isAny(selected.CITY)) ? empty : fetchCities(selected.STATE[0]),
+      // Angular (filter.component.ts:601) reads the OPPOSITE gender's NEWHEIGHT
+      // bucket for a partner preference, and fetchExactHeightOptions expects
+      // registration's '1'/'0' encoding — not LOGIN_GENDER's 'M'/'F', which
+      // never matched '0' and so always resolved against the MALE list. Same
+      // translation SearchScreen.tsx's partnerHeightGender does.
       (selected.STARTHEIGHT?.[0] === DEFAULT_FILTER.STARTHEIGHT[0] && selected.ENDHEIGHT?.[0] === DEFAULT_FILTER.ENDHEIGHT[0])
-        ? empty : fetchExactHeightOptions(gender ?? '1'),
-      // STAR codes aren't grouped by raasi in storage, so resolving a real
-      // selection means checking every raasi's own star list — Angular's UI
-      // itself is a raasi->star tree, so a saved STAR code can't be resolved
-      // without it. Only paid for when STAR actually differs from "Any".
-      isAny(selected.STAR) ? empty : fetchRaasiOptions().then(raasis =>
-        Promise.all(raasis.map(r => fetchStarOptions(r.key))).then(groups => groups.flat())),
+        ? empty : fetchExactHeightOptions(gender === 'F' ? '1' : '0'),
+      // Star keys are unique across raasis, so the flat all-stars list (the
+      // cached blob, via fetchStarOptions with no raasi) resolves any saved
+      // code. This walked every raasi, which now costs one API call each.
+      isAny(selected.STAR) ? empty : fetchStarOptions(),
       isAny(selected.DOSHAM) ? empty
         : fetchDoshamOptions(selected.STAR?.[0] ?? '', '', selected.MOTHERTONGUE?.[0]).then(r => r.dosham),
     ])

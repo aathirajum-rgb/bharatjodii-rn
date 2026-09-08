@@ -12,7 +12,7 @@
 // closes the popup; the live "Matches" count inside it is the same debounced
 // count SearchScreen already recomputes on every field change, so it updates
 // in near-real-time as you pick values, before you even click Apply.
-import { Fragment } from 'react'
+import { Fragment, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import DesktopPageShell from '../../components/desktop-page-shell/DesktopPageShell'
@@ -25,6 +25,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import type { MultiSelectOption } from '../../components/multi-select-picker/MultiSelectPicker'
 import type { PickerOption } from '../../components/searchable-picker/SearchablePicker'
+import { sortFilterOptions } from '../../adapters/filterPreference.adapter'
 import type { FieldKey } from './SearchScreen'
 import { AGE_OPTIONS, SIMPLE_MULTI_FIELDS } from './SearchScreen'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
@@ -40,6 +41,11 @@ export interface SearchDesktopLayoutProps {
 
   rows:      Array<{ key: FieldKey; label: string; hidden?: boolean }>
   rowValue:  Record<string, string>
+  // Angular: search.component.ts's isFieldSetToAny() — per-field "still holds
+  // no real preference", read off the saved selection rather than off
+  // rowValue's text (each unset field now shows its own wording, e.g. "Any
+  // caste" / "Dosham doesn't matter", so no single string identifies "Any").
+  fieldIsAny: Record<string, boolean>
   selected:  Record<string, any>
   labelCache: Record<string, MultiSelectOption[]>
   heightOptions: PickerOption[]
@@ -87,7 +93,7 @@ function strictCopyFor(key: FieldKey | 'DIVISION') {
 
 export default function SearchDesktopLayout(props: SearchDesktopLayoutProps) {
   const {
-    navigation, userName, loading, rows, rowValue, selected, labelCache, heightOptions, fieldIcon,
+    navigation, userName, loading, rows, rowValue, fieldIsAny, selected, labelCache, heightOptions, fieldIcon,
     matchCount, countLoading, strictPrefs, onToggleStrictPref,
     manageStrictOpen, setManageStrictOpen,
     ageEditor, setAgeEditor, heightEditor, setHeightEditor, locationStep, setLocationStep,
@@ -147,11 +153,26 @@ export default function SearchDesktopLayout(props: SearchDesktopLayoutProps) {
   // nothing to strictly match against yet.
   const showStrict = !!activeKey
     && !STRICT_EXCLUDED_FIELDS.has(activeKey as FieldKey)
-    && (rowValue as any)[activeKey] !== t('SEARCH.ANY', 'Any')
+    && !fieldIsAny[activeKey]
 
   function toSelectOptions(opts: MultiSelectOption[] | undefined): SelectOption[] {
     return (opts ?? []).map(o => ({ key: o.key, label: o.label }))
   }
+
+  // Angular's sortingList() order (selected values hoisted to the top,
+  // alphabetical within each group) — see sortFilterOptions.
+  //
+  // Frozen for as long as the popup stays on one field: `selected` is
+  // deliberately NOT a dependency, because unlike mobile's staged
+  // MultiSelectPicker this layout applies each toggle immediately, and
+  // re-sorting mid-click would move rows out from under the cursor. Angular
+  // likewise sorts once, when the panel opens.
+  const sortedOptionsFor = useMemo(() => {
+    const forField = (field: string) =>
+      toSelectOptions(sortFilterOptions(field, labelCache[field] ?? [], selected[field]))
+    return { CITY: forField('CITY'), STAR: forField('STAR'), ACTIVE: activeKey ? forField(activeKey) : [] }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeKey, labelCache])
 
   return (
     <DesktopPageShell navigation={navigation} userName={userName} activeItem="editPreferences" onTabPress={handleTabPress}>
@@ -261,7 +282,7 @@ export default function SearchDesktopLayout(props: SearchDesktopLayoutProps) {
             />
             <DesktopMultiSelectField
               label="City"
-              options={toSelectOptions(labelCache.CITY)}
+              options={sortedOptionsFor.CITY}
               selectedKeys={new Set(selected.CITY ?? [])}
               onToggle={key => {
                 const cur: string[] = selected.CITY ?? []
@@ -284,7 +305,7 @@ export default function SearchDesktopLayout(props: SearchDesktopLayoutProps) {
             />
             <DesktopMultiSelectField
               label="Star"
-              options={toSelectOptions(labelCache.STAR)}
+              options={sortedOptionsFor.STAR}
               selectedKeys={new Set(selected.STAR ?? [])}
               onToggle={key => {
                 const cur: string[] = selected.STAR ?? []
@@ -300,7 +321,7 @@ export default function SearchDesktopLayout(props: SearchDesktopLayoutProps) {
         {activeKey && (activeKey === 'CASTE' || activeKey === 'DIVISION' || SIMPLE_MULTI_FIELDS.has(activeKey as FieldKey)) && (
           <DesktopMultiSelectField
             label={activeLabel}
-            options={toSelectOptions(labelCache[activeKey])}
+            options={sortedOptionsFor.ACTIVE}
             selectedKeys={new Set(selected[activeKey] ?? [])}
             onToggle={key => {
               const field = activeKey
@@ -327,7 +348,7 @@ export default function SearchDesktopLayout(props: SearchDesktopLayoutProps) {
         fieldIcon={fieldIcon}
         fieldLabel={Object.fromEntries(rows.map(r => [r.key, r.label])) as Record<FieldKey, string>}
         fieldValue={rowValue as Record<FieldKey, string>}
-        anyLabel={t('SEARCH.ANY')}
+        fieldIsAny={fieldIsAny}
         matchCount={matchCount}
         countLoading={countLoading}
         onShowMatches={onShowMatches}
@@ -376,5 +397,8 @@ const s = StyleSheet.create({
     width: 312, height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
   },
-  showMatchesText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.white },
+  // Angular button-revamp's default ctaFontSize is `body2-regular-14` and no
+  // filter-side CTA overrides it — same Regular-14 as the mobile footer CTA
+  // (this was Medium).
+  showMatchesText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.white },
 })

@@ -3,22 +3,22 @@
 // "Filters" (quick/temporary) mode and "Partner preferences" (PP) mode).
 //
 // Known simplifications vs Angular (documented, not silent):
-//  - LOCATION is State→City only (Country fixed to India), matching the same
-//    simplification onboarding's LocationScreen already makes app-wide.
+//  - LOCATION is Country + State + City, three multi-select panels off the
+//    field's own page, matching Angular. The City panel is a flat list of the
+//    selected states' districts rather than Angular's per-state grouped tree.
 //  - CASTE stops at Caste (no Subcaste/Gothra sub-cascade) — those are rarely
 //    changed post-onboarding and add a lot of UI for a rarely-touched facet.
 //  - STAR is Raasi (single) → Star (multi), a simplified stand-in for Angular's
 //    grouped parent/child checkbox tree.
 //  - AGE/HEIGHT are bounded single-value Min/Max pickers (not Angular's grouped
 //    side-panel lists), reusing the existing SearchablePicker component.
-//  - MONTHLYINCOME is a flat multi-select bracket list — Angular's nested
-//    "custom range" sub-picker isn't ported.
-//  - PROFILECREATED is a recency multi-select (Any Time/1 Week/1 month/3 Month —
-//    confirmed against a live screenshot) using PROFILECREATED_OPTIONS' local,
-//    fixed list; its day-count codes ('7'/'30'/'90') aren't confirmed against
-//    Angular's real API contract (see that constant's own comment).
-//    PHOTOAVAILABLE/HOROSCOPEAVAILABLE (both Filter-mode-only, alongside
-//    PROFILECREATED) are plain on/off checkboxes, matching Angular.
+//  - MONTHLYINCOME and DOSHAM are Angular's radio-first fields: three choices
+//    from FILTERSCREEN, where only the LAST one opens a sub-list (income
+//    brackets / dosham types). See buildRadioChoices and doshamChoices below.
+//  - PROFILECREATED, PHOTOAVAILABLE and HOROSCOPEAVAILABLE are Filter-mode-only.
+//    PROFILECREATED's options come from the server list (initialfetch's
+//    PROFILECREATED), matching Angular; the other two are plain on/off
+//    checkboxes, also matching Angular.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -32,20 +32,26 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
-import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
+import { CDN_REACT } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
 import { handleBack } from '../../utils/navigationRef'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import SearchDesktopLayout from './SearchDesktopLayout'
 import { fetchSearchResults } from '../../service/homeService'
-import { resolveFilterLabel, isAnySelection } from '../../adapters/filterPreference.adapter'
 import {
-  getSelectedObject, saveFilterState, getSearchPPCheckBox,
-  getFilterEventType, resetFilter, buildSearchParams, DEFAULT_FILTER,
+  resolveFilterLabel, isAnySelection, sortFilterOptions,
+  buildRadioChoices, buildIncomeChoices, incomeAmountFor, buildStarGroups, parseStarMatchingKeys,
+} from '../../adapters/filterPreference.adapter'
+import RadioGroup from '../../components/radio/RadioGroup'
+import {
+  getSelectedObject, saveFilterState,
+  getFilterEventType, resetFilter, buildSearchParams, DEFAULT_FILTER, DEFAULT_PP_CHECKBOX,
+  markFilterPPEdited,
   getStrictFilterState, setStrictFilterState,
 } from '../../service/filterService'
 import { getPPSetData } from '../../service/profileService'
+import { fetchEditProfileInfo } from '../../service/editProfileService'
 import StrictFilterManageModal from '../../components/search/StrictFilterManageModal'
 import {
   MANAGE_FILTER_CTA, STRICT_FILTERS_TITLE, STRICT_FILTERS_NOTE,
@@ -54,10 +60,11 @@ import StrictFieldEditorScreen, { CompactFieldRow } from '../../components/searc
 import {
   fetchReligionOptions, fetchCasteOptions, fetchDivisionOptions,
   fetchRaasiOptions, fetchStarOptions, fetchDoshamOptions,
-  fetchOccupationOptions, fetchQualificationOptions, fetchMonthlyIncomeOptions,
+  fetchOccupationOptions, fetchQualificationOptions, fetchIncomeRangeOptions,
   fetchMotherTongueOptions, fetchMaritalStatusOptions, fetchEatingHabitOptions,
   fetchPhysicalStatusOptions, fetchExactHeightOptions,
-  fetchStates, fetchCities,
+  fetchStates, fetchCities, fetchFilterCountries, getRegistrationArrays, fetchProfileCreatedOptions, getRegValue,
+  fetchStateGroups, fetchCityGroups, type OptionGroup,
 } from '../../service/registrationService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
@@ -76,14 +83,17 @@ const ICON_ARROW = CDN_REACT + '/menu_right_arrow.svg'
 // etc.) — this port previously rendered label+value+chevron only, no icon at
 // all. Reuses ViewProfile's own ICON map (same assets/images/svg/viewprofile/
 // CDN set Angular's detail rows already use) rather than a second copy of
-// these paths — every field below has a directly confirmed match EXCEPT
-// RELIGION, which has no other on-screen usage anywhere in this port to
-// confirm against; that one path is a best-guess following the exact same
-// `viewprofile/{field}-icon.svg` naming convention every other icon here uses.
+// these paths.
+//
+// RELIGION is the exception: it has no viewprofile counterpart, and the
+// `viewprofile/religion-icon.svg` path guessed from that naming convention
+// does not exist (404), so the row rendered with no icon at all. It now uses
+// the dedicated react/filter-religion.svg asset — the same one Edit Profile's
+// religion row points at, so the two surfaces stay in sync.
 const FIELD_ICON: Record<FieldKey, string> = {
   AGE:            ICON.age,
   LOCATION:       ICON.location,
-  RELIGION:       CDN_SVG + 'viewprofile/religion-icon.svg',
+  RELIGION:       CDN_REACT + '/filter-religion.svg',
   CASTE:          ICON.caste,
   STAR:           ICON.star,
   DOSHAM:         ICON.dosham,
@@ -113,23 +123,13 @@ export const SIMPLE_MULTI_FIELDS = new Set<FieldKey>([
   'MOTHERTONGUE', 'MARITALSTATUS', 'EATINGHABITS', 'PHYSICALSTATUS', 'PROFILECREATED',
 ])
 
-// Angular's real "Profile created" field is a recency multi-select (Any Time /
-// 1 Week ago / 1 month ago / 3 Month ago — confirmed against a live
-// screenshot), not the on/off toggle this port previously used. These 4
-// options are fixed/local (no server list exists for them, unlike every
-// other SIMPLE_MULTI_FIELDS entry), but the underlying day-count CODES sent
-// to the search API ('7'/'30'/'90') are an unconfirmed best guess — a
-// reasonable convention for day-based recency buckets, not verified against
-// Angular's actual API contract. If matches don't filter correctly by this
-// field, these codes are the first thing to check.
-function getProfileCreatedOptions(t: (key: string) => string): MultiSelectOption[] {
-  return [
-    { key: '0',  label: t('FILTER.PROFILECREATED_ANYTIME') },
-    { key: '7',  label: t('FILTER.PROFILECREATED_1WEEK') },
-    { key: '30', label: t('FILTER.PROFILECREATED_1MONTH') },
-    { key: '90', label: t('FILTER.PROFILECREATED_3MONTH') },
-  ]
-}
+// Angular: `showAnyOption: !['AGE', 'DOSHAM', 'MONTHLYINCOME'].includes(TYPE)`
+// (filter.component.ts / filter-popup.component.ts's side-panel payload). These
+// two panels are the "pick specific values" step of a radio-first field, so the
+// radio group above them already owns the "Dosham doesn't matter" / "Any income"
+// answer — repeating it as an Any row inside the panel is a second, conflicting
+// way to say the same thing. (AGE has no checkbox panel in this port.)
+const NO_ANY_ROW_PANELS = new Set<FieldKey>(['DOSHAM', 'MONTHLYINCOME'])
 
 export const AGE_OPTIONS: PickerOption[] = Array.from({ length: 53 }, (_, i) => {
   const age = 18 + i
@@ -169,7 +169,7 @@ export default function SearchScreen({ navigation }: Props) {
   const [eventType,  setEventType]  = useState<'filter' | 'pp'>('pp')
   const [selected,   setSelected]   = useState<Record<string, any>>(DEFAULT_FILTER)
   const [ppCheckBox, setPpCheckBox] = useState<string[]>([])
-  const [gender,     setGender]     = useState('1')
+  const [gender,     setGender]     = useState('')
   const [matriId,    setMatriId]    = useState('')
   const [userName,   setUserName]   = useState('')
 
@@ -192,9 +192,34 @@ export default function SearchScreen({ navigation }: Props) {
   // fetched — used both to render the picker and to resolve display labels.
   const [labelCache, setLabelCache] = useState<Record<string, MultiSelectOption[]>>({})
 
+  // Angular: search.component.ts's `filterScreenList = filterDataList['FILTERSCREEN']`
+  // — the per-field label map from the SAME initialfetch(type=all) blob this
+  // port already caches as REGISTRATIONARRAYS, so reading it here costs no
+  // extra call. Its ['0'] entry is each field's own "unset" wording ("Any
+  // caste", "Any star", "Dosham doesn't matter", "Any Country", …), which is
+  // what Angular's rows actually display; this port was showing one generic
+  // t('SEARCH.ANY') = "Any" for every unset field instead.
+  const [filterScreen, setFilterScreen] = useState<Record<string, any>>({})
+  const [incomeAmount, setIncomeAmount] = useState('')
+  // The member's own income and occupation, which decide WHICH income radio
+  // rows exist (Angular's piIncomeStatus / occupationStatus).
+  const [piIncome,     setPiIncome]     = useState('')
+  const [ownOccupation, setOwnOccupation] = useState('')
+  // Location's grouped panels: states under their country, districts under
+  // their state (Angular's buildParentChild output).
+  const [stateGroups, setStateGroups] = useState<OptionGroup[]>([])
+  const [cityGroups,  setCityGroups]  = useState<OptionGroup[]>([])
+  // Star's two groups (matching / all other) and the member's own matching
+  // star keys, read from PPSETDATA.PISTARMATCHING.
+  const [starGroups,   setStarGroups]   = useState<OptionGroup[]>([])
+  const [matchingStars, setMatchingStars] = useState<string[]>([])
+
   const [ageEditor,    setAgeEditor]    = useState<'min' | 'max' | null>(null)
   const [heightEditor, setHeightEditor] = useState<'min' | 'max' | null>(null)
-  const [locationStep, setLocationStep] = useState<'state' | 'city' | null>(null)
+  // Angular's LOCATION field (filterRevampConfig.LOCATION) is three separate
+  // checkbox panels — Country, State, City — reached from three rows on the
+  // field's own page, not a forced Country->State->City walk.
+  const [locationStep, setLocationStep] = useState<'country' | 'state' | 'city' | null>(null)
   const [starStep,     setStarStep]     = useState<'raasi' | 'star' | null>(null)
   const [multiEditor,  setMultiEditor]  = useState<FieldKey | null>(null)
   const [heightOptions, setHeightOptions] = useState<PickerOption[]>([])
@@ -206,6 +231,7 @@ export default function SearchScreen({ navigation }: Props) {
   const ageMaxMounted    = useModalMounted(ageEditor === 'max')
   const heightMinMounted = useModalMounted(heightEditor === 'min')
   const heightMaxMounted = useModalMounted(heightEditor === 'max')
+  const countryMounted   = useModalMounted(locationStep === 'country')
   const stateMounted     = useModalMounted(locationStep === 'state')
   const cityMounted      = useModalMounted(locationStep === 'city')
   const raasiMounted     = useModalMounted(starStep === 'raasi')
@@ -236,22 +262,68 @@ export default function SearchScreen({ navigation }: Props) {
       // Note: Angular's own search.component.ts calls getPPSETData(0) — the
       // cache-first flag. Forcing is the deliberate difference, so the toggles
       // can't show a stale STRICKPP.
-      await getPPSetData(true).catch(() => null)
+      const ppSet = await getPPSetData(true).catch(() => null)
 
-      const [obj, pp, evType, id, gen, name, strict] = await Promise.all([
+      const [obj, evType, id, gen, name, occupation, strict, arrays] = await Promise.all([
         getSelectedObject(),
-        getSearchPPCheckBox(),
         getFilterEventType(),
         getItem(SK.Auth.USER_ID),
         getItem(SK.User.LOGIN_GENDER),
         getItem(SK.User.NAME),
+        // Angular's occupationStatus reads the member's own OCCUPATION. In this
+        // port that lives in REGISTRATION_VALUES (setRegValues, written when the
+        // profile is fetched); SK.User.OCCUPATION is not written anywhere, so
+        // reading only that left the flag permanently false and the income
+        // radio unpruned.
+        getRegValue('OCCUPATION').catch(() => null),
         getStrictFilterState(),
+        getRegistrationArrays().catch(() => ({} as Record<string, any>)),
       ])
+      // The height row always holds two real codes (height has no "Any"
+      // state), so its label list is needed for the FIRST paint — seeded here
+      // rather than left to the lazy prefetch effect, which would show the
+      // "Any height" fallback for a frame. Reads the REGISTRATIONARRAYS blob
+      // fetched just above, so it adds no request.
+      const heightOpts = await fetchExactHeightOptions((gen ?? '') === 'F' ? '1' : '0')
+        .catch(() => [] as MultiSelectOption[])
+
+      setFilterScreen((arrays as any)?.FILTERSCREEN ?? {})
+      // The member's own income, resolved to a displayable amount, fills the
+      // <income> placeholder in Monthly income's radio labels ("Should not
+      // exceed ₹50,000") — Angular's setMonthlyIncome() does this once, off
+      // PPSETDATA.PIINCOME plus the blob's income lists.
+      setIncomeAmount(incomeAmountFor((ppSet as any)?.PIINCOME, arrays as Record<string, any>))
+      setPiIncome(String((ppSet as any)?.PIINCOME ?? ''))
+      // Angular's occupationStatus reads localStorage.OCCUPATION, which its
+      // setStorageValue('2', …) spread writes from the member's own profile.
+      // REGISTRATION_VALUES is this port's equivalent container, but it is only
+      // filled by flows the member may never have hit — so when it's empty the
+      // profile is read once, or the income radio silently keeps rows Angular
+      // prunes ("Should not exceed …").
+      let ownOcc = String(occupation ?? '')
+      if (ownOcc === '') {
+        ownOcc = String((await fetchEditProfileInfo().catch(() => null))?.occupation ?? '')
+      }
+      setOwnOccupation(ownOcc)
+      // The member's horoscope-matching stars, which the Star panel groups
+      // under "Matching stars" (Angular: selectedObject.PISTARMATCHING, seeded
+      // from PPSETDATA the same way).
+      setMatchingStars(parseStarMatchingKeys((ppSet as any)?.PISTARMATCHING))
+      if (heightOpts.length > 0) setLabelCache(prev => ({ ...prev, HEIGHT: heightOpts }))
       setSelected(obj)
-      setPpCheckBox(pp)
+      // FILTERPP reports the fields edited in THIS visit, so the flags start
+      // clean on every open — a stale '1' left by an earlier visit would
+      // otherwise ride along and break "only the edited field is 1". Both
+      // paths that build a payload (the count effect and Show matches) persist
+      // this array first, so storage picks the cleared value up too.
+      setPpCheckBox([...DEFAULT_PP_CHECKBOX])
       setEventType(evType)
       setMatriId(id ?? '')
-      setGender(gen ?? '1')
+      // LOGIN_GENDER is 'M'/'F' (Angular's LOGINGENDER). Angular's
+      // getLogInGender() returns '' when it isn't set, and every gender rule
+      // below treats that as "not male" — '1' was never a value this key can
+      // hold, so defaulting to it just made the state unreadable.
+      setGender(gen ?? '')
       setUserName(name ?? '')
       setStrictPrefs(strict)
       setLoading(false)
@@ -281,7 +353,11 @@ export default function SearchScreen({ navigation }: Props) {
       setCountLoading(true)
       try {
         await saveFilterState(selected, ppCheckBox, {})
-        const params = await buildSearchParams(matriId, 0, 1)
+        // forCount — Angular's getUrlParams(0) countParam: SETPP hardcoded
+        // all '0', no FILTERPP. This is the count the PP footer AND both
+        // strict-filter screens display, and it was going out with the
+        // search-call SETPP (1|1|1|…) instead.
+        const params = await buildSearchParams(matriId, 0, 1, { forCount: true })
         const res = await fetchSearchResults(params, controller.signal)
         // A newer request has since started — this one's result is stale,
         // discard it instead of overwriting the count for the current filters.
@@ -303,6 +379,11 @@ export default function SearchScreen({ navigation }: Props) {
 
   function updateField(key: string, value: any) {
     setSelected(prev => ({ ...prev, [key]: value }))
+    // FILTERPP: flag this field's own position as edited (Angular does the
+    // same inside each field editor — filter-popup.component.ts:1377). Every
+    // edit on both mobile and desktop funnels through here, so this is the one
+    // place that needs it.
+    setPpCheckBox(prev => markFilterPPEdited(prev, key))
   }
 
   async function ensureOptions(key: string, loader: () => Promise<MultiSelectOption[]>) {
@@ -312,12 +393,100 @@ export default function SearchScreen({ navigation }: Props) {
     return opts
   }
 
+  // LOGIN_GENDER is Angular's LOGINGENDER ('M'/'F'), but this port's consumers
+  // disagree about it — payWallService/communicationService compare against
+  // 'M', while IgnoredProfilesScreen compares against '0' — so the stored value
+  // can be either encoding depending on what the webview handed over. Every
+  // gender rule below goes through this, because a value in the OTHER encoding
+  // silently matches no branch: that alone leaves the income radio unpruned and
+  // the Monthly income row visible for men.
+  const memberGender: 'M' | 'F' | '' =
+    ['F', 'f', '0'].includes(gender) ? 'F'
+    : ['M', 'm', '1'].includes(gender) ? 'M'
+    : ''
+
+  // Angular (filter.component.ts:601) builds the filter's height list from the
+  // OPPOSITE gender's NEWHEIGHT bucket — it's a PARTNER preference, so a male
+  // user picks from the female heights and vice versa.
+  //
+  // Two encodings collide here: `gender` is LOGIN_GENDER ('M'/'F', same as
+  // Angular's LOGINGENDER), while fetchExactHeight* takes registration's
+  // GENDER ('1' male / '0' female). Passing `gender` straight through never
+  // matched '0', so this screen always served the MALE list regardless of who
+  // was logged in. This flips to the partner's gender AND translates it.
+  const partnerHeightGender = memberGender === 'F' ? '1' : '0'
+
   // Shared with hooks/useFilterDisplayValues.ts (desktop Matches filter
   // sidebar) via adapters/filterPreference.adapter.ts — same "Any"-sentinel +
   // code->label resolution rule, just fed this screen's own lazily-cached
   // per-field option list instead of the sidebar's eagerly-fetched one.
+  // Angular: search.component.ts's `data['selectedData'] =
+  // this.filterScreenList[fieldKey][0]` for any field still holding '0'. Each
+  // field words its own "unset" state ("Any caste", "Any star", "Dosham
+  // doesn't matter"), so a single shared "Any" is never what the reference
+  // shows. Falls back to t('SEARCH.ANY') only when FILTERSCREEN has no entry
+  // (fields with no server list at all, e.g. PROFILECREATED).
+  function anyLabelFor(key: string): string {
+    const label = filterScreen?.[key]?.['0']
+    return typeof label === 'string' && label.trim() !== '' ? label : t('SEARCH.ANY')
+  }
+
   function labelsFor(key: string, keys: string[]): string {
-    return resolveFilterLabel(labelCache[key] ?? [], keys, t('SEARCH.ANY'))
+    return resolveFilterLabel(labelCache[key] ?? [], keys, anyLabelFor(key))
+  }
+
+  // ── Radio-first fields: Dosham & Monthly income ──────────────────────────
+  // Angular gives both a radio group built from their whole FILTERSCREEN map,
+  // and the sub-list ("Select type of dosham" / the income brackets) is
+  // reachable ONLY while option '2' is selected (filter.component.html's
+  // `disabled: !(selectedData === searchDataList[2])`). This port used to show
+  // the sub-list AS the whole field, so neither the "doesn't matter" / "should
+  // not have dosham" choices nor the income semantics ("should not exceed" /
+  // "should be at least" the member's own income) existed at all.
+  const doshamChoices = useMemo(
+    // The <gender> placeholder becomes the PARTNER's term: a female member is
+    // looking for a groom and vice versa (Angular setDoshamValue()).
+    () => buildRadioChoices(filterScreen?.DOSHAM, {
+      gender: memberGender === 'F' ? t('SEARCH.GROOM') : t('SEARCH.BRIDE'),
+    }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filterScreen, memberGender],
+  )
+  // Angular prunes this list per member (getArrayList) — see buildIncomeChoices.
+  // `hasOccupation` is Angular's occupationStatus: a stored OCCUPATION that
+  // isn't the "not working" code '8'.
+  const incomeChoices = useMemo(
+    () => buildIncomeChoices(filterScreen?.MONTHLYINCOME, incomeAmount, {
+      piIncome:      piIncome,
+      gender:        memberGender,
+      hasOccupation: ownOccupation !== '' && ownOccupation !== '0' && ownOccupation !== '8',
+    }),
+    [filterScreen, incomeAmount, piIncome, memberGender, ownOccupation],
+  )
+
+  // The radio label for a radio-first field, or null once the member has moved
+  // past the radio into the sub-list (dosham types / income brackets), where
+  // the value has to come from that list instead. '2' is the sub-list state, so
+  // it reports null too — except before anything is picked, when it IS the
+  // current answer ("Select income range").
+  function radioChoiceLabel(
+    field: 'DOSHAM' | 'MONTHLYINCOME', choices: { key: string; label: string }[],
+  ): string | null {
+    // A real sub-list pick is shown as the picked values themselves, so hand
+    // the row back to labelsFor.
+    if (hasSubListPick(field)) return null
+    return choices.find(c => c.key === radioValueFor(field, choices))?.label ?? null
+  }
+
+  // One height bound -> its label, or null when the code can't be resolved.
+  // Kept separate from labelsFor() because HEIGHT must never fall back to the
+  // raw code: unlike every other field its stored value is always a real
+  // list key ('1'..'31'), never the '0' "Any" sentinel, so resolveFilterLabel's
+  // anyLabel branch can't catch an unresolved one.
+  function heightBound(keys: string[] | undefined): string | null {
+    const key = keys?.[0]
+    if (!key) return null
+    return (labelCache.HEIGHT ?? []).find(o => o.key === key)?.label ?? null
   }
 
   // ── Row value display ────────────────────────────────────────────────────
@@ -391,32 +560,48 @@ export default function SearchScreen({ navigation }: Props) {
 
     want('RELIGION',       selected.RELIGION,       fetchReligionOptions)
     want('OCCUPATION',     selected.OCCUPATION,     fetchOccupationOptions)
-    want('MONTHLYINCOME',  selected.MONTHLYINCOME,  fetchMonthlyIncomeOptions)
+    // The filter's bracket list is MONTHLYINCOMERANGE, not MONTHLYINCOME —
+    // see fetchIncomeRangeOptions.
+    want('MONTHLYINCOME',  selected.STARTMONTHLYINCOME, fetchIncomeRangeOptions)
     want('EDUCATION',      selected.EDUCATION,      fetchQualificationOptions)
     want('MOTHERTONGUE',   selected.MOTHERTONGUE,   fetchMotherTongueOptions)
     want('MARITALSTATUS',  selected.MARITALSTATUS,  () => fetchMaritalStatusOptions(gender))
     want('EATINGHABITS',   selected.EATINGHABITS,   fetchEatingHabitOptions)
     want('PHYSICALSTATUS', selected.PHYSICALSTATUS, fetchPhysicalStatusOptions)
+    want('COUNTRY',        selected.COUNTRY,        fetchFilterCountries)
     want('STATE',          selected.STATE,          fetchStates)
+    // `doshamHash`, not `dosham`: the panel lists the dosham TYPES (Chevvai,
+    // Kala sarpa, Kethu, …) from DOSHAMHASH[TAMIL|OTHER] — Angular's
+    // getArrayData()'s DOSHAM branch reads exactly that. `dosham` is the
+    // top-level DOSHAM list, whose own choices the radio group above already
+    // owns, so this panel was showing those instead of the types.
     want('DOSHAM',         selected.DOSHAM,
-      async () => (await fetchDoshamOptions(selected.STAR?.[0] ?? '', '', selected.MOTHERTONGUE?.[0])).dosham)
+      async () => (await fetchDoshamOptions(selected.STAR?.[0] ?? '', '', selected.MOTHERTONGUE?.[0])).doshamHash)
     if (!isAnySelection(selected.STATE)) {
-      want('CITY', selected.CITY, () => fetchCities(selected.STATE[0]))
+      // Every selected state's districts in ONE call, so the row's label
+      // resolves for all of them — this used to fetch the FIRST state only,
+      // leaving raw codes for districts belonging to any other state.
+      want('CITY', selected.CITY, async () => {
+        const groups = await fetchCityGroups(
+          (selected.STATE as string[]).filter(k => k && k !== '0').map(key => ({ key, label: key })),
+        )
+        return groups.flatMap(g => g.options)
+      })
     }
-    // Height rows read labelCache.HEIGHT for both bounds; DEFAULT_FILTER's
-    // 1..5 is the "Any" case, so only fetch once it's been narrowed.
-    if (selected.STARTHEIGHT?.[0] !== DEFAULT_FILTER.STARTHEIGHT[0]
-      || selected.ENDHEIGHT?.[0] !== DEFAULT_FILTER.ENDHEIGHT[0]) {
-      want('HEIGHT', selected.STARTHEIGHT, () => fetchExactHeightOptions(gender))
+    // HEIGHT is fetched UNCONDITIONALLY. Angular always resolves both bounds
+    // against the height list (`START + ' - ' + END`) — height has no "Any"
+    // state, and 1..31 is a real range, not a sentinel. Skipping the fetch
+    // while the range was untouched left labelCache.HEIGHT empty, and
+    // resolveFilterLabel's `?? k` fallback then rendered the raw CODES in the
+    // row ("1 - 5"). The list is read out of the already-cached
+    // REGISTRATIONARRAYS blob, so this costs no request.
+    if (!labelCache.HEIGHT) {
+      wanted.push(['HEIGHT', () => fetchExactHeightOptions(partnerHeightGender)])
     }
-    // STAR codes aren't grouped by raasi in storage, so resolving one means
-    // flattening every raasi's star list (same approach useFilterDisplayValues
-    // takes) — only worth it when STAR actually differs from "Any".
-    want('STAR', selected.STAR, async () => {
-      const raasis = await fetchRaasiOptions()
-      const groups = await Promise.all(raasis.map(r => fetchStarOptions(r.key)))
-      return groups.flat()
-    })
+    // Star keys are unique across raasis, so the flat all-stars list resolves
+    // any of them — fetchStarOptions() with no raasi reads it straight from the
+    // cached blob. (This used to walk every raasi, which is now a call each.)
+    want('STAR', selected.STAR, () => fetchStarOptions())
 
     if (wanted.length === 0) return
 
@@ -440,20 +625,43 @@ export default function SearchScreen({ navigation }: Props) {
 
   const rowValue = useMemo(() => {
     return {
-      AGE:            `${selected.STARTAGE ?? '18'} - ${selected.ENDAGE ?? '50'} ${t('SEARCH.ANY') === 'Any' ? 'yrs' : ''}`.trim(),
-      LOCATION:       labelsFor('CITY', selected.CITY ?? []) !== t('SEARCH.ANY')
-                        ? labelsFor('CITY', selected.CITY ?? [])
-                        : labelsFor('STATE', selected.STATE ?? []),
+      // Angular: `START + ' - ' + END + ' ' + pageContent['YEARS']` — the unit
+      // is a translated word ("years"), not an English-only "yrs" literal.
+      AGE:            `${selected.STARTAGE ?? '18'} - ${selected.ENDAGE ?? '50'} ${t('SEARCH.YEARS')}`.trim(),
+      // Angular: search.component.ts's updateLocationValue() — one composed
+      // "Country - X , State - Y , District - Z" line, not just the narrowest
+      // level that happens to be set. State/district parts appear only once
+      // that level's own list exists (Angular gates them on
+      // filterDataList.STATE/.CITY; labelCache is this port's equivalent, and
+      // CITY is only fetched after a state is picked).
+      LOCATION:       [
+                        `${t('SEARCH.SELECT_COUNTRY_TXT')} - ${labelsFor('COUNTRY', selected.COUNTRY ?? [])}`,
+                        `${t('SEARCH.SELECT_STATE_TXT')} - ${labelsFor('STATE', selected.STATE ?? [])}`,
+                        ...((labelCache.CITY?.length ?? 0) > 0
+                          ? [`${t('SEARCH.SELECT_CITY_TXT')} - ${labelsFor('CITY', selected.CITY ?? [])}`]
+                          : []),
+                      ].join(' , '),
       RELIGION:       labelsFor('RELIGION', selected.RELIGION ?? []),
       CASTE:          isChristian ? labelsFor('DIVISION', selected.DIVISION ?? []) : labelsFor('CASTE', selected.CASTE ?? []),
       STAR:           labelsFor('STAR', selected.STAR ?? []),
-      DOSHAM:         labelsFor('DOSHAM', selected.DOSHAM ?? []),
+      // Dosham/Monthly income read their RADIO label while the stored value is
+      // one of the radio keys, and the sub-list's labels once real values are
+      // picked — Angular: `['0','1','3'].includes(key) ? searchValueList[field]
+      // .value : searchValueList['START'+field].value` (search.component.ts).
+      DOSHAM:         radioChoiceLabel('DOSHAM', doshamChoices)
+                        ?? labelsFor('DOSHAM', selected.DOSHAM ?? []),
       OCCUPATION:     labelsFor('OCCUPATION', selected.OCCUPATION ?? []),
-      MONTHLYINCOME:  labelsFor('MONTHLYINCOME', selected.MONTHLYINCOME ?? []),
+      MONTHLYINCOME:  radioChoiceLabel('MONTHLYINCOME', incomeChoices)
+                        ?? labelsFor('MONTHLYINCOME', selected.STARTMONTHLYINCOME ?? []),
       EDUCATION:      labelsFor('EDUCATION', selected.EDUCATION ?? []),
-      HEIGHT:         (selected.STARTHEIGHT?.[0] && selected.ENDHEIGHT?.[0])
-                        ? `${labelsFor('HEIGHT', selected.STARTHEIGHT)} - ${labelsFor('HEIGHT', selected.ENDHEIGHT)}`
-                        : t('SEARCH.ANY'),
+      // Both bounds must actually RESOLVE to a label. resolveFilterLabel's
+      // last resort is the raw code, which is never something to show a user
+      // (this row read "1 - 5"); if either bound is missing from the list —
+      // list not loaded yet, or a saved code outside it — fall back to the
+      // field's own "Any" wording, the way an unset field renders.
+      HEIGHT:         (heightBound(selected.STARTHEIGHT) && heightBound(selected.ENDHEIGHT))
+                        ? `${heightBound(selected.STARTHEIGHT)} - ${heightBound(selected.ENDHEIGHT)}`
+                        : anyLabelFor('HEIGHT'),
       MOTHERTONGUE:   labelsFor('MOTHERTONGUE', selected.MOTHERTONGUE ?? []),
       MARITALSTATUS:  labelsFor('MARITALSTATUS', selected.MARITALSTATUS ?? []),
       EATINGHABITS:   labelsFor('EATINGHABITS', selected.EATINGHABITS ?? []),
@@ -461,7 +669,34 @@ export default function SearchScreen({ navigation }: Props) {
       PROFILECREATED: labelsFor('PROFILECREATED', selected.PROFILECREATED ?? []),
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }
-  }, [selected, labelCache, isChristian])
+  }, [selected, labelCache, isChristian, filterScreen, doshamChoices, incomeChoices])
+
+  // Angular: search.component.ts's isFieldSetToAny() — whether a row still
+  // holds NO real preference, read off the saved selection ('0'), which is
+  // what gates the strict-filter toggle on both strict surfaces. Kept here
+  // (not derived from the row's displayed text) because every unset field now
+  // renders its own wording rather than one shared "Any" string.
+  const isAnyField = useMemo(() => {
+    const any: Record<string, boolean> = {}
+    // Range fields always carry a concrete min-max, so they're never "Any".
+    any.AGE    = false
+    any.HEIGHT = false
+    // Angular keys LOCATION off COUNTRY alone; this port fixes Country to
+    // India and only lets State/District be narrowed (see this file's header),
+    // so all three levels have to be unset for the field to count as "Any".
+    any.LOCATION = isAnySelection(selected.COUNTRY)
+      && isAnySelection(selected.STATE)
+      && isAnySelection(selected.CITY)
+    any.CASTE = isChristian ? isAnySelection(selected.DIVISION) : isAnySelection(selected.CASTE)
+    // Same row, and the desktop layout's activeKey widens to 'DIVISION' for
+    // Christian castes — keep both spellings resolvable.
+    any.DIVISION = any.CASTE
+    ;([
+      'RELIGION', 'STAR', 'DOSHAM', 'OCCUPATION', 'MONTHLYINCOME', 'EDUCATION',
+      'MOTHERTONGUE', 'MARITALSTATUS', 'EATINGHABITS', 'PHYSICALSTATUS', 'PROFILECREATED',
+    ] as FieldKey[]).forEach(key => { any[key] = isAnySelection(selected[key]) })
+    return any
+  }, [selected, isChristian])
 
   // ── Field open handlers ──────────────────────────────────────────────────
 
@@ -469,15 +704,15 @@ export default function SearchScreen({ navigation }: Props) {
     let opts: MultiSelectOption[] = []
     switch (key) {
       case 'RELIGION':       opts = await ensureOptions('RELIGION', fetchReligionOptions); break
-      case 'DOSHAM':         opts = await ensureOptions('DOSHAM', async () => (await fetchDoshamOptions(selected.STAR?.[0] ?? '', '', selected.MOTHERTONGUE?.[0])).dosham); break
+      case 'DOSHAM':         opts = await ensureOptions('DOSHAM', async () => (await fetchDoshamOptions(selected.STAR?.[0] ?? '', '', selected.MOTHERTONGUE?.[0])).doshamHash); break
       case 'OCCUPATION':     opts = await ensureOptions('OCCUPATION', fetchOccupationOptions); break
-      case 'MONTHLYINCOME':  opts = await ensureOptions('MONTHLYINCOME', fetchMonthlyIncomeOptions); break
+      case 'MONTHLYINCOME':  opts = await ensureOptions('MONTHLYINCOME', fetchIncomeRangeOptions); break
       case 'EDUCATION':      opts = await ensureOptions('EDUCATION', fetchQualificationOptions); break
       case 'MOTHERTONGUE':   opts = await ensureOptions('MOTHERTONGUE', fetchMotherTongueOptions); break
       case 'MARITALSTATUS':  opts = await ensureOptions('MARITALSTATUS', () => fetchMaritalStatusOptions(gender)); break
       case 'EATINGHABITS':   opts = await ensureOptions('EATINGHABITS', fetchEatingHabitOptions); break
       case 'PHYSICALSTATUS': opts = await ensureOptions('PHYSICALSTATUS', fetchPhysicalStatusOptions); break
-      case 'PROFILECREATED': opts = await ensureOptions('PROFILECREATED', async () => getProfileCreatedOptions(t)); break
+      case 'PROFILECREATED': opts = await ensureOptions('PROFILECREATED', fetchProfileCreatedOptions); break
       default: break
     }
     if (opts.length === 0) return
@@ -502,9 +737,58 @@ export default function SearchScreen({ navigation }: Props) {
     setLocationStep('state')
   }
 
+  // ── Location's three panels (Angular: LOCATION's COUNTRY/STATE/CITY LIST) ──
+  async function openCountryList() {
+    await ensureOptions('COUNTRY', fetchFilterCountries)
+    setLocationStep('country')
+  }
+
+  // States of every selected country, grouped under it — and with Country on
+  // "Any" that means EVERY country, which is what Angular does too
+  // (getAnyKeyValues('COUNTRY', true, '0') collects all country keys before
+  // asking for their states).
+  async function openStateList() {
+    const countries = await ensureOptions('COUNTRY', fetchFilterCountries)
+    const chosen: string[] = (selected.COUNTRY ?? []).filter((k: string) => k && k !== '0')
+    const parents = chosen.length > 0
+      ? countries.filter(c => chosen.includes(c.key))
+      : countries
+    const groups = await fetchStateGroups(parents).catch(() => [] as OptionGroup[])
+    setStateGroups(groups)
+    // The flat pool behind the row's own label — every state on show.
+    setLabelCache(prev => ({ ...prev, STATE: groups.flatMap(g => g.options) }))
+    setLocationStep('state')
+  }
+
+  // Districts of every selected state, grouped under it.
+  async function openCityList() {
+    const chosen: string[] = (selected.STATE ?? []).filter((k: string) => k && k !== '0')
+    if (chosen.length === 0) { openStateList(); return }
+    const parents = (labelCache.STATE ?? []).filter(s => chosen.includes(s.key))
+    const groups = await fetchCityGroups(
+      parents.length > 0 ? parents : chosen.map(key => ({ key, label: key })),
+    ).catch(() => [] as OptionGroup[])
+    setCityGroups(groups)
+    setLabelCache(prev => ({ ...prev, CITY: groups.flatMap(g => g.options) }))
+    setLocationStep('city')
+  }
+
+  // Angular's Star panel is ONE list split under two read-only headings —
+  // "Matching stars" (the member's own PISTARMATCHING) and "All other stars",
+  // both named by FILTERSCREEN.STAR. There is no raasi step, and no per-raasi
+  // grouping: see buildStarGroups.
   async function openStar() {
+    // Still loaded for SearchDesktopLayout, which keeps its own Raasi -> Star
+    // cascade and reads labelCache.RAASI for it.
     await ensureOptions('RAASI', fetchRaasiOptions)
-    setStarStep('raasi')
+    const allStars = await ensureOptions('STAR', () => fetchStarOptions())
+    setStarGroups(buildStarGroups(
+      allStars,
+      matchingStars,
+      String(filterScreen?.STAR?.['1'] ?? ''),
+      String(filterScreen?.STAR?.['2'] ?? ''),
+    ))
+    setStarStep('star')
   }
 
   // Shared by mobile's SearchablePicker onSelect and SearchDesktopLayout's
@@ -524,7 +808,7 @@ export default function SearchScreen({ navigation }: Props) {
   }
 
   async function openHeight(bound: 'min' | 'max') {
-    const opts = await ensureOptions('HEIGHT', () => fetchExactHeightOptions(gender))
+    const opts = await ensureOptions('HEIGHT', () => fetchExactHeightOptions(partnerHeightGender))
     setHeightOptions(opts.map(o => ({ key: o.key, label: o.label.replace(/<[^>]+>/g, '') })))
     setHeightEditor(bound)
   }
@@ -546,6 +830,79 @@ export default function SearchScreen({ navigation }: Props) {
     setFieldEditorOpen(key)
   }
 
+  // Angular: filterRevampConfig's per-field SUBTITLE — "Select preferred
+  // monthly income", "Select preferred location", … Every field has its own
+  // key; the constructed "Select preferred " + row label it replaces produced
+  // wrong copy wherever the two differ (Income being the clearest case).
+  // Falls back to that construction if a key is ever missing (i18n echoes the
+  // key back when it can't resolve one).
+  function fieldSubtitle(field: FieldKey): string {
+    const key   = `FILTER.SUBTITLE_${field === 'CASTE' && isChristian ? 'DIVISION' : field}`
+    const value = t(key as any)
+    if (value && !value.includes('SUBTITLE_')) return value
+    const label = rows.find(r => r.key === field)?.label ?? ''
+    return `Select preferred ${label.toLowerCase()}`
+  }
+
+  // Angular: filterRevampConfig's LIST entry per field carries its own LABEL
+  // and PLACEHOLDER, which are NOT the PP row's label — Monthly income's row
+  // says "Income" while its sub-row says "Income range" and, until a range is
+  // picked, reads "Select monthly income range".
+  function subRowLabel(field: FieldKey): string {
+    const value = t(`FILTER.LBL_${field}` as any)
+    if (value && !value.includes('LBL_')) return value
+    return rows.find(r => r.key === field)?.label ?? ''
+  }
+
+  function subRowPlaceholder(field: FieldKey): string {
+    const value = t(`FILTER.PLACEHOLDER_${field}` as any)
+    if (value && !value.includes('PLACEHOLDER_')) return value
+    return anyLabelFor(field)
+  }
+
+  // Which stored key a picker reads/writes. Income is the one field where the
+  // sub-list's selection does NOT live under the field's own key (see the
+  // MONTHLYINCOME branch in the picker's onApply).
+  function selectionFor(field: string): string[] {
+    if (field === 'MONTHLYINCOME') return selected.STARTMONTHLYINCOME ?? ['0']
+    return selected[field] ?? ['0']
+  }
+
+  // '2' is Angular's "pick specific values" option for both fields; any other
+  // stored value that isn't one of the radio keys means the sub-list already
+  // holds real selections, which is still the '2' state.
+  // Which radio row is on. The two key spaces OVERLAP — a dosham type could be
+  // keyed '1', the same as the "should not have dosham" radio — and the stored
+  // field holds either kind, so the count breaks the tie: a radio answer is
+  // always exactly one key, while a sub-list pick that isn't a radio key, or
+  // more than one key, is the "pick specific values" state ('2').
+  //
+  // Still ambiguous for a SINGLE sub-list value keyed '0'/'1'/'2'; Angular has
+  // the same overlap and leans on the two key spaces differing in practice.
+  function radioValueFor(field: 'DOSHAM' | 'MONTHLYINCOME', choices: { key: string }[]): string {
+    const stored: string[] = selected[field] ?? []
+    if (stored.length === 1 && choices.some(c => c.key === stored[0])) return String(stored[0])
+    return '2'
+  }
+
+  // True once the sub-list (dosham types / income brackets) holds a real pick,
+  // as opposed to sitting on the bare '2' radio with nothing chosen yet.
+  function hasSubListPick(field: 'DOSHAM' | 'MONTHLYINCOME'): boolean {
+    const subList: string[] = selectionFor(field).filter(k => k && k !== '0' && k !== '2')
+    return subList.length > 0
+  }
+
+  function onRadioChoice(field: 'DOSHAM' | 'MONTHLYINCOME', key: string) {
+    updateField(field, [key])
+    // Angular clearIncomeRangeSelection(): leaving "Select income range" must
+    // drop the picked brackets, or they keep going out as STARTINCOME/ENDINCOME.
+    if (field === 'MONTHLYINCOME' && key !== '2') {
+      updateField('STARTMONTHLYINCOME', [...DEFAULT_FILTER.STARTMONTHLYINCOME])
+      updateField('ENDMONTHLYINCOME', [...DEFAULT_FILTER.ENDMONTHLYINCOME])
+    }
+    if (key === '2') openFieldPicker(field)
+  }
+
   // ── Reset / Apply ─────────────────────────────────────────────────────────
 
   async function handleReset() {
@@ -556,40 +913,61 @@ export default function SearchScreen({ navigation }: Props) {
     await resetFilter(eventType)
     const obj = { ...DEFAULT_FILTER }
     setSelected(obj)
-    setPpCheckBox([])
+    // Angular's reset drops SEARCHPPCHKBOX so the next read falls back to
+    // CONFIG.searchPPCheckBox (14 zeros) — `[]` made FILTERPP go out empty
+    // until the screen remounted.
+    setPpCheckBox([...DEFAULT_PP_CHECKBOX])
     setLabelCache({})
   }
 
-  async function handleShowMatches() {
+  // `strictFilterApply` = the CTA inside Manage Strict Filters, which sends no
+  // FILTERPP (turning a strict toggle isn't a field edit). SETPP is unaffected:
+  // the strict filter lives inside Edit Preference, so it still goes out as
+  // all '1' in PP mode.
+  async function handleShowMatches(strictFilterApply = false) {
+    // Dismiss the Manage Strict Filters panel BEFORE navigating. Angular's
+    // manage-strict-filter view is a MODE of the PP page (search.component.html's
+    // `manageStrictFilter` branch), so applying navigates the whole page away and
+    // there is nothing to close. Here it's a Modal layered over this screen, and
+    // a Modal outlives navigation — the member stayed looking at the same panel
+    // while Matches loaded underneath it. Unconditional: it's already false for
+    // the plain footer CTA, and this also stops a stale panel from being there
+    // if the member comes back to this screen.
+    setManageStrictOpen(false)
+
     await saveFilterState(selected, ppCheckBox, {})
-    const params = await buildSearchParams(matriId, 0, 20)
+    const params = await buildSearchParams(matriId, 0, 20, { strictFilterApply })
     navigation.navigate('Matches', { searchParams: params })
   }
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  // Row order matches Figma's "Jodii - Filters (Partner Preferences)" mobile
-  // list (node 1364:1711) exactly — confirmed via screenshot: Age, Location,
-  // Caste, Star, Dosham, Occupation, Monthly income, Education, Height,
-  // Mother tongue, Religion, Marital status, Physical status. Religion sits
-  // near the end (after Mother tongue), not right after Location, contrary
-  // to this port's original (pre-Figma-review) guess. Same order the desktop
-  // card (node 647:11468) already used, so one array now serves both.
+  // Row order is Angular's own `CONFIG.searchList` (core/config/filter.config.ts)
+  // read top to bottom: Age, Location, Religion, Caste/Division, Star, Dosham,
+  // Occupation, Monthly income, Education, Height, Mother tongue, Marital
+  // status, Eating habits, Physical status, Profile created. Religion sits
+  // THIRD (right after Location, above Caste — the field it gates), not near
+  // the end, and Eating habits comes before Physical status; this port had
+  // both of those the other way round.
   const rows: Array<{ key: FieldKey; label: string; hidden?: boolean }> = [
     { key: 'AGE',            label: t('FILTER.AGE') },
     { key: 'LOCATION',       label: t('FILTER.LOCATION') },
+    { key: 'RELIGION',       label: t('FILTER.RELIGION') },
     { key: 'CASTE',          label: isChristian ? t('FILTER.DIVISION') : t('FILTER.CASTE'), hidden: !showCasteRow },
     { key: 'STAR',           label: t('FILTER.STAR') },
     { key: 'DOSHAM',         label: t('FILTER.DOSHAM') },
     { key: 'OCCUPATION',     label: t('FILTER.OCCUPATION') },
-    { key: 'MONTHLYINCOME',  label: t('FILTER.MONTHLYINCOME'), hidden: gender === '1' },
+    // Angular (JA-104): "Hide the monthly income field for male login users" —
+    // `logInGender === 'M'`. LOGIN_GENDER stores 'M'/'F' (never '1'/'0'), so
+    // the old `gender === '1'` test could never be true and the row showed for
+    // male users too.
+    { key: 'MONTHLYINCOME',  label: t('FILTER.MONTHLYINCOME'), hidden: memberGender === 'M' },
     { key: 'EDUCATION',      label: t('FILTER.EDUCATION') },
     { key: 'HEIGHT',         label: t('FILTER.HEIGHT') },
     { key: 'MOTHERTONGUE',   label: t('FILTER.MOTHERTONGUE') },
-    { key: 'RELIGION',       label: t('FILTER.RELIGION') },
     { key: 'MARITALSTATUS',  label: t('FILTER.MARITALSTATUS') },
-    { key: 'PHYSICALSTATUS', label: t('FILTER.PHYSICALSTATUS') },
     { key: 'EATINGHABITS',   label: t('FILTER.EATINGHABITS') },
+    { key: 'PHYSICALSTATUS', label: t('FILTER.PHYSICALSTATUS') },
     { key: 'PROFILECREATED', label: t('FILTER.PROFILECREATED'), hidden: eventType !== 'filter' },
   ]
 
@@ -601,6 +979,7 @@ export default function SearchScreen({ navigation }: Props) {
         loading={loading}
         rows={rows}
         rowValue={rowValue}
+        fieldIsAny={isAnyField}
         selected={selected}
         labelCache={labelCache}
         heightOptions={heightOptions}
@@ -615,7 +994,7 @@ export default function SearchScreen({ navigation }: Props) {
         setAgeEditor={setAgeEditor}
         heightEditor={heightEditor}
         setHeightEditor={setHeightEditor}
-        locationStep={locationStep}
+        locationStep={locationStep === 'country' ? null : locationStep}
         setLocationStep={setLocationStep}
         starStep={starStep}
         setStarStep={setStarStep}
@@ -630,7 +1009,7 @@ export default function SearchScreen({ navigation }: Props) {
         selectState={selectState}
         selectRaasi={selectRaasi}
         onReset={handleReset}
-        onShowMatches={handleShowMatches}
+        onShowMatches={() => handleShowMatches()}
       />
     )
   }
@@ -653,11 +1032,16 @@ export default function SearchScreen({ navigation }: Props) {
         <Text style={s.headerTitle}>
           {eventType === 'filter' ? t('FILTER.FILTER_HEADER') : t('FILTER.PP_HEADER')}
         </Text>
-        {/* Figma (node 15889:1907) shows Reset in BOTH Filter and Partner-
-            preferences mode — this previously only showed it in filter mode. */}
-        <Pressable onPress={handleReset} hitSlop={8}>
-          <Text style={s.resetText}>{t('FILTER.RESET_HEADER')}</Text>
-        </Pressable>
+        {/* Angular: search.component.html gates Reset on
+            filterService.checkFilterEventType() — i.e. Filters mode ONLY.
+            JODII-305 ("Reset button in PP needs to be removed (top right)")
+            deliberately took it off Partner preferences; this port was showing
+            it in both modes. */}
+        {eventType === 'filter' && (
+          <Pressable onPress={handleReset} hitSlop={8}>
+            <Text style={s.resetText}>{t('FILTER.RESET_HEADER')}</Text>
+          </Pressable>
+        )}
       </View>
 
       <ScrollView style={s.flex1} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
@@ -679,23 +1063,24 @@ export default function SearchScreen({ navigation }: Props) {
           </View>
         )}
 
-        <View style={s.card}>
-          {rows.filter(r => !r.hidden).map((row, i, arr) => (
-            <View key={row.key}>
-              <Pressable
-                style={({ pressed }) => [s.row, pressed && s.rowPressed]}
-                onPress={() => fieldRowPress(row.key)}
-                accessibilityRole="button"
-              >
-                <CdnSvg uri={FIELD_ICON[row.key]} width={20} height={20} style={s.rowIcon} />
-                <View style={s.rowText}>
-                  <Text style={s.rowLabel}>{row.label}</Text>
-                  <Text style={s.rowValue} numberOfLines={1}>{(rowValue as any)[row.key]}</Text>
-                </View>
-                <CdnSvg uri={ICON_ARROW} width={16} height={16} />
-              </Pressable>
-              {i < arr.length - 1 && <View style={s.rowDivider} />}
-            </View>
+        {/* Angular: a plain ion-list on the white page — no card, no radius,
+            no side margins. Every row (the last one included) carries its own
+            bottom border, per `.filter-list-item`. */}
+        <View style={s.list}>
+          {rows.filter(r => !r.hidden).map(row => (
+            <Pressable
+              key={row.key}
+              style={({ pressed }) => [s.row, pressed && s.rowPressed]}
+              onPress={() => fieldRowPress(row.key)}
+              accessibilityRole="button"
+            >
+              <CdnSvg uri={FIELD_ICON[row.key]} width={24} height={24} style={s.rowIcon} />
+              <View style={s.rowText}>
+                <Text style={s.rowLabel}>{row.label}</Text>
+                <Text style={s.rowValue} numberOfLines={1}>{(rowValue as any)[row.key]}</Text>
+              </View>
+              <CdnSvg uri={ICON_ARROW} width={16} height={16} />
+            </Pressable>
           ))}
 
           {/* Filter-mode-only, same as PROFILECREATED above — this port
@@ -706,9 +1091,10 @@ export default function SearchScreen({ navigation }: Props) {
               filterService selection (PHOTOAVAILABLE/HOROSCOPEAVAILABLE are
               already in DEFAULT_FILTER and saved/sent the same way every
               other field here is). */}
+          {/* No separator of its own: every field row above already ends in
+              Angular's own `.filter-list-item` bottom border. */}
           {eventType === 'filter' && (
             <>
-              <View style={s.rowDivider} />
               <CheckboxGroup
                 options={[
                   {
@@ -730,7 +1116,7 @@ export default function SearchScreen({ navigation }: Props) {
       </ScrollView>
 
       <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
-        <Pressable style={s.applyBtn} onPress={handleShowMatches} disabled={countLoading}>
+        <Pressable style={s.applyBtn} onPress={() => handleShowMatches()} disabled={countLoading}>
           {countLoading ? (
             <ActivityIndicator color={Colors.white} />
           ) : (
@@ -788,28 +1174,57 @@ export default function SearchScreen({ navigation }: Props) {
         onClose={() => setHeightEditor(null)}
       />}
 
-      {/* ── LOCATION: State → City ── */}
-      {stateMounted && <SearchablePicker
+      {/* ── LOCATION: three independent checkbox panels ──
+           Angular's LOCATION LIST gives COUNTRY/STATE/CITY each their own
+           SHOWCHECKBOXBTN panel (only Country has no search box). State was a
+           SINGLE-select picker here, so "Andhra Pradesh, Telangana" couldn't
+           be expressed at all. */}
+      {countryMounted && <MultiSelectPicker
+        visible={locationStep === 'country'}
+        title={t('FILTER.SELECT_COUNTRY')}
+        options={sortFilterOptions('COUNTRY', labelCache.COUNTRY ?? [], selected.COUNTRY)}
+        selectedKeys={selected.COUNTRY ?? ['0']}
+        anyLabel={anyLabelFor('COUNTRY')}
+        onApply={keys => updateField('COUNTRY', keys)}
+        onClose={() => setLocationStep(null)}
+      />}
+      {stateMounted && <MultiSelectPicker
         visible={locationStep === 'state'}
         title={t('FILTER.SELECT_STATE')}
         placeholder={t('FILTER.SEARCH_STATE')}
-        options={(labelCache.STATE ?? []).map(o => ({ key: o.key, label: o.label }))}
-        selectedKey={selected.STATE?.[0]}
-        onSelect={selectState}
+        options={sortFilterOptions('STATE', labelCache.STATE ?? [], selected.STATE)}
+        groups={stateGroups}
+        selectedKeys={selected.STATE ?? ['0']}
+        anyLabel={anyLabelFor('STATE')}
+        onApply={keys => {
+          updateField('STATE', keys)
+          // A different set of states invalidates the district choice, and its
+          // list has to be refetched for the new states (Angular drops CITY the
+          // same way when STATE changes).
+          updateField('CITY', ['0'])
+          setLabelCache(prev => { const n = { ...prev }; delete n.CITY; return n })
+        }}
         onClose={() => setLocationStep(null)}
       />}
       {cityMounted && <MultiSelectPicker
         visible={locationStep === 'city'}
         title={t('FILTER.SELECT_CITY')}
         placeholder={t('FILTER.SEARCH_CITY')}
-        options={labelCache.CITY ?? []}
+        options={sortFilterOptions('CITY', labelCache.CITY ?? [], selected.CITY)}
+        groups={cityGroups}
         selectedKeys={selected.CITY ?? ['0']}
-        anyLabel={t('SEARCH.ANY')}
+        anyLabel={anyLabelFor('CITY')}
         onApply={keys => updateField('CITY', keys)}
         onClose={() => setLocationStep(null)}
       />}
 
-      {/* ── STAR: Raasi → Star ── */}
+      {/* ── STAR: one panel, "Matching stars" / "All other stars" ──
+           The raasi step this replaces was a React-only invention; Angular has
+           no such screen. Tapping either heading selects that whole group —
+           Angular's checkedListOption() sends STAR's '1' to
+           selectSubOptionMatchinList and '2' to selectSubOptionList, each of
+           which takes the group as a unit. The raasi picker below stays
+           mounted for the desktop layout, which still cascades. */}
       {raasiMounted && <SearchablePicker
         visible={starStep === 'raasi'}
         title={t('FILTER.SUBTITLE_STAR')}
@@ -823,9 +1238,10 @@ export default function SearchScreen({ navigation }: Props) {
         visible={starStep === 'star'}
         title={t('FILTER.SELECT_STAR')}
         placeholder={t('FILTER.SEARCH_STAR')}
-        options={labelCache.STAR ?? []}
+        options={sortFilterOptions('STAR', labelCache.STAR ?? [], selected.STAR)}
+        groups={starGroups}
         selectedKeys={selected.STAR ?? ['0']}
-        anyLabel={t('SEARCH.ANY')}
+        anyLabel={anyLabelFor('STAR')}
         onApply={keys => updateField('STAR', keys)}
         onClose={() => setStarStep(null)}
       />}
@@ -835,15 +1251,26 @@ export default function SearchScreen({ navigation }: Props) {
       {multiEditor && (
         <MultiSelectPicker
           visible={!!multiEditor}
-          title={t(`FILTER.${multiEditor}` as any)}
+          title={t(`FILTER.SELECT_${multiEditor}` as any)}
           placeholder={multiEditor === 'RELIGION' ? t('FILTER.SEARCH_RELIGION')
             : multiEditor === 'CASTE' ? t('FILTER.SEARCH_CASTE')
             : multiEditor === 'MOTHERTONGUE' ? t('FILTER.SEARCH_MOTHERTONGUE')
             : undefined}
-          options={labelCache[multiEditor] ?? []}
-          selectedKeys={selected[multiEditor] ?? ['0']}
-          anyLabel={t('SEARCH.ANY')}
+          options={sortFilterOptions(multiEditor, labelCache[multiEditor] ?? [], selectionFor(multiEditor))}
+          selectedKeys={selectionFor(multiEditor) ?? ['0']}
+          anyLabel={NO_ANY_ROW_PANELS.has(multiEditor) ? undefined : anyLabelFor(multiEditor)}
           onApply={keys => {
+            if (multiEditor === 'MONTHLYINCOME') {
+              // Angular stores picked income BRACKETS under STARTMONTHLYINCOME
+              // and leaves MONTHLYINCOME on '2' (the "Select income range"
+              // choice) — that pair is what incomeParams() reads. Writing the
+              // brackets into MONTHLYINCOME made them look like the semantic
+              // choice instead, so STARTINCOME went out as a bracket code.
+              updateField('STARTMONTHLYINCOME', keys)
+              updateField('ENDMONTHLYINCOME', keys)
+              updateField('MONTHLYINCOME', ['2'])
+              return
+            }
             updateField(multiEditor, keys)
             if (multiEditor === 'RELIGION') {
               // Religion changed — stale caste/subcaste cache must be dropped.
@@ -865,26 +1292,32 @@ export default function SearchScreen({ navigation }: Props) {
         fieldIcon={FIELD_ICON}
         fieldLabel={Object.fromEntries(rows.map(r => [r.key, r.label])) as Record<FieldKey, string>}
         fieldValue={rowValue as Record<FieldKey, string>}
-        anyLabel={t('SEARCH.ANY')}
+        fieldIsAny={isAnyField}
         matchCount={matchCount}
         countLoading={countLoading}
-        onShowMatches={handleShowMatches}
+        onShowMatches={() => handleShowMatches(true)}
       />
 
-      {/* ── Per-field strict wrapper (Figma nodes 1364:2128 / 1385:302) ──
+      {/* ── Per-field editor page ──
           Sits AROUND the field's own existing picker (opened unchanged via
           openFieldPicker) rather than replacing it — the picker's own Modal
-          stacks on top of this one when the CompactFieldRow below is tapped. */}
+          stacks on top of this one when a CompactFieldRow below is tapped.
+          `strictAllowed` mirrors Angular's redirectToFilterPage(), which
+          navigates this page with `manageStrictFilter || filterEventType !=
+          'filter'`: the strict block belongs to Edit Preference, and to
+          Filters mode only when opened from Manage Strict Filters. */}
       {fieldEditorOpen && (
         <StrictFieldEditorScreen
           visible={!!fieldEditorOpen}
           onClose={() => setFieldEditorOpen(null)}
           fieldKey={fieldEditorOpen}
           fieldLabel={rows.find(r => r.key === fieldEditorOpen)?.label ?? ''}
+          subtitle={fieldSubtitle(fieldEditorOpen)}
           fieldValue={(rowValue as any)[fieldEditorOpen]}
           strictEnabled={!!strictPrefs[fieldEditorOpen]}
           onToggleStrict={value => toggleStrictPref(fieldEditorOpen, value)}
-          anyLabel={t('SEARCH.ANY')}
+          isAny={!!isAnyField[fieldEditorOpen]}
+          strictAllowed={eventType !== 'filter' || manageStrictOpen}
           matchCount={matchCount}
           countLoading={countLoading}
         >
@@ -906,17 +1339,70 @@ export default function SearchScreen({ navigation }: Props) {
             <>
               <CompactFieldRow
                 label={t('FILTER.LBL_MIN_HEIGHT')}
-                value={selected.STARTHEIGHT?.[0] ? labelsFor('HEIGHT', selected.STARTHEIGHT) : t('SEARCH.ANY')}
+                value={heightBound(selected.STARTHEIGHT) ?? anyLabelFor('HEIGHT')}
                 onPress={() => openHeight('min')}
               />
               <CompactFieldRow
                 label={t('FILTER.LBL_MAX_HEIGHT')}
-                value={selected.ENDHEIGHT?.[0] ? labelsFor('HEIGHT', selected.ENDHEIGHT) : t('SEARCH.ANY')}
+                value={heightBound(selected.ENDHEIGHT) ?? anyLabelFor('HEIGHT')}
                 onPress={() => openHeight('max')}
               />
             </>
           )}
-          {fieldEditorOpen !== 'AGE' && fieldEditorOpen !== 'HEIGHT' && (
+          {/* Location: Country / State / City, one row each — Angular's
+              LOCATION field page (filterRevampConfig.LOCATION's three-entry
+              LIST). This port only had State→City, with no Country row. */}
+          {fieldEditorOpen === 'LOCATION' && (
+            <>
+              <CompactFieldRow
+                label={t('SEARCH.SELECT_COUNTRY_TXT')}
+                value={labelsFor('COUNTRY', selected.COUNTRY ?? [])}
+                onPress={openCountryList}
+              />
+              <CompactFieldRow
+                label={t('SEARCH.SELECT_STATE_TXT')}
+                value={labelsFor('STATE', selected.STATE ?? [])}
+                onPress={openStateList}
+              />
+              <CompactFieldRow
+                label={t('SEARCH.SELECT_CITY_TXT')}
+                value={labelsFor('CITY', selected.CITY ?? [])}
+                onPress={openCityList}
+              />
+            </>
+          )}
+
+          {/* Dosham / Monthly income: radio group first, sub-list row gated on '2' */}
+          {(fieldEditorOpen === 'DOSHAM' || fieldEditorOpen === 'MONTHLYINCOME') && (() => {
+            const choices = fieldEditorOpen === 'DOSHAM' ? doshamChoices : incomeChoices
+            const value   = radioValueFor(fieldEditorOpen, choices)
+            return (
+              <>
+                <RadioGroup
+                  options={choices.map(c => ({ key: c.key, value: c.label }))}
+                  value={value}
+                  onChange={key => onRadioChoice(fieldEditorOpen, key)}
+                  layout="pill"
+                />
+                {/* Angular: the sub-row carries the field's own LIST LABEL
+                    (`FILTER.LBL_MONTHLYINCOME` = "Income range", not the row's
+                    "Income"), and its PLACEHOLDER until a value is actually
+                    picked — this showed the current range instead. */}
+                <CompactFieldRow
+                  label={subRowLabel(fieldEditorOpen)}
+                  value={hasSubListPick(fieldEditorOpen)
+                    ? (rowValue as any)[fieldEditorOpen]
+                    : subRowPlaceholder(fieldEditorOpen)}
+                  onPress={() => openFieldPicker(fieldEditorOpen)}
+                  disabled={value !== '2'}
+                />
+              </>
+            )
+          })()}
+
+          {/* Every other field is a single row opening its own list. */}
+          {!(['AGE', 'HEIGHT', 'LOCATION', 'DOSHAM', 'MONTHLYINCOME'] as FieldKey[])
+            .includes(fieldEditorOpen) && (
             <CompactFieldRow
               label={rows.find(r => r.key === fieldEditorOpen)?.label ?? ''}
               value={(rowValue as any)[fieldEditorOpen]}
@@ -932,7 +1418,9 @@ export default function SearchScreen({ navigation }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#F1F3FB' },
+  // Angular renders this page on a plain white ion-content — the tinted page
+  // + floating rounded cards this port used are not in the reference.
+  screen: { flex: 1, backgroundColor: Colors.white },
   flex1:  { flex: 1 },
   center: { alignItems: 'center', justifyContent: 'center' },
 
@@ -956,7 +1444,10 @@ const s = StyleSheet.create({
   headerTitle: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, lineHeight: 24, color: Colors.black, marginLeft: 6 },
   resetText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.link, paddingHorizontal: 12 },
 
-  scrollContent: { padding: 16, gap: 12 },
+  // Angular: the strict-filter block sits flush under the header (full-bleed,
+  // its own 24px inner padding) and the list follows with `mt-8` — there is no
+  // page-level padding or inter-section gap to add here.
+  scrollContent: { paddingBottom: 16 },
   // Figma (node 15889:2095): a rounded card (5%-opacity tint of the brand red,
   // NOT a plain gray/secondary-colored line of text) — the container carries
   // the background/padding/radius, subHeaderText carries the actual type.
@@ -968,58 +1459,70 @@ const s = StyleSheet.create({
   },
   subHeaderText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 20, color: Colors.black },
 
+  // Angular `.strict-filter-card` (+ its `pr-24 pl-24 pt-16 pb-16`): a
+  // full-bleed tinted band, NOT an inset rounded card — no radius and no side
+  // margins, so it meets both screen edges exactly as in the reference.
   strictBanner: {
     backgroundColor: '#FBF2F5', borderWidth: 1, borderColor: '#FFE3EC',
-    borderRadius: 8, padding: 12, marginBottom: 4, gap: 8,
+    paddingHorizontal: 24, paddingVertical: 16, gap: 6,
   },
-  strictBannerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
-  strictBannerDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 20, color: Colors.black },
+  strictBannerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, lineHeight: 20, color: Colors.black },
+  // Angular: `.strict-filter-desc` + `mb-16` — 16px below the copy before the
+  // CTA (6 of it from the container's own gap).
+  strictBannerDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 18, color: Colors.black, marginBottom: 10 },
+  // Angular FILTER_BTN: button-revamp `large` — 40px tall, 8px radius,
+  // transparent fill, 1px primary border, primary text at body-14.
   manageStrictBtn: {
-    height: 40, borderWidth: 1, borderColor: Colors.primaryDark, borderRadius: 4,
+    height: 40, borderWidth: 1, borderColor: Colors.primaryDark, borderRadius: 8,
     alignItems: 'center', justifyContent: 'center',
   },
-  manageStrictBtnText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.primaryDark },
+  manageStrictBtnText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.primaryDark },
 
-  card: { backgroundColor: Colors.white, borderRadius: 12, overflow: 'hidden' },
+  // Angular: `<ion-list class="pl-24 pr-24">` in an `mt-8` row — a flat list
+  // straight on the page.
+  list: { marginTop: 8 },
 
-  // Figma (node 15889:1927): paddingVertical 20 (was 14) — each row is ~80px
-  // tall there, ~56px here, which is why noticeably more rows fit on screen
-  // before scrolling than Angular's own reference (~8 rows per screen there).
+  // Angular `.filter-list-item`: 20px top/bottom padding, 24px page inset,
+  // top-aligned content, and a bottom border on EVERY row (the last one
+  // included — this port skipped it there).
   row: {
     flexDirection:     'row',
     alignItems:        'flex-start',
-    paddingHorizontal: 16,
+    paddingHorizontal: 24,
     paddingVertical:   20,
-    gap:               12,
+    gap:               8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(204,204,204,0.5)',
   },
   rowPressed: { opacity: 0.6 },
   rowIcon:  { flexShrink: 0 },
-  // Figma: 8px gap between the label line and the value line below it (was a
-  // 2px marginBottom on the label alone).
-  rowText:  { flex: 1, gap: 8 },
-  // Figma: label is 14px Poppins-Regular/black (was 12px, gray) — value is
-  // 14px Poppins-Medium/black (was a plain 500-weight system font).
+  // Angular: the value line sits `mt-6` under the label.
+  rowText:  { flex: 1, gap: 6 },
+  // Angular: label `body2-regular-14`, value `body1-medium-14` — both black.
   rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.black },
   rowValue: { fontFamily: Fonts.poppinsMedium, fontSize: 14, lineHeight: 16, color: Colors.black },
-  rowDivider: {
-    height:           StyleSheet.hairlineWidth,
-    backgroundColor:  'rgba(204,204,204,0.5)',
-    marginHorizontal: 16,
-  },
 
+  // Angular: `ion-footer.footer-shadow` with the CTA at `ml-24 mr-24 pt-16 pb-16`.
   footer: {
-    paddingHorizontal: 16,
-    paddingTop:        12,
+    paddingHorizontal: 24,
+    paddingTop:        16,
     backgroundColor:   Colors.white,
-    borderTopWidth:    StyleSheet.hairlineWidth,
-    borderTopColor:    'rgba(204,204,204,0.5)',
+    shadowColor:       '#000',
+    shadowOffset:      { width: 0, height: -4 },
+    shadowOpacity:     0.08,
+    shadowRadius:      8,
+    elevation:         8,
   },
+  // Angular PRIMARY_BTN: button-revamp `standard` — 44px tall, 8px radius.
   applyBtn: {
-    height:           48,
+    height:           44,
     borderRadius:     8,
     backgroundColor:  Colors.primaryDark,
     alignItems:       'center',
     justifyContent:   'center',
   },
-  applyText: { color: Colors.white, fontSize: 14, fontWeight: '600' },
+  // Angular button-revamp's default ctaFontSize is `body2-regular-14` +
+  // `line-height-16`, and the PP/Filters footer CTA doesn't override it — so
+  // the button label is Poppins-REGULAR 14, not medium or semibold.
+  applyText: { color: Colors.white, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16 },
 })
