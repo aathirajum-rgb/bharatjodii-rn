@@ -49,7 +49,6 @@ import {
   fetchMatches,
   fetchExplore,
   fetchSearchResults,
-  type QuickFilters,
   type ExploreFacet,
   fetchExtendedMatchesCount,
   fetchExtendedMatches,
@@ -67,7 +66,14 @@ import {
 } from '../../service/communicationService'
 import { fetchBulkLikeMatches, getPPSetData } from '../../service/profileService'
 import { redirectToViewProfile } from '../../service/buttonService'
-import { setFilterEventType, buildSearchParams } from '../../service/filterService'
+import {
+  setFilterEventType, buildSearchParams,
+  getActiveQuickFilters, toggleQuickFilter, getFilterEditedCount,
+  setMatchTotals, decrementMatchTotals, getPreferenceMatchCount,
+  type QuickFilterChip,
+} from '../../service/filterService'
+import { fetchQuickFilterChips } from '../../service/registrationService'
+import { FILTER_CHIP, type ChipConfig } from '../../components/matches-header/FilterChipsRow'
 import {
   getHeroBannerDetails, openMembershipTab, fetchUpgradePaymentPromo, redirectToIntermediatePage,
   type UpgradePaymentPromo,
@@ -900,7 +906,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   const exploreLabel  = route?.params?.exploreLabel as string | undefined
   // Set by SearchScreen's "Show matches" CTA (filterService.buildSearchParams()) —
   // Angular: search.component.ts applyFilter() → router.navigate(['matches'], {state:{SEARCH_URL}})
-  const searchParams  = route?.params?.searchParams as string | undefined
+  const routeSearchParams = route?.params?.searchParams as string | undefined
   const [facets,  setFacets]  = useState<ExploreFacet[]>([])
   const [qSearch, setQSearch] = useState('')
 
@@ -908,12 +914,19 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   // that just called setExtendedLoaded(false) in the same tick (a plain state
   // read here would still see the pre-update value, since the setState hasn't
   // committed yet within this synchronous call chain).
-  async function fetchList(start: number, limit: number, quickFilters?: QuickFilters, opts?: { extended?: boolean }) {
+  // No quickFilters argument any more: a quick-filter chip is now a persisted
+  // filter edit that re-queries through the SEARCH path (see applyQuickFilter),
+  // exactly as Angular does, so the plain matches branch below is always the
+  // unfiltered list.
+  async function fetchList(start: number, limit: number, opts?: { extended?: boolean }) {
     // Angular getExtendedMatches() → routepage='extendedPage' → callMatchesApi()
     // keeps hitting extendedmatches/v1 (not the regular matches/search/explore
     // endpoint) for every subsequent page once "Continue seeing profiles" has
     // been tapped — see extendedLoaded below and loadMore()'s matching branch.
     if (opts?.extended ?? extendedLoaded) return fetchExtendedMatches(start, limit)
+    // A quick-filter chip puts this screen on the same search path the "Show
+    // matches" CTA uses, so pagination past page 0 keeps the chip's filter on.
+    const searchParams = quickFilterParams ?? routeSearchParams
     if (searchParams) {
       // Angular matches.page.ts:999-1003 — the searchPage route paginates just
       // like plain matches, reusing the same filter selection with an
@@ -929,7 +942,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     }
     return exploreType
       ? fetchExplore(exploreType, start, limit, qSearch)
-      : fetchMatches(start, limit, quickFilters)
+      : fetchMatches(start, limit)
   }
 
   // ── State ───────────────────────────────────────────────────────────────────
@@ -939,10 +952,54 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   // prefetch cache (see redirectToViewProfile's profileIds param).
   const profileIds = useMemo(() => profiles.map(p => p.profileId), [profiles])
   const [totalCount,   setTotalCount]   = useState(0)
+  // Angular's getPPContent() count — the saved Partner Preference total, which
+  // deliberately does NOT follow a temporary quick filter (see setMatchTotals).
+  // Separate from totalCount, which is the current result set and drives the
+  // page title.
+  const [preferenceCount, setPreferenceCount] = useState(0)
+
+  // Angular guards EVERY count write with `routepage ∈ matches | matchesPage |
+  // searchPage` (matches.page.ts:1281) — an explore-by-category listing is a
+  // different result set entirely and must not touch either stored count.
+  // Going through one helper keeps that guard in a single place; wiring the
+  // calls in one-by-one had put them on the explore load and the facet-refine
+  // path too, which let a category browse overwrite the preference count.
+  function recordMatchTotals(total: number) {
+    if (exploreType) return
+    setMatchTotals(total).then(setPreferenceCount).catch(() => {})
+  }
+
+  // Angular: matches.page.ts:1543/1576 — a profile left the list, so both
+  // counts drop by one (the PP one only outside filter mode).
+  function recordMatchRemoval() {
+    if (exploreType) return
+    decrementMatchTotals().then(setPreferenceCount).catch(() => {})
+  }
   const [loading,      setLoading]      = useState(true)
   const [loadingMore,  setLoadingMore]  = useState(false)
   const [extendedCount,  setExtendedCount]  = useState(0)
-const [selectedChip,   setSelectedChip]   = useState<string>('')
+  // Angular: matches.page.ts's hdrSearchList — the static FILTER chip plus the
+  // fields the API's QUICKFILTER block describes, labels included. Built here
+  // (not inside the header) for the same reason Angular builds it in
+  // matches.page.ts and passes it down as `[filterDataFromMatches]`.
+  const [quickFilterChips, setQuickFilterChips] = useState<QuickFilterChip[]>([])
+  const chips = useMemo<ChipConfig[]>(
+    () => (quickFilterChips.length === 0
+      ? []
+      : [FILTER_CHIP, ...quickFilterChips.map(c => ({ key: c.key, label: c.label }))]),
+    [quickFilterChips],
+  )
+  // Angular: quickFilterSearchList — every chip carries its own `isSelected`,
+  // so several can be on at once. Seeded from the persisted selection on focus
+  // (see the effect below), because a chip tap is a real, saved filter edit.
+  const [selectedChips, setSelectedChips] = useState<string[]>([])
+  // Angular: filterService.updateFilterEditCount — the Filters chip's badge.
+  const [filterCount,   setFilterCount]   = useState(0)
+  // Set once a chip has been toggled: from then on the list comes from the
+  // SEARCH endpoint with the full persisted preference set, exactly as Angular's
+  // clickOnFilterChip() -> applyFilter() -> emit({SEARCH_URL}) does, rather than
+  // from the plain matches endpoint with three ad-hoc flags.
+  const [quickFilterParams, setQuickFilterParams] = useState<string | null>(null)
   const [showPhotoPromotion, setShowPhotoPromotion] = useState(false)
   const [photoBannerData,    setPhotoBannerData]    = useState<any>(null)
   const [bannerSlots,          setBannerSlots]          = useState<Array<{ slot: string; insertAfter: number }>>([])
@@ -1206,12 +1263,13 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         // extendedmatches/v1 branch from a "Continue seeing profiles" tap before the switch.
         extendedApiStartRef.current = 0
         setExtendedLoaded(false)
-        const result = await fetchList(0, 20, undefined, { extended: false })
+        const result = await fetchList(0, 20, { extended: false })
         if (ctrl.cancelled) return
 
         setProfiles(result.items.map(matchProfileAdapter.adapt))
         setBannerSlots(result.bannerSlots)
         setTotalCount(result.totalCount)
+        recordMatchTotals(result.totalCount)
         setFacets(result.facets ?? [])
         apiStartRef.current = result.items.length  // cursor for next page
 
@@ -1557,6 +1615,37 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     }, []),
   )
 
+  // Chip state is derived from storage, not owned here — Angular reads it back
+  // the same way (getStorageValues(), and SELECTEDFILTERS is persisted
+  // specifically "for the filter swiper chip number [not to get hidden] when the
+  // page got refreshed"). Re-read on every focus so the row also reflects edits
+  // made on the Search screen and a Reset performed there.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false
+      ;(async () => {
+        // Angular's updateQuickFilterList(): hydrate the row from the API first,
+        // THEN derive each chip's on/off state against the codes it came back
+        // with — the selection is only meaningful relative to QUICKFILTER.key.
+        const loaded = await fetchQuickFilterChips()
+        const [active, count, ppCount] = await Promise.all([
+          getActiveQuickFilters(loaded),
+          getFilterEditedCount(),
+          // Seeded from storage so the preferences line shows the cached PP
+          // count on the first paint, before the listing call comes back —
+          // Angular reads the same key straight out of localStorage.
+          getPreferenceMatchCount(),
+        ])
+        if (cancelled) return
+        setQuickFilterChips(loaded)
+        setSelectedChips(active)
+        setFilterCount(count)
+        if (ppCount > 0) setPreferenceCount(ppCount)
+      })().catch(e => { if (__DEV__) console.error('[Matches] quick filter state error:', e) })
+      return () => { cancelled = true }
+    }, []),
+  )
+
   // Angular: matches.page.ts ngOnInit() calls getPPSETData(1) unconditionally
   // — matches is the default landing page after login, so this is the
   // earliest point in a normal session where MOTHERTONGUE (from
@@ -1688,6 +1777,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     // Optimistic UI: remove card immediately (matches Angular removeProfile)
     setProfiles(prev => prev.filter(p => p.profileId !== profile.profileId))
     setTotalCount(prev => Math.max(0, prev - 1))
+    recordMatchRemoval()
     apiStartRef.current = Math.max(0, apiStartRef.current - 1)
     try {
       await communicationBtnOnClick('matches', 'skip', { MATRIID: profile.profileId })
@@ -1702,6 +1792,7 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     // Optimistic UI: remove card immediately (matches Angular removeProfile)
     setProfiles(prev => prev.filter(p => p.profileId !== profile.profileId))
     setTotalCount(prev => Math.max(0, prev - 1))
+    recordMatchRemoval()
     apiStartRef.current = Math.max(0, apiStartRef.current - 1)
     try {
       await communicationBtnOnClick('matches', 'viewlater', { MATRIID: profile.profileId })
@@ -2117,10 +2208,11 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     extendedApiStartRef.current = 0
     setExtendedLoaded(false)
     try {
-      const result = await fetchList(0, 20, undefined, { extended: false })
+      const result = await fetchList(0, 20, { extended: false })
       setProfiles(result.items.map(matchProfileAdapter.adapt))
       setBannerSlots(result.bannerSlots)
       setTotalCount(result.totalCount)
+      recordMatchTotals(result.totalCount)
       apiStartRef.current = result.items.length
     } catch (e) {
       if (__DEV__) console.error('[Matches] reload after bulk-like error:', e)
@@ -2241,21 +2333,17 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     await requestPushNotificationPermission()
   }
 
-  // Angular: clickOnFilterChip() → applyFilter()/callMatchesApi() — re-queries
-  // the list with the toggled quick-filter flag(s), reset to page 0. 'FILTER'
-  // isn't a togglable flag itself — it opens the full filter/preferences screen
-  // (Angular: type:'searchPage' navigation). Desktop's 'NEARBY' chip has no
-  // Angular Matches-quick-filter equivalent (that's the separate explore-by-
-  // category flow) — toggling it just clears back to the unfiltered list.
-  function quickFilterFor(key: string): QuickFilters | undefined {
-    switch (key) {
-      case 'PROFILECREATED':     return { profileCreated: true }
-      case 'PHOTOAVAILABLE':     return { photoAvailable: true }
-      case 'HOROSCOPEAVAILABLE': return { horoscopeAvailable: true }
-      default:                   return undefined
-    }
-  }
-
+  // Angular: clickOnFilterChip() — toggle THIS chip (the others keep their own
+  // state), persist the change into the shared filter selection, flip the app
+  // into Filters mode, refresh the Filters-chip badge count, then applyFilter().
+  // applyFilter() builds filterService.getUrlParams() and hands the matches page
+  // a SEARCH_URL, so the refreshed list comes from the search endpoint with the
+  // member's WHOLE preference set — not from the plain matches endpoint with
+  // three ad-hoc flags bolted on, which is what this used to do (and which also
+  // meant the chips silently dropped every other preference the member had set).
+  //
+  // 'FILTER' is not a togglable flag: it opens the full filter screen
+  // (Angular: `type: 'searchPage'` → filterBtnEventEmit).
   async function applyQuickFilter(key: string) {
     // SearchScreen.tsx's header title/Reset-link/subheader all key off this
     // SAME eventType flag (getFilterEventType()) — without setting it here,
@@ -2263,17 +2351,46 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
     // "Filter" from Matches showed the "Partner preferences" header instead of
     // "Filters", even though this tap is the Filter-mode entry point, not PP.
     if (key === 'FILTER') { await setFilterEventType('filter'); navigation.navigate('Search'); return }
-    const next = selectedChip === key ? '' : key
-    setSelectedChip(next)
+    // Anything the API didn't describe — desktop's React-only 'NEARBY' chip, or
+    // a field this build doesn't know — is ignored rather than written into the
+    // selection under a name the params builder knows nothing about.
+    if (!quickFilterChips.some(c => c.key === key)) return
+
+    const active = await toggleQuickFilter(key, quickFilterChips)
+    setSelectedChips(active)
+    setFilterCount(await getFilterEditedCount())
+    await refreshWithCurrentFilters()
+  }
+
+  // Reset inside the desktop filter panel — clears every quick filter, then
+  // re-queries ONCE at the end rather than per chip (which is why it doesn't
+  // just call applyQuickFilter in a loop).
+  async function resetQuickFilters() {
+    let active: string[] = []
+    for (const field of await getActiveQuickFilters(quickFilterChips)) {
+      active = await toggleQuickFilter(field, quickFilterChips)
+    }
+    setSelectedChips(active)
+    setFilterCount(await getFilterEditedCount())
+    await refreshWithCurrentFilters()
+  }
+
+  // Re-runs the search from page 0 against whatever is currently persisted.
+  // Shared by every chip toggle, the panel's Reset and its Apply.
+  async function refreshWithCurrentFilters() {
     setLoading(true)
     apiStartRef.current = 0
     extendedApiStartRef.current = 0
     setExtendedLoaded(false)
     try {
-      const result = await fetchList(0, 20, quickFilterFor(next), { extended: false })
+      const userId = await getItem(StorageKeys.Auth.USER_ID)
+      const params = await buildSearchParams(userId ?? '', 0, 20)
+      setQuickFilterParams(params)
+      const result = await fetchSearchResults(params)
       setProfiles(result.items.map(matchProfileAdapter.adapt))
       setBannerSlots(result.bannerSlots)
       setTotalCount(result.totalCount)
+      recordMatchTotals(result.totalCount)
       apiStartRef.current = result.items.length
     } catch (e) {
       if (__DEV__) console.error('[Matches] quick filter error:', e)
@@ -2298,6 +2415,9 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
       setProfiles(result.items.map(matchProfileAdapter.adapt))
       setBannerSlots(result.bannerSlots)
       setTotalCount(result.totalCount)
+      // No recordMatchTotals() here: this path is explore-only (it returns
+      // early without an exploreType), and Angular's count write is gated to
+      // the matches/search routes. The facet count is not the PP count.
       if (result.facets) {
         // Server re-sorts/recomputes counts per new QSEARCH — but keep the just-applied
         // checked state instead of trusting the fresh (unchecked) response.
@@ -2500,8 +2620,10 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
           onEditPreferences={() => goToEditPreferences(navigation)}
           loadingMore={loadingMore}
           onLoadMore={loadMore}
-          selectedChip={selectedChip}
+          selectedChips={selectedChips}
           onChipSelect={applyQuickFilter}
+          onResetFilters={resetQuickFilters}
+          onApplyFilters={refreshWithCurrentFilters}
           addPhotoBannerMatches={addPhotoBannerMatches}
           onActivateProfile={() => addPhoto.openAddPhoto(navigation)}
         />
@@ -2660,8 +2782,11 @@ const [selectedChip,   setSelectedChip]   = useState<string>('')
         loading={loading}
         totalCount={totalCount}
         langCode={i18n.language}
-        selectedChip={selectedChip}
+        chips={chips}
+        selectedChips={selectedChips}
         onChipSelect={applyQuickFilter}
+        filterCount={filterCount}
+        preferenceCount={preferenceCount}
         onEditPreferences={() => goToEditPreferences(navigation)}
         onHeaderLayout={handleHeaderLayout}
         onTitleLayout={handleTitleLayout}

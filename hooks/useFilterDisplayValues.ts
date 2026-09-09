@@ -17,7 +17,7 @@ import { getItem } from '../service/storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { isAnySelection, resolveFilterLabel, type FilterOption } from '../adapters/filterPreference.adapter'
 import {
-  fetchReligionOptions, fetchCasteOptions, fetchDivisionOptions,
+  fetchReligionOptions, fetchSearchCasteOptions,
   fetchStarOptions, fetchDoshamOptions,
   fetchOccupationOptions, fetchQualificationOptions, fetchMonthlyIncomeOptions,
   fetchMotherTongueOptions, fetchMaritalStatusOptions, fetchEatingHabitOptions,
@@ -65,13 +65,18 @@ export function useFilterDisplayValues(): [FilterDisplayResult | null, () => voi
     // division field is filled from the caste list") and CasteScreen.tsx's
     // `isChristian = religion === '2'`. Previously named isIslam here, which
     // mislabelled the branch (the behaviour it drove was already right).
-    // Caste/division only resolve under ONE religion: a multi-religion
-    // selection has neither, matching SearchScreen's own row-visibility rule.
-    const religionKeys   = (selected.RELIGION ?? []).filter((k: string) => k && k !== '0')
-    const singleReligion = religionKeys.length === 1 ? religionKeys[0] : null
-    const religion       = singleReligion ?? '0'
-    const isChristian    = singleReligion === '2'
-    const casteKeys      = singleReligion === null ? [] : (isChristian ? selected.DIVISION : selected.CASTE)
+    //
+    // Same rule as SearchScreen's Caste/Division row: Christian ALONE stores
+    // its picks under DIVISION, every other religion — a mixed one such as
+    // Hindu+Christian included — stores them under CASTE. The whole selection
+    // is joined with '~' and sent to the one caste list API, which answers with
+    // that religion's castes (and, for a mix that includes Christian, its
+    // divisions alongside them). This used to bail out entirely unless exactly
+    // one religion was selected, so a mixed selection rendered raw codes.
+    const religionKeys = (selected.RELIGION ?? []).filter((k: string) => k && k !== '0')
+    const religion     = religionKeys.join('~')
+    const isChristian  = religion === '2'
+    const casteKeys    = religion === '' ? [] : (isChristian ? selected.DIVISION : selected.CASTE)
 
     const [
       religionOpts, casteOpts, occupationOpts, incomeOpts, educationOpts,
@@ -79,7 +84,7 @@ export function useFilterDisplayValues(): [FilterDisplayResult | null, () => voi
       heightOpts, starOpts, doshamOpts,
     ] = await Promise.all([
       isAny(selected.RELIGION) ? empty : fetchReligionOptions(),
-      isAny(casteKeys) ? empty : (isChristian ? fetchDivisionOptions() : fetchCasteOptions(religion, selected.MOTHERTONGUE?.[0] ?? '')),
+      isAny(casteKeys) ? empty : fetchSearchCasteOptions(religion),
       isAny(selected.OCCUPATION) ? empty : fetchOccupationOptions(),
       isAny(selected.MONTHLYINCOME) ? empty : fetchMonthlyIncomeOptions(),
       isAny(selected.EDUCATION) ? empty : fetchQualificationOptions(),

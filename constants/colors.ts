@@ -14,6 +14,10 @@ export const Colors = {
   inputBorder:      '#B0B0B0',   // default / unfocused
   inputFocus:       '#4797D9',   // focused (blue)
   inputError:       '#DE2A68',   // error (red-pink)
+  // Angular search.component.scss's `.red-dot` — the "this filter row was
+  // edited" marker. Same hex as inputError, but a different meaning, so it gets
+  // its own name rather than borrowing the error token.
+  editedDot:        '#DE2A68',
 
   // ── Text ──────────────────────────────────────────────────────────────────
   textPrimary:      '#111111',   // headings, body

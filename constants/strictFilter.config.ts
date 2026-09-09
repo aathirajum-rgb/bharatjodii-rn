@@ -58,36 +58,52 @@ export const STRICT_EXCLUDED_FIELDS = new Set<FieldKey>(['OCCUPATION'])
 // Angular en.json: STRICT_FILTERS / STRICT_FILTERS_NOTE / MANAGE_FILTER —
 // verbatim strings, already what SearchDesktopLayout.tsx hardcoded inline;
 // centralized here so mobile's new manage modal uses the exact same copy.
-export const STRICT_FILTERS_TITLE = 'Strict filters'
-export const STRICT_FILTERS_NOTE  = 'By turning on strict filters, you will only see matches that exactly meet your specified preferences'
-export const MANAGE_FILTER_CTA    = 'Manage Strict Filters'
-export const FILTER_CTA_NOTE      = '(This might reduce your matches)'
+// i18n keys, not literals — every one of these now exists in all 11 locale
+// files, copied across from Angular's own src/assets/i18n.
+export const STRICT_FILTERS_TITLE = 'SEARCH.STRICT_FILTERS'
+export const STRICT_FILTERS_NOTE  = 'SEARCH.STRICT_FILTERS_NOTE'
+export const MANAGE_FILTER_CTA    = 'SEARCH.MANAGE_FILTER'
+export const FILTER_CTA_NOTE      = 'SEARCH.FILTER_CTA_NOTE'
+
+// The `t` from react-i18next, narrowed to what this file needs so the config
+// stays free of a react-i18next import.
+export type TFunc = (key: string) => string
 
 // Angular en.json: MATCH_REDUCED, with #OLDCOUNT#/#NEWCOUNT# placeholders.
+// Not read from i18n: Angular's string carries markup (`<br>` and two
+// `<span class='matches-old|new'>`) that only its HTML renderer can use.
 export function matchReducedText(oldCount: number, newCount: number): string {
   return `Matches reduced ${oldCount.toLocaleString('en-IN')} to ${newCount.toLocaleString('en-IN')}`
 }
 
-// Range-style fields use "between {label} range {value}" wording; every
-// other field uses "matching your selected {label} ({value})" — same split
-// STRICT_FIELD_COPY's own description/note text already uses.
-const RANGE_FIELDS = new Set<FieldKey>(['AGE', 'HEIGHT', 'MONTHLYINCOME'])
-
-// Angular en.json's per-field `{FIELD}_FILTER_RANGE` key — e.g. AGE_FILTER_RANGE:
-// "Turn on strict age filter to view and get contacted only by matches between
-// age range #AGERANGE#". Shown only while the toggle is OFF, with the field's
-// live current value substituted in place of Angular's #AGERANGE#-style token.
-export function strictPromptText(key: FieldKey, label: string, value: string): string {
-  const lower = label.toLowerCase()
-  return RANGE_FIELDS.has(key)
-    ? `Turn on strict ${lower} filter to view and get contacted only by matches between ${lower} range ${value}`
-    : `Turn on strict ${lower} filter to view and get contacted only by matches matching ${value}`
+// Angular en.json's per-field `SEARCH.{PREFIX}_FILTER_RANGE`, shown under the
+// toggle. Only AGE_FILTER_RANGE carries a substitution token (#AGERANGE#);
+// every other field's string is fixed and names no value at all — HEIGHT's is
+// "…only by matches within the specified height range", full stop.
+//
+// This used to BUILD the sentence from a template — "between {field} range
+// {value}" for AGE/HEIGHT/INCOME, "matching {value}" otherwise — which invented
+// copy Angular does not have. On the Height page it read "…matches between
+// height range 4 ft 6 in (137 cm) - 7 ft 0 in (213 cm)" where Angular says
+// "…matches within the specified height range".
+export function strictPromptText(t: TFunc, key: FieldKey, value: string): string {
+  return t(STRICT_FIELD_KEYS[key].prompt).replace('#AGERANGE#', value)
 }
 
+// The four i18n KEYS each field's strict block reads. Resolving happens at
+// render time via strictFieldCopy(t, field) — the strings themselves live in
+// locales/*.json for all 11 languages, exactly as Angular has them.
 export interface StrictFieldCopy {
-  label:       string   // e.g. "Strict age filter"
-  description: string   // short one-liner shown in the manage-list row
-  note:        string   // consequence warning shown when the toggle is ON
+  label:       string   // SEARCH.{PREFIX}_FILTER        — e.g. "Strict age filter"
+  description: string   // SEARCH.{PREFIX}_FILTER_TXT    — one-liner beside the toggle
+  prompt:      string   // SEARCH.{PREFIX}_FILTER_RANGE  — shown under the toggle
+  note:        string   // SEARCH.{PREFIX}_NOTE          — consequence warning
+}
+
+// Resolves a field's four keys against the active language.
+export function strictFieldCopy(t: TFunc, field: FieldKey): StrictFieldCopy {
+  const k = STRICT_FIELD_KEYS[field]
+  return { label: t(k.label), description: t(k.description), prompt: t(k.prompt), note: t(k.note) }
 }
 
 // Angular's per-field i18n key pattern is `{FIELD}_FILTER` / `{FIELD}_FILTER_TXT`
@@ -97,76 +113,101 @@ export interface StrictFieldCopy {
 // template Angular uses field-to-field (confirmed pattern, not per-field
 // verbatim capture for every one of the 14 — safe since Angular itself just
 // substitutes the field name into this same sentence shape).
-export const STRICT_FIELD_COPY: Record<FieldKey, StrictFieldCopy> = {
+// Each field's four i18n keys, under Angular's own SEARCH namespace. The
+// strings live in locales/*.json for all 11 languages (copied over from
+// nbpwa/src/assets/i18n), so this file holds no user-facing copy at all.
+//
+// The prefixes are NOT simply the FieldKey — Angular's own naming is uneven,
+// and getting one wrong silently renders the raw key:
+//   MONTHLYINCOME  -> INCOME_*
+//   MARITALSTATUS  -> MARITAL_STATUS_*
+//   PHYSICALSTATUS -> PHYSICAL_STATUS_*
+//   EATINGHABITS   -> EATING_HABITS_*
+//   MOTHERTONGUE   -> MOTHER_TONGUE_*, except its note, which is MOTHERTONGUE_NOTE
+export const STRICT_FIELD_KEYS: Record<FieldKey, StrictFieldCopy> = {
   AGE: {
-    label:       'Strict age filter',
-    description: 'See matches strictly within the specified age range',
-    note:        'Matches outside this age range will not be able to see your profile. You might miss some good matches because of this.',
+    label:       'SEARCH.AGE_FILTER',
+    description: 'SEARCH.AGE_FILTER_TXT',
+    prompt:      'SEARCH.AGE_FILTER_RANGE',
+    note:        'SEARCH.AGE_NOTE',
   },
   HEIGHT: {
-    label:       'Strict height filter',
-    description: 'See matches strictly within the specified height range',
-    note:        'Matches outside this height range will not be able to see your profile. You might miss some good matches because of this.',
+    label:       'SEARCH.HEIGHT_FILTER',
+    description: 'SEARCH.HEIGHT_FILTER_TXT',
+    prompt:      'SEARCH.HEIGHT_FILTER_RANGE',
+    note:        'SEARCH.HEIGHT_NOTE',
   },
   MARITALSTATUS: {
-    label:       'Strict marital status filter',
-    description: 'See matches strictly matching your selected marital status',
-    note:        'Matches with a different marital status will not be able to see your profile. You might miss some good matches because of this.',
+    label:       'SEARCH.MARITAL_STATUS_FILTER',
+    description: 'SEARCH.MARITAL_STATUS_FILTER_TXT',
+    prompt:      'SEARCH.MARITAL_STATUS_FILTER_RANGE',
+    note:        'SEARCH.MARITAL_STATUS_NOTE',
   },
   RELIGION: {
-    label:       'Strict religion filter',
-    description: 'See matches strictly matching your selected religion',
-    note:        'Matches of a different religion will not be able to see your profile. You might miss some good matches because of this.',
+    label:       'SEARCH.RELIGION_FILTER',
+    description: 'SEARCH.RELIGION_FILTER_TXT',
+    prompt:      'SEARCH.RELIGION_FILTER_RANGE',
+    note:        'SEARCH.RELIGION_NOTE',
   },
   STAR: {
-    label:       'Strict star filter',
-    description: 'See matches strictly matching your selected star',
-    note:        'Matches with a different star will not be able to see your profile. You might miss some good matches because of this.',
+    label:       'SEARCH.STAR_FILTER',
+    description: 'SEARCH.STAR_FILTER_TXT',
+    prompt:      'SEARCH.STAR_FILTER_RANGE',
+    note:        'SEARCH.STAR_NOTE',
   },
   DOSHAM: {
-    label:       'Strict dosham filter',
-    description: 'See matches strictly matching your selected dosham',
-    note:        'Matches with a different dosham will not be able to see your profile. You might miss some good matches because of this.',
+    label:       'SEARCH.DOSHAM_FILTER',
+    description: 'SEARCH.DOSHAM_FILTER_TXT',
+    prompt:      'SEARCH.DOSHAM_FILTER_RANGE',
+    note:        'SEARCH.DOSHAM_NOTE',
   },
   EDUCATION: {
-    label:       'Strict education filter',
-    description: 'See matches strictly matching your selected education',
-    note:        'Matches with a different education will not be able to see your profile. You might miss some good matches because of this.',
+    label:       'SEARCH.EDUCATION_FILTER',
+    description: 'SEARCH.EDUCATION_FILTER_TXT',
+    prompt:      'SEARCH.EDUCATION_FILTER_RANGE',
+    note:        'SEARCH.EDUCATION_NOTE',
   },
   OCCUPATION: {
-    label:       'Strict occupation filter',
-    description: 'See matches strictly matching your selected occupation',
-    note:        'Matches with a different occupation will not be able to see your profile. You might miss some good matches because of this.',
+    label:       'SEARCH.OCCUPATION_FILTER',
+    description: 'SEARCH.OCCUPATION_FILTER_TXT',
+    prompt:      'SEARCH.OCCUPATION_FILTER_RANGE',
+    note:        'SEARCH.OCCUPATION_NOTE',
   },
   MONTHLYINCOME: {
-    label:       'Strict income filter',
-    description: 'See matches strictly within the specified income range',
-    note:        'Matches outside this income range will not be able to see your profile. You might miss some good matches because of this.',
+    label:       'SEARCH.INCOME_FILTER',
+    description: 'SEARCH.INCOME_FILTER_TXT',
+    prompt:      'SEARCH.INCOME_FILTER_RANGE',
+    note:        'SEARCH.INCOME_NOTE',
   },
   LOCATION: {
-    label:       'Strict location filter',
-    description: 'See matches strictly matching your selected location',
-    note:        'Matches outside this location will not be able to see your profile. You might miss some good matches because of this.',
+    label:       'SEARCH.LOCATION_FILTER',
+    description: 'SEARCH.LOCATION_FILTER_TXT',
+    prompt:      'SEARCH.LOCATION_FILTER_RANGE',
+    note:        'SEARCH.LOCATION_NOTE',
   },
   MOTHERTONGUE: {
-    label:       'Strict mother tongue filter',
-    description: 'See matches strictly matching your selected mother tongue',
-    note:        'Matches with a different mother tongue will not be able to see your profile. You might miss some good matches because of this.',
+    label:       'SEARCH.MOTHER_TONGUE_FILTER',
+    description: 'SEARCH.MOTHER_TONGUE_FILTER_TXT',
+    prompt:      'SEARCH.MOTHER_TONGUE_FILTER_RANGE',
+    note:        'SEARCH.MOTHERTONGUE_NOTE',
   },
   CASTE: {
-    label:       'Strict caste filter',
-    description: 'See matches strictly matching your selected caste',
-    note:        'Matches with a different caste will not be able to see your profile. You might miss some good matches because of this.',
+    label:       'SEARCH.CASTE_FILTER',
+    description: 'SEARCH.CASTE_FILTER_TXT',
+    prompt:      'SEARCH.CASTE_FILTER_RANGE',
+    note:        'SEARCH.CASTE_NOTE',
   },
   PHYSICALSTATUS: {
-    label:       'Strict physical status filter',
-    description: 'See matches strictly matching your selected physical status',
-    note:        'Matches with a different physical status will not be able to see your profile. You might miss some good matches because of this.',
+    label:       'SEARCH.PHYSICAL_STATUS_FILTER',
+    description: 'SEARCH.PHYSICAL_STATUS_FILTER_TXT',
+    prompt:      'SEARCH.PHYSICAL_STATUS_FILTER_RANGE',
+    note:        'SEARCH.PHYSICAL_STATUS_NOTE',
   },
   EATINGHABITS: {
-    label:       'Strict eating habits filter',
-    description: 'See matches strictly matching your selected eating habits',
-    note:        'Matches with different eating habits will not be able to see your profile. You might miss some good matches because of this.',
+    label:       'SEARCH.EATING_HABITS_FILTER',
+    description: 'SEARCH.EATING_HABITS_FILTER_TXT',
+    prompt:      'SEARCH.EATING_HABITS_FILTER_RANGE',
+    note:        'SEARCH.EATING_HABITS_NOTE',
   },
   // Filter-mode-only field, never part of Partner Preferences' strict set —
   // kept only so this Record<FieldKey, ...> stays exhaustive over SearchScreen's
@@ -174,6 +215,7 @@ export const STRICT_FIELD_COPY: Record<FieldKey, StrictFieldCopy> = {
   PROFILECREATED: {
     label:       '',
     description: '',
+    prompt:      '',
     note:        '',
   },
 }

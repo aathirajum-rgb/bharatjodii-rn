@@ -13,6 +13,7 @@ import { useCallback } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import FilterFieldRow from './FilterFieldRow'
 import CheckboxGroup from '../checkbox/CheckboxGroup'
+import { QUICK_FILTER_ICON } from '../../service/filterService'
 import { useFilterDisplayValues, type FilterFieldKey } from '../../hooks/useFilterDisplayValues'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
@@ -32,15 +33,25 @@ const FIELD_KEYS = [
 const noop = () => {}
 
 export default function MatchesFilterSidebar({
-  totalCount, selectedChip, onChipSelect, onEditPreferences,
+  totalCount, selectedChips, onChipSelect, onResetFilters, onApplyFilters, onEditPreferences,
 }: {
   totalCount:         number
-  selectedChip:       string
+  // The quick-filter fields currently ON. Each toggles independently, matching
+  // Angular's per-chip `isSelected` (see FilterChipsRow.tsx).
+  selectedChips:      string[]
   onChipSelect:       (key: string) => void
+  // Reset clears every quick filter at once; a per-key toggle can't express
+  // that, and calling onChipSelect once per active key would re-query each time.
+  onResetFilters?:    (() => void) | undefined
+  // Each toggle already applies immediately (Angular's clickOnFilterChip calls
+  // applyFilter()), so Apply just re-runs the current query.
+  onApplyFilters?:    (() => void) | undefined
   onEditPreferences?: (() => void) | undefined
 }) {
   const { t } = useTranslation()
   const editPreferences = onEditPreferences ?? noop
+  const resetFilters    = onResetFilters ?? noop
+  const applyFilters    = onApplyFilters ?? noop
   const [filterDisplay, reloadFilterDisplay] = useFilterDisplayValues()
 
   // Refresh on every return to this screen — SearchScreen.tsx (navigated to via
@@ -53,7 +64,7 @@ export default function MatchesFilterSidebar({
     <View style={s.container}>
       <View style={s.header}>
         <Text style={s.title}>{t('FILTER.FILTER_HEADER')}</Text>
-        <Pressable onPress={() => onChipSelect('')}>
+        <Pressable onPress={resetFilters}>
           <Text style={s.reset}>{t('FILTER.RESET_HEADER')}</Text>
         </Pressable>
       </View>
@@ -84,19 +95,19 @@ export default function MatchesFilterSidebar({
         <CheckboxGroup
           style={s.checkboxes}
           options={[
-            { key: 'PHOTOAVAILABLE',     value: t('MATCHES.PP_ADDED_PHOTOS_CHECKBOX'), checked: selectedChip === 'PHOTOAVAILABLE' },
-            { key: 'HOROSCOPEAVAILABLE', value: t('MATCHES.PP_HOROSCOPE_CHECKBOX'),    checked: selectedChip === 'HOROSCOPEAVAILABLE' },
+            { key: 'PHOTOAVAILABLE',     value: t('MATCHES.PP_ADDED_PHOTOS_CHECKBOX'), checked: selectedChips.includes('PHOTOAVAILABLE'),     icon: QUICK_FILTER_ICON.PHOTOAVAILABLE },
+            { key: 'HOROSCOPEAVAILABLE', value: t('MATCHES.PP_HOROSCOPE_CHECKBOX'),    checked: selectedChips.includes('HOROSCOPEAVAILABLE'), icon: QUICK_FILTER_ICON.HOROSCOPEAVAILABLE },
           ]}
-          onToggle={key => onChipSelect(selectedChip === key ? '' : key)}
+          onToggle={key => onChipSelect(key)}
         />
 
         <View style={s.footer}>
           <Text style={s.matchCount}>{t('MATCHES.MATCHES_PREVIEW_COUNT').replace('#COUNT#', String(totalCount))}</Text>
           <View style={s.actions}>
-            <Pressable style={s.resetBtn} onPress={() => onChipSelect('')}>
+            <Pressable style={s.resetBtn} onPress={resetFilters}>
               <Text style={s.resetBtnText}>{t('FILTER.RESET_HEADER')}</Text>
             </Pressable>
-            <Pressable style={s.applyBtn} onPress={() => onChipSelect(selectedChip)}>
+            <Pressable style={s.applyBtn} onPress={applyFilters}>
               <Text style={s.applyBtnText}>{t('GENERAL.APPLY')}</Text>
             </Pressable>
           </View>

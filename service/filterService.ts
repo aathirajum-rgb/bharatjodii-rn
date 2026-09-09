@@ -1,6 +1,7 @@
 import { getItem, setItem, getJson, setJson, removeItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { STRICT_FIELD_ORDER, STRICT_FIELD_KEY_MAP } from '../constants/strictFilter.config'
+import { CDN_SVG } from '../constants/cdn'
 import type { FieldKey } from '../screens/search/SearchScreen'
 
 // ─── Filter defaults ──────────────────────────────────────────────────────────
@@ -59,6 +60,10 @@ const K = {
   EVTYPE:   'FILTEREVENTTYPE',
   PARAMS:   'SEARCH_PARAMS',
   STRICT:   'STRICT_FILTER_STATE',
+  // The count of the CURRENT result set, temporary filter included.
+  TOTAL:    'MATCHESTOTALCOUNT',
+  // The count for the member's saved Partner Preference — see setMatchTotals().
+  PP_TOTAL: 'MATCHESPPTOTALCOUNT',
 }
 
 // The state before anything is stored: every field strict-OFF.
@@ -76,6 +81,83 @@ const DEFAULT_STRICT_STATE: Record<FieldKey, boolean> = Object.fromEntries(
 
 export async function getSelectedObject(): Promise<Record<string, any>> {
   return (await getJson<Record<string, any>>(K.SELECTED)) ?? { ...DEFAULT_FILTER }
+}
+
+// Whether a filter session has actually been stored, as opposed to
+// getSelectedObject() having handed back the DEFAULT_FILTER fallback. Angular
+// asks the same question with `if (!localStorage.getItem('SEARCHVALUES'))`
+// before seeding the screen from the member's partner preference.
+export async function hasStoredFilterSelection(): Promise<boolean> {
+  return (await getJson<Record<string, any>>(K.SELECTED)) != null
+}
+
+// ─── Partner preference → filter selection ────────────────────────────────────
+// Angular: search.component.ts's setsearchValueList(PPSetData) plus the three
+// helpers it delegates to (setCountryValue / setIncomeValues / setCasteValue).
+// The getpreference payload IS the baseline the filter screen starts from: each
+// row shows the member's saved preference until they change it in Filters mode,
+// which is what makes a red dot mean "different from your saved preference"
+// and what Reset puts back.
+//
+// Only the mapping is ported. Angular interleaves callAPIPoppulateData() calls
+// for STATE/RELIGION/CASTE/… into the same loop; here those lists are fetched
+// by the screen's own effects off the resulting selection, so this stays a pure
+// function.
+
+// Angular's common.isValidparam() — absent, empty, or the strings browsers
+// leave behind when an undefined value is stringified.
+function isValidPPValue(value: any): boolean {
+  if (value === null || value === undefined) return false
+  const s = String(value).trim()
+  return s !== '' && s !== 'null' && s !== 'undefined'
+}
+
+// PP values arrive as '~'-joined strings; the selection stores arrays for most
+// fields but plain scalars for a few (ages, the two availability flags,
+// PISTARMATCHING). Match whatever shape DEFAULT_FILTER declares for the key, or
+// buildSearchParams' `.join('~')` / raw reads see the wrong type.
+function toSelectionShape(value: any, defaultValue: any): any {
+  const parts = String(value).split('~').filter(p => p !== '')
+  if (Array.isArray(defaultValue)) return parts.length > 0 ? parts : [String(value)]
+  return String(value)
+}
+
+export function ppSelectionFromPPSet(ppSet: Record<string, any> | null | undefined): Record<string, any> {
+  const obj: Record<string, any> = { ...DEFAULT_FILTER }
+  if (!ppSet) return obj
+
+  // Angular's setCasteValue(): the caste cascade collapses top-down, so a
+  // preference with no religion cannot carry a caste, and so on. Done on a COPY
+  // — Angular mutates the payload in place, which this deliberately doesn't.
+  const pp: Record<string, any> = { ...ppSet }
+  if (!isValidPPValue(pp.RELIGION) || String(pp.RELIGION) === '0') pp.CASTE    = '0'
+  if (!isValidPPValue(pp.CASTE)    || String(pp.CASTE)    === '0') pp.SUBCASTE = '0'
+  if (!isValidPPValue(pp.SUBCASTE) || String(pp.SUBCASTE) === '0') pp.GOTHRA   = '0'
+  // search.component.ts:387 — Christian preferences store their division under
+  // CASTE, and the DIVISION row reads it from there.
+  if (String(pp.RELIGION) === '2' && !isValidPPValue(pp.DIVISION)) pp.DIVISION = pp.CASTE
+
+  for (const key of Object.keys(DEFAULT_FILTER)) {
+    // Handled below — Angular skips these in the same loop, via singleChkValues
+    // for the location trio and setIncomeValues() for the income triple.
+    if (['MONTHLYINCOME', 'STARTMONTHLYINCOME', 'ENDMONTHLYINCOME'].includes(key)) continue
+    if (isValidPPValue(pp[key])) obj[key] = toSelectionShape(pp[key], DEFAULT_FILTER[key])
+  }
+
+  // Angular's setIncomeValues(): MONTHLYINCOME is the semantic CHOICE and comes
+  // from STARTINCOME, not from a field of its own; a payload with no choice but
+  // a real bracket pair means "pick specific values" ('2').
+  obj.MONTHLYINCOME      = isValidPPValue(pp.STARTINCOME) ? [String(pp.STARTINCOME)] : ['0']
+  obj.STARTMONTHLYINCOME = isValidPPValue(pp.STARTMONTHLYINCOME)
+    ? toSelectionShape(pp.STARTMONTHLYINCOME, DEFAULT_FILTER.STARTMONTHLYINCOME) : ['0']
+  obj.ENDMONTHLYINCOME   = isValidPPValue(pp.ENDMONTHLYINCOME)
+    ? toSelectionShape(pp.ENDMONTHLYINCOME, DEFAULT_FILTER.ENDMONTHLYINCOME) : ['0']
+  if (!isValidPPValue(pp.STARTINCOME)
+    && obj.STARTMONTHLYINCOME[0] !== '0' && obj.ENDMONTHLYINCOME[0] !== '0') {
+    obj.MONTHLYINCOME = ['2']
+  }
+
+  return obj
 }
 
 export async function getSearchPPCheckBox(): Promise<string[]> {
@@ -151,12 +233,65 @@ const FILTERPP_EXTRA_INDEX: Record<string, number> = {
 // position, or -1 for keys that hold no position (e.g. PISTARMATCHING).
 // Sub-fields share their parent's slot: COUNTRY/STATE/CITY all report
 // LOCATION's, CASTE/SUBCASTE/GOTHRA/DIVISION all report CASTE's.
+// Which ROW a stored selection key belongs to. Sub-fields collapse into their
+// parent row the same way they share a FILTERPP slot: COUNTRY/STATE/CITY all
+// report LOCATION, CASTE/SUBCASTE/GOTHRA/DIVISION all report CASTE, and
+// STARTAGE/ENDAGE both report AGE.
+export function filterRowKey(selectionKey: string): string | null {
+  if (FILTERPP_EXTRA_INDEX[selectionKey] !== undefined) return selectionKey
+  const base = selectionKey.replace(/^(START|END)/, '')
+  return STRICT_FIELD_KEY_MAP[base] ?? null
+}
+
 function filterPPIndex(selectionKey: string): number {
   const extra = FILTERPP_EXTRA_INDEX[selectionKey]
   if (extra !== undefined) return extra
-  const base  = selectionKey.replace(/^(START|END)/, '')
-  const field = STRICT_FIELD_KEY_MAP[base]
-  return field ? STRICT_FIELD_ORDER.indexOf(field) : -1
+  const field = filterRowKey(selectionKey)
+  return field ? STRICT_FIELD_ORDER.indexOf(field as FieldKey) : -1
+}
+
+function sameAsDefault(value: any, fallback: any): boolean {
+  if (Array.isArray(value) || Array.isArray(fallback)) {
+    const a = Array.isArray(value)    ? value    : [value]
+    const b = Array.isArray(fallback) ? fallback : [fallback]
+    return a.length === b.length && a.every((v, i) => String(v ?? '') === String(b[i] ?? ''))
+  }
+  return String(value ?? '') === String(fallback ?? '')
+}
+
+// Angular: `searchValueList[field].isAnyChanges`, mirrored into
+// filterService.selectedFilters — one flag per ROW, which drives both the red
+// "edited" dot on the filter row and the count badge on the Filters chip.
+//
+// The baseline is the member's saved PARTNER PREFERENCE, not DEFAULT_FILTER:
+// the filter screen opens showing the preference (setsearchValueList seeds it
+// from the getpreference payload) and Angular's setsearchValueList explicitly
+// clears every isAnyChanges as it does so — "it should be true for showing the
+// red dot" only once the member changes something in Filters mode. So a dot
+// means "different from your saved preference", and Reset — which restores the
+// preference — clears them all. Falls back to DEFAULT_FILTER when the
+// preference hasn't loaded yet.
+//
+// DERIVED rather than tracked as its own mutable flag: Angular sets
+// isAnyChanges at each write site and has to remember to clear it again, which
+// is what makes a reset there a multi-step teardown. A comparison cannot drift.
+export function computeEditedRows(
+  obj: Record<string, any>,
+  baseline: Record<string, any> = DEFAULT_FILTER,
+): Record<string, boolean> {
+  const edited: Record<string, boolean> = {}
+  for (const key of Object.keys(DEFAULT_FILTER)) {
+    const row = filterRowKey(key)
+    if (!row) continue
+    if (!sameAsDefault(obj?.[key], baseline?.[key] ?? DEFAULT_FILTER[key])) edited[row] = true
+  }
+  return edited
+}
+
+// Angular: filter.service.ts's isAnyOneFieldEdited() — the guard Reset uses to
+// decide whether there is anything to undo.
+export function isAnyFieldEdited(edited: Record<string, boolean>): boolean {
+  return Object.values(edited).some(Boolean)
 }
 
 // Marks the edited field — and ONLY that field. Editing age sends
@@ -179,6 +314,101 @@ export function markFilterPPEdited(ppCheckBox: string[], selectionKey: string): 
   return next
 }
 
+// ─── Quick-filter chips (Matches header) ──────────────────────────────────────
+// Angular: search.component.html's chip swiper, fed by filter.config.ts's
+// `quickFilterList` and toggled by search.component.ts's clickOnFilterChip().
+//
+// The chips are NOT a radio group — each one carries its own `isSelected` and
+// toggles independently, so "Recently joined" + "with photos" can both be on.
+// A tap is a real filter edit, not view state: it writes the field into the
+// persisted selection, flips the app into Filters mode, records the field in
+// SELECTEDFILTERS (which is what the Filters chip's count badge reads) and then
+// re-runs the search. That is why this lives here rather than in the screen —
+// the Matches header and Edit Preferences are editing one and the same object.
+
+// The three fields the server may send chips for, in Angular's own
+// filter.config.ts `quickFilterList` order (the FILTER chip is not one of them —
+// it navigates rather than toggling a field).
+export const QUICK_FILTER_FIELDS = ['PROFILECREATED', 'PHOTOAVAILABLE', 'HOROSCOPEAVAILABLE'] as const
+
+// Leading icons for the two quick-filter CHECKBOX rows — the Filters screen's
+// own list (mobile, Filters mode) and the desktop filter sidebar, which render
+// the same two options and so must not each carry their own copy of the URLs.
+// Not used by the chip row: a chip's icon is the filter/close glyph Chip.tsx
+// owns, never the field's own (see FilterChipsRow.tsx).
+export const QUICK_FILTER_ICON: Record<string, string> = {
+  PHOTOAVAILABLE:     `${CDN_SVG}menu/filter-with-photos.svg`,
+  HOROSCOPEAVAILABLE: `${CDN_SVG}viewprofile/horoscope-icon.svg`,
+}
+
+// One chip's server-driven definition. Angular hydrates each hdrSearchList entry
+// from REGISTRATIONARRAYS.QUICKFILTER in matches.page.ts's updateQuickFilterList();
+// registrationService.fetchQuickFilterChips() is that step, and hands the codes
+// back here so this file stays free of any dependency on it.
+export interface QuickFilterChip {
+  key:      string   // fieldType — PROFILECREATED | PHOTOAVAILABLE | HOROSCOPEAVAILABLE
+  label:    string   // already localized by the server (initialfetch is sent with LANG)
+  onValue:  string   // written into the selection when the chip is switched ON
+  offValue: string   // …and when it is switched OFF
+}
+
+function isQuickFilterOn(obj: Record<string, any>, chip: QuickFilterChip): boolean {
+  const raw = obj[chip.key]
+  return String(Array.isArray(raw) ? raw[0] : raw ?? '') === chip.onValue
+}
+
+export async function getSelectedFilters(): Promise<Record<string, boolean>> {
+  return (await getJson<Record<string, boolean>>(K.FILTERS)) ?? {}
+}
+
+// Angular: filter.service.ts getFilterEditedCount() — how many fields the member
+// has actually set, shown as the badge on the Filters chip. Zero outside Filters
+// mode (`if (!checkFilterEventType()) { updateFilterEditCount = 0 }`), because
+// the badge counts a temporary filter session, not the saved preference.
+export async function getFilterEditedCount(): Promise<number> {
+  if ((await getFilterEventType()) !== 'filter') return 0
+  const filters = await getSelectedFilters()
+  return Object.keys(filters).filter(key => filters[key] === true).length
+}
+
+// Which chips are currently on, read back from the persisted selection so the
+// header renders correctly after a remount or a Reset elsewhere. Angular does
+// the same re-derivation at the top of updateQuickFilterList().
+export async function getActiveQuickFilters(chips: QuickFilterChip[]): Promise<string[]> {
+  const obj = await getSelectedObject()
+  return chips.filter(chip => isQuickFilterOn(obj, chip)).map(chip => chip.key)
+}
+
+// Angular: clickOnFilterChip() — toggle the one chip, persist, and let the
+// caller re-query. Returns the full set of chips left on.
+export async function toggleQuickFilter(
+  field: string, chips: QuickFilterChip[],
+): Promise<string[]> {
+  const chip = chips.find(c => c.key === field)
+  if (!chip) return getActiveQuickFilters(chips)
+
+  const obj    = await getSelectedObject()
+  const turnOn = !isQuickFilterOn(obj, chip)
+  const value  = turnOn ? chip.onValue : chip.offValue
+  // PROFILECREATED is stored as an ARRAY and sent joined with '~'; the other two
+  // are plain scalars — see baseParams()/buildSearchParams() and DEFAULT_FILTER.
+  // Angular writes `[keyValue]` for all three, but reads the latter two straight
+  // into the URL, where a one-element array stringifies to the same '1'/'0'.
+  const next   = { ...obj, [field]: field === 'PROFILECREATED' ? [value] : value }
+
+  // Angular sets FILTEREVENTTYPE='filter' on every chip tap: a quick filter is
+  // a temporary filter, never an edit to the saved partner preference.
+  await setFilterEventType('filter')
+
+  const filters = await getSelectedFilters()
+  await Promise.all([
+    setJson(K.SELECTED, next),
+    setJson(K.FILTERS, { ...filters, [field]: turnOn }),
+  ])
+
+  return chips.filter(c => isQuickFilterOn(next, c)).map(c => c.key)
+}
+
 export async function saveFilterState(
   obj: Record<string, any>,
   ppCheckBox: string[],
@@ -191,11 +421,85 @@ export async function saveFilterState(
   ])
 }
 
+// ─── Matches counts ───────────────────────────────────────────────────────────
+// Angular keeps TWO counts, and the difference is the whole point of the
+// "#COUNT# profiles based on your preferences." line (matches.page.ts:2900's
+// getPPContent()):
+//
+//   MATCHESTOTALCOUNT    always written — the CURRENT result set, so it moves
+//                        with a temporary quick filter.
+//   MATCHESPPTOTALCOUNT  written only when NOT in filter mode
+//                        (`if (!this.filterService.checkFilterEventType())`,
+//                        matches.page.ts:1281) — the member's saved Partner
+//                        Preference count.
+//
+// The sentence says "based on your preferences", so it has to keep showing the
+// PP count while a temporary filter narrows the list. Hence the PP key is read
+// first and the applied count is only a fallback for the very first load,
+// before any PP count has been cached.
+//
+// Angular re-reads localStorage on every change-detection pass, which is why it
+// needs no subscription. Here the caller holds the resolved number in state and
+// these helpers return it, so one call both persists and yields what to render.
+
+const parseCount = (raw: string | null): number | null => {
+  if (raw == null || raw.trim() === '') return null
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : null
+}
+
+// Angular's three-level fallback: PP count -> applied count -> in-memory.
+export async function getPreferenceMatchCount(fallback = 0): Promise<number> {
+  const [pp, total] = await Promise.all([getItem(K.PP_TOTAL), getItem(K.TOTAL)])
+  return parseCount(pp) ?? parseCount(total) ?? fallback
+}
+
+// Angular: matches.page.ts:1281-1285 — the listing API returned a new TOTAL.
+// Returns the number the preferences line should now show.
+export async function setMatchTotals(total: number): Promise<number> {
+  const isFilter = (await getFilterEventType()) === 'filter'
+  await setItem(K.TOTAL, String(total))
+  if (!isFilter) {
+    await setItem(K.PP_TOTAL, String(total))
+    return total
+  }
+  return getPreferenceMatchCount(total)
+}
+
+// Angular: matches.page.ts:1543-1547 / 1576-1580 — a profile left the list
+// (interest sent, ignored, skipped), so both counts drop by one under the same
+// filter-mode guard.
+export async function decrementMatchTotals(): Promise<number> {
+  const isFilter = (await getFilterEventType()) === 'filter'
+  const [ppRaw, totalRaw] = await Promise.all([getItem(K.PP_TOTAL), getItem(K.TOTAL)])
+
+  const total = parseCount(totalRaw)
+  if (total != null) await setItem(K.TOTAL, String(Math.max(0, total - 1)))
+
+  const pp = parseCount(ppRaw)
+  if (!isFilter && pp != null) {
+    const next = Math.max(0, pp - 1)
+    await setItem(K.PP_TOTAL, String(next))
+    return next
+  }
+  return getPreferenceMatchCount(Math.max(0, (total ?? 0) - 1))
+}
+
 // ─── URL param builders ───────────────────────────────────────────────────────
 
 function baseParams(obj: Record<string, any>): string {
-  // Religion 2 = Islam → use DIVISION instead of CASTE
-  const casteVal = obj.RELIGION?.[0] === '2'
+  // Angular (filter.service.ts getUrlParams): CASTE carries DIVISION's keys for
+  // religion '2' — CHRISTIAN, not Islam (search.component.ts:100, "For
+  // christian the division field is filled from the caste list").
+  //
+  // Tested on the WHOLE selection, not RELIGION[0]: Christian ALONE is the only
+  // case whose picks live under DIVISION, which is exactly the rule the
+  // Caste/Division row uses to decide which field it writes. Angular's
+  // `RELIGION[0] === '2'` agrees for every selection the option list can
+  // produce in order, but would send an empty DIVISION for a mixed
+  // Christian-first selection whose picks the UI had stored under CASTE.
+  const religionKeys = (obj.RELIGION ?? []).filter((k: string) => k && k !== '0')
+  const casteVal = religionKeys.join('~') === '2'
     ? (obj.DIVISION ?? []).join('~')
     : (obj.CASTE ?? []).join('~')
 
@@ -332,13 +636,24 @@ export async function resetFilter(eventType = 'filter'): Promise<void> {
   const keysToRemove = [
     'SYSTEMSETPP', SK.App.PP_SET_DATA, 'PREVLANGUAGE',
     'FILTERDATALIST', K.SELECTED, 'SEARCHVALUES',
-    'SELECTEDKEYS', 'SELECTEDVALUES', 'MATCHESTOTALCOUNT',
+    // K.PP_TOTAL is NOT here, deliberately: Angular's resetFilter() drops
+    // MATCHESTOTALCOUNT and leaves MATCHESPPTOTALCOUNT alone, so the
+    // "profiles based on your preferences" line survives a filter reset.
+    'SELECTEDKEYS', 'SELECTEDVALUES', K.TOTAL,
     'FILTERCOUNT', 'MATCHESOLDCOUNT', K.PPCHECK,
     'ISCALLEDAPI', K.FILTERS,
-    // Angular: reset forces every strict flag back to '1' — clearing this key
-    // has the same effect, since getStrictFilterState() falls back to
-    // DEFAULT_STRICT_STATE (all-true) when nothing is persisted.
-    K.STRICT,
+    // K.STRICT (STRICT_FILTER_STATE) is deliberately NOT purged. Angular's
+    // filter.service.ts resetFilter() removes exactly the 14 keys above and
+    // leaves the strict state alone — the only place it is ever removed is
+    // filter.component.ts:301, restoring a snapshot when the member cancels out
+    // of the strict panel, which is a different action entirely.
+    //
+    // It used to be cleared here, on the premise that an absent key falls back
+    // to "all strict flags on". It does not: DEFAULT_STRICT_STATE is all-FALSE
+    // (see its own comment — an unknown field must serialize to '0', matching
+    // Angular's `state[key] === true` test). So purging it made the next
+    // searchResult call go out as STRICKPP=0|0|0|… and silently drop every
+    // strict preference the member had set.
   ]
 
   if (eventType === 'pp') keysToRemove.push(K.EVTYPE)
@@ -357,10 +672,14 @@ export interface FilterItem {
   parentValue?: any
 }
 
-const UNCHECKED_KEYS = new Set(['no', '0', '00', '9998', '9999', '999', '998'])
+// Angular's sentinel option codes ("Caste no bar", "Others", "Don't wish to
+// specify", …). It uses this one list for BOTH purposes: they can never be
+// "checked" (isValueChecked below) and getSearchDataList() also omits them from
+// a panel's options entirely — see fetchSearchCasteOptions(), which imports it.
+export const NON_SELECTABLE_OPTION_KEYS = new Set(['no', '0', '00', '9998', '9999', '999', '998'])
 
 export function isValueChecked(key: string, selectedList: any[] | undefined): boolean {
-  if (!selectedList || UNCHECKED_KEYS.has(String(key))) return false
+  if (!selectedList || NON_SELECTABLE_OPTION_KEYS.has(String(key))) return false
   if (selectedList[0] === '0') return false
   return selectedList.includes(String(key))
 }

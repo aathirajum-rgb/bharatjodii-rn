@@ -1,46 +1,50 @@
 // Horizontally-scrolling quick-filter chip row — shared between the mobile
-// MatchesHeader (MOBILE_FILTER_CHIPS) and the desktop MatchesDesktopLayout
-// (DESKTOP_FILTER_CHIPS), which use different chip sets but the same component.
-import { Pressable, ScrollView, StyleSheet, Text } from 'react-native'
+// Matches header (its chips come from the API — see FILTER_CHIP below) and the
+// desktop MatchesDesktopLayout (DESKTOP_FILTER_CHIPS) — different chip sets,
+// same component.
+//
+// Angular: search.component.html's `<swiper [config]="filterMatches">` over
+// `quickFilterSearchList`. The swiper config is `slidesPerView: 'auto'`,
+// `freeMode: true`, `loop: false` — i.e. plain free horizontal scrolling with
+// content-sized slides, which is what a horizontal ScrollView already is.
+import { ScrollView, StyleSheet } from 'react-native'
 import { useTranslation } from 'react-i18next'
-import CdnSvg from '../cdn-svg/CdnSvg'
+import Chip from '../chip/Chip'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG } from '../../constants/cdn'
 import { SemanticFontsEnglish } from '../../src/theme/fonts'
 
-const CDN = CDN_SVG
-
-// A chip's icon (if any) renders in exactly one position — never both — so
-// this is one field, not two independent booleans. labelKey (not a literal
-// label) so translation happens here, at render time, via useTranslation() —
-// these arrays are module-level constants with no component context of their own.
+// Angular: filter.config.ts's quickFilterList entries. `type: 'searchPage'`
+// marks the one chip that navigates to the filter page instead of toggling a
+// flag — it is also the only one with a leading icon and a count badge, per
+// search.component.html's `item.fieldType == 'FILTER' ? ... : ...` bindings.
+// Every other chip is a plain toggle whose icon appears only once selected.
+//
+// The per-chip `imgUrl` in Angular's config is dead: the template drives the
+// icon off `iconType` alone ('filter-img' / 'close-icon' / ''), so a selected
+// chip shows a CLOSE icon, never the field's own. Chip.tsx owns both URLs.
 export interface ChipConfig {
-  key:           string
-  labelKey:      string
-  icon?:         string
-  iconPosition?: 'leading' | 'onSelect'  // 'leading' = always before label (mobile "Filters");
-                                          // 'onSelect' = after label once selected (mobile quick-filter chips)
+  key:              string
+  // An i18n key, for the chips whose copy this app owns. The Matches quick
+  // filters do NOT use it — their labels arrive already localized from the
+  // server, in `label` below (see registrationService.fetchQuickFilterChips()).
+  labelKey?:        string
+  label?:           string
+  opensFilterPage?: boolean
 }
 
-// Figma node 11026:8853 — chips in horizontal scroll, gap 8 (mobile Matches header)
-// Angular: search.component.html:176-187 (the REAL live chip row — a near-identical
-// block earlier in matches.page.html looks like the same thing but is commented out
-// and dead) binds [filterText]="item.selectedData | translate". filter.config.ts's
-// quickFilterList sets selectedData to a literal, untranslated English string for
-// 3 of these 4 chips (a real, current gap in Angular itself — none of the 12 locale
-// JSONs has a key matching those literal strings, so ngx-translate's missing-key
-// fallback just echoes them back verbatim in every language there too).
-// Rather than reproduce that gap, we use labelName's keys instead — Angular's OWN
-// per-chip translation keys for these same 3 fields (FILTER.PROFILECREATED /
-// FILTER.PROFILEWITHPHOTOS / FILTER.PROFILEWITHHOROSCOPE), which DO have real,
-// complete translations across all locale files — a deliberate, confirmed
-// improvement over Angular's untranslated selectedData, not a parity port.
-export const MOBILE_FILTER_CHIPS: ChipConfig[] = [
-  { key: 'FILTER',             labelKey: 'SEARCH.FILTER_HEADER',        icon: CDN + 'revamp/filter-revamp.svg',        iconPosition: 'leading' },
-  { key: 'PROFILECREATED',     labelKey: 'FILTER.PROFILECREATED',       icon: CDN + 'menu/filter-profile-created.svg', iconPosition: 'onSelect' },
-  { key: 'PHOTOAVAILABLE',     labelKey: 'FILTER.PROFILEWITHPHOTOS',    icon: CDN + 'menu/filter-with-photos.svg',     iconPosition: 'onSelect' },
-  { key: 'HOROSCOPEAVAILABLE', labelKey: 'FILTER.PROFILEWITHHOROSCOPE', icon: CDN + 'menu/filter-horoscope.svg',       iconPosition: 'onSelect' },
-]
+// The one chip this app supplies itself. Angular's filter.config.ts gives it
+// `selectedData: 'SEARCH.FILTER_HEADER'` — a real i18n key, which is why the
+// template's `| translate` resolves it while the other three pass straight
+// through. It is also the only chip with a leading icon and a count badge, and
+// the only one that navigates instead of toggling a field (`type:'searchPage'`).
+//
+// The other three are NOT listed here: they are built at runtime from the API
+// (registrationService.fetchQuickFilterChips() → MatchesScreen), mirroring
+// Angular's matches.page.ts hdrSearchList → `[filterDataFromMatches]` input →
+// search.component's quickFilterSearchList.
+export const FILTER_CHIP: ChipConfig = {
+  key: 'FILTER', labelKey: 'SEARCH.FILTER_HEADER', opensFilterPage: true,
+}
 
 // Desktop "Jodii Desktop" Figma quick-filter row — plain text chips, no icons.
 // React-only design (no Angular desktop equivalent). Labels match the Figma
@@ -54,13 +58,19 @@ export const DESKTOP_FILTER_CHIPS: ChipConfig[] = [
 ]
 
 export default function FilterChipsRow({
-  chips, selected, onSelect, selectedBg, selectedTextColor,
+  chips, selected, onSelect, filterCount = 0, selectedBg, selectedTextColor,
 }: {
-  chips:              ChipConfig[]
-  selected:           string
-  onSelect:           (key: string) => void
-  selectedBg?:         string | undefined   // override for the selected-chip background (default = mobile's Figma value)
-  selectedTextColor?: string | undefined   // override for the selected-chip label color (default = mobile's Figma value)
+  chips:    ChipConfig[]
+  // Every chip toggles independently (Angular gives each list entry its own
+  // `isSelected`), so this is the set that is ON — not a single active key.
+  selected: string[]
+  onSelect: (key: string) => void
+  // Angular: [countShow]/[countText] on the Filters chip —
+  // filterService.updateFilterEditCount, how many fields the member has set.
+  // Already 0 outside Filters mode, so no extra gate is needed here.
+  filterCount?:       number
+  selectedBg?:        string | undefined  // override for the selected-chip background (desktop palette)
+  selectedTextColor?: string | undefined  // override for the selected-chip label color (desktop palette)
 }) {
   const { t } = useTranslation()
   return (
@@ -71,41 +81,46 @@ export default function FilterChipsRow({
       style={f.scroll}
     >
       {chips.map(chip => {
-        const isSelected  = selected === chip.key
-        const isLeadingIcon = chip.iconPosition === 'leading'
+        // The Filters chip never renders as selected — tapping it navigates
+        // away rather than setting a flag, so its `isSelected` stays 0.
+        const isSelected = !chip.opensFilterPage && selected.includes(chip.key)
         return (
-          <Pressable
+          <Chip
             key={chip.key}
-            style={[
-              f.chip,
-              isSelected && f.chipSelected,
-              isSelected && selectedBg != null && { backgroundColor: selectedBg },
+            label={chip.label ?? (chip.labelKey ? t(chip.labelKey) : '')}
+            state={isSelected ? 'selected' : 'default'}
+            // Angular: `fieldType == 'FILTER' ? 'filter-img' : isSelected ? 'close-icon' : ''`
+            // — a selected chip offers a CLOSE affordance, which is also the
+            // only visual cue that tapping it again clears the filter.
+            icon={chip.opensFilterPage ? 'filter' : isSelected ? 'close' : undefined}
+            iconPosition={chip.opensFilterPage ? 'start' : 'end'}
+            count={chip.opensFilterPage ? filterCount : undefined}
+            onPress={() => onSelect(chip.key)}
+            // A plain object, not a StyleSheet entry: Chip applies `style` LAST,
+            // so anything set here beats its own `chipSelected` background —
+            // hence the unselected tint is only applied while unselected.
+            style={{
+              flexShrink: 0,
+              ...(isSelected
+                ? (selectedBg != null ? { backgroundColor: selectedBg } : null)
+                : { backgroundColor: UNSELECTED_BG }),
+            }}
+            labelStyle={[
+              f.chipText,
+              ...(isSelected && selectedTextColor != null ? [{ color: selectedTextColor }] : []),
             ]}
-            onPress={() => onSelect(isSelected && !isLeadingIcon ? '' : chip.key)}
-          >
-            {isLeadingIcon && chip.icon && (
-              <CdnSvg uri={chip.icon} width={20} height={20} style={{ marginRight: 4 }} />
-            )}
-            <Text
-              style={[
-                f.chipText,
-                isSelected && f.chipTextSelected,
-                isSelected && selectedTextColor != null && { color: selectedTextColor },
-              ]}
-            >
-              {t(chip.labelKey)}
-            </Text>
-            {chip.iconPosition === 'onSelect' && chip.icon && isSelected && (
-              <CdnSvg uri={chip.icon} width={16} height={16} style={{ marginLeft: 4 }} />
-            )}
-          </Pressable>
+          />
         )
       })}
     </ScrollView>
   )
 }
 
-// Figma chips: height 40, px 16, py 8, border-radius 20, border #B0B0B0, gap 8
+// Chip.tsx carries the chip box itself (height 40, px 16, py 8, radius 20,
+// border #B0B0B0) and an 8px marginRight, which is this row's gap — so the
+// container only owns its padding, and there is no `gap` here to double it up.
+const UNSELECTED_BG = 'rgba(255,255,255,0.2)'
+
 const f = StyleSheet.create({
   scroll: {
     flexShrink: 0,
@@ -113,36 +128,18 @@ const f = StyleSheet.create({
   },
   row: {
     paddingLeft:   16,
-    paddingRight:  16,
+    // Chip's own trailing marginRight supplies the last chip's gap, so this is
+    // 8 rather than 16 — the two together are the same 16px inset as the left.
+    paddingRight:  8,
     paddingTop:    8,
     paddingBottom: 8,
     flexDirection: 'row',
     alignItems:    'center',
-    gap:           8,
-  },
-  chip: {
-    height:            40,
-    paddingHorizontal: 16,
-    paddingVertical:   8,
-    borderRadius:      20,
-    borderWidth:       1,
-    borderColor:       Colors.inputBorder,
-    backgroundColor:   'rgba(255,255,255,0.2)',
-    flexDirection:     'row',
-    alignItems:        'center',
-    flexShrink:        0,
-  },
-  chipSelected: {
-    borderColor:     Colors.chipBorderActive,
-    backgroundColor: Colors.chipSurfaceSelected,
   },
   chipText: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
     lineHeight: 20,
-    color:      '#000000',
-  },
-  chipTextSelected: {
-    color: Colors.primary,
+    color:      Colors.textPrimary,
   },
 })

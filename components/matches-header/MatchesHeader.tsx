@@ -3,7 +3,7 @@ import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-n
 import { useTranslation } from 'react-i18next'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import CdnSvg from '../cdn-svg/CdnSvg'
-import FilterChipsRow, { MOBILE_FILTER_CHIPS } from './FilterChipsRow'
+import FilterChipsRow, { type ChipConfig } from './FilterChipsRow'
 import FacetFilterModal from './FacetFilterModal'
 import LanguagePill, { LANG_LABELS } from '../language-pill/LanguagePill'
 import { Colors } from '../../constants/colors'
@@ -26,8 +26,20 @@ export interface MatchesHeaderProps {
   loading:         boolean
   totalCount:      number
   langCode:        string
-  selectedChip:    string
+  // Angular: the `[filterDataFromMatches]="{list: hdrSearchList, …}"` input —
+  // matches.page.ts builds the row from the API and passes it down, rather than
+  // the chip row owning a static list of its own.
+  chips:           ChipConfig[]
+  // Angular gives every quick-filter chip its own `isSelected`, so more than one
+  // can be on at a time — this is the set that is ON, not a single active key.
+  selectedChips:   string[]
   onChipSelect:    (key: string) => void
+  // Angular: filterService.updateFilterEditCount — the badge on the Filters chip.
+  filterCount?:    number
+  // Angular: getPPContent()'s count — the saved Partner Preference total, which
+  // stays put while a quick filter narrows the list. NOT totalCount, which is
+  // the current result set and drives the title above.
+  preferenceCount?: number
   onEditPreferences?: () => void
   onHeaderLayout:  (height: number) => void
   onTitleLayout:   (height: number) => void
@@ -54,8 +66,11 @@ export default function MatchesHeader({
   loading,
   totalCount,
   langCode,
-  selectedChip,
+  chips,
+  selectedChips,
   onChipSelect,
+  filterCount = 0,
+  preferenceCount = 0,
   onEditPreferences,
   onHeaderLayout,
   onTitleLayout,
@@ -111,7 +126,10 @@ export default function MatchesHeader({
         {!loading && !isExploreMode && (
           <View style={s.ppRow}>
             <Text style={[s.ppText, { fontFamily: langFonts.regular }]}>
-              {t('MATCHES.PROFILE_COUNT').replace('#COUNT#', String(totalCount))}
+              {/* Angular getPPContent(): `#COUNT#` is a literal token in every
+                  locale file, replaced by hand rather than interpolated, and
+                  the number is the PP count — not the filtered one. */}
+              {t('MATCHES.PROFILE_COUNT').replace('#COUNT#', String(preferenceCount))}
             </Text>
             <Pressable style={s.ppEditBtn} onPress={onEditPreferences} hitSlop={8}>
               <Text style={[s.ppEditText, { fontFamily: langFonts.regular }]}>{t('MATCHES.EDIT_PP')}</Text>
@@ -122,8 +140,15 @@ export default function MatchesHeader({
 
         {/* Filter chips — Figma: top 56 from content start (12 title-top + 24 title + 20 gap).
             Angular: *ngIf="!isExploreMatches && hdrSearchList.length > 0" — same gate. */}
-        {!isExploreMode && (
-          <FilterChipsRow chips={MOBILE_FILTER_CHIPS} selected={selectedChip} onSelect={onChipSelect} />
+        {/* Angular also gates the whole row on `quickFilterSearchList?.length > 0`
+            — with no chips there is nothing to scroll. */}
+        {!isExploreMode && chips.length > 0 && (
+          <FilterChipsRow
+            chips={chips}
+            selected={selectedChips}
+            onSelect={onChipSelect}
+            filterCount={filterCount}
+          />
         )}
 
         {/* Facet refinement chips — explore-by-category mode only (#5). Angular:

@@ -8,6 +8,7 @@
 // openSimpleMulti pickers stay completely unchanged — this wrapper never
 // touches them, it just sits around a tap-target that opens them).
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Modal, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
@@ -16,7 +17,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../cdn-svg/CdnSvg'
-import { STRICT_FIELD_COPY, STRICT_EXCLUDED_FIELDS, strictPromptText } from '../../constants/strictFilter.config'
+import {
+  strictFieldCopy, STRICT_EXCLUDED_FIELDS, STRICT_FIELD_ORDER, strictPromptText,
+} from '../../constants/strictFilter.config'
 import type { FieldKey } from '../../screens/search/SearchScreen'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
@@ -55,14 +58,21 @@ export default function StrictFieldEditorScreen({
   strictEnabled, onToggleStrict, isAny, strictAllowed, matchCount, countLoading, children,
 }: StrictFieldEditorScreenProps) {
   const insets = useSafeAreaInsets()
-  const copy = STRICT_FIELD_COPY[fieldKey]
+  const { t } = useTranslation()
+  const copy = strictFieldCopy(t, fieldKey)
   // Angular: filter-popup.component.ts's showStrictFilter getter —
   //   manageStrictFilter && !excluded(action) && !!content && !isFieldValueAny
   // Excluded fields (Occupation) never show the toggle, a field left at "Any"
   // has nothing to strictly match against, and Filters mode doesn't show the
   // strict block at all. (Angular's content check has no equivalent here:
-  // STRICT_FIELD_COPY is typed over every FieldKey, so copy always exists.)
-  const showStrict = strictAllowed && !STRICT_EXCLUDED_FIELDS.has(fieldKey) && !isAny
+  // STRICT_FIELD_KEYS is typed over every FieldKey, so copy always exists.)
+  // A field with no STRICKPP position of its own (PROFILECREATED — Filters-mode
+  // only, absent from STRICT_FIELD_ORDER) has no strict state to offer, so its
+  // page is just the subtitle, the field row and Apply.
+  const showStrict = strictAllowed
+    && STRICT_FIELD_ORDER.includes(fieldKey)
+    && !STRICT_EXCLUDED_FIELDS.has(fieldKey)
+    && !isAny
 
   // Baseline captured the moment this screen opens — "Matches reduced" only
   // reflects a change made *in this visit*, not just "less than the total".
@@ -104,22 +114,25 @@ export default function StrictFieldEditorScreen({
                 />
               </View>
 
-              {/* Angular splits these two: the reduced-matches NOTE sits with
-                  the toggle (`*ngIf="isMatchesReduced"`), while the "Turn on
-                  strict … filter" RANGE prompt is in the footer and shows only
-                  while the toggle is OFF (`showStrictFilter &&
-                  !isStrictFilterOn`). This rendered the prompt with the toggle
-                  already on. */}
-              {(reduced || !strictEnabled) && (
-                <Text style={[s.promptText, reduced && s.warningText]}>
-                  {reduced ? copy.note : strictPromptText(fieldKey, fieldLabel, fieldValue)}
-                </Text>
-              )}
+              {/* Angular: the consequence NOTE lives HERE, under the toggle,
+                  and only once the count has actually dropped
+                  (`<div *ngIf="isMatchesReduced">`). The "Turn on strict …"
+                  RANGE prompt is a separate element in the FOOTER — see below. */}
+              {reduced && <Text style={[s.promptText, s.warningText]}>{copy.note}</Text>}
             </>
           )}
         </ScrollView>
 
-        <View style={[s.footer, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={[s.footerWrap, { paddingBottom: insets.bottom + 16 }]}>
+          {/* Angular: `<div class="pl-24 pr-24 pb-16" *ngIf="showStrictFilter &&
+              !isStrictFilterOn">` — the RANGE prompt sits in the FOOTER, above
+              the count/Apply row, and only while the toggle is still OFF. It
+              used to render up in the scroll body directly under the banner. */}
+          {showStrict && !strictEnabled && (
+            <Text style={s.footerPrompt}>{strictPromptText(t, fieldKey, fieldValue)}</Text>
+          )}
+
+          <View style={s.footerRow}>
           {/* Angular: the footer's matches column is `*ngIf="showStrictFilter"`
               and Apply widens from `width-60` to `width100` without it — so a
               Filters-mode field page is just a full-width Apply. */}
@@ -136,8 +149,11 @@ export default function StrictFieldEditorScreen({
             )}
           </View>}
           <Pressable style={s.applyBtn} onPress={onClose}>
-            <Text style={s.applyText}>Apply</Text>
+            {/* Angular: `[buttonText]="pageContent['FILTER_APPLY_CTA']"` — a
+                translated string, not an English literal. */}
+            <Text style={s.applyText}>{t('FILTER.FILTER_APPLY_CTA', 'Apply')}</Text>
           </Pressable>
+          </View>
         </View>
       </View>
     </Modal>
@@ -182,10 +198,21 @@ const s = StyleSheet.create({
   promptText:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 16, color: Colors.black },
   warningText: { color: Colors.inputError },
 
-  footer: {
-    flexDirection: 'row', alignItems: 'center', gap: 26, paddingHorizontal: 24, paddingTop: 20,
+  // Angular's <ion-footer> is a COLUMN: the RANGE prompt row, then the
+  // count/Apply row. The hairline and the page inset belong to the outer
+  // container so the prompt sits inside them too.
+  footerWrap: {
+    paddingHorizontal: 24, paddingTop: 20,
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border,
   },
+  // Angular `.pl-24 .pr-24 .pb-16` on the prompt div, with `pr-12` on the <p>
+  // itself so the text stops short of the edge.
+  footerPrompt: {
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize: 12, lineHeight: 16, color: Colors.black,
+    paddingRight: 12, marginBottom: 16,
+  },
+  footerRow: { flexDirection: 'row', alignItems: 'center', gap: 26 },
   matchesCol: { gap: 4 },
   // Angular `.strict-matches-count`: label `body3-regular-12` at 12/16; value
   // `body2-regular-14` with the block's own `font-weight: 600` + 24 line-height

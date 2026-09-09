@@ -48,7 +48,9 @@ import {
   getSelectedObject, saveFilterState,
   getFilterEventType, resetFilter, buildSearchParams, DEFAULT_FILTER, DEFAULT_PP_CHECKBOX,
   markFilterPPEdited,
-  getStrictFilterState, setStrictFilterState,
+  getStrictFilterState, setStrictFilterState, QUICK_FILTER_ICON,
+  computeEditedRows, isAnyFieldEdited,
+  ppSelectionFromPPSet, hasStoredFilterSelection,
 } from '../../service/filterService'
 import { getPPSetData } from '../../service/profileService'
 import { fetchEditProfileInfo } from '../../service/editProfileService'
@@ -58,7 +60,7 @@ import {
 } from '../../constants/strictFilter.config'
 import StrictFieldEditorScreen, { CompactFieldRow } from '../../components/search/StrictFieldEditorScreen'
 import {
-  fetchReligionOptions, fetchCasteOptions, fetchDivisionOptions,
+  fetchReligionOptions, fetchSearchCasteOptions,
   fetchRaasiOptions, fetchStarOptions, fetchDoshamOptions,
   fetchOccupationOptions, fetchQualificationOptions, fetchIncomeRangeOptions,
   fetchMotherTongueOptions, fetchMaritalStatusOptions, fetchEatingHabitOptions,
@@ -169,6 +171,28 @@ export default function SearchScreen({ navigation }: Props) {
   const [eventType,  setEventType]  = useState<'filter' | 'pp'>('pp')
   const [selected,   setSelected]   = useState<Record<string, any>>(DEFAULT_FILTER)
   const [ppCheckBox, setPpCheckBox] = useState<string[]>([])
+  // The member's saved partner preference, mapped into selection shape — the
+  // screen's starting point, the red dot's baseline, and what Reset restores.
+  // Angular keeps it as `ppSetDataList` for exactly the same three uses.
+  const [ppBaseline, setPpBaseline] = useState<Record<string, any>>(DEFAULT_FILTER)
+
+  // ── Edited-row indicator (the red dot) ───────────────────────────────────
+  // Angular: search.component.html:100's `*ngIf="checkIsAnyChanges(item)"`, whose
+  // predicate is BOTH conditions together —
+  //   checkFilterEventType()            // FILTEREVENTTYPE === 'filter'
+  //   && item.isAnyChanges              // this row was actually changed
+  // so in Partner-Preference mode the dot never appears, however much is set.
+  // Derived, never stored: see computeEditedRows() for why. Declared up here
+  // beside `selected` because the debounced count effect persists it too.
+  //
+  // The baseline is the member's saved partner preference — the screen opens
+  // ON it, so a dot marks a Filters-mode change away from it, and Reset (which
+  // restores it) clears every dot. DEFAULT_FILTER stands in until it loads.
+  const editedRows     = useMemo(() => computeEditedRows(selected, ppBaseline), [selected, ppBaseline])
+  const isRowEdited    = (key: string) => eventType === 'filter' && editedRows[key] === true
+  // Angular's Reset guard, `if (!isAnyOneFieldEdited()) return` — the same
+  // predicate decides whether the button does anything at all.
+  const anyFieldEdited = isAnyFieldEdited(editedRows)
   const [gender,     setGender]     = useState('')
   const [matriId,    setMatriId]    = useState('')
   const [userName,   setUserName]   = useState('')
@@ -264,8 +288,9 @@ export default function SearchScreen({ navigation }: Props) {
       // can't show a stale STRICKPP.
       const ppSet = await getPPSetData(true).catch(() => null)
 
-      const [obj, evType, id, gen, name, occupation, strict, arrays] = await Promise.all([
+      const [obj, hasStored, evType, id, gen, name, occupation, strict, arrays] = await Promise.all([
         getSelectedObject(),
+        hasStoredFilterSelection(),
         getFilterEventType(),
         getItem(SK.Auth.USER_ID),
         getItem(SK.User.LOGIN_GENDER),
@@ -310,7 +335,14 @@ export default function SearchScreen({ navigation }: Props) {
       // from PPSETDATA the same way).
       setMatchingStars(parseStarMatchingKeys((ppSet as any)?.PISTARMATCHING))
       if (heightOpts.length > 0) setLabelCache(prev => ({ ...prev, HEIGHT: heightOpts }))
-      setSelected(obj)
+      // Angular: setsearchValueList(ppSetDataList) — the saved partner
+      // preference IS the screen's starting state, seeded whenever no filter
+      // session is stored yet (`if (!localStorage.getItem('SEARCHVALUES'))`).
+      // Without this the screen opened on DEFAULT_FILTER, so a member whose
+      // preference said "Hindu, 25-30" saw "Any religion, 18-50" instead.
+      const baseline = ppSelectionFromPPSet(ppSet as Record<string, any> | null)
+      setPpBaseline(baseline)
+      setSelected(hasStored ? obj : baseline)
       // FILTERPP reports the fields edited in THIS visit, so the flags start
       // clean on every open — a stale '1' left by an earlier visit would
       // otherwise ride along and break "only the edited field is 1". Both
@@ -352,7 +384,10 @@ export default function SearchScreen({ navigation }: Props) {
 
       setCountLoading(true)
       try {
-        await saveFilterState(selected, ppCheckBox, {})
+        // Angular persists filterService.selectedFilters alongside the selection
+        // (setStorageValues) — that map is what the Matches header's count badge
+        // reads back. This wrote `{}`, so the badge was always 0 after an edit.
+        await saveFilterState(selected, ppCheckBox, editedRows)
         // forCount — Angular's getUrlParams(0) countParam: SETPP hardcoded
         // all '0', no FILTERPP. This is the count the PP footer AND both
         // strict-filter screens display, and it was going out with the
@@ -495,37 +530,47 @@ export default function SearchScreen({ navigation }: Props) {
   // Angular: search.component.ts:1429-1446 (JA-104) filters searchInputLists —
   //   CASTE    → RELIGION.key !== '0' && RELIGION.key !== '2' && filterDataList.CASTE non-empty
   //   DIVISION → RELIGION.key !== '0' && RELIGION.key === '2' && filterDataList.CASTE non-empty
-  // RELIGION.key is the whole selection joined (multi-select is comma-joined,
-  // cf. filter-popup.component.ts's `relgval.replace(/,/g,'~')`), so `=== '2'`
-  // means Christian ALONE. The "several religions → show neither" case falls
-  // out of the second clause: the caste fetch for a mixed religion returns no
-  // list, so filterDataList.CASTE stays empty and both rows drop out. That
-  // list-emptiness check is the real gate, not an "exactly one religion" rule —
-  // two caste-bearing religions still show CASTE if the server returns options.
+  // RELIGION.key is the WHOLE selection joined, so those three clauses read:
+  //   Any religion ('0' / nothing) → neither row: there is no caste to narrow.
+  //   Christian alone   ('2')      → the Division row, labelled "Division".
+  //   Anything else ('1', '1~2', …)→ the Caste row, labelled "Caste" — and that
+  //     deliberately INCLUDES a mixed selection such as Hindu+Christian, where
+  //     the one panel lists Hindu castes and Christian divisions together under
+  //     the single "Caste" name. Nothing in Angular special-cases multi-select
+  //     here; the combined list is simply what the caste API answers for
+  //     `religion=1~2`.
+  // Both rows read the SAME list (filterDataList.CASTE) — getSearchDataList()
+  // maps action 'DIVISION' onto searchType 'CASTE' — so there is one fetch,
+  // fetchSearchCasteOptions(), and only the label and the stored key differ.
   //
   // Religion '2' is CHRISTIAN, not Islam: search.component.ts:100 ("For
   // christian the division field is filled from the caste list") and
   // CasteScreen.tsx's `isChristian = religion === '2'`. The old `isIslam` name
   // here (and in useFilterDisplayValues.ts) mislabelled it — the behaviour it
   // drove was right, the name wasn't.
-  const religionKey  = (selected.RELIGION ?? []).filter((k: string) => k && k !== '0').join(',')
-  const isChristian  = religionKey === '2'
+  //
+  // '~' is the join Angular sends to every list API (filter-popup.component.ts's
+  // `relgval.replace(/,/g,'~')`); this used ',', which the caste API doesn't
+  // parse, so a multi-religion selection never resolved to a list.
+  const religionKey   = (selected.RELIGION ?? []).filter((k: string) => k && k !== '0').join('~')
+  const isChristian   = religionKey === '2'
   const religionIsAny = religionKey === ''
 
   // Angular keeps filterDataList.CASTE populated by re-fetching on every
   // religion change; this is the same fetch, kept only as "did it return
   // anything", which is all the visibility rule needs.
+  // Angular's `contentLoaded = false` during a reset — gates the primary CTA
+  // only, not the whole page.
+  const [resetting, setResetting] = useState(false)
+
   const [casteListAvailable, setCasteListAvailable] = useState(false)
-  const motherTongue = selected.MOTHERTONGUE?.[0] ?? ''
 
   useEffect(() => {
     if (religionIsAny) { setCasteListAvailable(false); return }
     let cancelled = false
     ;(async () => {
       try {
-        const opts = isChristian
-          ? await fetchDivisionOptions()
-          : await fetchCasteOptions(religionKey, motherTongue)
+        const opts = await fetchSearchCasteOptions(religionKey)
         if (cancelled) return
         setCasteListAvailable(opts.length > 0)
         // The row's own value resolves against this same list — cache it here
@@ -538,7 +583,9 @@ export default function SearchScreen({ navigation }: Props) {
       }
     })()
     return () => { cancelled = true }
-  }, [religionKey, isChristian, religionIsAny, motherTongue])
+    // The member's own mother tongue is read inside the fetch and never
+    // changes here, so the partner-preference MOTHERTONGUE is no longer a dep.
+  }, [religionKey, isChristian, religionIsAny])
 
   const showCasteRow = !religionIsAny && casteListAvailable
 
@@ -719,15 +766,16 @@ export default function SearchScreen({ navigation }: Props) {
     setMultiEditor(key)
   }
 
+  // One panel, one list. `key` only decides which stored field the panel
+  // reads/writes (DIVISION for Christian alone, CASTE otherwise) and therefore
+  // which title it shows — the OPTIONS are the same caste fetch either way,
+  // because Angular's Division panel is literally filterDataList.CASTE.
+  // religionKey, not a single religion: Angular sends the WHOLE selection
+  // ('1~2' for Hindu+Christian), and the combined caste+division list that
+  // comes back is what the one "Caste" panel is meant to show.
   async function openCaste() {
-    const key = isChristian ? 'DIVISION' : 'CASTE'
-    const opts = isChristian
-      ? await ensureOptions('DIVISION', fetchDivisionOptions)
-      // religionKey, not the single `religion` state — Angular sends the WHOLE
-      // selection to the caste fetch (filter-popup.component.ts joins a
-      // multi-select with '~'), which is exactly why a mixed religion comes
-      // back with no list and the row disappears.
-      : await ensureOptions('CASTE', () => fetchCasteOptions(religionKey, selected.MOTHERTONGUE?.[0] ?? ''))
+    const key  = isChristian ? 'DIVISION' : 'CASTE'
+    const opts = await ensureOptions(key, () => fetchSearchCasteOptions(religionKey))
     if (opts.length === 0) return
     setMultiEditor(key as FieldKey)
   }
@@ -822,11 +870,17 @@ export default function SearchScreen({ navigation }: Props) {
     if (SIMPLE_MULTI_FIELDS.has(key)) { openSimpleMulti(key); return }
   }
 
-  // PROFILECREATED is Filter-mode-only, never a strict field (not in
-  // STRICT_FIELD_ORDER) — it bypasses StrictFieldEditorScreen and opens its
-  // picker directly, same as before this wrapper existed.
+  // Every row opens its own field page. Angular's redirectToFilterPage() sends
+  // all of them to `/search/filterpopup/<FIELD>` (only the range fields — AGE,
+  // DOSHAM, MONTHLYINCOME, STAR, HEIGHT — take the `/search/filter/` route),
+  // and filterRevampConfig has a full TITLE/SUBTITLE/LIST entry for
+  // PROFILECREATED like any other field.
+  //
+  // PROFILECREATED used to jump straight to its picker, skipping the page, on
+  // the grounds that it is Filter-mode-only and not a strict field. Being a
+  // non-strict field only means the page shows no strict toggle — the editor
+  // already decides that per field — not that it should have no page.
   function fieldRowPress(key: FieldKey) {
-    if (key === 'PROFILECREATED') { openFieldPicker(key); return }
     setFieldEditorOpen(key)
   }
 
@@ -905,19 +959,46 @@ export default function SearchScreen({ navigation }: Props) {
 
   // ── Reset / Apply ─────────────────────────────────────────────────────────
 
+  // Angular: resetFilter(true) — search.component.ts:2100-ish.
+  //
+  //   if (!this.filterService.isAnyOneFieldEdited()) return;   // inert, not hidden
+  //   ... filterService.resetFilter()  -> defaults + count + purge storage
+  //   contentLoaded = false            -> disables the CTA while re-deriving
+  //
+  // Angular then chains nested setTimeout(…, 100) calls to force Angular to
+  // re-run ngOnInit. That is a change-detection workaround, NOT behaviour:
+  // resetting the state here re-renders everything that reads it, so there is
+  // nothing to schedule. Idempotent by construction — a second tap hits the
+  // guard above, because the state it would clear is already cleared.
   async function handleReset() {
-    // Reset now shows in both modes (see header below) — resetFilter('pp')
-    // additionally clears the stored eventType flag itself, which 'filter'
-    // deliberately doesn't touch; passing the actual current mode instead of
-    // always hardcoding 'filter' matters now that this fires from PP mode too.
-    await resetFilter(eventType)
-    const obj = { ...DEFAULT_FILTER }
-    setSelected(obj)
-    // Angular's reset drops SEARCHPPCHKBOX so the next read falls back to
-    // CONFIG.searchPPCheckBox (14 zeros) — `[]` made FILTERPP go out empty
-    // until the screen remounted.
-    setPpCheckBox([...DEFAULT_PP_CHECKBOX])
-    setLabelCache({})
+    if (!anyFieldEdited) return
+    setResetting(true)
+    try {
+      // resetFilter('pp') additionally clears the stored eventType flag itself,
+      // which 'filter' deliberately doesn't touch; passing the actual current
+      // mode matters now that this can fire from either. It purges the same
+      // keys Angular's filterService.resetFilter() removes, SELECTEDFILTERS
+      // (the edited map behind the count badge) included.
+      await resetFilter(eventType)
+      // Back to the PARTNER PREFERENCE, not to DEFAULT_FILTER. Angular gets
+      // there indirectly: resetFilter() deletes FILTERDATALIST and
+      // SELECTED_NEWPP, so the setDataValue() re-run that follows takes its
+      // fetch-fresh branch and re-seeds every row from the getpreference
+      // payload. Same destination, without the teardown-and-refetch — the
+      // baseline is already in hand. Resetting to DEFAULT_FILTER instead wiped
+      // the member's saved preference off the screen.
+      setSelected({ ...ppBaseline })
+      // Angular's reset drops SEARCHPPCHKBOX so the next read falls back to
+      // CONFIG.searchPPCheckBox (14 zeros) — `[]` made FILTERPP go out empty
+      // until the screen remounted.
+      setPpCheckBox([...DEFAULT_PP_CHECKBOX])
+      setLabelCache({})
+      // editedRows recomputes off `selected`, so every dot clears and the
+      // Filters-chip count lands on 0 with no separate bookkeeping. The Matches
+      // screen re-reads both from storage on focus.
+    } finally {
+      setResetting(false)
+    }
   }
 
   // `strictFilterApply` = the CTA inside Manage Strict Filters, which sends no
@@ -935,7 +1016,7 @@ export default function SearchScreen({ navigation }: Props) {
     // if the member comes back to this screen.
     setManageStrictOpen(false)
 
-    await saveFilterState(selected, ppCheckBox, {})
+    await saveFilterState(selected, ppCheckBox, editedRows)
     const params = await buildSearchParams(matriId, 0, 20, { strictFilterApply })
     navigation.navigate('Matches', { searchParams: params })
   }
@@ -1008,6 +1089,7 @@ export default function SearchScreen({ navigation }: Props) {
         openHeight={openHeight}
         selectState={selectState}
         selectRaasi={selectRaasi}
+        isRowEdited={isRowEdited}
         onReset={handleReset}
         onShowMatches={() => handleShowMatches()}
       />
@@ -1037,9 +1119,22 @@ export default function SearchScreen({ navigation }: Props) {
             JODII-305 ("Reset button in PP needs to be removed (top right)")
             deliberately took it off Partner preferences; this port was showing
             it in both modes. */}
+        {/* Angular: `*ngIf="filterService.checkFilterEventType()"` — Filters mode
+            only (JODII-305 took it off Partner preferences). Angular leaves it
+            looking enabled with nothing to undo and silently no-ops; here it is
+            also rendered disabled, so the guard is visible rather than felt as
+            a dead tap. */}
         {eventType === 'filter' && (
-          <Pressable onPress={handleReset} hitSlop={8}>
-            <Text style={s.resetText}>{t('FILTER.RESET_HEADER')}</Text>
+          <Pressable
+            onPress={handleReset}
+            hitSlop={8}
+            disabled={!anyFieldEdited || resetting}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: !anyFieldEdited || resetting }}
+          >
+            <Text style={[s.resetText, !anyFieldEdited && s.resetTextDisabled]}>
+              {t('FILTER.RESET_HEADER')}
+            </Text>
           </Pressable>
         )}
       </View>
@@ -1055,10 +1150,10 @@ export default function SearchScreen({ navigation }: Props) {
             Preference mode only (same gate as the sub-header above). */}
         {eventType !== 'filter' && (
           <View style={s.strictBanner}>
-            <Text style={s.strictBannerTitle}>{STRICT_FILTERS_TITLE}</Text>
-            <Text style={s.strictBannerDesc}>{STRICT_FILTERS_NOTE}</Text>
+            <Text style={s.strictBannerTitle}>{t(STRICT_FILTERS_TITLE)}</Text>
+            <Text style={s.strictBannerDesc}>{t(STRICT_FILTERS_NOTE)}</Text>
             <Pressable style={s.manageStrictBtn} onPress={() => setManageStrictOpen(true)} accessibilityRole="button">
-              <Text style={s.manageStrictBtnText}>{MANAGE_FILTER_CTA}</Text>
+              <Text style={s.manageStrictBtnText}>{t(MANAGE_FILTER_CTA)}</Text>
             </Pressable>
           </View>
         )}
@@ -1067,21 +1162,36 @@ export default function SearchScreen({ navigation }: Props) {
             no side margins. Every row (the last one included) carries its own
             bottom border, per `.filter-list-item`. */}
         <View style={s.list}>
-          {rows.filter(r => !r.hidden).map(row => (
-            <Pressable
-              key={row.key}
-              style={({ pressed }) => [s.row, pressed && s.rowPressed]}
-              onPress={() => fieldRowPress(row.key)}
-              accessibilityRole="button"
-            >
-              <CdnSvg uri={FIELD_ICON[row.key]} width={24} height={24} style={s.rowIcon} />
-              <View style={s.rowText}>
-                <Text style={s.rowLabel}>{row.label}</Text>
-                <Text style={s.rowValue} numberOfLines={1}>{(rowValue as any)[row.key]}</Text>
-              </View>
-              <CdnSvg uri={ICON_ARROW} width={16} height={16} />
-            </Pressable>
-          ))}
+          {rows.filter(r => !r.hidden).map(row => {
+            const edited = isRowEdited(row.key)
+            return (
+              <Pressable
+                key={row.key}
+                style={({ pressed }) => [s.row, pressed && s.rowPressed]}
+                onPress={() => fieldRowPress(row.key)}
+                accessibilityRole="button"
+                // The dot is decorative — a screen reader gets the state as
+                // words on the row instead, so it isn't announced as an
+                // unlabelled image or missed entirely.
+                accessibilityLabel={
+                  `${row.label}, ${(rowValue as any)[row.key]}${edited ? `, ${t('FILTER.MODIFIED', 'modified')}` : ''}`
+                }
+              >
+                <CdnSvg uri={FIELD_ICON[row.key]} width={24} height={24} style={s.rowIcon} />
+                <View style={s.rowText}>
+                  <View style={s.rowLabelLine}>
+                    <Text style={s.rowLabel}>{row.label}</Text>
+                    {/* Angular: `<span class="ml-8"><div class="red-dot"></div></span>` */}
+                    {edited && <View style={s.editedDot} accessibilityElementsHidden importantForAccessibility="no" />}
+                  </View>
+                  <Text style={s.rowValue} numberOfLines={1}>
+                    {(rowValue as any)[row.key]}
+                  </Text>
+                </View>
+                <CdnSvg uri={ICON_ARROW} width={16} height={16} />
+              </Pressable>
+            )
+          })}
 
           {/* Filter-mode-only, same as PROFILECREATED above — this port
               previously only had these two on the DESKTOP sidebar
@@ -1096,16 +1206,19 @@ export default function SearchScreen({ navigation }: Props) {
           {eventType === 'filter' && (
             <>
               <CheckboxGroup
+                inset
                 options={[
                   {
                     key:     'PHOTOAVAILABLE',
                     value:   t('MATCHES.PP_ADDED_PHOTOS_CHECKBOX'),
                     checked: selected.PHOTOAVAILABLE === '1',
+                    icon:    QUICK_FILTER_ICON.PHOTOAVAILABLE,
                   },
                   {
                     key:     'HOROSCOPEAVAILABLE',
                     value:   t('MATCHES.PP_HOROSCOPE_CHECKBOX'),
                     checked: selected.HOROSCOPEAVAILABLE === '1',
+                    icon:    QUICK_FILTER_ICON.HOROSCOPEAVAILABLE,
                   },
                 ]}
                 onToggle={(key, checked) => updateField(key, checked ? '1' : '0')}
@@ -1116,7 +1229,7 @@ export default function SearchScreen({ navigation }: Props) {
       </ScrollView>
 
       <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
-        <Pressable style={s.applyBtn} onPress={() => handleShowMatches()} disabled={countLoading}>
+        <Pressable style={s.applyBtn} onPress={() => handleShowMatches()} disabled={countLoading || resetting}>
           {countLoading ? (
             <ActivityIndicator color={Colors.white} />
           ) : (
@@ -1254,6 +1367,12 @@ export default function SearchScreen({ navigation }: Props) {
           title={t(`FILTER.SELECT_${multiEditor}` as any)}
           placeholder={multiEditor === 'RELIGION' ? t('FILTER.SEARCH_RELIGION')
             : multiEditor === 'CASTE' ? t('FILTER.SEARCH_CASTE')
+            // Angular's DIVISION config entry carries its own SEARCHBARTXT
+            // ('FILTER.SEARCH_DIVISION'), so the Christian panel says "Search
+            // division" rather than dropping to no placeholder at all.
+            // (cast: DIVISION isn't a member of FieldKey — openCaste widens it
+            // the same way, matching SearchDesktopLayout's `FieldKey | 'DIVISION'`.)
+            : (multiEditor as string) === 'DIVISION' ? t('FILTER.SEARCH_DIVISION')
             : multiEditor === 'MOTHERTONGUE' ? t('FILTER.SEARCH_MOTHERTONGUE')
             : undefined}
           options={sortFilterOptions(multiEditor, labelCache[multiEditor] ?? [], selectionFor(multiEditor))}
@@ -1443,6 +1562,7 @@ const s = StyleSheet.create({
   // RED brand color, a genuinely wrong color for this specific text.
   headerTitle: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, lineHeight: 24, color: Colors.black, marginLeft: 6 },
   resetText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.link, paddingHorizontal: 12 },
+  resetTextDisabled: { opacity: 0.4 },
 
   // Angular: the strict-filter block sits flush under the header (full-bleed,
   // its own 24px inner padding) and the list follows with `mt-8` — there is no
@@ -1482,13 +1602,18 @@ const s = StyleSheet.create({
   // straight on the page.
   list: { marginTop: 8 },
 
-  // Angular `.filter-list-item`: 20px top/bottom padding, 24px page inset,
-  // top-aligned content, and a bottom border on EVERY row (the last one
-  // included — this port skipped it there).
+  // Angular `.filter-list-item`: 20px top/bottom padding, top-aligned content,
+  // and a bottom border on EVERY row (the last one included).
+  //
+  // The 24px page inset is a MARGIN, not padding: Angular puts it on the
+  // enclosing `<ion-list class="pl-24 pr-24">` and gives the item itself
+  // `--padding-start: 0; --inner-padding-end: 0`, so the item box — and with it
+  // the bottom border — starts 24px in from each edge. As padding it sat INSIDE
+  // the bordered box instead, which drew every divider edge to edge.
   row: {
     flexDirection:     'row',
     alignItems:        'flex-start',
-    paddingHorizontal: 24,
+    marginHorizontal:  24,
     paddingVertical:   20,
     gap:               8,
     borderBottomWidth: 1,
@@ -1496,8 +1621,24 @@ const s = StyleSheet.create({
   },
   rowPressed: { opacity: 0.6 },
   rowIcon:  { flexShrink: 0 },
-  // Angular: the value line sits `mt-6` under the label.
-  rowText:  { flex: 1, gap: 6 },
+  // Angular's value line carries `mt-6`, and it applies in EVERY state. The
+  // template also puts `ion-no-margin` on it when the row has no edited dot,
+  // which looks like it should collapse the gap — it doesn't: both rules are
+  // `!important` at equal specificity, and `.mt-6` (global.scss:1066) is
+  // declared after Ionic's `.ion-no-margin` (padding.css, imported line 20), so
+  // the later one wins. Making the gap conditional here left every unedited row
+  // with its label and value touching.
+  rowText:  { flex: 1, gap: 10 },
+  rowLabelLine: { flexDirection: 'row', alignItems: 'center' },
+  // Angular search.component.scss:190 — `.red-dot { width/height 8; background
+  // #DE2A68; border-radius 50% }`, with the `ml-8` from its wrapping span.
+  editedDot: {
+    width:           8,
+    height:          8,
+    borderRadius:    4,
+    backgroundColor: Colors.editedDot,
+    marginLeft:      8,
+  },
   // Angular: label `body2-regular-14`, value `body1-medium-14` — both black.
   rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.black },
   rowValue: { fontFamily: Fonts.poppinsMedium, fontSize: 14, lineHeight: 16, color: Colors.black },

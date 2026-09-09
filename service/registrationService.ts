@@ -13,6 +13,9 @@ import { ENavigation } from '../types/enums/navigation.enum'
 import { setAppsFlyerUserId } from './analyticsService'
 import { fetchEditProfileInfo, type EditProfileInfo } from './editProfileService'
 import { stripAndDecodeHtml, decodeEntities } from '../utils/htmlEntities'
+import {
+  NON_SELECTABLE_OPTION_KEYS, QUICK_FILTER_FIELDS, type QuickFilterChip,
+} from './filterService'
 
 // The registrationform/v1 (initialfetch) API returns vernacular option labels as
 // HTML numeric character references — Tamil "Myself" arrives as the literal text
@@ -958,6 +961,56 @@ export async function getNextPageAfterCaste(selectedCaste: string): Promise<stri
   return (await gothraAppliesToCaste(selectedCaste)) ? '16' : '20'
 }
 
+// The Matches header's quick-filter chips, hydrated from the API.
+//
+// Angular: matches.page.ts's updateQuickFilterList() starts from the static
+// filter.config.ts `quickFilterList` skeleton and then overwrites each non-FILTER
+// entry from REGISTRATIONARRAYS.QUICKFILTER — the same initialfetch `type=all`
+// blob getRegistrationArrays() already caches, fetched with LANG, so the labels
+// come back ALREADY LOCALIZED. That is why the template's `| translate` only
+// ever resolves the FILTER chip's key: the other three are server strings, not
+// i18n keys, and must not be hardcoded on this side.
+//
+//   QUICKFILTER.<field>.value    -> the chip's label   (`selectedData`)
+//   QUICKFILTER.<field>.key      -> the code that means "this chip is on"
+//   FILTERSCREEN.<field>['0']    -> label fallback when QUICKFILTER has no value
+//
+// A field the server omits gets no chip at all, and an empty/absent QUICKFILTER
+// drops the whole row — Angular's `if (!isValidparam(quickFilterList)) return`
+// leaves the skeleton's untranslated placeholder text on screen instead, which
+// is not something worth reproducing.
+//
+// onValue/offValue encode Angular's two selected-state rules
+// (updateQuickFilterList's isSelected block):
+//   PROFILECREATED               is on when the stored code EQUALS QUICKFILTER.key
+//     — it is an option code ('1' = the "1 Week ago" bucket), not a flag;
+//   PHOTOAVAILABLE/HOROSCOPEAVAILABLE are on when it DIFFERS from QUICKFILTER.key
+//     — those are booleans whose key is the "off" value ('0').
+export async function fetchQuickFilterChips(): Promise<QuickFilterChip[]> {
+  const arrays = await getRegistrationArrays()
+  const quick  = arrays?.QUICKFILTER
+  if (!quick || typeof quick !== 'object' || Object.keys(quick).length === 0) return []
+  const screen = arrays?.FILTERSCREEN ?? {}
+
+  return QUICK_FILTER_FIELDS.flatMap((field): QuickFilterChip[] => {
+    const entry = quick[field]
+    if (!entry) return []
+
+    // `label` here is this file's shared HTML-decoding helper (line 27).
+    const text = label(entry.value) || label(screen?.[field]?.['0'])
+    if (!text) return []
+
+    const quickKey = String(entry.key ?? '')
+    return [{
+      key:      field,
+      label:    text,
+      ...(field === 'PROFILECREATED'
+        ? { onValue: quickKey || '1', offValue: '0' }
+        : { onValue: '1', offValue: quickKey || '0' }),
+    }]
+  })
+}
+
 // Fetches religion options from REGISTRATIONARRAYS.RELIGION.
 // Angular uses | keyvalue pipe on the plain object → { key: "1", value: "Hindu" }.
 // API returns either a plain object {"1":"Hindu",...} or an array [{KEY,VALUE}].
@@ -993,23 +1046,86 @@ export async function fetchPhysicalStatusOptions(): Promise<Array<{ key: string;
   return []
 }
 
-// Fetches the Division list (Angular's caste substitute shown when RELIGION === '2' / Islam)
-// from REGISTRATIONARRAYS.DIVISION. Used by the Search/Filter screen only.
-export async function fetchDivisionOptions(): Promise<Array<{ key: string; label: string }>> {
-  const data = await getRegistrationArrays()
-  const raw  = data?.DIVISION
-  if (Array.isArray(raw)) {
-    return raw.map((item: any) => ({
-      key:   String(item.KEY   ?? item.key   ?? ''),
-      label: label(item.VALUE ?? item.value ?? ''),
-    })).filter(o => o.key !== '')
-  }
-  if (raw && typeof raw === 'object') {
-    return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
-  }
-  return []
-}
+// The Search / Edit-Preferences caste list — the ONE list behind both the Caste
+// row and the Division row (Angular: getSearchDataList() maps action 'DIVISION'
+// onto searchType 'CASTE', and search.component.ts:100 — "For christian the
+// division field is filled from the caste list"). Only the row's LABEL and the
+// stored key differ between the two; this is where the options come from.
+//
+// `type=caste&religion=<key>&mothertongue=<mt>` is religion-scoped, verified
+// against the API:
+//   religion=1  -> that mother tongue's Hindu castes
+//   religion=2  -> the Christian divisions (Roman Catholic, CSI, Protestant, …)
+//   religion=1~2-> {} — the endpoint does NOT accept a '~' list here
+//   mothertongue=0 or empty -> {} for ANY religion, so the member's own mother
+//     tongue is mandatory, not cosmetic
+// so a multi-religion selection is fetched one call per religion and merged,
+// which is what makes Hindu+Christian list every caste AND every division in
+// the single panel titled "Caste".
+//
+// Angular sends an extra `page=search` on this call. That flag makes the
+// endpoint ignore `religion` and `mothertongue` entirely and answer with the
+// master list of every caste and division across all religions — so Angular's
+// Christian member opens "Division" onto Hindu castes. Dropped deliberately:
+// the requirement is a religion-scoped list per selection, and the merge above
+// already produces the combined list for the one case that wants it.
+//
+// Deliberately NOT fetchCasteOptions(): that one short-circuits on the
+// REGISTRATIONARRAYS.CASTE blob, the list for the member's OWN religion
+// captured during registration, so the filter kept showing that list whatever
+// religion the member picked. Here it is always fetched fresh — Angular
+// likewise refetches on every religion change rather than caching.
+export async function fetchSearchCasteOptions(
+  religion: string,
+): Promise<Array<{ key: string; label: string }>> {
+  // Accepts one key or Angular's '~'-joined selection; '0' is "Any", which has
+  // no caste list of its own.
+  const religionKeys = religion.split('~').filter(k => k && k !== '0')
+  if (religionKeys.length === 0) return []
 
+  const lang = (await getItem(SK.Auth.LANG)) ?? 'en'
+  // The MEMBER'S OWN mother tongue — search.component.ts:368 and
+  // filter-popup.component.ts:215 both read `localStorage['MOTHERTONGUE'] ||
+  // '47'`. The partner-preference MOTHERTONGUE selection is a different value
+  // and is '0' until the member sets one, which the endpoint answers with an
+  // empty list. ('MOTHERTONGUE' is the key actually populated here; the
+  // misspelled 'MOTHERTOUNGE' is the fallback, the order languageService uses.)
+  const mothertongue = (await getItem('MOTHERTONGUE'))
+    ?? (await getItem(SK.User.MOTHER_TONGUE))
+    ?? '47'
+
+  const toList = (raw: any): Array<{ key: string; label: string }> => {
+    if (Array.isArray(raw)) {
+      // An array of single-entry hashes — Angular folds it into one object
+      // (`Object.assign({}, acc, item)` per item); { KEY, VALUE } entries are
+      // handled too, as elsewhere in this file.
+      return raw.flatMap((item: any) => (
+        item && typeof item === 'object' && !('KEY' in item || 'key' in item)
+          ? Object.entries(item).map(([key, value]) => ({ key, label: label(value) }))
+          : [{ key: String(item?.KEY ?? item?.key ?? ''), label: label(item?.VALUE ?? item?.value ?? '') }]
+      )).filter(o => o.key !== '')
+    }
+    if (raw && typeof raw === 'object') {
+      return Object.entries(raw).map(([key, value]) => ({ key, label: label(value) }))
+    }
+    return []
+  }
+
+  const lists = await Promise.all(religionKeys.map(async key => {
+    const paramStr = `type=caste&religion=${key}&mothertongue=${mothertongue}&LANG=${lang}`
+    const res      = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
+    return toList(res?.RESPONSE?.CASTE ?? res?.CASTE)
+  }))
+
+  // Merge in selection order, first occurrence wins — the religions overlap on
+  // shared codes, and a duplicate key would render as two identical rows the
+  // picker can't tell apart. The sentinel codes go too: Angular's
+  // getSearchDataList() pushes an option only when its key is absent from that
+  // same list, so "Caste no bar" (998) and "Others" (999) are not panel rows.
+  const seen = new Set<string>()
+  return lists.flat().filter(o =>
+    !NON_SELECTABLE_OPTION_KEYS.has(o.key) && (seen.has(o.key) ? false : (seen.add(o.key), true)))
+}
 // Fetches monthly income options from REGISTRATIONARRAYS.MONTHLYINCOME
 // Angular: apiResponse["MONTHLYINCOME"] → array of { CKEY, VALUE }
 // The FILTER's income-bracket panel. Angular reads a different list here than

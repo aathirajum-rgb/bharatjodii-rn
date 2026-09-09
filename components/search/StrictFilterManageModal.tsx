@@ -6,7 +6,8 @@
 // existing local-modal-state convention for every other field editor in
 // SearchScreen.tsx) rather than a second full-screen mode of that screen.
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import Toggle from '../toggle/Toggle'
+import { useTranslation } from 'react-i18next'
+import Toggle, { TOGGLE_WIDTH } from '../toggle/Toggle'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REVAMP, CDN_SVG } from '../../constants/cdn'
@@ -55,6 +56,7 @@ export default function StrictFilterManageModal({
   matchCount, countLoading, onShowMatches,
 }: StrictFilterManageModalProps) {
   const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen">
@@ -69,8 +71,8 @@ export default function StrictFilterManageModal({
         </View>
 
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-          <Text style={s.title}>{STRICT_FILTERS_TITLE}</Text>
-          <Text style={s.subtitle}>{STRICT_FILTERS_NOTE}</Text>
+          <Text style={s.title}>{t(STRICT_FILTERS_TITLE)}</Text>
+          <Text style={s.subtitle}>{t(STRICT_FILTERS_NOTE)}</Text>
 
           <View style={s.list}>
             {VISIBLE_FIELDS.map((key, i) => {
@@ -94,12 +96,20 @@ export default function StrictFilterManageModal({
                   </View>
                   <View style={s.rowRight}>
                     <CdnSvg uri={ICON_EDIT} width={24} height={24} />
-                    {!isAny && (
-                      <Toggle
-                        value={!!strictState[key]}
-                        onValueChange={value => onToggle(key, value)}
-                      />
-                    )}
+                    {/* The toggle's slot is always occupied, so the edit icon
+                        stays in one column whether or not the row has a toggle.
+                        Angular does the same thing by padding the icon instead
+                        (`isFieldSetToAny(item) ? 'pr-56' : 'pr-16'`), which
+                        hardcodes the toggle's width in two places; reserving
+                        the space keeps the two in step on their own. */}
+                    <View style={s.toggleSlot}>
+                      {!isAny && (
+                        <Toggle
+                          value={!!strictState[key]}
+                          onValueChange={value => onToggle(key, value)}
+                        />
+                      )}
+                    </View>
                   </View>
                 </Pressable>
               )
@@ -108,7 +118,7 @@ export default function StrictFilterManageModal({
         </ScrollView>
 
         <View style={[s.footer, { paddingBottom: insets.bottom + 16 }]}>
-          <Text style={s.footerNote}>{FILTER_CTA_NOTE}</Text>
+          <Text style={s.footerNote}>{t(FILTER_CTA_NOTE)}</Text>
           <Pressable style={s.showMatchesBtn} onPress={onShowMatches} disabled={countLoading}>
             <Text style={s.showMatchesText}>
               {countLoading ? '…' : `Show ${matchCount.toLocaleString('en-IN')} matches`}
@@ -149,6 +159,7 @@ const s = StyleSheet.create({
   rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.black },
   rowValue: { fontFamily: Fonts.poppinsMedium, fontSize: 14, lineHeight: 16, color: Colors.black },
   rowRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  toggleSlot: { width: TOGGLE_WIDTH, alignItems: 'flex-end' },
 
   footer: {
     paddingHorizontal: 24, paddingTop: 16, gap: 12, alignItems: 'center',

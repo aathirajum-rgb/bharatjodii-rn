@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
+import { Pressable, StyleSheet, Text, View, type TextStyle, type ViewStyle } from 'react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
@@ -19,6 +19,11 @@ export interface ChipProps {
   count?:        number    | undefined   // shows a red badge when > 0
   onPress?:      (() => void) | undefined
   style?:        ViewStyle   | undefined
+  // Angular keeps the label `color-1f1e1b body2-regular-14` in every state, so
+  // there is no per-state label styling here. This is for the callers that DO
+  // restyle it — the desktop quick-filter row, which is a React-only design
+  // with its own palette and the app's language-aware font stack.
+  labelStyle?:   TextStyle | TextStyle[] | undefined
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -46,6 +51,7 @@ export default function Chip({
   count,
   onPress,
   style,
+  labelStyle,
 }: ChipProps) {
   const iconSize = ICON_SIZE[iconPosition]
 
@@ -68,7 +74,7 @@ export default function Chip({
       {iconPosition === 'start' && iconEl}
 
       {/* Label */}
-      <Text style={styles.label} numberOfLines={1}>{label}</Text>
+      <Text style={[styles.label, labelStyle]} numberOfLines={1}>{label}</Text>
 
       {/* End icon */}
       {iconPosition === 'end' && iconEl}

@@ -18,7 +18,10 @@ import { useEffect, useRef } from 'react'
 import { Animated, Pressable, StyleSheet, type ViewStyle } from 'react-native'
 import { Colors } from '../../constants/colors'
 
-const TRACK_W = 51
+// Exported so callers can reserve the toggle's slot in a row where it is
+// conditionally hidden — see StrictFilterManageModal's toggleSlot.
+export const TOGGLE_WIDTH = 51
+const TRACK_W = TOGGLE_WIDTH
 const TRACK_H = 32
 const SPACING = 2
 const HANDLE  = TRACK_H - SPACING * 2          // 28
