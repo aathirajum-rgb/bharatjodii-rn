@@ -11,6 +11,7 @@ import { Image } from 'expo-image'
 import { SvgXml } from 'react-native-svg'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 import {
   callPartialRegistrationAPI,
   fetchReligionOptions,
@@ -195,9 +196,9 @@ const styles = StyleSheet.create({
   },
   // Angular .floating body3-regular-12 black-color: black, not gray
   fieldLabelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
 
   selectField: {
@@ -214,9 +215,9 @@ const styles = StyleSheet.create({
   // Angular's placeholder/value span is always black-color; only weight toggles
   selectFieldText: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   selectFieldTextActive: {
     fontWeight: '500',

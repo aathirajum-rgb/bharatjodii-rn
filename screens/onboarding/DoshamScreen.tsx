@@ -9,6 +9,7 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 import {
   fetchDoshamOptions,
   getRegValues,
@@ -214,7 +215,7 @@ export default function DoshamScreen({ navigation }: Props) {
               <View style={[styles.yesNoIcon, hasDosham === true && styles.yesNoIconActive]}>
                 {hasDosham === true && <Text style={styles.yesNoCheckmark}>✓</Text>}
               </View>
-              <Text style={[styles.yesNoBtnText, hasDosham === true && styles.yesNoBtnTextActive]}>
+              <Text style={[styles.yesNoBtnText, hasDosham === true && styles.yesNoBtnTextActive, { fontFamily: langFonts.regular }]}>
                 {t('GENERAL.YES', 'Yes')}
               </Text>
             </Pressable>
@@ -228,7 +229,7 @@ export default function DoshamScreen({ navigation }: Props) {
               <View style={[styles.yesNoIcon, hasDosham === false && styles.yesNoIconActive]}>
                 {hasDosham === false && <Text style={styles.yesNoCheckmark}>✓</Text>}
               </View>
-              <Text style={[styles.yesNoBtnText, hasDosham === false && styles.yesNoBtnTextActive]}>
+              <Text style={[styles.yesNoBtnText, hasDosham === false && styles.yesNoBtnTextActive, { fontFamily: langFonts.regular }]}>
                 {t('GENERAL.NO', 'No')}
               </Text>
             </Pressable>
@@ -300,11 +301,15 @@ const styles = StyleSheet.create({
     borderColor:     Colors.chipBorderActive,
     backgroundColor: Colors.radioCheckedBg,
   },
-  // Figma keeps the label black in both states — only the indicator turns red
+  // Angular (radio.component.html, type-1 non-GENDER): .body2-regular-14
+  // line-height-16 black-color — Figma keeps the label black in both states,
+  // only the indicator turns red. No explicit lineHeight here (user
+  // preference: let RN's Text fall back to the font's natural metric on
+  // onboarding screens even where Angular sets one).
   yesNoBtnText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   yesNoBtnTextActive: {
     fontWeight: '500',
@@ -345,11 +350,15 @@ const styles = StyleSheet.create({
   checkRowActive: {
     backgroundColor: Colors.selectionBg,
   },
+  // Angular (checkbox.component.html): .body2-regular-14 line-height-16
+  // black-color. No explicit lineHeight here (user preference: let RN's Text
+  // fall back to the font's natural metric on onboarding screens even where
+  // Angular sets one).
   checkLabel: {
     flex:        1,
-    fontSize:    14,
+    fontSize:    FontSize.font14,
     fontWeight:  '400',
-    color:       Colors.textPrimary,
+    color:       Colors.black,
     marginRight: 12,
   },
   // Figma keeps the label black when checked — only the weight changes

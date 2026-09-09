@@ -29,10 +29,14 @@ import ConfirmNameGenderSheet from '../../components/bottom-sheet/ConfirmNameGen
 import { os } from './onboardingStyles'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize, remPx } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_SVG + 'gender-registration.svg'
+// Angular .img-icon: min-height/min-width 4.5rem — a rem value, so it scales
+// with device width like every other rem-based size (see src/theme/fonts.ts).
+const AVATAR_SIZE = remPx(4.5)
 
 // Fallback used when the API is unavailable — CDN URLs matched from Angular codebase
 const FALLBACK_OPTIONS: GenderOption[] = [
@@ -298,30 +302,33 @@ const styles = StyleSheet.create({
     borderColor: Colors.primaryDark,
   },
 
-  // Avatar — Angular .img-icon: min 4.5rem (72px)
+  // Avatar — Angular .img-icon: min 4.5rem
   avatar: {
-    width:  72,
-    height: 72,
+    width:  AVATAR_SIZE,
+    height: AVATAR_SIZE,
   },
 
-  // Label — Angular body1-medium-14: 14px Medium
+  // Label — Angular radio.component.html (pageName == 'GENDER'):
+  // .body1-medium-14 pl-16 black-color line-height-20. No explicit lineHeight
+  // here (user preference: let RN's Text fall back to the font's natural
+  // metric on onboarding screens even where Angular sets one).
   cardLabel: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   cardLabelSelected: {
-    color: Colors.textPrimary,
+    color: Colors.black,
   },
 
-  // Helper subtext under the selected card — Angular: body1-medium-14 black-color
+  // Helper subtext under the selected card — Angular: body1-medium-14
+  // black-color (no line-height class set — don't invent one)
   helperText: {
     marginTop:  8,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
-    lineHeight: 20,
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
 
   // Radio — Angular ion-radio::part(container): 20×20, 2px border
@@ -346,7 +353,7 @@ const styles = StyleSheet.create({
 
   errorText: {
     marginTop: 16,
-    fontSize:  12,
+    fontSize:  FontSize.font12,
     color:     Colors.inputError,
   },
 })

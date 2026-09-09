@@ -22,6 +22,7 @@ import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -210,15 +211,15 @@ const styles = StyleSheet.create({
   // screen's own subtitle sits right below it with only a 12px gap, not the
   // usual 32px, so this can't just reuse the shared os.title style)
   title: {
-    fontSize:     22,
+    fontSize:     FontSize.font22,
     fontWeight:   '600',
-    color:        Colors.textPrimary,
+    color:        Colors.black,
     marginBottom: 12,
   },
 
   // Figma: black, not gray — 32px gap down to the property list
   subtitle: {
-    fontSize:     14,
+    fontSize:     FontSize.font14,
     fontWeight:   '400',
     color:        Colors.textPrimary,
     marginBottom: 32,
@@ -249,11 +250,15 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.borderSubtle,
   },
 
+  // Angular: checkbox.component.html — .body2-regular-14 line-height-16
+  // black-color. No explicit lineHeight here (user preference: let RN's Text
+  // fall back to the font's natural metric on onboarding screens even where
+  // Angular sets one).
   rowLabel: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   rowLabelSelected: {
     fontWeight: '500',

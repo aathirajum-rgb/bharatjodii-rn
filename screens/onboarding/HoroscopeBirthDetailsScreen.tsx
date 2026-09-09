@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ActivityIndicator, Animated, FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Animated, Dimensions, FlatList, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
+import { SvgXml } from 'react-native-svg'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 import {
   fetchDateOptions,
   fetchHoroCities,
@@ -32,6 +34,17 @@ import { useLanguageReload } from '../../hooks/useLanguageReload'
 const CDN_ARROW_DOWN = CDN_REVAMP + 'down-arrow.svg'
 const ITEM_H         = 40
 const MAX_LIST_ITEMS = 7
+
+// Angular's .select-icon class (registration-revamp.component.scss) sizes the
+// DOB triplet's up/down-arrow ion-img at 5.25vmin square — scales with device
+// width since the app is portrait-locked (1vmin ~= 1% of width), not a flat px.
+const SELECT_ICON_SIZE = Math.round(Dimensions.get('window').width * 0.0525)
+
+// Angular's generic ISDROPDOWN field (State of birth / City of birth) renders
+// a real `ion-icon name="chevron-forward-outline" class="black-color width-height-24"`,
+// not a plain "›" text glyph — same traced SVG + 24x24/black convention as
+// LocationScreen.tsx / MotherTongueScreen.tsx use for the identical icon.
+const CHEVRON_FORWARD_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M184 112l144 144-144 144"/></svg>`
 
 // Fallback only, same as DOBScreen.tsx — used until fetchMonthOptions() resolves.
 const MONTH_FALLBACK = [
@@ -429,7 +442,10 @@ export default function HoroscopeBirthDetailsScreen({ navigation }: Props) {
                   style={[styles.dropdownItem, isSel && styles.dropdownItemSel]}
                   onPress={() => pickerField && handleDatePick(pickerField, item.key)}
                 >
-                  <Text style={[styles.dropdownItemText, isSel && styles.dropdownItemTextSel, { fontFamily: isSel ? langFonts.semiBold : langFonts.regular }]}>
+                  {/* Angular: the option's own <span class="body2-regular-14"> is unaffected by
+                      selection — only the ion-item's ".selection" class changes (background only) —
+                      so the text stays plain regardless of isSel. */}
+                  <Text style={[styles.dropdownItemText, { fontFamily: langFonts.regular }]}>
                     {item.label}
                   </Text>
                 </Pressable>
@@ -476,7 +492,7 @@ function FloatField({ label, value, placeholder, onPress, hasValue, disabled, lo
         {loading ? (
           <ActivityIndicator size={16} color={Colors.textSecondary} style={{ marginRight: 4 }} />
         ) : (
-          <Text style={floatStyles.arrow}>›</Text>
+          <SvgXml xml={CHEVRON_FORWARD_XML} width={24} height={24} />
         )}
       </Pressable>
 
@@ -529,13 +545,13 @@ const styles = StyleSheet.create({
   },
   dateFieldText: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
     color:      Colors.textDark,
   },
   chevronIcon: {
-    width:  16,
-    height: 16,
+    width:  SELECT_ICON_SIZE,
+    height: SELECT_ICON_SIZE,
   },
 
   // ── Inline dropdown (rendered inside Modal, positioned at field location) ──
@@ -559,14 +575,13 @@ const styles = StyleSheet.create({
   dropdownItemSel: {
     backgroundColor: 'rgba(181,0,51,0.05)',
   },
+  // Angular: .opt-select (on the ion-item host) sets color:#333333, inherited by
+  // the plain body2-regular-14 span inside it (no color of its own) — matches
+  // Colors.textDark, not the darker Colors.textPrimary.
   dropdownItemText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
-  },
-  dropdownItemTextSel: {
-    fontWeight: '600',
-    color:      Colors.primaryDark,
+    color:      Colors.textDark,
   },
 })
 
@@ -585,19 +600,16 @@ const floatStyles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
+  // Angular: the span carries an explicit "black-color" class (#000000), not
+  // the lighter Colors.textPrimary (#111111).
   value: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   placeholder: {
     fontWeight: '400',
-  },
-  arrow: {
-    fontSize:   22,
-    color:      Colors.textPrimary,
-    lineHeight: 26,
   },
   labelWrap: {
     position:          'absolute',
@@ -607,9 +619,11 @@ const floatStyles = StyleSheet.create({
     paddingHorizontal: 4,
     zIndex:            1,
   },
+  // Angular: the floating div carries an explicit "black-color" class (#000000),
+  // not the lighter Colors.textPrimary.
   labelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
 })

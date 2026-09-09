@@ -1,6 +1,6 @@
 import { Platform, StyleSheet } from 'react-native'
 import { Colors } from '../../constants/colors'
-import { Fonts } from '../../src/theme/fonts'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 
 // Shared layout styles used by every onboarding screen.
 // Import as `os` to keep usage terse: os.screen, os.footer, etc.
@@ -27,12 +27,17 @@ export const os = StyleSheet.create({
   // Screens rendering server-translated text should override this per-render
   // via useLanguageFonts() (e.g. { fontFamily: langFonts.semiBold }) so
   // non-English languages get their matching NotoSans script instead.
+  // Angular: the "onboarding/:id" route renders registration-revamp.component,
+  // whose page-title ion-label (registration-revamp.component.html:32) is
+  // `.heading1-semibold-22 black-color` for every currentPageType — font22,
+  // not font20, and .black-color has no competing override in this component
+  // (unlike the older /registration/:id flow) so color is plain #000. No
+  // line-height class is set here.
   title: {
     fontFamily:   Fonts.poppinsSemiBold,
-    fontSize:     22,
+    fontSize:     FontSize.font22,
     fontWeight:   '600',
-    color:        Colors.textPrimary,
-    lineHeight:   28,
+    color:        Colors.black,
     marginBottom: 32,
   },
 
@@ -46,11 +51,13 @@ export const os = StyleSheet.create({
     backgroundColor:   Colors.surface,
   },
 
+  // Angular: registration-revamp.component.html's error rows (job-detail
+  // error line 113, DOB error line 313) both use `.body3-regular-12
+  // color-de2a68` — font12, not a hardcoded 12, and no line-height class.
   errorText: {
     marginTop: 8,
-    fontSize:  12,
+    fontSize:  FontSize.font12,
     color:     Colors.inputError,
-    lineHeight: 16,
   },
 })
 

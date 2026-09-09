@@ -26,6 +26,7 @@ import { os } from './onboardingStyles'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { stripAndDecodeHtml } from '../../utils/htmlEntities'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -157,11 +158,17 @@ export default function MotherTongueScreen({ navigation }: Props) {
               accessibilityRole="button"
               accessibilityLabel="Select mother tongue"
             >
+              {/* Angular: black-color width-95 poppins-family, ngClass'd between
+                  body1-medium-14/body2-regular-14 — poppins-family is declared AFTER
+                  both in global.scss, so at equal specificity (both !important) it wins
+                  the font-family cascade; that class maps to var(--english-poppins),
+                  which _variable.scss defines as Roboto-Regular (originally meant for
+                  the Rupee symbol), not Poppins/NotoSans. */}
               <Text
                 style={[
                   styles.selectFieldText,
                   !!selected && styles.selectFieldTextActive,
-                  { fontFamily: selected ? langFonts.medium : langFonts.regular },
+                  { fontFamily: Fonts.robotoRegular },
                 ]}
                 numberOfLines={1}
               >
@@ -203,11 +210,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     zIndex:            10,
   },
-  // Angular: body3-regular-12 (registration-revamp.component.html:217) — Poppins-Regular
+  // Angular: floating body3-regular-12 black-color
+  // (registration-revamp.component.html:217-219) — Poppins-Regular
   selectFieldLabelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   selectField: {
     flexDirection:   'row',
@@ -220,15 +228,17 @@ const styles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
-  // Angular: body2-regular-14 while showing the placeholder — Poppins-Regular
+  // Angular: black-color width-95 poppins-family, body2-regular-14 while
+  // showing the placeholder — fontFamily is Fonts.robotoRegular (see the
+  // poppins-family cascade note at the Text element above), not Poppins.
   selectFieldText: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   // Angular: body1-medium-14 once a value is selected (registration-revamp.
-  // component.html:211) — Poppins-Medium
+  // component.html:211) — weight 500; family still Roboto (poppins-family)
   selectFieldTextActive: {
     fontWeight: '500',
   },

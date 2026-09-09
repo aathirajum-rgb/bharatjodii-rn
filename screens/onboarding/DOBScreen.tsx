@@ -38,7 +38,7 @@ import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { stripAndDecodeHtml as stripHtml } from '../../utils/htmlEntities'
-import { Fonts } from '../../src/theme/fonts'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -905,10 +905,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     zIndex:            10,
   },
+  // Angular: floating-dob body3-regular-12 black-color
   fieldLabelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
-    color:      Colors.textSecondary,
+    color:      Colors.black,
   },
 
   fieldPressable: {
@@ -917,15 +918,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     height:            48,
   },
+  // Angular: ion-label class="ion-no-margin black-color body1-medium-14" —
+  // same class for both a filled value and the untranslated placeholder.
   fieldText: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   fieldPlaceholder: {
     fontWeight: '500',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   chevronIcon: {
     width:  16,
@@ -958,10 +961,11 @@ const styles = StyleSheet.create({
     borderTopLeftRadius:    7,
     borderBottomLeftRadius: 7,
   },
+  // Angular: .mt-12 body2-regular-14 black-color height-block
   ageBadgeText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   ageBadgeYears: {
     fontWeight: '600',
@@ -980,8 +984,11 @@ const styles = StyleSheet.create({
     height: 8,
     opacity: 1,
   },
+  // Angular: body2-regular-14 or-color — or-color has no matching rule in
+  // this component's stylesheet (only recharge/app-rating scope it), so this
+  // text is left at its existing ambient color rather than forcing a new one.
   orText: {
-    fontSize:         14,
+    fontSize:         FontSize.font14,
     fontWeight:       '400',
     color:            Colors.textPrimary,
     opacity:          1,
@@ -993,23 +1000,27 @@ const styles = StyleSheet.create({
   // Poppins Regular) — no manual line break; it wraps only if the viewport is
   // narrow. `numberOfLines` below keeps this to one line to match on mobile.
 
+  // Angular: body2-regular-14 black-color (no line-height class set)
   noRemText: {
-    fontSize:     14,
+    fontSize:     FontSize.font14,
     fontWeight:   '400',
-    color:        Colors.textPrimary,
-    lineHeight:   20,
+    color:        Colors.black,
     marginBottom: 8,
   },
   enterAgeRow: {
     flexDirection: 'row',
     alignItems:    'center',
   },
+  // Angular: app-button-revamp default ctaFontSize is EButtonFontSize.regular14
+  // ('body2-regular-14'), textColor 'linkColor' (--ion-color-link-color, i.e.
+  // Colors.link). No explicit lineHeight (user preference: let RN's Text
+  // fall back to the font's natural metric on onboarding screens even where
+  // Angular sets one).
   enterAgeLink: {
-    fontSize:           14,
+    fontSize:           FontSize.font14,
     fontWeight:         '400',
     color:              Colors.link,
     textDecorationLine: 'underline',
-    lineHeight:         20,
   },
   enterAgeIcon: {
     marginLeft: 6,
@@ -1054,15 +1065,17 @@ const styles = StyleSheet.create({
   dropdownItemSel: {
     backgroundColor: 'rgba(181,0,51,0.05)',
   },
+  // Angular: <span class="body2-regular-14"> inside an ion-item styled by
+  // .opt-select { color: #333333 } — no color class of its own, so it
+  // inherits that ambient #333333 (Colors.textDark), not Colors.textPrimary.
   dropdownItemText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.textDark,
   },
-  dropdownItemTextSel: {
-    fontWeight: '600',
-    color:      Colors.primaryDark,
-  },
+  // Angular's '.selection' class (applied to the matching ion-item) only
+  // changes --background — it doesn't bold or recolor the row's text.
+  dropdownItemTextSel: {},
 
   // ── Modal overlay ─────────────────────────────────────────────────────────────
 
@@ -1085,10 +1098,13 @@ const styles = StyleSheet.create({
     alignSelf:    'flex-end',
     marginBottom: 12,
   },
+  // Angular: registration-modal-popup's ion-label class="heading2-semibold-18
+  // color-1f1e1b" — font18, not font20; #1f1e1b is a one-off color specific
+  // to this popup, not one of the app's named color tokens.
   ageSheetTitle: {
-    fontSize:     20,
+    fontSize:     FontSize.font18,
     fontWeight:   '600',
-    color:        Colors.textPrimary,
+    color:        '#1f1e1b',
     marginBottom: 28,
     marginTop:    0,
   },
@@ -1096,6 +1112,8 @@ const styles = StyleSheet.create({
     position:  'relative',
     marginTop: 8,
   },
+  // Angular: ion-input class="body1-medium-14" (no black-color here, unlike
+  // the other input fields, so the color is left at its existing value)
   ageInputBox: {
     height:            48,
     borderWidth:       1,
@@ -1103,7 +1121,7 @@ const styles = StyleSheet.create({
     borderRadius:      8,
     paddingHorizontal: 12,
     fontFamily:        Fonts.poppinsMedium,
-    fontSize:          14,
+    fontSize:          FontSize.font14,
     fontWeight:        '500',
     color:             Colors.textPrimary,
   },
@@ -1114,17 +1132,19 @@ const styles = StyleSheet.create({
     backgroundColor:   Colors.surface,
     paddingHorizontal: 4,
   },
+  // Angular: floating body3-regular-12 black-color
   ageLabelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
-    color:      Colors.textSecondary,
+    color:      Colors.black,
   },
+  // Closest Angular analog (name-violation text): body3-regular-12
+  // color-de2a68 — no line-height class set.
   ageError: {
     fontFamily: Fonts.poppinsRegular,
     marginTop:  8,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      Colors.inputError,
-    lineHeight: 16,
   },
   ageConfirmBtn: {
     marginTop: 28,

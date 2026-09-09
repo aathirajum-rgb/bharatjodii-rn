@@ -20,7 +20,7 @@ import CdnLottie from '../../components/CdnLottie'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
-import { Fonts } from '../../src/theme/fonts'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
@@ -199,11 +199,13 @@ const styles = StyleSheet.create({
     lineHeight: 13,
   },
 
-  // Angular: body2-regular-14 (radio.component.html:13, TYPE=type-1) — Poppins-Regular
+  // Angular: body2-regular-14 line-height-16 black-color (radio.component.html:13, TYPE=type-1) — Poppins-Regular.
+  // No explicit lineHeight here (user preference: let RN's Text fall back to
+  // the font's natural metric on onboarding screens even where Angular sets one).
   chipLabel: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   chipLabelSelected: {
     fontWeight: '500',

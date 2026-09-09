@@ -16,6 +16,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import { SvgXml } from 'react-native-svg'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 import {
   fetchEducationGroupOptions,
   getRegValue,
@@ -246,15 +247,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     zIndex:            10,
   },
+  // Angular: registration-revamp.component.html's dropdown floating label is
+  // `.floating body3-regular-12 black-color`.
   selectFieldLabelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   // Angular: EDUGROUPLABEL's <span class='body3-regular-12 color-808080'> —
   // the "(Optional)" suffix renders muted, not the label's primary color.
+  // #808080 has no exact Colors.* token (textSecondary is #666666), so it's
+  // used as a literal here, matching the same convention already used for
+  // this exact class elsewhere (e.g. NotificationScreen.tsx's .time-notification).
   selectFieldLabelSecondary: {
-    color: Colors.textSecondary,
+    color: '#808080',
   },
   selectField: {
     flexDirection:   'row',
@@ -267,11 +273,14 @@ const styles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
+  // Angular: the placeholder/selected-value span combines `.black-color` with
+  // either `.body1-medium-14` (value selected) or `.body2-regular-14`
+  // (placeholder) — same font14, only weight/family differ (selectFieldTextActive).
   selectFieldText: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   selectFieldTextActive: {
     fontWeight: '500',

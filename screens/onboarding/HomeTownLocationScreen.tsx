@@ -9,8 +9,10 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
+import { SvgXml } from 'react-native-svg'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 import {
   callPartialRegistrationAPI,
   fetchCities,
@@ -28,6 +30,12 @@ import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'location.svg'
+
+// Angular's dropdown-field arrow is Ionic's "chevron-forward-outline" icon —
+// same SVG traced for the identical dropdown row in LocationScreen.tsx (Angular:
+// registration-revamp.component.html's `ion-icon name="chevron-forward-outline"
+// class="black-color width-height-24"`), not the plain '›' glyph previously used here.
+const CHEVRON_FORWARD_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M184 112l144 144-144 144"/></svg>`
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -233,7 +241,7 @@ function FloatField({ label, value, placeholder, onPress, hasValue, disabled, lo
         {loading ? (
           <ActivityIndicator size={16} color={Colors.textSecondary} style={{ marginRight: 4 }} />
         ) : (
-          <Text style={[floatStyles.arrow, disabled && floatStyles.disabledText]}>›</Text>
+          <SvgXml xml={CHEVRON_FORWARD_XML} width={24} height={24} />
         )}
       </Pressable>
       {hasValue && (
@@ -274,20 +282,15 @@ const floatStyles = StyleSheet.create({
   fieldDisabled: {},
   value: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   // Angular's placeholder/value span is always black-color; only weight toggles
   placeholder: {
     fontWeight: '400',
   },
   disabledText: {},
-  arrow: {
-    fontSize:   22,
-    color:      Colors.textPrimary,
-    lineHeight: 26,
-  },
   labelWrap: {
     position:          'absolute',
     top:               -8,
@@ -297,8 +300,8 @@ const floatStyles = StyleSheet.create({
     zIndex:            1,
   },
   labelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
 })

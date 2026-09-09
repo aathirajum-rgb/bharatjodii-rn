@@ -21,7 +21,7 @@ import { CDN_REG, CDN_LOTTIE } from '../../constants/cdn'
 import CdnLottie from '../../components/CdnLottie'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
-import { Fonts } from '../../src/theme/fonts'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
@@ -187,7 +187,10 @@ export default function MaritalStatusScreen({ navigation }: Props) {
                   <View style={[styles.chipIcon, isSelected && styles.chipIconSelected]}>
                     {isSelected && <Text style={styles.checkmark}>✓</Text>}
                   </View>
-                  <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected, { fontFamily: isSelected ? langFonts.medium : langFonts.regular }]}>
+                  {/* Angular's radio.component.html (type-1, non-GENDER) uses a single
+                      static class ("body2-regular-14 line-height-16 black-color") for the
+                      option label regardless of selection — it never switches to Medium. */}
+                  <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected, { fontFamily: langFonts.regular }]}>
                     {opt.label}
                   </Text>
                 </Pressable>
@@ -216,7 +219,10 @@ export default function MaritalStatusScreen({ navigation }: Props) {
                     <View style={[styles.chipIcon, isSelected && styles.chipIconSelected]}>
                       {isSelected && <Text style={styles.checkmark}>✓</Text>}
                     </View>
-                    <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected, { fontFamily: isSelected ? langFonts.medium : langFonts.regular }]}>
+                    {/* Angular's radio.component.html (type-1, non-GENDER) uses a single
+                        static class ("body2-regular-14 line-height-16 black-color") for
+                        the option label regardless of selection — never switches to Medium. */}
+                    <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected, { fontFamily: langFonts.regular }]}>
                       {opt.label}
                     </Text>
                   </Pressable>
@@ -241,11 +247,12 @@ const styles = StyleSheet.create({
   },
 
   // Sub-heading above the children chip grid — extra marginTop gives clear
-  // separation from the marital-status options above it.
+  // separation from the marital-status options above it. Angular:
+  // heading4-medium-16 black-color (registration-revamp.component.html:86).
   childrenTitle: {
-    fontSize:     17.5,
+    fontSize:     FontSize.font16,
     fontWeight:   '500',
-    color:        Colors.textPrimary,
+    color:        Colors.black,
     marginTop:    40,
     marginBottom: 16,
   },
@@ -298,13 +305,15 @@ const styles = StyleSheet.create({
     lineHeight: 13,
   },
 
+  // Angular: radio.component.html (type-1, non-GENDER) —
+  // body2-regular-14 line-height-16 black-color
   chipLabel: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
     lineHeight: 16,
   },
-  chipLabelSelected: {
-    fontWeight: '500',
-  },
+  // Angular's option-label class is static (see the render-side comment
+  // above) — it never bolds on selection, so this has no overrides.
+  chipLabelSelected: {},
 })

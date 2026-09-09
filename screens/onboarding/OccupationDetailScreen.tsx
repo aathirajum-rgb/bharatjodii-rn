@@ -20,6 +20,7 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 import {
   getRegValue,
   isValidJobDetailFormat,
@@ -245,6 +246,7 @@ const styles = StyleSheet.create({
     position:  'relative',
     marginTop: 8,
   },
+  // Angular: `ion-input class="body1-medium-14 black-color"`.
   inputBox: {
     height:            48,
     borderWidth:       1,
@@ -252,9 +254,9 @@ const styles = StyleSheet.create({
     borderRadius:      8,
     paddingHorizontal: 12,
     paddingVertical:   0,
-    fontSize:          14,
+    fontSize:          FontSize.font14,
     fontWeight:        '500',
-    color:             Colors.textPrimary,
+    color:             Colors.black,
   },
   labelWrap: {
     position:          'absolute',
@@ -263,14 +265,18 @@ const styles = StyleSheet.create({
     backgroundColor:   Colors.surface,
     paddingHorizontal: 4,
   },
+  // Angular: the floating label div is `.floating body3-regular-12 black-color`.
   labelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   // Angular: JOBDETAILLABEL's <span class='body3-regular-12 color-808080'> —
   // the "(Optional)" suffix renders muted, not the label's primary color.
+  // #808080 has no exact Colors.* token (textSecondary is #666666), so it's
+  // used as a literal here, matching the same convention already used for
+  // this exact class elsewhere (e.g. NotificationScreen.tsx's .time-notification).
   labelTextSecondary: {
-    color: Colors.textSecondary,
+    color: '#808080',
   },
 })

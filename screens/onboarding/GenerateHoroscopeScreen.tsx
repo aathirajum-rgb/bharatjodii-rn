@@ -14,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker'
 import GalleryAccessSheet from '../../components/gallery-access-sheet/GalleryAccessSheet'
 import GallerySettingsSheet from '../../components/gallery-access-sheet/GallerySettingsSheet'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 import { getRegValue, uploadHoroscopeFile } from '../../service/registrationService'
 import { requestStoragePermission } from '../../service/permissionService'
 import { getItem, setItem } from '../../service/storageService'
@@ -273,9 +274,9 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   subtitle: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
     textAlign:  'center',
   },
 

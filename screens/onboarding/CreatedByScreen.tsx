@@ -16,6 +16,7 @@ import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -150,7 +151,10 @@ export default function CreatedByScreen({ navigation }: Props) {
                     {isSelected && <Text style={styles.checkmark}>✓</Text>}
                   </View>
 
-                  <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected, { fontFamily: isSelected ? langFonts.medium : langFonts.regular }]}>
+                  {/* Angular's radio.component.html (type-1, non-GENDER) uses a single
+                      static class ("body2-regular-14 line-height-16 black-color") for the
+                      option label regardless of selection — it never switches to Medium. */}
+                  <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected, { fontFamily: langFonts.regular }]}>
                     {opt.label}
                   </Text>
                 </Pressable>
@@ -219,13 +223,17 @@ const styles = StyleSheet.create({
     lineHeight: 13,
   },
 
+  // Angular: radio.component.html (type-1, non-GENDER) —
+  // body2-regular-14 line-height-16 black-color. No explicit lineHeight here
+  // (user preference: let RN's Text fall back to the font's natural metric
+  // on onboarding screens even where Angular sets one).
   chipLabel: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
-  chipLabelSelected: {
-    fontWeight: '500',
-  },
+  // Angular's option-label class is static (see the render-side comment
+  // above) — it never bolds on selection, so this has no overrides.
+  chipLabelSelected: {},
 
 })

@@ -7,6 +7,7 @@ import AppHeader from '../components/app-header/AppHeader'
 import ButtonRevamp from '../components/button-revamp/ButtonRevamp'
 import CdnSvg from '../components/cdn-svg/CdnSvg'
 import { Colors } from '../constants/colors'
+import { FontSize } from '../src/theme/fonts'
 import { CDN_SVG } from '../constants/cdn'
 import { StorageKeys } from '../constants/storage.keys'
 import { OnboardingCtx, FooterState, FooterHandlers } from '../contexts/OnboardingContext'
@@ -586,9 +587,13 @@ const shell = StyleSheet.create({
     gap:             4,
     marginBottom:    12,
   },
+  // Angular: app-button-revamp for the link CTA (registration-revamp.component.html's
+  // SHOWLINKBTN button) doesn't pass [ctaFontSize], so it falls back to the
+  // component's default EButtonFontSize.regular14 = .body2-regular-14 —
+  // font14/Regular/400, not a hardcoded 14/Medium-500.
   linkText: {
-    fontSize:           14,
-    fontWeight:         '500',
+    fontSize:           FontSize.font14,
+    fontWeight:         '400',
     color:              Colors.link,
     textDecorationLine: 'underline',
   },
@@ -601,10 +606,14 @@ const shell = StyleSheet.create({
     justifyContent:  'center',
     paddingVertical: 12,
   },
+  // Angular: the skip CTA's app-button-revamp also has no [ctaFontSize] override
+  // (default .body2-regular-14 → font14/Regular/400); textColor is
+  // EButtonTextColor.lightblack → --ion-color-light-black: #333333
+  // (theme/variables.scss) — Colors.textDark, not the app's general textMedium.
   skipText: {
-    fontSize:   15,
-    fontWeight: '500',
-    color:      Colors.textMedium,
+    fontSize:   FontSize.font14,
+    fontWeight: '400',
+    color:      Colors.textDark,
   },
   skipIcon: {
     marginLeft: 4,

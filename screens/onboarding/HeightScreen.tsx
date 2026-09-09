@@ -32,6 +32,7 @@ import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -304,7 +305,12 @@ export default function HeightScreen({ navigation }: Props) {
                 onPress={openPanel}
                 accessibilityRole="button"
               >
-                <Text style={[styles.exactFieldText, { fontFamily: langFonts.regular }]} numberOfLines={1}>
+                {/* Angular: .black-color.body2-regular-14.poppins-family — poppins-family
+                    is declared AFTER body2-regular-14/body1-medium-14 in global.scss, so at
+                    equal specificity (both !important) it wins the font-family cascade; that
+                    class maps to var(--english-poppins), which _variable.scss defines as
+                    Roboto-Regular (originally meant for the Rupee symbol), not Poppins. */}
+                <Text style={[styles.exactFieldText, { fontFamily: Fonts.robotoRegular }]} numberOfLines={1}>
                   {selectedHeight
                     ? selectedHeight.label
                     : linkText}
@@ -488,14 +494,15 @@ const styles = StyleSheet.create({
   // constant on selection (only the row background + radio dot change); the
   // fontFamily itself is set inline per the app's current language.
   rowLabel: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
 
-  // Angular: body2-regular-14 (radio.component.html)
+  // Angular: body2-regular-14 (radio.component.html) — font14, not 13; no
+  // color class, so the ambient gray here is left as-is rather than guessed.
   rowSubtitle: {
-    fontSize:   13,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      'rgba(0,0,0,0.6)',
     marginTop:  2,
@@ -537,7 +544,8 @@ const styles = StyleSheet.create({
   // Angular: body2-regular-14 (registration-revamp.component.html:64) —
   // fontFamily applied inline via langFonts (server-translated OR text)
   orText: {
-    fontSize:         14,
+    fontSize:         FontSize.font14,
+    fontWeight:       '400',
     color:            Colors.textPrimary,
     marginHorizontal: 16,
   },
@@ -557,12 +565,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     zIndex:            10,
   },
-  // Angular: body3-regular-12 (registration-revamp.component.html:54-55) —
-  // fontFamily applied inline via langFonts (translated "Height" label)
+  // Angular: floating body3-regular-12 black-color (registration-revamp.
+  // component.html:54-55) — fontFamily applied inline via langFonts
+  // (translated "Height" label)
   exactFieldLabelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   exactField: {
     flexDirection:   'row',
@@ -575,14 +584,15 @@ const styles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
-  // Angular: body2-regular-14, static weight — never bolds on selection
-  // (registration-revamp.component.html:51-52) — fontFamily applied inline
-  // via langFonts (selected height label / server-translated link text)
+  // Angular: black-color body2-regular-14 poppins-family, static weight —
+  // never bolds on selection (registration-revamp.component.html:51-52) —
+  // fontFamily is Fonts.robotoRegular (see the poppins-family cascade note
+  // at the Text element above), not langFonts
   exactFieldText: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
 
   // Right-side sliding panel (Angular right-side-panel.component.scss: width 86.7%)
@@ -612,13 +622,14 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderSubtle,
   },
-  // Angular: heading4-medium-16 (right-side-panel.component.html:12) —
-  // fontFamily applied inline via langFonts (translated panel title)
+  // Angular: black-color heading4-medium-16 (right-side-panel.component.
+  // html:12) — weight 500, not 600 — fontFamily applied inline via
+  // langFonts (translated panel title)
   panelTitle: {
     flex:       1,
-    fontSize:   16,
-    fontWeight: '600',
-    color:      Colors.textPrimary,
+    fontSize:   FontSize.font16,
+    fontWeight: '500',
+    color:      Colors.black,
   },
   panelCloseTxt: {
     fontSize: 16,
@@ -644,9 +655,9 @@ const styles = StyleSheet.create({
     backgroundColor:   '#F0F0F0',
   },
   sectionHeaderText: {
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '500',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
 
   // Height list items (inside panel)
@@ -664,16 +675,17 @@ const styles = StyleSheet.create({
   heightItemSelected: {
     backgroundColor: '#FBF2F5',
   },
-  // Angular: body2-regular-14 (right-side-panel.component.html:41) —
-  // fontFamily applied inline via langFonts (server-translated height label)
+  // Angular: black-color body2-regular-14 (right-side-panel.component.
+  // html:41) — fontFamily applied inline via langFonts (server-translated
+  // height label)
   heightItemText: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
-  heightItemTextSelected: {
-    fontWeight: '500',
-    color:      Colors.primaryDark,
-  },
+  // Angular hides the radio control entirely and only tints the row
+  // background on selection (.exact-height ion-item ion-radio { display:
+  // none }) — the label text itself has no selected-state override.
+  heightItemTextSelected: {},
 })

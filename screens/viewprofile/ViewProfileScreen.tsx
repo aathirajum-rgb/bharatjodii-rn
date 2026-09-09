@@ -66,6 +66,7 @@ import { shouldShowCoachMark, markCoachMarkShown } from '../../service/coachMark
 import { StorageKeys } from '../../constants/storage.keys'
 import { Colors } from '../../constants/colors'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize } from '../../src/theme/fonts'
 import { CDN_SVG, CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
 import i18n from '../../i18n'
 import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interface'
@@ -292,7 +293,7 @@ export function SimilarProfileCardItem({
                 whole card edge-to-edge instead of a compact centered badge. */}
             <View style={s.similarCardOverlay}>
               <View style={s.similarCardOverlayBadge}>
-                <Text style={[s.similarCardOverlayText, { fontFamily: langFonts.regular }]}>
+                <Text style={[s.similarCardOverlayText, { fontFamily: langFonts.medium }]}>
                   {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
                 </Text>
                 {/* Angular: --ion-color-whatsapp-bg = linear-gradient(180deg, #4AC14B 0%,
@@ -305,7 +306,7 @@ export function SimilarProfileCardItem({
                   style={s.similarCardWaBtn}
                 >
                   <WhatsAppIcon width={16} height={16} />
-                  <Text style={[s.similarCardWaBtnText, { fontFamily: langFonts.medium }]}>{t('GENERAL.WHATSAPP')}</Text>
+                  <Text style={[s.similarCardWaBtnText, { fontFamily: langFonts.regular }]}>{t('GENERAL.WHATSAPP')}</Text>
                 </LinearGradient>
               </View>
             </View>
@@ -1557,7 +1558,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               <View style={s.ctaSendInterestWrap}>
                 {showFreeBadge(ctaCtx) && (
                   <View style={s.freeBadge} pointerEvents="none">
-                    <Text style={[s.freeBadgeText, { fontFamily: langFonts.semiBold }]}>{t('GENERAL.FREE')}</Text>
+                    <Text style={[s.freeBadgeText, { fontFamily: langFonts.medium }]}>{t('GENERAL.FREE')}</Text>
                   </View>
                 )}
                 <Pressable style={s.ctaSendInterest} onPress={handleCall}>
@@ -1601,7 +1602,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     if (!ownProfile) return null
     return (
       <Pressable style={s.biodataCta} onPress={handleDownloadBiodata}>
-        <Text style={[s.biodataCtaText, { fontFamily: langFonts.semiBold }]}>{t('BIO_DATA.BIODATA_DOWNLOAD_FREE')}</Text>
+        <Text style={[s.biodataCtaText, { fontFamily: langFonts.medium }]}>{t('BIO_DATA.BIODATA_DOWNLOAD_FREE')}</Text>
       </Pressable>
     )
   }
@@ -1927,7 +1928,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
             {profile.isNewlyJoined && !ownProfile && (
               <View style={s.newBadge} pointerEvents="none">
                 <CdnSvg uri={NEWLY_JOINED_STAR_URI} width={14} height={14} />
-                <Text style={[s.newBadgeText, { fontFamily: langFonts.regular }]}>{t('MATCHES.NEW')}</Text>
+                <Text style={[s.newBadgeText, { fontFamily: langFonts.medium }]}>{t('MATCHES.NEW')}</Text>
               </View>
             )}
             {showCoachMark && (
@@ -2026,7 +2027,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               toLikedStatus() already clamps any raw '5' down to '0', so checking
               for '0' here covers both Angular states. */}
           {!!profile.likedMsg && (!ownProfile || !sameGender) && profile.likedStatus === '0' && (
-            <Text style={[s.likedMsg, { fontFamily: langFonts.regular }]}>{profile.likedMsg}</Text>
+            <Text style={[s.likedMsg, { fontFamily: langFonts.medium }]}>{profile.likedMsg}</Text>
           )}
 
           {/* The top CTA is NOT rendered inline here — Angular's copy of it is
@@ -2111,7 +2112,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                       <CdnSvg uri={ICON.star} width={20} height={20} />
                       <Pressable style={s.starMatchTextWrap} onPress={handleViewStarMatchDetails}>
                         <Text style={[s.starMatchText, { fontFamily: langFonts.regular }]}>
-                          <Text style={[s.starMatchRating, { fontFamily: langFonts.semiBold }]}>{starMatch.displayText}</Text>
+                          <Text style={[s.starMatchRating, { fontFamily: langFonts.medium }]}>{starMatch.displayText}</Text>
                           {t('STARMATCHING.STAR_MATCHING_TXT')}
                         </Text>
                         <View style={s.starMatchLinkRow}>
@@ -2133,7 +2134,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                       {/* Angular: .blur-text-vp-revamp — filter: blur(5px) on the
                           score for free (ENTRYTYPE 'F') members. */}
                       <Text style={[s.starMatchText, { fontFamily: langFonts.regular }]}>
-                        <Text style={[s.starMatchBlurred, { fontFamily: langFonts.semiBold }]}>9/10</Text>{t('STARMATCHING.STAR_MATCHING_TXT')}
+                        <Text style={[s.starMatchBlurred, { fontFamily: langFonts.medium }]}>9/10</Text>{t('STARMATCHING.STAR_MATCHING_TXT')}
                       </Text>
                       <View style={s.starMatchLinkRow}>
                         <Text style={[s.starMatchTeaser, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.FREE_MEMBER_REPORT')}</Text>
@@ -2508,8 +2509,9 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primaryDark, height: 24,
     paddingLeft: 8, paddingRight: 12, borderBottomRightRadius: 10, gap: 4,
   },
-  // fontFamily applied inline (langFonts.regular) — see Text usage.
-  newBadgeText: { fontWeight: '400', fontSize: 12, color: Colors.white },
+  // Angular: badge.component.html — .textcta-medium-12 (font12, Poppins-Medium,
+  // weight 500) — NOT Regular/400. fontFamily applied inline (langFonts.medium).
+  newBadgeText: { fontWeight: '500', fontSize: FontSize.font12, color: Colors.white },
   // Feature 2 prev/next-profile chevrons — same dark-circle/white-chevron style
   // as PhotoSwiper's own desktop arrow fallback (matchesCard.shared.tsx). Angular:
   // viewprofile.page.scss:512,523 `top: calc(100vw + 32px)` — just below the square
@@ -2609,13 +2611,16 @@ const s = StyleSheet.create({
   },
 
   nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  // Angular: heading1-semibold-22 black-color
+  // Angular: viewprofile.page.html:489 — heading1-semibold-22 black-color (font22,
+  // NOT 24).
   // fontFamily applied inline (langFonts.semiBold) — see Text usage.
-  name:    { flex: 1, fontWeight: '600', fontSize: 24, color: Colors.black },
+  name:    { flex: 1, fontWeight: '600', fontSize: FontSize.font22, color: Colors.black },
   // Angular: body2-regular-14 black-color — fontFamily applied inline (langFonts.regular).
   jodiId:  { fontWeight: '400', fontSize: 14, color: Colors.black, marginTop: 4, marginBottom: 18 },
-  // fontFamily applied inline (langFonts.regular) — see Text usage.
-  likedMsg: { fontWeight: '400', fontSize: 12, color: Colors.likedStripText, marginTop: 6 },
+  // Angular: viewprofile.page.html:479 — .black-color body1-medium-14 (font14,
+  // Poppins-Medium/weight 500, pure black) — NOT likedStripText pink/Regular/12.
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  likedMsg: { fontWeight: '500', fontSize: FontSize.font14, color: Colors.black, marginTop: 6 },
 
   // Angular: viewprofile.page.html:469-489 — Call/WhatsApp icon buttons beside the name.
   nameIconsRow: { flexDirection: 'row', alignItems: 'center', gap: 32 },
@@ -2705,8 +2710,10 @@ const s = StyleSheet.create({
     height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.primaryDark, borderRadius: 8, marginTop: 16,
   },
-  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
-  biodataCtaText: { fontWeight: '600', fontSize: 14, color: Colors.white },
+  // Angular: download-biodata.component.html:1304 — .body1-medium-14 white-color
+  // (Poppins-Medium, weight 500) — NOT SemiBold/600.
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  biodataCtaText: { fontWeight: '500', fontSize: FontSize.font14, color: Colors.white },
 
   afterLikeRow: {
     backgroundColor: Colors.afterLikeBg, borderRadius: 8, borderWidth: 1,
@@ -2726,17 +2733,22 @@ const s = StyleSheet.create({
     position: 'absolute', top: -10, right: 8, zIndex: 1,
     backgroundColor: Colors.badgeNewBg, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2,
   },
-  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
-  freeBadgeText: { fontWeight: '600', fontSize: 10, color: Colors.badgeNewText },
+  // Angular: viewprofile.page.html:392 — `.free textcta-medium-12 black-color`
+  // (font12, Poppins-Medium/weight 500, pure black) — NOT SemiBold/10px/badgeNewText-green.
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  freeBadgeText: { fontWeight: '500', fontSize: FontSize.font12, color: Colors.black },
+  // Angular: viewprofile.page.html:428 — `.body3-regular-12 black-color` (font12,
+  // Regular, pure black) — NOT font11/textSecondary-grey.
   // fontFamily applied inline (langFonts.regular) — see Text usage.
   contactsLeftText: {
-    fontWeight: '400', fontSize: 11, color: Colors.textSecondary, textAlign: 'center', marginTop: 8,
+    fontWeight: '400', fontSize: FontSize.font12, color: Colors.black, textAlign: 'center', marginTop: 8,
   },
 
-  // Angular: heading1-semibold-20 black-color, line-height:16, mt-24 mb-4
+  // Angular: heading1-semibold-20 line-height-16 black-color, mt-24 mb-4 (every
+  // section header in viewprofile.page.html uses this identical class combo).
   // fontFamily applied inline (langFonts.semiBold) — see Text usage.
   sectionHeader: {
-    fontWeight: '600', fontSize: 20, color: Colors.black,
+    fontWeight: '600', fontSize: FontSize.font20, lineHeight: 16, color: Colors.black,
     marginTop: 24, marginBottom: 4,
   },
   // Angular: icon column (ion-col size="1") + text column (size="11", pl-12) —
@@ -2760,25 +2772,30 @@ const s = StyleSheet.create({
     borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(255,192,0,0.4)',
   },
   starMatchTextWrap: { flex: 1 },
-  // Angular: only the rating number itself ("4.5/10") is semibold — the rest
-  // of the sentence ("stars matching with this profile") is regular weight.
-  // .body2-regular-14 on the "View details"/"Pay now..." link — also regular.
+  // Angular: viewprofile.page.html:813 — the sentence wrapper is `.body2-regular-14
+  // black-color` (font14, Regular, pure black) — NOT font13/textDark. Only the
+  // rating number itself ("4.5/10") is medium weight (.body1-medium-14 —
+  // "medium", not semibold, despite the visual boldness).
+  // .body2-regular-14 on the "View details"/"Pay now..." link (app-button-revamp's
+  // default ctaFontSize) — also font14/regular, not font13.
   // fontFamily applied inline (langFonts.regular) — see Text usage.
-  starMatchText:   { fontWeight: '400', fontSize: 13, color: Colors.textDark },
-  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
-  starMatchRating: { fontWeight: '600' },
+  starMatchText:   { fontWeight: '400', fontSize: FontSize.font14, color: Colors.black },
+  // Angular: .body1-medium-14 — Poppins-Medium/weight 500, NOT SemiBold/600.
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  starMatchRating: { fontWeight: '500' },
   // fontFamily applied inline (langFonts.regular) — see Text usage.
-  starMatchTeaser: { fontWeight: '400', fontSize: 13, color: Colors.link },
+  starMatchTeaser: { fontWeight: '400', fontSize: FontSize.font14, color: Colors.link },
   starMatchLinkRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 4 },
   // Angular: button-revamp.component.html:15 — style="width: 24px; height: 20px".
   starMatchLinkArrow: { width: 18, height: 18 },
   // Angular: .blur-text-vp-revamp — filter: blur(5px) on the teaser score for
   // free members. RN's Text has no blur filter; textShadow is the closest
   // visual approximation available without a native blur-view dependency.
-  // Also semibold, same as starMatchRating — this is that same score text.
-  // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  // Same weight as starMatchRating (medium, not semibold) — this is that same
+  // score text, just for the free-member (blurred) branch.
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
   starMatchBlurred: {
-    fontWeight: '600',
+    fontWeight: '500',
     color: 'transparent',
     textShadowColor: '#333333', textShadowRadius: 5, textShadowOffset: { width: 0, height: 0 },
   },
@@ -2802,9 +2819,12 @@ const s = StyleSheet.create({
   // text aligned with the rest of the padded content, but the card row itself bleeds
   // to the screen edges.
   similarSection: { paddingTop: 32, paddingBottom: 24 },
+  // Angular: app-swiper.component.html:24 — `.heading2-semibold-18 line-height-24`
+  // — NOT heading1-semibold-20 (this is a different, smaller heading class than
+  // the in-page section headers above).
   // fontFamily applied inline (langFonts.semiBold) — see Text usage.
   similarHeader: {
-    fontWeight: '600', fontSize: 20, color: Colors.black,
+    fontWeight: '600', fontSize: FontSize.font18, lineHeight: 24, color: Colors.black,
     marginBottom: 10, paddingHorizontal: 24,
   },
   // paddingVertical gives each card's shadow (shadowRadius:12, extends above AND
@@ -2847,16 +2867,25 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 8, gap: 8,
     alignItems: 'center',paddingLeft: 12,paddingRight:12,
   },
-  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  // Angular: photo-request.component.ts's getFontSize() resolves to
+  // EButtonFontSize.semibold12 = 'textcta-medium-12' for this exact context
+  // (whatsAppAddPhotoRequestFlag + variant 'similarprofiles' + fromPage
+  // 'viewprofile') — font12, Poppins-MEDIUM/weight 500 (the enum's "semibold"
+  // name is misleading; the class itself is medium), NOT font11/Regular. No
+  // line-height class exists on this text in Angular, so none is set here.
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
   similarCardOverlayText: {
-    fontWeight: '400', fontSize: 11, color: Colors.white, textAlign: 'center', lineHeight: 15,
+    fontWeight: '500', fontSize: FontSize.font12, color: Colors.white, textAlign: 'center',
   },
   similarCardWaBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4,
     borderRadius: 8, paddingHorizontal: 6, height: 32, width: '100%',
   },
-  // fontFamily applied inline (langFonts.medium) — see Text usage.
-  similarCardWaBtnText: { fontWeight: '500', fontSize: 12, color: Colors.white },
+  // Angular: photo-request.component.ts's setCTAFontSize() resolves to
+  // EButtonFontSize.regular12 = 'body3-regular-12' for this same context —
+  // font12, Poppins-REGULAR/weight 400, NOT Medium/500.
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  similarCardWaBtnText: { fontWeight: '400', fontSize: FontSize.font12, color: Colors.white },
   // Angular: profile-card.component.scss's .information-block — a top-to-bottom
   // black scrim (transparent → solid black), 16px vertical/12px horizontal padding,
   // bottom corners rounded to match the card. Not a flat semi-transparent overlay.
@@ -2865,12 +2894,14 @@ const s = StyleSheet.create({
     paddingHorizontal: 12, paddingVertical: 16,
     borderBottomLeftRadius: 12, borderBottomRightRadius: 12,
   },
-  // Angular: .heading3-semibold-16 (Poppins-Semibold, 16px, white).
+  // Angular: profile-card.component.html:16 — .heading3-semibold-16 (Poppins-
+  // Semibold, font16, white) — NOT font18.
   // fontFamily applied inline (langFonts.semiBold) — see Text usage.
-  similarCardName: { fontWeight: '600', fontSize: 18, color: Colors.white },
-  // Angular: .body2-regular-14 (Poppins-Regular, 14px, white), no margin from name.
+  similarCardName: { fontWeight: '600', fontSize: FontSize.font16, color: Colors.white },
+  // Angular: profile-card.component.html:21 — .body2-regular-14 (Poppins-Regular,
+  // font14, white), no margin from name — NOT font16.
   // fontFamily applied inline (langFonts.regular) — see Text usage.
-  similarCardMeta: { fontWeight: '400', fontSize: 16, color: Colors.white, paddingRight: 50 },
+  similarCardMeta: { fontWeight: '400', fontSize: FontSize.font14, color: Colors.white, paddingRight: 50 },
 
   // Header — a SEPARATE solid white bar in normal flow above the photo (never
   // overlaying it) — confirmed against the real app's screenshots. Content swaps
@@ -2893,10 +2924,12 @@ const s = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: Colors.selectionBg, paddingHorizontal: 16, paddingVertical: 12,
   },
+  // Angular: download-biodata.component.html:32 — `.body3-regular-12 color-333333`
+  // — NOT #1e1e1e.
   // fontFamily applied inline (langFonts.regular) — see Text usage.
   missingBannerText: {
-    flex: 1, marginRight: 12, fontSize: 12,
-    color: '#1e1e1e', letterSpacing: 0.24,
+    flex: 1, marginRight: 12, fontSize: FontSize.font12,
+    color: '#333333', letterSpacing: 0.24,
   },
   missingBannerCta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   // fontFamily applied inline (langFonts.regular) — see Text usage.
@@ -2907,10 +2940,10 @@ const s = StyleSheet.create({
   // header bar's overall height down from ~66px to ~60px.
   headerBackBtn: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   headerSpacer: { flex: 1 },
-  // Angular: `.vp-profile-name` (global.scss:22188-22192) — font16 (~16px),
-  // Poppins-Medium, `--gray-color1` (#1f1e1b) — not SemiBold/pure-black.
+  // Angular: `.vp-profile-name` (global.scss:22281-22285) — font16, Poppins-Medium,
+  // `--gray-color1` (#1f1e1b) — not SemiBold/pure-black, and NOT font18.
   // fontFamily applied inline (langFonts.medium) — see Text usage.
-  headerName: { flex: 1, fontWeight: '500', fontSize: 18, color: '#1f1e1b' },
+  headerName: { flex: 1, fontWeight: '500', fontSize: FontSize.font16, color: '#1f1e1b' },
   headerIconBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   // Angular: .width-height-18 (viewprofile.page.scss:22-25) — box sized exactly
   // to the 18x18 icon, not a bigger 28x28 hit-target box (hitSlop covers touch
@@ -2931,8 +2964,10 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white, width: 108, height: 38,
   },
   langPillCompact: { width: 108 },
+  // Angular: dropdown.component.html:8 — `actionType == 'languageChanges'` uses
+  // `.textcta-medium-12` (font12, Medium/500, black) — NOT font13.
   // fontFamily applied inline (langFonts.medium) — see Text usage.
-  langPillText: { fontWeight: '500', fontSize: 13, color: '#000000' },
+  langPillText: { fontWeight: '500', fontSize: FontSize.font12, color: '#000000' },
 
   menuDropdown: {
     position: 'absolute', top: 40, right: 8, minWidth: 200,

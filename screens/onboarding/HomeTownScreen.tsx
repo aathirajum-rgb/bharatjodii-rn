@@ -9,6 +9,7 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 import {
   callPartialRegistrationAPI,
   checkIsNRIUser,
@@ -138,7 +139,7 @@ export default function HomeTownScreen({ navigation }: Props) {
             <View style={[styles.chipRadio, homeTownSame === 'yes' && styles.chipRadioSelected]}>
               {homeTownSame === 'yes' && <Text style={styles.chipRadioTick}>✓</Text>}
             </View>
-            <Text style={[styles.yesNoLabel, homeTownSame === 'yes' && styles.yesNoLabelSelected, { fontFamily: homeTownSame === 'yes' ? langFonts.medium : langFonts.regular }]}>
+            <Text style={[styles.yesNoLabel, { fontFamily: langFonts.regular }]}>
               {yesLabel ?? t('GENERAL.YES', 'Yes')}
             </Text>
           </Pressable>
@@ -152,7 +153,7 @@ export default function HomeTownScreen({ navigation }: Props) {
             <View style={[styles.chipRadio, homeTownSame === 'no' && styles.chipRadioSelected]}>
               {homeTownSame === 'no' && <Text style={styles.chipRadioTick}>✓</Text>}
             </View>
-            <Text style={[styles.yesNoLabel, homeTownSame === 'no' && styles.yesNoLabelSelected, { fontFamily: homeTownSame === 'no' ? langFonts.medium : langFonts.regular }]}>
+            <Text style={[styles.yesNoLabel, { fontFamily: langFonts.regular }]}>
               {noLabel ?? t('GENERAL.NO', 'No')}
             </Text>
           </Pressable>
@@ -208,12 +209,14 @@ const styles = StyleSheet.create({
     lineHeight: 13,
   },
 
+  // Angular: radio.component.html's type-1 label is always `body2-regular-14
+  // line-height-16 black-color` — no medium/selected-weight variant exists for
+  // the checked state (only the chip's border/background change). No explicit
+  // lineHeight here (user preference: let RN's Text fall back to the font's
+  // natural metric on onboarding screens even where Angular sets one).
   yesNoLabel: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
-  },
-  yesNoLabelSelected: {
-    fontWeight: '500',
+    color:      Colors.black,
   },
 })

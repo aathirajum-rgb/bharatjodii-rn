@@ -26,6 +26,7 @@ import {
 } from '../../service/registrationService'
 import { getItem } from '../../service/storageService'
 import { CDN_REG, CDN_LOTTIE } from '../../constants/cdn'
+import { FontSize } from '../../src/theme/fonts'
 import CdnLottie from '../../components/CdnLottie'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { os } from './onboardingStyles'
@@ -480,9 +481,9 @@ const floatStyles = StyleSheet.create({
 
   value: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   placeholder: {
     fontWeight: '400',
@@ -499,8 +500,8 @@ const floatStyles = StyleSheet.create({
     zIndex:            1,
   },
   labelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
 })

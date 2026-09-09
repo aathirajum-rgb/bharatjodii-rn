@@ -17,7 +17,8 @@ import { Image } from 'expo-image'
 import { useTranslation } from 'react-i18next'
 import OnboardingDesktopLayout from './OnboardingDesktopLayout'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG } from '../../constants/cdn'
+import { Fonts, FontSize } from '../../src/theme/fonts'
+import { CDN_SVG, CDN_REG } from '../../constants/cdn'
 import { Endpoints } from '../../service/api.endpoints'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { StorageKeys as SK } from '../../constants/storage.keys'
@@ -27,8 +28,14 @@ import {
   getPhotoConfig, validatePhotoAsset, normalizeWebFile, getRejectReasons, describeRejection,
   type PhotoRejectionCode,
 } from '../../service/photoValidationService'
+import CdnSvg from '../../components/cdn-svg/CdnSvg'
 
 const PLACEHOLDER = CDN_SVG + 'add-photo.svg'
+// onboarding-photo.component.html's per-photo trash icon — same asset
+// ManagePhotosScreen.tsx's delete button now uses, in place of a "🗑" emoji
+// glyph (emoji rendering isn't consistent across desktop browsers/OSes the
+// way this real icon is).
+const CDN_TRASH_ICON = CDN_REG + 'trash-img.svg'
 const MAX_PHOTOS = 10
 
 type Photo = { PHOTOID: string; PHOTOURL: string; PHOTOTHUMB?: string; MAINPHOTO: number; PHOTOSTATUS: number }
@@ -175,7 +182,7 @@ export default function PhotoUploadDesktopStep({ navigation }: Props) {
                   <View style={s.mainLabel}><Text style={s.mainLabelText}>Profile Picture</Text></View>
                 )}
                 <Pressable style={s.deleteBtn} onPress={() => confirmDelete(p)} hitSlop={4}>
-                  <Text style={s.deleteIcon}>🗑</Text>
+                  <CdnSvg uri={CDN_TRASH_ICON} width={14} height={14} />
                 </Pressable>
               </View>
             ))}
@@ -215,6 +222,9 @@ export default function PhotoUploadDesktopStep({ navigation }: Props) {
 const s = StyleSheet.create({
   loader: { marginTop: 48 },
 
+  // Figma-only desktop pitch copy — doesn't match any single Angular mobile
+  // string/class 1:1 (AddPhotoScreen's own CONTENT1/CONTENT2 bullets read
+  // differently), so left unchanged rather than guessing a source class.
   introText: { fontSize: 16, fontWeight: '600', color: Colors.textPrimary, textAlign: 'center', lineHeight: 22 },
   introSub: { fontSize: 13, fontWeight: '400', color: Colors.textSecondary, textAlign: 'center', marginTop: 4 },
 
@@ -235,25 +245,34 @@ const s = StyleSheet.create({
     position: 'absolute', bottom: 0, left: 0, right: 0,
     backgroundColor: 'rgba(0,0,0,0.5)', paddingVertical: 5, paddingLeft: 8,
   },
-  mainLabelText: { fontSize: 11, fontWeight: '700', color: Colors.white },
+  // Angular: `.profile-picture textcta-medium-12 white-color`
+  // (onboarding-photo.component.html) — same label ManagePhotosScreen renders.
+  mainLabelText: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font12, fontWeight: '500', color: Colors.white },
   deleteBtn: {
     position: 'absolute', top: 6, right: 6, width: 26, height: 26, borderRadius: 7,
     backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center',
   },
-  deleteIcon: { fontSize: 13 },
 
   addTile: {
     width: 128, height: 128, borderRadius: 12, borderWidth: 1.5, borderStyle: 'dashed', borderColor: Colors.borderNeutral,
     alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.surfaceInput,
   },
+  // Angular's real icon here is a plain `<ion-icon name="add-outline">` with
+  // no font-size utility class — no verified size to port, left as-is.
   addTilePlus: { fontSize: 26, fontWeight: '300', color: Colors.textSecondary },
-  addTileLabel: { fontSize: 12, fontWeight: '500', color: Colors.textSecondary, marginTop: 2 },
+  // Angular: `.textcta-medium-12 black-color` (onboarding-photo.component.html's
+  // "Add photos" empty-slot label).
+  addTileLabel: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font12, fontWeight: '500', color: Colors.black, marginTop: 2 },
 
+  // Angular: `.textcta-medium-12 color-29339B` wrapped in `<u>`
+  // (registration-revamp.component.html:145) — same guidelines row
+  // ManagePhotosScreen renders.
   guidelines: {
-    fontSize: 13, fontWeight: '400', color: Colors.textSecondary, textDecorationLine: 'underline',
+    fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font12, fontWeight: '500', color: Colors.link, textDecorationLine: 'underline',
     textAlign: 'center', marginTop: 16,
   },
 
   skipRow: { alignSelf: 'center', marginTop: 12 },
-  skipText: { fontSize: 14, fontWeight: '500', color: Colors.textSecondary },
+  // Angular: #skip_cta's span is `.body2-regular-14 color-333333`.
+  skipText: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font14, fontWeight: '400', color: Colors.textDark },
 })

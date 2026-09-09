@@ -9,6 +9,7 @@ import {
 } from 'react-native'
 import { Image } from 'expo-image'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 import {
   callPartialRegistrationAPI,
   fetchQualificationOptions,
@@ -133,7 +134,7 @@ export default function QualificationScreen({ navigation }: Props) {
                   <View style={[styles.chipIcon, isSelected && styles.chipIconSelected]}>
                     {isSelected && <Text style={styles.checkmark}>✓</Text>}
                   </View>
-                  <Text style={[styles.chipLabel, isSelected && styles.chipLabelSelected, { fontFamily: isSelected ? langFonts.medium : langFonts.regular }]}>
+                  <Text style={[styles.chipLabel, { fontFamily: langFonts.regular }]}>
                     {opt.label}
                   </Text>
                 </Pressable>
@@ -203,13 +204,15 @@ const styles = StyleSheet.create({
     lineHeight: 13,
   },
 
+  // Angular: radio.component.html's type-1 non-GENDER label is always
+  // `.body2-regular-14 line-height-16 black-color` regardless of selection —
+  // setClass()/getClassName() only ever toggle the surrounding item's border
+  // and background (radio.component.scss's .radio-options.item-radio-checked),
+  // never the label's own weight or color. So no selected-state override here.
   chipLabel: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
     lineHeight: 16,
-  },
-  chipLabelSelected: {
-    fontWeight: '500',
   },
 })

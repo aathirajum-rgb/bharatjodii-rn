@@ -22,6 +22,7 @@ import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -235,9 +236,9 @@ const styles = StyleSheet.create({
   loader: { alignSelf: 'center', marginTop: 48 },
 
   sectionLabel: {
-    fontSize:     16,
+    fontSize:     FontSize.font16,
     fontWeight:   '500',
-    color:        Colors.textPrimary,
+    color:        Colors.black,
     marginBottom: 16,
   },
   sectionLabelSpacing: {
@@ -289,9 +290,9 @@ const styles = StyleSheet.create({
   },
 
   chipLabel: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
     lineHeight: 16,
   },
   chipLabelSelected: {

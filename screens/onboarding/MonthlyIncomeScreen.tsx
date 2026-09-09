@@ -28,6 +28,7 @@ import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -220,11 +221,15 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
                   accessibilityRole="button"
                   accessibilityLabel="Select currency"
                 >
+                  {/* Angular: ion-select class="body1-medium-14 black-color" (html:187) is
+                      static on the element — always medium weight, even showing the
+                      placeholder — unlike the income field's ISDROPDOWN span below, which
+                      does conditionally swap body1-medium-14/body2-regular-14. */}
                   <Text
                     style={[
                       styles.selectFieldText,
-                      !!selectedCurrencyOption && styles.selectFieldTextActive,
-                      { fontFamily: selectedCurrencyOption ? langFonts.medium : langFonts.regular },
+                      styles.selectFieldTextActive,
+                      { fontFamily: langFonts.medium },
                     ]}
                     numberOfLines={1}
                   >
@@ -320,9 +325,9 @@ const styles = StyleSheet.create({
     zIndex:            10,
   },
   selectFieldLabelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   selectField: {
     flexDirection:   'row',
@@ -337,9 +342,9 @@ const styles = StyleSheet.create({
   },
   selectFieldText: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   selectFieldTextActive: {
     fontWeight: '500',

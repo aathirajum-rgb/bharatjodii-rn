@@ -8,8 +8,10 @@ import {
   View,
 } from 'react-native'
 import { Image } from 'expo-image'
+import { SvgXml } from 'react-native-svg'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 import {
   fetchRaasiOptions,
   fetchStarOptions,
@@ -29,6 +31,13 @@ import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 const CDN_PAGE_ICON = CDN_REG + 'star-raasi.svg'
 const FOOTER_H      = 160
+
+// Angular's dropdown-row arrow is Ionic's "chevron-forward-outline" icon at
+// `.width-height-24` (24px) — not the plain "›" text glyph this screen
+// previously drew (that lacked Angular's font-size/weight and used the wrong
+// 26px line-height). Same icon Religion/Caste/Gothra screens already inline
+// for a pixel-exact match.
+const CHEVRON_FORWARD_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M184 112l144 144-144 144"/></svg>`
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -168,12 +177,16 @@ export default function StarRaasiScreen({ navigation }: Props) {
                 accessibilityLabel="Select raasi"
               >
                 <Text
-                  style={[styles.selectFieldText, !!selectedRaasi && styles.selectFieldTextActive, { fontFamily: langFonts.regular }]}
+                  style={[
+                    styles.selectFieldText,
+                    !!selectedRaasi && styles.selectFieldTextActive,
+                    { fontFamily: selectedRaasi ? langFonts.medium : langFonts.regular },
+                  ]}
                   numberOfLines={1}
                 >
                   {selectedRaasi ? selectedRaasi.label : t('REGISTRATION.SELECTRASSI', 'Select Raasi')}
                 </Text>
-                <Text style={styles.selectFieldArrow}>›</Text>
+                <SvgXml xml={CHEVRON_FORWARD_XML} width={24} height={24} />
               </Pressable>
             </View>
 
@@ -193,12 +206,16 @@ export default function StarRaasiScreen({ navigation }: Props) {
                   accessibilityLabel="Select star"
                 >
                   <Text
-                    style={[styles.selectFieldText, !!selectedStar && styles.selectFieldTextActive, { fontFamily: langFonts.regular }]}
+                    style={[
+                      styles.selectFieldText,
+                      !!selectedStar && styles.selectFieldTextActive,
+                      { fontFamily: selectedStar ? langFonts.medium : langFonts.regular },
+                    ]}
                     numberOfLines={1}
                   >
                     {selectedStar ? selectedStar.label : t('REGISTRATION.SELECTSTAR', 'Select Star')}
                   </Text>
-                  <Text style={styles.selectFieldArrow}>›</Text>
+                  <SvgXml xml={CHEVRON_FORWARD_XML} width={24} height={24} />
                 </Pressable>
               </View>
             )}
@@ -260,9 +277,9 @@ const styles = StyleSheet.create({
   },
   // Angular .floating body3-regular-12 black-color: black, not gray
   fieldLabelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
 
   selectField: {
@@ -279,17 +296,12 @@ const styles = StyleSheet.create({
   // Angular's placeholder/value span is always black-color; only weight toggles
   selectFieldText: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   selectFieldTextActive: {
     fontWeight: '500',
-  },
-  selectFieldArrow: {
-    fontSize:   22,
-    color:      Colors.textPrimary,
-    lineHeight: 26,
   },
 
 })

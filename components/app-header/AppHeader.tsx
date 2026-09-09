@@ -24,6 +24,12 @@ const H1_ICON_BTN_SIZE = SW * 0.09
 const H1_ICON_SIZE = H1_ICON_BTN_SIZE - 8
 // `.avatar { width/height: 13.5vmin }`.
 const H1_AVATAR_SIZE = SW * 0.135
+// Angular: `.notification-badge-message { width: 1.5rem; height: 1rem }` —
+// 1rem/1.5rem happen to be the exact same values as --font16/--font24
+// (FontSize's own header comment lists both), so reuse those named entries
+// instead of a separate remPx() call for the same numbers.
+const BADGE_WIDTH  = FontSize.font24
+const BADGE_HEIGHT = FontSize.font16
 
 // Angular's header back-button and language-pill dropdown both use Ionic's
 // bundled "chevron-back-outline" / "chevron-down-outline" icons (ion-icon
@@ -428,26 +434,31 @@ const styles = StyleSheet.create({
     justifyContent:  'center',
     position:        'relative',
   },
-  // Badge on toolbar icon
+  // Badge on toolbar icon — Angular: `.notification-badge-message` (Home's
+  // only badged toolbar item is 'notification' — the other class,
+  // `.numbers-badge-message`, is 1px-offset-different and used elsewhere,
+  // not through this component).
   badgeWrap: {
-    position:          'absolute',
-    top:               -4,
-    right:             -4,
-    backgroundColor:   Colors.primary,
-    borderRadius:      10,
-    minWidth:          16,
-    height:            16,
-    alignItems:        'center',
-    justifyContent:    'center',
-    paddingHorizontal: 3,
-    borderWidth:       1,
-    borderColor:       Colors.white,
+    position:        'absolute',
+    top:             -3,
+    right:           -8,
+    backgroundColor: '#DE2A68',
+    borderRadius:    20,
+    width:           BADGE_WIDTH,
+    height:          BADGE_HEIGHT,
+    alignItems:      'center',
+    justifyContent:  'center',
+    borderWidth:     1,
+    borderColor:     Colors.white,
   },
+  // Angular: `.font-8` — font-size var(--font8) (0.5rem, dynamic — see
+  // FontSize's header comment), Poppins-REGULAR (not SemiBold); `white-color`
+  // already matched. No line-height class on this element — none set here
+  // either, letting it fall back to the font's natural metric.
   badgeText: {
-    fontFamily: Fonts.poppinsSemiBold,
+    fontFamily: Fonts.poppinsRegular,
     color:      Colors.white,
-    fontSize:   8,
-    lineHeight: 12,
+    fontSize:   FontSize.font8,
   },
 
   // ── header2 ────────────────────────────────────────────────────────────────

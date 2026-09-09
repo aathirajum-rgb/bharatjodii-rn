@@ -11,6 +11,7 @@ import { Image } from 'expo-image'
 import { SvgXml } from 'react-native-svg'
 import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 import {
   callPartialRegistrationAPI,
   fetchOccupationOptions,
@@ -200,10 +201,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     zIndex:            10,
   },
+  // Angular: registration-revamp.component.html's dropdown floating label is
+  // `.floating body3-regular-12 black-color`.
   selectFieldLabelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   selectField: {
     flexDirection:   'row',
@@ -216,11 +219,14 @@ const styles = StyleSheet.create({
     paddingRight:    12,
     backgroundColor: Colors.surface,
   },
+  // Angular: the placeholder/selected-value span combines `.black-color` with
+  // either `.body1-medium-14` (value selected) or `.body2-regular-14`
+  // (placeholder) — same font14, only weight/family differ (selectFieldTextActive).
   selectFieldText: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   selectFieldTextActive: {
     fontWeight: '500',

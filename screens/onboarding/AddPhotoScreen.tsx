@@ -13,6 +13,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { getRegValue, fetchAddPhotoIntermediateContent } from '../../service/registrationService'
 import { CDN_SVG } from '../../constants/cdn'
@@ -512,14 +513,19 @@ const styles = StyleSheet.create({
     height: '100%',
   },
 
+  // Angular: add-photo.component.html's bindTitle() div uses
+  // `.heading1-semibold-20 black-color line-height-32` — font20/SemiBold/600,
+  // plain black, NOT the generic `.heading1-semibold-22` page title (that's
+  // cleared to '' for pageType 20 while showPhotoPromotion is true — see
+  // registration-revamp.component.ts's getPageContent()).
   title: {
-    fontSize:      24,
-    fontWeight:    '700',
-    color:         Colors.textPrimary,
+    fontSize:      FontSize.font20,
+    fontWeight:    '600',
+    color:         Colors.black,
     lineHeight:    32,
     textAlign:     'center',
     marginBottom:  24,
-    
+
   },
 
   card: {
@@ -538,31 +544,36 @@ const styles = StyleSheet.create({
     elevation:         3,
     
   },
+  // Angular: promotype '1'`s SUBHEADER row is `.body2-regular-14 black-color`
+  // — no line-height class set, so none is invented here either.
   cardIntro: {
-    fontSize:   15,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
-    color:      Colors.textPrimary,
-    lineHeight: 18,
+    color:      Colors.black,
   },
   bulletRow: {
     flexDirection: 'row',
     alignItems:    'flex-start',
     gap:           10,
   },
+  // Angular: the real bullet is a `<li>` marker, colored via
+  // `li::marker { color: #8A8A8A; }` (add-photo.component.scss) — not
+  // black/textPrimary.
   bullet: {
     width:           6,
     height:          6,
     borderRadius:    3,
-    backgroundColor: Colors.textPrimary,
+    backgroundColor: Colors.borderNeutral,
     marginTop:       7,
     flexShrink:      0,
   },
+  // Angular: each `<li>` (CONTENT1/CONTENT2) is `.heading4-medium-16
+  // black-color` — no line-height class set, so none is invented here either.
   bulletText: {
     flex:       1,
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '500',
-    color:      Colors.textPrimary,
-    lineHeight: 20,
+    color:      Colors.black,
   },
 
   addBtn: {
@@ -577,8 +588,12 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   addBtnLabel: {
-    // Angular: app-button-revamp's span uses "body2-regular-14" — 14px regular.
-    fontSize:   15,
+    // Angular: app-button-revamp's span uses ctaFontSize default
+    // (EButtonFontSize.regular14 = "body2-regular-14") — button.enum.ts /
+    // button-revamp.component.ts. No explicit lineHeight (user preference:
+    // let RN's Text fall back to the font's natural metric on onboarding
+    // screens even where Angular sets one).
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      Colors.white,
   },
@@ -593,13 +608,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     gap:               4,
   },
+  // Angular: #skip_cta's span is `.body2-regular-14 color-333333`.
   laterText: {
-    fontSize:   15,
-    color:      '#333333',
+    fontSize:   FontSize.font14,
+    color:      Colors.textDark,
   },
+  // Angular renders a real `<ion-icon name="chevron-forward-outline"
+  // class="color-333333">` here (not wrapped in app-button-revamp, so none
+  // of its iconSize/ctaFontSize defaults apply) — no explicit font-size
+  // utility class sets its size, only its color, so there's no verified
+  // Angular px value to port for this glyph's size; left as-is.
   laterChevron: {
     fontSize:   18,
-    color:      '#333333',
+    color:      Colors.textDark,
     lineHeight: 22,
   },
 })

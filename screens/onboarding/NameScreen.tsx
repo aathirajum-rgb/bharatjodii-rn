@@ -19,6 +19,7 @@ import {
   validateNameGender,
 } from '../../service/registrationService'
 import { CDN_REG } from '../../constants/cdn'
+import { FontSize } from '../../src/theme/fonts'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import ConfirmNameGenderSheet from '../../components/bottom-sheet/ConfirmNameGenderSheet'
 import { os } from './onboardingStyles'
@@ -275,7 +276,9 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
 
-  // Box itself — Figma: 48px height, 8px radius, 1px #b0b0b0 border
+  // Box itself — Figma: 48px height, 8px radius, 1px #b0b0b0 border.
+  // Angular: ion-input class="body1-medium-14 black-color" — font14/Medium/500,
+  // and black-color is #000 exactly (not the app's general textPrimary #111).
   inputBox: {
     height:            48,
     borderWidth:       1,
@@ -283,9 +286,9 @@ const styles = StyleSheet.create({
     borderRadius:      8,
     paddingHorizontal: 12,
     paddingVertical:   0,
-    fontSize:          14,
+    fontSize:          FontSize.font14,
     fontWeight:        '500',
-    color:             Colors.textPrimary,
+    color:             Colors.black,
   },
   // Floating label chip — Angular .floating: top:-8, left:16, white bg
   labelWrap: {
@@ -295,11 +298,11 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     paddingHorizontal: 4,
   },
-  // Angular body3-regular-12 black-color: 12px Regular, black (not gray)
+  // Angular body3-regular-12 black-color: font12 Regular, #000 exactly (not textPrimary)
   labelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
 
 })

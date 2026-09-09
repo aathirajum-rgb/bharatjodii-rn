@@ -10,9 +10,9 @@ import {
   Text,
   View,
 } from 'react-native'
-import Svg, { Path, Polyline, Rect, Line } from 'react-native-svg'
 import { useTranslation } from 'react-i18next'
 import { Colors } from '../../constants/colors'
+import { Fonts, FontSize, remPx } from '../../src/theme/fonts'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
 import { getFewMoreDetailsNextPage } from './fewMoreDetailsFlow'
@@ -23,8 +23,9 @@ import { getItem } from '../../service/storageService'
 import { handleBack } from '../../utils/navigationRef'
 import { getRegValue } from '../../service/registrationService'
 import { deletePhoto, setMainPhoto } from '../../service/profileService'
-import { CDN_LOTTIE } from '../../constants/cdn'
+import { CDN_LOTTIE, CDN_REG, CDN_SVG } from '../../constants/cdn'
 import CdnLottie from '../../components/CdnLottie'
+import CdnSvg from '../../components/cdn-svg/CdnSvg'
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
@@ -75,57 +76,31 @@ function getSubtitle(createdBy: string): string {
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
+// Angular: this screen is currentPageType '20' once showPhotoPromotion has
+// flipped false (post-upload) — registration-revamp.component.ts's
+// getPageContent() then leaves ICONTYPE/regPageContent untouched, so the
+// generic template's page icon (`*ngIf="regPageContent?.ICONTYPE"`,
+// `.min-height-48`), app-onboarding-photo's trash icon, and the guidelines
+// row's icon all render their real CDN assets — not the hand-drawn
+// placeholder vectors this screen used before.
 
-function PersonCardIcon() {
-  return (
-    <Svg width={40} height={40} viewBox="0 0 24 24" fill="none">
-      <Rect x={2} y={4} width={20} height={16} rx={2} stroke="#111" strokeWidth={1.6} />
-      <Path
-        d="M8 12a2.5 2.5 0 100-5 2.5 2.5 0 000 5z"
-        stroke="#111"
-        strokeWidth={1.5}
-      />
-      <Path
-        d="M4 19c0-2.21 1.79-4 4-4h1"
-        stroke="#111"
-        strokeWidth={1.5}
-        strokeLinecap="round"
-      />
-      <Line x1={14} y1={9} x2={20} y2={9} stroke="#111" strokeWidth={1.5} strokeLinecap="round" />
-      <Line x1={14} y1={13} x2={18} y2={13} stroke="#111" strokeWidth={1.5} strokeLinecap="round" />
-    </Svg>
-  )
-}
+// registration.config.ts REGISTRATIONPAGE[20].ICONTYPE.
+const CDN_PAGE_ICON = CDN_REG + 'add-photos.svg'
+// onboarding-photo.component.html's per-photo trash icon.
+const CDN_TRASH_ICON = CDN_REG + 'trash-img.svg'
+// registration-revamp.component.html's guidelines row icon (`.width-height-16`
+// = 1.5rem, so it scales with device width like any other rem value here).
+const CDN_GUIDELINES_ICON = CDN_SVG + 'guidelins.svg'
+const GUIDELINES_ICON_SIZE = remPx(1.5)
 
 function TrashIcon() {
-  return (
-    <Svg width={18} height={18} viewBox="0 0 24 24" fill="none">
-      <Polyline points="3 6 5 6 21 6" stroke="#555" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-      <Path
-        d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"
-        stroke="#555"
-        strokeWidth={2}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <Path d="M10 11v6M14 11v6" stroke="#555" strokeWidth={2} strokeLinecap="round" />
-      <Path d="M9 6V4a1 1 0 011-1h4a1 1 0 011 1v2" stroke="#555" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
-    </Svg>
-  )
+  // Angular's `.trash` wrapper sets position only, no explicit width/height —
+  // no verified size to port, so this keeps its existing footprint.
+  return <CdnSvg uri={CDN_TRASH_ICON} width={18} height={18} />
 }
 
 function InfoIcon() {
-  return (
-    <Svg width={16} height={16} viewBox="0 0 24 24" fill="none">
-      <Path
-        d="M12 22c5.52 0 10-4.48 10-10S17.52 2 12 2 2 6.48 2 12s4.48 10 10 10z"
-        stroke="#555"
-        strokeWidth={1.8}
-      />
-      <Line x1={12} y1={16} x2={12} y2={12} stroke="#555" strokeWidth={2} strokeLinecap="round" />
-      <Line x1={12} y1={8} x2={12.01} y2={8} stroke="#555" strokeWidth={2} strokeLinecap="round" />
-    </Svg>
-  )
+  return <CdnSvg uri={CDN_GUIDELINES_ICON} width={GUIDELINES_ICON_SIZE} height={GUIDELINES_ICON_SIZE} />
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -334,9 +309,9 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
         contentContainerStyle={styles.scroll}
         showsVerticalScrollIndicator={false}
       >
-        {/* Icon */}
+        {/* Icon — Angular: REGISTRATIONPAGE[20].ICONTYPE, `.min-height-48` (flat 48px). */}
         <View style={styles.iconRow}>
-          <PersonCardIcon />
+          <Image source={{ uri: CDN_PAGE_ICON }} style={styles.pageIcon} contentFit="contain" />
         </View>
 
         {/* Title + subtitle */}
@@ -444,18 +419,31 @@ const styles = StyleSheet.create({
   iconRow: {
     marginBottom: 12,
   },
+  // Angular: `.min-height-48` (flat 48px) on the page ICONTYPE `<img>`.
+  pageIcon: {
+    width:  48,
+    height: 48,
+  },
 
+  // Angular: this screen renders once currentPageType '20' has left
+  // showPhotoPromotion, so the generic template's title col applies again —
+  // `.heading1-semibold-22 black-color` (registration-revamp.component.html:32).
   title: {
-    fontSize:     24,
-    fontWeight:   '700',
-    color:        '#111',
+    fontFamily:   Fonts.poppinsSemiBold,
+    fontSize:     FontSize.font22,
+    fontWeight:   '600',
+    color:        Colors.black,
     marginBottom: 6,
   },
+  // Angular: the subheading ion-label is plain `.body2-regular-14` — no
+  // color utility class and no line-height class, so this app's default text
+  // color (Ionic's unthemed --ion-text-color, #000) applies, not an invented
+  // gray, and no line-height is set either.
   subtitle: {
-    fontSize:     14,
+    fontFamily:   Fonts.poppinsRegular,
+    fontSize:     FontSize.font14,
     fontWeight:   '400',
-    color:        '#555',
-    lineHeight:   20,
+    color:        Colors.black,
     marginBottom: 20,
   },
 
@@ -529,9 +517,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingLeft:     10,
   },
+  // Angular: `.profile-picture textcta-medium-12 white-color`
+  // (onboarding-photo.component.html).
   profileLabelText: {
-    fontSize:   13,
-    fontWeight: '700',
+    fontFamily: Fonts.poppinsMedium,
+    fontSize:   FontSize.font12,
+    fontWeight: '500',
     color:      '#fff',
   },
 
@@ -584,9 +575,13 @@ const styles = StyleSheet.create({
     marginTop:     16,
     paddingVertical: 4,
   },
+  // Angular: `.textcta-medium-12 color-29339B` wrapped in `<u>`
+  // (registration-revamp.component.html:145).
   guidelinesText: {
-    fontSize:          14,
-    color:             '#444',
+    fontFamily:          Fonts.poppinsMedium,
+    fontSize:            FontSize.font12,
+    fontWeight:          '500',
+    color:               Colors.link,
     textDecorationLine: 'underline',
   },
 

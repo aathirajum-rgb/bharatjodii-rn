@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Colors } from '../../constants/colors'
-import { Fonts } from '../../src/theme/fonts'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 import { generateHoroscope, getRegValues } from '../../service/registrationService'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
@@ -389,9 +389,9 @@ const styles = StyleSheet.create({
   },
   columnLabel: {
     flex:       1,
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '500',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
     textAlign:  'center',
   },
   colonSpacer: {
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.poppinsRegular,
     fontSize:   20,
     fontWeight: '500',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
 
   colon: {
@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.poppinsRegular,
     fontSize:   24,             // space, now that wheelBody uses flex-start
     fontWeight: '700',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
     textAlign:  'center',
   },
 
