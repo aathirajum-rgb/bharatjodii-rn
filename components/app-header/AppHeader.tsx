@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
+import { Dimensions, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { SvgXml } from 'react-native-svg'
 import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
@@ -8,10 +8,22 @@ import Badge from '../badge/Badge'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { getOwnGenderAvatarUrl } from '../../utils/avatar'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { handleBack } from '../../utils/navigationRef'
 import LanguagePill from '../language-pill/LanguagePill'
+
+// Angular: header.component.scss's header1 sizes are all vmin (this app is
+// portrait-locked — app.json's orientation:'portrait' — so 1vmin ≈ 1% of
+// device width, same reasoning as HomeScreen.tsx's own SW-based proportional
+// sizes, e.g. HAND_SIZE = SW * 0.35).
+const SW = Dimensions.get('window').width
+// `.home-header-icon` wraps `.width-height-32` (9vmin) with its own 4px
+// padding on every side — the icon itself is the button size minus that.
+const H1_ICON_BTN_SIZE = SW * 0.09
+const H1_ICON_SIZE = H1_ICON_BTN_SIZE - 8
+// `.avatar { width/height: 13.5vmin }`.
+const H1_AVATAR_SIZE = SW * 0.135
 
 // Angular's header back-button and language-pill dropdown both use Ionic's
 // bundled "chevron-back-outline" / "chevron-down-outline" icons (ion-icon
@@ -159,7 +171,7 @@ export default function AppHeader({
       // scrolls back up past a hero banner, or on init when a hero banner is
       // active — for the common case (no hero banner, no scroll yet) the
       // header renders plain white, confirmed against a live screenshot.
-      <SafeAreaView edges={['top']} style={[styles.h1Bg, style]}>
+      <SafeAreaView edges={['top']} style={[styles.h1Bg, hasPaidBatch ? styles.h1BgPaid : null, style]}>
 
         {/* ── Row 1: App bar ── */}
         <View style={styles.h1AppBar}>
@@ -169,7 +181,7 @@ export default function AppHeader({
             style={styles.h1IconBtn}
             onPress={() => onToolbarItemPress?.('menu')}
           >
-            <CdnSvg uri={ICONS.menuHome} width={27} height={27} />
+            <CdnSvg uri={ICONS.menuHome} width={H1_ICON_SIZE} height={H1_ICON_SIZE} />
           </Pressable>
 
           <View style={styles.flex1} />
@@ -191,7 +203,7 @@ export default function AppHeader({
               style={styles.h1IconBtn}
               onPress={() => onToolbarItemPress?.(item.toolType)}
             >
-              <CdnSvg uri={item.toolImg} width={27} height={27} />
+              <CdnSvg uri={item.toolImg} width={H1_ICON_SIZE} height={H1_ICON_SIZE} />
               {!!(item.showNotification && item.notifyCount && item.notifyCount !== '0') && (
                 <BadgeCount count={item.notifyCount!} />
               )}
@@ -211,13 +223,13 @@ export default function AppHeader({
               userImg is a real uploaded photo (JPG/PNG) when set, not
               guaranteed SVG like the fallback placeholder is, so this needs
               CdnImage's format detection, not a hardcoded CdnSvg. */}
-          <Pressable style={styles.h1AvatarWrap} onPress={onAvatarPress}>
+          <Pressable style={[styles.h1AvatarWrap, { width: H1_AVATAR_SIZE, height: H1_AVATAR_SIZE, borderRadius: H1_AVATAR_SIZE / 2 }]} onPress={onAvatarPress}>
             {!!avatarUri && (
               <CdnImage
                 uri={avatarUri}
-                width={48}
-                height={48}
-                style={styles.h1AvatarRadius}
+                width={H1_AVATAR_SIZE}
+                height={H1_AVATAR_SIZE}
+                style={[styles.h1AvatarRadius, { borderRadius: H1_AVATAR_SIZE / 2 }]}
                 // cover, not CdnImage's 'contain' default — a portrait photo
                 // letterboxed inside the 48px circle instead of filling it.
                 // Only affects the raster path; an SVG placeholder routes to
@@ -234,8 +246,13 @@ export default function AppHeader({
                 (--ion-color-link-color: #29339B) for Home's header1 in every
                 state this app reaches, not the brand red this used. */}
             <View style={styles.h1EditRow}>
-              <Text style={styles.h1EditLabel}>Edit profile</Text>
-              <CdnSvg uri={ICONS.fwdLink} width={12} height={12} />
+              {/* Angular: `EDITPROFILE.EDIT_PROFILE` — was a hardcoded
+                  literal, not the real translation key (only ever matched
+                  English by coincidence). */}
+              <Text style={styles.h1EditLabel}>{t('EDITPROFILE.EDIT_PROFILE')}</Text>
+              {/* Angular: iconSize={eButtonSize.small} = 16px (button-revamp's
+                  `.small` icon mixin), not 12. */}
+              <CdnSvg uri={ICONS.fwdLink} width={16} height={16} />
             </View>
             {/* Angular: paidBatch = entryType=='P' && payRenewalFlag=='0' &&
                 !check_Paid_Verified_Nophoto() — shown as a green pill under
@@ -290,7 +307,9 @@ export default function AppHeader({
           <Pressable style={styles.langBtn} onPress={onLanguagePress}>
             <CdnSvg uri={ICONS.lang} width={24} height={24} />
             <Text style={[styles.langText, { fontFamily: langFonts.medium }]}>{resolvedLangLabel}</Text>
-            <SvgXml xml={CHEVRON_DOWN_XML} width={16} height={16} />
+            {/* Angular: bare `<ion-icon name="chevron-down-outline">`, no size
+                class at all here — Ionic's own default (1.5rem ≈ 24px), not 16. */}
+            <SvgXml xml={CHEVRON_DOWN_XML} width={24} height={24} />
           </Pressable>
         )}
       </View>
@@ -310,12 +329,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingBottom:     12,
   },
+  // Angular: `[ngClass]="hasPaidBatch ? 'pb-16' : 'pb-12'"` on the outer grid.
+  h1BgPaid: {
+    paddingBottom: 16,
+  },
 
   // Row 1: hamburger | language | icons
+  // Angular: this row's own `pb-16` — the gap to row 2 lives here, not on
+  // row 2's own marginTop (h1UserBar no longer sets one, to avoid double-
+  // counting the same gap on both sides of it).
   h1AppBar: {
     flexDirection:  'row',
     alignItems:     'center',
     paddingTop:     16,
+    paddingBottom:  16,
     gap:            8,
   },
 
@@ -323,16 +350,14 @@ const styles = StyleSheet.create({
   h1UserBar: {
     flexDirection: 'row',
     alignItems:    'center',
-    marginTop:     10,
   },
 
   // Avatar — Angular: .avatar { width/height: 13.5vmin } — no border/ring
   // exists in the real CSS at all (the completion-% overlay that DOES have
-  // a red border is separately confirmed dead/commented-out).
+  // a red border is separately confirmed dead/commented-out). Size/radius
+  // are computed inline from H1_AVATAR_SIZE (device-width-scaled); this
+  // supplies everything else.
   h1AvatarWrap: {
-    width:          48,
-    height:         48,
-    borderRadius:   24,
     // Clip here, not just on the inner image: the fallback placeholder
     // avatar is an SVG (CdnSvg/SvgCssUri), which ignores borderRadius on
     // its own style, so relying on the child alone left the placeholder
@@ -355,11 +380,19 @@ const styles = StyleSheet.create({
     flex:       1,
     marginLeft: 12,
   },
+  // Angular: `heading4-medium-16 color-333333` — font-size var(--font16)
+  // (1rem, dynamic — see FontSize's header comment). Color: componentData's
+  // TEXTCOLOR is only ever assigned once a hero banner/scroll state kicks in
+  // (out of scope here, same simplification as the header's background —
+  // see the header1 branch's own comment); in the common default case it's
+  // unset, so the inline [attr.style] is invalid CSS and gets ignored,
+  // leaving `.color-333333`'s `!important` as the real winner — not
+  // textPrimary (#111). No line-height class on this span — none set here
+  // either, letting it fall back to the font's natural metric.
   h1UserName: {
     fontFamily: Fonts.poppinsMedium,
-    fontSize:   16,
-    color:      Colors.textPrimary,
-    lineHeight: 22,
+    fontSize:   FontSize.font16,
+    color:      '#333333',
   },
   h1EditRow: {
     flexDirection: 'row',
@@ -368,10 +401,12 @@ const styles = StyleSheet.create({
     marginTop:     1,
   },
   // Angular: componentData.LINKCTACOLOR resolves to 'linkColor'
-  // (--ion-color-link-color: #29339B), not the brand red.
+  // (--ion-color-link-color: #29339B), not the brand red. buttonSize
+  // 'linkSmall' sets font-size var(--font12) (0.75rem, dynamic — see
+  // FontSize's header comment), weight 400 — family already matched.
   h1EditLabel: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      Colors.link,
   },
   h1PaidBadge: {
@@ -379,11 +414,12 @@ const styles = StyleSheet.create({
   },
 
   // Icon buttons — Angular: .home-header-icon (8px radius, transparent fill,
-  // solid black 1px border) wraps .width-height-32 (9vmin ≈ 32px on a
-  // typical phone width) — corrected from an earlier, too-large 36×36 guess.
+  // solid black 1px border, 4px padding) wraps .width-height-32 (9vmin,
+  // device-width-scaled — see H1_ICON_BTN_SIZE above), not a flat 37 (which
+  // only happened to be close on one specific screen width).
   h1IconBtn: {
-    width:           37,
-    height:          37,
+    width:           H1_ICON_BTN_SIZE,
+    height:          H1_ICON_BTN_SIZE,
     borderRadius:    8,
     backgroundColor: 'transparent',
     borderWidth:     1,
@@ -415,10 +451,13 @@ const styles = StyleSheet.create({
   },
 
   // ── header2 ────────────────────────────────────────────────────────────────
+  // Angular: `.border-bottom-search { border-bottom: 1px solid #f1f5f9 }` —
+  // a different, more specific gray than the generic Colors.divider token
+  // (#f0f0f0) other screens use for plain list/card dividers.
   wrapper2: {
     backgroundColor:   Colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.divider,
+    borderBottomColor: '#f1f5f9',
   },
   titleRow: {
     flexDirection:     'row',
@@ -433,10 +472,13 @@ const styles = StyleSheet.create({
     justifyContent:  'center',
     marginRight:     4,
   },
+  // Angular: `heading4-medium-16 color-333333` — font-size var(--font16)
+  // (1rem, dynamic — see FontSize's header comment); color already matched
+  // (Colors.textDark = #333333).
   titleText: {
     fontFamily: SemanticFontsEnglish.headingEnglishMedium,
     flex:       1,
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     color:      Colors.textDark,
   },
   flex1: { flex: 1 },
@@ -464,9 +506,12 @@ const styles = StyleSheet.create({
     height:            36,
     marginTop:         4,
   },
+  // Angular: `textcta-medium-12 black-color` — font-size var(--font12)
+  // (0.75rem, dynamic — see FontSize's header comment), Poppins-Medium
+  // (family already matched); color pure black (#000), not textPrimary (#111).
   langText: {
     fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
-    fontSize:   12,
-    color:      Colors.textPrimary,
+    fontSize:   FontSize.font12,
+    color:      Colors.black,
   },
 })

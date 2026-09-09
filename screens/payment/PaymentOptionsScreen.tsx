@@ -24,6 +24,7 @@ import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import LinkCTA from '../../components/link-cta/LinkCTA'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
+import { useNetwork } from '../../contexts/NetworkContext'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import PaymentOptionsDesktopLayout from './payment-options-desktop/PaymentOptionsDesktopLayout'
 import {
@@ -67,6 +68,7 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
   const { t, i18n } = useTranslation()
   const isDesktop = useIsDesktopWeb()
+  const { isOffline } = useNetwork()
 
   const selectedPackage: SelectedPackage | undefined = route.params?.selectedPackage
 
@@ -261,6 +263,9 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
 
   async function handlePay() {
     if (!selectedKey) { Alert.alert('Select payment method', 'Please choose a payment method.'); return }
+    // Defense-in-depth alongside the global OfflineScreen overlay — don't
+    // start checkout/open the payment gateway SDK while offline.
+    if (isOffline) { Alert.alert('Error', t('GENERAL.NOINTERNET')); return }
 
     const remainingMs = await getRetryRemainingMs()
     if (remainingMs > 0) {

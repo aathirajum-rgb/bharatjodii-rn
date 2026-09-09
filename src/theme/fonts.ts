@@ -1,3 +1,59 @@
+import { Dimensions } from 'react-native'
+
+// Angular: html { font-size: var(--font-auto-resize) }. Two conflicting
+// definitions exist (theme/variables.scss's calc(13px + 1vw) vs.
+// _variable.scss's calc(0.325em + 3vw)); angular.json loads
+// theme/variables.scss BEFORE global.scss (which @imports _variable.scss),
+// so at equal specificity the later one wins — 0.325em + 3vw is what the app
+// actually renders with. Every var(--fontN) (e.g. --font18: 1.125rem) is
+// that many rem units of THIS root, not a fixed px value — so all of them
+// scale with device width, not just the one already ported below.
+// 0.325em resolves against the browser default root size (16px, nothing to
+// inherit from on <html> itself), so only the 3vw term is actually dynamic;
+// baked out here as a flat linear formula against RN's device width.
+const { width: SCREEN_W } = Dimensions.get('window')
+const REM_BASE_PX = 0.325 * 16 + 0.03 * SCREEN_W
+
+// Low-level rem→px conversion against the scaling root above. Prefer
+// FontSize.fontN below at call sites — it's a one-off escape hatch for a rem
+// value that isn't one of Angular's named --fontN constants.
+export function remPx(rem: number): number {
+  return rem * REM_BASE_PX
+}
+
+// Named lookup for Angular's own var(--fontN) constants (_variable.scss),
+// keyed by the SAME name so a ported style's source comment ("font-size:
+// var(--font18)") maps straight onto FontSize.font18 — use this instead of
+// calling remPx(1.125) directly, so the rem multiplier doesn't have to be
+// reverse-engineered back into "which --fontN was this" every time the style
+// is read later.
+export const FontSize = {
+  font8:  remPx(0.5),
+  font9:  remPx(0.563),
+  font10: remPx(0.625),
+  font11: remPx(0.688),
+  font12: remPx(0.75),
+  font13: remPx(0.813),
+  font14: remPx(0.875),
+  font15: remPx(0.938),
+  font16: remPx(1),
+  font17: remPx(1.063),
+  font18: remPx(1.125),
+  font19: remPx(1.187),
+  font20: remPx(1.25),
+  font22: remPx(1.375),
+  font23: remPx(1.438),
+  font24: remPx(1.5),
+  font25: remPx(1.562),
+  font26: remPx(1.6),
+  font27: remPx(1.687),
+  font28: remPx(1.75),
+  font30: remPx(1.875),
+  font32: remPx(2),
+  font34: remPx(2.125),
+  font40: remPx(2.5),
+} as const
+
 // Font family constants — RN equivalent of the web app's
 // var(--button-english-Medium) style custom properties. Screens should use
 // these instead of hardcoding fontFamily strings inline.

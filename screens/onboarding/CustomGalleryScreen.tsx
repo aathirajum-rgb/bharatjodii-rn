@@ -27,6 +27,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import AppHeader from '../../components/app-header/AppHeader'
 import { Colors } from '../../constants/colors'
+import { useNetwork } from '../../contexts/NetworkContext'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { Endpoints } from '../../service/api.endpoints'
 import { uploadFile } from '../../service/apiClient'
@@ -134,6 +135,7 @@ function CheckBadge() {
 export default function CustomGalleryScreen({ navigation, route, onClose, onUploaded }: Props) {
   const insets        = useSafeAreaInsets()
   const { t }         = useTranslation()
+  const { isOffline } = useNetwork()
   const existingCount = (route.params?.existingCount as number | undefined) ?? 0
   const remaining     = Math.max(0, MAX_PHOTOS - existingCount)
 
@@ -304,6 +306,12 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
 
   async function uploadAndNavigate(photos: PendingPhoto[]) {
     if (photos.length === 0) return
+    // Defense-in-depth alongside the global OfflineScreen overlay — don't
+    // even start the upload while offline.
+    if (isOffline) {
+      Alert.alert('Error', t('GENERAL.NOINTERNET'))
+      return
+    }
     setUploading(true)
     try {
       const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
@@ -427,6 +435,18 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
   function retryFromVerdict() {
     setVerdictPhase('idle')
   }
+
+  // Android: PhotoUploadProcessFragment.kt's ConnectivityManager.NetworkCallback
+  // .onLost() — actively marks an in-progress upload as failed the moment
+  // connectivity drops mid-flight, rather than leaving it to hang until the
+  // request itself eventually times out.
+  useEffect(() => {
+    if (isOffline && uploading) {
+      setUploading(false)
+      Alert.alert('Error', t('GENERAL.NOINTERNET'))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOffline])
 
   // ─── Render item ──────────────────────────────────────────────────────────
 

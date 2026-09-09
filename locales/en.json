@@ -1624,6 +1624,8 @@
         "PROFILEDELETED":"This profile is deleted or currently unavailable",
         "PROFILEDELETED_HV":"Profile deleted",
         "NOINTERNET":"Please check internet connection",
+        "OFFLINE_TITLE":"No Internet Connection",
+        "TRY_AGAIN":"Try Again",
         "MONTHLYINCOME":"Monthly income",
         "REVIEW_CONT1":"We are happy you had a great experience!",
         "REVIEW_CONT2":"Please review us on Play Store.",

@@ -25,6 +25,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
+import { useNetwork } from '../../contexts/NetworkContext'
 import { SemanticFontsEnglish } from '../../src/theme/fonts'
 import {
   getFinalAmount, getNetBankingList, getRetryRemainingMs,
@@ -44,6 +45,7 @@ type Props = { navigation: any; route: any }
 export default function NetBankingScreen({ navigation, route }: Props) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
+  const { isOffline } = useNetwork()
   const selectedPackage: SelectedPackage | undefined = route.params?.selectedPackage
   const amountLabel: string | undefined = route.params?.amountLabel
 
@@ -87,6 +89,9 @@ export default function NetBankingScreen({ navigation, route }: Props) {
   // submission, and verification all happen on that screen instead.
   async function handlePay() {
     if (!selectedKey || !selectedPackage) return
+    // Defense-in-depth alongside the global OfflineScreen overlay — don't
+    // start checkout while offline.
+    if (isOffline) { Alert.alert('Error', t('GENERAL.NOINTERNET')); return }
 
     setPaying(true)
     try {

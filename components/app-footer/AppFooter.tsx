@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { getMenuPromo } from '../../service/paymentService'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, RupeeSymbolFont, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // ─── Icon sizes — footer.component.scss ───────────────────────────────────────
 // Every icon sits in a `.footer-icon-size` span: 1.57rem = 25.12px. Three tabs
@@ -256,13 +256,19 @@ const styles = StyleSheet.create({
     alignItems:     'center',
     justifyContent: 'center',
   },
-  // Angular: `.font-10-nav pt-4 line-height-12` — 10px, Poppins-Regular,
-  // 12px line-height, 4px above. Inactive `.footer-text-in-active` = gray-color1
-  // (#545454); active `.footer-text-active` = --pink.
+  // Angular: `.font-10-nav pt-4 line-height-12` — font-size var(--font10)
+  // (0.625rem, scales with device width — see FontSize's header comment),
+  // Poppins-Regular (var(--english-regular-poppins), weight 400), 12px flat
+  // line-height (`.line-height-12` is a plain px value, not rem-based), 4px
+  // above. Inactive `.footer-text-in-active` = var(--gray-color1) = #1F1E1B
+  // (footer.component.scss:1-8; NOT #545454 — that was never the Angular
+  // value); active `.footer-text-active` only repeats the same font-size and
+  // swaps color to var(--pink) = #B50033 — it does NOT change weight/family,
+  // so the active label stays Poppins-Regular too.
   tabLabel: {
     fontFamily: SemanticFontsEnglish.bottomnavEnglishRegular,
-    fontSize:   10,
-    color:      '#545454',
+    fontSize:   FontSize.font10,
+    color:      '#1F1E1B',
     marginTop:  4,
     lineHeight: 12,
     textAlign:  'center',
@@ -270,8 +276,7 @@ const styles = StyleSheet.create({
   // The Message tab's own label is `pt-2`, not `pt-4`.
   tabLabelMessage: { marginTop: 2 },
   tabLabelActive: {
-    fontFamily: Fonts.poppinsMedium,
-    color:      '#B50033',
+    color: '#B50033',
   },
   // Count badge — "99+" red pill (Figma: Likes tab)
   countBadge: {
@@ -288,10 +293,14 @@ const styles = StyleSheet.create({
     borderWidth:       1,
     borderColor:       Colors.white,
   },
+  // Angular: `ion-badge` classes `font-8 white-color` (footer.component.html:
+  // 12/28/38, all three count badges) — font-8 is font-size var(--font8)
+  // (0.5rem, scales with device width) + font-family var(--english-regular-
+  // poppins) = Poppins-Regular; no semibold class is applied to these badges.
   countText: {
-    fontFamily: Fonts.poppinsSemiBold,
+    fontFamily: Fonts.poppinsRegular,
     color:      Colors.white,
-    fontSize:   8,
+    fontSize:   FontSize.font8,
     lineHeight: 12,
   },
   // "₹200 OFF" upgrade pill above Membership icon — gradient: #33258C → #751246
@@ -307,10 +316,18 @@ const styles = StyleSheet.create({
     alignItems:        'center',
     justifyContent:    'center',
   },
+  // Angular: `.membership-off` div classes `font-8 poppins-family white-color`
+  // (footer.component.html:57). font-8 sets font-size var(--font8) (scales
+  // with device width) and would also set font-family to Poppins-Regular, but
+  // `.poppins-family` is declared LATER in global.scss (line 2316 vs font-8's
+  // 2303) and both declare font-family with !important, so at equal
+  // specificity poppins-family wins: font-family: var(--english-poppins) =
+  // Roboto-Regular. Same alias RupeeSymbolFont already documents (it's meant
+  // for the ₹ glyph, but the cascade applies it to the whole "₹200 OFF" text).
   upgradeTagText: {
-    fontFamily: Fonts.poppinsSemiBold,
+    fontFamily: RupeeSymbolFont,
     color:      Colors.white,
-    fontSize:   8,
+    fontSize:   FontSize.font8,
   },
   // Membership expiry red dot
   redDot: {

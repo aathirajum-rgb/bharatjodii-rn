@@ -10,6 +10,7 @@ import i18n from './i18n'
 import { APP_VERSION } from './constants/appVersion'
 import { StorageKeys } from './constants/storage.keys'
 import { AuthProvider } from './contexts/AuthContext'
+import { NetworkProvider } from './contexts/NetworkContext'
 import { ErrorBoundary } from './components/error-boundary/ErrorBoundary'
 import { initCrashLogger } from './utils/crashLogger'
 import { useOTAUpdate } from './hooks/useOTAUpdate'
@@ -185,9 +186,11 @@ export default function App() {
               mount their own <StatusBar> to override; expo-status-bar restores this
               root setting automatically once that screen unmounts. */}
           <StatusBar style="dark" />
-          <AuthProvider>
-            <RootNavigation />
-          </AuthProvider>
+          <NetworkProvider>
+            <AuthProvider>
+              <RootNavigation />
+            </AuthProvider>
+          </NetworkProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>

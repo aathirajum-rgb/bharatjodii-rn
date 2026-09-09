@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   Dimensions,
   FlatList,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -14,16 +15,21 @@ import { useTranslation } from 'react-i18next'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import CdnSvg from '../cdn-svg/CdnSvg'
 import ProfileCard, { PHOTO_HEIGHT, type CardSection, type CardVariant } from '../profile-card/ProfileCard'
 import { FEMALE_AVATAR_URL, getOppGenderAvatarUrl } from '../../utils/avatar'
-import { Fonts } from '../../src/theme/fonts'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 
 // Angular: core/config/button.config.ts's SEE_ALL — textColor: 'linkColor'
 // (--ion-color-link-color: #29339B), iconType: 'forward-icon-link' — a plain
 // text+chevron in the brand red was wrong on both counts.
 const SEE_ALL_LINK_COLOR = '#29339B'
-const FWD_ICON = `${CDN_SVG}revamp/forward-icon-link.svg`
+// Angular: app-swiper.component.html's "See all" <app-button-revamp> overrides
+// SEE_ALL config's own iconType to `EButtonIcons.forwardAnimation`
+// ('forward-animation-link') — button-revamp.component.ts's IsShowAnimation()
+// then renders a plain <img> (not the static forward-icon-link.svg icon slot)
+// at a literal `assets/images/svg/revamp/animation/right-arrow-animation.gif`,
+// 24×20px (not the square 12×12/24×24 a static icon would use).
+const FWD_ANIM_ICON = `${CDN_SVG}revamp/animation/right-arrow-animation.gif`
 
 // ─── Pagination dots ────────────────────────────────────────────────────────────
 // Angular: home.config.ts's per-section swiper `pagination: { dynamicBullets:
@@ -440,28 +446,23 @@ export default function SwiperCard({
         }
       />
 
-      {/* ── Pagination dots, below the card list, centered on their own row ──
-          Angular positions these absolutely (`.explore-pagination
-          .swiper-pagination { bottom: -25px }` in global.scss), independent
-          of the "See all" link below — they were previously forced into one
-          `space-between` row together, which let the link's width push the
-          dots off-center instead of centering them in their own right. */}
-      {items.length > 1 && (
-        <View style={styles.dotsWrapper}>
+      {/* ── Pagination dots + "See all" link, sharing one row (dots left,
+          link right) ── Angular's dots are absolutely offset -25px UP into
+          the space right above the CTA row (`.explore-pagination
+          .swiper-pagination { bottom: -25px }`), so the two visually share a
+          line even though they're separate elements in the DOM — splitting
+          them into two stacked RN rows (previous version here) lost that and
+          pushed "See all" onto its own line below the dots. Same
+          space-between pattern CoverflowSwiper.tsx's own bottomRow uses. */}
+      {(items.length > 1 || (linkVisible && !!onSeeAllPress)) && (
+        <View style={styles.bottomRow}>
           <PaginationDots total={items.length} activeIndex={activeIndex} />
-        </View>
-      )}
-
-      {/* ── "See all" link, its own row below the dots, right-aligned ──
-          Angular: app-swiper.component.html's CTA row is a sibling `d-flex
-          ion-justify-content-end` row below the pagination, not sharing a row
-          with it. */}
-      {linkVisible && !!onSeeAllPress && (
-        <View style={styles.seeAllRow}>
-          <Pressable onPress={onSeeAllPress} style={styles.seeAllBtn}>
-            <Text style={styles.seeAllText}>{t('HOME.SEE_ALL_CTA')}</Text>
-            <CdnSvg uri={FWD_ICON} width={12} height={12} />
-          </Pressable>
+          {linkVisible && !!onSeeAllPress && (
+            <Pressable onPress={onSeeAllPress} style={styles.seeAllBtn}>
+              <Text style={styles.seeAllText}>{t('HOME.SEE_ALL_CTA')}</Text>
+              <Image source={{ uri: FWD_ANIM_ICON }} style={styles.seeAllIcon} />
+            </Pressable>
+          )}
         </View>
       )}
     </View>
@@ -495,10 +496,14 @@ const styles = StyleSheet.create({
     alignItems:        'flex-start',
     gap:               6,
   },
-  // Angular: .heading2-semibold-18 { font-family: var(--english-semibold-poppins) }
+  // Angular: .heading2-semibold-18.line-height-24 — font-family
+  // var(--english-semibold-poppins), font-size var(--font18) (1.125rem, scales
+  // with device width — see remPx()'s header comment), line-height a flat 24px
+  // (NOT rem-based, unlike the font-size).
   headerTitle: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   18,
+    fontSize:   FontSize.font18,
+    lineHeight: 24,
     color:      Colors.textPrimary,
     flexShrink: 1,
   },
@@ -509,10 +514,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     borderRadius:      4,
   },
-  // Angular: .textcta-medium-12 .white-color
+  // Angular: .textcta-medium-12 (var(--font12), 0.75rem, dynamic — see
+  // FontSize's header comment) .white-color
   newTagText: {
     fontFamily: Fonts.poppinsMedium,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     lineHeight: 16,
     color:      Colors.white,
   },
@@ -521,11 +527,19 @@ const styles = StyleSheet.create({
     alignItems:    'center',
     gap:           4,
   },
+  // Angular: button.config.ts's SEE_ALL sets no ctaFontSize, so
+  // button-revamp.component.ts's default (EButtonFontSize.regular14 =
+  // body2-regular-14) applies — Poppins-Regular @ var(--font14) (0.875rem,
+  // dynamic), weight 400. A flat 13/600/system-font here matched none of
+  // those three.
   seeAllText: {
-    fontSize:   13,
+    fontFamily: Fonts.poppinsRegular,
+    fontSize:   FontSize.font14,
     color:      SEE_ALL_LINK_COLOR,
-    fontWeight: '600',
   },
+  // Angular: the animated <img> is styled inline `width: 24px; height: 20px`
+  // — not square, so this can't be expressed as a single CdnSvg width/height.
+  seeAllIcon: { width: 24, height: 20 },
 
   // ── List ──────────────────────────────────────────────────────────────────
   // Angular: the slides row is `.row-pad { padding-left: 24px }` — LEFT only, so
@@ -554,29 +568,21 @@ const styles = StyleSheet.create({
   // Angular: swiper box has class="explore-pagination pb-16" (16px bottom
   // padding) before the dots start — the dots themselves are absolutely
   // offset -25px past that via Swiper.js's own pagination CSS (no clean RN
-  // equivalent), but the resulting card-to-row gap is that 16px. Centered
-  // (not space-between'd against the "See all" link, which lives in its own
-  // row below) to match Angular's independent absolute centering.
-  dotsWrapper: {
-    alignItems: 'center',
-    // The 16px card→dots gap now comes from listContent's paddingBottom, which
-    // has to live INSIDE the scroll view so the card shadow isn't clipped.
+  // equivalent), landing them visually on the same line as the CTA row right
+  // below — reproduced here as one real flex row (dots left, "See all"
+  // right) instead of two stacked ones. The 16px card→row gap comes from
+  // listContent's paddingBottom, which has to live INSIDE the scroll view so
+  // the card shadow isn't clipped — no separate marginTop needed here.
+  bottomRow: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
+    paddingHorizontal: CARD_PAD,
   },
   dotsRow: {
     flexDirection: 'row',
     alignItems:    'center',
     gap:           4,
-  },
-  // ── "See all" row, right-aligned, below the dots ──────────────────────────
-  // Angular: app-swiper.component.html's CTA row — `d-flex
-  // ion-justify-content-end` — is a separate sibling row beneath the
-  // pagination, independently right-justified rather than sharing the dots'
-  // row.
-  seeAllRow: {
-    flexDirection:     'row',
-    justifyContent:    'flex-end',
-    paddingHorizontal: CARD_PAD,
-    marginTop:         8,
   },
   // Angular global.scss: .explore-pagination .swiper-pagination-bullet —
   // 5x5 circle, #F4CECE.

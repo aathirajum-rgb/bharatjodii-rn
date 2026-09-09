@@ -49,6 +49,7 @@ import {
   chooseAttachmentSource, pickChatAttachment, uploadChatAttachment,
   type PickedChatAttachment,
 } from '../../service/chatMediaService'
+import { useNetwork } from '../../contexts/NetworkContext'
 import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
 import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
 import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
@@ -98,6 +99,7 @@ type Props = { navigation: any; route: any }
 
 export default function ChatScreen({ navigation, route }: Props) {
   const { t } = useTranslation()
+  const { isOffline } = useNetwork()
   const insets = useSafeAreaInsets()
   // Angular: .chat-avatar-profile { width/height: 11.12vmin } — vmin is 1% of
   // the SMALLER viewport dimension, so the avatar grows with the device
@@ -504,6 +506,13 @@ export default function ChatScreen({ navigation, route }: Props) {
   async function handleSend() {
     const text = message.trim()
     if (!text || sending) return
+
+    // Defense-in-depth alongside the global OfflineScreen overlay — don't even
+    // attempt the send while offline.
+    if (isOffline) {
+      setToastRequest({ message: t('GENERAL.NOINTERNET'), key: Date.now() })
+      return
+    }
 
     if (!checkToSendMessage()) {
       await explainWhySendBlocked()
