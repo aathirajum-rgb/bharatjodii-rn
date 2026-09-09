@@ -13,10 +13,13 @@ import {
   View,
 } from 'react-native'
 import Constants from 'expo-constants'
+import { StatusBar } from 'expo-status-bar'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTranslation } from 'react-i18next'
 import { useVideoPlayer, VideoView } from 'expo-video'
+import { SvgXml } from 'react-native-svg'
 import CdnSvg, { CdnImage } from '../../components/cdn-svg/CdnSvg'
 import CdnLottie from '../../components/CdnLottie'
 import AppHeader, { type ToolbarItem } from '../../components/app-header/AppHeader'
@@ -43,7 +46,7 @@ import { StorageKeys } from '../../constants/storage.keys'
 import { CDN_LOTTIE } from '../../constants/cdn'
 import { APP_VERSION } from '../../constants/appVersion'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import HomeDesktopLayout from './HomeDesktopLayout'
 import HeroBanner, { type HeroBannerContent } from './HeroBanner'
@@ -78,6 +81,19 @@ import {
 
 const CDN = 'https://imgs.jodii.app/assets/images/svg/'
 const FWD_ICON = `${CDN}revamp/forward-icon-link.svg`
+
+// Angular: both the Help section's CTA and the video-faq-popup's close button
+// use Ionic's bundled Ionicons (node_modules/ionicons/dist/svg/*.svg), not a
+// CDN-hosted image — same reasoning as AppHeader.tsx's CHEVRON_BACK_XML.
+// Inlined verbatim (stroke swapped from currentColor to the CSS class's fixed
+// color, since SvgXml doesn't inherit RN style color).
+// chevron-forward-outline, colored .color-29339B — used by both the Help
+// section's CTA (home-banner.component.html) and the Explore Categories tile
+// (explore-card.component.html), both `ion-icon` with no other color class.
+const CHEVRON_FORWARD_BLUE_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#29339B" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M184 112l144 144-144 144"/></svg>`
+// close-outline, white (video-faq-popup.component.css's
+// `.align-end-video-page { color: #fff }`, at its own font-size: 25px).
+const CLOSE_OUTLINE_WHITE_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M368 368L144 144M368 144L144 368"/></svg>`
 
 // Bundled locally instead of fetched from CDN as SVG (who-viewed-bg-color.svg,
 // liked-profiles-bg.svg): both turned out to be auto-traced art with
@@ -172,6 +188,16 @@ const EXPLORE_TILE_HEIGHT = SW * 0.20
 const EXPLORE_ICON_COL = (EXPLORE_TILE_WIDTH - 12) * 2 / 12
 // Angular: .success-story-image img { width: 35vw; height: 35vw }
 const HAND_SIZE = SW * 0.35
+// Angular: complete-profile.component.html's `cardType==='completeprofile'`
+// branch (the Complete-Your-Profile cards specifically — the OTHER branch
+// this same component renders, `*ngIf="selfVideo"`, is a completely different
+// full-bleed video-thumbnail layout) sizes its thumbnail via `ion-col size="2"
+// class="padd0"` — a plain 2/12-width column, no gutter — inside a full-width
+// row nested in `.complete-profile-block { padding: 8px 12px }`, itself
+// inside the outer grid's `pl-24 pr-0`. So its true pixel size scales with
+// device width (2/12 of screenWidth - 24 grid pad - 24 card pad), not a flat
+// 48px.
+const CP_THUMB_SIZE = (SW - 48) / 6
 
 // ─── Toolbar ──────────────────────────────────────────────────────────────────
 // Angular: core/config/home.config.ts's homeToolBar — discover-matches (search
@@ -303,12 +329,18 @@ export const CompleteProfileSection = memo(function CompleteProfileSection({ car
             {/* Angular: card?.THUMBIMG — a per-card image URL from the server;
                 format isn't guaranteed, so CdnImage picks SvgUri vs Image by
                 extension instead of assuming either way. */}
-            {!!card.imageUrl && <CdnImage uri={card.imageUrl} width={48} height={48} />}
+            {!!card.imageUrl && <CdnImage uri={card.imageUrl} width={CP_THUMB_SIZE} height={CP_THUMB_SIZE} />}
             <View style={s.cpInfo}>
               <Text style={s.cpTitle}>{card.label}</Text>
               <View style={s.cpCtaRow}>
                 <Text style={s.cpCtaText}>{card.ctaLabel}</Text>
-                <CdnSvg uri={FWD_ICON} width={16} height={16} />
+                {/* Angular: this button passes no [iconSize] at all (unlike
+                    the "Add photo" LINK_BTN config used elsewhere, which sets
+                    EIconSize.small=16) — button-revamp.component.ts's default
+                    (EIconSize.large) applies here, 24px not 16. iconType IS
+                    the static forward-icon-link.svg (not the animated GIF the
+                    header/ghost-card "See all" links use elsewhere on Home). */}
+                <CdnSvg uri={FWD_ICON} width={24} height={24} />
               </View>
             </View>
           </LinearGradient>
@@ -472,10 +504,14 @@ export const ExploreCategoriesSection = memo(function ExploreCategoriesSection({
               <View style={s.catIconWrap}>
                 {!!cat.imageUrl && <CdnImage uri={cat.imageUrl} width={28} height={28} />}
               </View>
-              <Text style={s.catLabel} numberOfLines={2}>
-                {cat.label}{'  '}
-                <Text style={s.catChevron}>{'›'}</Text>
-              </Text>
+              {/* Angular: the chevron is INLINE inside the (possibly-2-line)
+                  wrapping label span — RN's Text can only nest more Text, not
+                  a real icon, inline in wrapping text, so this is pinned to
+                  the tile's right edge instead (catTile's own alignItems:
+                  'center' vertically centers it, same as Angular's
+                  vertical-middle-position). */}
+              <Text style={s.catLabel} numberOfLines={2}>{cat.label}</Text>
+              <SvgXml xml={CHEVRON_FORWARD_BLUE_XML} width={16} height={16} style={s.catChevron} />
             </LinearGradient>
           </Pressable>
         ))}
@@ -538,12 +574,12 @@ export const SuccessStoriesSection = memo(function SuccessStoriesSection({
 // CSS-drawn triangle.
 
 export const SelfHelpVideosSection = memo(function SelfHelpVideosSection({
-  videos, cardWidth, cardHeight, onVideoPress,
-}: { videos: HelpVideo[]; cardWidth: number; cardHeight: number; onVideoPress: (item: HelpVideo) => void }) {
+  videos, cardWidth, cardHeight, onVideoPress, onSeeAllPress,
+}: { videos: HelpVideo[]; cardWidth: number; cardHeight: number; onVideoPress: (item: HelpVideo) => void; onSeeAllPress: () => void }) {
   const { t } = useTranslation()
   return (
     <>
-      <Text style={s.sectionTitle}>{t('HOME.SELF_VIDEO_HEADER')}</Text>
+      <Text style={[s.sectionTitle, s.selfVideoSectionTitle]}>{t('HOME.SELF_VIDEO_HEADER')}</Text>
       <FlatList
         data={videos}
         keyExtractor={i => i.id}
@@ -568,6 +604,18 @@ export const SelfHelpVideosSection = memo(function SelfHelpVideosSection({
           </Pressable>
         )}
       />
+      {/* Angular: complete-profile.component.html's own bottom "See all" row
+          (`profileHeaders?.seeAllTxt !== ''` — true for this section, unlike
+          Complete-Your-Profile's, which never sets that field) — a plain
+          ion-text + static chevron-forward-outline icon, not an
+          app-button-revamp (so no animated-GIF override applies here, unlike
+          the header "See all" links elsewhere on Home). */}
+      <View style={s.selfHelpSeeAllRow}>
+        <Pressable style={s.selfHelpSeeAllBtn} onPress={onSeeAllPress}>
+          <Text style={s.selfHelpSeeAllText}>{t('HOME.SEE_ALL_CTA')}</Text>
+          <SvgXml xml={CHEVRON_FORWARD_BLUE_XML} width={24} height={24} />
+        </Pressable>
+      </View>
     </>
   )
 }, propsEqualIgnoringFunctions)
@@ -615,7 +663,7 @@ export const HelpSection = memo(function HelpSection({
         <Text style={s.helpSub}>{t('FAQ_DETAILS.BANNER.BODY')}</Text>
         <Pressable style={s.helpCta} onPress={onCallPress}>
           <Text style={s.helpCtaText}>{t('FAQ_DETAILS.BANNER.CTA').replace('#CALL#', ctaPhone).trim()}</Text>
-          <Text style={s.helpCtaChevron}>{'›'}</Text>
+          <SvgXml xml={CHEVRON_FORWARD_BLUE_XML} width={24} height={24} style={s.helpCtaChevron} />
         </Pressable>
       </View>
       <CdnSvg uri={`${CDN}call-24-7.svg`} width={80} height={80} />
@@ -864,6 +912,7 @@ const ProfilesViewedSection = memo(function ProfilesViewedSection({
 
 export default function HomeScreen({ navigation }: { navigation: any }) {
   const isDesktop = useIsDesktopWeb()
+  const insets = useSafeAreaInsets()
   const { t, i18n } = useTranslation()
 
   // ── WhatsApp "no photo" CTA (All Matches / New Matches / etc. cards) ──────
@@ -1102,6 +1151,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             ? Date.now() + Math.max(0, endMs - startMs)
             : Date.now() + 10 * 60 * 1000
           paymentFailedContent = {
+            bannerStyle: 'paymentFailed',
             title: '', body: String(text), ctaLabel: String(cta), countdownDeadlineMs: deadlineMs,
             // Angular: .payment-failed-banner — a rounded, bordered, inset
             // card (mt-24 ml-24 mr-24), not the full-bleed banner every other
@@ -1145,6 +1195,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
                          : 'PHOTOPUBLISHPAID'
         const raw = reg?.[bannerKey]?.['Banner'] ?? {}
         setHeroBannerContent({
+          bannerStyle: 'photoPromo',
           title:      raw['TITLE'] || 'Profile not active yet!',
           body:       raw['BODY']  || 'Upload your photo to activate profile and let matches see you',
           ctaLabel:   raw['CTA']   || 'Add photo now',
@@ -1211,6 +1262,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         const ownTimerDeadline = isOldBanner && details?.['TIMER'] ? Date.parse(details['TIMER']) : NaN
         const bgColor = hex(isOldBanner ? details?.['BANNERBG'] : details?.['BRIDEBGCOLOR'])
         setHeroBannerContent({
+          bannerStyle: isOldBanner ? 'old' : 'bride',
           title:      details?.['TITLE'] || 'Upgrade your membership',
           title1:     isOldBanner ? (details?.['TITLE1'] || undefined) : undefined,
           title2:     isOldBanner ? (details?.['TITLE2'] || undefined) : undefined,
@@ -2055,6 +2107,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               cardWidth={SW * 0.58}
               cardHeight={SW * 0.33}
               onVideoPress={item => item.videoUrl && setVideoModalUrl(item.videoUrl)}
+              // Angular: onClickSeeAllCTA() case 'faqvideo' → router.navigate(['/video-faq']).
+              onSeeAllPress={() => navigation.navigate('VideoFaq')}
             />
           </View>
         )}
@@ -2115,10 +2169,17 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         onPrimaryPress={handleProfileValidationCtaPress}
       />
 
-      <Modal visible={!!videoModalUrl} animationType="slide" onRequestClose={() => setVideoModalUrl(null)}>
+      {/* statusBarTranslucent: without it, Android's Modal leaves the system
+          status bar as its own opaque (white) window ABOVE this one, so the
+          camera-cutout strip reads white against this player's black
+          background instead of blending into it. StatusBar style="light"
+          swaps to light icons for that same strip while the modal is open —
+          App.tsx's root <StatusBar style="dark"/> auto-restores on unmount. */}
+      {!!videoModalUrl && <StatusBar style="light" />}
+      <Modal visible={!!videoModalUrl} animationType="slide" statusBarTranslucent onRequestClose={() => setVideoModalUrl(null)}>
         <View style={s.videoModal}>
-          <Pressable style={s.videoModalClose} onPress={() => setVideoModalUrl(null)}>
-            <Text style={s.videoModalCloseText}>✕</Text>
+          <Pressable style={[s.videoModalClose, { top: insets.top + 8 }]} onPress={() => setVideoModalUrl(null)}>
+            <SvgXml xml={CLOSE_OUTLINE_WHITE_XML} width={25} height={25} />
           </Pressable>
           {!!videoModalUrl && <SelfHelpVideoPlayer uri={videoModalUrl} />}
         </View>
@@ -2198,14 +2259,23 @@ const s = StyleSheet.create({
 
   // Angular: every one of this style's four callers (Complete your profile,
   // Liked profiles, Explore categories, Self-help videos) uses
-  // `heading2-semibold-18` for its section heading — 18px, not the 15 used here.
-  sectionTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textPrimary, paddingHorizontal: 16, marginBottom: 12 },
+  // `heading2-semibold-18` for its section heading — font-size var(--font18)
+  // (1.125rem, scales with device width — see FontSize's header comment),
+  // not the static 15/18 previously used here.
+  sectionTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, color: Colors.textPrimary, paddingHorizontal: 16, marginBottom: 12 },
   // Angular: complete-profile.component.html's outer grid is pl-24 pr-0
   // (not the generic 16px every other section header uses), header color is
-  // the specific .color-1f1e1b (not textPrimary).
+  // the specific .color-1f1e1b (not textPrimary) — no line-height-24 class on
+  // this heading (unlike app-swiper's own header), so no lineHeight here either.
   // The title→first-card gap is 37: the heading's own mb-5, plus the cards
   // ion-row's mt-16, plus each card's own mt-16.
   cpSectionTitle: { paddingHorizontal: 24, color: '#1F1E1B', marginBottom: 37 },
+  // Angular: complete-profile.component.html is ALSO what renders the
+  // Self-help videos heading (self-videos=true uses the identical template),
+  // so it's the same `heading2-semibold-18 color-1f1e1b` — color only here,
+  // this section's own paddingHorizontal/marginBottom (sectionTitle's 16/12)
+  // are unchanged from before.
+  selfVideoSectionTitle: { color: '#1F1E1B' },
   // Angular: the grid is `pt-32 pb-24` and the cards row adds mb-16 below the
   // last card — i.e. 32 above the heading and 40 under the last card, not the
   // generic section's 20/4.
@@ -2214,9 +2284,11 @@ const s = StyleSheet.create({
   // Complete profile — Angular: .complete-profile-block (separate bordered/
   // gradient box per card, not one shared container with divider rows).
   cpList: { marginHorizontal: 24, gap: 16 },
+  // Angular: the inner ion-row is `d-flex align-item-flex-end` — the
+  // thumbnail and text column align to the row's BOTTOM edge, not centered.
   cpCard: {
     flexDirection:     'row',
-    alignItems:        'center',
+    alignItems:        'flex-end',
     gap:               12,
     borderRadius:      12,
     borderWidth:       1,
@@ -2224,11 +2296,20 @@ const s = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical:   8,
   },
-  cpInfo:    { flex: 1, gap: 8 },
+  // Angular: the title `<div>` and the CTA `<div>` below it are plain
+  // siblings with no margin/gap class between them — no gap here either.
+  cpInfo:    { flex: 1 },
   // Angular: .body1-medium-14 { font-family: var(--english-medium-poppins) }
-  cpTitle:   { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 14, color: Colors.black },
+  // Angular: `body1-medium-14 black-color` — font-size var(--font14) (0.875rem,
+  // scales with device width — see FontSize's header comment); family/color
+  // already matched.
+  cpTitle:   { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: FontSize.font14, color: Colors.black },
   cpCtaRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  cpCtaText: { fontFamily: Fonts.poppinsRegular, fontSize: 14, color: '#29339B' },
+  // Angular: this CTA is <app-button-revamp buttonSize="link">, whose
+  // ctaFontSize defaults to EButtonFontSize.regular14 = body2-regular-14 —
+  // font-size var(--font14) (0.875rem, dynamic — see FontSize's header
+  // comment), not a flat 14.
+  cpCtaText: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font14, color: '#29339B' },
 
   // Liked profiles tabs
   // Angular: app-swiper.component.scss's `ion-segment` for this section —
@@ -2262,19 +2343,28 @@ const s = StyleSheet.create({
   // Angular: --color: #000000 (unselected) at body3-regular-12; --color-checked:
   // #8B4800 (a brown) at body1-medium-14 — the selected tab is a size up, and
   // neither color is the generic text token this used.
-  tabPillText:        { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 17, color: '#000000', textAlign: 'center' },
-  // global.scss's .body1-medium-14 is --english-medium-poppins @ 14/500, i.e.
-  // Poppins-Medium — SemanticFontsEnglish has no body-medium slot, so take the
-  // family straight from Fonts (same mapping SemanticFonts.en.medium uses).
-  tabPillTextActive:  { fontFamily: Fonts.poppinsMedium, fontSize: 14, lineHeight: 20, color: '#8B4800' },
+  // body3-regular-12's font-size is var(--font12) — 0.75rem, dynamic (see
+  // FontSize's header comment); lineHeight:17 has no Angular class behind
+  // it (an unselected ion-segment-button gets no explicit line-height there),
+  // kept as an existing tuned value.
+  tabPillText:        { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 17, color: '#000000', textAlign: 'center' },
+  // global.scss's .body1-medium-14 is --english-medium-poppins @ var(--font14)
+  // (0.875rem, dynamic), i.e. Poppins-Medium — SemanticFontsEnglish has no
+  // body-medium slot, so take the family straight from Fonts (same mapping
+  // SemanticFonts.en.medium uses).
+  tabPillTextActive:  { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, lineHeight: 20, color: '#8B4800' },
   // Angular: this section's header ion-row is `pt-32 pr-24 pl-24` with pb-8
   // (every other section gets pb-24), and its ion-col adds mt-24 — so the title
   // sits 24px lower and 24px in from the edge, with only 8px under it before the
   // tab row. The generic sectionTitle's 16px inset / 12px gap is neither.
-  likedSectionTitle:  { paddingHorizontal: 24, marginTop: 24, marginBottom: 8 },
+  // Unlike sectionTitle's other 3 callers, this heading is actually rendered
+  // through app-swiper.component.html's OWN header template (Liked Profiles
+  // is an <app-swiper>, not <app-complete-profile>/a standalone <ion-text>),
+  // which — see SwiperCard.tsx's headerTitle — carries `line-height-24` too.
+  likedSectionTitle:  { paddingHorizontal: 24, marginTop: 24, marginBottom: 8, lineHeight: 24 },
   // Angular: .body2-regular-14 line-height-24, ml-24 mr-24 mb-32 pt-8 — shown
   // instead of the tab row when only one of likedYou/likedByMe has data.
-  onlyOneLikedText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 24, color: Colors.textPrimary, paddingHorizontal: 24, paddingTop: 8, marginBottom: 32 },
+  onlyOneLikedText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 24, color: Colors.textPrimary, paddingHorizontal: 24, paddingTop: 8, marginBottom: 32 },
 
   // Explore categories
   // Angular: .discover-new-bg — 12px radius, 1px #E6E6E6 border, compact
@@ -2290,15 +2380,21 @@ const s = StyleSheet.create({
   // title and the first tile, and 24 under the last row. The generic section's
   // 20/12/4 had the whole block sitting far too tight.
   exploreSection:      { paddingTop: 32, paddingBottom: 24 },
-  exploreSectionTitle: { paddingHorizontal: 24, marginBottom: 32 },
+  // Angular: this heading's class list is `heading2-semibold-18 black-color`
+  // — pure black (#000), not sectionTitle's textPrimary (#111).
+  exploreSectionTitle: { paddingHorizontal: 24, marginBottom: 32, color: Colors.black },
   catGrid:      { flexDirection: 'row', flexWrap: 'wrap' },
   // Angular: .discover-new-bg { padding: 8px 4px 8px 8px } — tighter on the
   // right, where the chevron sits, not a flat 8px on every side.
   catTile:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#E6E6E6', paddingTop: 8, paddingRight: 4, paddingBottom: 8, paddingLeft: 8, height: EXPLORE_TILE_HEIGHT },
   // marginRight is Angular's `pl-5` on the label column, not a rounded 8.
   catIconWrap:  { width: EXPLORE_ICON_COL, marginRight: 5, alignItems: 'center', justifyContent: 'center' },
-  catLabel:     { flex: 1, fontFamily: Fonts.poppinsMedium, fontSize: 12, color: Colors.textPrimary, lineHeight: 16 },
-  catChevron:   { color: '#29339B', fontFamily: Fonts.poppinsSemiBold },
+  // Angular: `textcta-medium-12 black-color`, label wrapped in a
+  // `line-height-16` span — font-size var(--font12) (0.75rem, dynamic — see
+  // FontSize's header comment), pure black (not textPrimary).
+  catLabel:     { flex: 1, fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font12, color: Colors.black, lineHeight: 16 },
+  // Angular's `ml-2` on the icon itself.
+  catChevron:   { marginLeft: 8 },
 
   // Angular: .success-story-section { background: #FEF2F6 } and its own pb-24,
   // wrapped in an ion-grid that is `pt-0 pr-0 pl-0 pb-0` — so the heart
@@ -2329,16 +2425,33 @@ const s = StyleSheet.create({
   // encapsulated, and app-swiper.component.scss defines only .blackColor /
   // .purpleColor. So Angular's title falls back to the inherited dark text —
   // painting it white here put it on #FEF2F6 pink and made it unreadable.
-  storyTitle:     { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, lineHeight: 24, color: Colors.black },
+  // Angular: this headline is ALSO app-swiper's own header template
+  // (successStory's swiperHeader branch) — same `heading2-semibold-18
+  // line-height-24`, so the same dynamic font-size applies.
+  storyTitle:     { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, lineHeight: 24, color: Colors.black },
   // Angular: .body2-regular-14.black-color.line-height-20
-  storySubtitle:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, marginTop: 8, lineHeight: 20 },
+  // Angular: `line-height-20 body2-regular-14 black-color mt-8` — font-size
+  // var(--font14) (0.875rem, dynamic — see FontSize's header comment);
+  // line-height-20 is a flat 20px (not rem-based), already matched.
+  storySubtitle:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, marginTop: 8, lineHeight: 20 },
 
   // Self-help videos
   videoCard:     { borderRadius: 10, overflow: 'hidden', position: 'relative', backgroundColor: Colors.white },
   videoThumbImg: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   playBtn:       { position: 'absolute', top: '50%', left: '50%', width: 40, height: 40, marginLeft: -20, marginTop: -20, alignItems: 'center', justifyContent: 'center' },
   videoCaptionScrim: { position: 'absolute', bottom: 0, left: 0, right: 0, padding: 10, paddingTop: 24, backgroundColor: 'rgba(0,0,0,0.45)' },
-  videoTitle:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.white, lineHeight: 16 },
+  // Angular: `body3-regular-12 white-color overflow-auto line-height-16` —
+  // font-size var(--font12) (0.75rem, dynamic — see FontSize's header comment);
+  // line-height-16 is a flat 16px (not rem-based), already matched.
+  videoTitle:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.white, lineHeight: 16 },
+  // Angular: the "See all" row is `ion-col size="12" class="d-flex
+  // ion-justify-content-end"` — right-aligned, no extra top margin of its own
+  // beyond the FlatList's existing bottom padding.
+  selfHelpSeeAllRow: { flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 16, marginTop: 12 },
+  selfHelpSeeAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  // Angular: `textcta-medium-12 color-29339B` — font-size var(--font12)
+  // (0.75rem, dynamic — see FontSize's header comment), Poppins-Medium.
+  selfHelpSeeAllText: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font12, color: '#29339B' },
 
   // Help section
   // Angular: FAQ_DETAILS.BANNER — title/body/link-CTA on a gradient card with
@@ -2353,19 +2466,31 @@ const s = StyleSheet.create({
   // Angular: `heading4-medium-16` (Poppins-MEDIUM 16, not semibold). TITLECOLOR
   // isn't a key on FAQ_DETAILS.BANNER, so [ngStyle] sets nothing and the title
   // keeps the default dark text.
-  helpTitle:     { fontFamily: Fonts.poppinsMedium, fontSize: 16, color: Colors.textPrimary },
+  // Angular: home-banner.component.html's helpBanner TITLE is
+  // `heading4-medium-16` — font-size var(--font16) (1rem, scales with device
+  // width — see FontSize's header comment), not a flat 16px.
+  helpTitle:     { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font16, color: Colors.textPrimary },
   // Angular: `body2-regular-14` + `mt-8`; CONTANTCOLOR is likewise absent from
   // the translation object, so this is default dark at 14 — not 13 gray.
-  helpSub:       { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textPrimary, marginTop: 8, lineHeight: 20 },
-  // Angular: the CTA row is `mt-4`; its label is `textcta-medium-12` (12px
+  // Angular: home-banner.component.html's helpBanner BODY is `body2-regular-14
+  // poppins-family mt-8` — font-size var(--font14) (0.875rem, dynamic — see
+  // FontSize's header comment). No line-height class on this one (unlike
+  // storySubtitle's identically-sized text, which has line-height-20) — drop
+  // the explicit lineHeight so it falls back to the font's natural metric.
+  helpSub:       { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.textPrimary, marginTop: 8 },
+  // Angular: the CTA row is `mt-4`; its label is `textcta-medium-12`
+  // (var(--font12), 0.75rem, dynamic — see FontSize's header comment —
   // Poppins-Medium) in .color-29339B, with the chevron at ml-4.
   helpCta:       { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  helpCtaText:   { fontFamily: Fonts.poppinsMedium, fontSize: 12, color: '#29339B' },
-  helpCtaChevron: { fontFamily: Fonts.poppinsSemiBold, fontSize: 15, color: '#29339B', marginLeft: 4 },
+  helpCtaText:   { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font12, color: '#29339B' },
+  // Angular's ion-icon here has no explicit size class, so it's Ionic's own
+  // default (1.5rem ≈ 24px) — a real chevron-forward-outline icon now
+  // (CHEVRON_FORWARD_BLUE_XML), not this SemiBold '›' character standing in
+  // for it.
+  helpCtaChevron: { marginLeft: 4 },
 
   // Self-help video modal
   videoModal:      { flex: 1, backgroundColor: '#000' },
   videoModalClose: { position: 'absolute', top: 48, right: 16, zIndex: 1, padding: 8 },
-  videoModalCloseText: { fontSize: 22, color: Colors.white },
   videoModalPlayer: { flex: 1 },
 })

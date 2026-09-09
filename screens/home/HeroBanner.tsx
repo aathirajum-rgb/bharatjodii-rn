@@ -6,10 +6,11 @@
 // uses for its own 3-variant subset).
 import { useEffect, useState, type ReactNode } from 'react'
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native'
+import { useTranslation } from 'react-i18next'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Colors } from '../../constants/colors'
 import { CdnImage } from '../../components/cdn-svg/CdnSvg'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // Angular: home-banner.component.scss's .jodii-membership-banner-block —
 // min-height: 42vmin !important — the OLD banner's outer row, not a fixed px
@@ -63,6 +64,13 @@ function formatOwnTimer(deadlineMs: number): string {
 }
 
 export interface HeroBannerContent {
+  // Angular: home-banner.component.html's #heroBanner TITLE/BODY classes
+  // differ per banner sub-variant, not just "old" vs "bride" — 'photoPromo'
+  // (the addPhotoPromotion/nonIdVerifyPromotion/addPhotoPromotionPaid grid)
+  // and 'paymentFailed' (paymentFailedPromotion) each use their own distinct
+  // classes too. Required so every call site has to pick the right one
+  // explicitly rather than silently falling through to 'old' by omission.
+  bannerStyle:         'old' | 'bride' | 'photoPromo' | 'paymentFailed'
   title:               string
   title1?:             string | undefined  // Angular: TITLE1 — old-banner-style sub-line (e.g. "on Jodii")
   title2?:             string | undefined  // Angular: TITLE2 — old-banner-style second sub-line
@@ -145,6 +153,21 @@ export interface HeroBannerProps {
 }
 
 export default function HeroBanner({ content, onPress, onDismiss }: HeroBannerProps) {
+  const { i18n } = useTranslation()
+  // Angular: the bride-banner TITLE class is `berkshire` (BerkshireSwash,
+  // a decorative script font) for English specifically, `regular-16`
+  // (Poppins-Regular) for every other language — the OTHER 3 bannerStyle
+  // variants have no such per-language split.
+  const titleStyle =
+    content.bannerStyle === 'bride'      ? [s.titleBride, i18n.language === 'en' ? s.titleBrideEn : s.titleBrideOther] :
+    content.bannerStyle === 'photoPromo' ? s.titlePhotoPromo :
+    s.title
+  const bodyStyle =
+    content.bannerStyle === 'bride'         ? s.bodyBride :
+    content.bannerStyle === 'photoPromo'    ? s.bodyPhotoPromo :
+    content.bannerStyle === 'paymentFailed' ? s.bodyPaymentFailed :
+    s.body
+
   const [remaining, setRemaining] = useState(() =>
     content.countdownDeadlineMs != null ? formatRemaining(content.countdownDeadlineMs) : ''
   )
@@ -168,10 +191,18 @@ export default function HeroBanner({ content, onPress, onDismiss }: HeroBannerPr
 
   const body = content.countdownDeadlineMs != null ? content.body.replace(TIMER_TOKEN, remaining) : content.body
 
-  const ownTimerLine = content.ownTimerDeadlineMs != null && content.ownTimerContent
-    ? (content.ownTimerContent.includes(OWN_TIMER_TOKEN)
-        ? content.ownTimerContent.replace(OWN_TIMER_TOKEN, ownRemaining)
-        : `${content.ownTimerContent} ${ownRemaining}`)
+  // Angular: this line's markup genuinely differs by language, not just by
+  // token-substitution style — tm/ml render ONE run (CONTENT with <TIMER>
+  // substituted inline, all at body3-regular-12/Regular weight); every other
+  // language renders TWO runs (CONTENT at body3-regular-12/Regular, then the
+  // digits themselves at textcta-medium-12/Medium weight, appended after a
+  // space) — never substituted inline. RN CAN mix two Text weights within one
+  // paragraph (nested Text, same trick renderRichText() above already uses
+  // for <del> strikethrough), so this splits into two real runs instead of
+  // collapsing everything to the digits' Medium weight.
+  const isTmMl = ['tm', 'ml'].includes(i18n.language)
+  const ownTimerLabel = content.ownTimerDeadlineMs != null && content.ownTimerContent
+    ? (isTmMl ? content.ownTimerContent.replace(OWN_TIMER_TOKEN, ownRemaining) : content.ownTimerContent)
     : null
 
   const Wrap: any = content.gradient ? LinearGradient : View
@@ -210,11 +241,11 @@ export default function HeroBanner({ content, onPress, onDismiss }: HeroBannerPr
           />
         )}
         <View style={s.textCol}>
-          {!!content.title && <Text style={[s.title, (content.titleColor ?? content.textColor) ? { color: content.titleColor ?? content.textColor } : null]}>{renderRichText(content.title, 'title')}</Text>}
+          {!!content.title && <Text style={[titleStyle, (content.titleColor ?? content.textColor) ? { color: content.titleColor ?? content.textColor } : null]}>{renderRichText(content.title, 'title')}</Text>}
           {!!content.title1 && <Text style={[s.title1, (content.title1Color ?? content.textColor) ? { color: content.title1Color ?? content.textColor } : null]}>{renderRichText(content.title1, 'title1')}</Text>}
           {!!content.title2 && <Text style={[s.title2, (content.title2Color ?? content.textColor) ? { color: content.title2Color ?? content.textColor } : null]}>{renderRichText(content.title2, 'title2')}</Text>}
-          {!!body && <Text style={[s.body, (content.bodyColor ?? content.textColor) ? { color: content.bodyColor ?? content.textColor, opacity: 1 } : null]}>{renderRichText(body, 'body')}</Text>}
-          {!!ownTimerLine && (
+          {!!body && <Text style={[bodyStyle, (content.bodyColor ?? content.textColor) ? { color: content.bodyColor ?? content.textColor, opacity: 1 } : null]}>{renderRichText(body, 'body')}</Text>}
+          {!!ownTimerLabel && (
             <View
               style={[
                 s.ownTimerBox,
@@ -222,7 +253,14 @@ export default function HeroBanner({ content, onPress, onDismiss }: HeroBannerPr
                 content.ownTimerBorderColor ? { borderWidth: 1, borderColor: content.ownTimerBorderColor } : null,
               ]}
             >
-              <Text style={s.ownTimer}>{ownTimerLine}</Text>
+              {isTmMl ? (
+                <Text style={s.ownTimerLabel}>{ownTimerLabel}</Text>
+              ) : (
+                <Text style={s.ownTimerLabel}>
+                  {ownTimerLabel}{' '}
+                  <Text style={s.ownTimer}>{ownRemaining}</Text>
+                </Text>
+              )}
             </View>
           )}
           <View
@@ -289,10 +327,44 @@ const s = StyleSheet.create({
     flex: 1,
     gap:  4,
   },
+  // Angular: home-banner.component.html's #heroBanner TITLE, isOldBanner()
+  // path — `heading2-semibold-18 poppins-family` — font-size var(--font18)
+  // (1.125rem, scales with device width — see FontSize's header comment);
+  // family already matched (Poppins-SemiBold — poppins-family's font-family
+  // override is ignored here per the same established convention as
+  // HomeScreen.tsx's helpBanner BODY, which reserves --english-poppins for
+  // the Rupee-symbol use case, not a general override). TITLECOLOR is
+  // server-driven via [attr.style], not a fixed class — RN default color
+  // left alone. Used when bannerStyle==='old' (and 'paymentFailed', whose
+  // title is always '' so this never actually renders for it).
   title: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   15,
+    fontSize:   FontSize.font18,
     color:      Colors.white,
+    paddingRight: 20,
+  },
+  // Angular: the !isOldBanner ("bride") TITLE class — `berkshire line-height-16`
+  // for English, `regular-16 line-height-16` for every other language — both
+  // font-size var(--font16) (1rem, dynamic — see FontSize's header comment)
+  // and a flat 16px line-height (not rem-based). titleBrideEn/Other supply the
+  // per-language font-family half of the split.
+  titleBride: {
+    fontSize:     FontSize.font16,
+    lineHeight:   16,
+    color:        Colors.white,
+    paddingRight: 20,
+  },
+  titleBrideEn:    { fontFamily: Fonts.berkshireSwashRegular },
+  titleBrideOther: { fontFamily: Fonts.poppinsRegular },
+  // Angular: the addPhotoPromotion/nonIdVerifyPromotion/addPhotoPromotionPaid
+  // grid's TITLE — `heading3-semibold-16 black-color` — font-size
+  // var(--font16) (1rem, dynamic), Poppins-SemiBold. No TITLECOLOR binding on
+  // this grid at all (unlike 'old'/'bride') — color is always black-color,
+  // already supplied by this variant's own call site via `textColor`.
+  titlePhotoPromo: {
+    fontFamily:   Fonts.poppinsSemiBold,
+    fontSize:     FontSize.font16,
+    color:        Colors.white,
     paddingRight: 20,
   },
   // Angular's [innerHTML] renders a literal <del> as real strikethrough —
@@ -300,21 +372,74 @@ const s = StyleSheet.create({
   strike: {
     textDecorationLine: 'line-through',
   },
+  // Angular: home-banner.component.html's TITLE1 (isOldBanner()-only field) —
+  // `heading4-medium-16 mt-4` — font-size var(--font16) (1rem, scales with
+  // device width — see FontSize's header comment); family already matched
+  // (Poppins-Medium). NOTECOLOR is server-driven via [ngStyle] — RN default
+  // color left alone.
   title1: {
     fontFamily: SemanticFontsEnglish.headingEnglishMedium,
-    fontSize:   13,
+    fontSize:   FontSize.font16,
     color:      Colors.white,
   },
+  // Angular: home-banner.component.html's TITLE2 (isOldBanner()-only field) —
+  // `heading1-semibold-22 poppins-family mt-4` — font-size var(--font22)
+  // (1.375rem, scales with device width — see FontSize's header comment);
+  // family already matched (Poppins-SemiBold; poppins-family ignored, same
+  // convention as `title` above). CTABGCOLOR is server-driven via [ngStyle]
+  // (yes, TITLE2 really does reuse the CTA background color as its own text
+  // color) — RN default color left alone.
   title2: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   16,
+    fontSize:   FontSize.font22,
     color:      Colors.white,
   },
+  // Angular: home-banner.component.html's BODY, isOldBanner() path —
+  // `textcta-medium-12 mt-8 poppins-family f-600` — font-size var(--font12)
+  // (0.75rem, scales with device width — see FontSize's header comment),
+  // family Poppins-Medium (poppins-family ignored, same convention as
+  // `title` above) — was Poppins-Regular, wrong weight. CONTENTCOLOR is
+  // server-driven via [attr.style] — RN default color left alone. Used when
+  // bannerStyle==='old'.
   body: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   12,
+    fontFamily: Fonts.poppinsMedium,
+    fontSize:   FontSize.font12,
     color:      Colors.white,
     opacity:    0.9,
+  },
+  // Angular: the !isOldBanner ("bride") BODY class — `heading2-semibold-18
+  // mt-8 line-height-20` — font-size var(--font18) (1.125rem, dynamic — see
+  // FontSize's header comment), Poppins-SemiBold, flat 20px line-height (not
+  // rem-based).
+  bodyBride: {
+    fontFamily: Fonts.poppinsSemiBold,
+    fontSize:   FontSize.font18,
+    lineHeight: 20,
+    color:      Colors.white,
+    marginTop:  8,
+  },
+  // Angular: the addPhotoPromotion/nonIdVerifyPromotion/addPhotoPromotionPaid
+  // grid's BODY — `body3-regular-12 black-color mt-8` — font-size
+  // var(--font12), Poppins-REGULAR (not Medium like 'old'/`textcta-medium-12`
+  // above). No CONTENTCOLOR binding on this grid — color is always
+  // black-color, already supplied via this variant's own `textColor`.
+  bodyPhotoPromo: {
+    fontFamily: Fonts.poppinsRegular,
+    fontSize:   FontSize.font12,
+    color:      Colors.white,
+    marginTop:  8,
+  },
+  // Angular: paymentFailedPromotion's content div — `black-color line-height-20`
+  // wrapping a `body3-regular-12` span (the PAGETYPE 4/5 case, `body2-regular-14
+  // pr-16 mt-8`, is handled by a separate screen — AutoRenewalFailureSheet —
+  // never reached via this Home banner). font-size var(--font12), Poppins-
+  // Regular, flat 20px line-height, no top margin (unlike the other 3
+  // variants, none of which have their own mt-8 in this specific branch).
+  bodyPaymentFailed: {
+    fontFamily: Fonts.poppinsRegular,
+    fontSize:   FontSize.font12,
+    lineHeight: 20,
+    color:      Colors.white,
   },
   // Angular: this line's own container carries the "black-color" utility
   // class — its text is always #000, independent of ownTimerBg/border below
@@ -328,9 +453,23 @@ const s = StyleSheet.create({
     paddingVertical:   4,
     marginTop:         2,
   },
+  // Angular: this line's CONTENT-text span — `body3-regular-12` — font-size
+  // var(--font12) (0.75rem, scales with device width — see FontSize's header
+  // comment), Poppins-Regular. Used for the whole line on tm/ml (CONTENT with
+  // <TIMER> substituted inline, no separate weight for the digits); the label
+  // portion only on every other language, where `ownTimer` below nests inside
+  // for just the digits.
+  ownTimerLabel: {
+    fontFamily: Fonts.poppinsRegular,
+    fontSize:   FontSize.font12,
+    color:      '#000000',
+  },
+  // Angular: the timer-digits span (non-tm/ml only) — `textcta-medium-12` —
+  // same font-size var(--font12), but Poppins-MEDIUM, not Regular like the
+  // label it's nested inside.
   ownTimer: {
     fontFamily: Fonts.poppinsMedium,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      '#000000',
   },
   // Angular: .upgrade-now-btn-revamp — border-radius: 16px; padding: 8px top/
@@ -346,15 +485,25 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     marginTop:         6,
   },
+  // Angular: home-banner.component.html's CTA span — `textcta-medium-12` —
+  // font-size var(--font12) (0.75rem, scales with device width — see
+  // FontSize's header comment), family Poppins-Medium — was Poppins-SemiBold,
+  // wrong weight. CTATEXTCOLOR is server-driven via [attr.style] — RN default
+  // color left alone.
   ctaText: {
-    fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   13,
+    fontFamily: Fonts.poppinsMedium,
+    fontSize:   FontSize.font12,
     color:      '#29339B',
   },
   ctaArrow: {},
+  // Angular: home-banner.component.html's VALID line (!isOldBanner()-only
+  // field, so no old-banner class to reconcile against) — `body3-regular-12`
+  // — font-size var(--font12) (0.75rem, scales with device width — see
+  // FontSize's header comment); family already matched (Poppins-Regular).
+  // C2COLOR is server-driven via [attr.style] — RN default color left alone.
   validText: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   11,
+    fontSize:   FontSize.font12,
     color:      Colors.white,
     opacity:    0.85,
     marginTop:  4,

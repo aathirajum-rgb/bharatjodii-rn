@@ -22,6 +22,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import FloatingLabelInput from '../../components/input/FloatingLabelInput'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
+import { useNetwork } from '../../contexts/NetworkContext'
 import {
   getCheckoutDetails, getFinalAmount, getPaymentConfig, getRetryRemainingMs, getServerFilteredUpiApps,
   getUpiAppList, handlePaymentSuccess, initPayUNative, initRazorpayNative,
@@ -55,6 +56,7 @@ type Props = { navigation: any; route: any }
 export default function UpiAddressScreen({ navigation, route }: Props) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
+  const { isOffline } = useNetwork()
   const selectedPackage: SelectedPackage | undefined = route.params?.selectedPackage
   const amountLabel: string | undefined = route.params?.amountLabel
 
@@ -113,6 +115,9 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
   async function handlePay() {
     setTouched(true)
     if (!canPay || !selectedPackage) return
+    // Defense-in-depth alongside the global OfflineScreen overlay — don't
+    // start checkout/open the payment gateway SDK while offline.
+    if (isOffline) { Alert.alert('Error', t('GENERAL.NOINTERNET')); return }
 
     const remainingMs = await getRetryRemainingMs()
     if (remainingMs > 0) {

@@ -2,6 +2,7 @@ import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
 import * as MediaLibrary from 'expo-media-library/legacy';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { Colors } from '../constants/colors';
 import { StorageKeys as SK } from '../constants/storage.keys';
+import { useNetwork } from '../contexts/NetworkContext';
 import { Endpoints } from '../service/api.endpoints';
 import { uploadFile } from '../service/apiClient';
 import {
@@ -93,6 +95,8 @@ const DEFAULT_MAX_SELECTION = 10;
 
 export default function GalleryScreen({ navigation, onDone, maxSelection = DEFAULT_MAX_SELECTION }: Props) {
   const insets = useSafeAreaInsets();
+  const { t } = useTranslation();
+  const { isOffline } = useNetwork();
 
   const [permission, setPermission]       = useState<'unknown' | 'granted' | 'denied'>('unknown');
   const [assets, setAssets]               = useState<Asset[]>([]);
@@ -216,6 +220,12 @@ export default function GalleryScreen({ navigation, onDone, maxSelection = DEFAU
     items: { uri: string; filename: string; mimeType?: string | undefined; width?: number | undefined; height?: number | undefined }[],
   ) => {
     if (items.length === 0) return;
+    // Defense-in-depth alongside the global OfflineScreen overlay — don't
+    // even start the upload while offline.
+    if (isOffline) {
+      Alert.alert('Error', t('GENERAL.NOINTERNET'));
+      return;
+    }
 
     setUploading(true);
     try {
@@ -266,6 +276,18 @@ export default function GalleryScreen({ navigation, onDone, maxSelection = DEFAU
       setUploading(false);
     }
   }, [navigation]);
+
+  // Android: PhotoUploadProcessFragment.kt's ConnectivityManager.NetworkCallback
+  // .onLost() — actively marks an in-progress upload as failed the moment
+  // connectivity drops mid-flight, rather than leaving it to hang until the
+  // request itself eventually times out.
+  useEffect(() => {
+    if (isOffline && uploading) {
+      setUploading(false);
+      Alert.alert('Error', t('GENERAL.NOINTERNET'));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOffline]);
 
   // Screen is mounted as a plain Stack.Screen (navigation.navigate('Gallery')) from
   // many call sites, none of which pass params — React Navigation only ever injects

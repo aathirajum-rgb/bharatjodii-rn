@@ -118,6 +118,7 @@ import SuccessStoriesScreen               from '../screens/success-stories/Succe
 import HelpCenterScreen                   from '../screens/help-center/HelpCenterScreen'
 import SearchScreen                       from '../screens/search/SearchScreen'
 import FaqScreen                          from '../screens/help-center/FaqScreen'
+import VideoFaqScreen                     from '../screens/home/VideoFaqScreen'
 import IgnoredProfilesScreen               from '../screens/ignored-profiles/IgnoredProfilesScreen'
 import ViewLaterScreen                     from '../screens/view-later/ViewLaterScreen'
 import SearchByIdScreen                    from '../screens/search-by-id/SearchByIdScreen'
@@ -207,6 +208,7 @@ export type AppStackParamList = {
   HelpCenter: undefined
   Search: undefined
   Faq: { type: 'PROFILE' | 'CONTACTMATCHES' | 'PAYMENT'; itemId?: number }
+  VideoFaq: undefined
   IgnoredProfiles: undefined
   ViewLater: undefined
   SearchById: undefined
@@ -734,6 +736,7 @@ export default function AppStack() {
       <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
       <Stack.Screen name="Search" component={SearchScreen} />
       <Stack.Screen name="Faq" component={FaqScreen} />
+      <Stack.Screen name="VideoFaq" component={VideoFaqScreen} />
       <Stack.Screen name="IgnoredProfiles" component={IgnoredProfilesScreen} />
       <Stack.Screen name="ViewLater" component={ViewLaterScreen} />
       <Stack.Screen name="SearchById" component={SearchByIdScreen} />

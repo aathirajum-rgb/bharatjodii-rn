@@ -11,19 +11,22 @@
 // scroll, and because the card itself (padded white shell + "View profile"
 // button) is unique to this section.
 import { useEffect, useRef, useState } from 'react'
-import { Animated, Dimensions, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Animated, Dimensions, Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import CdnSvg from '../cdn-svg/CdnSvg'
 import CdnLottie from '../CdnLottie'
 import ProfileCard, { PHOTO_HEIGHT } from '../profile-card/ProfileCard'
 import { PaginationDots, type SwiperItem } from './SwiperCard'
-import { Fonts } from '../../src/theme/fonts'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 
 const SEE_ALL_LINK_COLOR = '#29339B'
-const FWD_ICON = `${CDN_SVG}revamp/forward-icon-link.svg`
 const CDN_ANIM = `${CDN_SVG}revamp/animation/`
+// Angular: this shared app-swiper "See all" row overrides SEE_ALL config's
+// iconType to `EButtonIcons.forwardAnimation` — button-revamp.component.ts's
+// IsShowAnimation() then renders a plain <img> (not a static icon) at this
+// literal path, 24×20px — same asset SwiperCard.tsx's own "See all" link uses.
+const FWD_ANIM_ICON = `${CDN_ANIM}right-arrow-animation.gif`
 
 const { width: SW } = Dimensions.get('window')
 // Angular: `.card-type-1-padding { width: 86.667vmin; padding: 4.444vmin }` —
@@ -161,7 +164,7 @@ export default function CoverflowSwiper({
           {showSeeAll && (
             <Pressable onPress={onSeeAllPress} style={styles.seeAllBtn}>
               <Text style={styles.seeAllText}>{t('HOME.SEE_ALL_CTA')}</Text>
-              <CdnSvg uri={FWD_ICON} width={12} height={12} />
+              <Image source={{ uri: FWD_ANIM_ICON }} style={styles.seeAllIcon} />
             </Pressable>
           )}
         </View>
@@ -177,9 +180,18 @@ const styles = StyleSheet.create({
   // Angular: .animations-position-right { position:absolute; right:0; top:0 }
   // — same animation, mirrored via rotate(50deg).
   headerAnimRight: { position: 'absolute', right: 0, top: 0, transform: [{ rotate: '50deg' }] },
+  // Angular: `.heading2-semibold-18.line-height-24` — font-family
+  // var(--english-semibold-poppins) (Poppins-Semibold), font-size var(--font18)
+  // (1.125rem, scales with device width — see FontSize's header comment),
+  // line-height a flat 24px (NOT rem-based). headerColor input here is
+  // 'blackColor' (dailyRecommendationSection.headerbgColor), which doesn't
+  // match any real CSS class (.black-color is the actual one) — a no-op, so
+  // the default inherited color applies; Colors.textPrimary already matches
+  // the equivalent header in SwiperCard.tsx for this same dead-class case.
   header: {
     fontFamily:  Fonts.poppinsSemiBold,
-    fontSize:    18,
+    fontSize:    FontSize.font18,
+    lineHeight:  24,
     color:       Colors.textPrimary,
     textAlign:   'center',
     marginBottom: 32,
@@ -201,5 +213,13 @@ const styles = StyleSheet.create({
     marginTop:         16,
   },
   seeAllBtn:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  seeAllText: { fontSize: 13, color: SEE_ALL_LINK_COLOR, fontWeight: '600' },
+  // Angular: button.config.ts's SEE_ALL sets no ctaFontSize, so
+  // button-revamp.component.ts's default (EButtonFontSize.regular14 =
+  // body2-regular-14) applies — Poppins-Regular @ var(--font14) (0.875rem,
+  // dynamic), weight 400 — same shared CTA already matched in SwiperCard.tsx.
+  // A flat 13/600 here matched none of those three.
+  seeAllText: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font14, color: SEE_ALL_LINK_COLOR },
+  // Angular: the animated <img> is styled inline `width: 24px; height: 20px`
+  // — not square, same asset/size as SwiperCard.tsx's own "See all" link.
+  seeAllIcon: { width: 24, height: 20 },
 })

@@ -30,6 +30,7 @@ import CdnLottie from '../../components/CdnLottie'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
+import { useNetwork } from '../../contexts/NetworkContext'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import RechargeDesktopLayout from './RechargeDesktopLayout'
 import {
@@ -60,6 +61,7 @@ export default function RechargeScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
   const isDesktop = useIsDesktopWeb()
   const { t, i18n } = useTranslation()
+  const { isOffline } = useNetwork()
   // The "View other packages" sheet's height is driven by how tall its card
   // list may grow. A fixed pixel cap (this was 480) can't track screen size,
   // so on a tall screen the sheet stopped well short of where Angular's sits.
@@ -166,6 +168,9 @@ export default function RechargeScreen({ navigation, route }: Props) {
   // the two selection surfaces the plan came from.
   function proceedWithPlan(plan?: MembershipPlan) {
     if (!plan) return
+    // Defense-in-depth alongside the global OfflineScreen overlay — don't
+    // enter the checkout flow while offline.
+    if (isOffline) { Alert.alert('Error', t('GENERAL.NOINTERNET')); return }
     const selectedPackage: SelectedPackage = {
       PACKAGEID:      plan.productid,
       value:          plan.value1[0],

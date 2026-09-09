@@ -20,6 +20,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import FloatingLabelInput, { validateName } from '../../components/input/FloatingLabelInput'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
+import { useNetwork } from '../../contexts/NetworkContext'
 import { getSessionValue } from '../../service/registrationService'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import {
@@ -82,6 +83,7 @@ type Props = { navigation: any; route: any }
 export default function CardPaymentScreen({ navigation, route }: Props) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
+  const { isOffline } = useNetwork()
   const selectedPackage: SelectedPackage | undefined = route.params?.selectedPackage
   const amountLabel: string | undefined = route.params?.amountLabel
 
@@ -133,6 +135,10 @@ export default function CardPaymentScreen({ navigation, route }: Props) {
 
   async function handlePay() {
     if (!isValid || !selectedPackage) return
+    // Defense-in-depth alongside the global OfflineScreen overlay — don't
+    // start checkout while offline. No inline-error mechanism exists on this
+    // screen, so this is a silent no-op (the overlay already covers the UI).
+    if (isOffline) return
 
     setPaying(true)
     try {

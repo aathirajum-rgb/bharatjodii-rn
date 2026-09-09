@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 import CdnLottie from '../CdnLottie'
 
 // Angular: matches.page.ts:2317 / home-banner.component.ts:108 / recharge.page.ts:739 —
@@ -75,11 +75,20 @@ const s = StyleSheet.create({
   lottie: {
     flexShrink: 0,
   },
+  // Angular: payment-stickey.component.html's first row (`.payment-failed`) —
+  // on Home (explore.component.html) no [component-class] is bound at all, so
+  // ComponentClass?.contentClass resolves to '' and only the template's own
+  // literal classes apply: `.body3-regular-12 black-color line-height-16`.
+  // font-size var(--font12) (0.75rem, scales with device width — see
+  // FontSize's header comment); family is Poppins-REGULAR (english-regular-
+  // poppins), not the specialCta/medium role; color black (#000000), not
+  // white; line-height a flat 16px (NOT rem-based, unlike the font-size).
   text: {
     flex:       1,
-    fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium,
-    fontSize:   12,
-    color:      Colors.white,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize:   FontSize.font12,
+    lineHeight: 16,
+    color:      Colors.black,
   },
   cta: {
     backgroundColor:   Colors.white,
@@ -87,10 +96,14 @@ const s = StyleSheet.create({
     paddingVertical:   6,
     paddingHorizontal: 12,
   },
+  // Angular: the CTA `<span class="textcta-medium-12">` sits inside a `<p
+  // class="color-29339B">` — font-size var(--font12); family Poppins-MEDIUM
+  // (english-medium-poppins), not SemiBold; color #29339B inherited from the
+  // wrapping `<p>` (Colors.link), not primaryDeep.
   ctaText: {
-    fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   12,
-    color:      Colors.primaryDeep,
+    fontFamily: Fonts.poppinsMedium,
+    fontSize:   FontSize.font12,
+    color:      Colors.link,
   },
   close: {
     paddingHorizontal: 2,

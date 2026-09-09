@@ -18,6 +18,7 @@ import MessageSectionTabs from '../../components/messages/MessageSectionTabs'
 import AllMessagesEmptyState from '../../components/messages/AllMessagesEmptyState'
 import ConversationRow from '../../components/messages/ConversationRow'
 import MessagerListDesktopLayout from './MessagerListDesktopLayout'
+import { useNetwork } from '../../contexts/NetworkContext'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { adaptChatListRecord, dedupeChatList } from '../../adapters/chatList.adapter'
 import { redirectToViewProfile } from '../../service/buttonService'
@@ -70,6 +71,7 @@ export default function MessagerListScreen({ navigation }: Props) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
   const isDesktop = useIsDesktopWeb()
+  const { isOffline } = useNetwork()
 
   const [activeSection, setActiveSection] = useState<MessageSection>('messages')
   const [activeTab,   setActiveTab]   = useState<MessageTab>('whoseviewednumber')
@@ -223,7 +225,9 @@ export default function MessagerListScreen({ navigation }: Props) {
     })
 
     socketConnection(EnvConfig.notify).then(() => {
-      if (cancelled) return
+      // Defense-in-depth alongside the global OfflineScreen overlay — don't
+      // fire the list request while offline.
+      if (cancelled || isOffline) return
       emitChatList(CONVERSATION_TAB_VALUE, 0, LIMIT)
       emitChatList(TAB_VALUES.whoseviewednumber, 0, LIMIT)
       emitChatList(TAB_VALUES.whoviewednumber, 0, LIMIT)

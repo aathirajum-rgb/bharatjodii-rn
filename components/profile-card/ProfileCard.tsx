@@ -1,5 +1,6 @@
 import {
   Dimensions,
+  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -10,14 +11,19 @@ import { LinearGradient } from 'expo-linear-gradient'
 import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { FontSize, Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import ProfilePhoto, { type PhotoVariant } from '../profile-photo/ProfilePhoto'
 import { getOppGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
 
 // Angular: core/config/button.config.ts's SEE_ALL — textColor: 'linkColor'
 // (--ion-color-link-color: #29339B), not the brand red.
 const SEE_ALL_LINK_COLOR = '#29339B'
-const FWD_ICON = `${CDN_SVG}revamp/forward-icon-link.svg`
+// Angular: both this card's "View full profile" (type=3) and "See all" ghost
+// card (type=5) <app-button-revamp> calls override SEE_ALL's own iconType to
+// `EButtonIcons.forwardAnimation` — button-revamp.component.ts's
+// IsShowAnimation() then renders a plain <img> (not a static icon) at this
+// literal path, 24×20px — same asset SwiperCard.tsx's "See all" link uses.
+const FWD_ANIM_ICON = `${CDN_SVG}revamp/animation/right-arrow-animation.gif`
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -330,7 +336,12 @@ export default function ProfileCard({
 
           <View style={[styles.cardBottom, isLikedYou && styles.cardBottomPadded]}>
             {isLikedYou && !!labelText() && (
-              <Text style={styles.likedLabel} numberOfLines={2}>{labelText()}</Text>
+              // Angular: `[ngClass]="newTextLable != '1' ? 'black-color' : ''"` next to a
+              // fixed `likedColor` ('infoRedColor', var(--ion-color-error-color) #DE2A68) —
+              // black-color's `!important` wins over infoRedColor's plain declaration
+              // whenever newTextLable isn't '1', so the default label is black, and only
+              // the isNewLabel==='1' branch (ngClass empties out) falls through to the pink.
+              <Text style={[styles.likedLabel, isNewLabel && styles.likedLabelNew]} numberOfLines={2}>{labelText()}</Text>
             )}
             <Pressable
               style={styles.primaryBtn}
@@ -369,7 +380,19 @@ export default function ProfileCard({
                 height={14}
                 style={styles.viewedIcon}
               />
-              <Text style={[styles.viewedText, isNew && styles.viewedTextNew]} numberOfLines={1}>{labelText()}</Text>
+              {/* Angular: the default (non-"new") label is `[ngClass]="(cardType ===
+                  'viewedbyme') ? 'font-10-nav' : 'body3-regular-12'"` — viewedbyme gets
+                  var(--font10), viewedyou/whoviewednumber get var(--font12); the "new"
+                  state's own markup isn't cardType-conditional and is always
+                  body3-regular-12 regardless of section. */}
+              <Text
+                style={[
+                  styles.viewedText,
+                  !isNew && section === 'viewedbyme' && styles.viewedTextSmall,
+                  isNew && styles.viewedTextNew,
+                ]}
+                numberOfLines={1}
+              >{labelText()}</Text>
             </View>
           </ProfilePhoto>
 
@@ -385,7 +408,7 @@ export default function ProfileCard({
                 character (matches every other link-style CTA in this app). */}
             <Pressable onPress={onPress} style={[styles.linkBtn, styles.linkBtnRow]}>
               <Text style={styles.linkBtnText}>View full profile</Text>
-              <CdnSvg uri={FWD_ICON} width={12} height={12} />
+              <Image source={{ uri: FWD_ANIM_ICON }} style={styles.linkBtnIcon} />
             </Pressable>
           </View>
         </Pressable>
@@ -434,7 +457,7 @@ export default function ProfileCard({
             </View>
             <Pressable onPress={onViewMorePress} style={[styles.linkBtn, styles.linkBtnCenter, styles.linkBtnRow]}>
               <Text style={styles.linkBtnText}>{viewMoreContent}</Text>
-              <CdnSvg uri={`${IMG_CDN}revamp/forward-icon-link.svg`} width={12} height={12} />
+              <Image source={{ uri: FWD_ANIM_ICON }} style={styles.linkBtnIcon} />
             </Pressable>
           </LinearGradient>
         </Pressable>
@@ -598,17 +621,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 16,
   },
-  // Angular: .heading3-semibold-16 { font-family: var(--english-semibold-poppins) }
+  // Angular: .heading3-semibold-16 { font-size: var(--font16) !important; font-family: var(--english-semibold-poppins) }
   overlayName: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize: 16,
+    fontSize: FontSize.font16,
     color: Colors.white,
     marginBottom: 2,
   },
-  // Angular: .body2-regular-14 { font-family: var(--english-regular-poppins) }
+  // Angular: .body2-regular-14 { font-size: var(--font14) !important; font-family: var(--english-regular-poppins) }
   overlayDetail: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize: 14,
+    fontSize: FontSize.font14,
     color: Colors.white,
     opacity: 0.88,
   },
@@ -650,33 +673,48 @@ const styles = StyleSheet.create({
   // Angular: type='8's detail line is `body2-regular-14` + `.black-color` with
   // `mt-6` — 14px black, not the shared style's 13px gray. nameText's own
   // marginBottom:4 plus this 2 makes up that 6px gap.
+  // font-size: var(--font14) !important (body2-regular-14); family/color inherited
+  // from the now-fixed shared detailText below.
   detailText8: {
-    fontSize: 14,
+    fontSize: FontSize.font14,
     color: Colors.black,
     marginTop: 2,
   },
-  // Angular: .heading3-semibold-16 { font-family: var(--english-semibold-poppins) }
+  // Angular: .heading3-semibold-16 { font-size: var(--font16) !important; font-family:
+  // var(--english-semibold-poppins) }. The class sets no color, and nothing up the
+  // tree does either (global.scss's `body` only sets font-family, not color) — falls
+  // through to the UA/Ionic default black, not this app's textPrimary token.
   nameText: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize: 16,
-    color: Colors.textPrimary,
+    fontSize: FontSize.font16,
+    color: Colors.black,
     marginBottom: 4,
   },
+  // Angular: cases 6 & 7's detail line has no font-size class of its own — its
+  // wrapping div carries `body2-regular-14` (var(--font14), english-regular-poppins)
+  // and the label itself only `.black-color`, so it inherits that size/family. Was
+  // 13px gray (a plain system-font guess); every other case that reaches this style
+  // (3/4/8, via detailText3/4/8) already overrides fontSize+color explicitly so this
+  // fix only actually changes cases 6 & 7's rendering.
   detailText: {
-    fontSize: 13,
-    color: Colors.textSecondary,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize: FontSize.font14,
+    color: Colors.black,
     marginBottom: 2,
   },
-  // Angular: type='3's detail line is .black-color + .body2-regular-14, not
-  // this shared style's gray — scoped here rather than changed on the shared
+  // Angular: type='3's detail line is .black-color + .body2-regular-14 (var(--font14)),
+  // not this shared style's gray — scoped here rather than changed on the shared
   // style since variants 4/6/7/8 haven't been reviewed yet.
   detailText3: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize: 14,
+    fontSize: FontSize.font14,
     color: Colors.black,
   },
+  // Angular: case 4's date div is itself `.color-545454.body3-regular-12` (var(--font12),
+  // english-regular-poppins) — this base supplies the family/size, dateText4 the color.
   dateText: {
-    fontSize: 12,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize: FontSize.font12,
     color: Colors.textTertiary,
     marginTop: 6,
   },
@@ -688,7 +726,7 @@ const styles = StyleSheet.create({
   // 13/gray) and the date is `body3-regular-12` + `.color-545454` + `mt-8`.
   cardInfo4:   { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
   nameText4:   { fontFamily: Fonts.poppinsMedium },
-  detailText4: { fontSize: 14, color: Colors.black },
+  detailText4: { fontSize: FontSize.font14, color: Colors.black },
   dateText4:   { color: '#545454', marginTop: 8 },
 
   // ── Primary action button ──────────────────────────────────────────────────
@@ -702,11 +740,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
   },
+  // Angular: app-button-revamp's text span defaults to ctaFontSize=EButtonFontSize.regular14
+  // ('body2-regular-14': var(--font14), english-regular-poppins, weight 400) — neither
+  // ctaFontSize nor fontFamily is overridden at any call site in profile-card.component.html.
+  // But the button's own `background` class IS EButtonBackground.primary ('primaryBg'),
+  // and `ion-button.primaryBg span { font-weight: 500 }` in button-revamp.component.scss
+  // outranks body2-regular-14's 400 (both !important-free, but the more specific nested
+  // selector wins) — so the rendered weight is 500 (Medium), not 600 (SemiBold). The
+  // span also always carries a static `letter-spacing-normal` class (`!important`),
+  // so no letter-spacing belongs here either.
   primaryBtnText: {
-    fontFamily: Fonts.poppinsSemiBold,
+    fontFamily: Fonts.poppinsMedium,
     color: Colors.white,
-    fontSize: 14,
-    letterSpacing: 0.2,
+    fontSize: FontSize.font14,
   },
 
   // ── Link / text button ─────────────────────────────────────────────────────
@@ -721,19 +767,36 @@ const styles = StyleSheet.create({
     alignItems:    'center',
     gap:           4,
   },
+  // Angular: both call sites (type='3' "View full profile", type='5' "See All") use
+  // app-button-revamp with the default ctaFontSize (EButtonFontSize.regular14 →
+  // body2-regular-14: var(--font14), english-regular-poppins, weight 400) — neither
+  // background (transparent) nor buttonSize (link) has a nested span override the way
+  // primaryBg does, so it stays 14px Regular, not 13px/600 bold.
   linkBtnText: {
-    fontSize: 13,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize: FontSize.font14,
     color: SEE_ALL_LINK_COLOR,
-    fontWeight: '600',
   },
+  // Angular: the animated <img> is styled inline `width: 24px; height: 20px`
+  // — not square, same asset/size as SwiperCard.tsx's own "See all" link.
+  linkBtnIcon: { width: 24, height: 20 },
 
   // ── Liked label (type 2) ───────────────────────────────────────────────────
+  // Angular: `body3-regular-12` (var(--font12), english-regular-poppins) + the
+  // `newTextLable != '1'` branch's `.black-color` (`!important`, wins over the
+  // fixed `likedColor` infoRedColor) — see likedLabelNew for the other branch.
   likedLabel: {
-    fontSize: 12,
-    color: Colors.textSecondary,
+    fontFamily: Fonts.poppinsRegular,
+    fontSize: FontSize.font12,
+    color: Colors.black,
     textAlign: 'center',
     marginBottom: 12,
     lineHeight: 18,
+  },
+  // Angular: when newTextLable === '1', the ngClass empties out (no black-color),
+  // so likedColor's own `infoRedColor` (var(--ion-color-error-color): #DE2A68) applies.
+  likedLabelNew: {
+    color: Colors.inputError,
   },
 
   // ── Viewed overlay (type 3) — bottom of photo ─────────────────────────────
@@ -754,10 +817,18 @@ const styles = StyleSheet.create({
     height: 14,
     flexShrink: 0,
   },
+  // Angular: default (non-"new") state — `body3-regular-12` (var(--font12),
+  // english-regular-poppins) for viewedyou/whoviewednumber; viewedbyme gets
+  // `font-10-nav` (var(--font10)) instead, see viewedTextSmall.
   viewedText: {
     flex: 1,
-    fontSize: 11,
+    fontFamily: Fonts.poppinsRegular,
+    fontSize: FontSize.font12,
     color: Colors.white,
+  },
+  // Angular: `[ngClass]="(cardType === 'viewedbyme') ? 'font-10-nav' : 'body3-regular-12'"`
+  viewedTextSmall: {
+    fontSize: FontSize.font10,
   },
   // Angular: profile-card.component.scss's .newly-viewed — solid light-pink
   // background (#FCEAF0), not the default dark gradient overlay.
@@ -840,10 +911,12 @@ const styles = StyleSheet.create({
     height: 14,
     flexShrink: 0,
   },
+  // Angular: `.color-de2a68.body3-regular-12` — var(--font12), english-regular-poppins,
+  // weight 400 (regular, not the 600 previously guessed here).
   eyeBadgeText: {
-    fontSize: 11,
+    fontFamily: Fonts.poppinsRegular,
+    fontSize: FontSize.font12,
     color: Colors.inputError,
-    fontWeight: '600',
   },
 
   // ── Liked footer (type 8) — Angular: .liked-profile-card — a "ticket
@@ -868,9 +941,10 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderColor: Colors.white,
   },
+  // Angular: `.body3-regular-12.black-color` — var(--font12), english-regular-poppins.
   likedFooterText: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize: 12,
+    fontSize: FontSize.font12,
     color: Colors.black,
   },
 })

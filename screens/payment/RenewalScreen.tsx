@@ -7,6 +7,7 @@
 // explicit "Renew Now" tap instead — a deliberate, safer UX change.
 
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
@@ -15,6 +16,7 @@ import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
+import { useNetwork } from '../../contexts/NetworkContext'
 import {
   getRenewalBanner, getRetryRemainingMs, handlePaymentSuccess, recordPaymentFailure,
   submitUpiAutopayRenewal, type RenewalBannerData,
@@ -26,6 +28,8 @@ type Props = { navigation: any; route: any }
 
 export default function RenewalScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
+  const { t } = useTranslation()
+  const { isOffline } = useNetwork()
 
   const [banner, setBanner]         = useState<RenewalBannerData | null>(null)
   const [loading, setLoading]       = useState(true)
@@ -59,6 +63,9 @@ export default function RenewalScreen({ navigation, route }: Props) {
       setRestrictedMinutes(Math.ceil(remainingMs / 60000))
       return
     }
+    // Defense-in-depth alongside the global OfflineScreen overlay — don't
+    // start the charge while offline.
+    if (isOffline) { Alert.alert('Error', t('GENERAL.NOINTERNET')); return }
 
     setRenewing(true)
     try {

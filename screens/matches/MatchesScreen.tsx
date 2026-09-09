@@ -38,6 +38,7 @@ import {
 import MatchesDesktopLayout from './MatchesDesktopLayout'
 import LanguagePillSheet from '../../components/language-pill/LanguagePillSheet'
 import MembershipBanner from '../../components/matches/MembershipBanner'
+import { useNetwork } from '../../contexts/NetworkContext'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { Colors } from '../../constants/colors'
@@ -893,6 +894,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   const { t, i18n } = useTranslation()
   const isDesktop = useIsDesktopWeb()
   const langFonts = useLanguageFonts()
+  const { isOffline } = useNetwork()
 
   // Android: HomeScreenActivity's ExitPopup — now registered centrally in
   // RootNavigation.tsx as handleBack()'s root fallback (fires whenever
@@ -1688,6 +1690,9 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   // 1449-1454) — same infinite-scroll mechanism, different cursor/bound/source.
   async function loadMore() {
     if (loadingMoreRef.current) return
+    // Defense-in-depth alongside the global OfflineScreen overlay — don't fire
+    // the next-page call while offline.
+    if (isOffline) { showToast(t('GENERAL.NOINTERNET')); return }
     const cursorRef = extendedLoaded ? extendedApiStartRef : apiStartRef
     const bound      = extendedLoaded ? extendedCount : totalCount
     if (cursorRef.current >= bound) return

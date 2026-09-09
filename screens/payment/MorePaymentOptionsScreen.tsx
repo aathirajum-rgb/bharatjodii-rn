@@ -21,6 +21,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import LinkCTA from '../../components/link-cta/LinkCTA'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
+import { useNetwork } from '../../contexts/NetworkContext'
 import {
   checkQrPaymentOutcome, generatePaymentLink, getFinalAmount, getPaymentConfig, getQRPaymentData,
   getRechargeHelpline, getUpiAppList, handlePaymentSuccess, recordPaymentFailure,
@@ -49,6 +50,7 @@ type Props = { navigation: any; route: any }
 export default function MorePaymentOptionsScreen({ navigation, route }: Props) {
   const { t, i18n } = useTranslation()
   const insets = useSafeAreaInsets()
+  const { isOffline } = useNetwork()
   const selectedPackage: SelectedPackage | undefined = route.params?.selectedPackage
   const amountLabel: string | undefined = route.params?.amountLabel
 
@@ -139,6 +141,9 @@ export default function MorePaymentOptionsScreen({ navigation, route }: Props) {
   // used it as a substitute for — see generatePaymentLink()'s header comment).
   function handleSharePaymentLink() {
     if (!selectedPackage) return
+    // Defense-in-depth alongside the global OfflineScreen overlay — don't
+    // start the link-generation call while offline.
+    if (isOffline) { Alert.alert('Error', t('GENERAL.NOINTERNET')); return }
     Alert.alert(
       'Share a payment link',
       'Generate a payment link so a family member or friend can pay for you.',
