@@ -38,7 +38,8 @@ import { communicationBtnOnClick, type CommActionResult } from '../../service/co
 import { checkAddPhotoPromotion } from '../../service/buttonService'
 import { markProfileViewed } from '../../service/viewProfileService'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
-import { openMembershipTab, paymentTrack } from '../../service/paymentService'
+import { paymentTrack } from '../../service/paymentService'
+import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { getItem, setItem, getJson } from '../../service/storageService'
 import { navigate, resetTo } from '../../utils/navigationRef'
 import { ENavigation } from '../../types/enums/navigation.enum'
@@ -687,15 +688,7 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
       <>
         <DailyRecommendationDesktopLayout
           langCode={i18n.language}
-          onTabPress={tab => {
-            switch (tab) {
-              case 0: navigation.navigate('Home');     break
-              case 1: navigation.navigate('Matches');  break
-              case 2: navigation.navigate('Activity'); break
-              case 3: openMembershipTab(); break
-              case 4: navigation.navigate('MessagerList'); break
-            }
-          }}
+          onTabPress={tab => handleFooterTabPress(navigation, tab)}
           onLanguagePress={() => navigation.navigate('LanguageSelection')}
           oppGender={gating.oppGender}
           contentLoaded={contentLoaded}

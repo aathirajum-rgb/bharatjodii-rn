@@ -1,4 +1,6 @@
 import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { useFooterBadges } from '../../contexts/FooterBadgesContext'
 import {
   Alert,
   Dimensions,
@@ -23,7 +25,6 @@ import { SvgXml } from 'react-native-svg'
 import CdnSvg, { CdnImage } from '../../components/cdn-svg/CdnSvg'
 import CdnLottie from '../../components/CdnLottie'
 import AppHeader, { type ToolbarItem } from '../../components/app-header/AppHeader'
-import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import SwiperCard, { type SwiperItem } from '../../components/swiper-card/SwiperCard'
 import CoverflowSwiper from '../../components/swiper-card/CoverflowSwiper'
 import Loader from '../../components/loader/Loader'
@@ -151,14 +152,6 @@ function LocalCoverBackground({
   )
 }
 const { width: SW } = Dimensions.get('window')
-
-// Angular: services/common.ts's `showRedDot` — a singleton service property
-// (default true, flipped false in footer.component.ts:165 once the user taps
-// the membership footer tab) that stays false for the rest of the app
-// session, surviving in-app navigation but resetting on an actual app
-// reload/restart — mirrored here as a module-level flag rather than React
-// state so it survives HomeScreen unmounting/remounting across tab navigation.
-let membershipDotDismissedForSession = false
 
 // Angular: explore.component.html / discover-matches.component.html both wrap
 // the category grid in <ion-row class="... pl-4 pr-24">, with each
@@ -955,8 +948,13 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [ppSetData, setPpSetData]         = useState<Record<string, any>>({})
   const [comCount, setComCount]           = useState<ComCountEntry[]>([])
   const [completeCards, setCompleteCards] = useState<CompleteProfileCard[]>([])
-  const [upgradeTag, setUpgradeTag] = useState('')
-  const [showMembershipDot, setShowMembershipDot] = useState(false)
+  // The persistent tab bar (MainTabs.tsx) renders AppFooter now, not this
+  // screen — publish these into the shared context instead of local state.
+  const {
+    setUpgradeTag, setShowMembershipDot,
+    isMembershipDotDismissedForSession, dismissMembershipDotForSession,
+    setLikesCount,
+  } = useFooterBadges()
 
   // ── Hero banner / assist banner (mutually exclusive top slot) ─────────────
   const [heroBannerVariant, setHeroBannerVariant]   = useState<HeroBannerVariant>(null)
@@ -1037,6 +1035,9 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const [likedByMe, setLikedByMe]             = useState<SwiperItem[]>([])
   const [likedMe, setLikedMe]                 = useState<SwiperItem[]>([])
   const [likedMeTotal, setLikedMeTotal]       = useState(0)
+  // Was passed straight into a locally-rendered <AppFooter likesCount=.../> —
+  // the persistent tab bar reads it from FooterBadgesContext instead now.
+  useEffect(() => { setLikesCount(likedMeTotal) }, [likedMeTotal, setLikesCount])
   const [stories, setStories]                 = useState<SwiperItem[]>([])
   const [videos, setVideos]                   = useState<HelpVideo[]>([])
   const [customerCare, setCustomerCare]       = useState({ phone: '', whatsapp: '' })
@@ -1334,8 +1335,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       // Angular: footer.component.html:52's showRedDot && membershipExpiry &&
       // ENTRYTYPE==='F' && upgradeTag!=='' — showRedDot itself defaults true
       // and only ever flips false for the rest of the session once the user
-      // has tapped the membership tab (see membershipDotDismissedForSession).
-      setShowMembershipDot(!membershipDotDismissedForSession && membershipExpiry && entryTypeVal === 'F' && !!tag)
+      // has tapped the membership tab (FooterBadgesContext's dismiss flag).
+      setShowMembershipDot(!isMembershipDotDismissedForSession() && membershipExpiry && entryTypeVal === 'F' && !!tag)
 
       // ── Force-update sticky — Angular populates updatePopupContent.APPFORCEUPDATE
       // independently of checkProfileStatus() below (explore.component.ts:553),
@@ -1526,6 +1527,10 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
 
   // ── Navigation / action handlers ───────────────────────────────────────────
 
+  // The mobile bottom AppFooter is gone from this screen (MainTabs.tsx's
+  // persistent tab bar owns tab-switch taps now) — this only still exists to
+  // feed HomeDesktopLayout's MatchesDesktopNav (the desktop-web top nav,
+  // which is its own separate, still-per-screen component, not AppFooter).
   function handleTabPress(tab: FooterTab) {
     switch (tab) {
       case 1: navigation.navigate('Matches');  break
@@ -1535,8 +1540,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       // rest of the session the moment the membership tab is tapped, before
       // paymentTrack(31)/routing even happens below.
       case 3:
-        membershipDotDismissedForSession = true
-        setShowMembershipDot(false)
+        dismissMembershipDotForSession()
         openMembershipTab()
         break
     }
@@ -2229,13 +2233,6 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         onLinkPress={phoneInfo.close}
       />
 
-      <AppFooter
-        activeTab={0}
-        likesCount={likedMeTotal}
-        upgradeTag={upgradeTag || undefined}
-        showMembershipDot={showMembershipDot}
-        onTabPress={handleTabPress}
-      />
       <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
 
     </View>

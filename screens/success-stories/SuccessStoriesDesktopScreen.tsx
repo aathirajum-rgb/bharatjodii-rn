@@ -22,7 +22,7 @@ import { CDN_REACT, CDN_REVAMP } from '../../constants/cdn'
 import { StorageKeys } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
-import { openMembershipTab } from '../../service/paymentService'
+import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { apiCall } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
@@ -135,15 +135,7 @@ export default function SuccessStoriesDesktopScreen({ navigation }: Props) {
     fetchStories(false)
   }
 
-  function handleTabPress(tab: FooterTab) {
-    switch (tab) {
-      case 0: navigation.navigate('Home');     break
-      case 1: navigation.navigate('Matches');  break
-      case 2: navigation.navigate('Activity'); break
-      case 3: openMembershipTab(); break
-      case 4: navigation.navigate('MessagerList'); break
-    }
-  }
+  const handleTabPress = (tab: FooterTab) => handleFooterTabPress(navigation, tab)
 
   return (
     <DesktopPageShell navigation={navigation} userName={userName} activeItem="successStories" onTabPress={handleTabPress}>

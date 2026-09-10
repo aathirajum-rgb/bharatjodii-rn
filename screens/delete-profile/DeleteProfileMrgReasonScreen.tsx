@@ -18,7 +18,7 @@ import { StorageKeys } from '../../constants/storage.keys'
 import { getItem, getMultiple } from '../../service/storageService'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
-import { openMembershipTab } from '../../service/paymentService'
+import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileMrgReasonDesktopLayout from './DeleteProfileMrgReasonDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
@@ -165,15 +165,7 @@ export default function DeleteProfileMrgReasonScreen({ navigation, route }: Prop
     label: t(`DELETE_PROFILE.MRG_REASON_${k}`),
   }))
 
-  function handleTabPress(tab: FooterTab) {
-    switch (tab) {
-      case 0: navigation.navigate('Home');     break
-      case 1: navigation.navigate('Matches');  break
-      case 2: navigation.navigate('Activity'); break
-      case 3: openMembershipTab(); break
-      case 4: navigation.navigate('MessagerList'); break
-    }
-  }
+  const handleTabPress = (tab: FooterTab) => handleFooterTabPress(navigation, tab)
 
   if (isDesktop) {
     return (

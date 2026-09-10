@@ -32,7 +32,7 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import SearchByIdDesktopLayout from './SearchByIdDesktopLayout'
 import { getItem } from '../../service/storageService'
 import { StorageKeys } from '../../constants/storage.keys'
-import { openMembershipTab } from '../../service/paymentService'
+import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { handleBack } from '../../utils/navigationRef'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 
@@ -77,15 +77,7 @@ export default function SearchByIdScreen({ navigation }: Props) {
     }
   }
 
-  function handleTabPress(tab: FooterTab) {
-    switch (tab) {
-      case 0: navigation.navigate('Home');     break
-      case 1: navigation.navigate('Matches');  break
-      case 2: navigation.navigate('Activity'); break
-      case 3: openMembershipTab(); break
-      case 4: navigation.navigate('MessagerList'); break
-    }
-  }
+  const handleTabPress = (tab: FooterTab) => handleFooterTabPress(navigation, tab)
 
   if (isDesktop) {
     return (

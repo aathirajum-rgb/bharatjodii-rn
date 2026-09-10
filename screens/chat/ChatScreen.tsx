@@ -15,11 +15,12 @@
 // RESPBASIC round-trip for authoritative online/last-active/name/photo rather
 // than trusting whatever the caller handed over — this screen does the same,
 // using the nav params only as an immediate-render seed.
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, KeyboardAvoidingView, Linking, Platform, Pressable,
-  ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions,
+  ActivityIndicator, FlatList, KeyboardAvoidingView, Linking, Platform, Pressable,
+  StyleSheet, Text, TextInput, View, useWindowDimensions,
+  type ListRenderItem,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAudioRecorder, useAudioRecorderState, RecordingPresets } from 'expo-audio'
@@ -62,7 +63,7 @@ import CdnLottie from '../../components/CdnLottie'
 import { Colors } from '../../constants/colors'
 import { EnvConfig } from '../../constants/env'
 import { formatLastActive } from '../../utils/chatTime'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 import type { ChatMessageItem, ChatMessagesResponse, SendMessageResponse } from '../../types/interfaces/chatMessage.interface'
 
 // Angular: FIRST_TIME_MSG_LIMIT — 3 messages allowed before the partner
@@ -90,6 +91,14 @@ function formatVoiceDuration(totalSeconds: number): string {
 // this port treats them as genuinely distinct states so that case has an
 // actual, working read-only UI.
 type BlockedState = 'none' | 'by_me' | 'by_them'
+
+// One row of the (inverted) FlatList thread below — a flattened, reversed
+// view of groupMessagesByDate()'s {key, messages} groups. Flattening date
+// separators into the same list as the messages (instead of a SectionList)
+// sidesteps RN's well-known section-header quirks under `inverted`.
+type ChatRow =
+  | { type: 'separator'; id: string; label: string }
+  | { type: 'message'; id: string; item: ChatMessageItem }
 
 const CDN = CDN_SVG
 const BACK_ICON_URI = CDN + 'arrow-back-activity.svg'
@@ -126,7 +135,7 @@ export default function ChatScreen({ navigation, route }: Props) {
   const micIconHeight = micIconWidth * (25 / 24)
   const sendIconWidth = sendBtnSize - 13 - 9
   const sendIconHeight = sendBtnSize - 12 - 12
-  const scrollRef = useRef<ScrollView>(null)
+  const scrollRef = useRef<FlatList<ChatRow>>(null)
 
   const partnerId = String(route.params?.partnerId ?? '')
   const [partnerName, setPartnerName]   = useState(String(route.params?.partnerName ?? ''))
@@ -435,9 +444,12 @@ export default function ChatScreen({ navigation, route }: Props) {
 
   // Angular: updateScroll() — always jumps to bottom, no preserved-position
   // logic (there's no load-older-messages feature to preserve position for).
+  // The thread FlatList below is `inverted`, so "bottom" (the newest message)
+  // is offset 0 — scrollToOffset(0) is the inverted-list equivalent of the
+  // old ScrollView's scrollToEnd().
   useEffect(() => {
     if (messages.length) {
-      const timeout = setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 100)
+      const timeout = setTimeout(() => scrollRef.current?.scrollToOffset({ offset: 0, animated: true }), 100)
       return () => clearTimeout(timeout)
     }
     return undefined
@@ -705,6 +717,38 @@ export default function ChatScreen({ navigation, route }: Props) {
 
   const { allow: messageAllow, bannerText: limitBannerText } = computeMessageGate()
   const groups = groupMessagesByDate(messages, t('MESSAGES.TODAY'), t('MESSAGES.YESTERDAY'))
+  // Flatten oldest-first {key, messages} groups into rows, then reverse for
+  // the inverted FlatList below (index 0 renders at the visual bottom under
+  // `inverted`, so the newest message/row needs to be first).
+  const chatRows = useMemo<ChatRow[]>(() => {
+    const rows: ChatRow[] = []
+    for (const group of groups) {
+      rows.push({ type: 'separator', id: `sep-${group.key}`, label: group.key })
+      for (const item of group.messages) rows.push({ type: 'message', id: item.id, item })
+    }
+    return rows.reverse()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, t])
+  const renderRow: ListRenderItem<ChatRow> = useCallback(({ item: row }) => {
+    if (row.type === 'separator') {
+      return (
+        <View style={styles.dateSeparatorWrap}>
+          <Text style={styles.dateSeparatorText}>{row.label}</Text>
+        </View>
+      )
+    }
+    return (
+      <ChatBubble
+        item={row.item}
+        onPressMedia={(kind, uri) => setMediaViewer({ kind, uri })}
+        oppGender={ownGender === 'F' ? 'M' : 'F'}
+        onCallPress={() => handleCallOrWhatsApp('call')}
+        onWhatsAppPress={() => handleCallOrWhatsApp('whatsapp')}
+        ownPhoto={ownPhoto}
+        partnerPhoto={partnerPhoto}
+      />
+    )
+  }, [ownGender, ownPhoto, partnerPhoto, handleCallOrWhatsApp])
   const lastActiveText = partnerOnline
     ? t('MESSAGES.ONLINE')
     : partnerLastActive
@@ -792,32 +836,23 @@ export default function ChatScreen({ navigation, route }: Props) {
             <Text style={styles.emptyTitle}>{t('MESSAGES.NO_MESSAGES')}</Text>
           </View>
         ) : (
-          <ScrollView
+          // `inverted` — was a plain ScrollView+.map() rendering every message
+          // at once (fine for a short thread, but mounts every attachment/
+          // image/audio bubble in a long-running conversation regardless of
+          // whether it's on screen). FlatList only mounts cells near the
+          // visible viewport; `inverted` is the standard RN chat pattern —
+          // data is fed newest-first (chatRows above is already built that
+          // way) so the newest message renders at the bottom without an
+          // explicit scroll-to-end on every load, the way the ScrollView
+          // version needed.
+          <FlatList
             ref={scrollRef}
             style={styles.flex1}
-            contentContainerStyle={styles.threadContent}
-            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
-          >
-            {groups.map(group => (
-              <View key={group.key}>
-                <View style={styles.dateSeparatorWrap}>
-                  <Text style={styles.dateSeparatorText}>{group.key}</Text>
-                </View>
-                {group.messages.map(item => (
-                  <ChatBubble
-                    key={item.id}
-                    item={item}
-                    onPressMedia={(kind, uri) => setMediaViewer({ kind, uri })}
-                    oppGender={ownGender === 'F' ? 'M' : 'F'}
-                    onCallPress={() => handleCallOrWhatsApp('call')}
-                    onWhatsAppPress={() => handleCallOrWhatsApp('whatsapp')}
-                    ownPhoto={ownPhoto}
-                    partnerPhoto={partnerPhoto}
-                  />
-                ))}
-              </View>
-            ))}
-          </ScrollView>
+            data={chatRows}
+            keyExtractor={row => row.id}
+            renderItem={renderRow}
+            inverted
+          />
         )}
 
         {/* ── Input / blocked / limit-exceeded banner ── */}
@@ -844,9 +879,9 @@ export default function ChatScreen({ navigation, route }: Props) {
           // Angular: showBottomRestriction() — the entire footer is replaced,
           // not just a disabled send button.
           <View style={[styles.blockedBanner, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-            <Text style={styles.blockedText}>{limitBannerText}</Text>
-            <Pressable onPress={() => navigation.navigate('Matches')}>
-              <Text style={styles.tapToUnblock}>{t('MESSAGES.EXPLORE_MATCHES')}</Text>
+            <Text style={styles.limitReachedText}>{limitBannerText}</Text>
+            <Pressable onPress={() => navigation.navigate('MainTabs', { screen: 'Matches' })}>
+              <Text style={[styles.tapToUnblock, styles.exploreMatchesColor]}>{t('MESSAGES.EXPLORE_MATCHES')}</Text>
             </Pressable>
           </View>
         ) : (
@@ -1005,7 +1040,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.divider,
     // ThreeDotMenu.tsx's dropdown is `position: absolute` INSIDE this header —
     // its own zIndex:9999 only ranks it among header's children, not against the
-    // ScrollView thread below, which paints on top of header (Android sibling
+    // FlatList thread below, which paints on top of header (Android sibling
     // paint order) without this. Elevation is required for Android; zIndex alone
     // (RN's iOS/Fabric stacking) isn't enough there.
     zIndex: 10, elevation: 10,
@@ -1023,8 +1058,12 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.iOSGreen, borderWidth: 2, borderColor: Colors.surface,
   },
   headerText: { flex: 1, gap: 1 },
-  headerName: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.textDark },
-  headerStatus: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textSecondary },
+  // Angular: h2.heading4-medium-16.black-color — MEDIUM weight (not
+  // semibold) at font16, pure black (not textDark).
+  headerName: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font16, color: Colors.black },
+  // Angular: p.body3-regular-12.color-1f2721 — font12, a distinct near-black-
+  // green (#1f2721), not this app's general textSecondary grey.
+  headerStatus: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.chatLastSeenText },
   callBtn: { padding: 4 },
   // Angular's header row (ion-row) has no explicit gap/column-gap — the call
   // icon's column zeroes its padding (padd0) while the 3-dot's column keeps
@@ -1043,13 +1082,11 @@ const styles = StyleSheet.create({
 
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
+  // No Angular equivalent — an empty thread never renders bare in Angular
+  // (there's always at least the phone-view system row or a real message);
+  // left as-is, not sourced from any Angular class.
   emptyTitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary, textAlign: 'center' },
 
-  // Angular: ion-grid.chat-section has no top/bottom padding of its own — the
-  // date-divider's pt-8 is the only top spacing before the first message, and
-  // the last message's own mb-4 (or its bubble's implicit bottom edge) is the
-  // only spacing before the input bar's own bordered/padded surface below.
-  threadContent: { flexGrow: 1 },
   // Angular: messages.component.html:115-120 — plain centered ion-label, NO
   // background/border/shadow/card of any kind (confirmed: no matching CSS
   // rule anywhere for this row). pt-8/pb-8 (8px top/bottom on the row) plus
@@ -1059,7 +1096,7 @@ const styles = StyleSheet.create({
   // its own 8/8 — the 16 comes from the message row, not doubled here.
   dateSeparatorWrap: { alignItems: 'center', paddingTop: 8, paddingBottom: 8 },
   dateSeparatorText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#1f1e1b',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.chatNearBlackText,
   },
 
   // Angular: .messages-bottom-block — background #FFF, border-top 1px solid
@@ -1089,7 +1126,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F0F0', borderRadius: 52,
     borderWidth: 1, borderColor: '#808080',
     paddingLeft: 16, paddingRight: 44, paddingTop: 16, paddingBottom: 0,
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textPrimary,
+    // Angular: .jodii-chat-textarea/.jodii-chat-textarea-msg both set
+    // color:#1f1e1b explicitly (body2-regular-14 itself carries no color).
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.chatNearBlackText,
   },
   sendBtn: {
     backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
@@ -1104,7 +1143,9 @@ const styles = StyleSheet.create({
 
   recordingRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   recordingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.inputError },
-  recordingTimer: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textPrimary },
+  // Angular: `.delete-block-time` (id="audioTimer") — specialCta-english-
+  // Medium at font12, black — not the body-regular family/size this had.
+  recordingTimer: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: FontSize.font12, color: Colors.black },
 
   blockedBanner: {
     alignItems: 'center', justifyContent: 'center', gap: 10,
@@ -1112,10 +1153,30 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.divider,
   },
-  blockedText: { fontFamily: Fonts.poppinsMedium, fontSize: 14, color: Colors.textDark, textAlign: 'center' },
+  // Angular: shared by REPORTED_PROFILE / OPP_BLOCK_TEXT / BLOCKED_CONTENT —
+  // all three are body1-medium-14.color-1f1e1b (font14, Poppins-Medium,
+  // #1f1e1b), not textDark.
+  blockedText: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, color: Colors.chatNearBlackText, textAlign: 'center' },
+  // Angular: showBottomRestriction()'s own "send-one-msg-block" text is a
+  // DIFFERENT source than blockedText above — body2-regular-14.black-color
+  // (Poppins-Regular, pure black), not body1-medium-14/#1f1e1b. (Named
+  // limitReachedText, not limitBannerText, to avoid shadowing the
+  // `limitBannerText` string variable destructured from computeMessageGate().)
+  limitReachedText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, textAlign: 'center' },
+  // Angular: both the by_me banner's "TAP_HERE" button (largemedium size)
+  // and the messageAllow-false banner's "Explore Matches" button (link size)
+  // omit [ctaFontSize]/[fontFamily], so both fall back to the SAME default —
+  // body2-regular-14 (Poppins-Regular, font14), not buttonEnglishMedium.
   tapToUnblock: {
-    fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.primary,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14,
+    // Angular: [textColor]="'primaryColor'" -> --ion-color-primary (#B50033),
+    // this app's primaryDark, not the brighter primary red.
+    color: Colors.primaryDark,
     borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 6,
     paddingHorizontal: 20, paddingVertical: 10,
   },
+  // Angular: CONFIG.SEE_ALL.textColor = EButtonTextColor.link ->
+  // --ion-color-link-color (#29339B) — a different color than tapToUnblock's
+  // primaryColor above, even though both buttons share the same font/size.
+  exploreMatchesColor: { color: Colors.link },
 })

@@ -23,7 +23,8 @@ import LottieView from 'lottie-react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import CdnLottie from '../../components/CdnLottie'
-import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
+import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { useFooterBadges } from '../../contexts/FooterBadgesContext'
 import MatchesHeader from '../../components/matches-header/MatchesHeader'
 import {
   WhatsAppIcon, WhatsAppUnlockButton, CallIcon, MessageIcon, CloseIcon, ViewLaterIcon, LikeIcon,
@@ -42,6 +43,7 @@ import { useNetwork } from '../../contexts/NetworkContext'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { isBanner, type MatchProfile, type BannerItem, type MatchListItem } from '../../types/interfaces/matches.interface'
@@ -582,11 +584,12 @@ const pcs = StyleSheet.create({
     paddingTop:         24,
     paddingBottom:      24,
   },
+  // Angular: breather.component.html's PCS block — heading2-semibold-18 black-color
   // fontFamily applied inline (langFonts.semiBold) — see PcsBanner's Text usage.
   title: {
     marginTop:  16,
-    fontSize:   19,
-    color:      '#000000',
+    fontSize:   FontSize.font18,
+    color:      Colors.black,
     textAlign:  'center',
     marginBottom: 24,
   },
@@ -598,9 +601,10 @@ const pcs = StyleSheet.create({
     alignItems:     'center',
     justifyContent: 'center',
   },
+  // Angular: app-button-revamp default ctaFontSize = EButtonFontSize.regular14
   // fontFamily applied inline (langFonts.regular) — see PcsBanner's Text usage.
   ctaText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.white,
   },
 })
@@ -794,16 +798,18 @@ const n = StyleSheet.create({
     paddingHorizontal: 24,
     gap:               6,
   },
+  // Angular: end-card.component.html cardType='no-data' — heading3-semibold-16 black-color
   // fontFamily applied inline (langFonts.semiBold) — see NoMatchesCard's Text usage.
   title: {
-    fontSize:   16,
-    color:      '#000000',
+    fontSize:   FontSize.font16,
+    color:      Colors.black,
     textAlign:  'center',
   },
+  // Angular: body2-regular-14 black-color
   // fontFamily applied inline (langFonts.regular) — see NoMatchesCard's Text usage.
   desc: {
-    fontSize:   14,
-    color:      '#000000',
+    fontSize:   FontSize.font14,
+    color:      Colors.black,
     textAlign:  'center',
   },
   cta: {
@@ -816,15 +822,21 @@ const n = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical:   10,
   },
+  // Angular: ion-button class="body1-medium-14 secondary-cta-jodii" — color #B50033 = Colors.primaryDark
   // fontFamily applied inline (langFonts.medium) — see NoMatchesCard's Text usage.
   ctaText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.primaryDark,
   },
 })
 
 // BANNERSLOT 1010 — "get ID verified" promo (Angular: matches.page.ts:1208-1210, sent
 // via EKYCFLAG=1 for non-verified male users). Removed live by subscribeIdVerified().
+// FLAGGED: no confirmed 1:1 Angular template found for this exact compact-row layout
+// (unlike PcsBanner/AddPhotoBanner above, whose breather.component.html source is
+// confirmed) — matches.page.ts routes 1010 through app-breather too, but none of its
+// breatherType blocks (PCS/PAYMENT/ADDPHOTO/ADDPHOTOPAID/IDVERIFY) match this icon+
+// textCol+pill shape. Typography left as-is pending that source; not touched here.
 function IdVerifyBanner({ onPress }: { onPress: () => void }) {
   const { t } = useTranslation()
   const langFonts = useLanguageFonts()
@@ -1076,6 +1088,10 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
 
   // ── Live footer like-count badge ────────────────────────────────────────────
   const [likesCount, setLikesCount] = useState(0)
+  // The persistent tab bar (MainTabs.tsx) renders AppFooter now, not this
+  // screen — publish into the shared context instead of a local prop.
+  const { setLikesCount: setFooterLikesCount } = useFooterBadges()
+  useEffect(() => { setFooterLikesCount(likesCount) }, [likesCount, setFooterLikesCount])
 
   // Angular: paymentPromoPopUp() → bottom-sheet.component's `paymentPromo` block —
   // the real upgrade sheet shown for Call/WhatsApp/Message when the viewer is a
@@ -2870,16 +2886,6 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         />
       )}
 
-      {/* ── Footer ─────────────────────────────────────────────────────────── */}
-      {/* No upgradeTag prop: AppFooter now loads the real MENUDISCOUNT itself
-          (Angular's footer.component.ts does the same), so this no longer ships
-          a hardcoded "₹200 OFF" to every user regardless of their real offer. */}
-      <AppFooter
-        activeTab={1}
-        likesCount={likesCount}
-        onTabPress={handleTabPress}
-      />
-
       <BulkLikeModal
         visible={showBulkLike}
         candidates={bulkLikeCandidates}
@@ -3013,9 +3019,10 @@ const s = StyleSheet.create({
   screen:       { flex: 1, backgroundColor: Colors.white },
   loaderBox:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
   footerLoader: { marginVertical: 16 },
+  // Angular: matches-card.component.html — heading2-semibold-18 black-color
   // fontFamily applied inline (langFonts.semiBold) — see EXTENDED_INTRO's Text usage.
   extendedIntroText: {
-    fontSize:          18,
+    fontSize:          FontSize.font18,
     color:             Colors.black,
     textAlign:         'center',
     paddingHorizontal: 16,
@@ -3428,17 +3435,26 @@ const e = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
   },
+  // FLAGGED/left as-is: Angular's count badge is a flat gray "avatar-images" circle
+  // with body1-medium-14 black-color text (+ body3-regular-12 for "more"), but this
+  // circle is deliberately styled with a brand-red backgroundColor (Colors.primary)
+  // here — an RN-only enhancement, not in Angular — which is why the text is white
+  // rather than black. Not touching fontSize either since it looks tuned to fit
+  // this fixed 52px circle rather than a straight port of 14/12.
   // fontFamily applied inline (langFonts.semiBold/.regular) — see ExtendedMatchesCard's Text usage.
   countNum:   { fontSize: 13, color: Colors.white, lineHeight: 16 },
   countLabel: { fontSize: 10, color: Colors.white, lineHeight: 13 },
+  // Angular: end-card.component.html — heading1-semibold-20 color-4c4c4c (was
+  // mistakenly ported as 18px; Angular's own class is the 20px size).
   title: {
-    fontSize:   18,
+    fontSize:   FontSize.font20,
     color:      Colors.extendedCardTitle,
     textAlign:  'center',
     marginBottom: 8,
   },
+  // Angular: end-card.component.html — body2-regular-14 color-666666
   desc: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.textSecondary,
     textAlign:  'center',
     lineHeight: 22,
@@ -3496,14 +3512,14 @@ const pb = StyleSheet.create({
   // Angular: heading3-semibold-16 black-color
   // fontFamily applied inline (langFonts.semiBold) — see PhotoPromotionBanner's Text usage.
   title: {
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     color:      Colors.black,
     lineHeight: 22,
   },
   // Angular: mt-8 body3-regular-12 black-color
   // fontFamily applied inline (langFonts.regular) — see PhotoPromotionBanner's Text usage.
   body: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      Colors.black,
     marginTop:  8,
     lineHeight: 18,
@@ -3517,9 +3533,10 @@ const pb = StyleSheet.create({
     alignSelf:         'flex-start',
     alignItems:        'center',
   },
+  // Angular: app-button-revamp default ctaFontSize = EButtonFontSize.regular14
   // fontFamily applied inline (langFonts.semiBold) — see PhotoPromotionBanner's Text usage.
   ctaText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
   },
 })
 
@@ -3545,14 +3562,14 @@ const ap = StyleSheet.create({
   // Angular: heading1-semibold-22 black-color line-height-32
   // fontFamily applied inline (langFonts.semiBold) — see AddPhotoBanner's Text usage.
   title: {
-    fontSize:   22,
+    fontSize:   FontSize.font22,
     color:      Colors.black,
     lineHeight: 32,
   },
   // Angular: body1-medium-14 black-color
   // fontFamily applied inline (langFonts.medium) — see AddPhotoBanner's Text usage.
   subheader: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.black,
   },
   // Angular: pl-24, benefits-container gap:12
@@ -3567,7 +3584,7 @@ const ap = StyleSheet.create({
   },
   // Angular: li::marker color #8A8A8A
   bullet: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.borderNeutral,
     lineHeight: 22,
     flexShrink: 0,
@@ -3575,7 +3592,7 @@ const ap = StyleSheet.create({
   // Angular: body2-regular-14 black-color
   // fontFamily applied inline (langFonts.regular) — see AddPhotoBanner's Text usage.
   bulletText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.black,
     flex:       1,
     lineHeight: 22,
@@ -3587,9 +3604,10 @@ const ap = StyleSheet.create({
     paddingVertical: 14,
     alignItems:      'center',
   },
+  // Angular: app-button-revamp default ctaFontSize = EButtonFontSize.regular14
   // fontFamily applied inline (langFonts.semiBold) — see AddPhotoBanner's Text usage.
   ctaText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.white,
   },
 })

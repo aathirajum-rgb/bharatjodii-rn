@@ -27,7 +27,7 @@ import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { CDN_SVG } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
-import { openMembershipTab } from '../../service/paymentService'
+import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { handleBack } from '../../utils/navigationRef'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { ICON, LogoutSheet, performLogout } from '../menu/MenuScreen'
@@ -54,15 +54,7 @@ export default function SettingsScreen({ navigation }: Props) {
     })
   }, [])
 
-  function handleTabPress(tab: FooterTab) {
-    switch (tab) {
-      case 0: navigation.navigate('Home');     break
-      case 1: navigation.navigate('Matches');  break
-      case 2: navigation.navigate('Activity'); break
-      case 3: openMembershipTab(); break
-      case 4: navigation.navigate('MessagerList'); break
-    }
-  }
+  const handleTabPress = (tab: FooterTab) => handleFooterTabPress(navigation, tab)
 
   function handleLogout() {
     setLogoutSheetVisible(true)

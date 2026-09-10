@@ -10,6 +10,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import type { ExploreFacet } from '../../service/homeService'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize } from '../../src/theme/fonts'
 
 const CDN = CDN_SVG
 
@@ -240,25 +241,28 @@ const s = StyleSheet.create({
     marginTop    : 12,
     gap:               2,
   },
-  // Figma: #000000 — fontFamily applied inline (langFonts.regular), see Text usage.
+  // Angular: matches.page.html body2-regular-14 black-color — fontFamily
+  // applied inline (langFonts.regular), see Text usage.
   ppText: {
-    fontSize:   14,
-    color:      '#000000',
+    fontSize:   FontSize.font14,
+    color:      Colors.black,
   },
   ppEditBtn: {
     flexDirection: 'row',
     alignItems:    'center',
   },
-  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  // Angular: matches.page.html body2-regular-14 color-29339B — fontFamily
+  // applied inline (langFonts.regular), see Text usage.
   ppEditText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.link,
   },
-  // Figma: Poppins-SemiBold 18 #000000 — fontFamily applied inline (langFonts.semiBold).
+  // Angular: matches.page.html color-333333 heading2-semibold-18 — fontFamily
+  // applied inline (langFonts.semiBold).
   title: {
-    fontSize:   18,
+    fontSize:   FontSize.font18,
     lineHeight: 24,
-    color:      '#000000',
+    color:      Colors.textDark,
   },
   titleActions: {
     flexDirection: 'row',
@@ -287,10 +291,14 @@ const s = StyleSheet.create({
     backgroundColor: Colors.chipSurfaceSelected,
   },
   facetChipDisabled: { opacity: 0.4 },
-  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  // Angular: matches.page.html body3-regular-12 color-4c4c4c — fontFamily
+  // applied inline (langFonts.regular).
   facetChipText: {
-    fontSize:   12,
-    color:      '#4c4c4c',
+    fontSize:   FontSize.font12,
+    color:      Colors.extendedCardTitle,
   },
+  // No Angular equivalent selected-text color exists (.filter-selected only
+  // restyles the chip's background/border) — kept as a pre-existing RN-only
+  // enhancement rather than removed; flagging here per the typography audit.
   facetChipTextSelected: { color: Colors.primary },
 })

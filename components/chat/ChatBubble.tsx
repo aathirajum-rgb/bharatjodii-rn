@@ -5,7 +5,7 @@
 // (kind='other') renders as a plain "Attachment" placeholder rather than the
 // rich player Angular has for those — not sendable yet in this port, but
 // existing ones must still render, not crash.
-import { useEffect } from 'react'
+import { memo, useEffect } from 'react'
 import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
@@ -14,7 +14,7 @@ import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
 import { WhatsAppIcon, getAvatarFallbackUri } from '../matches/matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import { SemanticFontsEnglish } from '../../src/theme/fonts'
+import { FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { formatClockTime } from '../../utils/chatTime'
 import type { ChatMessageItem } from '../../types/interfaces/chatMessage.interface'
 
@@ -104,7 +104,11 @@ function Avatar({ uri, fallbackGender }: { uri?: string | undefined; fallbackGen
   return <CdnImage uri={src} width={45} height={45} resizeMode="cover" style={styles.avatar} />
 }
 
-export default function ChatBubble({ item, onPressMedia, oppGender = 'M', onCallPress, onWhatsAppPress, ownPhoto, partnerPhoto }: Props) {
+// memo() — ChatScreen.tsx now renders this inside a FlatList (was a plain
+// ScrollView+.map()); wrapping it means an unrelated ChatScreen re-render
+// (typing state, menu toggles, etc.) doesn't force every visible bubble to
+// re-render.
+const ChatBubble = memo(function ChatBubble({ item, onPressMedia, oppGender = 'M', onCallPress, onWhatsAppPress, ownPhoto, partnerPhoto }: Props) {
   const { t } = useTranslation()
   // Angular's ion-col[size=auto] + width:90% chain renders narrower than a
   // plain 90%-of-available-space would in RN (Ionic's auto column doesn't
@@ -246,7 +250,9 @@ export default function ChatBubble({ item, onPressMedia, oppGender = 'M', onCall
       </View>
     </View>
   )
-}
+})
+
+export default ChatBubble
 
 const styles = StyleSheet.create({
   // Angular: ion-row's own mt-16 (messages.component.html:126/300) — 16px
@@ -284,12 +290,17 @@ const styles = StyleSheet.create({
   bubbleOwn: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E6E6E6', borderRadius: 12, borderTopRightRadius: 0 },
   bubblePartner: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E6E6E6', borderRadius: 12, borderTopLeftRadius: 0 },
 
-  // Angular: sent text is 12px (--font12), received is 14px (--font14) —
-  // genuinely different sizes, both Poppins-Regular, color #000 on both sides
-  // (no white-on-color text since neither bubble is colored anymore).
-  text: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, lineHeight: 19, color: '#000000' },
-  textOwn: { fontSize: 12 },
-  textPartner: { fontSize: 14 },
+  // Angular: sent side's ion-label carries `body2-regular-14` directly
+  // (html:160), whose `!important` font-size (--font14) wins the cascade
+  // over the less-specific-but-non-important `.send-msg-block ion-label`
+  // rule's font12 — so despite that rule's own font-size, the sent text
+  // actually renders at 14px, same as the received side's own (unclassed)
+  // `.received-msg-block ion-label` rule. Both Poppins-Regular, color #000
+  // on both sides (no white-on-color text since neither bubble is colored
+  // anymore).
+  text: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 19, color: Colors.black },
+  textOwn: {},
+  textPartner: {},
 
   // Angular: .send-msg-time-block p / .received-msg-time-block p — both sides
   // use the same #777777, since neither bubble is colored anymore. This row
@@ -303,7 +314,11 @@ const styles = StyleSheet.create({
   meta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
   metaOwn: { marginRight: 45 + 6 },
   metaPartner: {},
-  time: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 10, color: '#777777' },
+  // Angular: `.send-msg-time-block`/`.received-msg-time-block` wraps its `<p>`
+  // in `body3-regular-12` (font12, not font10) — the scss rule's own
+  // color:#777777 is the only one set for this element (body3-regular-12
+  // itself carries no color).
+  time: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.chatTimestampMuted },
   timeOwn: {},
   timePartner: {},
 
@@ -335,9 +350,10 @@ const styles = StyleSheet.create({
   systemCardPartner: { borderRadius: 12, borderTopLeftRadius: 0 },
   // Angular: heading has no explicit line-height (browser default); mt-12
   // (12px) gap to the first button below, not 8.
+  // Angular: `.body2-regular-14.black-color` — pure black, not textPrimary.
   systemTitle: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14,
-    color: Colors.textPrimary, marginBottom: 12,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14,
+    color: Colors.black, marginBottom: 12,
   },
   // Angular: app-button-revamp [buttonSize]='msgBtn' [border]='primaryBorder'
   // [background]='whiteBg' [textColor]='lightBlack' [hasFullWidth]='true' —
@@ -354,7 +370,9 @@ const styles = StyleSheet.create({
   // Angular: no ctaFontSize passed → falls back to body2-regular-14, then the
   // .msgBtn size variant overrides it to 12px/weight 400 (still Poppins-
   // Regular) — NOT medium/14 as this had before.
-  systemBtnText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 12, color: Colors.textPrimary },
+  // Angular: [textColor]="'lightBlack'" -> --ion-color-light-black (#333333),
+  // not textPrimary.
+  systemBtnText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: FontSize.font12, color: Colors.textDark },
   // Angular: .send-msg-time-block/.received-msg-time-block — the timestamp
   // (+ read tick, sent side only) sits BELOW the card, not inside it. This
   // row is given the SAME fixed width as the card itself (systemCardWidth,
@@ -374,7 +392,10 @@ const styles = StyleSheet.create({
   // since this row is a separate sibling below the avatar+card row, not
   // nested inside it.
   systemTimeRowPartner: { justifyContent: 'flex-start', marginLeft: 45 + 6 },
-  systemTime: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 10, color: Colors.textTertiary },
+  // Angular: same `.send-msg-time-block`/`.received-msg-time-block` +
+  // body3-regular-12 source as `time` above — font12, #777777, not font10/
+  // textTertiary.
+  systemTime: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.chatTimestampMuted },
 
   // Angular: .image-video-send-receive — a borderless media box; kept inside
   // the same colored bubble shell as text messages here for visual
@@ -383,7 +404,10 @@ const styles = StyleSheet.create({
   mediaThumb: { width: 200, height: 200, borderRadius: 10, backgroundColor: Colors.surfaceAlt },
   videoPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#00000022' },
   mediaMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, alignSelf: 'flex-end', paddingRight: 4 },
-  mediaTime: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 10, color: Colors.textTertiary },
+  // Angular: same `.send-msg-time-block`/`.received-msg-time-block` +
+  // body3-regular-12 source as `time` above — font12, #777777, not font10/
+  // textTertiary.
+  mediaTime: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.chatTimestampMuted },
 
   audioBubble: {
     flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '78%',
@@ -391,5 +415,8 @@ const styles = StyleSheet.create({
   },
   audioTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.35)', overflow: 'hidden' },
   audioProgress: { height: '100%', backgroundColor: Colors.primary },
+  // No Angular equivalent — app-audio-wave (wavesurfer.js) isn't ported, so
+  // this scrubber's elapsed/duration readout has no source class to check
+  // against; left as-is.
   audioTime: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 11, color: Colors.textPrimary },
 })

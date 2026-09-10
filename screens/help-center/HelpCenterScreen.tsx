@@ -129,7 +129,7 @@ export default function HelpCenterScreen({ navigation }: Props) {
       setFilterEventType('pp')
       navigation.navigate('Search')
     } else if (cta === 'Newly Joined') {
-      navigation.navigate('Matches', { exploreType: 'NEYLYJOINED', exploreLabel: title })
+      navigation.navigate('MainTabs', { screen: 'Matches', params: { exploreType: 'NEYLYJOINED', exploreLabel: title } })
     } else if (cta === 'Activity') {
       navigation.navigate('Faq', { type: 'CONTACTMATCHES', itemId: 9 })
     } else {

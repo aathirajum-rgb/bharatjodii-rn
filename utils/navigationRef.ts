@@ -35,7 +35,22 @@ function dispatchWhenRouteReady(dispatch: () => void, name: string, timeoutMs = 
   setTimeout(attempt, 50)
 }
 
+// Home/Matches/Activity/MessagerList moved from flat Stack.Screens into
+// MainTabs' own Tab.Navigator (see navigation/MainTabs.tsx) — they're no
+// longer top-level route names on the root stack, so a bare
+// navigationRef.navigate('Matches')/reset({routes:[{name:'Matches'}]}) would
+// no longer resolve (a plain NAVIGATE only bubbles UP the navigator tree
+// automatically, never down into a sibling's nested navigator). Every
+// caller of navigate()/resetTo() in this file still passes the same flat
+// name as before — this just re-targets those 4 names at MainTabs so none
+// of those call sites needed to change.
+const TAB_SCREENS = new Set(['Home', 'Matches', 'Activity', 'MessagerList'])
+
 export function navigate(name: string, params?: Record<string, unknown>): void {
+  if (TAB_SCREENS.has(name)) {
+    dispatchWhenRouteReady(() => navigationRef.navigate('MainTabs', { screen: name, params }), 'MainTabs')
+    return
+  }
   dispatchWhenRouteReady(() => navigationRef.navigate(name, params), name)
 }
 
@@ -65,6 +80,16 @@ export function handleBack(): boolean {
 
 // Replaces router with replaceUrl:true — clears back stack
 export function resetTo(name: string, params?: Record<string, unknown>): void {
+  if (TAB_SCREENS.has(name)) {
+    dispatchWhenRouteReady(
+      () => navigationRef.reset({
+        index: 0,
+        routes: [{ name: 'MainTabs', state: { index: 0, routes: [{ name, params }] } }],
+      }),
+      'MainTabs',
+    )
+    return
+  }
   dispatchWhenRouteReady(
     () => navigationRef.reset({ index: 0, routes: [{ name, params }] }),
     name,

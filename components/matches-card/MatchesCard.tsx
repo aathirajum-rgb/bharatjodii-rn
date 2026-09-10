@@ -15,6 +15,7 @@ import ProfilePhoto from '../profile-photo/ProfilePhoto'
 import Badge from '../badge/Badge'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
 import { showLikeCTA, showAfterLikeCTA } from '../matches/matchesCard.shared'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -445,9 +446,10 @@ const styles = StyleSheet.create({
     paddingTop: 32,
   },
   featuredLabel: {
-    fontSize:          14,
+    fontFamily:        Fonts.poppinsMedium,
+    fontSize:          FontSize.font14,
     fontWeight:        '500',
-    color:             Colors.textPrimary,
+    color:             Colors.black,
     paddingHorizontal: 16,
     paddingBottom:     8,
   },
@@ -504,9 +506,10 @@ const styles = StyleSheet.create({
   },
   activityText: {
     flex:       1,
-    fontSize:   14,
+    fontFamily: Fonts.poppinsMedium,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
     lineHeight: 20,
   },
 
@@ -525,8 +528,9 @@ const styles = StyleSheet.create({
   },
   likedLblText: {
     flex:       1,
-    fontSize:   12,
-    color:      Colors.primaryDeep,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize:   FontSize.font12,
+    color:      Colors.likedStripText,
     lineHeight: 18,
     marginTop:  2,
   },
@@ -543,9 +547,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   nameText: {
-    fontSize:   18,
+    fontFamily: Fonts.poppinsSemiBold,
+    fontSize:   FontSize.font18,
     fontWeight: '600',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
   iconBtn: {
     width:  36,
@@ -567,8 +572,9 @@ const styles = StyleSheet.create({
     justifyContent:    'center',
   },
   basicViewText: {
-    fontSize:   14,
-    color:      Colors.textSecondary,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize:   FontSize.font14,
+    color:      Colors.black,
     lineHeight: 22,
   },
 
@@ -592,9 +598,10 @@ const styles = StyleSheet.create({
     marginTop:        12,
   },
   afterLikeText: {
-    fontSize:     14,
+    fontFamily:   Fonts.poppinsMedium,
+    fontSize:     FontSize.font14,
     fontWeight:   '500',
-    color:        Colors.textPrimary,
+    color:        Colors.black,
     textAlign:    'center',
     marginBottom: 12,
     lineHeight:   20,

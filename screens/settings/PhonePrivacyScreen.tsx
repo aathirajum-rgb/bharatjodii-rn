@@ -26,7 +26,7 @@ import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem, setItem } from '../../service/storageService'
 import { apiCall } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
-import { openMembershipTab } from '../../service/paymentService'
+import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { handleBack } from '../../utils/navigationRef'
 import { ICON } from '../menu/MenuScreen'
@@ -71,15 +71,7 @@ export default function PhonePrivacyScreen({ navigation }: Props) {
     })
   }, [])
 
-  function handleTabPress(tab: FooterTab) {
-    switch (tab) {
-      case 0: navigation.navigate('Home');     break
-      case 1: navigation.navigate('Matches');  break
-      case 2: navigation.navigate('Activity'); break
-      case 3: openMembershipTab(); break
-      case 4: navigation.navigate('MessagerList'); break
-    }
-  }
+  const handleTabPress = (tab: FooterTab) => handleFooterTabPress(navigation, tab)
 
   function handleSubmit() {
     if (selected === '1' || selected === '2') {

@@ -64,6 +64,9 @@ export const Colors = {
   chipBorderActive:    'rgba(181, 0, 51, 0.40)',    // selected / checked border
   chipSurfaceSelected: '#FAE7ED',                   // selected fill
   chipSurfaceChecked:  'rgba(249, 230, 235, 0.20)', // checked fill (subtle)
+  // Angular: chip.component.html ion-label's `.color-1f1e1b` — a near-black
+  // distinct from textPrimary (#111111), not this app's general text token.
+  chipLabelText:       '#1f1e1b',
 
   // ── Badge surfaces ───────────────────────────────────────────────────────────
   badgePaidBg:       '#FFF8E1',   // paid-member badge background
@@ -129,4 +132,24 @@ export const Colors = {
   // popover.component.scss .tooltip rule, not this app's general design tokens.
   verifiedPopoverBg:     '#FEF6DB',
   verifiedPopoverBorder: 'rgba(247,190,87,1)',
+
+  // ── Chat / Messages (ChatScreen, MessagerListScreen) ─────────────────────────
+  // Angular's `.color-1f1e1b` — reused verbatim across many unrelated
+  // components (chip.component.html's ion-label, messages.component.html's
+  // date separator + input text, the blocked/reported banner text) as a
+  // near-black distinct from black-color's pure #000000.
+  chatNearBlackText:   '#1f1e1b',
+  // Angular: messages.component.html's `.color-1f2721` — the chat header's
+  // online/last-active status line, distinct from chatNearBlackText above.
+  chatLastSeenText:    '#1f2721',
+  // Angular: `.jodii-chat-time` (messager-list.component.css/scss) — the
+  // conversation row's own right-aligned timestamp.
+  chatTimeText:        '#2d382f',
+  // Angular: `.send-msg-time-block p` / `.received-msg-time-block p`
+  // (messages.component.scss) — the per-message clock timestamp under each
+  // chat bubble.
+  chatTimestampMuted:  '#777777',
+  // Angular: `.color-b3b3b3` (global.scss) — a deleted profile's greyed-out
+  // name/message text in the messager-list row.
+  chatDeletedRowText:  '#b3b3b3',
 }

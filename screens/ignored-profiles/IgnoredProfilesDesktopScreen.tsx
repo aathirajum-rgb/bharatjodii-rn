@@ -41,9 +41,10 @@ import { communicationBtnOnClick, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit
 import { redirectToViewProfile } from '../../service/buttonService'
 import { getItem } from '../../service/storageService'
 import {
-  openMembershipTab, fetchUpgradePaymentPromo, redirectToIntermediatePage,
+  fetchUpgradePaymentPromo, redirectToIntermediatePage,
   type UpgradePaymentPromo,
 } from '../../service/paymentService'
+import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { StorageKeys } from '../../constants/storage.keys'
 import { Colors } from '../../constants/colors'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
@@ -280,15 +281,7 @@ export default function IgnoredProfilesDesktopScreen({ navigation }: Props) {
     if (num) Linking.openURL(`https://wa.me/${num}`)
   }
 
-  function handleTabPress(tab: FooterTab) {
-    switch (tab) {
-      case 0: navigation.navigate('Home');     break
-      case 1: navigation.navigate('Matches');  break
-      case 2: navigation.navigate('Activity'); break
-      case 3: openMembershipTab(); break
-      case 4: navigation.navigate('MessagerList'); break
-    }
-  }
+  const handleTabPress = (tab: FooterTab) => handleFooterTabPress(navigation, tab)
 
   function noop() {}
 

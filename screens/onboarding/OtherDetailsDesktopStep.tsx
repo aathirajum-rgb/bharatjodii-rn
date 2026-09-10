@@ -125,7 +125,7 @@ export default function OtherDetailsDesktopStep({ navigation }: Props) {
 
       await refreshSession()
       await setItem('LASTAPPLOGINAT', new Date().toISOString())
-      navigation.navigate('Home')
+      navigation.navigate('MainTabs', { screen: 'Home' })
     } catch {
       // allow retry
     } finally {

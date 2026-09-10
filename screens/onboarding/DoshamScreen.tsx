@@ -126,7 +126,7 @@ export default function DoshamScreen({ navigation }: Props) {
         await submitHoroscopeDetails(star, raasi, doshamValue)
         await refreshSession()
         await setItem('LASTAPPLOGINAT', new Date().toISOString())
-        navigation.navigate('Home')
+        navigation.navigate('MainTabs', { screen: 'Home' })
       } catch {
         // allow retry
       } finally {
@@ -142,7 +142,7 @@ export default function DoshamScreen({ navigation }: Props) {
         await submitHoroscopeDetails(star, raasi, '2')
         await refreshSession()
         await setItem('LASTAPPLOGINAT', new Date().toISOString())
-        navigation.navigate('Home')
+        navigation.navigate('MainTabs', { screen: 'Home' })
       } catch {
         setSubmitting(false)
       }
@@ -158,7 +158,7 @@ export default function DoshamScreen({ navigation }: Props) {
   async function handleSkip() {
     await refreshSession()
     await setItem('LASTAPPLOGINAT', new Date().toISOString())
-    navigation.navigate('Home')
+    navigation.navigate('MainTabs', { screen: 'Home' })
   }
 
   const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()

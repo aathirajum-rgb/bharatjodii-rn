@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import type { ExploreFacet } from '../../service/homeService'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export interface FacetFilterModalProps {
   visible:  boolean
@@ -108,9 +108,11 @@ const m = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.divider,
   },
+  // Angular: filter.component.html QUICKFILTER title — ion-label
+  // heading2-semibold-18 (var(--font18)), not font16.
   title: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   16,
+    fontSize:   FontSize.font18,
     color:      '#000000',
   },
   closeText: {
@@ -145,10 +147,11 @@ const m = StyleSheet.create({
     fontSize:   13,
     lineHeight: 15,
   },
+  // Angular: filter.component.html ion-label body2-regular-14 → var(--font14)
   rowText: {
     flex:       1,
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      '#000000',
   },
   applyBtn: {

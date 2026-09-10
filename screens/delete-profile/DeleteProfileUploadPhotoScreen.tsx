@@ -22,7 +22,7 @@ import { StorageKeys } from '../../constants/storage.keys'
 import { getItem, getMultiple } from '../../service/storageService'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
-import { openMembershipTab } from '../../service/paymentService'
+import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileUploadPhotoDesktopLayout from './DeleteProfileUploadPhotoDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
@@ -158,15 +158,7 @@ export default function DeleteProfileUploadPhotoScreen({ navigation, route }: Pr
     await callDeleteAPI()
   }
 
-  function handleTabPress(tab: FooterTab) {
-    switch (tab) {
-      case 0: navigation.navigate('Home');     break
-      case 1: navigation.navigate('Matches');  break
-      case 2: navigation.navigate('Activity'); break
-      case 3: openMembershipTab(); break
-      case 4: navigation.navigate('MessagerList'); break
-    }
-  }
+  const handleTabPress = (tab: FooterTab) => handleFooterTabPress(navigation, tab)
 
   // ── Render ────────────────────────────────────────────────────────────────
 

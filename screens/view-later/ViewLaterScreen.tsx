@@ -39,9 +39,10 @@ import { redirectToViewProfile } from '../../service/buttonService'
 import { handleBack } from '../../utils/navigationRef'
 import { getItem } from '../../service/storageService'
 import {
-  openMembershipTab, fetchUpgradePaymentPromo, redirectToIntermediatePage,
+  fetchUpgradePaymentPromo, redirectToIntermediatePage,
   type UpgradePaymentPromo,
 } from '../../service/paymentService'
+import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { StorageKeys } from '../../constants/storage.keys'
 import { CDN_REACT } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
@@ -220,15 +221,7 @@ export default function ViewLaterScreen({ navigation }: Props) {
     ? `${t('GENERAL.VIEWLATER_PROFILES')} (${totalCount})`
     : t('GENERAL.VIEWLATER_PROFILES')
 
-  function handleTabPress(tab: FooterTab) {
-    switch (tab) {
-      case 0: navigation.navigate('Home');     break
-      case 1: navigation.navigate('Matches');  break
-      case 2: navigation.navigate('Activity'); break
-      case 3: openMembershipTab(); break
-      case 4: navigation.navigate('MessagerList'); break
-    }
-  }
+  const handleTabPress = (tab: FooterTab) => handleFooterTabPress(navigation, tab)
 
   const sheets = (
     <>

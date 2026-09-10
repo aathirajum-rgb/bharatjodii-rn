@@ -30,6 +30,7 @@ import CdnLottie from '../../components/CdnLottie'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
+import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { useNetwork } from '../../contexts/NetworkContext'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import RechargeDesktopLayout from './RechargeDesktopLayout'
@@ -77,15 +78,10 @@ export default function RechargeScreen({ navigation, route }: Props) {
   // see handleTabPress() in every screen with an AppFooter.
   const fromTab = !!route?.params?.fromTab
 
-  function handleTabPress(tab: FooterTab) {
-    switch (tab) {
-      case 0: navigation.navigate('Home');     break
-      case 1: navigation.navigate('Matches');  break
-      case 2: navigation.navigate('Activity'); break
-      case 4: navigation.navigate('MessagerList'); break
-      // case 3 (Membership) — already here, no-op.
-    }
-  }
+  // Membership tap is a no-op here — already on the Membership destination,
+  // and re-firing openMembershipTab()'s own navigate() would push a
+  // duplicate instance of this screen on top of itself.
+  const handleTabPress = (tab: FooterTab) => handleFooterTabPress(navigation, tab, null)
 
   const [data, setData]           = useState<MembershipPlansData | null>(null)
   const [selectedId, setSelected] = useState('')

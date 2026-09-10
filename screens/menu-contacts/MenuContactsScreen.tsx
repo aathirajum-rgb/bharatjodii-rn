@@ -58,6 +58,7 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { getMembershipTierTheme } from './membershipTierTheme'
 import MenuContactsDesktopLayout from './MenuContactsDesktopLayout'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
+import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ICONS = {
@@ -105,15 +106,10 @@ export default function MenuContactsScreen({ navigation, route }: { navigation: 
   // arrow and the tab bar are two faces of the same flag, never both shown.
   const fromTab = !!route?.params?.fromTab
 
-  function handleTabPress(tab: FooterTab) {
-    switch (tab) {
-      case 0: navigation.navigate('Home');     break
-      case 1: navigation.navigate('Matches');  break
-      case 2: navigation.navigate('Activity'); break
-      case 4: navigation.navigate('MessagerList'); break
-      // case 3 (Membership) — already here, no-op.
-    }
-  }
+  // Membership tap is a no-op here — already on the Membership destination,
+  // and re-firing openMembershipTab()'s own navigate() would push a
+  // duplicate instance of this screen on top of itself.
+  const handleTabPress = (tab: FooterTab) => handleFooterTabPress(navigation, tab, null)
 
   // Angular: footer.component.ts:97-100 — upgradeTag = getMenuPromo()'s
   // MENUDISCOUNT ('' when absent), the "₹1200 OFF" chip over the Membership

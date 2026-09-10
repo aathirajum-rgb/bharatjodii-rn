@@ -1,4 +1,5 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import type { NavigatorScreenParams } from '@react-navigation/native'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Animated, KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -36,6 +37,7 @@ const CDN_FORWARD_ICON_GREY = CDN_SVG + 'revamp/forward-icon-grey.svg'
 const CDN_CLOSE_ICON = CDN_SVG + 'revamp/close-white.svg'
 import ComponentShowcaseScreen    from '../screens/dev/ComponentShowcaseScreen'
 import HomeScreen                  from '../screens/home/HomeScreen'
+import MainTabs, { type MainTabsParamList } from './MainTabs'
 import GalleryScreen               from '../screens/GalleryScreen'
 import CreatedByScreen             from '../screens/onboarding/CreatedByScreen'
 import NameScreen                  from '../screens/onboarding/NameScreen'
@@ -86,7 +88,6 @@ import BookAppointmentScreen        from '../screens/payment/BookAppointmentScre
 import RechargeScreen              from '../screens/payment/RechargeScreen'
 import type { SelectedPackage }    from '../service/paymentService'
 import PermissionDemoScreen        from '../screens/PermissionDemoScreen'
-import MatchesScreen               from '../screens/matches/MatchesScreen'
 import DailyRecommendationScreen   from '../screens/daily-recommendation/DailyRecommendationScreen'
 import ViewProfileScreen           from '../screens/viewprofile/ViewProfileScreen'
 import BlockerScreen               from '../screens/verify/BlockerScreen'
@@ -98,8 +99,6 @@ import ValidationScreen            from '../screens/validation/ValidationScreen'
 import DiscoverMatchesScreen       from '../screens/discover-matches/DiscoverMatchesScreen'
 import AddPhotoIntermediateScreen  from '../screens/addphoto-intermediate/AddPhotoIntermediateScreen'
 import StarMatchingScreen          from '../screens/star-matching/StarMatchingScreen'
-import ActivityScreen               from '../screens/activity/ActivityScreen'
-import MessagerListScreen           from '../screens/messagerList/MessagerListScreen'
 import ChatScreen                   from '../screens/chat/ChatScreen'
 import SafetyTipsScreen             from '../screens/safety-tips/SafetyTipsScreen'
 import LanguageSelectionScreen     from '../screens/LanguageSelectionScreen'
@@ -139,10 +138,13 @@ import ExternalPageScreen                  from '../screens/external-page/Extern
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type AppStackParamList = {
-  Home:              undefined
-  // exploreType/exploreLabel — Angular: matches.page.ts explorePage branch (FILTERTYPE
-  // scoped listing, e.g. tapping a Home "Explore matches based on" category tile)
-  Matches:           { exploreType?: string; exploreLabel?: string; searchParams?: string } | undefined
+  // Home/Matches/Activity/MessagerList moved to MainTabs.tsx's own Tab.Navigator
+  // (a real BottomTabNavigator) so switching between them re-focuses an
+  // existing mounted screen instead of pushing a new one every time.
+  MainTabs:          NavigatorScreenParams<MainTabsParamList> | undefined
+  // Web deep-link alias only ('dashboard' path) — redirects into MainTabs'
+  // Home tab (DashboardRedirect below) rather than rendering a second,
+  // footer-less HomeScreen instance outside the tab navigator.
   dashboard:         undefined
   // standalone — set when entering page 21 (ManagePhotosScreen) from outside the
   // onboarding wizard (e.g. Help Center's "Add Photo" quick link); its Confirm
@@ -167,12 +169,6 @@ export type AppStackParamList = {
   // modal ON TOP of the current page (Matches, onboarding, etc.) — never a full-screen
   // push. AuthStack's own LanguageSelection route (pre-login, full-screen) is separate.
   LanguageSelection: undefined
-  // Angular: activity.component reads BOTH the :module route param and the
-  // router state ({ activityType, selectedSubTab }) — Home's "see all" links for
-  // "Profiles who viewed you" / "Profiles you viewed" / "Liked profiles" open
-  // this screen already switched to that list (app-swiper's onClickSeeAllCTA).
-  Activity:          { activityType?: 'likedyou' | 'likesent' | 'viewedyou' | 'viewedbyme'; selectedSubTab?: 'viewedbyme' | 'viewinglater' } | undefined
-  MessagerList:      undefined
   // partnerOnline/partnerLastActive are an immediate-render seed only — ChatScreen.tsx
   // re-confirms both via its own BasicView/RESPBASIC round-trip on mount, matching
   // Angular's own reliance on that socket call over trusting the caller's handoff.
@@ -644,19 +640,33 @@ const shell = StyleSheet.create({
   },
 })
 
+// 'dashboard' is a web deep-link-only alias for Home (ENavigation.DASHBOARD) —
+// Home itself now lives inside MainTabs, so this just redirects there instead
+// of rendering a second, footer-less HomeScreen instance outside the tabs.
+function DashboardRedirect({ navigation }: { navigation: any }) {
+  useEffect(() => {
+    navigation.replace('MainTabs', { screen: 'Home' })
+  }, [navigation])
+  return null
+}
+
 // ─── Stack ────────────────────────────────────────────────────────────────────
 
 const Stack = createNativeStackNavigator<AppStackParamList>()
 
 export default function AppStack() {
   const { initialRoute } = useAuth()
+  // initialRoute resolves to 'onboarding' | 'Matches' | 'recharge' — 'Matches'
+  // now lives inside MainTabs (whose own initialRouteName is already
+  // 'Matches'), not as a flat screen on this stack.
+  const stackInitialRoute = initialRoute === 'Matches' ? 'MainTabs' : initialRoute
 
   return (
     <Stack.Navigator
       screenOptions={{ headerShown: false }}
-      initialRouteName={initialRoute}
+      initialRouteName={stackInitialRoute}
     >
-      <Stack.Screen name="Matches"   component={MatchesScreen} />
+      <Stack.Screen name="MainTabs" component={MainTabs} />
       <Stack.Screen name="daily-recommendations" component={DailyRecommendationScreen} />
       <Stack.Screen name="viewProfile" component={ViewProfileScreen} />
       <Stack.Screen
@@ -677,8 +687,7 @@ export default function AppStack() {
       <Stack.Screen name="DiscoverMatches" component={DiscoverMatchesScreen} />
       <Stack.Screen name="addphoto-intermediate" component={AddPhotoIntermediateScreen} />
       <Stack.Screen name="star-matching" component={StarMatchingScreen} />
-      <Stack.Screen name="Home"      component={HomeScreen} />
-      <Stack.Screen name="dashboard" component={HomeScreen} />
+      <Stack.Screen name="dashboard" component={DashboardRedirect} />
       <Stack.Screen name="onboarding" component={OnboardingRouter} />
       <Stack.Screen
         name="Permissions"
@@ -725,8 +734,6 @@ export default function AppStack() {
       <Stack.Screen name="payment-failed" component={PaymentFailedScreen} />
       <Stack.Screen name="doorstep-collection" component={DoorstepCollectionScreen} />
       <Stack.Screen name="renewal" component={RenewalScreen} />
-      <Stack.Screen name="Activity" component={ActivityScreen} />
-      <Stack.Screen name="MessagerList" component={MessagerListScreen} />
       <Stack.Screen name="chat-window" component={ChatScreen} />
       <Stack.Screen name="safety-tips" component={SafetyTipsScreen} />
       <Stack.Screen name="Menu" component={MenuScreen} />

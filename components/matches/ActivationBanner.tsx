@@ -11,7 +11,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CDN = CDN_SVG
 const ALERT_CIRCLE_URI = CDN + 'revamp/alert-circle.svg'
@@ -68,16 +68,19 @@ const rich = StyleSheet.create({
     marginBottom:      16,
   },
   left: { gap: 16, flexShrink: 1 },
+  // Angular: breather.component.html ADDPHOTO title — heading1-semibold-22 black-color
+  // line-height-32 (same real banner mobile's AddPhotoBanner renders — 22px, not 24).
   title: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   24,
+    fontSize:   FontSize.font22,
     lineHeight: 32,
     color:      Colors.black,
   },
   checklist: { gap: 8 },
+  // Angular: breather.component.html ADDPHOTO bullets — body2-regular-14 black-color
   checkText: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.black,
   },
   cta: {
@@ -92,7 +95,7 @@ const rich = StyleSheet.create({
   },
   ctaText: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.white,
   },
   iconCircle: {

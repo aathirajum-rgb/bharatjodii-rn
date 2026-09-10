@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import { SemanticFontsEnglish } from '../../src/theme/fonts'
+import { FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const REMOVE_ICON_URI  = CDN_SVG + 'remove-photo-img.svg'
 const REPORT_ICON_URI  = CDN_SVG + 'viewprofile/report-profile-img.svg'
@@ -154,5 +154,6 @@ const s = StyleSheet.create({
   // line itself (rather than changing the row's own Angular-matched 8px
   // padding) so rows don't feel cramped against it.
   itemDivider: { height: StyleSheet.hairlineWidth, backgroundColor: '#f0f0f0', marginHorizontal: 16, marginVertical: 4 },
-  itemText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  // Angular: report-remove-profile.component.html — body2-regular-14 black-color
+  itemText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
 })

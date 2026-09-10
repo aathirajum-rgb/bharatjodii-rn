@@ -59,6 +59,29 @@ export interface ListingResult {
 
 export const EMPTY_LISTING: ListingResult = { items: [], bannerSlots: [], totalCount: 0, newCount: 0 }
 
+// ─── Short-TTL cache for Home's per-focus refetch storm ──────────────────────
+// HomeScreen.tsx's useFocusEffect calls loadHome() on EVERY focus (tab-switch
+// back to Home, back-navigation from any pushed screen) — with no cache at
+// all, this refetched every listing/session section below from scratch even
+// when the user was away for a couple of seconds. A short TTL is enough to
+// absorb that "just switched tabs and back" case while still feeling live for
+// anything longer. Keyed by user id (not cleared on logout) so a cache entry
+// can never resolve for a different account that logs in later in the same
+// app session — a miss just means one extra network round trip, not a leak.
+const HOME_CACHE_TTL_MS = 45_000
+const homeCache = new Map<string, { data: unknown; expiresAt: number }>()
+
+async function withTtlCache<T>(name: string, fetcher: () => Promise<T>): Promise<T> {
+  const userId = (await getItem(StorageKeys.Auth.USER_ID)) ?? ''
+  const key = `${name}:${userId}`
+  const hit = homeCache.get(key)
+  if (hit && hit.expiresAt > Date.now()) return hit.data as T
+
+  const data = await fetcher()
+  homeCache.set(key, { data, expiresAt: Date.now() + HOME_CACHE_TTL_MS })
+  return data
+}
+
 // ─── Profile mapper ───────────────────────────────────────────────────────────
 
 // Exported so DailyRecommendationScreen can run drService's raw (uncached-envelope)
@@ -194,6 +217,9 @@ export function toListingResult(res: Record<string, any>): ListingResult {
 // in registrationService.ts) — NOT as individual AsyncStorage keys.
 // Only ATN, RTN, NBID, LOGINGENDER, CCODE/MCODE, and LANG are individual keys.
 
+// Not TTL-cached like the network-backed fetches below — this is already
+// just two AsyncStorage reads (no round trip to save), and caching it would
+// risk serving a stale LANG right after a language switch writes a new one.
 export async function fetchHomeSession(): Promise<HomeSession> {
   const [session, lang] = await Promise.all([
     getSession(),                        // reads USER_SESSION blob
@@ -312,6 +338,9 @@ export interface NotifCountResult {
   comCount: ComCountEntry[]
 }
 
+// Not TTL-cached — ActivityScreen.tsx's REFRESH_ACTIVITY_COUNT flow deliberately
+// force-refetches this after the user views a profile out of these lists so
+// badge counts aren't stale; a shared cache here would silently defeat that.
 export async function fetchNotifCount(): Promise<NotifCountResult> {
   const [userId, gender, session] = await Promise.all([
     getItem(StorageKeys.Auth.USER_ID),
@@ -354,7 +383,11 @@ export async function fetchMenuPromo(): Promise<any> {
 // Stores full RESPONSE blob in PPSETDATA (read by communicationService for call/whatsapp)
 // Also stores PHOTOCOUNT, PHOTOAVAILABLE, VERIFIEDBYCALLNUM
 
-export async function fetchAndStorePPSetData(): Promise<Record<string, any>> {
+export function fetchAndStorePPSetData(): Promise<Record<string, any>> {
+  return withTtlCache('fetchAndStorePPSetData', fetchAndStorePPSetDataUncached)
+}
+
+async function fetchAndStorePPSetDataUncached(): Promise<Record<string, any>> {
   const [userId, gender] = await Promise.all([
     getItem(StorageKeys.Auth.USER_ID),
     getItem(StorageKeys.User.LOGIN_GENDER),
@@ -596,7 +629,11 @@ export async function fetchMatches(start = 0, limit = 20, quickFilters?: QuickFi
 // never shows banner slots or the freematch paywall gate, so those params don't
 // apply here.
 
-export async function fetchHomeAllMatches(): Promise<ListingResult> {
+export function fetchHomeAllMatches(): Promise<ListingResult> {
+  return withTtlCache('fetchHomeAllMatches', fetchHomeAllMatchesUncached)
+}
+
+async function fetchHomeAllMatchesUncached(): Promise<ListingResult> {
   const userId = await getItem(StorageKeys.Auth.USER_ID)
   const params = `ID=${userId ?? ''}&START=0&LIMIT=50&LIKED=1&VIEWED=0&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&MYHOME=1`
   const res = await apiCall(Endpoints.listing.matches, 'POST', params)
@@ -680,7 +717,11 @@ export async function fetchSearchResults(searchParams: string, signal?: AbortSig
 // ERRCODE 23 ("ATN and RTN Expire!", a red herring — the real cause is the
 // server rejecting the unrecognized param shape) even with a fully valid token.
 
-export async function fetchViewedYou(): Promise<ListingResult> {
+export function fetchViewedYou(): Promise<ListingResult> {
+  return withTtlCache('fetchViewedYou', fetchViewedYouUncached)
+}
+
+async function fetchViewedYouUncached(): Promise<ListingResult> {
   const [userId, session] = await Promise.all([getItem(StorageKeys.Auth.USER_ID), getSession()])
   const params = `ID=${userId ?? ''}&START=0&LIMIT=20&BANNERFLAG=0&MYHOME=1&LASTLOGIN=${session['LASTLOGIN'] ?? ''}`
   const res = await apiCall(Endpoints.listing.viewedYou, 'POST', params)
@@ -692,7 +733,11 @@ export async function fetchViewedYou(): Promise<ListingResult> {
 // SKIPED=1,MYHOME=1 — same shape fetchDailyRecommendations() below already uses;
 // this wrapper just returns the ListingResult (with totalCount) shape Home needs.
 
-export async function fetchDailyRec(): Promise<ListingResult> {
+export function fetchDailyRec(): Promise<ListingResult> {
+  return withTtlCache('fetchDailyRec', fetchDailyRecUncached)
+}
+
+async function fetchDailyRecUncached(): Promise<ListingResult> {
   const userId = await getItem(StorageKeys.Auth.USER_ID)
   const params = `ID=${userId ?? ''}&START=0&LIMIT=15&LIKED=1&VIEWED=1&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&MYHOME=1`
   const res = await apiCall(Endpoints.listing.dailyRecommendations, 'POST', params)
@@ -704,7 +749,11 @@ export async function fetchDailyRec(): Promise<ListingResult> {
 // ID,START=0,LIMIT=30,LIKED=1,VIEWED=1,REPORTED=1,BLOCKED=1,REMOVED=1,SKIPED=1,
 // BANNERFLAG=0,LOGINCOUNT,NEWMATCHES=1,MYHOME=1.
 
-export async function fetchNewlyJoined(): Promise<ListingResult> {
+export function fetchNewlyJoined(): Promise<ListingResult> {
+  return withTtlCache('fetchNewlyJoined', fetchNewlyJoinedUncached)
+}
+
+async function fetchNewlyJoinedUncached(): Promise<ListingResult> {
   const [userId, session] = await Promise.all([getItem(StorageKeys.Auth.USER_ID), getSession()])
   const loginCount = session['LOGINCOUNT'] ?? '0'
   const parts = [
@@ -719,7 +768,11 @@ export async function fetchNewlyJoined(): Promise<ListingResult> {
 // ─── Profiles you viewed ──────────────────────────────────────────────────────
 // Angular: ID,START=0,LIMIT=10,BANNERFLAG=0,SKIPED=1,MYHOME=1.
 
-export async function fetchViewedByMe(): Promise<ListingResult> {
+export function fetchViewedByMe(): Promise<ListingResult> {
+  return withTtlCache('fetchViewedByMe', fetchViewedByMeUncached)
+}
+
+async function fetchViewedByMeUncached(): Promise<ListingResult> {
   const userId = await getItem(StorageKeys.Auth.USER_ID)
   const params = `ID=${userId ?? ''}&START=0&LIMIT=10&BANNERFLAG=0&SKIPED=1&MYHOME=1`
   const res = await apiCall(Endpoints.listing.viewedByMe, 'POST', params)
@@ -729,7 +782,11 @@ export async function fetchViewedByMe(): Promise<ListingResult> {
 // ─── Liked by me ──────────────────────────────────────────────────────────────
 // Angular: ID,START=0,LIMIT=10,BANNERFLAG=0,SKIPED=1.
 
-export async function fetchLikedByMe(): Promise<ListingResult> {
+export function fetchLikedByMe(): Promise<ListingResult> {
+  return withTtlCache('fetchLikedByMe', fetchLikedByMeUncached)
+}
+
+async function fetchLikedByMeUncached(): Promise<ListingResult> {
   const userId = await getItem(StorageKeys.Auth.USER_ID)
   const params = `ID=${userId ?? ''}&START=0&LIMIT=10&BANNERFLAG=0&SKIPED=1`
   const res = await apiCall(Endpoints.listing.likedByMe, 'POST', params)
@@ -739,7 +796,11 @@ export async function fetchLikedByMe(): Promise<ListingResult> {
 // ─── Liked you ────────────────────────────────────────────────────────────────
 // Angular: ID,START=0,LIMIT=10,BANNERFLAG=0,SKIPED=1.
 
-export async function fetchLikedYou(): Promise<ListingResult> {
+export function fetchLikedYou(): Promise<ListingResult> {
+  return withTtlCache('fetchLikedYou', fetchLikedYouUncached)
+}
+
+async function fetchLikedYouUncached(): Promise<ListingResult> {
   const userId = await getItem(StorageKeys.Auth.USER_ID)
   const params = `ID=${userId ?? ''}&START=0&LIMIT=10&BANNERFLAG=0&SKIPED=1`
   const res = await apiCall(Endpoints.listing.likedYou, 'POST', params)
@@ -852,7 +913,11 @@ export async function fetchProfileValidationBanner(): Promise<ProfileValidationB
 // ─── Success Stories ──────────────────────────────────────────────────────────
 // Angular: ID,TYPE=5.
 
-export async function fetchSuccessStories(): Promise<SwiperItem[]> {
+export function fetchSuccessStories(): Promise<SwiperItem[]> {
+  return withTtlCache('fetchSuccessStories', fetchSuccessStoriesUncached)
+}
+
+async function fetchSuccessStoriesUncached(): Promise<SwiperItem[]> {
   const userId = await getItem(StorageKeys.Auth.USER_ID)
   const res = await apiCall(Endpoints.registration.successStory, 'POST', `ID=${userId ?? ''}&TYPE=5`)
   // Angular: response nests the array at RESPONSE.SUCCESSSTORY, not top-level.

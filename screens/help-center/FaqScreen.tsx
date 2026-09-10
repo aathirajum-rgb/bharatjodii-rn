@@ -200,7 +200,7 @@ function FaqDetail({
       return
     }
     if (type === 'CONTACTMATCHES' && label === item.CTA && label.toLowerCase().includes('activity')) {
-      navigation.navigate('Activity')
+      navigation.navigate('MainTabs', { screen: 'Activity' })
       return
     }
     if (type === 'PAYMENT') { onCallSupport(); return }

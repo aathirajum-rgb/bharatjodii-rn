@@ -185,13 +185,26 @@ export async function requestPermissionAndGetToken(): Promise<string | null> {
     return null
   }
 
-  const Notifications = await import('expo-notifications')
-  const { status: existing } = await Notifications.getPermissionsAsync()
-  let finalStatus = existing
+  let finalStatus: string
+  try {
+    const Notifications = await import('expo-notifications')
+    const { status: existing } = await Notifications.getPermissionsAsync()
+    finalStatus = existing
 
-  if (existing !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync()
-    finalStatus = status
+    if (existing !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync()
+      finalStatus = status
+    }
+  } catch (err) {
+    // On web, Notification.requestPermission() rejects when not called from
+    // a user gesture (e.g. this fires from checkAuth() at app startup) —
+    // degrade gracefully instead of crashing, same as the getToken() failure
+    // path below. Logged with console.warn (not the [CRASH] logger's
+    // console.error) so the message/stack print as plain text instead of
+    // being swallowed into the dev overlay's code-frame-only rendering.
+    console.warn('[Push] permission check failed:', err instanceof Error ? (err.stack ?? err.message) : err)
+    showDebugToast(`Push: permission check failed — ${err instanceof Error ? err.message : String(err)}`)
+    return null
   }
 
   if (finalStatus !== 'granted') {

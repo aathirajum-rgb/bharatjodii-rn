@@ -2,7 +2,7 @@
 // photo-left/info-right layout. Same props as the mobile MatchCard
 // (screens/matches/MatchesScreen.tsx) so MatchesDesktopLayout can pass the
 // exact same profile/handlers with zero adaptation.
-import { useState, type ReactNode } from 'react'
+import { memo, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
@@ -27,7 +27,10 @@ const CDN = CDN_SVG
 // 220×260 rectangle this previously guessed at.
 const DEFAULT_PHOTO_SIZE = 248
 
-export default function MatchCardDesktop({
+// Wrapped in memo() to match the mobile MatchCard (MatchesScreen.tsx) —
+// unrelated re-renders of the desktop list/screen shouldn't force every
+// visible card to re-render during scroll.
+const MatchCardDesktop = memo(function MatchCardDesktop({
   profile, oppGender, ownEntryType, femaleFreeEligible, indNumbersLeft,
   onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp, onMessage,
   showLikedBadge, menu, photoSize,
@@ -299,7 +302,9 @@ export default function MatchCardDesktop({
       </View>
     </View>
   )
-}
+})
+
+export default MatchCardDesktop
 
 const c = StyleSheet.create({
   card: {

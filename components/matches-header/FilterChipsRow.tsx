@@ -11,7 +11,7 @@ import { ScrollView, StyleSheet } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import Chip from '../chip/Chip'
 import { Colors } from '../../constants/colors'
-import { SemanticFontsEnglish } from '../../src/theme/fonts'
+import { FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // Angular: filter.config.ts's quickFilterList entries. `type: 'searchPage'`
 // marks the one chip that navigates to the filter page instead of toggling a
@@ -136,10 +136,11 @@ const f = StyleSheet.create({
     flexDirection: 'row',
     alignItems:    'center',
   },
+  // Angular: chip.component.html ion-label color-1f1e1b body2-regular-14 → var(--font14)
   chipText: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     lineHeight: 20,
-    color:      Colors.textPrimary,
+    color:      Colors.chipLabelText,
   },
 })

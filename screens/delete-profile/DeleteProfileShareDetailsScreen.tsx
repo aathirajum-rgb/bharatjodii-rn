@@ -20,7 +20,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import { StorageKeys } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
-import { openMembershipTab } from '../../service/paymentService'
+import { handleFooterTabPress } from '../../utils/footerTabPress'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
@@ -284,15 +284,7 @@ export default function DeleteProfileShareDetailsScreen({ navigation, route }: P
     setMarriedInLabel(value)
   }
 
-  function handleTabPress(tab: FooterTab) {
-    switch (tab) {
-      case 0: navigation.navigate('Home');     break
-      case 1: navigation.navigate('Matches');  break
-      case 2: navigation.navigate('Activity'); break
-      case 3: openMembershipTab(); break
-      case 4: navigation.navigate('MessagerList'); break
-    }
-  }
+  const handleTabPress = (tab: FooterTab) => handleFooterTabPress(navigation, tab)
 
   // ── Render ────────────────────────────────────────────────────────────────
 

@@ -30,11 +30,10 @@ import {
   fetchExploreCategories, fetchAndStorePPSetData, type ExploreCategory,
 } from '../../service/homeService'
 import { ExploreCategoriesSection } from '../home/HomeScreen'
-import { ENavigation } from '../../types/enums/navigation.enum'
-import { openMembershipTab } from '../../service/paymentService'
+import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { setFilterEventType } from '../../service/filterService'
 import { handleBack } from '../../utils/navigationRef'
-import { SemanticFontsEnglish } from '../../src/theme/fonts'
+import { FontSize, Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
@@ -63,15 +62,7 @@ export default function DiscoverMatchesScreen({ navigation }: Props) {
   // has no "none active" option — it's a strict 0-4 union), so Matches (1)
   // is highlighted as the closest thematic fit, matching how this screen is
   // reached from Home's own Matches-adjacent search icon.
-  function handleTabPress(tab: FooterTab) {
-    switch (tab) {
-      case 0: navigation.navigate('Home');     break
-      case 1: navigation.navigate('Matches');  break
-      case 2: navigation.navigate('Activity'); break
-      case 3: openMembershipTab(); break
-      case 4: navigation.navigate('MessagerList'); break
-    }
-  }
+  const handleTabPress = (tab: FooterTab) => handleFooterTabPress(navigation, tab)
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
@@ -110,7 +101,7 @@ export default function DiscoverMatchesScreen({ navigation }: Props) {
               would stack and double the margin. */}
           <ExploreCategoriesSection
             categories={categories}
-            onCategoryPress={cat => navigation.navigate(ENavigation.MATCHES, { exploreType: cat.id, exploreLabel: cat.label })}
+            onCategoryPress={cat => navigation.navigate('MainTabs', { screen: 'Matches', params: { exploreType: cat.id, exploreLabel: cat.label } })}
           />
         </ScrollView>
       )}
@@ -135,13 +126,15 @@ const s = StyleSheet.create({
     borderBottomWidth: 1, borderBottomColor: '#f1f5f9',
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
+  // Angular: heading4-medium-16 color-333333 (discover-matches.component.html:10)
+  // — font16 + Poppins-Medium; fontFamily was missing entirely before this fix.
+  headerTitle: { flex: 1, fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
 
   // No horizontal padding here — ExploreCategoriesSection applies its own
   // exact left/right padding (see its header comment in HomeScreen.tsx).
   content: { paddingTop: 24 },
 
   emptyState:  { paddingHorizontal: 32 },
-  emptyText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, textAlign: 'center', marginTop: 6, marginBottom: 16, lineHeight: 20 },
+  emptyText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, textAlign: 'center', marginTop: 6, marginBottom: 16, lineHeight: 20 },
   emptyBtn:    { marginTop: 0 },
 })

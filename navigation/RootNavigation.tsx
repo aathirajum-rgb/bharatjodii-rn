@@ -2,6 +2,7 @@ import {
   NavigationContainer,
   getPathFromState as defaultGetPathFromState,
   getStateFromPath as defaultGetStateFromPath,
+  type LinkingOptions,
 } from '@react-navigation/native'
 import * as Linking from 'expo-linking'
 import { useCallback, useEffect } from 'react'
@@ -14,8 +15,8 @@ import { refreshSession } from '../service/homeService'
 import { getItem, setItem } from '../service/storageService'
 import { getLinkingPrefixes, handleResolverURL } from '../service/deepLinkService'
 import { handleBack, navigationRef } from '../utils/navigationRef'
-import AppStack from './AppStack'
-import AuthStack from './AuthStack'
+import AppStack, { type AppStackParamList } from './AppStack'
+import AuthStack, { type AuthStackParamList } from './AuthStack'
 
 // ─── Web hash-based URL routing ───────────────────────────────────────────────
 // Target format: https://stgmobile.jodii.app/jodii/#/daily-recommendations?frm_page=login
@@ -53,7 +54,11 @@ function getHashRoute(): string {
 
 const WEB_BASE_PATH = '/jodii/';
 
-const linking = {
+// Typed against AppStackParamList (not left inferred) so TS's conditional
+// PathConfigMap type recognizes MainTabs' value as NavigatorScreenParams and
+// allows the nested `screens` map below — without this it only sees the
+// untyped default ParamListBase and rejects nested screens entirely.
+const linking: LinkingOptions<AppStackParamList & AuthStackParamList> = {
   prefixes: Platform.OS === 'web' ? [] : getLinkingPrefixes(),
   config: {
     screens: {
@@ -61,7 +66,17 @@ const linking = {
       login:             'login',
       otp:               'otp',
       // App screens
-      Home:              'home',
+      // Home/Matches/Activity/MessagerList live inside MainTabs' own
+      // Tab.Navigator now — nesting this config to match lets React
+      // Navigation build the correct nested state straight from the URL.
+      MainTabs: {
+        screens: {
+          Home:         'home',
+          Matches:      'matches',
+          Activity:     'activity',
+          MessagerList: 'messager-list',
+        },
+      },
       Permissions:       'permissions',
       Gallery:           'gallery',
       recharge:          'recharge',
@@ -75,7 +90,6 @@ const linking = {
       // registered Stack.Screen names, not copied from the ENavigation enum
       // (several enum values don't match, e.g. 'notification' vs 'Notification').
       viewProfile:            'viewprofile/:matriId',
-      Activity:               'activity',
       Notification:           'notification',
       'verify-id':            'verify-id',
       'selfie-verification':  'selfie-verification',
@@ -87,7 +101,6 @@ const linking = {
       Validation:             'validation',
       DiscoverMatches:        'discover-matches',
       'star-matching':        'star-matching',
-      Matches:                'matches',
       'chat-window':          'chat-window/:partnerId',
       Menu:                   'menu',
       Biodata:                'biodata',
@@ -118,7 +131,6 @@ const linking = {
       IgnoredProfiles:        'ignored-profiles',
       ViewLater:              'view-later',
       SearchById:             'search-by-id',
-      MessagerList:           'messager-list',
       ExternalPage:           'external-page',
       'payment-options':      'payment-options',
       'card-payment':         'card-payment',

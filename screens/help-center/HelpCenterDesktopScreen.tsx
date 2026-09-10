@@ -32,7 +32,7 @@ import { apiCall } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
 import { fetchCustomerCare } from '../../service/homeService'
 import { setFilterEventType } from '../../service/filterService'
-import { openMembershipTab } from '../../service/paymentService'
+import { handleFooterTabPress } from '../../utils/footerTabPress'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
@@ -92,7 +92,7 @@ export default function HelpCenterDesktopScreen({ navigation }: Props) {
       setFilterEventType('pp')
       navigation.navigate('Search')
     } else if (cta === 'Newly Joined') {
-      navigation.navigate('Matches', { exploreType: 'NEYLYJOINED', exploreLabel: title })
+      navigation.navigate('MainTabs', { screen: 'Matches', params: { exploreType: 'NEYLYJOINED', exploreLabel: title } })
     } else if (cta === 'Activity') {
       navigation.navigate('Faq', { type: 'CONTACTMATCHES', itemId: 9 })
     } else {
@@ -104,15 +104,7 @@ export default function HelpCenterDesktopScreen({ navigation }: Props) {
     if (csPhone) Linking.openURL(`tel:${csPhone}`)
   }
 
-  function handleTabPress(tab: FooterTab) {
-    switch (tab) {
-      case 0: navigation.navigate('Home');     break
-      case 1: navigation.navigate('Matches');  break
-      case 2: navigation.navigate('Activity'); break
-      case 3: openMembershipTab(); break
-      case 4: navigation.navigate('MessagerList'); break
-    }
-  }
+  const handleTabPress = (tab: FooterTab) => handleFooterTabPress(navigation, tab)
 
   const supportTopics = [
     { type: SUPPORT_TOPIC_TYPES[0], title: t('FAQ_DETAILS.HEADER_1') },

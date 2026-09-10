@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Pressable,
   StyleSheet,
   Text,
@@ -10,6 +9,7 @@ import {
   type StyleProp,
   type ViewStyle,
 } from 'react-native'
+import { Image } from 'expo-image'
 import { BlurView } from 'expo-blur'
 import { LinearGradient } from 'expo-linear-gradient'
 import * as ImagePicker from 'expo-image-picker'
@@ -336,9 +336,17 @@ export default function ProfilePhoto({
               borderBottomRightRadius: r.br,
             },
           ]}
-          resizeMode="cover"
+          contentFit="cover"
+          // memory-disk cache + recyclingKey so the same photo isn't
+          // re-downloaded/re-decoded every time this card remounts or is
+          // recycled by a FlatList — mirrors matchesCard.shared.tsx's swiper.
+          cachePolicy="memory-disk"
+          recyclingKey={profileImage}
+          transition={150}
           onError={() => setImgError(true)}
-          onLoad={onImageLoad}
+          // exactOptionalPropertyTypes forbids an explicit `onLoad: undefined`
+          // — only include the prop at all when a real callback was passed.
+          {...(onImageLoad ? { onLoad: onImageLoad } : {})}
         />
       )}
 

@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
+import type { FooterTab } from '../../components/app-footer/AppFooter'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
 import MessageSectionTabs from '../../components/messages/MessageSectionTabs'
@@ -35,7 +35,7 @@ import CdnLottie from '../../components/CdnLottie'
 import { EnvConfig } from '../../constants/env'
 import i18n from '../../i18n'
 import type { ChatListItem, ChatListResponse } from '../../types/interfaces/chatList.interface'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -508,9 +508,6 @@ export default function MessagerListScreen({ navigation }: Props) {
         </>
       )}
 
-      {/* ── Footer — tab 4 ("Messages") is this screen ── */}
-      <AppFooter activeTab={4} onTabPress={handleTabPress} />
-
       <Toast request={toastRequest} bottomOffset={56 + 16} />
     </View>
   )
@@ -532,7 +529,9 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: Colors.divider,
   },
-  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textDark },
+  // Angular: `heading2-semibold-18.clr0` — font18, semibold, pure black
+  // (clr0 = #000000), not textDark.
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, color: Colors.black },
 
   tabBarWrap: { backgroundColor: Colors.surface },
   tabScroll: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
@@ -543,12 +542,18 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   chipActive: { backgroundColor: Colors.chipSurfaceSelected, borderColor: Colors.chipBorderActive },
-  chipLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textDark },
-  chipLabelActive: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textDark },
+  // Angular: chip.component.html's ion-label is ALWAYS `color-1f1e1b
+  // body2-regular-14` regardless of selected state — the chip container's
+  // own border/background change on selection, the text color doesn't.
+  chipLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.chatNearBlackText },
+  chipLabelActive: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.chatNearBlackText },
   unreadBadge: {
     minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
     backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
   },
+  // No Angular equivalent — these phone-view sub-tab chips always pass
+  // [countShow]="false" in messager-list.component.html, so app-chip's own
+  // unread-count overlay never renders there; left as-is.
   unreadBadgeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 11, color: Colors.white },
 
   conversationListContent: { flexGrow: 1, paddingHorizontal: 16, paddingVertical: 8 },
@@ -559,11 +564,17 @@ const styles = StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 32, paddingTop: 40, gap: 12,
   },
-  emptyTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textPrimary, textAlign: 'center' },
-  emptySubtitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  // Angular: `heading3-semibold-16.black-color` — font16 (not 18), pure black.
+  emptyTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: Colors.black, textAlign: 'center' },
+  // Angular: `body2-regular-14.black-color` — pure black, not textSecondary.
+  emptySubtitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, textAlign: 'center', lineHeight: 20 },
   emptyBtn: {
     marginTop: 12, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 6,
     paddingHorizontal: 20, paddingVertical: 10,
   },
-  emptyBtnLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.primary },
+  // Angular: emptyCta's app-button-revamp uses the same SECONDARY_BTN config
+  // as AllMessagesEmptyState's CTA — [textColor]="'black'" and no
+  // [ctaFontSize]/[fontFamily] override (default body2-regular-14), not
+  // buttonEnglishMedium/primary.
+  emptyBtnLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
 })

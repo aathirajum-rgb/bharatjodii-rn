@@ -353,6 +353,29 @@ export async function clearSession(): Promise<void> {
       'REGISTRATION_VALUES',
       'REGISTERURL',
       'USER_SESSION',
+      // profileService.ts's getPPSetData() — cache-first (reads this before ever
+      // hitting the network), so leaving these in place after logout serves the
+      // PREVIOUS user's paywall/photo/preference state to whoever logs in next
+      // on the same device, until something happens to force a fresh fetch.
+      StorageKeys.App.PP_SET_DATA,
+      StorageKeys.Payment.PAYMENT_WALL,
+      'PHOTOCOUNT',
+      'PHOTOAVAILABLE',
+      'PI_VALIDATION',
+      'FAQENABLEFLAG',
+      'MOTHERTONGUE',
+      'NUMBEROFPAYMENTS',
+      'VERIFIEDBYCALLNUM',
+      // paymentService.ts's PAYMENT_CACHE_KEYS — a failed-payment sticky state
+      // tied to one user's one transaction attempt; must not survive into the
+      // next login or they'd land on a "your payment failed" screen for a
+      // payment they never made.
+      'PAYMENT_FAILED',
+      'PAYMENTFAILTYPE',
+      'PAYMENT_FAILED_EXPIRED',
+      'PAYMENTFAILURE_STICKY_UNTIL',
+      'PAYMENT_FAILED_PACKAGEID',
+      'PAYMENT_FAILED_CONTEXT',
     ])
 
     if (Object.keys(entries).length > 0) {

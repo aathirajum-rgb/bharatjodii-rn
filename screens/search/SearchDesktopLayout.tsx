@@ -29,7 +29,7 @@ import { sortFilterOptions } from '../../adapters/filterPreference.adapter'
 import type { FieldKey } from './SearchScreen'
 import { AGE_OPTIONS, SIMPLE_MULTI_FIELDS } from './SearchScreen'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
-import { openMembershipTab } from '../../service/paymentService'
+import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ICON_ARROW = CDN_REACT + '/menu_right_arrow.svg'
@@ -103,15 +103,7 @@ export default function SearchDesktopLayout(props: SearchDesktopLayoutProps) {
   } = props
   const { t } = useTranslation()
 
-  function handleTabPress(tab: FooterTab) {
-    switch (tab) {
-      case 0: navigation.navigate('Home');     break
-      case 1: navigation.navigate('Matches');  break
-      case 2: navigation.navigate('Activity'); break
-      case 3: openMembershipTab(); break
-      case 4: navigation.navigate('MessagerList'); break
-    }
-  }
+  const handleTabPress = (tab: FooterTab) => handleFooterTabPress(navigation, tab)
 
   function fieldRowPress(key: FieldKey) {
     if (key === 'AGE') { setAgeEditor('min'); return }

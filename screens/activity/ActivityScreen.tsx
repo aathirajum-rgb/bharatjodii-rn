@@ -35,7 +35,8 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
-import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
+import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { useFooterBadges } from '../../contexts/FooterBadgesContext'
 import LanguagePill from '../../components/language-pill/LanguagePill'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
@@ -169,6 +170,18 @@ export default function ActivityScreen({ navigation, route }: Props) {
 
   const isViewedList  = selectedType === 'viewedyou' || selectedType === 'viewedbyme'
   const listKey: ListKey = selectedType === 'viewedbyme' ? selectedSubTab : selectedType
+
+  // Angular: <app-footer *ngIf="!isViewedList()">. The tab bar is global now
+  // (MainTabs.tsx persists all 4 tabs), so hiding it while this screen shows
+  // its "viewed you"/"viewed by me" drill-down has to go through shared
+  // context instead of just not rendering a locally-owned <AppFooter> — and
+  // only while THIS screen is actually focused, so switching to another tab
+  // doesn't leave the footer hidden everywhere else.
+  const { setFooterVisible } = useFooterBadges()
+  useFocusEffect(useCallback(() => {
+    setFooterVisible(!isViewedList)
+    return () => setFooterVisible(true)
+  }, [isViewedList, setFooterVisible]))
 
   // ── Contact flow state (confirm → communicationBtnOnClick → result) ────────
   // Angular button.component.ts's two-step contact reveal: confirm → phoneviewed
@@ -1238,9 +1251,6 @@ export default function ActivityScreen({ navigation, route }: Props) {
           onClose={handleStickyClose}
         />
       )}
-
-      {/* ── Footer — Angular: <app-footer *ngIf="!isViewedList()"> ── */}
-      {!isViewedList && <AppFooter activeTab={2} onTabPress={handleTabPress} />}
 
       <BottomSheet
         visible={profileValidationSheetVisible}

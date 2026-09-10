@@ -1018,7 +1018,7 @@ export default function SearchScreen({ navigation }: Props) {
 
     await saveFilterState(selected, ppCheckBox, editedRows)
     const params = await buildSearchParams(matriId, 0, 20, { strictFilterApply })
-    navigation.navigate('Matches', { searchParams: params })
+    navigation.navigate('MainTabs', { screen: 'Matches', params: { searchParams: params } })
   }
 
   // ── Render ────────────────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { HtmlText } from './matchesCard.shared'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 function parseCssColor(style: string | undefined, prop: string): string | undefined {
   if (!style) return undefined
@@ -37,7 +37,10 @@ export default function MembershipBanner({ data, onPress }: { data: any; onPress
   const valid = stripHtml(data.VALID ?? data.FCONTENT ?? '')
   const benefits: Array<{ IMG?: string; VALUE?: string }> = Array.isArray(data.BENEFITS) ? data.BENEFITS : []
   const isWhite = data.FONTCOLOR === 'white-color'
-  const textColor = isWhite ? Colors.white : Colors.textStrong
+  // Angular: breather.component.ts's getOfferTagClassName()/title ngClass fall back to
+  // the literal 'black-color' class (#000000 = Colors.black) whenever FONTCOLOR isn't
+  // 'white-color' — not this app's general textStrong (#1a1a1a) token.
+  const textColor = isWhite ? Colors.white : Colors.black
   // Figma: pill is a light gradient fill + 1px border, both campaign-colored (Ramadan:
   // #218441/mint-green) — RN can't do the two-stop gradient cheaply here, so we take a
   // flat approximation from OFFERTAG's background color instead (accepted simplification).
@@ -87,7 +90,7 @@ export default function MembershipBanner({ data, onPress }: { data: any; onPress
         {/* Validity / timer pill — ribbon shape: rounded left corners only, no right border
             (Angular: border-t/border-b/border-l but no border-r, rounded-tl/rounded-bl only) */}
         {!!valid && (
-          <Text style={[mb.valid, { backgroundColor: validBg, borderColor: validBorder, color: isWhite ? Colors.white : '#000000' }]}>
+          <Text style={[mb.valid, { backgroundColor: validBg, borderColor: validBorder, color: isWhite ? Colors.white : Colors.black }]}>
             {valid}
           </Text>
         )}
@@ -161,31 +164,34 @@ const mb = StyleSheet.create({
   // heading2-semibold-18 for tm/ml. 22px, not 24 — that was from a different Figma node.
   title: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   22,
+    fontSize:   FontSize.font22,
     color:      Colors.textStrong,
     lineHeight: 24,
   },
   // Figma: "on paid membership!" line — 14px Poppins-Medium, tracking 0.28
+  // (Angular: breather.component.html:38 FESTIVALSUBTITLE — body1-medium-14 line-height-20)
   subtitle: {
     fontFamily:    Fonts.poppinsMedium,
-    fontSize:      14,
+    fontSize:      FontSize.font14,
     color:         Colors.textDark,
     marginTop:     8,
     lineHeight:    20,
     letterSpacing: 0.28,
   },
-  // Figma: the "₹200 OFF" span specifically — 24px Poppins-SemiBold (vs. the 14/16px
-  // surrounding copy) — applied via HtmlText's spanStyle regardless of server markup
+  // The "₹200 OFF" span specifically — Angular: breather.component.ts's transform() confirms
+  // the server-sent SUBTITLE span itself carries class heading1-semibold-22 (22px
+  // Poppins-SemiBold, var(--font22)) — 24px here was a Figma-node mismeasurement.
   subtitleAmount: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   24,
+    fontSize:   FontSize.font22,
   },
   // Figma: ribbon pill — 14px Poppins-Regular, h-24 (py-4), rounded left corners only,
   // border on top/bottom/left but NOT right (open ribbon edge, not a closed pill).
-  // Angular: breather.component.scss .offerTag { margin-top: 10px } (English)
+  // Angular: breather.component.scss .offerTag { margin-top: 10px } (English) — the pill
+  // text itself is body2-regular-14 (breather.component.html:49).
   valid: {
     fontFamily:              SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:                14,
+    fontSize:                FontSize.font14,
     lineHeight:              20,
     marginTop:               10,
     paddingHorizontal:       8,
@@ -217,7 +223,7 @@ const mb = StyleSheet.create({
   // Figma: 14px Poppins-Medium (not Regular/13)
   benefitText: {
     fontFamily: Fonts.poppinsMedium,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.textDark,
     flex:       1,
     lineHeight: 20,
@@ -237,6 +243,6 @@ const mb = StyleSheet.create({
   },
   ctaText: {
     fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
   },
 })
