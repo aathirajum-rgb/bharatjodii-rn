@@ -5,11 +5,12 @@ import {
   type LinkingOptions,
 } from '@react-navigation/native'
 import * as Linking from 'expo-linking'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, BackHandler, Platform, View } from 'react-native'
 import { useAuth } from '../contexts/AuthContext'
 import { useExitConfirm } from '../hooks/useExitConfirm'
 import ExitConfirmSheet from '../components/exit-confirm/ExitConfirmSheet'
+import WebRouteFadeOverlay from '../components/web-route-fade/WebRouteFadeOverlay'
 import type { ProfileDeactivateInfo } from '../components/auth/ProfileDeactivatedModal'
 import { refreshSession } from '../service/homeService'
 import { getItem, setItem } from '../service/storageService'
@@ -220,11 +221,31 @@ async function guardCheck(
 export default function RootNavigation() {
   const { isAuthenticated, loading, handleDeactivation } = useAuth()
 
+  // Top-of-stack route KEY (not name) of the ROOT navigator (AppStack or
+  // AuthStack — whichever is currently mounted directly under
+  // NavigationContainer), used only to drive WebRouteFadeOverlay below.
+  // Deliberately NOT the deepest focused route: MainTabs is one entry in
+  // this state regardless of which tab is active inside it, so switching
+  // Home/Matches/Activity/Messages never changes this entry's key and never
+  // triggers the fade. Using `key` rather than `name` matters for the
+  // registration wizard: every onboarding step is the SAME route name
+  // ('onboarding', see AppStack.tsx) pushed again with a different `pageNo`
+  // param (navigation.push('onboarding', { pageNo })) — `name` would stay
+  // "onboarding" for the whole wizard and never fire, but `push()` always
+  // creates a fresh route `key` per step, so comparing `key` correctly
+  // detects each step as its own transition.
+  const [topRouteKey, setTopRouteKey] = useState<string | undefined>(undefined)
+
   // onStateChange fires on every screen navigation — equivalent to canActivate.
   // Browser URL syncing on web is handled entirely by linking's
   // getPathFromState/getStateFromPath above — nothing to do for it here.
   const handleStateChange = useCallback(() => {
     guardCheck(isAuthenticated, handleDeactivation)
+    if (Platform.OS === 'web') {
+      const rootState = navigationRef.getRootState()
+      const topRoute = rootState?.routes[rootState.index]
+      setTopRouteKey(topRoute?.key)
+    }
   }, [isAuthenticated, handleDeactivation])
 
   // Registers the "Do you want to exit?" alert as handleBack()'s root
@@ -271,6 +292,7 @@ export default function RootNavigation() {
         onYes={exitConfirm.onYes}
         onNo={exitConfirm.onNo}
       />
+      <WebRouteFadeOverlay routeKey={topRouteKey} />
     </>
   )
 }

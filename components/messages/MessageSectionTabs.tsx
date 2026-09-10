@@ -6,7 +6,7 @@
 // inactive one (messager-list.component.scss:152-168). Figma: node 56:4094.
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export interface MessageSectionTabItem {
   key:   string
@@ -82,18 +82,20 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.poppinsMedium,
     color:      Colors.primaryDark,
   },
+  // Angular: .received-badge { background: #de2a68 }
   badge: {
     minWidth:          18,
     height:            18,
     borderRadius:       9,
     paddingHorizontal:  4,
-    backgroundColor:   Colors.primaryDark,
+    backgroundColor:   Colors.inputError,
     alignItems:        'center',
     justifyContent:    'center',
   },
+  // Angular: `received-badge body3-regular-12` — Poppins-Regular 12px, white.
   badgeText: {
-    fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   11,
+    fontFamily: Fonts.poppinsRegular,
+    fontSize:   FontSize.font12,
     color:      Colors.white,
   },
 })

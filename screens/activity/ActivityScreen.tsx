@@ -1366,14 +1366,19 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderColor: Colors.inputBorder,
   },
   chipActive: { backgroundColor: Colors.chipSurfaceSelected, borderColor: Colors.chipBorderActive },
-  chipLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textDark },
-  chipLabelActive: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textDark },
+  // Angular: chip.component.html:3 — `color-1f1e1b body2-regular-14`, the SAME
+  // class regardless of selected state (only the chip container's own
+  // border/background change, not the label color).
+  chipLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.chipLabelText },
+  chipLabelActive: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.chipLabelText },
   // Angular: app-chip's countShow badge — small red circle, white count text.
   unreadBadge: {
     minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
     backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
   },
-  unreadBadgeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 11, color: Colors.white },
+  // Angular: chip.component.html:10 — `font-12-all white-color` (global.scss:2276)
+  // — Poppins-Regular 12px, not semibold 11px.
+  unreadBadgeText: { fontFamily: Fonts.poppinsRegular, fontSize: 12, color: Colors.white },
 
   // ── Card + 3-dot menu overlay ──────────────────────────────────────────────────
   cardWrap: { position: 'relative' },
@@ -1394,8 +1399,14 @@ const styles = StyleSheet.create({
   },
   listCardImg: { borderRadius: 8, backgroundColor: Colors.background },
   listCardTextCol: { flex: 1, gap: 4 },
-  listCardName: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.textDark },
-  listCardDetail: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textMedium, lineHeight: 18 },
+  // Angular: list-view-card.component.html:14 — without `showCheckbox` (this
+  // screen's usage), the name span is `black-color font-14-semibold` — 14px
+  // Poppins-Semibold, #000000, not 16px `textDark`.
+  listCardName: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  // Angular: list-view-card.component.html:26 — `body3-regular-12`, no color
+  // class (inherits #000000 from the row's own `reallyblack` class) — 12px,
+  // not 13px/textMedium, and no line-height rule exists for it either.
+  listCardDetail: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
 
   // ── Deleted profile placeholder (Angular: .delete-div, fixed 145px) ──────────
   deletedRow: {
@@ -1406,28 +1417,51 @@ const styles = StyleSheet.create({
   },
   deletedImg: { borderRadius: 8, backgroundColor: Colors.background },
   deletedTextCol: { flex: 1, gap: 6 },
-  deletedName: { fontFamily: Fonts.poppinsMedium, fontSize: 16, color: Colors.textDark },
-  deletedNote: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textMedium },
+  // Angular: activity.component.html:249's `heading4-medium-16 pl-12` — no
+  // color class, inherits #000000 — not `textDark`.
+  deletedName: { fontFamily: Fonts.poppinsMedium, fontSize: 16, color: Colors.black },
+  // Angular: `.detail-matches` (activity.component.scss:539) — Poppins-Regular
+  // 14px (not 13), `var(--gray)` = #666666 (= Colors.textSecondary, not
+  // textMedium), line-height 18px.
+  deletedNote: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary, lineHeight: 18 },
 
   // ── Unpaid upsell banner — Figma: bg rgba(181,0,51,0.05) ─────────────────────
   banner: { backgroundColor: 'rgba(181, 0, 51, 0.05)', padding: 16, gap: 6 },
-  bannerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.textPrimary, lineHeight: 22 },
-  bannerSub: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textMedium, lineHeight: 20, marginBottom: 8 },
+  // Angular: `.shortlisted-header` block (activity.component.html:158-177) —
+  // title `heading3-semibold-16 black-color` (#000000, not textPrimary).
+  bannerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, lineHeight: 22 },
+  // Angular: `body2-regular-14 black-color line-height-20` — #000000, not textMedium.
+  bannerSub: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, lineHeight: 20, marginBottom: 8 },
+  // Angular: buttonSize `mediumsemibold`, border `primaryBorder` ->
+  // --ion-color-primary (#B50033 = primaryDark, not the brighter primary red).
   bannerBtn: {
-    alignSelf: 'flex-start', borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 6,
+    alignSelf: 'flex-start', borderWidth: 1.5, borderColor: Colors.primaryDark, borderRadius: 6,
     paddingHorizontal: 14, paddingVertical: 8,
   },
-  bannerBtnLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.primary },
+  // Angular: no ctaFontSize override -> default body2-regular-14 (Poppins-
+  // Regular 14px), but `.mediumsemibold span{font-weight:500}` wins over that
+  // class's own 400. textColor 'primaryColor' -> --ion-color-primary (primaryDark).
+  bannerBtnLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, fontWeight: '500', color: Colors.primaryDark },
 
-  // ── Add-photo promotion (Angular: app-add-photo, fromPage="activity") ────────
+  // ── Add-photo promotion (Angular: app-add-photo, fromPage="activity", default
+  // promotype='1') ─────────────────────────────────────────────────────────────
   photoPromoWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },
-  photoPromoTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textPrimary, textAlign: 'center' },
-  photoPromoBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textMedium, textAlign: 'center', lineHeight: 20 },
+  // Angular: add-photo.component.html:26 — `heading1-semibold-20 black-color
+  // line-height-32` — 20px (not 18), #000000, line-height 32.
+  photoPromoTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black, textAlign: 'center', lineHeight: 32 },
+  // Angular: promotype='1' renders the SUBHEADER line — `body2-regular-14
+  // black-color`, no line-height class — #000000, not textMedium. (Angular
+  // also renders two `heading4-medium-16 black-color` bullet points below this
+  // that photoPromoBanner's TITLE/BODY/CTA shape has no data for — not fixed
+  // here, flagging as a real content-model gap.)
+  photoPromoBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, textAlign: 'center' },
   photoPromoCta: {
     marginTop: 8, backgroundColor: Colors.primaryDark, borderRadius: 8,
     paddingHorizontal: 24, paddingVertical: 12,
   },
-  photoPromoCtaLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 15, color: Colors.white },
+  // Angular: no buttonSize/ctaFontSize override -> default body2-regular-14 —
+  // Poppins-Regular 14px (not Medium 15), white.
+  photoPromoCtaLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.white },
 
   // ── List ──────────────────────────────────────────────────────────────────────
   listContent: { flexGrow: 1, paddingBottom: 16 },
@@ -1437,12 +1471,19 @@ const styles = StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'center',
     paddingHorizontal: 24, paddingVertical: 40, gap: 8,
   },
-  emptyTitle: { marginTop: 8, fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.textPrimary, textAlign: 'center' },
-  emptySubtitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
-  // Angular: SECONDARY_BTN — outlined pill, brand-red label ("Go to matches").
+  // Angular: activity.component.html:99+ empty block — `heading3-semibold-16
+  // black-color` (#000000, not textPrimary).
+  emptyTitle: { marginTop: 8, fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, textAlign: 'center' },
+  // Angular: `body2-regular-14 black-color` (#000000, not textSecondary).
+  emptySubtitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, textAlign: 'center', lineHeight: 20 },
+  // Angular: SECONDARY_BTN (button.config.ts:50) — border `primaryBorder` ->
+  // --ion-color-primary (#B50033 = primaryDark), NOT a red/primary label —
+  // textColor is literally `black`.
   emptyCta: {
-    marginTop: 16, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 8,
+    marginTop: 16, borderWidth: 1.5, borderColor: Colors.primaryDark, borderRadius: 8,
     paddingHorizontal: 24, paddingVertical: 12,
   },
-  emptyCtaLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 15, color: Colors.primary },
+  // Angular: no buttonSize/ctaFontSize override -> default body2-regular-14 —
+  // Poppins-Regular 14px (not Medium 15), textColor black (not primary red).
+  emptyCtaLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
 })

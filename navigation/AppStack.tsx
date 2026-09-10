@@ -2,6 +2,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import type { NavigatorScreenParams } from '@react-navigation/native'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Animated, KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import ReAnimated, { SlideInRight, SlideOutRight } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import AppHeader from '../components/app-header/AppHeader'
@@ -487,10 +488,18 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
           onLanguagePress={() => navigation.navigate('LanguageSelection')}
         />
 
-        {/* Swapping content — only this re-renders on pageNo change */}
-        <View style={shell.content}>
+        {/* Swapping content — only this re-renders on pageNo change. Header/
+            footer above and below stay put; this view alone slides so the
+            step change reads as a soft in-place transition rather than a
+            whole-screen native push (which showed iOS's native edge shadow
+            since the "screen" is really just this content region). */}
+        <ReAnimated.View
+          style={shell.content}
+          entering={SlideInRight.duration(220)}
+          exiting={SlideOutRight.duration(220)}
+        >
           {renderContent()}
-        </View>
+        </ReAnimated.View>
 
         {/* Persistent footer — driven by OnboardingCtx state */}
         <View
@@ -688,7 +697,17 @@ export default function AppStack() {
       <Stack.Screen name="addphoto-intermediate" component={AddPhotoIntermediateScreen} />
       <Stack.Screen name="star-matching" component={StarMatchingScreen} />
       <Stack.Screen name="dashboard" component={DashboardRedirect} />
-      <Stack.Screen name="onboarding" component={OnboardingRouter} />
+      <Stack.Screen
+        name="onboarding"
+        component={OnboardingRouter}
+        // The persistent header/footer live inside OnboardingRouter and look
+        // identical step to step, so animating the whole native-stack screen
+        // (even a fade) still visibly moves them and, on iOS, draws the
+        // native push shadow along the edge. Content itself now slides via
+        // Reanimated inside OnboardingRouter, so the outer screen transition
+        // is disabled entirely — see the ReAnimated.View wrapping renderContent().
+        options={{ animation: 'none', gestureEnabled: false }}
+      />
       <Stack.Screen
         name="Permissions"
         component={PermissionDemoScreen}
@@ -734,7 +753,10 @@ export default function AppStack() {
       <Stack.Screen name="payment-failed" component={PaymentFailedScreen} />
       <Stack.Screen name="doorstep-collection" component={DoorstepCollectionScreen} />
       <Stack.Screen name="renewal" component={RenewalScreen} />
-      <Stack.Screen name="chat-window" component={ChatScreen} />
+      {/* Live message thread + socket wiring — kept rendering even when
+          backgrounded behind another pushed screen, unlike the rest of this
+          stack (see enableFreeze() in App.tsx). */}
+      <Stack.Screen name="chat-window" component={ChatScreen} options={{ freezeOnBlur: false }} />
       <Stack.Screen name="safety-tips" component={SafetyTipsScreen} />
       <Stack.Screen name="Menu" component={MenuScreen} />
       <Stack.Screen name="Biodata" component={BiodataScreen} />
@@ -778,8 +800,12 @@ export default function AppStack() {
       {/* Angular: opened as a modal overlay on the current page — never a full push.
           LanguageSelectionScreen already self-dismisses via the centralized
           handleBack() once canGoBack() is true, so onSelect here is just the
-          (unreachable) fallback. */}
-      <Stack.Screen name="LanguageSelection" options={{ presentation: 'modal', animation: 'slide_from_right' }}>
+          (unreachable) fallback. No explicit `animation` here — leaving it
+          unset lets native-stack use its own default modal transition
+          (slide-up on iOS, fade on Android), which matches `presentation:
+          'modal'`; the previous `slide_from_right` override made it animate
+          like a push while behaving/dismissing like a modal. */}
+      <Stack.Screen name="LanguageSelection" options={{ presentation: 'modal' }}>
         {({ navigation }) => (
           <LanguageSelectionScreen navigation={navigation} onSelect={() => centralizedHandleBack()} presentedAsModal />
         )}

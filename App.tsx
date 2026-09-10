@@ -5,6 +5,7 @@ import { Platform } from 'react-native'
 import { useEffect, useState } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
+import { enableFreeze } from 'react-native-screens'
 import './i18n'
 import i18n from './i18n'
 import { APP_VERSION } from './constants/appVersion'
@@ -26,6 +27,12 @@ SplashScreen.preventAutoHideAsync()
 
 // As early as possible, before anything else can throw.
 initCrashLogger()
+
+// Lets native-stack/bottom-tabs suspend re-renders of screens that are
+// mounted but not visible (backgrounded tab, pushed-under stack screen) —
+// per-screen `freezeOnBlur` options below only take effect once this has
+// run. No-op on web (react-native-screens' isNativePlatformSupported check).
+enableFreeze()
 
 function makeRandomDeviceId(): string {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {

@@ -1163,20 +1163,30 @@ const styles = StyleSheet.create({
   // limitReachedText, not limitBannerText, to avoid shadowing the
   // `limitBannerText` string variable destructured from computeMessageGate().)
   limitReachedText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, textAlign: 'center' },
-  // Angular: both the by_me banner's "TAP_HERE" button (largemedium size)
-  // and the messageAllow-false banner's "Explore Matches" button (link size)
-  // omit [ctaFontSize]/[fontFamily], so both fall back to the SAME default —
-  // body2-regular-14 (Poppins-Regular, font14), not buttonEnglishMedium.
+  // Angular: the by_me banner's "TAP_HERE" button — buttonSize 'largemedium',
+  // [border]="'primaryBorder'", [textColor]="'primaryColor'", no
+  // [ctaFontSize]/[fontFamily] so text falls back to body2-regular-14 (Poppins-
+  // Regular, font14), BUT `ion-button.largemedium span { font-weight: 500 }`
+  // (button-revamp.component.scss:149) overrides that class's own 400.
   tapToUnblock: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, fontWeight: '500',
     // Angular: [textColor]="'primaryColor'" -> --ion-color-primary (#B50033),
-    // this app's primaryDark, not the brighter primary red.
+    // this app's primaryDark, not the brighter primary red. `.primaryBorder`
+    // (:285-287) uses that SAME --ion-color-primary var for its border.
     color: Colors.primaryDark,
-    borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 6,
+    // Angular: setButtonBorder mixin (:33-47) — 1px !important (not 1.5).
+    // `ion-button.largemedium { border-radius: 8px }` (:92-95), not 6.
+    borderWidth: 1, borderColor: Colors.primaryDark, borderRadius: 8,
     paddingHorizontal: 20, paddingVertical: 10,
   },
-  // Angular: CONFIG.SEE_ALL.textColor = EButtonTextColor.link ->
-  // --ion-color-link-color (#29339B) — a different color than tapToUnblock's
-  // primaryColor above, even though both buttons share the same font/size.
-  exploreMatchesColor: { color: Colors.link },
+  // Angular: CONFIG.SEE_ALL (button.config.ts:165-173) — the messageAllow-false
+  // banner's "Explore Matches" button is a DIFFERENT shape from TAP_HERE above,
+  // not just a different text color: textColor 'link' (--ion-color-link-color
+  // #29339B), border 'noBorder', buttonSize 'link' (auto height, ALL padding
+  // 0, span line-height:20 !important, no font-weight override — stays at
+  // body2-regular-14's own 400).
+  exploreMatchesColor: {
+    color: Colors.link, fontWeight: '400', lineHeight: 20,
+    borderWidth: 0, paddingHorizontal: 0, paddingVertical: 0,
+  },
 })

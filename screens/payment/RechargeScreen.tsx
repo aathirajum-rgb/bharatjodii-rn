@@ -507,7 +507,11 @@ const s = StyleSheet.create({
     position: 'absolute', top: -20, left: 0, height: 40, borderTopLeftRadius: 12, borderTopRightRadius: 12,
     paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center',
   },
-  onlyForYouText: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: 10, color: Colors.white },
+  // Angular: `.font-10-medium` (global.scss:2291) — despite the class name, its
+  // English font-family var is Poppins-REGULAR (weight:500 is a plain, non-
+  // !important override on top of that static file, not a distinct Medium
+  // font file) — not the specialCta/buttonMedium Poppins-Medium file.
+  onlyForYouText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 10, color: Colors.white },
 
   // Angular: .most-popular (benefits-card.component.scss:58-66) — a child of
   // the card, top:-1.4rem (-22.4px), left:27px, padding 4px 8px, radius 20.
@@ -521,12 +525,12 @@ const s = StyleSheet.create({
     position: 'absolute', top: -14, left: 30, borderRadius: 20,
     paddingHorizontal: 8, paddingVertical: 4, alignItems: 'center', justifyContent: 'center', zIndex: 1,
   },
-  // Angular: .font-10-medium (global.scss:2291) — 10px, weight 500, white.
-  // No line-height class is applied there, so it falls to the browser's
-  // ~1.5 default (15px). RN's own default differs per platform/font, so it's
-  // pinned here to keep the badge the same ~23px tall (15 + 4px padding x2)
-  // that the -22.4px top offset is calibrated against.
-  mostSoldText: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: 10, lineHeight: 15, color: Colors.white },
+  // Angular: .font-10-medium (global.scss:2291) — 10px, Poppins-REGULAR (see
+  // onlyForYouText above — the class name is misleading), weight 500, white.
+  // No line-height class is applied there, so RN pins one here to keep the
+  // badge the same ~23px tall (15 + 4px padding x2) that the -22.4px top
+  // offset is calibrated against.
+  mostSoldText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 10, lineHeight: 15, color: Colors.white },
 
   // Angular: .intermediate-item-block (benefits-card.component.scss:1-13) —
   // 12px padding all round, radius 16, white, 1px #8A8A8A border and NO
@@ -580,9 +584,12 @@ const s = StyleSheet.create({
   finalPrice:   { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, marginTop: 4, marginLeft: 4 },
   // Angular: .textcta-medium-12 + .font-10-nav both apply; .font-10-nav sits
   // later in global.scss so 10px wins the size, while .textcta-medium-12's
-  // !important weight:500 wins the weight. Plus .pr-2 (padding-right 2px) —
-  // there is no top margin on this element.
-  saveText:     { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: 10, color: '#00A650', paddingRight: 2 },
+  // !important weight:500 wins the weight. Family is .font-10-nav's own
+  // Poppins-Regular, further overridden to Roboto by a `lang=='en'` wrapper
+  // class RN can't port (same untranslatable override as finalPrice below) —
+  // Poppins-Regular is the closest available stand-in, not Poppins-Medium.
+  // Plus .pr-2 (padding-right 2px) — there is no top margin on this element.
+  saveText:     { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 10, color: '#00A650', paddingRight: 2 },
 
   // Angular: .hr-line-payment (benefits-card.component.scss:45-50) — a 1px
   // #e6e6e6 filled div inset 5px each side, with .mt-12/.mb-12 around it.
@@ -595,9 +602,9 @@ const s = StyleSheet.create({
   benefitIconSm: { marginLeft: 2 },
   // Angular: .body3-regular-12 .line-height-16 — 12px, line-height 16.
   benefitText: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black, lineHeight: 16 },
-  // Angular: the emphasis is server-supplied <b> markup, so it renders at the
-  // UA-default weight 700 at the SAME 12px size — it is not bumped to 14px.
-  benefitBold: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '700' },
+  // Angular: recharge.page.html:113 — the emphasis span carries `.font-14-semibold`
+  // (14px, Poppins-Semibold, weight 600), not the surrounding 12px body text.
+  benefitBold: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, fontWeight: '600' },
 
   // Angular: app-button-revamp buttonSize=linkmedium (button-revamp.component
   // .scss:213) — padding 6px top/bottom, 0 left/right, height auto, and NO
@@ -609,9 +616,11 @@ const s = StyleSheet.create({
   // ADJUSTABLE — marginTop is the card-to-link gap (-20 cancels the container
   // gap, so -12 nets out to the 8px Angular specifies).
   viewAllRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: 6, marginTop: -12 },
-  // Angular: ctaFontSize regular14 + linkmedium's own span{font-weight:500},
+  // Angular: ctaFontSize regular14 (14px Poppins-Regular) + linkmedium's own
+  // `span{font-weight:500}`, which outranks the plain .body2-regular-14 class
+  // on specificity, so weight 500 wins over the family's own 400.
   // textColor greyColor = --ion-color-grey-color (#545454, variables.scss:179).
-  viewAllText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#545454', lineHeight: 20 },
+  viewAllText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, fontWeight: '500', color: '#545454', lineHeight: 20 },
 
   couponRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
@@ -628,7 +637,10 @@ const s = StyleSheet.create({
     borderRadius: 8, paddingVertical: 8, paddingHorizontal: 16,
     backgroundColor: Colors.membershipCardBg, alignItems: 'center',
   },
-  offerBannerText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#7A1739', textAlign: 'center', lineHeight: 16 },
+  // Angular: recharge.page.html:151 — `.div-note` (color:#7A1739, no font
+  // rules) + `.textcta-medium-12` (global.scss:2270) — 12px Poppins-MEDIUM,
+  // weight 500 !important, not Regular.
+  offerBannerText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 12, color: '#7A1739', textAlign: 'center', lineHeight: 16 },
 
   // Angular: <ion-footer class="footer-shadow"> (recharge.page.scss:391) —
   // box-shadow 0 -3px 16px rgba(0,0,0,.08); the inner row is .pl-24 .pr-24

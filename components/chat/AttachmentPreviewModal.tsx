@@ -68,20 +68,29 @@ export default function AttachmentPreviewModal({ visible, attachment, uploading,
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#000' },
+  // Angular: modalpopup.component.html:75 — `ion-grid.color-white` for the
+  // 'sendDocument' action; `.color-white` (global.scss:5869) is a misleadingly
+  // -named BACKGROUND utility (`background-color: white`), not a text color —
+  // this screen is white, not the black backdrop it had.
+  screen: { flex: 1, backgroundColor: Colors.white },
   header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
   backBtn: { padding: 4 },
-  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.white },
+  // Angular: `.color-333333 heading4-medium-16` — Poppins-MEDIUM (not
+  // semibold), #333333 (not white — there's no dark backdrop to sit on).
+  headerTitle: { fontFamily: Fonts.poppinsMedium, fontSize: 16, color: Colors.textDark },
 
   previewArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   previewImage: { width: '100%', height: '100%' },
   previewVideo: { width: '100%', height: '100%' },
 
   footer: { paddingHorizontal: 24, paddingTop: 16 },
+  // Angular: `.primary-cta-jodii { background: #B50033 }` — this app's
+  // primaryDark, not the brighter primary red.
   sendBtn: {
-    height: 48, borderRadius: 24, backgroundColor: Colors.primary,
+    height: 48, borderRadius: 24, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
   },
   sendBtnDisabled: { opacity: 0.6 },
-  sendBtnLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 15, color: Colors.white },
+  // Angular: `white-color body1-medium-14` — 14px (not 15), Poppins-Medium, white.
+  sendBtnLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.white },
 })

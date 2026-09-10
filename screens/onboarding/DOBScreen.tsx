@@ -813,7 +813,15 @@ export default function DOBScreen({ navigation }: Props) {
             { paddingBottom: insets.bottom + 20 },
             { transform: [{ translateY: ageSlideAnim }] },
           ]}
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          // 'height' shrinks the container's own height by the keyboard height —
+          // fine for a flex-filled view, but this sheet is absolutely positioned
+          // with only `bottom: 0` (no `top`) and sized by its content, so the
+          // shrunken box stays glued to the literal screen bottom and ends up
+          // entirely underneath the keyboard instead of rising above it.
+          // 'padding' instead adds invisible paddingBottom equal to the keyboard
+          // height below the visible content, which pushes title/input/button up
+          // regardless of the container's positioning — works on both platforms.
+          behavior="padding"
         >
           {/* Angular: registration-modal-popup's close-icon-size, top-right of the
               sheet, dismisses back to the DOB fields without saving an age. */}

@@ -50,10 +50,11 @@ const styles = StyleSheet.create({
     paddingTop:        40,
     gap:               16,
   },
+  // Angular: `heading3-semibold-16 black-color` — pure #000000, not textPrimary.
   title: {
     fontFamily: Fonts.poppinsSemiBold,
     fontSize:   16,
-    color:      Colors.textPrimary,
+    color:      Colors.black,
     textAlign:  'center',
   },
   btn: {
@@ -64,9 +65,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical:   12,
   },
+  // Angular: SECONDARY_BTN default — body2-regular-14, textColor black (matches
+  // MessagerListScreen.tsx's own emptyBtnLabel for the phoneviews empty state).
   btnLabel: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
-    color:      Colors.textDark,
+    color:      Colors.black,
   },
 })

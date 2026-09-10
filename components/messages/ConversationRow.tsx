@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { formatChatTime } from '../../utils/chatTime'
 import type { ChatListItem } from '../../types/interfaces/chatList.interface'
 
@@ -149,7 +149,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     gap: 12,
   },
-  rowUnread: { backgroundColor: Colors.primarySurface },
+  // Angular: `.jodii-chat-received-pink-bg { background: #FAFAFA }`.
+  rowUnread: { backgroundColor: Colors.surfaceAlt },
   rowPressed: { opacity: 0.85 },
 
   avatarWrap: { width: 52, height: 52 },
@@ -173,22 +174,28 @@ const styles = StyleSheet.create({
   // actually shrink so the name/caption Text's numberOfLines={1} can truncate
   // on web instead of the row just growing wider than its allotted space.
   info: { flex: 1, gap: 3, justifyContent: 'center', minWidth: 0 },
-  name: { fontFamily: Fonts.poppinsMedium, fontSize: 14, color: Colors.textPrimary },
-  nameGreyed: { color: Colors.textMuted },
+  // Angular: `h2.body1-medium-14` — no color rule of its own; it inherits
+  // #000000 from the wrapping ion-row's `reallyblack` class (or #b3b3b3 from
+  // `color-b3b3b3` when deleted — see nameGreyed).
+  name: { fontFamily: Fonts.poppinsMedium, fontSize: 14, color: Colors.black },
+  nameGreyed: { color: Colors.chatDeletedRowText },
 
   // minWidth: 0 — flexbox default is min-width: auto, which on web keeps a row
   // wide enough to fit its text unbroken instead of letting it shrink and
   // truncate; without this the ellipsis below never actually triggers on web.
   msgRow: { flexDirection: 'row', alignItems: 'center', gap: 4, minWidth: 0 },
+  // Angular: `span.body3-regular-12` — same inheritance as name above: plain
+  // #000000 (not a muted grey) from the wrapping row's `reallyblack` class.
   msgText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textSecondary,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.black,
     flexShrink: 1, overflow: 'hidden',
   },
-  msgTextGreyed: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textMuted },
-  // "Viewed your/his/her mobile number" caption — matches Angular's own row,
-  // which leaves this plain black (no pink/primary color rule exists there).
+  // Angular: `.color-b3b3b3` (global.scss) — deleted profile's greyed row text.
+  msgTextGreyed: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.chatDeletedRowText },
+  // "Viewed your/his/her mobile number" caption — Angular: `span.body3-regular-12`
+  // (12px, not 13), same #000000 inheritance as msgText above.
   viewedNumberText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textPrimary,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.black,
     flexShrink: 1, overflow: 'hidden',
   },
 
@@ -198,13 +205,19 @@ const styles = StyleSheet.create({
   // the caption off early — e.g. "...viewed your mobile nu..." — since this
   // column had only a floor, not a ceiling, on its width).
   trailing: { alignItems: 'flex-end', gap: 6, minWidth: 44, maxWidth: 72, flexShrink: 0 },
+  // Angular: `.jodii-chat-time` — Poppins-Regular (--bottomnav-english-Regular),
+  // 10px (--font10), #2d382f — this class sets its own color, so it wins over
+  // the ancestor row's reallyblack/color-b3b3b3 regardless of deleted state.
   time: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 11, color: Colors.textPrimary,
+    fontFamily: SemanticFontsEnglish.bottomnavEnglishRegular, fontSize: FontSize.font10, color: Colors.chatTimeText,
     textAlign: 'right',
   },
+  // Angular: `.jodii-chat-msg-badge { background-color: #DE2A68 }`.
   unreadBadge: {
     minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
-    backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: Colors.inputError, alignItems: 'center', justifyContent: 'center',
   },
-  unreadBadgeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 11, color: Colors.white },
+  // Angular: `jodii-chat-msg-badge body3-regular-12 white-color` — Poppins-Regular
+  // 12px (not semibold 11px), white.
+  unreadBadgeText: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font12, color: Colors.white },
 })
