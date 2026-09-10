@@ -44,7 +44,7 @@ import { getItem, setItem, removeItem, getJson } from '../../service/storageServ
 import { getRegistrationArrays, getSessionValue } from '../../service/registrationService'
 import { logScreen } from '../../service/analyticsService'
 import { StorageKeys } from '../../constants/storage.keys'
-import { CDN_LOTTIE } from '../../constants/cdn'
+import { CDN_LOTTIE, CDN_REACT } from '../../constants/cdn'
 import { APP_VERSION } from '../../constants/appVersion'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
@@ -96,30 +96,34 @@ const CHEVRON_FORWARD_BLUE_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBo
 // `.align-end-video-page { color: #fff }`, at its own font-size: 25px).
 const CLOSE_OUTLINE_WHITE_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#FFFFFF" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M368 368L144 144M368 144L144 368"/></svg>`
 
-// Bundled locally instead of fetched from CDN as SVG (who-viewed-bg-color.svg,
+// Rasterized instead of fetched from CDN as SVG (who-viewed-bg-color.svg,
 // liked-profiles-bg.svg): both turned out to be auto-traced art with
 // 700-1500+ <path> elements each (340KB/920KB of vector data for what's just
 // a faint watermark pattern). react-native-svg draws every path synchronously
 // on the UI thread via Canvas, plus a Canvas.saveLayer() per opacity group —
 // that much work blocked the main thread past Android's 5s input-dispatch
 // timeout, ANRing (and getting force-killed by the OS) on the Home screen.
-// Decoding a bitmap is orders of magnitude cheaper than drawing ~1000 paths.
-const WHO_VIEWED_BG = require('../../assets/images/home/who-viewed-bg-color.png')
+// Decoding a bitmap is orders of magnitude cheaper than drawing ~1000 paths —
+// that's still true fetched over the network as a plain <Image>, so these
+// live on the CDN now (assets/images/react/) rather than bundled in the app;
+// only the SVG-vs-raster format choice (not where the file lives) was ever
+// the fix for the ANR.
+const WHO_VIEWED_BG = CDN_REACT + '/who-viewed-bg-color.png'
 const WHO_VIEWED_BG_RATIO = 360 / 588 // source SVG's viewBox aspect ratio
-const LIKED_PROFILES_BG = require('../../assets/images/home/liked-profiles-bg.png')
+const LIKED_PROFILES_BG = CDN_REACT + '/liked-profiles-bg.png'
 const LIKED_PROFILES_BG_RATIO = 360 / 624
 
 // Raster equivalent of CdnSvgBackground's cover+anchor behavior (CSS
-// background-size:cover + background-position) for the two local assets
-// above. RN's <Image resizeMode="cover"> always centers the crop, so
-// 'top-left' anchoring (liked-profiles-bg — centering cut its artwork's top
-// edge off, the same issue CdnSvgBackground's own anchor prop exists for)
-// needs the scale/position worked out manually against the measured
-// container box.
+// background-size:cover + background-position) for the two CDN raster
+// backgrounds above. RN's <Image resizeMode="cover"> always centers the
+// crop, so 'top-left' anchoring (liked-profiles-bg — centering cut its
+// artwork's top edge off, the same issue CdnSvgBackground's own anchor prop
+// exists for) needs the scale/position worked out manually against the
+// measured container box.
 function LocalCoverBackground({
   source, aspectRatio, anchor = 'center', children, style,
 }: {
-  source: number
+  source: string
   aspectRatio: number
   anchor?: 'center' | 'top-left'
   children?: React.ReactNode
@@ -146,7 +150,7 @@ function LocalCoverBackground({
       style={[style, { overflow: 'hidden' }]}
       onLayout={e => setSize({ width: e.nativeEvent.layout.width, height: e.nativeEvent.layout.height })}
     >
-      {!!imageStyle && <Image source={source} style={imageStyle} />}
+      {!!imageStyle && <Image source={{ uri: source }} style={imageStyle} />}
       {children}
     </View>
   )

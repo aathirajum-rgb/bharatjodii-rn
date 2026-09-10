@@ -27,21 +27,6 @@ export function useOppGenderAvatarUrl(): string {
   return url
 }
 
-// ─── Local asset helper ───────────────────────────────────────────────────────
-// CdnSvg (components/cdn-svg/CdnSvg.tsx) takes a URI string for both its web
-// (<Image>) and native (<SvgUri>) paths. On native, react-native's real
-// Image.resolveAssetSource() turns a require()'d local file into that kind of
-// URI. react-native-web has no such static method (confirmed by crash — throws
-// "resolveAssetSource is not a function") since Metro's web asset plugin
-// already resolves require() itself, to that same {uri, width, height} shape.
-export function localAsset(mod: number): string {
-  if (typeof Image.resolveAssetSource === 'function') {
-    return Image.resolveAssetSource(mod).uri
-  }
-  const resolved = mod as unknown as string | { uri: string }
-  return typeof resolved === 'string' ? resolved : resolved.uri
-}
-
 // ─── Section header: title + trailing chevron ────────────────────────────────
 // Figma: `Poppins SemiBold`, 22px, #000000, paired with a 40×40 chevron
 // (rotated -90° from a shared "Icon - Backarrow" base) — repeats on nearly

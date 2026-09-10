@@ -5,7 +5,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import CdnSvg from '../cdn-svg/CdnSvg'
-import { localAsset } from '../desktop-home/DesktopHomeShared'
+import { CDN_REACT } from '../../constants/cdn'
 import { TAB_LABEL_KEYS, type FooterTab } from '../app-footer/AppFooter'
 import { LANG_LABELS } from './MatchesHeader'
 import { Colors } from '../../constants/colors'
@@ -18,20 +18,23 @@ const NAV_TABS: FooterTab[] = [0, 1, 2, 4]
 
 // Figma: each nav item gets its own dedicated icon (not the mobile bottom-nav
 // [inactive, active] pair set) — a single glyph whose color follows the
-// active/inactive text color instead of swapping images.
-const NAV_ICONS: Record<FooterTab, number> = {
-  0: require('../../assets/desktop-home/nav-home-icon.svg'),
-  1: require('../../assets/desktop-home/nav-matches-icon.svg'),
-  2: require('../../assets/desktop-home/nav-liked-profiles-icon.svg'),
-  4: require('../../assets/desktop-home/nav-contacted-profiles-call-icon.svg'),
-  3: require('../../assets/desktop-home/nav-upgrade-crown-icon.svg'),
+// active/inactive text color instead of swapping images. Previously bundled
+// locally (assets/desktop-home/) — moved to the CDN (same assets/images/react/
+// folder every other app-authored icon already lives in) to keep them out of
+// the app bundle.
+const NAV_ICONS: Record<FooterTab, string> = {
+  0: CDN_REACT + '/nav-home-icon.svg',
+  1: CDN_REACT + '/nav-matches-icon.svg',
+  2: CDN_REACT + '/nav-liked-profiles-icon.svg',
+  4: CDN_REACT + '/nav-contacted-profiles-call-icon.svg',
+  3: CDN_REACT + '/nav-upgrade-crown-icon.svg',
 }
 
-const LOGO_WORDMARK = require('../../assets/desktop-home/jodii-logo-wordmark.svg')
-const LOGO_SPARK_1  = require('../../assets/desktop-home/jodii-logo-spark-1.svg')
-const LOGO_SPARK_2  = require('../../assets/desktop-home/jodii-logo-spark-2.svg')
-const GLOBE_ICON     = require('../../assets/desktop-home/nav-language-globe-icon.svg')
-const CHEVRON_DOWN   = require('../../assets/desktop-home/chevron-down-icon.svg')
+const LOGO_WORDMARK = CDN_REACT + '/jodii-logo-wordmark.svg'
+const LOGO_SPARK_1  = CDN_REACT + '/jodii-logo-spark-1.svg'
+const LOGO_SPARK_2  = CDN_REACT + '/jodii-logo-spark-2.svg'
+const GLOBE_ICON     = CDN_REACT + '/nav-language-globe-icon.svg'
+const CHEVRON_DOWN   = CDN_REACT + '/chevron-down-icon.svg'
 
 type Props = {
   activeTab:        FooterTab
@@ -50,9 +53,9 @@ export default function MatchesDesktopNav({
   return (
     <View style={s.bar}>
       <View style={s.logoWrap}>
-        <CdnSvg uri={localAsset(LOGO_WORDMARK)} width={77} height={40} />
-        <View style={s.logoSpark1}><CdnSvg uri={localAsset(LOGO_SPARK_1)} width={13} height={12} /></View>
-        <View style={s.logoSpark2}><CdnSvg uri={localAsset(LOGO_SPARK_2)} width={9} height={7} /></View>
+        <CdnSvg uri={LOGO_WORDMARK} width={77} height={40} />
+        <View style={s.logoSpark1}><CdnSvg uri={LOGO_SPARK_1} width={13} height={12} /></View>
+        <View style={s.logoSpark2}><CdnSvg uri={LOGO_SPARK_2} width={9} height={7} /></View>
       </View>
 
       <View style={s.links}>
@@ -60,14 +63,14 @@ export default function MatchesDesktopNav({
           const isActive = activeTab === tab
           return (
             <Pressable key={tab} style={s.link} onPress={() => onTabPress(tab)}>
-              <CdnSvg uri={localAsset(NAV_ICONS[tab])} width={24} height={24} />
+              <CdnSvg uri={NAV_ICONS[tab]} width={24} height={24} />
               <Text style={[s.linkText, isActive && s.linkTextActive]}>{t(TAB_LABEL_KEYS[tab])}</Text>
             </Pressable>
           )
         })}
 
         <Pressable style={s.link} onPress={() => onTabPress(3)}>
-          <CdnSvg uri={localAsset(NAV_ICONS[3])} width={16} height={12} />
+          <CdnSvg uri={NAV_ICONS[3]} width={16} height={12} />
           <Text style={s.linkText}>Upgrade</Text>
           <View style={s.upgradeBadge}>
             <Text style={s.upgradeBadgeText}>{upgradeTag}</Text>
@@ -76,9 +79,9 @@ export default function MatchesDesktopNav({
       </View>
 
       <Pressable style={s.langBtn} onPress={onLanguagePress}>
-        <CdnSvg uri={localAsset(GLOBE_ICON)} width={16} height={16} />
+        <CdnSvg uri={GLOBE_ICON} width={16} height={16} />
         <Text style={s.langText}>{langLabel}</Text>
-        <CdnSvg uri={localAsset(CHEVRON_DOWN)} width={16} height={16} />
+        <CdnSvg uri={CHEVRON_DOWN} width={16} height={16} />
       </Pressable>
     </View>
   )
