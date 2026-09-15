@@ -23,6 +23,7 @@ import { apiCall } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
 import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
 import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
+import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictSheets'
 
 const ICONS = {
   header:   CDN_SVG + 'updated-images/verify-your-identity-img-updated.svg',
@@ -266,6 +267,7 @@ export default function BlockerScreen({ navigation }: { navigation: any }) {
         </Text>
       </Pressable>
       <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
+      <AddPhotoVerdictSheets addPhoto={addPhoto} />
     </View>
   )
 }

@@ -54,6 +54,7 @@ import { useNetwork } from '../../contexts/NetworkContext'
 import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
 import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
 import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
+import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictSheets'
 import { requestMicrophonePermission } from '../../service/permissionService'
 import { getItem, getJson, setJson } from '../../service/storageService'
 import { getSessionValue } from '../../service/registrationService'
@@ -485,7 +486,11 @@ export default function ChatScreen({ navigation, route }: Props) {
   // field is preferred server-side — showContactDetails() already returns the
   // same dialNumber for both, see communicationService.ts, so calling with
   // the real 'call'/'whatsapp' action here is equivalent and more correct).
-  async function handleCallOrWhatsApp(action: 'call' | 'whatsapp') {
+  // Wrapped in useCallback (with usePhoneInfoSheet's own return value now
+  // memoized too) so renderRow's useCallback below isn't defeated on every
+  // ChatScreen re-render — it was previously a plain function, recreated
+  // every render regardless of whether its own inputs actually changed.
+  const handleCallOrWhatsApp = useCallback(async (action: 'call' | 'whatsapp') => {
     try {
       const result = await communicationBtnOnClick('message', action, { MATRIID: partnerId })
       if (result.type === 'show_contact') {
@@ -504,7 +509,7 @@ export default function ChatScreen({ navigation, route }: Props) {
     } catch (e) {
       if (__DEV__) console.error('[Chat] call/whatsapp error:', e)
     }
-  }
+  }, [partnerId, partnerName, phoneInfo, navigation])
 
   function handleContactDetailsCall() {
     if (contactDetails?.dialNumber) Linking.openURL(`tel:${contactDetails.dialNumber}`)
@@ -567,7 +572,11 @@ export default function ChatScreen({ navigation, route }: Props) {
     const url = await uploadChatAttachment(pendingAttachment)
     setAttachmentUploading(false)
     if (!url) {
-      setToastRequest({ message: t('MESSAGES.CHAT_MSG_LIMIT'), key: Date.now() })
+      // CHAT_MSG_LIMIT's copy is specifically the file-size-limit message
+      // (see the tooLarge branch above) — a generic upload failure here
+      // (network drop, server error) isn't the same thing and shouldn't
+      // borrow that wording.
+      setToastRequest({ message: 'Upload failed. Please try again.', key: Date.now() })
       return
     }
     pendingFirstMessageRef.current = !hasRealChatMessage()
@@ -638,7 +647,8 @@ export default function ChatScreen({ navigation, route }: Props) {
     const url = await uploadChatAttachment(recordedAttachment)
     setVoiceSending(false)
     if (!url) {
-      setToastRequest({ message: t('MESSAGES.CHAT_MSG_LIMIT'), key: Date.now() })
+      // Same generic-vs-size-limit distinction as handleSendAttachment above.
+      setToastRequest({ message: 'Upload failed. Please try again.', key: Date.now() })
       return
     }
     pendingFirstMessageRef.current = !hasRealChatMessage()
@@ -1009,6 +1019,7 @@ export default function ChatScreen({ navigation, route }: Props) {
       />
       <Toast request={toastRequest} bottomOffset={80} />
       <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
+      <AddPhotoVerdictSheets addPhoto={addPhoto} />
 
       <AttachmentPreviewModal
         visible={!!pendingAttachment}

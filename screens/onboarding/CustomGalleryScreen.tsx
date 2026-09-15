@@ -43,6 +43,7 @@ import VerificationSuccessSheet from '../../components/bottom-sheet/Verification
 import { os } from './onboardingStyles'
 import { CDN_LOTTIE } from '../../constants/cdn'
 import CdnLottie from '../../components/CdnLottie'
+import { getFileSizeSafe } from '../../utils/getFileSize'
 
 // expo-media-library's Asset has no mimeType getter (unlike expo-image-picker
 // assets) — derive it from the filename extension, same fallback Android's own
@@ -294,9 +295,11 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
       const uri      = await asset.getUri()
       const filename = await asset.getFilename()
       const shape    = await asset.getShape().catch(() => null)
+      const fileSize = await getFileSizeSafe(uri)
       photos.push({
         uri, filename,
         mimeType: mimeTypeFromFilename(filename),
+        fileSize,
         width: shape?.width, height: shape?.height,
       })
     }

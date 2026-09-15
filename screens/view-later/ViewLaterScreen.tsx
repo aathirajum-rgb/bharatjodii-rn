@@ -32,6 +32,7 @@ import { useContactGating } from '../../hooks/useContactGating'
 import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
 import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
 import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
+import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictSheets'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { fetchViewLaterProfiles } from '../../service/viewLaterService'
 import { communicationBtnOnClick, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
@@ -271,6 +272,7 @@ export default function ViewLaterScreen({ navigation }: Props) {
       />
       <Toast request={toastRequest} />
       <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
+      <AddPhotoVerdictSheets addPhoto={addPhoto} />
     </>
   )
 

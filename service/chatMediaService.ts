@@ -4,11 +4,14 @@
 // generic endpoint Angular reuses for audio/image/video/pdf despite the name).
 // Scope: image and video only — pdf/audio are separate, out of scope here.
 import * as ImagePicker from 'expo-image-picker'
-import { Alert } from 'react-native'
+import { Alert, Platform } from 'react-native'
 import { uploadFile } from './apiClient'
 import { Endpoints } from './api.endpoints'
 import { getItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
+import { getFileSizeSafe } from '../utils/getFileSize'
+import { snapshotWebFile } from '../utils/webFileSnapshot'
+import { requestCameraPermission, requestStoragePermission } from './permissionService'
 
 // Angular: loadImageFromDevice()'s formatAllow/size gates — image ≤25MB,
 // video ≤100MB. expo-image-picker reports a broad `image/*`/`video/*` mime
@@ -22,6 +25,11 @@ export interface PickedChatAttachment {
   msgType: '2' | '3' | '5'  // Angular: 2=audio 3=video 5=image
   uri:     string
   mimeType: string
+  // Web only — expo-image-picker's web shim populates this with the real
+  // browser File; native's FormData polyfill accepts the {uri,name,type}
+  // object shape instead, which a real browser FormData can't (it just
+  // stringifies the object, silently uploading no file at all).
+  file?: File | undefined
 }
 
 export type PickAttachmentResult =
@@ -31,10 +39,15 @@ export type PickAttachmentResult =
   | { ok: false; reason: 'permissionDenied' }
 
 async function launchPicker(source: 'camera' | 'library'): Promise<ImagePicker.ImagePickerResult | null> {
-  const perm = source === 'camera'
-    ? await ImagePicker.requestCameraPermissionsAsync()
-    : await ImagePicker.requestMediaLibraryPermissionsAsync()
-  if (!perm.granted) return null
+  // Shared permissionService (not expo-image-picker's own request calls
+  // directly) so a permanently-blocked permission gets the same
+  // Settings-redirect alert every other picker in the app shows, instead of
+  // silently doing nothing — this screen already gets that for its
+  // microphone permission (requestMicrophonePermission), just not here.
+  const permission = source === 'camera'
+    ? await requestCameraPermission()
+    : await requestStoragePermission()
+  if (permission !== 'granted') return null
 
   const options: ImagePicker.ImagePickerOptions = {
     mediaTypes: ['images', 'videos'],
@@ -66,9 +79,11 @@ export async function pickChatAttachment(source: 'camera' | 'library'): Promise<
   const asset = result.assets[0]
   const isVideo = asset.type === 'video'
   const maxBytes = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES
-  // fileSize isn't always populated by every platform/picker version — fail
-  // open (allow) rather than block a legitimate attachment on missing metadata.
-  if (asset.fileSize != null && asset.fileSize > maxBytes) {
+  // fileSize isn't always populated by every platform/picker version — rather
+  // than failing open (allow) on missing metadata, which let oversized videos
+  // through uncapped, read it off the filesystem as a fallback.
+  const fileSize = asset.fileSize ?? await getFileSizeSafe(asset.uri)
+  if (fileSize != null && fileSize > maxBytes) {
     return { ok: false, reason: 'tooLarge' }
   }
 
@@ -78,6 +93,11 @@ export async function pickChatAttachment(source: 'camera' | 'library'): Promise<
       msgType: isVideo ? '3' : '5',
       uri: asset.uri,
       mimeType: asset.mimeType ?? (isVideo ? 'video/mp4' : 'image/jpeg'),
+      // Snapshotted immediately, not held as a live reference — this chat
+      // flow always shows AttachmentPreviewModal before the user taps Send,
+      // and that delay is exactly what triggers iOS Safari's 0-byte-upload
+      // bug (see webFileSnapshot.ts).
+      ...(asset.file ? { file: await snapshotWebFile(asset.file) } : {}),
     },
   }
 }
@@ -94,11 +114,23 @@ export async function uploadChatAttachment(attachment: PickedChatAttachment): Pr
 
   const formData = new FormData()
   formData.append('ID', loginId)
-  formData.append('UPLOADAUDIO', {
-    uri: attachment.uri,
-    type: attachment.mimeType,
-    name: `chat-attachment.${extension}`,
-  } as any)
+  if (Platform.OS === 'web' && attachment.file) {
+    formData.append('UPLOADAUDIO', attachment.file, attachment.file.name)
+  } else if (Platform.OS === 'web' && attachment.uri.startsWith('blob:')) {
+    // Voice recordings (expo-audio's web recorder) never carry a `.file` —
+    // just a blob: object URL — since nothing hands us the original Blob
+    // directly. Re-fetching a blob: URL synchronously returns the same
+    // in-memory data (no network round-trip), giving us a real Blob to
+    // attach instead of the RN-only object shape.
+    const blob = await fetch(attachment.uri).then(r => r.blob())
+    formData.append('UPLOADAUDIO', blob, `chat-attachment.${extension}`)
+  } else {
+    formData.append('UPLOADAUDIO', {
+      uri: attachment.uri,
+      type: attachment.mimeType,
+      name: `chat-attachment.${extension}`,
+    } as any)
+  }
 
   const result = await uploadFile(Endpoints.media.chatAudioUpdate, formData)
 

@@ -23,6 +23,8 @@ import { getItem, getMultiple } from '../../service/storageService'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
 import { handleFooterTabPress } from '../../utils/footerTabPress'
+import { requestStoragePermission } from '../../service/permissionService'
+import { snapshotWebFile } from '../../utils/webFileSnapshot'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileUploadPhotoDesktopLayout from './DeleteProfileUploadPhotoDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
@@ -71,11 +73,12 @@ export default function DeleteProfileUploadPhotoScreen({ navigation, route }: Pr
   // ── Image picker ──────────────────────────────────────────────────────────
 
   async function pickPhoto() {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow access to your photo library.')
-      return
-    }
+    // Shared permissionService (not expo-image-picker's own request call
+    // directly) so a permanently-blocked permission gets the same
+    // Settings-redirect alert every other picker in the app shows, instead
+    // of this screen's own generic message with no path to recovery.
+    const permission = await requestStoragePermission()
+    if (permission !== 'granted') return
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -83,11 +86,17 @@ export default function DeleteProfileUploadPhotoScreen({ navigation, route }: Pr
     })
     if (!result.canceled && result.assets[0]) {
       setPhotoUri(result.assets[0].uri)
+      // Snapshotted immediately — this photo sits in state until the whole
+      // delete-profile form is submitted, an arbitrary delay that triggers
+      // iOS Safari's 0-byte-upload bug for a picker File (see
+      // webFileSnapshot.ts).
+      const file = result.assets[0].file
+      setPhotoFile(file ? await snapshotWebFile(file) : null)
     }
   }
 
-  function pickPhotoWeb(file: File) {
-    setPhotoFile(file)
+  async function pickPhotoWeb(file: File) {
+    setPhotoFile(await snapshotWebFile(file))
     setPhotoUri(URL.createObjectURL(file))
   }
 

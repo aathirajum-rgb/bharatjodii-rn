@@ -6,6 +6,10 @@ import { useEffect, useState } from 'react'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { enableFreeze } from 'react-native-screens'
+// Patches Alert.alert on web (react-native-web's is a no-op) — must be
+// imported before anything else can call Alert.alert.
+import './utils/webAlertBridge'
+import WebAlertHost from './components/WebAlertHost'
 import './i18n'
 import i18n from './i18n'
 import { APP_VERSION } from './constants/appVersion'
@@ -198,6 +202,7 @@ export default function App() {
               <RootNavigation />
             </AuthProvider>
           </NetworkProvider>
+          {Platform.OS === 'web' && <WebAlertHost />}
         </SafeAreaProvider>
       </GestureHandlerRootView>
     </ErrorBoundary>

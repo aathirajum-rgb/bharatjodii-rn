@@ -37,6 +37,7 @@ import { useContactGating, type ContactGating } from '../../hooks/useContactGati
 import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
 import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
 import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
+import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictSheets'
 import { openMembershipTab, paymentTrack, getHeroBannerDetails, getMenuPromo, redirectToIntermediatePage } from '../../service/paymentService'
 import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
@@ -1873,6 +1874,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         onTabPress={handleTabPress}
       />
       <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
+      <AddPhotoVerdictSheets addPhoto={addPhoto} />
       </>
     )
   }
@@ -2238,6 +2240,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       />
 
       <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
+      <AddPhotoVerdictSheets addPhoto={addPhoto} />
 
     </View>
   )
@@ -2263,7 +2266,10 @@ const s = StyleSheet.create({
   // `heading2-semibold-18` for its section heading — font-size var(--font18)
   // (1.125rem, scales with device width — see FontSize's header comment),
   // not the static 15/18 previously used here.
-  sectionTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, color: Colors.textPrimary, paddingHorizontal: 16, marginBottom: 12 },
+  // Angular: app-swiper.component.html's heading gets no [headerColor] input for
+  // the liked-profiles swiper (explore.component.html only passes blockbgColor),
+  // so it inherits the framework default black (#000000), not textPrimary.
+  sectionTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, color: Colors.black, paddingHorizontal: 16, marginBottom: 12 },
   // Angular: complete-profile.component.html's outer grid is pl-24 pr-0
   // (not the generic 16px every other section header uses), header color is
   // the specific .color-1f1e1b (not textPrimary) — no line-height-24 class on
@@ -2365,7 +2371,9 @@ const s = StyleSheet.create({
   likedSectionTitle:  { paddingHorizontal: 24, marginTop: 24, marginBottom: 8, lineHeight: 24 },
   // Angular: .body2-regular-14 line-height-24, ml-24 mr-24 mb-32 pt-8 — shown
   // instead of the tab row when only one of likedYou/likedByMe has data.
-  onlyOneLikedText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 24, color: Colors.textPrimary, paddingHorizontal: 24, paddingTop: 8, marginBottom: 32 },
+  // No color class on this label either, so it's the same inherited black
+  // (not textPrimary) as likedSectionTitle above.
+  onlyOneLikedText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 24, color: Colors.black, paddingHorizontal: 24, paddingTop: 8, marginBottom: 32 },
 
   // Explore categories
   // Angular: .discover-new-bg — 12px radius, 1px #E6E6E6 border, compact
@@ -2469,8 +2477,10 @@ const s = StyleSheet.create({
   // keeps the default dark text.
   // Angular: home-banner.component.html's helpBanner TITLE is
   // `heading4-medium-16` — font-size var(--font16) (1rem, scales with device
-  // width — see FontSize's header comment), not a flat 16px.
-  helpTitle:     { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font16, color: Colors.textPrimary },
+  // width — see FontSize's header comment), not a flat 16px. TITLECOLOR is
+  // bound via [ngStyle] but absent from the FAQ_DETAILS.BANNER translation
+  // object, so it resolves to inherited black, not textPrimary.
+  helpTitle:     { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font16, color: Colors.black },
   // Angular: `body2-regular-14` + `mt-8`; CONTANTCOLOR is likewise absent from
   // the translation object, so this is default dark at 14 — not 13 gray.
   // Angular: home-banner.component.html's helpBanner BODY is `body2-regular-14
@@ -2478,7 +2488,7 @@ const s = StyleSheet.create({
   // FontSize's header comment). No line-height class on this one (unlike
   // storySubtitle's identically-sized text, which has line-height-20) — drop
   // the explicit lineHeight so it falls back to the font's natural metric.
-  helpSub:       { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.textPrimary, marginTop: 8 },
+  helpSub:       { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, marginTop: 8 },
   // Angular: the CTA row is `mt-4`; its label is `textcta-medium-12`
   // (var(--font12), 0.75rem, dynamic — see FontSize's header comment —
   // Poppins-Medium) in .color-29339B, with the chevron at ml-4.

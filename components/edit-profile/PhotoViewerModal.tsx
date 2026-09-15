@@ -80,9 +80,14 @@ export default function PhotoViewerModal({
 
           <View style={s.photoBox}>
             <Image source={{ uri: photo.PHOTOURL || photo.PHOTOTHUMB || '' }} style={s.photoImg} contentFit="cover" />
-            <Pressable style={s.deleteBtn} onPress={() => onDelete(photo)} hitSlop={4}>
-              <CdnSvg uri={DELETE_ICON} width={24} height={24} />
-            </Pressable>
+            {/* Angular/PhotoAlbumViewerMobile.tsx: MAINPHOTO==0 gate — the main
+                profile photo can't be deleted directly, only replaced or
+                superseded by making another photo the main one first. */}
+            {!isMain && (
+              <Pressable style={s.deleteBtn} onPress={() => onDelete(photo)} hitSlop={4}>
+                <CdnSvg uri={DELETE_ICON} width={24} height={24} />
+              </Pressable>
+            )}
           </View>
 
           <Text style={s.counter}>{index + 1}/{photos.length}</Text>

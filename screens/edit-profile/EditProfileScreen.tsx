@@ -46,11 +46,14 @@ import { uploadFile } from '../../service/apiClient'
 import { managePhotos } from '../../service/profileService'
 import {
   getPhotoConfig, validatePhotoAsset, normalizeWebFile, getRejectReasons, describeRejection,
+  pollPhotoValidation,
   type PhotoRejectionCode,
 } from '../../service/photoValidationService'
 import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import { fetchEditProfileInfo, type EditProfileInfo } from '../../service/editProfileService'
 import PhotoAlbumViewerMobile from '../../components/edit-profile/PhotoAlbumViewerMobile'
+import PhotoVerdictSheet, { type VerdictPhoto } from '../../components/photo-validation/PhotoVerdictSheet'
+import VerificationSuccessSheet from '../../components/bottom-sheet/VerificationSuccessSheet'
 import {
   CHILDREN_OPTIONS,
   fetchReligionOptions, fetchCasteOptions, fetchOccupationOptions,
@@ -328,14 +331,74 @@ export default function EditProfileScreen({ navigation }: Props) {
   // runs, so the disabled={photoUploading} prop can't catch it on its own.
   const pickerBusyRef = useRef(false)
 
+  // AI photo-validation verdict — same state machine as onboarding's
+  // CustomGalleryScreen (native/web). Every add-photo path here sends
+  // AIVALIDATE but, until now, never read the verdict back.
+  const [verdictPhase, setVerdictPhase] = useState<'idle' | 'uploading' | 'approved' | 'rejected' | 'mixed'>('idle')
+  const [verdictApproved, setVerdictApproved] = useState<VerdictPhoto[]>([])
+  const [verdictRejected, setVerdictRejected] = useState<VerdictPhoto[]>([])
+
+  async function runVerdictPoll(config: Awaited<ReturnType<typeof getPhotoConfig>>, uploadedPhotoIds: string[]) {
+    if (!config.isNativeFaceDetectionEnabled || uploadedPhotoIds.length === 0) return
+    setVerdictPhase('uploading')
+    const verdict = await pollPhotoValidation(uploadedPhotoIds)
+
+    if (!verdict) {
+      setVerdictPhase('idle')
+      return
+    }
+    if (verdict.isSelfieRequired) {
+      setVerdictPhase('idle')
+      navigation.push('photo-mismatch-selfie', { standalone: true })
+      return
+    }
+
+    const approved: VerdictPhoto[] = []
+    const rejected: VerdictPhoto[] = []
+    for (const r of verdict.results) {
+      const entry: VerdictPhoto = {
+        photoId:  r.photoId,
+        photoUrl: r.photoUrl,
+        ...(r.reason?.title    ? { reasonTitle: r.reason.title }       : {}),
+        ...(r.reason?.subtitle ? { reasonSubtitle: r.reason.subtitle } : {}),
+      }
+      if (r.status.toLowerCase() === 'approve') approved.push(entry)
+      else rejected.push(entry)
+    }
+    setVerdictApproved(approved)
+    setVerdictRejected(rejected)
+    setVerdictPhase(rejected.length === 0 ? 'approved' : approved.length === 0 ? 'rejected' : 'mixed')
+  }
+
+  function dismissVerdict() {
+    setVerdictPhase('idle')
+  }
+
+  function retryFromVerdict() {
+    setVerdictPhase('idle')
+  }
+
   async function handleWebFiles(e: any) {
-    const files: File[] = Array.from(e.target.files ?? [])
+    let files: File[] = Array.from(e.target.files ?? [])
     if (!files.length) return
+    // Native's openGalleryPicker caps selection via selectionLimit before the
+    // OS picker even opens; the browser's file dialog has no such incremental
+    // cap, so enforce the same MAX_PHOTOS-total limit here after the fact.
+    const remaining = Math.max(0, MAX_PHOTOS - photos.length)
+    if (files.length > remaining) {
+      Alert.alert(
+        'Photo limit reached',
+        `You can add up to ${remaining} more photo${remaining !== 1 ? 's' : ''}. Only the first ${remaining} selected will be uploaded.`,
+      )
+      files = files.slice(0, remaining)
+    }
+    if (!files.length) { if (webFileInputRef.current) webFileInputRef.current.value = ''; return }
     setPhotoUploading(true)
     try {
       const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
       const config = await getPhotoConfig()
       const rejections: PhotoRejectionCode[] = []
+      const uploadedPhotoIds: string[] = []
       for (const file of files) {
         const input = await normalizeWebFile(file)
         const validation = await validatePhotoAsset(input, config)
@@ -349,8 +412,13 @@ export default function EditProfileScreen({ navigation }: Props) {
         formData.append('AIVALIDATE', config.isNativeFaceDetectionEnabled ? '1' : '0')
         formData.append('UPLOADPHOTO', file, file.name)
         const res = await uploadFile(Endpoints.media.addProfilePic, formData)
-        if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
-          await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
+        if (res?.RESPONSECODE == 1) {
+          if (res?.RESPONSE?.PHOTOURL) {
+            await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
+          }
+          if (res?.RESPONSE?.PHOTOID) {
+            uploadedPhotoIds.push(String(res.RESPONSE.PHOTOID))
+          }
         }
       }
       await load()
@@ -358,8 +426,10 @@ export default function EditProfileScreen({ navigation }: Props) {
         const reasons = await getRejectReasons()
         Alert.alert('Some photos were not added', rejections.map(code => describeRejection(code, reasons)).join('\n\n'))
       }
+      await runVerdictPoll(config, uploadedPhotoIds)
     } catch {
       Alert.alert('Error', 'Upload failed. Please try again.')
+      setVerdictPhase('idle')
     } finally {
       setPhotoUploading(false)
       if (webFileInputRef.current) webFileInputRef.current.value = ''
@@ -466,6 +536,7 @@ export default function EditProfileScreen({ navigation }: Props) {
         const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
         const config = await getPhotoConfig()
         const rejections: PhotoRejectionCode[] = []
+        const uploadedPhotoIds: string[] = []
         for (const asset of result.assets) {
           const validation = await validatePhotoAsset({
             uri: asset.uri,
@@ -485,8 +556,13 @@ export default function EditProfileScreen({ navigation }: Props) {
             uri: asset.uri, type: asset.mimeType ?? 'image/jpeg', name: asset.fileName ?? 'photo.jpg',
           } as any)
           const res = await uploadFile(Endpoints.media.addProfilePic, formData)
-          if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
-            await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
+          if (res?.RESPONSECODE == 1) {
+            if (res?.RESPONSE?.PHOTOURL) {
+              await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
+            }
+            if (res?.RESPONSE?.PHOTOID) {
+              uploadedPhotoIds.push(String(res.RESPONSE.PHOTOID))
+            }
           }
         }
         await load()
@@ -494,8 +570,10 @@ export default function EditProfileScreen({ navigation }: Props) {
           const reasons = await getRejectReasons()
           Alert.alert('Some photos were not added', rejections.map(code => describeRejection(code, reasons)).join('\n\n'))
         }
+        await runVerdictPoll(config, uploadedPhotoIds)
       } catch {
         Alert.alert('Error', 'Upload failed. Please try again.')
+        setVerdictPhase('idle')
       } finally {
         setPhotoUploading(false)
       }
@@ -616,7 +694,6 @@ export default function EditProfileScreen({ navigation }: Props) {
             )
           })}
         </View>
-        <Text style={s.photoHint}>{t('EDITPROFILE.DRAG_PHOTO')}</Text>
 
         {/* ── Basic details ── */}
         <Section title={t('EDITPROFILE.BASIC_DETAILS')}>
@@ -765,6 +842,23 @@ export default function EditProfileScreen({ navigation }: Props) {
         initialIndex={viewerIndex ?? 0}
         onClose={() => setViewerIndex(null)}
         onChanged={load}
+      />
+
+      <VerificationSuccessSheet
+        visible={verdictPhase === 'approved'}
+        title={verdictApproved.length > 1
+          ? t('AI_PHOTO_VALIDATION.PHOTOS_APPROVED_MULTI', '#COUNT Photos approved successfully!').replace('#COUNT', String(verdictApproved.length))
+          : t('AI_PHOTO_VALIDATION.PHOTO_APPROVED_SINGLE', 'Photo approved successfully!')}
+        subtitle=""
+        onDismiss={dismissVerdict}
+      />
+      <PhotoVerdictSheet
+        visible={verdictPhase === 'uploading' || verdictPhase === 'rejected' || verdictPhase === 'mixed'}
+        phase={verdictPhase === 'uploading' ? 'uploading' : verdictPhase === 'mixed' ? 'mixed' : 'rejected'}
+        approved={verdictApproved}
+        rejected={verdictRejected}
+        onAddNewPhoto={retryFromVerdict}
+        onDismiss={dismissVerdict}
       />
     </View>
   )

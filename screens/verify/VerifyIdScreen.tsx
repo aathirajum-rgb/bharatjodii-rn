@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Alert,
   Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -312,9 +313,6 @@ export default function VerifyIdScreen({ navigation }: { navigation: any }) {
 
     setSubmitting(true)
     const asset    = result.assets[0]
-    const filename = asset.uri.split('/').pop() ?? 'id.jpg'
-    const ext      = filename.split('.').pop()?.toLowerCase() ?? 'jpg'
-    const mime     = ext === 'png' ? 'image/png' : 'image/jpeg'
     // Passport is two-sided (verify-id.page.ts:975-978) — the old native camera
     // bridge captured both sides then sent one call with DOCPAGE='both'. Without
     // that native multi-capture UI, we capture+upload front then back as two
@@ -328,7 +326,14 @@ export default function VerifyIdScreen({ navigation }: { navigation: any }) {
     formData.append('DOCPAGE', docPage)
     formData.append('INVOID', '1')
     formData.append('DOCNAME', docName)
-    formData.append('UPLOADPHOTO', { uri: asset.uri, name: filename, type: mime } as any)
+    if (Platform.OS === 'web' && asset.file) {
+      formData.append('UPLOADPHOTO', asset.file, asset.file.name)
+    } else {
+      const filename = asset.uri.split('/').pop() ?? 'id.jpg'
+      const ext      = filename.split('.').pop()?.toLowerCase() ?? 'jpg'
+      const mime     = ext === 'png' ? 'image/png' : 'image/jpeg'
+      formData.append('UPLOADPHOTO', { uri: asset.uri, name: filename, type: mime } as any)
+    }
 
     await uploadFile(Endpoints.media.addTrustBadge, formData)
 

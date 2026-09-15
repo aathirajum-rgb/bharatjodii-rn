@@ -54,6 +54,7 @@ import { useContactGating } from '../../hooks/useContactGating'
 import { usePhoneInfoSheet } from '../../hooks/usePhoneInfoSheet'
 import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
 import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
+import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictSheets'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { fetchActivityListingPage } from '../../service/activityService'
 import { communicationBtnOnClick, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, fetchContactDetails, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
@@ -969,6 +970,7 @@ export default function ActivityScreen({ navigation, route }: Props) {
         />
         <Toast request={toastRequest} />
         <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
+        <AddPhotoVerdictSheets addPhoto={addPhoto} />
       </ActivityDesktopLayout>
     )
   }
@@ -1328,6 +1330,7 @@ export default function ActivityScreen({ navigation, route }: Props) {
       />
       <Toast request={toastRequest} bottomOffset={56 + 16} />
       <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
+      <AddPhotoVerdictSheets addPhoto={addPhoto} />
     </View>
   )
 }

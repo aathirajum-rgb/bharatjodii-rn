@@ -26,9 +26,12 @@ import { getItem, setItem } from '../../service/storageService'
 import { getRegValue } from '../../service/registrationService'
 import {
   getPhotoConfig, validatePhotoAsset, normalizeWebFile, getRejectReasons, describeRejection,
+  pollPhotoValidation,
   type PhotoRejectionCode,
 } from '../../service/photoValidationService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import PhotoVerdictSheet, { type VerdictPhoto } from '../../components/photo-validation/PhotoVerdictSheet'
+import VerificationSuccessSheet from '../../components/bottom-sheet/VerificationSuccessSheet'
 
 const PLACEHOLDER = CDN_SVG + 'add-photo.svg'
 // onboarding-photo.component.html's per-photo trash icon — same asset
@@ -50,6 +53,15 @@ export default function PhotoUploadDesktopStep({ navigation }: Props) {
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
+
+  // AI photo-validation verdict — same state machine as CustomGalleryScreen's
+  // native/web variants, kept in sync with those files. Unlike onboarding's
+  // first-photo flow, dismissing here doesn't navigate anywhere — the grid
+  // (loadPhotos()) already reflects the new photo by the time the verdict
+  // sheet can appear.
+  const [verdictPhase, setVerdictPhase] = useState<'idle' | 'uploading' | 'approved' | 'rejected' | 'mixed'>('idle')
+  const [verdictApproved, setVerdictApproved] = useState<VerdictPhoto[]>([])
+  const [verdictRejected, setVerdictRejected] = useState<VerdictPhoto[]>([])
 
   useEffect(() => {
     Promise.all([getRegValue('GENDER'), getRegValue('CREATEDBY')]).then(([g, cb]) => {
@@ -78,6 +90,7 @@ export default function PhotoUploadDesktopStep({ navigation }: Props) {
       const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
       const config = await getPhotoConfig()
       const rejections: PhotoRejectionCode[] = []
+      const uploadedPhotoIds: string[] = []
       for (const file of files) {
         const input = await normalizeWebFile(file)
         const validation = await validatePhotoAsset(input, config)
@@ -91,8 +104,13 @@ export default function PhotoUploadDesktopStep({ navigation }: Props) {
         formData.append('AIVALIDATE', config.isNativeFaceDetectionEnabled ? '1' : '0')
         formData.append('UPLOADPHOTO', file, file.name)
         const res = await uploadFile(Endpoints.media.addProfilePic, formData)
-        if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
-          await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
+        if (res?.RESPONSECODE == 1) {
+          if (res?.RESPONSE?.PHOTOURL) {
+            await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
+          }
+          if (res?.RESPONSE?.PHOTOID) {
+            uploadedPhotoIds.push(String(res.RESPONSE.PHOTOID))
+          }
         }
       }
       await loadPhotos()
@@ -100,12 +118,58 @@ export default function PhotoUploadDesktopStep({ navigation }: Props) {
         const reasons = await getRejectReasons()
         Alert.alert('Some photos were not added', rejections.map(code => describeRejection(code, reasons)).join('\n\n'))
       }
+
+      // Same fire-immediately-after-upload verdict poll as CustomGalleryScreen
+      // (native/web) — this desktop onboarding step was missing it entirely,
+      // so an AI-flagged photo here never surfaced a verdict or a selfie
+      // recheck prompt.
+      if (config.isNativeFaceDetectionEnabled && uploadedPhotoIds.length > 0) {
+        setVerdictPhase('uploading')
+        const verdict = await pollPhotoValidation(uploadedPhotoIds)
+
+        if (!verdict) {
+          setVerdictPhase('idle')
+          return
+        }
+
+        if (verdict.isSelfieRequired) {
+          setVerdictPhase('idle')
+          navigation.push('photo-mismatch-selfie', { onDonePageNo: 'desktop-other-details' })
+          return
+        }
+
+        const approved: VerdictPhoto[] = []
+        const rejected: VerdictPhoto[] = []
+        for (const r of verdict.results) {
+          const entry: VerdictPhoto = {
+            photoId:  r.photoId,
+            photoUrl: r.photoUrl,
+            ...(r.reason?.title    ? { reasonTitle: r.reason.title }       : {}),
+            ...(r.reason?.subtitle ? { reasonSubtitle: r.reason.subtitle } : {}),
+          }
+          if (r.status.toLowerCase() === 'approve') approved.push(entry)
+          else rejected.push(entry)
+        }
+
+        setVerdictApproved(approved)
+        setVerdictRejected(rejected)
+        setVerdictPhase(rejected.length === 0 ? 'approved' : approved.length === 0 ? 'rejected' : 'mixed')
+      }
     } catch {
       Alert.alert('Error', 'Upload failed. Please try again.')
+      setVerdictPhase('idle')
     } finally {
       setUploading(false)
       if (inputRef.current) inputRef.current.value = ''
     }
+  }
+
+  function dismissVerdict() {
+    setVerdictPhase('idle')
+  }
+
+  function retryFromVerdict() {
+    setVerdictPhase('idle')
   }
 
   function openFilePicker() {
@@ -215,6 +279,23 @@ export default function PhotoUploadDesktopStep({ navigation }: Props) {
           <Text style={s.skipText}>I'll do this later ›</Text>
         </Pressable>
       )}
+
+      <VerificationSuccessSheet
+        visible={verdictPhase === 'approved'}
+        title={verdictApproved.length > 1
+          ? t('AI_PHOTO_VALIDATION.PHOTOS_APPROVED_MULTI', '#COUNT Photos approved successfully!').replace('#COUNT', String(verdictApproved.length))
+          : t('AI_PHOTO_VALIDATION.PHOTO_APPROVED_SINGLE', 'Photo approved successfully!')}
+        subtitle=""
+        onDismiss={dismissVerdict}
+      />
+      <PhotoVerdictSheet
+        visible={verdictPhase === 'uploading' || verdictPhase === 'rejected' || verdictPhase === 'mixed'}
+        phase={verdictPhase === 'uploading' ? 'uploading' : verdictPhase === 'mixed' ? 'mixed' : 'rejected'}
+        approved={verdictApproved}
+        rejected={verdictRejected}
+        onAddNewPhoto={retryFromVerdict}
+        onDismiss={dismissVerdict}
+      />
     </OnboardingDesktopLayout>
   )
 }

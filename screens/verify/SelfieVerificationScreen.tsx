@@ -18,7 +18,7 @@
 //   - Attempt-limit/cooldown UI — that lives entirely in BlockerScreen.tsx
 //     (SELFIEATTEMPT), nothing to add here.
 import { useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
 import { useTranslation } from 'react-i18next'
@@ -35,6 +35,7 @@ import { getItem } from '../../service/storageService'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
 import { requestCameraPermission } from '../../service/permissionService'
+import { snapshotWebFile } from '../../utils/webFileSnapshot'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
@@ -46,6 +47,7 @@ export default function SelfieVerificationScreen({ navigation: _navigation }: { 
 
   const [step, setStep] = useState<Step>('idle')
   const [photoUri, setPhotoUri] = useState<string | null>(null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [errorMsg, setErrorMsg] = useState('')
 
   async function openCamera() {
@@ -59,11 +61,18 @@ export default function SelfieVerificationScreen({ navigation: _navigation }: { 
     if (result.canceled || !result.assets[0]) return
 
     setPhotoUri(result.assets[0].uri)
+    // Snapshotted immediately, not held as a live reference — this screen
+    // always shows a preview step before confirmAndUpload, and that delay is
+    // exactly what triggers iOS Safari's 0-byte-upload bug for a picker File
+    // (see webFileSnapshot.ts).
+    const file = result.assets[0].file
+    setPhotoFile(file ? await snapshotWebFile(file) : null)
     setStep('preview')
   }
 
   function retake() {
     setPhotoUri(null)
+    setPhotoFile(null)
     setStep('idle')
     openCamera()
   }
@@ -78,16 +87,19 @@ export default function SelfieVerificationScreen({ navigation: _navigation }: { 
       getItem(SK.User.MEMBER_CODE),
     ])
 
-    const filename = photoUri.split('/').pop() ?? 'selfie.jpg'
-    const ext = filename.split('.').pop()?.toLowerCase() ?? 'jpg'
-    const mime = ext === 'png' ? 'image/png' : 'image/jpeg'
-
     const formData = new FormData()
     formData.append('ID', userId ?? '')
     formData.append('DOCPAGE', 'front')
     formData.append('INVOID', '1')
     formData.append('DOCNAME', 'selfie')
-    formData.append('UPLOADPHOTO', { uri: photoUri, name: filename, type: mime } as any)
+    if (Platform.OS === 'web' && photoFile) {
+      formData.append('UPLOADPHOTO', photoFile, photoFile.name)
+    } else {
+      const filename = photoUri.split('/').pop() ?? 'selfie.jpg'
+      const ext = filename.split('.').pop()?.toLowerCase() ?? 'jpg'
+      const mime = ext === 'png' ? 'image/png' : 'image/jpeg'
+      formData.append('UPLOADPHOTO', { uri: photoUri, name: filename, type: mime } as any)
+    }
 
     await uploadFile(Endpoints.media.addTrustBadge, formData)
 

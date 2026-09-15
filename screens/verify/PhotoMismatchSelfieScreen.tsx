@@ -16,7 +16,7 @@
 // other capture screen in this app, rather than Figma's live in-app
 // camera-preview mockup — see this screen's PR discussion for that tradeoff.
 import { useEffect, useState } from 'react'
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -32,6 +32,7 @@ import { getItem } from '../../service/storageService'
 import { apiCall, uploadFile } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
 import { requestCameraPermission } from '../../service/permissionService'
+import { snapshotWebFile } from '../../utils/webFileSnapshot'
 import { pollPhotoValidation } from '../../service/photoValidationService'
 
 const ICONS = {
@@ -60,6 +61,7 @@ export default function PhotoMismatchSelfieScreen({ navigation, route }: Props) 
 
   const [step, setStep] = useState<Step>('prompt')
   const [photoUri, setPhotoUri] = useState<string | null>(null)
+  const [photoFile, setPhotoFile] = useState<File | null>(null)
   const [existingThumbs, setExistingThumbs] = useState<string[]>([])
   const [mismatchReason, setMismatchReason] = useState<string | null>(null)
   // Angular/BlockerScreen.tsx: the support number is server-driven (CUSTOMER-CARE),
@@ -105,11 +107,17 @@ export default function PhotoMismatchSelfieScreen({ navigation, route }: Props) 
     if (result.canceled || !result.assets[0]) return
 
     setPhotoUri(result.assets[0].uri)
+    // Snapshotted immediately — this screen shows a preview before
+    // confirmAndUpload, and that delay triggers iOS Safari's 0-byte-upload
+    // bug for a picker File (see webFileSnapshot.ts).
+    const file = result.assets[0].file
+    setPhotoFile(file ? await snapshotWebFile(file) : null)
     setStep('preview')
   }
 
   function retake() {
     setPhotoUri(null)
+    setPhotoFile(null)
     setMismatchReason(null)
     setStep('prompt')
     openCamera()
@@ -121,14 +129,18 @@ export default function PhotoMismatchSelfieScreen({ navigation, route }: Props) 
 
     try {
       const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-      const filename = photoUri.split('/').pop() ?? 'selfie.jpg'
-      const ext  = filename.split('.').pop()?.toLowerCase() ?? 'jpg'
-      const mime = ext === 'png' ? 'image/png' : 'image/jpeg'
 
       const formData = new FormData()
       formData.append('ID', userId)
       formData.append('AIVALIDATE', '1')
-      formData.append('UPLOADPHOTO', { uri: photoUri, name: filename, type: mime } as any)
+      if (Platform.OS === 'web' && photoFile) {
+        formData.append('UPLOADPHOTO', photoFile, photoFile.name)
+      } else {
+        const filename = photoUri.split('/').pop() ?? 'selfie.jpg'
+        const ext  = filename.split('.').pop()?.toLowerCase() ?? 'jpg'
+        const mime = ext === 'png' ? 'image/png' : 'image/jpeg'
+        formData.append('UPLOADPHOTO', { uri: photoUri, name: filename, type: mime } as any)
+      }
 
       const uploadRes = await uploadFile(Endpoints.media.addProfilePic, formData)
       const selfiePhotoId = uploadRes?.RESPONSE?.PHOTOID ? String(uploadRes.RESPONSE.PHOTOID) : null

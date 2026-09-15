@@ -45,6 +45,7 @@ import ViewProfileDesktopLayout from './ViewProfileDesktopLayout'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
 import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
+import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictSheets'
 import {
   getViewProfile, markProfileViewed, getSimilarProfiles, viewHoroscope, getStarMatch,
   getBioDataLink, getEnlargedPhotos, getBiodataExtras, saveBiodataThemeId,
@@ -1713,6 +1714,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           onLinkPress={handlePhoneInfoClose}
         />
         <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
+        <AddPhotoVerdictSheets addPhoto={addPhoto} />
 
         <PhotoViewerModalDesktop
           visible={photoViewerOpen}
@@ -2429,6 +2431,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         onLinkPress={handlePhoneInfoClose}
       />
       <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
+      <AddPhotoVerdictSheets addPhoto={addPhoto} />
       {/* Angular: viewprofile.page.ts's presentPopover() — Verified badge info tap.
           content is API-supplied (PERSONALINFO.IDDET.BODY), no fallback text in
           Angular either, so an empty/missing verifiedInfoText just shows an empty

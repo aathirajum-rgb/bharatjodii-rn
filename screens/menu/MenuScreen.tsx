@@ -19,11 +19,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import { StorageKeys } from '../../constants/storage.keys'
-import { getItem, setItem } from '../../service/storageService'
+import { getItem } from '../../service/storageService'
 import { getSession, getSessionValue } from '../../service/registrationService'
 import { fetchMenuPromo } from '../../service/homeService'
-import { uploadFile } from '../../service/apiClient'
-import { Endpoints } from '../../service/api.endpoints'
 import { managePhotos } from '../../service/profileService'
 import { paymentTrack, redirectToIntermediatePage } from '../../service/paymentService'
 import { checkFreeTrialCondition } from '../../service/payWallService'
@@ -34,6 +32,9 @@ import { disconnectSocket } from '../../service/socketService'
 import { logEvent, dispatchNativeEvent } from '../../service/analyticsService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import CustomGalleryScreen from '../onboarding/CustomGalleryScreen'
+import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
+import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
+import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictSheets'
 import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import LanguagePillSheet from '../../components/language-pill/LanguagePillSheet'
@@ -257,9 +258,7 @@ export default function MenuScreen({ navigation }: Props) {
   // IS the picker, because browsers only open a file dialog from a direct
   // synchronous click — there is no intermediate screen to route through.
   const [galleryVisible, setGalleryVisible] = useState(false)
-  const [webUploading,   setWebUploading]   = useState(false)
   const [photoCount,     setPhotoCount]     = useState(0)
-  const webFileInputRef = useRef<HTMLInputElement | null>(null)
   // Angular's PROMO_CONT — payment/nbmenu/v1's RESPONSE, carrying CONTENT1
   // (the offer copy), CTA_TXT (button label), PAYMENTID, and a HOMEPAGE object
   // whose MENUTITLE/CTA drive the expired variant of the banner.
@@ -322,14 +321,6 @@ export default function MenuScreen({ navigation }: Props) {
 
   // ── Photo picker handlers ───────────────────────────────────────────────────
 
-  function openGalleryPicker() {
-    if (Platform.OS === 'web') {
-      webFileInputRef.current?.click()
-    } else {
-      setGalleryVisible(true)
-    }
-  }
-
   // managePhotos() is what actually writes PHOTO_URL to storage from the
   // photo list; the avatar here reads that key, so it has to run before the
   // re-read or the badge would upload a photo the menu never shows. The modal
@@ -339,27 +330,23 @@ export default function MenuScreen({ navigation }: Props) {
     loadProfileSummary()
   }, [loadProfileSummary])
 
-  async function handleWebFiles(e: any) {
-    const files: File[] = Array.from(e.target.files ?? [])
-    if (!files.length) return
-    setWebUploading(true)
-    try {
-      const uid = (await getItem(StorageKeys.Auth.USER_ID)) ?? ''
-      for (const file of files) {
-        const formData = new FormData()
-        formData.append('ID', uid)
-        formData.append('UPLOADPHOTO', file, file.name)
-        const res = await uploadFile(Endpoints.media.addProfilePic, formData)
-        if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
-          await setItem(StorageKeys.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
-        }
-      }
-      await refreshAfterUpload()
-    } catch {
-      Alert.alert('Error', 'Upload failed. Please try again.')
-    } finally {
-      setWebUploading(false)
-      if (webFileInputRef.current) webFileInputRef.current.value = ''
+  // Previously this screen hand-rolled its own web upload (handleWebFiles)
+  // instead of reusing this shared hook — a near-duplicate of its web path
+  // that was missing the AIVALIDATE field, the pre-upload validation gate,
+  // and per-rejection messaging. Native still keeps its own CustomGalleryScreen
+  // modal below (not this hook's native path, which navigates to a different
+  // Gallery screen) — only the web `<input>` picker is shared now.
+  const addPhoto = useAddPhotoPicker({
+    onUploaded: refreshAfterUpload,
+    onRejected: msg => Alert.alert('Some photos were not added', msg),
+    onError: msg => Alert.alert('Error', msg),
+  })
+
+  function openGalleryPicker() {
+    if (Platform.OS === 'web') {
+      addPhoto.webInputRef.current?.click()
+    } else {
+      setGalleryVisible(true)
     }
   }
 
@@ -451,7 +438,7 @@ export default function MenuScreen({ navigation }: Props) {
             <Pressable
               style={s.avatarContainer}
               onPress={openGalleryPicker}
-              disabled={webUploading}
+              disabled={addPhoto.uploading}
               accessibilityRole="button"
               accessibilityLabel={t('EDITPROFILE.ADDPHOTO')}
             >
@@ -473,7 +460,7 @@ export default function MenuScreen({ navigation }: Props) {
               {/* Purely decorative now — pointerEvents:'none' so it can't
                   swallow a tap that belongs to the avatar Pressable above. */}
               <View style={s.cameraBadge} pointerEvents="none">
-                {webUploading
+                {addPhoto.uploading
                   ? <ActivityIndicator color={Colors.primary} size="small" />
                   : <CdnSvg uri={ICON.camera} width={13} height={13} />
                 }
@@ -692,17 +679,8 @@ export default function MenuScreen({ navigation }: Props) {
       </Modal>
 
       {/* Web only — this hidden input IS the picker (see openGalleryPicker) */}
-      {Platform.OS === 'web' && (
-        // @ts-ignore — raw DOM element, react-native-web only
-        <input
-          ref={webFileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          style={{ position: 'absolute', width: 1, height: 1, opacity: 0, overflow: 'hidden' }}
-          onChange={handleWebFiles}
-        />
-      )}
+      <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
+      <AddPhotoVerdictSheets addPhoto={addPhoto} />
     </View>
   )
 }

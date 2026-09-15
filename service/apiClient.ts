@@ -229,6 +229,12 @@ export async function uploadFile(
   url: string,
   formData: FormData,
   _retrying = false,
+  // Optional 0–1 progress callback — no caller passed a 3rd/4th argument
+  // before this (verified across the codebase), so this is purely additive.
+  // Nothing wired this up before; large photo/video uploads on a slow
+  // connection could only ever show a static "uploading…" spinner, never a
+  // percentage.
+  onProgress?: (fraction: number) => void,
 ): Promise<ApiResult> {
   try {
     const [atn, rtn, appType, lang] = await Promise.all([
@@ -238,8 +244,18 @@ export async function uploadFile(
       getItem(StorageKeys.Auth.LANG),
     ])
 
-    // Media endpoints (image CDN) use a fixed APPTYPE=600; main API uses the app's own type
-    const resolvedAppType = MEDIA_ENDPOINTS.includes(url) ? '600' : (appType ?? '115')
+    // Always the app's own real APPTYPE — verified against both legacy
+    // references (Angular's httpservice.service.ts uploadData() sends
+    // localStorage's real APPTYPE for every module incl. photo uploads;
+    // Android's PhotoUploadRepository.kt/ImageUploadService.kt send
+    // Constants.APP_TYPE = BuildConfig.appType, same for photo/horoscope
+    // uploads). Neither ever hardcodes APPTYPE for media/image-CDN
+    // endpoints — the previous `'600'` override here had no such backing and
+    // is the confirmed cause of chataudioupd.php returning HTTP 500 for
+    // chat attachment uploads (doApiCall()'s plain apiCall() path already
+    // never special-cased this either, so this brings uploadFile() in line
+    // with it).
+    const resolvedAppType = appType ?? '115'
 
     // Only append common fields on the first attempt — retries reuse the same
     // FormData object and FormData.append() accumulates duplicates.
@@ -256,15 +272,26 @@ export async function uploadFile(
     // (application/x-www-form-urlencoded) would otherwise override it.
     const res: ApiResult = (await client.post(url, formData, {
       headers: { 'Content-Type': undefined },
+      ...(onProgress ? {
+        onUploadProgress: (evt: { loaded: number; total?: number }) => {
+          if (evt.total) onProgress(evt.loaded / evt.total)
+        },
+      } : {}),
     })).data
 
     if (!res) return errorResponse(url)
 
+    // Same RESPONSECODE/ERRCODE numeric-vs-string drift as doApiCall (see the
+    // comment there) — normalize before comparing so a string "22"/"61"/"23"
+    // from a media endpoint isn't missed by strict equality.
+    if (res['RESPONSECODE'] !== undefined) res['RESPONSECODE'] = String(res['RESPONSECODE'])
+    if (res['ERRCODE']      !== undefined) res['ERRCODE']      = String(res['ERRCODE'])
+
     const errCode = res['ERRCODE']
-    if (errCode === 22 || errCode === 61 || errCode === 23) {
+    if (errCode === '22' || errCode === '61' || errCode === '23') {
       if (_retrying) return errorResponse(url)
       const result = await handleErrCode(errCode, res['RTN'], () =>
-        uploadFile(url, formData, true),
+        uploadFile(url, formData, true, onProgress),
       )
       return result ?? res
     }

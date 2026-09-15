@@ -93,6 +93,7 @@ import { enablePaywall } from '../../service/payWallService'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
 import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
 import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
+import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictSheets'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
 import { StorageKeys } from '../../constants/storage.keys'
 import Constants from 'expo-constants'
@@ -2786,6 +2787,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         />
         <LanguagePillSheet visible={showLanguageSheet} onClose={() => setShowLanguageSheet(false)} />
         <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
+        <AddPhotoVerdictSheets addPhoto={addPhoto} />
         <Toast request={toastRequest} />
       </>
     )
@@ -3008,6 +3010,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
       {/* AppFooter's tab bar is 56px tall (+ its own safe-area padding) — the
           Toast's default 24px clearance alone left it overlapping the footer. */}
       <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
+      <AddPhotoVerdictSheets addPhoto={addPhoto} />
       <Toast request={toastRequest} bottomOffset={56 + 16} />
     </View>
   )

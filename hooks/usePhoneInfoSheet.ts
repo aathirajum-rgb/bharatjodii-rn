@@ -8,7 +8,7 @@
 // profile tabs) shows the same real sheets instead of a generic fallback
 // alert. MatchesScreen itself keeps its own inline copy for now — not
 // migrated here, to avoid touching an already-large, working screen.
-import { useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { BottomSheetData } from '../components/bottom-sheet/BottomSheet'
 import { getItem } from '../service/storageService'
 import { getRegistrationArrays } from '../service/registrationService'
@@ -42,7 +42,11 @@ export function usePhoneInfoSheet() {
   // Returns true if `result` was one of the kinds this hook owns (caller
   // should stop processing); false if the caller still needs to handle it
   // (show_contact / payment_promo / error / api_success, etc.).
-  async function handleResult(result: CommActionResult): Promise<boolean> {
+  // Wrapped in useCallback (here and below) so callers that build their own
+  // memoized callbacks around this hook's return value (e.g. ChatScreen.tsx's
+  // renderRow) get a referentially stable object instead of a new one every
+  // render, which would otherwise silently defeat that memoization.
+  const handleResult = useCallback(async (result: CommActionResult): Promise<boolean> => {
     switch (result.type) {
       case 'phone_protected':
         setSheet({ kind: 'phone_protected' }); return true
@@ -87,13 +91,13 @@ export function usePhoneInfoSheet() {
       default:
         return false
     }
-  }
+  }, [])
 
   // Maps each kind onto BottomSheet's generic data shape — same mapping
   // MatchesScreen.tsx's getPhoneInfoSheetData() uses. `t` typed as `any` since
   // i18next's real TFunction overload set doesn't structurally assign to any
   // plain function type once a fallback second arg is involved.
-  function getData(t: any): BottomSheetData {
+  const getData = useCallback((t: any): BottomSheetData => {
     if (!sheet) return {}
     switch (sheet.kind) {
       case 'phone_protected':
@@ -146,31 +150,34 @@ export function usePhoneInfoSheet() {
           ctaLabel: 'Become paid member',
         }
     }
-  }
+  }, [sheet])
 
-  function close() { setSheet(null) }
+  const close = useCallback(() => setSheet(null), [])
 
   // "Become a paid member" across the female-free variants, and verify_id's
   // own CTA, both point at the same upgrade path MatchesScreen uses.
-  function primaryPress(navigation: any) {
+  const primaryPress = useCallback((navigation: any) => {
     const kind = sheet?.kind
     setSheet(null)
     if (kind === 'female_free_photo_add' || kind === 'female_free_photo_fail'
       || kind === 'female_free_call_verification' || kind === 'female_free_limit_over') {
       navigation.navigate('recharge')
     }
-  }
+  }, [sheet])
 
   // openAddPhoto is hooks/useAddPhotoPicker.ts's trigger — passed in rather than
   // called via navigation.navigate('Gallery') directly, since that route has no
   // web implementation (see that hook's own header comment for why).
-  function secondaryPress(openAddPhoto: (navigation: any) => void, navigation: any) {
+  const secondaryPress = useCallback((openAddPhoto: (navigation: any) => void, navigation: any) => {
     const kind = sheet?.kind
     setSheet(null)
     if (kind === 'female_free_photo_add' || kind === 'female_free_photo_fail') {
       openAddPhoto(navigation)
     }
-  }
+  }, [sheet])
 
-  return { sheet, handleResult, getData, close, primaryPress, secondaryPress }
+  return useMemo(
+    () => ({ sheet, handleResult, getData, close, primaryPress, secondaryPress }),
+    [sheet, handleResult, getData, close, primaryPress, secondaryPress],
+  )
 }

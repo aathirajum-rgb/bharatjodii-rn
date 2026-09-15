@@ -58,6 +58,7 @@ import { apiCall, uploadFile } from '../../service/apiClient'
 import { getItem, setItem } from '../../service/storageService'
 import {
   getPhotoConfig, validatePhotoAsset, normalizeWebFile, getRejectReasons, describeRejection,
+  pollPhotoValidation,
   type PhotoRejectionCode,
 } from '../../service/photoValidationService'
 import { StorageKeys as SK } from '../../constants/storage.keys'
@@ -66,6 +67,8 @@ import { fetchEditProfileInfo, submitFieldChanges, type FieldChange } from '../.
 import { deletePhoto, setMainPhoto } from '../../service/profileService'
 import PhotoPrivacyDesktopModal from '../../components/photo-privacy/PhotoPrivacyDesktopModal'
 import PhotoViewerModal, { type ViewerPhoto } from '../../components/edit-profile/PhotoViewerModal'
+import PhotoVerdictSheet, { type VerdictPhoto } from '../../components/photo-validation/PhotoVerdictSheet'
+import VerificationSuccessSheet from '../../components/bottom-sheet/VerificationSuccessSheet'
 import DeletePhotoConfirmModal from '../../components/edit-profile/DeletePhotoConfirmModal'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
 import {
@@ -149,6 +152,12 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
   const [photoViewerIndex, setPhotoViewerIndex] = useState<number | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Photo | null>(null)
   const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
+
+  // AI photo-validation verdict — same state machine as onboarding's
+  // CustomGalleryScreen (native/web) and EditProfileScreen (mobile).
+  const [verdictPhase, setVerdictPhase] = useState<'idle' | 'uploading' | 'approved' | 'rejected' | 'mixed'>('idle')
+  const [verdictApproved, setVerdictApproved] = useState<VerdictPhoto[]>([])
+  const [verdictRejected, setVerdictRejected] = useState<VerdictPhoto[]>([])
 
   // ── Read-only fields ──
   const [ageDisplay, setAgeDisplay]       = useState<string | undefined>(undefined)
@@ -450,6 +459,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
       const filesToUpload = replacing ? files.slice(0, 1) : files
       const config = await getPhotoConfig()
       const rejections: PhotoRejectionCode[] = []
+      const uploadedPhotoIds: string[] = []
       for (const file of filesToUpload) {
         const input = await normalizeWebFile(file)
         const validation = await validatePhotoAsset(input, config)
@@ -463,8 +473,13 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
         formData.append('AIVALIDATE', config.isNativeFaceDetectionEnabled ? '1' : '0')
         formData.append('UPLOADPHOTO', file, file.name)
         const res = await uploadFile(Endpoints.media.addProfilePic, formData)
-        if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
-          await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
+        if (res?.RESPONSECODE == 1) {
+          if (res?.RESPONSE?.PHOTOURL) {
+            await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
+          }
+          if (res?.RESPONSE?.PHOTOID) {
+            uploadedPhotoIds.push(String(res.RESPONSE.PHOTOID))
+          }
         }
       }
       // Replacing sends exactly one file — if it's the one that got rejected,
@@ -483,20 +498,59 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
       if (replacing?.MAINPHOTO == 1) {
         setToastRequest({ message: t('EDITPROFILE.PHOTO_UPDATED_TOAST', 'Profile photo updated successfully'), key: Date.now() })
       }
+
+      if (config.isNativeFaceDetectionEnabled && uploadedPhotoIds.length > 0) {
+        setVerdictPhase('uploading')
+        const verdict = await pollPhotoValidation(uploadedPhotoIds)
+
+        if (!verdict) {
+          setVerdictPhase('idle')
+        } else if (verdict.isSelfieRequired) {
+          setVerdictPhase('idle')
+          navigation.push('photo-mismatch-selfie', { standalone: true })
+        } else {
+          const approved: VerdictPhoto[] = []
+          const rejected: VerdictPhoto[] = []
+          for (const r of verdict.results) {
+            const entry: VerdictPhoto = {
+              photoId:  r.photoId,
+              photoUrl: r.photoUrl,
+              ...(r.reason?.title    ? { reasonTitle: r.reason.title }       : {}),
+              ...(r.reason?.subtitle ? { reasonSubtitle: r.reason.subtitle } : {}),
+            }
+            if (r.status.toLowerCase() === 'approve') approved.push(entry)
+            else rejected.push(entry)
+          }
+          setVerdictApproved(approved)
+          setVerdictRejected(rejected)
+          setVerdictPhase(rejected.length === 0 ? 'approved' : approved.length === 0 ? 'rejected' : 'mixed')
+        }
+      }
     } catch {
       Alert.alert('Error', 'Upload failed. Please try again.')
+      setVerdictPhase('idle')
     } finally {
       setUploading(false)
       if (inputRef.current) inputRef.current.value = ''
     }
   }
 
+  function dismissVerdict() {
+    setVerdictPhase('idle')
+  }
+
+  function retryFromVerdict() {
+    setVerdictPhase('idle')
+  }
+
   function openFilePicker() {
+    if (uploading) return
     replacingPhotoRef.current = null
     inputRef.current?.click()
   }
 
   function openReplacePicker(photo: Photo) {
+    if (uploading) return
     replacingPhotoRef.current = photo
     inputRef.current?.click()
   }
@@ -763,7 +817,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
                 </View>
               </Pressable>
             ) : (
-              <Pressable style={s.primaryTileEmpty} onPress={openFilePicker}>
+              <Pressable style={s.primaryTileEmpty} onPress={openFilePicker} disabled={uploading}>
                 {uploading
                   ? <ActivityIndicator color={Colors.textSecondary} />
                   : <Image source={{ uri: PLACEHOLDER }} style={{ width: 40, height: 40 }} contentFit="contain" />}
@@ -783,7 +837,7 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
                   </View>
                 ))}
                 {photos.length < MAX_PHOTOS && (
-                  <Pressable style={s.smallAddTile} onPress={openFilePicker}>
+                  <Pressable style={s.smallAddTile} onPress={openFilePicker} disabled={uploading}>
                     {uploading
                       ? <ActivityIndicator color={Colors.textSecondary} />
                       : <CdnSvg uri={ADD_ICON} width={24} height={24} />}
@@ -792,9 +846,13 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
               </View>
             )}
           </View>
-          <Text style={photos.length === 0 ? s.photoHintEmpty : s.photoHint}>
-            {photos.length === 0 ? t('EDITPROFILE.ADDYOURPHOTO', 'Add your photos') : t('EDITPROFILE.DRAG_PHOTO')}
-          </Text>
+          {/* DRAG_PHOTO ("*Hold & Drag photos to reorder") dropped — there is
+              no reorder gesture or backend endpoint implemented anywhere in
+              this app, so showing it would promise a feature that doesn't
+              exist. */}
+          {photos.length === 0 && (
+            <Text style={s.photoHintEmpty}>{t('EDITPROFILE.ADDYOURPHOTO', 'Add your photos')}</Text>
+          )}
           <Pressable onPress={() => Alert.alert('Photo guidelines', 'Use clear, recent photos with good lighting.')}>
             <Text style={s.guidelines}>ⓘ Check out our photo tips</Text>
           </Pressable>
@@ -981,6 +1039,23 @@ export default function EditProfileDesktopScreen({ navigation }: Props) {
       />
 
       <Toast request={toastRequest} />
+
+      <VerificationSuccessSheet
+        visible={verdictPhase === 'approved'}
+        title={verdictApproved.length > 1
+          ? t('AI_PHOTO_VALIDATION.PHOTOS_APPROVED_MULTI', '#COUNT Photos approved successfully!').replace('#COUNT', String(verdictApproved.length))
+          : t('AI_PHOTO_VALIDATION.PHOTO_APPROVED_SINGLE', 'Photo approved successfully!')}
+        subtitle=""
+        onDismiss={dismissVerdict}
+      />
+      <PhotoVerdictSheet
+        visible={verdictPhase === 'uploading' || verdictPhase === 'rejected' || verdictPhase === 'mixed'}
+        phase={verdictPhase === 'uploading' ? 'uploading' : verdictPhase === 'mixed' ? 'mixed' : 'rejected'}
+        approved={verdictApproved}
+        rejected={verdictRejected}
+        onAddNewPhoto={retryFromVerdict}
+        onDismiss={dismissVerdict}
+      />
     </DesktopPageShell>
   )
 }

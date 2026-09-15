@@ -10,14 +10,17 @@
 // actual <WebPhotoInput> (components/add-photo/WebPhotoInput.tsx) itself.
 import { useCallback, useRef, useState } from 'react'
 import { Platform } from 'react-native'
+import { useNavigation } from '@react-navigation/native'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { Endpoints } from '../service/api.endpoints'
 import { uploadFile } from '../service/apiClient'
 import { getItem, setItem } from '../service/storageService'
 import {
   getPhotoConfig, validatePhotoAsset, normalizeWebFile, getRejectReasons, describeRejection,
+  pollPhotoValidation,
   type PhotoRejectionCode,
 } from '../service/photoValidationService'
+import type { VerdictPhoto } from '../components/photo-validation/PhotoVerdictSheet'
 
 type NavigationLike = { navigate: (route: string) => void }
 
@@ -34,6 +37,15 @@ export function useAddPhotoPicker(options: UseAddPhotoPickerOptions = {}) {
   const { onUploaded, onRejected, onError } = options
   const webInputRef = useRef<HTMLInputElement | null>(null)
   const [uploading, setUploading] = useState(false)
+  const navigation = useNavigation<any>()
+
+  // AI photo-validation verdict — same state machine as onboarding's
+  // CustomGalleryScreen (native/web) and Edit Profile's photo picker. Native
+  // uploads (routed to the Gallery screen) already poll on their own; this is
+  // specifically for the web `<input>` path this hook drives directly.
+  const [verdictPhase, setVerdictPhase] = useState<'idle' | 'uploading' | 'approved' | 'rejected' | 'mixed'>('idle')
+  const [verdictApproved, setVerdictApproved] = useState<VerdictPhoto[]>([])
+  const [verdictRejected, setVerdictRejected] = useState<VerdictPhoto[]>([])
 
   const handleWebFiles = useCallback(async (e: any) => {
     const files: File[] = Array.from(e.target.files ?? [])
@@ -43,6 +55,7 @@ export function useAddPhotoPicker(options: UseAddPhotoPickerOptions = {}) {
       const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
       const config = await getPhotoConfig()
       const rejections: PhotoRejectionCode[] = []
+      const uploadedPhotoIds: string[] = []
       let uploadedAny = false
 
       for (const file of files) {
@@ -58,9 +71,14 @@ export function useAddPhotoPicker(options: UseAddPhotoPickerOptions = {}) {
         formData.append('AIVALIDATE', config.isNativeFaceDetectionEnabled ? '1' : '0')
         formData.append('UPLOADPHOTO', file, file.name)
         const res = await uploadFile(Endpoints.media.addProfilePic, formData)
-        if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
-          await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
-          uploadedAny = true
+        if (res?.RESPONSECODE == 1) {
+          if (res?.RESPONSE?.PHOTOURL) {
+            await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL))
+            uploadedAny = true
+          }
+          if (res?.RESPONSE?.PHOTOID) {
+            uploadedPhotoIds.push(String(res.RESPONSE.PHOTOID))
+          }
         }
       }
 
@@ -69,13 +87,53 @@ export function useAddPhotoPicker(options: UseAddPhotoPickerOptions = {}) {
         onRejected?.(rejections.map(code => describeRejection(code, reasons)).join(' '))
       }
       if (uploadedAny) onUploaded?.()
+
+      if (config.isNativeFaceDetectionEnabled && uploadedPhotoIds.length > 0) {
+        setVerdictPhase('uploading')
+        const verdict = await pollPhotoValidation(uploadedPhotoIds)
+
+        if (!verdict) {
+          setVerdictPhase('idle')
+          return
+        }
+        if (verdict.isSelfieRequired) {
+          setVerdictPhase('idle')
+          navigation.push('photo-mismatch-selfie', { standalone: true })
+          return
+        }
+
+        const approved: VerdictPhoto[] = []
+        const rejected: VerdictPhoto[] = []
+        for (const r of verdict.results) {
+          const entry: VerdictPhoto = {
+            photoId:  r.photoId,
+            photoUrl: r.photoUrl,
+            ...(r.reason?.title    ? { reasonTitle: r.reason.title }       : {}),
+            ...(r.reason?.subtitle ? { reasonSubtitle: r.reason.subtitle } : {}),
+          }
+          if (r.status.toLowerCase() === 'approve') approved.push(entry)
+          else rejected.push(entry)
+        }
+        setVerdictApproved(approved)
+        setVerdictRejected(rejected)
+        setVerdictPhase(rejected.length === 0 ? 'approved' : approved.length === 0 ? 'rejected' : 'mixed')
+      }
     } catch {
       onError?.('Upload failed. Please try again.')
+      setVerdictPhase('idle')
     } finally {
       setUploading(false)
       if (webInputRef.current) webInputRef.current.value = ''
     }
-  }, [onUploaded, onRejected, onError])
+  }, [onUploaded, onRejected, onError, navigation])
+
+  function dismissVerdict() {
+    setVerdictPhase('idle')
+  }
+
+  function retryFromVerdict() {
+    setVerdictPhase('idle')
+  }
 
   // Single entry point for every "Add photo" CTA — native still routes through
   // the Gallery screen/navigator; web clicks the hidden input in place instead.
@@ -88,5 +146,8 @@ export function useAddPhotoPicker(options: UseAddPhotoPickerOptions = {}) {
     }
   }, [uploading])
 
-  return { webInputRef, handleWebFiles, openAddPhoto, uploading }
+  return {
+    webInputRef, handleWebFiles, openAddPhoto, uploading,
+    verdictPhase, verdictApproved, verdictRejected, dismissVerdict, retryFromVerdict,
+  }
 }

@@ -26,10 +26,13 @@ import {
   describeRejection,
   getPhotoConfig,
   getRejectReasons,
+  pollPhotoValidation,
   validatePhotoAsset,
   type PhotoRejectionCode,
 } from '../service/photoValidationService';
 import { getItem, setItem } from '../service/storageService';
+import PhotoVerdictSheet, { type VerdictPhoto } from '../components/photo-validation/PhotoVerdictSheet';
+import VerificationSuccessSheet from '../components/bottom-sheet/VerificationSuccessSheet';
 
 const NUM_COLUMNS = 3;
 const GAP = 2;
@@ -54,7 +57,7 @@ const ALL_PHOTOS: AlbumItem = { id: '__all__', title: 'All Photos', assetCount: 
 type ListItem = 'camera' | Asset;
 
 type Props = {
-  navigation: { goBack: () => void };
+  navigation: { goBack: () => void; push: (route: string, params?: any) => void };
   onDone?: (assets: Asset[]) => void;
   maxSelection?: number;
 };
@@ -109,6 +112,13 @@ export default function GalleryScreen({ navigation, onDone, maxSelection = DEFAU
   const [showDropdown, setShowDropdown]   = useState(false);
   const [uploading, setUploading]         = useState(false);
   const endCursorRef = useRef<string | undefined>(undefined);
+
+  // AI photo-validation verdict — same state machine as onboarding's
+  // CustomGalleryScreen (native/web) and Edit Profile's photo picker.
+  const [verdictPhase, setVerdictPhase] = useState<'idle' | 'uploading' | 'approved' | 'rejected' | 'mixed'>('idle');
+  const [verdictApproved, setVerdictApproved] = useState<VerdictPhoto[]>([]);
+  const [verdictRejected, setVerdictRejected] = useState<VerdictPhoto[]>([]);
+  const continueAfterVerdict = useRef<() => void>(() => {});
 
   // ─── Permission + initial load ────────────────────────────────────────────
 
@@ -232,6 +242,7 @@ export default function GalleryScreen({ navigation, onDone, maxSelection = DEFAU
       const userId = (await getItem(SK.Auth.USER_ID)) ?? '';
       const config = await getPhotoConfig();
       const rejections: PhotoRejectionCode[] = [];
+      const uploadedPhotoIds: string[] = [];
 
       for (const item of items) {
         const validation = await validatePhotoAsset({
@@ -255,8 +266,13 @@ export default function GalleryScreen({ navigation, onDone, maxSelection = DEFAU
         } as any);
 
         const res = await uploadFile(Endpoints.media.addProfilePic, formData);
-        if (res?.RESPONSECODE == 1 && res?.RESPONSE?.PHOTOURL) {
-          await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL));
+        if (res?.RESPONSECODE == 1) {
+          if (res?.RESPONSE?.PHOTOURL) {
+            await setItem(SK.User.PHOTO_URL, String(res.RESPONSE.PHOTOURL));
+          }
+          if (res?.RESPONSE?.PHOTOID) {
+            uploadedPhotoIds.push(String(res.RESPONSE.PHOTOID));
+          }
         }
       }
 
@@ -267,15 +283,68 @@ export default function GalleryScreen({ navigation, onDone, maxSelection = DEFAU
           rejections.map(code => describeRejection(code, reasons)).join('\n\n'),
         );
       }
-      if (rejections.length < items.length) {
-        navigation.goBack();
+
+      // Every picked photo was rejected — stay on the picker instead of
+      // navigating back on nothing having actually uploaded.
+      if (rejections.length === items.length) return;
+
+      continueAfterVerdict.current = () => navigation.goBack();
+
+      // Same fire-immediately-after-upload verdict poll as onboarding's
+      // CustomGalleryScreen — this screen was uploading with AIVALIDATE set
+      // but never reading the verdict back.
+      if (config.isNativeFaceDetectionEnabled && uploadedPhotoIds.length > 0) {
+        setVerdictPhase('uploading');
+        const verdict = await pollPhotoValidation(uploadedPhotoIds);
+
+        if (!verdict) {
+          setVerdictPhase('idle');
+          continueAfterVerdict.current();
+          return;
+        }
+
+        if (verdict.isSelfieRequired) {
+          setVerdictPhase('idle');
+          navigation.push('photo-mismatch-selfie', { standalone: true });
+          return;
+        }
+
+        const approved: VerdictPhoto[] = [];
+        const rejected: VerdictPhoto[] = [];
+        for (const r of verdict.results) {
+          const entry: VerdictPhoto = {
+            photoId:  r.photoId,
+            photoUrl: r.photoUrl,
+            ...(r.reason?.title    ? { reasonTitle: r.reason.title }       : {}),
+            ...(r.reason?.subtitle ? { reasonSubtitle: r.reason.subtitle } : {}),
+          };
+          if (r.status.toLowerCase() === 'approve') approved.push(entry);
+          else rejected.push(entry);
+        }
+
+        setVerdictApproved(approved);
+        setVerdictRejected(rejected);
+        setVerdictPhase(rejected.length === 0 ? 'approved' : approved.length === 0 ? 'rejected' : 'mixed');
+        return;
       }
+
+      continueAfterVerdict.current();
     } catch {
       Alert.alert('Error', 'Upload failed. Please try again.');
+      setVerdictPhase('idle');
     } finally {
       setUploading(false);
     }
   }, [navigation]);
+
+  function dismissVerdict() {
+    setVerdictPhase('idle');
+    continueAfterVerdict.current();
+  }
+
+  function retryFromVerdict() {
+    setVerdictPhase('idle');
+  }
 
   // Android: PhotoUploadProcessFragment.kt's ConnectivityManager.NetworkCallback
   // .onLost() — actively marks an in-progress upload as failed the moment
@@ -483,6 +552,23 @@ export default function GalleryScreen({ navigation, onDone, maxSelection = DEFAU
             ? <ActivityIndicator style={styles.loadingMore} color={Colors.iOSBlue} />
             : null
         }
+      />
+
+      <VerificationSuccessSheet
+        visible={verdictPhase === 'approved'}
+        title={verdictApproved.length > 1
+          ? t('AI_PHOTO_VALIDATION.PHOTOS_APPROVED_MULTI', '#COUNT Photos approved successfully!').replace('#COUNT', String(verdictApproved.length))
+          : t('AI_PHOTO_VALIDATION.PHOTO_APPROVED_SINGLE', 'Photo approved successfully!')}
+        subtitle=""
+        onDismiss={dismissVerdict}
+      />
+      <PhotoVerdictSheet
+        visible={verdictPhase === 'uploading' || verdictPhase === 'rejected' || verdictPhase === 'mixed'}
+        phase={verdictPhase === 'uploading' ? 'uploading' : verdictPhase === 'mixed' ? 'mixed' : 'rejected'}
+        approved={verdictApproved}
+        rejected={verdictRejected}
+        onAddNewPhoto={retryFromVerdict}
+        onDismiss={dismissVerdict}
       />
     </View>
   );

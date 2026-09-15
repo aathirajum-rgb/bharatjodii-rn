@@ -17,6 +17,7 @@ import { Colors } from '../../constants/colors'
 import { FontSize } from '../../src/theme/fonts'
 import { getRegValue, uploadHoroscopeFile } from '../../service/registrationService'
 import { requestStoragePermission } from '../../service/permissionService'
+import { getPhotoConfig, getRejectReasons, describeRejection } from '../../service/photoValidationService'
 import { getItem, setItem } from '../../service/storageService'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { CDN_IMG, CDN_LOTTIE } from '../../constants/cdn'
@@ -128,11 +129,35 @@ export default function GenerateHoroscopeScreen({ navigation }: Props) {
     }
   }
 
+  // Every other photo-upload site in the app runs the picked asset through
+  // photoValidationService's size/format gate first — this one previously
+  // sent whatever the picker returned straight to the server with no check
+  // at all. Only size/format apply here (not validatePhotoAsset's full
+  // gate) — a horoscope is a birth-chart image, not a profile photo, so the
+  // minimum-resolution and face-detection checks don't apply and would
+  // wrongly reject a legitimate horoscope scan.
   async function launchLibrary() {
     const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 0.8 })
     if (result.canceled || !result.assets[0]) return
 
-    await uploadPickedAsset(result.assets[0].uri)
+    const asset = result.assets[0]
+    const config = await getPhotoConfig()
+
+    if (asset.fileSize != null && asset.fileSize > config.maximumPhotoSize) {
+      const reasons = await getRejectReasons()
+      Alert.alert('Photo not uploaded', describeRejection('ALERT_FILE_SIZE_EXCEEDED', reasons))
+      return
+    }
+    if (asset.mimeType) {
+      const format = asset.mimeType.split('/')[1]?.toUpperCase()
+      if (!format || !config.allowedFormats.includes(format)) {
+        const reasons = await getRejectReasons()
+        Alert.alert('Photo not uploaded', describeRejection('ALERT_INCORRECT_FILE_FORMAT', reasons))
+        return
+      }
+    }
+
+    await uploadPickedAsset(asset.uri)
   }
 
   // Angular: common.ts's callNative('horoscope_from_phone') — the

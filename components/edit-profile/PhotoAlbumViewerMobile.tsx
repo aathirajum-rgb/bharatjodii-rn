@@ -46,6 +46,9 @@ import { uploadFile } from '../../service/apiClient'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem, setItem } from '../../service/storageService'
 import { deletePhoto, setMainPhoto } from '../../service/profileService'
+import {
+  getPhotoConfig, validatePhotoAsset, getRejectReasons, describeRejection,
+} from '../../service/photoValidationService'
 
 const ICON_BACK   = CDN_REACT + '/menu_back_arrow.svg'
 const ICON_DELETE = CDN_REACT + '/edit-profile-photo-delete-icon.svg'
@@ -74,6 +77,10 @@ export default function PhotoAlbumViewerMobile({
   const [busy,         setBusy]         = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<AlbumPhoto | null>(null)
   const listRef = useRef<FlatList>(null)
+  // Set true before the (async) permission request/picker launch, not after —
+  // otherwise a fast double-tap on "Replace photo" can fire both before either
+  // promise settles.
+  const pickerBusyRef = useRef(false)
 
   useEffect(() => {
     if (visible) setIndex(initialIndex)
@@ -126,46 +133,66 @@ export default function PhotoAlbumViewerMobile({
   }
 
   async function handleReplace() {
-    if (!current || busy) return
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Allow photo library access in Settings to replace this photo.')
-      return
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes:    ['images'],
-      allowsEditing: true,
-      aspect:        [3, 4],
-      quality:       0.85,
-    })
-    if (result.canceled || !result.assets[0]) return
-
-    const target = current
-    setBusy(true)
+    if (!current || busy || pickerBusyRef.current) return
+    pickerBusyRef.current = true
     try {
-      const asset  = result.assets[0]
-      const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
-      const formData = new FormData()
-      formData.append('ID', userId)
-      formData.append('UPLOADPHOTO', {
-        uri: asset.uri, type: 'image/jpeg', name: asset.fileName ?? 'photo.jpg',
-      } as any)
-
-      const uploadRes = await uploadFile(Endpoints.media.addProfilePic, formData)
-      if (uploadRes?.RESPONSECODE == 1) {
-        if (uploadRes?.RESPONSE?.PHOTOURL) {
-          await setItem(SK.User.PHOTO_URL, String(uploadRes.RESPONSE.PHOTOURL))
-        }
-        await deletePhoto(target.PHOTOID)
-        onChanged()
-        onClose()
-      } else {
-        Alert.alert('Error', 'Could not replace photo.')
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (status !== 'granted') {
+        Alert.alert('Permission required', 'Allow photo library access in Settings to replace this photo.')
+        return
       }
-    } catch {
-      Alert.alert('Error', 'Could not replace photo.')
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes:    ['images'],
+        allowsEditing: true,
+        aspect:        [3, 4],
+        quality:       0.85,
+      })
+      if (result.canceled || !result.assets[0]) return
+
+      const target = current
+      const asset  = result.assets[0]
+      setBusy(true)
+      try {
+        const config = await getPhotoConfig()
+        const validation = await validatePhotoAsset({
+          uri: asset.uri,
+          mimeType: asset.mimeType,
+          fileSize: asset.fileSize,
+          width: asset.width,
+          height: asset.height,
+        }, config)
+        if (!validation.ok) {
+          const reasons = await getRejectReasons()
+          Alert.alert('Photo not replaced', describeRejection(validation.code, reasons))
+          return
+        }
+
+        const userId = (await getItem(SK.Auth.USER_ID)) ?? ''
+        const formData = new FormData()
+        formData.append('ID', userId)
+        formData.append('AIVALIDATE', config.isNativeFaceDetectionEnabled ? '1' : '0')
+        formData.append('UPLOADPHOTO', {
+          uri: asset.uri, type: asset.mimeType ?? 'image/jpeg', name: asset.fileName ?? 'photo.jpg',
+        } as any)
+
+        const uploadRes = await uploadFile(Endpoints.media.addProfilePic, formData)
+        if (uploadRes?.RESPONSECODE == 1) {
+          if (uploadRes?.RESPONSE?.PHOTOURL) {
+            await setItem(SK.User.PHOTO_URL, String(uploadRes.RESPONSE.PHOTOURL))
+          }
+          await deletePhoto(target.PHOTOID)
+          onChanged()
+          onClose()
+        } else {
+          Alert.alert('Error', 'Could not replace photo.')
+        }
+      } catch {
+        Alert.alert('Error', 'Could not replace photo.')
+      } finally {
+        setBusy(false)
+      }
     } finally {
-      setBusy(false)
+      pickerBusyRef.current = false
     }
   }
 
