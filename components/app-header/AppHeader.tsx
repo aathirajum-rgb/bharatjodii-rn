@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Dimensions, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native'
+import { Dimensions, Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { SvgXml } from 'react-native-svg'
 import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
@@ -30,6 +30,15 @@ const H1_AVATAR_SIZE = SW * 0.135
 // instead of a separate remPx() call for the same numbers.
 const BADGE_WIDTH  = FontSize.font24
 const BADGE_HEIGHT = FontSize.font16
+
+// header2's back-button column width — Ionic's 12-col grid, header row has no
+// grid-level padding (`class="padd0"`). `notification.page.html`/
+// `header.component.html` (menu-contacts) both use `ion-col size="1.5"`;
+// `video-faq.page.html` is the one real exception at `size="2"` (passed via
+// the `backColSize` prop) — this changes how far the title's left edge sits,
+// not just the touch target, since the title column starts immediately after
+// this one (no flex spacer between them, unlike header1's toolbar row).
+const HEADER2_GRID_UNIT = SW / 12
 
 // Angular's header back-button and language-pill dropdown both use Ionic's
 // bundled "chevron-back-outline" / "chevron-down-outline" icons (ion-icon
@@ -66,6 +75,28 @@ export interface AppHeaderProps {
   // ── header2 (title bar) ──────────────────────────────────────────────────
   title?:             string  | undefined
   showBackIcon?:      boolean | undefined   // default true for header2
+  // header.component.html's own header2 block (heading4-medium-16 color-333333,
+  // border-bottom-search) is real ONLY for menu-contacts.page.html (a page not
+  // yet ported) — every other screen currently reusing this component for its
+  // title bar (NotificationScreen, VideoFaqScreen) has its OWN, different inline
+  // Angular header markup, not this shared component at all. These two escape
+  // hatches let each such screen match its OWN real source instead of forcing
+  // menu-contacts' specific styling onto screens that never had it.
+  titleStyle?:        StyleProp<TextStyle> | undefined
+  // video-faq.page.html's toolbar uses `.header-box-shadow` (a drop shadow)
+  // instead of `.border-bottom-search` (a 1px hairline) — the only header2
+  // caller that does.
+  shadowHeader?:      boolean | undefined
+  // header2's back-button ion-col size (12-col grid) — default 1.5 matches
+  // both real header2 sources (notification.page.html, menu-contacts via
+  // header.component.html); video-faq.page.html is the one exception at 2.
+  backColSize?:       number  | undefined
+  // video-faq.page.html's title row is `pt-12 pb-12` (content-hugging), not
+  // header2's own flat `height:52` (an unconfirmed guess for the OTHER real
+  // source, notification.page.html/menu-contacts, which has no vertical
+  // padding class at all — sized purely by its back-button's own intrinsic
+  // height). Lets a caller replace that guess with a real, cited value.
+  titleRowStyle?:     StyleProp<ViewStyle> | undefined
 
   // ── registration / signIn ───────────────────────────────────────────────
   showBackBtn?:       boolean | undefined
@@ -117,6 +148,10 @@ export default function AppHeader({
   homeToolBar,
   title,
   showBackIcon = true,
+  titleStyle,
+  shadowHeader = false,
+  backColSize  = 1.5,
+  titleRowStyle,
   showBackBtn  = true,
   closeIcon    = false,
   languageLabel,
@@ -202,11 +237,15 @@ export default function AppHeader({
 
           {/* Angular: home.config.ts's homeToolBar — discover-matches (search)
               then notification, in that order; each icon rendered from its own
-              toolImg URL (no local vector-icon special-casing). */}
-          {homeToolBar?.filter(t => t.toolType !== 'menu').map(item => (
+              toolImg URL (no local vector-icon special-casing). The second
+              entry's own `className: "ml-12"` (12px) is a bigger gap than the
+              row's own flat 8px — the ONLY pair in this row with a real,
+              confirmed Angular value, so it gets an explicit extra 4px on top
+              of the row's gap rather than changing that shared gap itself. */}
+          {homeToolBar?.filter(t => t.toolType !== 'menu').map((item, i) => (
             <Pressable
               key={item.toolType}
-              style={styles.h1IconBtn}
+              style={[styles.h1IconBtn, i > 0 && styles.h1IconBtnGap]}
               onPress={() => onToolbarItemPress?.(item.toolType)}
             >
               <CdnSvg uri={item.toolImg} width={H1_ICON_SIZE} height={H1_ICON_SIZE} />
@@ -256,9 +295,15 @@ export default function AppHeader({
                   literal, not the real translation key (only ever matched
                   English by coincidence). */}
               <Text style={styles.h1EditLabel}>{t('EDITPROFILE.EDIT_PROFILE')}</Text>
-              {/* Angular: iconSize={eButtonSize.small} = 16px (button-revamp's
-                  `.small` icon mixin), not 12. */}
-              <CdnSvg uri={ICONS.fwdLink} width={16} height={16} />
+              {/* Angular: button-revamp.component.scss sets the icon's `.small`
+                  box to 16x16, but the actual `background-size: contain` rule
+                  that would SCALE the image to fill that box is commented out
+                  — so it renders at the raw SVG's own native pixel size (7x10,
+                  confirmed from the live file: viewBox="0 0 7 10"), just
+                  centered inside the unused 16x16 box. CdnSvg has no such
+                  invisible box — passing 16x16 here scales the glyph up to
+                  ~11x16, visibly bigger than Angular's real tiny chevron. */}
+              <CdnSvg uri={ICONS.fwdLink} width={7} height={10} />
             </View>
             {/* Angular: paidBatch = entryType=='P' && payRenewalFlag=='0' &&
                 !check_Paid_Verified_Nophoto() — shown as a green pill under
@@ -282,14 +327,14 @@ export default function AppHeader({
   // ── header2: title bar ────────────────────────────────────────────────────
   if (type === 'header2') {
     return (
-      <SafeAreaView edges={['top']} style={[styles.wrapper2, style]}>
-        <View style={styles.titleRow}>
+      <SafeAreaView edges={['top']} style={[styles.wrapper2, shadowHeader && styles.wrapper2Shadow, style]}>
+        <View style={[styles.titleRow, titleRowStyle]}>
           {showBackIcon && (
-            <Pressable style={styles.backBtn} onPress={onBackPress}>
+            <Pressable style={[styles.backBtn, { width: HEADER2_GRID_UNIT * backColSize }]} onPress={onBackPress}>
               <SvgXml xml={CHEVRON_BACK_XML} width={24} height={24} />
             </Pressable>
           )}
-          <Text style={styles.titleText} numberOfLines={1}>{title ?? ''}</Text>
+          <Text style={[styles.titleText, titleStyle]} numberOfLines={1}>{title ?? ''}</Text>
         </View>
       </SafeAreaView>
     )
@@ -414,6 +459,9 @@ const styles = StyleSheet.create({
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   FontSize.font12,
     color:      Colors.link,
+    // Angular: button-revamp.component.scss's `ion-button.linkSmall span`
+    // sets `line-height: 20px !important` explicitly.
+    lineHeight: 20,
   },
   h1PaidBadge: {
     marginTop: 6,
@@ -433,6 +481,11 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
     position:        'relative',
+  },
+  // Angular: the 'notification' toolbar entry's own `className: "ml-12"` —
+  // on top of h1AppBar's flat 8px row gap, for a real 12px total.
+  h1IconBtnGap: {
+    marginLeft: 4,
   },
   // Badge on toolbar icon — Angular: `.notification-badge-message` (Home's
   // only badged toolbar item is 'notification' — the other class,
@@ -470,6 +523,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#f1f5f9',
   },
+  // Angular: video-faq.page.scss's `.header-box-shadow { background:#FFF;
+  // box-shadow:0 8px 16px 0 rgba(0,0,0,.08) }` — a page-specific alternative
+  // to the generic `.border-bottom-search` hairline, opted into via `shadowHeader`.
+  wrapper2Shadow: {
+    borderBottomWidth: 0,
+    shadowColor:   '#000000',
+    shadowOffset:  { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius:  16,
+    elevation:     4,
+  },
   titleRow: {
     flexDirection:     'row',
     alignItems:        'center',
@@ -497,13 +561,15 @@ const styles = StyleSheet.create({
   // ── registration / signIn ─────────────────────────────────────────────────
   wrapperAuth: {
     backgroundColor: Colors.white,
-    paddingBottom:   8,
   },
+  // Angular: header.component.html's `<ion-row class="pr-24 mt-24">` — RIGHT
+  // padding only (the back button/chevron sits flush against the left edge),
+  // not a flat 24 on both sides.
   authRow: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    paddingHorizontal: 24,
-    paddingTop:        24,
+    flexDirection: 'row',
+    alignItems:    'center',
+    paddingRight:  24,
+    paddingTop:    24,
   },
   langBtn: {
     flexDirection:     'row',

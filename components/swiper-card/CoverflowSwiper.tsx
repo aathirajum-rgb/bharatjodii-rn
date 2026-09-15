@@ -164,7 +164,14 @@ export default function CoverflowSwiper({
           {showSeeAll && (
             <Pressable onPress={onSeeAllPress} style={styles.seeAllBtn}>
               <Text style={styles.seeAllText}>{t('HOME.SEE_ALL_CTA')}</Text>
-              <Image source={{ uri: FWD_ANIM_ICON }} style={styles.seeAllIcon} />
+              {/* Angular: a plain <img style="width:24px;height:20px"> with no
+                  object-fit — the browser default (`fill`, non-uniform
+                  stretch, no cropping) applies. The GIF's real native frame
+                  is a 1200x1200 SQUARE; RN's Image defaults to `resizeMode:
+                  'cover'`, which for a square source in this 24x20 landscape
+                  box crops off the top/bottom to fill-and-overflow instead of
+                  stretching — a visibly zoomed-in/bigger arrow than Angular's. */}
+              <Image source={{ uri: FWD_ANIM_ICON }} style={styles.seeAllIcon} resizeMode="stretch" />
             </Pressable>
           )}
         </View>
@@ -184,15 +191,17 @@ const styles = StyleSheet.create({
   // var(--english-semibold-poppins) (Poppins-Semibold), font-size var(--font18)
   // (1.125rem, scales with device width — see FontSize's header comment),
   // line-height a flat 24px (NOT rem-based). headerColor input here is
-  // 'blackColor' (dailyRecommendationSection.headerbgColor), which doesn't
-  // match any real CSS class (.black-color is the actual one) — a no-op, so
-  // the default inherited color applies; Colors.textPrimary already matches
-  // the equivalent header in SwiperCard.tsx for this same dead-class case.
+  // 'blackColor' (dailyRecommendationSection.headerbgColor) — a real, LIVE
+  // class defined right in app-swiper.component.scss itself (`.blackColor {
+  // @include TextColor($Color: --ion-color-black-color) }` → #000000), not a
+  // dead/no-op class as a previous pass concluded (that check apparently
+  // missed this component's own stylesheet). Pure black, not textPrimary
+  // (#111111) — same fix already applied to SwiperCard.tsx's equivalent header.
   header: {
     fontFamily:  Fonts.poppinsSemiBold,
     fontSize:    FontSize.font18,
     lineHeight:  24,
-    color:       Colors.textPrimary,
+    color:       Colors.black,
     textAlign:   'center',
     marginBottom: 32,
   },

@@ -89,11 +89,20 @@ export function groupMessagesByDate(messages: ChatMessageItem[], todayLabel: str
 
 // Same record must never appear twice — a redundant RESPMESSAGE refresh or a
 // RESPSEND echo of a message already present via a live RESPRECEIVER push.
+// Angular: getChatMessage()'s subscription explicitly sorts `chatMessageArr`
+// by MessageTime ascending right after rebuilding it from CHATLIST — required
+// because checkViewedMobileNumber() makes POSITIONAL checks (chatMessageArr[0]/[1])
+// that only make sense against a chronologically-ordered array, and the
+// server's CHATLIST order isn't guaranteed to already be sorted. Every caller
+// of this function (initial fetch, send-echo append, receiver-push append)
+// goes through here, so the invariant holds everywhere.
 export function dedupeMessages(messages: ChatMessageItem[]): ChatMessageItem[] {
   const seen = new Set<string>()
-  return messages.filter(msg => {
-    if (seen.has(msg.id)) return false
-    seen.add(msg.id)
-    return true
-  })
+  return messages
+    .filter(msg => {
+      if (seen.has(msg.id)) return false
+      seen.add(msg.id)
+      return true
+    })
+    .sort((a, b) => a.timestamp - b.timestamp)
 }

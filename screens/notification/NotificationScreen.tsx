@@ -31,7 +31,7 @@ import {
   NOTIFICATION_EMPTY_ANIM, NOTIFICATION_LOADING_ANIM,
   type NotificationItem, type GroupedNotifications, type RichTextSegment,
 } from '../../service/inAppNotificationService'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const FWD_ICON = `${CDN_REVAMP}filter_right_arrow.svg`
 // Angular: onImgErrorHandler() — the [1,2,3,6,7] avatar-broken-image
@@ -98,9 +98,15 @@ export default function NotificationScreen({ navigation: _navigation }: Props) {
   return (
     <View style={s.screen}>
       <View style={s.contentWrap}>
+        {/* Angular: notification.page.html has its OWN inline header, not
+            <app-header> — title is `heading1-semibold-20 black-color`
+            (20px Poppins-SemiBold, pure black), not AppHeader's generic
+            header2 default (16px Poppins-Medium, #333333 — correct for
+            menu-contacts.page.html, the screen that default IS modeled on). */}
         <AppHeader
           type="header2"
           title={t('NOTIFICATION.TITLE')}
+          titleStyle={s.headerTitle}
           onBackPress={() => handleBack()}
         />
 
@@ -213,6 +219,9 @@ const s = StyleSheet.create({
   contentWrap: Platform.OS === 'web'
     ? { flex: 1, width: '100%', maxWidth: 480, alignSelf: 'center' }
     : { flex: 1 },
+  // Angular: `heading1-semibold-20 black-color` (global.scss) — 20px
+  // Poppins-SemiBold, pure black.
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font20, color: Colors.black },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
   emptyText: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary,

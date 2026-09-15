@@ -46,7 +46,25 @@ export default function VideoFaqScreen({ navigation }: { navigation: any }) {
 
   return (
     <View style={s.screen}>
-      <AppHeader type="header2" title={t('HOME.SELF_VIDEO_HEADER')} onBackPress={() => navigation.goBack()} />
+      {/* Angular: video-faq.page.html has its OWN inline header, not
+          <app-header> — title is `heading4-medium-16 black-color` (pure
+          black, not AppHeader's generic header2 default of #333333 — correct
+          for menu-contacts.page.html, the screen that default IS modeled on),
+          and the toolbar uses `.header-box-shadow` (a drop shadow) instead of
+          the generic `.border-bottom-search` hairline. Also the one header2
+          caller with a WIDER back-button column (`ion-col size="2"`, not the
+          usual 1.5) and a content-hugging row (`pt-12 pb-12`, not the
+          generic header2's flat height:52 — itself only a guess for the
+          OTHER real source, which has no vertical padding class at all). */}
+      <AppHeader
+        type="header2"
+        title={t('HOME.SELF_VIDEO_HEADER')}
+        titleStyle={s.headerTitle}
+        titleRowStyle={s.headerTitleRow}
+        backColSize={2}
+        shadowHeader
+        onBackPress={() => navigation.goBack()}
+      />
       <FlatList
         data={videos}
         keyExtractor={i => i.id}
@@ -84,6 +102,15 @@ export default function VideoFaqScreen({ navigation }: { navigation: any }) {
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.white },
+  // Angular: `heading4-medium-16 black-color` — family/size already match
+  // AppHeader's generic header2 default, only the color differs (pure black,
+  // not #333333).
+  headerTitle: { color: Colors.black },
+  // Angular: `<ion-row class="d-flex align-center-item pt-12 pb-12">` — a
+  // real, content-hugging 12px top/bottom padding, replacing header2's
+  // generic flat `height:52` (a guess for the other real header2 source,
+  // which has no vertical padding class at all).
+  headerTitleRow: { height: undefined, paddingVertical: 12 },
   // Angular: the video list's own wrapping div is `pl-24 pr-24 pb-24`.
   list: { paddingHorizontal: 24, paddingBottom: 24 },
   // Angular: `.mt-24 posrelative bg-color` — 24px above every card (including

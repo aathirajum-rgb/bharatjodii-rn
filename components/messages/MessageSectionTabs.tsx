@@ -57,12 +57,14 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.borderSubtle,
   },
   // Angular: .message-section-tab { padding: 12px 8px; border-bottom: 2px solid transparent }
+  // Angular has no flex-gap here — the badge's own spacing comes from
+  // .received-badge's margin-left: 4px, not a 6px row gap.
   tab: {
     flex:              1,
     flexDirection:     'row',
     alignItems:        'center',
     justifyContent:    'center',
-    gap:                6,
+    gap:                4,
     paddingVertical:    12,
     paddingHorizontal:  8,
     marginBottom:       -1, // overlaps the row's 1px border so the active tab's 2px fully replaces it
@@ -82,12 +84,13 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.poppinsMedium,
     color:      Colors.primaryDark,
   },
-  // Angular: .received-badge { background: #de2a68 }
+  // Angular: `.received-badge { padding: 5px 10px 5px 10px; border-radius:
+  // 50%; background: #de2a68 }` — a content-hugging pill (wider for 2-digit
+  // counts), not a fixed 18px circle.
   badge: {
-    minWidth:          18,
-    height:            18,
-    borderRadius:       9,
-    paddingHorizontal:  4,
+    paddingVertical:   5,
+    paddingHorizontal: 10,
+    borderRadius:      999,
     backgroundColor:   Colors.inputError,
     alignItems:        'center',
     justifyContent:    'center',

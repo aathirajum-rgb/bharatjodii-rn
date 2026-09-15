@@ -497,19 +497,16 @@ export async function fetchContactDetails(): Promise<void> {
   }
 }
 
-// ─── Chat ─────────────────────────────────────────────────────────────────────
+// ─── Paid-user verify-id / photo gate ─────────────────────────────────────────
+// Angular common-funtions.ts's check_Paid_NonVerifyIdUser()/
+// check_Paid_Verified_Nophoto() — both scoped to PAID MALE users only
+// (entryType=='P' && gender=='M' && getPaidFlag()=='1'), never fire for a free
+// or female user. Extracted so both the pre-entry gate below (handleChat) and
+// ChatScreen.tsx's own in-screen re-check (Angular re-runs this same check on
+// every getChatCount() call, not just once at entry) share one derivation.
+export type PaidBlockerGate = 'non_verify_id' | 'verified_no_photo' | null
 
-async function handleChat(fromPage: string, oppProfile: any): Promise<CommActionResult> {
-  // Angular communication.service.ts:117-131's real jodimessages branch, in its
-  // real order — check_Paid_NonVerifyIdUser() then check_Paid_Verified_Nophoto()
-  // then entryType=='F' then chat. Both check_Paid_* gates are scoped to PAID
-  // MALE users only (common-funtions.ts:382-386: entryType=='P' && gender=='M'
-  // && getPaidFlag()=='1') — they never fire for a free user or for a female
-  // user, unlike a previous version of this port which ran an unconditional
-  // photo-status check before entryType was even read, and which also read the
-  // ekyc flag off a key ('PI_EKYCSTATUS') nothing in this codebase ever writes
-  // (the real key, used everywhere else, is EKYCSTATUS) — so a paid member's
-  // eKYC always looked unverified here and could route to the wrong sheet.
+export async function checkPaidBlockerGate(): Promise<PaidBlockerGate> {
   const [entryType, ekycStatus, gender, paidFlag, ppSetRaw] = await Promise.all([
     getSessionValue('ENTRYTYPE'),
     getItem(SK.Verification.EKYC_STATUS),
@@ -521,13 +518,31 @@ async function handleChat(fromPage: string, oppProfile: any): Promise<CommAction
   const photoStatus: string = (ppSetRaw as any)?.PI_PHOTOSTATUS ?? 'N'
   const isPaidMale = entryType === 'P' && gender === 'M' && paidFlag === '1'
 
-  // check_Paid_NonVerifyIdUser() — paid male, not yet eKYC-verified.
-  if (isPaidMale && ekycStatus !== '1') {
+  if (isPaidMale && ekycStatus !== '1') return 'non_verify_id'
+  if (isPaidMale && ekycStatus === '1' && ['P', 'N', 'R'].includes(photoStatus)) return 'verified_no_photo'
+  return null
+}
+
+// ─── Chat ─────────────────────────────────────────────────────────────────────
+
+async function handleChat(fromPage: string, oppProfile: any): Promise<CommActionResult> {
+  // Angular communication.service.ts:117-131's real jodimessages branch, in its
+  // real order — check_Paid_NonVerifyIdUser() then check_Paid_Verified_Nophoto()
+  // then entryType=='F' then chat. A previous version of this port ran an
+  // unconditional photo-status check before entryType was even read, and also
+  // read the ekyc flag off a key ('PI_EKYCSTATUS') nothing in this codebase
+  // ever writes (the real key, used everywhere else, is EKYCSTATUS) — so a
+  // paid member's eKYC always looked unverified here and could route to the
+  // wrong sheet. checkPaidBlockerGate() above is the corrected derivation.
+  const [gate, entryType] = await Promise.all([
+    checkPaidBlockerGate(),
+    getSessionValue('ENTRYTYPE'),
+  ])
+
+  if (gate === 'non_verify_id') {
     return { type: 'verify_id', fromPage, action: 'jodimessages' }
   }
-
-  // check_Paid_Verified_Nophoto() — paid male, verified, no photo published yet.
-  if (isPaidMale && ekycStatus === '1' && ['P', 'N', 'R'].includes(photoStatus)) {
+  if (gate === 'verified_no_photo') {
     return { type: 'verify_id', fromPage, action: 'jodimessages', photoUpload: true }
   }
 

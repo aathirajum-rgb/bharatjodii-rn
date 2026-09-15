@@ -46,6 +46,7 @@ import { ENavigation } from '../../types/enums/navigation.enum'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const { width: SW } = Dimensions.get('window')
 
@@ -741,7 +742,9 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
             <View style={styles.header}>
               <Text style={styles.headerText} numberOfLines={1}>{headerText}</Text>
               <Pressable onPress={handleClose} hitSlop={8}>
-                <CdnSvg uri={`${CDN_SVG}revamp/close-icon.svg`} width={22} height={22} />
+                {/* Angular: .close-icon { font-size: 6.7vw; } — ~27px on a
+                    typical 400px-wide phone, not 22. */}
+                <CdnSvg uri={`${CDN_SVG}revamp/close-icon.svg`} width={27} height={27} />
               </Pressable>
             </View>
 
@@ -855,10 +858,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
   },
+  // Angular: .custom-header span is `heading4-medium-16` — font16, Poppins-
+  // Medium, weight 500. No color class on it, so it inherits Ionic's default
+  // black (#000000), not textPrimary (#111111).
   headerText: {
+    fontFamily: Fonts.poppinsMedium,
     fontSize:   16,
     fontWeight: '500',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
     flexShrink: 1,
   },
   cardStack: {
@@ -890,7 +897,11 @@ const styles = StyleSheet.create({
     right:           24,
     backgroundColor: '#DE2A68',
   },
+  // Angular: matches-card.component.html's swipe-text-overlay label is
+  // `heading2-semibold-18` — font18, Poppins-SemiBold, weight 600, white
+  // (already correct here) — only the font family was missing.
   stampText: {
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   18,
     fontWeight: '600',
     color:      '#FFFFFF',
@@ -911,17 +922,23 @@ const styles = StyleSheet.create({
     height: 140,
     width:  140,
   },
+  // Angular: .note-one is `heading3-semibold-16` — font16, Poppins-SemiBold,
+  // weight 600. No color class, so it inherits black, not textPrimary.
   endTitle: {
     marginTop:  16,
+    fontFamily: Fonts.poppinsSemiBold,
     fontSize:   16,
     fontWeight: '600',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
     textAlign:  'center',
   },
+  // Angular: .note-two is `body2-regular-14` — font14, Poppins-Regular,
+  // weight 400. No color class, so it inherits black, not textSecondary.
   endSub: {
     marginTop:  20,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   14,
-    color:      Colors.textSecondary,
+    color:      Colors.black,
     textAlign:  'center',
   },
   progressTrack: {
@@ -956,11 +973,15 @@ const styles = StyleSheet.create({
     width:  80,
     height: 80,
   },
+  // Angular: the SWIPE_RIGHT/SWIPE_LEFT tooltip label is
+  // `heading2-semibold-18 ... black-color` — font18 (not 16), Poppins-
+  // SemiBold, weight 600, explicit black.
   tooltipText: {
     marginTop:  4,
-    fontSize:   16,
+    fontFamily: Fonts.poppinsSemiBold,
+    fontSize:   18,
     fontWeight: '600',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
     textAlign:  'center',
   },
 })

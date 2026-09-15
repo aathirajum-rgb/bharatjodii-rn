@@ -34,42 +34,54 @@ export interface ButtonRevampProps {
 
 // ─── Icon CDN map ─────────────────────────────────────────────────────────────
 // Mirrors Angular button-revamp.component.scss $IconURLs map exactly.
-
+//
+// Angular's real per-icon rule is `ion-icon.#{$Name} { background: url($Url)
+// no-repeat; background-position: center; }` — note there's NO `background-
+// size` (the `contain` line is commented out in the source). `.small`/`.large`
+// only size the invisible ion-icon BOX (16/24px); with no background-size,
+// the image inside always renders at its own native pixel dimensions,
+// centered in that box. So the real on-screen size of every one of these
+// icons is whatever that specific SVG file's own width/height attributes
+// say — confirmed by fetching each file directly — not a uniform 20x20 (or
+// 16/24) the way the old flat CdnSvg size assumed. Each entry here carries
+// its own real size instead.
 const CDN = CDN_SVG
 
-export const ICON_URLS: Record<string, string> = {
+interface IconSpec { url: string; width: number; height: number }
+
+export const ICON_URLS: Record<string, IconSpec> = {
   // Angular's download-biodata CTA glyph (download-biodata.component.html's
   // Download Biodata button) — not part of the original $IconURLs map, added
   // so BiodataScreen can use the standard leading-icon slot.
-  'download-biodata-white': CDN + 'download-biodata-white.svg',
-  'like-img':             CDN + 'revamp/like-white-revamp.svg',
-  'liked-img':            CDN + 'vp-liked-white.svg',
-  'call-img':             CDN + 'revamp/call-icon.svg',
-  'call-img-white':       CDN + 'revamp/call-icon-white.svg',
-  'call-icon-pink':       CDN + 'revamp/call-icon-pink.svg',
-  'call-blue':            CDN + 'revamp/call-blue.svg',
-  'whatsapp-img':         CDN + 'revamp/whatsapp-revamp.svg',
-  'whatsapp-white-img':   CDN + 'revamp/white-whatsapp.svg',
-  'message-primary-img':  CDN + 'message-intermediate-img-vp.svg',
-  'dont-show-img':        CDN + 'revamp/close-icon.svg',
-  'tick-img':             CDN + 'tick-white.svg',
-  'forward-icon-link':    CDN + 'revamp/forward-icon-link.svg',
-  'forward-icon-white':   CDN + 'revamp/white-forward-icon.svg',
-  'forward-icon-pink':    CDN + 'revamp/forward-icon-pink.svg',
-  'forward-icon-grey':    CDN + 'revamp/forward-icon-grey.svg',
-  'forward-icon-green':   CDN + 'revamp/forward-icon-green.svg',
-  'right-arrow':          CDN + 'revamp/arrow-right-white.svg',
-  'forward-bold-icon-white': CDN + 'revamp/forward-bold-icon-white.svg',
-  'crown-white':          CDN + 'revamp/crown-white.svg',
-  'shortlist-white':      CDN + 'shortlist/shortlist-white.svg',
-  'shortlisted-white':    CDN + 'shortlist/shortlisted-white-updated.svg',
-  'mic-pink':             CDN + 'revamp/mic-pink.svg',
-  'mic-grey':             CDN + 'registration-new/mic-grey.svg',
-  'button-skip':          CDN + 'next-icon.svg',
-  'paid-membership':      CDN + 'get-paid-membership.svg',
-  'view-later':           CDN + 'view-later.svg',
-  'icon-gallery-pink':    CDN + 'icon-gallery-pink.svg',
-  'icon-phone-pink':      CDN + 'icon-phone-pink.svg',
+  'download-biodata-white': { url: CDN + 'download-biodata-white.svg',              width: 20, height: 20 },
+  'like-img':                { url: CDN + 'revamp/like-white-revamp.svg',            width: 18, height: 19 },
+  'liked-img':               { url: CDN + 'vp-liked-white.svg',                      width: 24, height: 24 },
+  'call-img':                { url: CDN + 'revamp/call-icon.svg',                    width: 24, height: 24 },
+  'call-img-white':          { url: CDN + 'revamp/call-icon-white.svg',              width: 18, height: 18 },
+  'call-icon-pink':          { url: CDN + 'revamp/call-icon-pink.svg',               width: 24, height: 24 },
+  'call-blue':               { url: CDN + 'revamp/call-blue.svg',                    width: 16, height: 16 },
+  'whatsapp-img':            { url: CDN + 'revamp/whatsapp-revamp.svg',              width: 23, height: 22 },
+  'whatsapp-white-img':      { url: CDN + 'revamp/white-whatsapp.svg',               width: 21, height: 21 },
+  'message-primary-img':     { url: CDN + 'message-intermediate-img-vp.svg',         width: 15, height: 15 },
+  'dont-show-img':           { url: CDN + 'revamp/close-icon.svg',                   width: 25, height: 24 },
+  'tick-img':                { url: CDN + 'tick-white.svg',                          width: 24, height: 24 },
+  'forward-icon-link':       { url: CDN + 'revamp/forward-icon-link.svg',            width: 7,  height: 10 },
+  'forward-icon-white':      { url: CDN + 'revamp/white-forward-icon.svg',           width: 16, height: 18 },
+  'forward-icon-pink':       { url: CDN + 'revamp/forward-icon-pink.svg',            width: 6,  height: 10 },
+  'forward-icon-grey':       { url: CDN + 'revamp/forward-icon-grey.svg',            width: 16, height: 16 },
+  'forward-icon-green':      { url: CDN + 'revamp/forward-icon-green.svg',           width: 7,  height: 10 },
+  'right-arrow':             { url: CDN + 'revamp/arrow-right-white.svg',            width: 16, height: 16 },
+  'forward-bold-icon-white': { url: CDN + 'revamp/forward-bold-icon-white.svg',      width: 24, height: 24 },
+  'crown-white':             { url: CDN + 'revamp/crown-white.svg',                  width: 21, height: 16 },
+  'shortlist-white':         { url: CDN + 'shortlist/shortlist-white.svg',           width: 10, height: 13 },
+  'shortlisted-white':       { url: CDN + 'shortlist/shortlisted-white-updated.svg', width: 16, height: 16 },
+  'mic-pink':                { url: CDN + 'revamp/mic-pink.svg',                     width: 25, height: 24 },
+  'mic-grey':                { url: CDN + 'registration-new/mic-grey.svg',           width: 25, height: 24 },
+  'button-skip':             { url: CDN + 'next-icon.svg',                           width: 25, height: 24 },
+  'paid-membership':         { url: CDN + 'get-paid-membership.svg',                 width: 20, height: 20 },
+  'view-later':              { url: CDN + 'view-later.svg',                          width: 24, height: 24 },
+  'icon-gallery-pink':       { url: CDN + 'icon-gallery-pink.svg',                   width: 16, height: 16 },
+  'icon-phone-pink':         { url: CDN + 'icon-phone-pink.svg',                     width: 24, height: 24 },
 }
 
 // ─── Variant → visual tokens ──────────────────────────────────────────────────
@@ -91,7 +103,11 @@ const VARIANT_TOKENS: Record<BtnVariant, VariantTokens> = {
     borderColor: undefined, borderWidth: 0,
   },
   secondary: {
-    bg: Colors.white, textColor: Colors.primaryDeep,
+    // Angular: .secondary-cta-jodii { border: 1px solid #B50033; color: #B50033 }
+    // — text and border share the exact same hex (Colors.primaryDark). Was
+    // Colors.primaryDeep (#8D0028), a different, darker maroon not used by
+    // this Angular class at all.
+    bg: Colors.white, textColor: Colors.primaryDark,
     borderColor: Colors.primaryDark, borderWidth: 1,
   },
   ghost: {
@@ -152,7 +168,7 @@ export default function ButtonRevamp({
 }: ButtonRevampProps) {
   const vt = VARIANT_TOKENS[variant]
   const st = SIZE_TOKENS[size]
-  const iconUrl = icon ? ICON_URLS[icon] : undefined
+  const iconSpec = icon ? ICON_URLS[icon] : undefined
   const isLink = variant === 'link'
   // Button labels are always server-translated text (CTA copy) — Poppins for
   // English, the matching NotoSans script for every other language, same as
@@ -190,8 +206,8 @@ export default function ButtonRevamp({
         />
       ) : (
         <>
-          {iconPosition === 'start' && !!iconUrl && (
-            <CdnSvg uri={iconUrl} width={20} height={20} style={styles.icon} />
+          {iconPosition === 'start' && !!iconSpec && (
+            <CdnSvg uri={iconSpec.url} width={iconSpec.width} height={iconSpec.height} style={styles.icon} />
           )}
 
           <Text
@@ -209,8 +225,8 @@ export default function ButtonRevamp({
             {label}
           </Text>
 
-          {iconPosition === 'end' && !!iconUrl && (
-            <CdnSvg uri={iconUrl} width={20} height={20} style={styles.icon} />
+          {iconPosition === 'end' && !!iconSpec && (
+            <CdnSvg uri={iconSpec.url} width={iconSpec.width} height={iconSpec.height} style={styles.icon} />
           )}
         </>
       )}
@@ -233,9 +249,12 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.82,
   },
+  // No fixed width/height here — CdnSvg's own `width`/`height` PROPS (now
+  // per-icon, from ICON_URLS' IconSpec) are the source of truth; on web,
+  // CdnSvg merges `style` in AFTER `{width,height}` in its own style array,
+  // so a flat size baked in here would silently win back over the per-icon
+  // size passed at each call site.
   icon: {
-    width:      20,
-    height:     20,
     flexShrink: 0,
   },
   label: {

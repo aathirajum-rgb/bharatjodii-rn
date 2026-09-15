@@ -2080,7 +2080,7 @@
         "AWAITING_RESPONSE":"Awaiting responses",
         "SHOW_MESSAGES":"Show unread messages only",
         "INITIATE_CONVERSATION": "You can initiate conversation with #COUNT more matches",
-        "SEND_ONE_MESSAGE": "You can send <span class='font-14-semibold'>only one message</span> to this member the first time. You can continue the conversation after ##HE_SHE## responds",
+        "SEND_ONE_MESSAGE": "You can send only <span class='font-14-semibold'>upto 3 messages</span> to this member the first time. You can continue the conversation after ##HE_SHE## responds",
         "MSG_LIMIT_EXCEED": "You have exceeded <span class='font-14-semibold'>#DURATION#</span> You can message #HIMHER# #RETURNMSG#",
         "MSG_DURATION_1": "your daily limit.",
         "MSG_DURATION_2": "your weekly limit.",

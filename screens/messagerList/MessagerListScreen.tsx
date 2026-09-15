@@ -8,6 +8,7 @@
 // Phone-view tabs previously fetched via REST (activityService.ts); switched
 // to the socket to get real OnlineNow/TimeStamp data the new row design needs.
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useFocusEffect } from '@react-navigation/native'
 import { useTranslation } from 'react-i18next'
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -159,14 +160,29 @@ export default function MessagerListScreen({ navigation }: Props) {
     })
   }, [])
 
-  // Angular: ionViewWillEnter() — socketConnection() then, 100ms later,
-  // chatLoginEmit() + loadChatListData() (listener attached before the list is
-  // requested, so a fast response isn't missed) + emitChatList for every tab.
-  // socketConnection() here already waits for that login step internally.
-  useEffect(() => {
+  // Angular: ionViewWillEnter() — fires on EVERY entry to this page, not just
+  // the first (this.chatListArr = []; this.loading = true; re-emits the list
+  // request), which is how the row you just sent a message to gets its
+  // up-to-date last-message/ReadStatus (tick mark) once you navigate back
+  // from ChatScreen — React Navigation keeps this screen mounted underneath,
+  // so a plain mount-only useEffect never re-ran and the list stayed stale.
+  // useFocusEffect below is the RN equivalent of ionViewWillEnter.
+  useFocusEffect(useCallback(() => {
     let cancelled = false
     let chatListReceived = false
     let retried = false
+
+    // Angular: `this.chatListArr = []` + `startLimit = 0` — reset pagination
+    // and re-request page 0 fresh on every entry, not just append to
+    // whatever was already loaded from a previous visit.
+    conversationStartRef.current = 0
+    setConversations([])
+    setConversationsLoaded(false)
+    setConversationsHasMore(true)
+    setTabData(prev => ({
+      whoseviewednumber: { ...prev.whoseviewednumber, items: [], start: 0, loaded: false, hasMore: true },
+      whoviewednumber:   { ...prev.whoviewednumber,   items: [], start: 0, loaded: false, hasMore: true },
+    }))
 
     const unsubscribe = onChatList((data: ChatListResponse) => {
       if (cancelled || !data) return
@@ -238,7 +254,8 @@ export default function MessagerListScreen({ navigation }: Props) {
       unsubscribe()
       unsubscribeLogin()
     }
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []))
 
   const handleConversationsEndReached = useCallback(() => {
     if (conversationsLoadingMore || !conversationsHasMore || !conversationsLoaded) return
@@ -433,7 +450,7 @@ export default function MessagerListScreen({ navigation }: Props) {
       {activeSection === 'messages' ? (
         !conversationsLoaded ? (
           <View style={styles.loadingWrap}>
-            <CdnLottie uri={CDN_LOTTIE + 'like-list-loding-screen.json'} width={120} height={120} />
+            <CdnLottie uri={CDN_LOTTIE + 'like-list-loding-screen.json'} width={80} height={80} />
           </View>
         ) : conversations.length === 0 ? (
           <AllMessagesEmptyState variant={isFree ? 'paywall' : 'empty'} onCtaPress={handleAllMessagesCta} />
@@ -487,7 +504,7 @@ export default function MessagerListScreen({ navigation }: Props) {
           <View style={styles.flex1}>
             {!current.loaded ? (
               <View style={styles.loadingWrap}>
-                <CdnLottie uri={CDN_LOTTIE + 'like-list-loding-screen.json'} width={120} height={120} />
+                <CdnLottie uri={CDN_LOTTIE + 'like-list-loding-screen.json'} width={80} height={80} />
               </View>
             ) : current.items.length === 0 ? (
               renderEmpty()
@@ -522,23 +539,31 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.surface },
   flex1:  { flex: 1 },
 
+  // Angular: header row is `pl-24 pt-16 pb-16 pr-24`, whose child col adds
+  // its own `pl-4` — net insets 28/24/16/16, not a flat 20/14. The header
+  // also carries `hide-header-bar`, which explicitly zeroes Ionic's own
+  // header shadow/border (global.scss:2737) — no bottom border belongs here
+  // at all (that border lives on the tabs row below, not this header).
   header: {
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+    paddingLeft: 28,
+    paddingRight: 24,
+    paddingTop: 16,
+    paddingBottom: 16,
     backgroundColor: Colors.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: Colors.divider,
   },
   // Angular: `heading2-semibold-18.clr0` — font18, semibold, pure black
   // (clr0 = #000000), not textDark.
   headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, color: Colors.black },
 
   tabBarWrap: { backgroundColor: Colors.surface },
-  tabScroll: { paddingHorizontal: 16, paddingVertical: 10, gap: 8 },
+  // Angular: wrapping row is `pt-12 pb-12` — 12px, not 10.
+  tabScroll: { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
+  // Angular: chip.component.scss — solid white background (not translucent),
+  // 4px internal gap (not 6), explicit 40px height.
   chip: {
-    flexDirection: 'row', alignItems: 'center', gap: 6,
+    flexDirection: 'row', alignItems: 'center', gap: 4, height: 40,
     paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderColor: Colors.inputBorder,
+    backgroundColor: '#ffffff', borderWidth: 1, borderColor: Colors.inputBorder,
     overflow: 'hidden',
   },
   chipActive: { backgroundColor: Colors.chipSurfaceSelected, borderColor: Colors.chipBorderActive },
@@ -556,21 +581,37 @@ const styles = StyleSheet.create({
   // unread-count overlay never renders there; left as-is.
   unreadBadgeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 11, color: Colors.white },
 
-  conversationListContent: { flexGrow: 1, paddingHorizontal: 16, paddingVertical: 8 },
-  conversationSeparator: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.divider, marginLeft: 64 },
+  // Angular: `ion-grid class="padd0"` around the *ngFor — the list itself
+  // adds no padding; each row (ConversationRow.tsx) carries its own full
+  // pt-20/pb-20 + 24px side insets instead.
+  conversationListContent: { flexGrow: 1 },
+  // Angular: `.messager-list-bottom-border-dddddd { border-bottom: 1px solid
+  // var(--grey-line, #E6E6E6) }` is applied to the WHOLE per-record ion-row
+  // (avatar column included), not an inset divider starting after the
+  // avatar — the undefined --grey-line falls back to #E6E6E6
+  // (Colors.borderSubtle, not Colors.divider #f0f0f0).
+  conversationSeparator: { height: StyleSheet.hairlineWidth, backgroundColor: Colors.borderSubtle },
   footerLoader: { paddingVertical: 20, alignItems: 'center' },
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  // Angular: `pl-45 pr-45` — 45px each side, not 32.
   emptyState: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: 32, paddingTop: 40, gap: 12,
+    paddingHorizontal: 45, paddingTop: 40,
   },
   // Angular: `heading3-semibold-16.black-color` — font16 (not 18), pure black.
-  emptyTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: Colors.black, textAlign: 'center' },
+  // `mt-16` icon→title gap (not a flat 12 shared with every other gap below).
+  emptyTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: Colors.black, textAlign: 'center', marginTop: 16 },
   // Angular: `body2-regular-14.black-color` — pure black, not textSecondary.
-  emptySubtitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, textAlign: 'center', lineHeight: 20 },
+  // `mt-8` title→subtitle gap.
+  emptySubtitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, textAlign: 'center', lineHeight: 20, marginTop: 8 },
+  // Angular: emptyCta's app-button-revamp resolves to `.paid-membership`
+  // (button-revamp.component.scss) — full-width, 44px tall, 8px radius,
+  // 24px internal padding, 1px border in --ion-color-primary (#B50033 —
+  // Colors.primaryDark, not the lighter Colors.primary). `mt-24` above it.
   emptyBtn: {
-    marginTop: 12, borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 6,
-    paddingHorizontal: 20, paddingVertical: 10,
+    width: '100%', height: 44, alignItems: 'center', justifyContent: 'center',
+    marginTop: 24, borderWidth: 1, borderColor: Colors.primaryDark, borderRadius: 8,
+    paddingHorizontal: 24,
   },
   // Angular: emptyCta's app-button-revamp uses the same SECONDARY_BTN config
   // as AllMessagesEmptyState's CTA — [textColor]="'black'" and no

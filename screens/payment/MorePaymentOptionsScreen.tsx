@@ -330,8 +330,11 @@ const s = StyleSheet.create({
     fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, textAlign: 'center',
   },
   qrImageWrap: { padding: 8, backgroundColor: Colors.white, borderRadius: 8 },
+  // Angular: .qr-3-sub (more-payment-option.page.scss) — color #1f1f1f, the
+  // same dark near-black used for rowLabel above, not the lighter
+  // textSecondary grey (#666666).
   qrNote: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: '#1F1F1F',
     textAlign: 'center', lineHeight: 20,
   },
   whatsappBtn: {

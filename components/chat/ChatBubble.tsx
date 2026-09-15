@@ -5,7 +5,7 @@
 // (kind='other') renders as a plain "Attachment" placeholder rather than the
 // rich player Angular has for those — not sendable yet in this port, but
 // existing ones must still render, not crash.
-import { memo, useEffect } from 'react'
+import { memo, useEffect, useRef } from 'react'
 import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio'
@@ -31,11 +31,18 @@ function formatSeconds(totalSeconds: number): string {
   return `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`
 }
 
+// Angular: messages.component.ts ngAfterViewInit's global capture-phase
+// 'play' listener — pauses every other <audio> element the instant one
+// starts, fixing a real multi-playback bug. Each AudioBubble below is its own
+// independent player instance with no shared parent state, so this module-
+// level pub-sub stands in for the DOM-wide listener Angular relies on.
+const audioStopListeners = new Set<() => void>()
+
 // Angular: app-audio-wave — play/pause (revamp/play-pink.svg + pause-pink.svg,
 // unchanged for both sent/received bubbles) driving a wavesurfer.js waveform.
 // wavesurfer isn't ported here (no RN equivalent); a plain progress bar
 // stands in for the waveform, showing the same play position.
-function AudioBubble({ item, isOwnMessage, readStatus, avatarUri, avatarFallbackGender }: { item: ChatMessageItem; isOwnMessage: boolean; readStatus: number; avatarUri?: string | undefined; avatarFallbackGender: 'M' | 'F' }) {
+function AudioBubble({ item, isOwnMessage, readStatus, avatarUri, avatarFallbackGender, avatarSize }: { item: ChatMessageItem; isOwnMessage: boolean; readStatus: number; avatarUri?: string | undefined; avatarFallbackGender: 'M' | 'F'; avatarSize: number }) {
   const player = useAudioPlayer(item.text)
   const status = useAudioPlayerStatus(player)
 
@@ -46,14 +53,35 @@ function AudioBubble({ item, isOwnMessage, readStatus, avatarUri, avatarFallback
     }
   }, [status.didJustFinish, player])
 
-  const toggle = () => (status.playing ? player.pause() : player.play())
+  // See audioStopListeners above — pauseRef always calls the current
+  // player.pause, so a stale closure inside the Set is never an issue.
+  const pauseRef = useRef(() => player.pause())
+  pauseRef.current = () => player.pause()
+
+  useEffect(() => {
+    const listener = () => pauseRef.current()
+    audioStopListeners.add(listener)
+    return () => { audioStopListeners.delete(listener) }
+  }, [])
+
+  const toggle = () => {
+    if (status.playing) {
+      player.pause()
+      return
+    }
+    // Pausing every bubble (including this one) right before play() is a
+    // harmless no-op for this player specifically — it's about to start
+    // anyway — and correctly stops any other bubble that was mid-playback.
+    audioStopListeners.forEach(listener => listener())
+    player.play()
+  }
   const totalSeconds = status.duration || 0
   const progress = totalSeconds > 0 ? Math.min(1, status.currentTime / totalSeconds) : 0
   const label = status.playing || status.currentTime > 0 ? formatSeconds(status.currentTime) : (item.duration ?? formatSeconds(totalSeconds))
 
   return (
     <View style={[styles.row, isOwnMessage ? styles.rowOwn : styles.rowPartner]}>
-      {!isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} />}
+      {!isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} size={avatarSize} />}
       <View style={[styles.audioBubble, isOwnMessage ? styles.bubbleOwn : styles.bubblePartner]}>
         <Pressable onPress={toggle} hitSlop={8}>
           <CdnSvg uri={CDN + (status.playing ? 'revamp/pause-pink.svg' : 'revamp/play-pink.svg')} width={28} height={28} />
@@ -64,7 +92,7 @@ function AudioBubble({ item, isOwnMessage, readStatus, avatarUri, avatarFallback
         <Text style={styles.audioTime}>{label}</Text>
         {isOwnMessage && <ReadTick readStatus={readStatus} />}
       </View>
-      {isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} />}
+      {isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} size={avatarSize} />}
     </View>
   )
 }
@@ -97,11 +125,19 @@ interface Props {
 // avatar blank; same onImgErrorHandler() fallback applies to the partner's
 // photo too. This had no such fallback at all — an empty/failed uri rendered
 // as a flat, imageless grey circle.
-function Avatar({ uri, fallbackGender }: { uri?: string | undefined; fallbackGender: 'M' | 'F' }) {
+function Avatar({ uri, fallbackGender, size }: { uri?: string | undefined; fallbackGender: 'M' | 'F'; size: number }) {
   const src = uri || getAvatarFallbackUri(fallbackGender)
   // The fallback silhouette is a remote .svg — native <Image> can't decode
   // that (see CdnSvg.tsx), so this needs CdnImage's format detection.
-  return <CdnImage uri={src} width={45} height={45} resizeMode="cover" style={styles.avatar} />
+  return (
+    <CdnImage
+      uri={src}
+      width={size}
+      height={size}
+      resizeMode="cover"
+      style={[styles.avatar, { width: size, height: size, borderRadius: size / 2 }]}
+    />
+  )
 }
 
 // memo() — ChatScreen.tsx now renders this inside a FlatList (was a plain
@@ -117,8 +153,13 @@ const ChatBubble = memo(function ChatBubble({ item, onPressMedia, oppGender = 'M
   // too much room and the heading stays on 1 line, so this targets a width
   // that reproduces Angular's actual visual result (2-line wrap) directly,
   // rather than the exact (unreproducible) CSS percentage chain.
-  const { width: winW } = useWindowDimensions()
+  const { width: winW, height: winH } = useWindowDimensions()
   const systemCardWidth = winW * 0.62
+  // Angular: ion-avatar.chat-avatar-profile { width/height: 11.12vmin } —
+  // same formula ChatScreen.tsx's own header avatar uses; ChatBubble's Avatar
+  // was previously a fixed 45x45, only coincidentally close at a ~400pt-wide
+  // reference device.
+  const avatarSize = (Math.min(winW, winH) * 11.12) / 100
   const avatarUri = item.isOwnMessage ? ownPhoto : partnerPhoto
   // getAvatarFallbackUri's param is "which gender's avatar to show" — for the
   // own-message side that's the LOGGED-IN user's own gender (opposite of
@@ -142,7 +183,7 @@ const ChatBubble = memo(function ChatBubble({ item, onPressMedia, oppGender = 'M
       <View style={[styles.row, item.isOwnMessage ? styles.rowOwn : styles.rowPartner]}>
         <View style={item.isOwnMessage ? styles.systemColOwn : styles.systemColPartner}>
           <View style={[styles.systemRow, item.isOwnMessage && styles.systemRowOwn]}>
-            {!item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} />}
+            {!item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} size={avatarSize} />}
             {/* Angular: linear-gradient(251deg, #EAEBF5 0%, #FFF 100%) — CSS
                 angles run clockwise from north (pointing toward the 100%/white
                 end); 251deg's direction vector is (-0.946, 0.326) in screen
@@ -173,12 +214,13 @@ const ChatBubble = memo(function ChatBubble({ item, onPressMedia, oppGender = 'M
                 <Text style={styles.systemBtnText}>{t('GENERAL.WHATSAPP')}</Text>
               </Pressable>
             </LinearGradient>
-            {item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} />}
+            {item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} size={avatarSize} />}
           </View>
           <View style={[
             styles.systemTimeRow,
             { width: systemCardWidth },
             item.isOwnMessage ? styles.systemTimeRowOwn : styles.systemTimeRowPartner,
+            item.isOwnMessage ? { marginRight: avatarSize + 6 } : { marginLeft: avatarSize + 6 },
           ]}>
             <Text style={styles.systemTime}>{formatClockTime(item.timestamp)}</Text>
             {item.isOwnMessage && <ReadTick readStatus={item.readStatus} />}
@@ -189,33 +231,48 @@ const ChatBubble = memo(function ChatBubble({ item, onPressMedia, oppGender = 'M
   }
 
   if (item.kind === 'audio') {
-    return <AudioBubble item={item} isOwnMessage={item.isOwnMessage} readStatus={item.readStatus} avatarUri={avatarUri} avatarFallbackGender={avatarFallbackGender} />
+    return <AudioBubble item={item} isOwnMessage={item.isOwnMessage} readStatus={item.readStatus} avatarUri={avatarUri} avatarFallbackGender={avatarFallbackGender} avatarSize={avatarSize} />
   }
 
   if (item.kind === 'image' || item.kind === 'video') {
+    // Angular: image/video shares the exact same `.send-msg-block`/
+    // `.received-msg-block` wrapper + `.send-msg-time-block`/`.received-msg-
+    // time-block` sibling row as the plain text bubble below — the per-type
+    // `.send-msg-image-time` in-bubble overlay is dead/commented-out markup,
+    // not what actually renders. Reusing the exact same row/col/meta
+    // structure as the text branch instead of a separate in-bubble overlay.
     return (
       <View style={[styles.row, item.isOwnMessage ? styles.rowOwn : styles.rowPartner]}>
-        {!item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} />}
-        <Pressable
-          style={[styles.mediaBubble, item.isOwnMessage ? styles.bubbleOwn : styles.bubblePartner]}
-          onPress={() => onPressMedia?.(item.kind as 'image' | 'video', item.text)}
-        >
-          {item.kind === 'image' ? (
-            <Image source={{ uri: item.text }} style={styles.mediaThumb} resizeMode="cover" />
-          ) : (
-            // Angular: poster="rectangle_bg.svg" — a generic placeholder
-            // rectangle, not an extracted video frame; the play icon overlay
-            // is the only visual cue this is a video.
-            <View style={[styles.mediaThumb, styles.videoPlaceholder]}>
-              <CdnSvg uri={CDN + 'play-btn-chat-img.svg'} width={36} height={36} />
-            </View>
-          )}
-          <View style={styles.mediaMeta}>
-            <Text style={styles.mediaTime}>{formatClockTime(item.timestamp)}</Text>
+        <View style={item.isOwnMessage ? styles.systemColOwn : styles.systemColPartner}>
+          <View style={[styles.bubbleRow, item.isOwnMessage && styles.bubbleRowOwn]}>
+            {!item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} size={avatarSize} />}
+            <Pressable
+              style={[styles.mediaBubble, item.isOwnMessage ? styles.bubbleOwn : styles.bubblePartner]}
+              onPress={() => onPressMedia?.(item.kind as 'image' | 'video', item.text)}
+            >
+              {item.kind === 'image' ? (
+                <Image source={{ uri: item.text }} style={styles.mediaThumb} resizeMode="cover" />
+              ) : (
+                // Angular: poster="rectangle_bg.svg" — a generic placeholder
+                // rectangle, not an extracted video frame; the play icon is a
+                // small circular badge (`.download-img-block`), not a full-
+                // thumbnail dark tint with a large centered icon.
+                <View style={styles.mediaThumb}>
+                  <View style={styles.videoPlayBadge}>
+                    <CdnSvg uri={CDN + 'play-btn-chat-img.svg'} width={24} height={24} />
+                  </View>
+                </View>
+              )}
+            </Pressable>
+            {item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} size={avatarSize} />}
+          </View>
+          <View style={[styles.meta, item.isOwnMessage ? styles.metaOwn : styles.metaPartner, item.isOwnMessage && { marginRight: avatarSize + 6 }]}>
+            <Text style={[styles.time, item.isOwnMessage ? styles.timeOwn : styles.timePartner]}>
+              {formatClockTime(item.timestamp)}
+            </Text>
             {item.isOwnMessage && <ReadTick readStatus={item.readStatus} />}
           </View>
-        </Pressable>
-        {item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} />}
+        </View>
       </View>
     )
   }
@@ -235,13 +292,13 @@ const ChatBubble = memo(function ChatBubble({ item, onPressMedia, oppGender = 'M
     <View style={[styles.row, item.isOwnMessage ? styles.rowOwn : styles.rowPartner]}>
       <View style={item.isOwnMessage ? styles.systemColOwn : styles.systemColPartner}>
         <View style={[styles.bubbleRow, item.isOwnMessage && styles.bubbleRowOwn]}>
-          {!item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} />}
+          {!item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} size={avatarSize} />}
           <View style={[styles.bubble, item.isOwnMessage ? styles.bubbleOwn : styles.bubblePartner]}>
             <Text style={[styles.text, item.isOwnMessage ? styles.textOwn : styles.textPartner]}>{bodyText}</Text>
           </View>
-          {item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} />}
+          {item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} size={avatarSize} />}
         </View>
-        <View style={[styles.meta, item.isOwnMessage ? styles.metaOwn : styles.metaPartner]}>
+        <View style={[styles.meta, item.isOwnMessage ? styles.metaOwn : styles.metaPartner, item.isOwnMessage && { marginRight: avatarSize + 6 }]}>
           <Text style={[styles.time, item.isOwnMessage ? styles.timeOwn : styles.timePartner]}>
             {formatClockTime(item.timestamp)}
           </Text>
@@ -298,7 +355,10 @@ const styles = StyleSheet.create({
   // `.received-msg-block ion-label` rule. Both Poppins-Regular, color #000
   // on both sides (no white-on-color text since neither bubble is colored
   // anymore).
-  text: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 19, color: Colors.black },
+  // Angular: neither `.send-msg-block ion-label`/`.received-msg-block
+  // ion-label` nor body2-regular-14 sets an explicit line-height — no
+  // lineHeight here, let it fall back to the font's natural metric.
+  text: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
   textOwn: {},
   textPartner: {},
 
@@ -308,11 +368,14 @@ const styles = StyleSheet.create({
   // That wrapper shrink-wraps to its widest child, which for the OWN side is
   // avatar+gap+bubble (avatar comes AFTER the bubble there) — so plain
   // `alignItems: flex-end` right-aligns this row to the wrapper's full edge,
-  // past the avatar, not to the bubble's own edge. marginRight compensates,
-  // same fix as systemTimeRowOwn above; the received side has no such offset
+  // past the avatar, not to the bubble's own edge. The actual marginRight
+  // (avatarSize + 6, dynamic) is applied inline where this is used — same
+  // fix as systemTimeRowOwn above; the received side has no such offset
   // since its avatar comes first, already outside this row's own box.
-  meta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  metaOwn: { marginRight: 45 + 6 },
+  // Angular: `.send-msg-time-block`/`.received-msg-time-block` set no
+  // margin-top at all — only normal block flow, not a fixed 4px gap.
+  meta: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaOwn: {},
   metaPartner: {},
   // Angular: `.send-msg-time-block`/`.received-msg-time-block` wraps its `<p>`
   // in `body3-regular-12` (font12, not font10) — the scss rule's own
@@ -380,38 +443,50 @@ const styles = StyleSheet.create({
   // via justifyContent, rather than relying on flex shrink-wrap alignSelf —
   // which doesn't reliably size against a sibling on RN Web, and was pinning
   // the timestamp to the screen edge instead of the card edge.
-  systemTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  // Angular: sent side's card ends 45px avatar + 6px gap BEFORE the column's
+  // Angular: same as `meta` above — no explicit margin-top on this row.
+  systemTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  // Angular: sent side's card ends avatarSize + 6px gap BEFORE the column's
   // true right edge (the avatar sits after the card on that side) — without
   // this offset the timestamp row (width:systemCardWidth, justify:flex-end)
   // right-aligns to the column's full edge, past the avatar, landing outside
-  // the card's actual right border instead of flush with it.
-  systemTimeRowOwn: { justifyContent: 'flex-end', marginRight: 45 + 6 },
-  // Angular: received side's card starts right after the 45px avatar + 6px
-  // gap (same as systemRow's own avatar+card layout) — offset to match,
-  // since this row is a separate sibling below the avatar+card row, not
-  // nested inside it.
-  systemTimeRowPartner: { justifyContent: 'flex-start', marginLeft: 45 + 6 },
+  // the card's actual right border instead of flush with it. The actual
+  // marginRight/marginLeft is applied inline (avatarSize + 6, dynamic — see
+  // the avatarSize computation above), not a fixed 45 here.
+  systemTimeRowOwn: { justifyContent: 'flex-end' },
+  // Angular: received side's card starts right after the avatar + 6px gap
+  // (same as systemRow's own avatar+card layout) — offset to match, since
+  // this row is a separate sibling below the avatar+card row, not nested
+  // inside it.
+  systemTimeRowPartner: { justifyContent: 'flex-start' },
   // Angular: same `.send-msg-time-block`/`.received-msg-time-block` +
   // body3-regular-12 source as `time` above — font12, #777777, not font10/
   // textTertiary.
   systemTime: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.chatTimestampMuted },
 
-  // Angular: .image-video-send-receive — a borderless media box; kept inside
-  // the same colored bubble shell as text messages here for visual
-  // consistency with the rest of this chat UI, rather than a bare image.
-  mediaBubble: { maxWidth: '65%', borderRadius: 14, padding: 4, overflow: 'hidden' },
-  mediaThumb: { width: 200, height: 200, borderRadius: 10, backgroundColor: Colors.surfaceAlt },
-  videoPlaceholder: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#00000022' },
-  mediaMeta: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4, alignSelf: 'flex-end', paddingRight: 4 },
-  // Angular: same `.send-msg-time-block`/`.received-msg-time-block` +
-  // body3-regular-12 source as `time` above — font12, #777777, not font10/
-  // textTertiary.
-  mediaTime: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.chatTimestampMuted },
+  // Angular: image/video lives inside the SAME `.send-msg-block`/`.received-
+  // msg-block` wrapper as text (14px padding all around, not 4) — the
+  // border/background/notch-radius come from bubbleOwn/bubblePartner
+  // applied alongside this in the JSX.
+  mediaBubble: { maxWidth: '65%', padding: 14 },
+  // Angular: `.image-video-send-receive { height:65vmin; width:45vmin }` —
+  // at this project's 400x800 reference viewport, 180x260 (a tall
+  // rectangle), not a 200x200 square.
+  mediaThumb: { width: 180, height: 260, borderRadius: 10, backgroundColor: Colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  // Angular: `.download-img-block` (messages.component.scss:468-480) — a
+  // small circular badge (24px icon + 12px padding = 48px), not a large
+  // centered icon over a dark full-thumbnail tint.
+  videoPlayBadge: {
+    width: 48, height: 48, borderRadius: 24, padding: 12,
+    backgroundColor: '#f1f5f9', alignItems: 'center', justifyContent: 'center',
+  },
 
+  // Angular: audio lives inside the same `.send-msg-block`/`.received-msg-
+  // block` wrapper as text/media (14px padding all around, not 10h/8v) —
+  // border/background/notch-radius come from bubbleOwn/bubblePartner
+  // applied alongside this in the JSX.
   audioBubble: {
     flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '78%',
-    borderRadius: 14, paddingHorizontal: 10, paddingVertical: 8,
+    padding: 14,
   },
   audioTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.35)', overflow: 'hidden' },
   audioProgress: { height: '100%', backgroundColor: Colors.primary },

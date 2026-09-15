@@ -98,10 +98,16 @@ export default function DiscoverMatchesScreen({ navigation }: Props) {
               now applies that exact left/right padding + gap itself (see
               EXPLORE_TILE_WIDTH's header comment in HomeScreen.tsx), so this
               screen's own content padding must stay vertical-only or the two
-              would stack and double the margin. */}
+              would stack and double the margin. showTitle=false because this
+              screen's own header above already renders "Discover matches" once
+              (discover-matches.component.html's <ion-toolbar>) — Home's copy of
+              this same section is the one page that also wants the in-grid
+              "Discover matches" heading (a different Angular page context),
+              so rendering it here too would show the title twice. */}
           <ExploreCategoriesSection
             categories={categories}
             onCategoryPress={cat => navigation.navigate('MainTabs', { screen: 'Matches', params: { exploreType: cat.id, exploreLabel: cat.label } })}
+            showTitle={false}
           />
         </ScrollView>
       )}
@@ -132,9 +138,13 @@ const s = StyleSheet.create({
 
   // No horizontal padding here — ExploreCategoriesSection applies its own
   // exact left/right padding (see its header comment in HomeScreen.tsx).
-  content: { paddingTop: 24 },
+  // Angular: discover-matches.component.html's <ion-row class="... mt-16 pb-24">
+  // — 16px top margin (bottom handled below via the ScrollView's own insets.bottom+24).
+  content: { paddingTop: 16 },
 
-  emptyState:  { paddingHorizontal: 32 },
+  // Angular: no-matches block's <ion-grid class="... ion-cust-padding-start
+  // ion-cust-padding-end ...">  — var(--ion-cust-padding) = 24px, not 32.
+  emptyState:  { paddingHorizontal: 24 },
   emptyText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, textAlign: 'center', marginTop: 6, marginBottom: 16, lineHeight: 20 },
   emptyBtn:    { marginTop: 0 },
 })

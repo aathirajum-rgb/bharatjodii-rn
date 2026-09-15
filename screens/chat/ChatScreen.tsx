@@ -16,14 +16,16 @@
 // than trusting whatever the caller handed over — this screen does the same,
 // using the nav params only as an immediate-render seed.
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useFocusEffect } from '@react-navigation/native'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, FlatList, KeyboardAvoidingView, Linking, Platform, Pressable,
+  ActivityIndicator, FlatList, Image, KeyboardAvoidingView, Linking, Platform, Pressable,
   StyleSheet, Text, TextInput, View, useWindowDimensions,
   type ListRenderItem,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useAudioRecorder, useAudioRecorderState, RecordingPresets } from 'expo-audio'
+import { LinearGradient } from 'expo-linear-gradient'
 import CdnSvg, { CdnImage } from '../../components/cdn-svg/CdnSvg'
 import { getOppGenderAvatarUrl } from '../../utils/avatar'
 import ChatBubble from '../../components/chat/ChatBubble'
@@ -31,20 +33,23 @@ import AttachmentPreviewModal from '../../components/chat/AttachmentPreviewModal
 import ChatMediaViewerModal from '../../components/chat/ChatMediaViewerModal'
 import ThreeDotMenu from '../../components/matches/ThreeDotMenu'
 import ReportProfileModal from '../../components/matches/ReportProfileModal'
+import { HtmlText } from '../../components/matches/matchesCard.shared'
 import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
 import { adaptChatMessageRecord, adaptSendResponse, dedupeMessages, groupMessagesByDate } from '../../adapters/chatMessage.adapter'
 import {
   socketConnection, emitBasicView, onBasicView, emitChatMessages, onChatMessages,
-  emitSendMessage, onSendResponse, emitMessageStatus, onReceiver,
+  emitSendMessage, onSendResponse, emitMessageStatus, onReceiver, emitChatList,
 } from '../../service/socketService'
-import { blockChatProfile, unblockChatProfile, communicationBtnOnClick } from '../../service/communicationService'
+import { blockChatProfile, unblockChatProfile, communicationBtnOnClick, checkPaidBlockerGate } from '../../service/communicationService'
+import { checkFreeTrialCondition } from '../../service/payWallService'
 import { handleBack, navigate } from '../../utils/navigationRef'
 import { ENavigation } from '../../types/enums/navigation.enum'
 import {
-  getChatCount, consumeChatCount, checkChatLimit, fetchChatPaymentPromo,
-  type ChatCountResult, type ChatPaymentPromo,
+  getChatCount, consumeChatCount, checkChatLimit, fetchChatPaymentPromo, fetchChatSuggestions,
+  fetchChatBlockerBanner, type ChatCountResult, type ChatPaymentPromo, type ChatBlockerBanner,
+  type ChatBlockerBannerKind,
 } from '../../service/chatService'
 import {
   chooseAttachmentSource, pickChatAttachment, uploadChatAttachment,
@@ -57,7 +62,7 @@ import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
 import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictSheets'
 import { requestMicrophonePermission } from '../../service/permissionService'
 import { getItem, getJson, setJson } from '../../service/storageService'
-import { getSessionValue } from '../../service/registrationService'
+import { getSessionValue, getRegValue } from '../../service/registrationService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import CdnLottie from '../../components/CdnLottie'
@@ -143,6 +148,9 @@ export default function ChatScreen({ navigation, route }: Props) {
   const [partnerPhoto, setPartnerPhoto] = useState(String(route.params?.partnerPhoto ?? ''))
   const [partnerOnline, setPartnerOnline] = useState(Boolean(route.params?.partnerOnline))
   const [partnerLastActive, setPartnerLastActive] = useState<number | null>(route.params?.partnerLastActive ?? null)
+  // Angular: basicViewDetail?.VIEW?.IDVERIFIED — drives the "not yet verified"
+  // note shown to female users chatting with an unverified male.
+  const [partnerIdVerified, setPartnerIdVerified] = useState<number | null>(null)
   // Angular never renders a blank avatar: messages.component.html binds
   // (error)="onImgErrorHandler($event, true)", which swaps in a gender-based
   // silhouette (common.ts's getAvatarImg). `true` = opposite profile, so a
@@ -186,6 +194,21 @@ export default function ChatScreen({ navigation, route }: Props) {
   const [paymentPromo, setPaymentPromo] = useState<ChatPaymentPromo | null>(null)
   const [showPaymentPromo, setShowPaymentPromo] = useState(false)
   const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
+
+  // ── Paid-blocker / free-trial-expired banner ─────────────────────────────
+  // Angular: check_Paid_NonVerifyIdUser()/check_Paid_Verified_Nophoto()/
+  // payWallService.checkFreeTrialCondition('expired') — all three replace the
+  // composer with the SAME banner block (messages.component.html:593-603),
+  // re-checked on every getChatCount() refresh, not just once at entry.
+  const [blockerGate, setBlockerGate] = useState<ChatBlockerBannerKind | null>(null)
+  const [blockerBanner, setBlockerBanner] = useState<ChatBlockerBanner | null>(null)
+
+  // ── Suggestion / template messages ───────────────────────────────────────
+  // Angular: suggestionList/selectedSuggestion — canned conversation-starter
+  // messages shown once, the first time a thread has no messages yet.
+  const [suggestionList, setSuggestionList] = useState<string[] | null>(null)
+  const [selectedSuggestion, setSelectedSuggestion] = useState<number | null>(null)
+  const suggestionsFetchedRef = useRef(false)
   const phoneInfo = usePhoneInfoSheet()
   // Web/PWA "Add photo now" CTA (phoneInfo's female-free-photo variants) — see
   // hooks/useAddPhotoPicker.ts for why this can't just navigate to the
@@ -280,21 +303,86 @@ export default function ChatScreen({ navigation, route }: Props) {
       .replace('#RETURNMSG#', t(`MESSAGES.MSG_DURATION_RETURNMSG_${type}`))
   }
 
+  // Angular: setLimitExceed()'s 'oneConversation' branch — chatOneConversation
+  // = SEND_ONE_MESSAGE with `##HE_SHE##` resolved to the PARTNER's pronoun via
+  // getGenderPrefix_He_She(...).toLowerCase() (same lowercase convention
+  // ChatBubble.tsx's own YOUVIEWEDNUMBER/VIEWEDYOURNUMBER pronoun substitution
+  // uses). Angular's own `.replace('#COUNT#', this.chatBalance)` on this same
+  // string is a no-op in production — the real en.json text hardcodes "3"
+  // literally with no `#COUNT#` token in it at all — so not replicated here.
+  function sendOneMessageText(): string {
+    const oppGender = ownGender === 'F' ? 'M' : 'F'
+    return t('MESSAGES.SEND_ONE_MESSAGE').replace(/##HE_SHE##/gi, t(`PRONOUN.${oppGender}.heshe`).toLowerCase())
+  }
+
   // Angular: checkSetLimitValue() — purely derived from messages/chatCountResult/
   // messageDetails, so computed straight from render rather than mirrored into
   // its own state via an effect (no external system to synchronize with here).
   function computeMessageGate(): { allow: boolean; bannerText: string } {
+    // Angular: getChatCount()'s check_Paid_* re-check unconditionally sets
+    // messageAllow=false — rendered via the richer blockerBanner UI below
+    // instead of bannerText, so this branch carries no text of its own.
+    if (blockerGate) {
+      return { allow: false, bannerText: '' }
+    }
     if (firstTimeMsgLimitReached()) {
-      return { allow: false, bannerText: t('MESSAGES.SEND_ONE_MESSAGE') }
+      return { allow: false, bannerText: sendOneMessageText() }
     }
     if (chatCountResult?.fairUsageExceeded && messageDetails) {
       const limitType = checkChatLimit(chatCountResult.chatBalanceDetail, messageDetails)
       if (limitType === 'monthlyLimitExceeded') return { allow: false, bannerText: buildLimitExceededText('3') }
       if (limitType === 'weeklyLimitExceeded')  return { allow: false, bannerText: buildLimitExceededText('2') }
       if (limitType === 'dailyLimitExceeded')   return { allow: false, bannerText: buildLimitExceededText('1') }
-      if (limitType === 'oneConversationOnly')  return { allow: false, bannerText: t('MESSAGES.SEND_ONE_MESSAGE') }
+      if (limitType === 'oneConversationOnly')  return { allow: false, bannerText: sendOneMessageText() }
     }
     return { allow: true, bannerText: '' }
+  }
+
+  // Angular: showSuggestionSection() — suggestions are there to start the
+  // conversation; once the member has sent a message, or the thread is
+  // blocked/reported, or an attachment/recording is already in flight, they're
+  // hidden. Angular's own gate also checks a separate `unblockedProfile`/
+  // `blockedProfile` pair; `blockedState === 'none'` covers the same intent
+  // (not currently blocked either direction) without needing that extra flag.
+  function showSuggestions(): boolean {
+    return !!suggestionList && suggestionList.length > 0 && !reported && blockedState === 'none'
+      && sentMsgCount() === 0 && !isRecording && !recordedAttachment && !pendingAttachment
+  }
+
+  // Angular: getSuggestion() — fetched once, right after the thread loads, if
+  // it turned out to be empty.
+  async function loadSuggestionsIfEmpty(messageCount: number) {
+    if (messageCount !== 0 || suggestionsFetchedRef.current) return
+    suggestionsFetchedRef.current = true
+    const [createdBy, memberCode, lang, name, city, gender] = await Promise.all([
+      getRegValue('CREATEDBY'),
+      getItem(StorageKeys.User.MEMBER_CODE),
+      getItem(StorageKeys.Auth.LANG),
+      getItem(StorageKeys.User.NAME),
+      getRegValue('CITY'),
+      getItem(StorageKeys.User.LOGIN_GENDER),
+    ])
+    const list = await fetchChatSuggestions({
+      createdBy: createdBy ?? '0',
+      memberCode: memberCode ?? '91',
+      lang: lang ?? 'en',
+      name: name ?? '',
+      city: city ?? '',
+      gender: gender ?? '',
+    })
+    setSuggestionList(list)
+  }
+
+  // Angular: patchSuggestion() — tapping the same suggestion again unselects
+  // it and clears the composer; tapping a different one patches its text in.
+  function handleSuggestionTap(text: string, index: number) {
+    if (selectedSuggestion === index) {
+      setSelectedSuggestion(null)
+      setMessage('')
+    } else {
+      setSelectedSuggestion(index)
+      setMessage(text)
+    }
   }
 
   // Angular: getChatCount() — fired right after the thread loads, and its
@@ -310,6 +398,28 @@ export default function ChatScreen({ navigation, route }: Props) {
     if (result.invalidPartner) {
       setToastRequest({ message: result.invalidPartnerMsg ?? 'Invalid MatriID', key: Date.now() })
     }
+  }
+
+  // Angular: getChatCount()'s own check_Paid_* re-check (:1012) plus the
+  // template's free-trial-expired condition (html:593) — re-derived every
+  // time the thread refreshes, same cadence as refreshChatCount() above.
+  async function refreshBlockerBanner() {
+    const paidGate = await checkPaidBlockerGate()
+    const kind: ChatBlockerBannerKind | null = paidGate ?? (await checkFreeTrialCondition('expired') ? 'free_trial_expired' : null)
+    setBlockerGate(kind)
+    if (!kind) { setBlockerBanner(null); return }
+    setBlockerBanner(await fetchChatBlockerBanner(kind))
+  }
+
+  // Angular: reDirectToMembership() — a different action per gate: verify-ID
+  // for the non-verified case, the add-photo flow for the verified-no-photo
+  // case (native callNative('Add_photo') — reusing this screen's own
+  // useAddPhotoPicker trigger, already wired for the phone-privacy sheet),
+  // and the plain recharge screen for a plain expired free trial.
+  function handleBlockerBannerCta() {
+    if (blockerGate === 'non_verify_id') { navigation.navigate('verify-id'); return }
+    if (blockerGate === 'verified_no_photo') { addPhoto.openAddPhoto(navigation); return }
+    navigation.navigate('recharge')
   }
 
   // ── Draft restore — Angular: chatDraftMessage[pMatriId], a per-partner
@@ -338,8 +448,19 @@ export default function ChatScreen({ navigation, route }: Props) {
   }, [message, partnerId])
 
   // ── Socket wiring ────────────────────────────────────────────────────────
-  useEffect(() => {
+  // Angular: ionViewWillEnter() (messages.component.ts:344) re-runs on EVERY
+  // re-entry to this page — not just the first — re-emitting BasicView/
+  // ChatMessages/ChatList. React Navigation keeps this screen mounted
+  // underneath a pushed screen (View Profile, Safety Tips, Report flow), so a
+  // plain mount-only effect never re-ran here, and messages sent/received
+  // while you were away, the partner's online/last-active/verified state, and
+  // the chat-list badge all went stale until you left and re-entered the
+  // whole navigator. useFocusEffect is this codebase's established RN
+  // equivalent of ionViewWillEnter (see MessagerListScreen.tsx's own fix for
+  // the identical bug on the conversation list).
+  useFocusEffect(useCallback(() => {
     let cancelled = false
+    suggestionsFetchedRef.current = false
 
     const unsubscribeBasicView = onBasicView((data: any) => {
       if (cancelled || !data) return
@@ -361,12 +482,17 @@ export default function ChatScreen({ navigation, route }: Props) {
       const lastLogin  = view.LASTLOGIN ?? data.LASTLOGIN
       // Angular (:309) checks BLOCKED at the TOP level of the response.
       const blocked    = data.BLOCKED ?? view.BLOCKED
+      const idVerified = view.IDVERIFIED
       if (name) setPartnerName(name)
       if (photo) setPartnerPhoto(photo)
       if (onlineNow != null) setPartnerOnline(Number(onlineNow) === 1)
       if (lastLogin) setPartnerLastActive(Number(lastLogin) * 1000)
-      if (blocked === 'Y') setBlockedState('by_me')
+      // Angular (:328-331): a live BasicView push reporting BLOCKED=='Y'
+      // also clears the draft (`this.message = ""`), not just the blocked
+      // banner state.
+      if (blocked === 'Y') { setBlockedState('by_me'); setMessage('') }
       else if (blocked === 'B') setBlockedState('by_them')
+      if (idVerified != null) setPartnerIdVerified(Number(idVerified))
     })
 
     const unsubscribeMessages = onChatMessages((data: ChatMessagesResponse) => {
@@ -377,14 +503,20 @@ export default function ChatScreen({ navigation, route }: Props) {
       setMessageDetails(data?.TOTALMSGCNT ?? null)
       setLoaded(true)
       refreshChatCount()
+      refreshBlockerBanner()
+      loadSuggestionsIfEmpty(adapted.length)
     })
 
     const unsubscribeSend = onSendResponse((res: SendMessageResponse) => {
       if (cancelled) return
       setSending(false)
-      // Angular: RESPONSECODE 2 + ERRCODE 1 — send failed server-side, just
-      // toast and drop it (no bubble to show for a message that never sent).
-      if (Number(res?.RESPONSECODE) === 2 && Number(res?.ERRCODE) === 1) return
+      // Angular: getSendResp() — RESPONSECODE 2 + ERRCODE 1 is a server-side
+      // send failure; Angular toasts the server's error text (if any) before
+      // dropping it (no bubble to show for a message that never sent).
+      if (Number(res?.RESPONSECODE) === 2 && Number(res?.ERRCODE) === 1) {
+        if (res?.Message) setToastRequest({ message: res.Message, key: Date.now() })
+        return
+      }
       const own = adaptSendResponse(res, ownIdRef.current, pendingVoiceDurationRef.current)
       pendingVoiceDurationRef.current = undefined
       setMessages(prev => dedupeMessages([...prev, own]))
@@ -392,7 +524,14 @@ export default function ChatScreen({ navigation, route }: Props) {
       // for the first REAL message of a thread (see handleSend()).
       if (pendingFirstMessageRef.current) {
         pendingFirstMessageRef.current = false
-        consumeChatCount(partnerId).then(() => refreshChatCount())
+        consumeChatCount(partnerId).then(() => {
+          refreshChatCount()
+          // Angular: emitChatList(5, 0, 1) inside the same chatCount(TYPE=2)
+          // success callback — pushes a fresh unread/message count to the rest
+          // of the app (messager-list's badge) right after the thread's first
+          // real message actually lands.
+          emitChatList(5, 0, 1)
+        })
       }
     })
 
@@ -423,6 +562,10 @@ export default function ChatScreen({ navigation, route }: Props) {
       socketConnection(EnvConfig.notify).then(() => {
         if (cancelled) return
         emitChatMessages(partnerId)
+        // Angular: ngOnInit()'s unconditional emitChatList() — refreshes the
+        // messager-list badge/count on every chat entry, not just after a
+        // first message sends.
+        emitChatList()
       })
     })
 
@@ -433,7 +576,7 @@ export default function ChatScreen({ navigation, route }: Props) {
       unsubscribeSend()
       unsubscribeReceiver()
     }
-  }, [partnerId])
+  }, [partnerId]))
 
   // Angular: getRecordedTime() subscription's `time == "03:00"` check.
   useEffect(() => {
@@ -460,8 +603,19 @@ export default function ChatScreen({ navigation, route }: Props) {
   // checkToSendMessage() fails, one popup explains why (paid-balance promo,
   // under-validation, or rejected-validation), in that priority order. Shared
   // by both the text-send gate and the attachment-button gate below.
+  // Angular: sendMessage()'s else-if chain (messages.component.ts:669-680) —
+  // in this exact order: the free-member/zero-balance payment-promo popup
+  // FIRST, then validation=='0', then validation=='2'. A previous version of
+  // this port checked validation=='0'/'2' first and fell through to the
+  // promo last, so a paid user with zero balance AND a validation flag saw
+  // the wrong popup. No final "else" here either — Angular shows nothing if
+  // none of the three conditions match.
   async function explainWhySendBlocked() {
-    if (chatCountResult?.profileValidation === '0' && chatCountResult.profileValidationMsg) {
+    if (ownEntryType === 'F' || (ownEntryType === 'P' && chatCountResult?.chatBalance === '0' && chatCountResult?.profileValidation === '1')) {
+      const promo = await fetchChatPaymentPromo(partnerName)
+      setPaymentPromo(promo)
+      setShowPaymentPromo(true)
+    } else if (chatCountResult?.profileValidation === '0' && chatCountResult.profileValidationMsg) {
       phoneInfo.handleResult({ type: 'under_validation', message: chatCountResult.profileValidationMsg })
     } else if (chatCountResult?.profileValidation === '2') {
       const bottom = chatCountResult.profileValidationBottom
@@ -472,10 +626,6 @@ export default function ChatScreen({ navigation, route }: Props) {
         cta: bottom?.cta ?? 'Okay',
         ...(bottom?.image ? { image: bottom.image } : {}),
       })
-    } else {
-      const promo = await fetchChatPaymentPromo(partnerName)
-      setPaymentPromo(promo)
-      setShowPaymentPromo(true)
     }
   }
 
@@ -827,6 +977,14 @@ export default function ChatScreen({ navigation, route }: Props) {
         )}
       </View>
 
+      {/* Angular: .not-verified-note (messages.component.html:102-107) — shown
+          to a female member chatting with a male whose ID isn't verified yet. */}
+      {ownGender === 'F' && partnerIdVerified === 0 && (
+        <View style={styles.notVerifiedNote}>
+          <Text style={styles.notVerifiedNoteText}>{t('VIEWPROFILE.VERIFIED_NOTE')}</Text>
+        </View>
+      )}
+
       {/* The header above is a normal layout sibling inside a container that
           already applies insets.top as paddingTop — RN's automatic frame
           measurement already knows this view starts below it, so an explicit
@@ -870,31 +1028,115 @@ export default function ChatScreen({ navigation, route }: Props) {
           // Angular: isChatReported() (JODII-453 fix) — a reported chat can be
           // read but not answered, this note takes priority over the block/
           // limit banners below since none of those reasons matter once reported.
-          <View style={[styles.blockedBanner, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+          <View style={[styles.blockedBanner, { paddingBottom: Math.max(insets.bottom, 24) }]}>
             <Text style={styles.blockedText}>{t('MESSAGES.REPORTED_PROFILE')}</Text>
           </View>
         ) : blockedState === 'by_them' ? (
-          <View style={[styles.blockedBanner, { paddingBottom: Math.max(insets.bottom, 20) }]}>
+          <View style={[styles.blockedBanner, styles.blockedBannerGrey, { paddingBottom: Math.max(insets.bottom, 24) }]}>
             <Text style={styles.blockedText}>{t('PRIVACY.OPP_BLOCK_TEXT')}</Text>
           </View>
         ) : blockedState === 'by_me' ? (
           <Pressable
-            style={[styles.blockedBanner, { paddingBottom: Math.max(insets.bottom, 20) }]}
+            style={[styles.blockedBanner, styles.blockedBannerGrey, { paddingBottom: Math.max(insets.bottom, 24) }]}
             onPress={handleBannerTapToUnblock}
           >
             <Text style={styles.blockedText}>{t('MESSAGES.BLOCKED_CONTENT')}</Text>
             <Text style={styles.tapToUnblock}>{t('MESSAGES.TAP_HERE')}</Text>
           </Pressable>
+        ) : blockerGate && blockerBanner ? (
+          // Angular: messages.component.html:593-603 (.free-trial-expired) —
+          // the SAME banner block for all three gates (paid-non-verified,
+          // paid-verified-no-photo, free-trial-expired), just different
+          // content-source keys and CTA action.
+          <LinearGradient
+            colors={['#FFF7F9', '#FFFFFF']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            // Angular: `linear-gradient(180deg, #FFF7F9 0%, #FFF 165.73%)` —
+            // the white stop is past 100%, so full white is reached at
+            // 100/165.73 ≈ 60% of the box height, then stays solid white for
+            // the rest (not a plain 0%→100% fade across the whole height).
+            locations={[0, 0.6035]}
+            style={[styles.blockerBanner, { paddingBottom: Math.max(insets.bottom, 24) }]}
+          >
+            <Text style={styles.blockerBannerTitle}>{blockerBanner.title}</Text>
+            <Text style={styles.blockerBannerSubtitle}>
+              {blockerBanner.subtitleTemplate.replace('##NAME##', partnerName)}
+            </Text>
+            <Pressable style={styles.blockerBannerCta} onPress={handleBlockerBannerCta}>
+              <Text style={styles.blockerBannerCtaText}>{blockerBanner.ctaLabel}</Text>
+            </Pressable>
+          </LinearGradient>
         ) : !messageAllow ? (
           // Angular: showBottomRestriction() — the entire footer is replaced,
-          // not just a disabled send button.
-          <View style={[styles.blockedBanner, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-            <Text style={styles.limitReachedText}>{limitBannerText}</Text>
-            <Pressable onPress={() => navigation.navigate('MainTabs', { screen: 'Matches' })}>
+          // not just a disabled send button. Real source is `.send-one-msg-
+          // block` (messages.component.scss:861-872) — the SAME gradient-
+          // top-border + pink-to-white background treatment as blockerBanner
+          // above, not a plain white/hairline-bordered box.
+          <LinearGradient
+            colors={['#FFF7F9', '#FFFFFF']}
+            start={{ x: 0.5, y: 0 }}
+            end={{ x: 0.5, y: 1 }}
+            // Angular: same `linear-gradient(180deg, #FFF7F9 0%, #FFF
+            // 165.73%)` as blockerBanner above — full white at ~60% of the
+            // box height, not a plain 0%→100% fade.
+            locations={[0, 0.6035]}
+            style={[styles.blockerBanner, { paddingBottom: Math.max(insets.bottom, 24) }]}
+          >
+            {/* Angular: `[innerHTML]="chatOneConversation"` — SEND_ONE_MESSAGE
+                carries a `<span class="font-14-semibold">` around "only one
+                message" for emphasis; a plain <Text> showed the raw tag. */}
+            <HtmlText html={limitBannerText} style={styles.limitReachedText} />
+            <Pressable
+              style={styles.exploreMatchesRow}
+              onPress={() => navigation.navigate('MainTabs', { screen: 'Matches' })}
+            >
               <Text style={[styles.tapToUnblock, styles.exploreMatchesColor]}>{t('MESSAGES.EXPLORE_MATCHES')}</Text>
+              {/* Angular: app-button-revamp's `iconPosition="end"` +
+                  `iconType="forward-animation-link"` — an animated forward-
+                  arrow GIF after the label, not plain text with no icon.
+                  resizeMode="stretch": Angular's plain <img> has no object-fit
+                  (browser default fill/stretch); the GIF's real native frame
+                  is a 1200x1200 SQUARE, and RN Image's own default
+                  (resizeMode:'cover') would crop it to fill this non-square
+                  box instead, visibly zooming the arrow in. */}
+              <Image source={{ uri: CDN + 'revamp/animation/right-arrow-animation.gif' }} style={styles.exploreMatchesArrow} resizeMode="stretch" />
             </Pressable>
-          </View>
+          </LinearGradient>
         ) : (
+          <>
+            {/* Angular: messages.component.html:481-496 (suggestions-for-you-block) —
+                pinned directly above the composer, hidden once the member has
+                sent a message or an attachment/recording is in flight. */}
+            {showSuggestions() && (
+              // Angular: linear-gradient(218deg, #FFF7F9 0% -> #FFF 91.61%).
+              // 218deg's direction vector is (-0.616, 0.788) in screen space
+              // (CSS gradient angle 0deg = "to top"), so the pale pink (0%)
+              // sits toward the top-right and fades to white toward the
+              // bottom-left — same conversion approach as ChatBubble.tsx's
+              // own gradient comment.
+              <LinearGradient
+                colors={['#FFF7F9', '#FFFFFF']}
+                start={{ x: 0.81, y: 0.11 }}
+                end={{ x: 0.19, y: 0.89 }}
+                locations={[0, 0.9161]}
+                style={styles.suggestionsBlock}
+              >
+                <Text style={styles.suggestionsTitle}>{t('MESSAGES.SUGGESTIONS', 'Suggestions for you')}</Text>
+                {suggestionList!.map((text, i) => (
+                  <Pressable
+                    key={i}
+                    style={styles.suggestionItem}
+                    onPress={() => handleSuggestionTap(text, i)}
+                  >
+                    <Text style={styles.suggestionText}>{text}</Text>
+                    <View style={[styles.suggestionCheckbox, selectedSuggestion === i && styles.suggestionCheckboxChecked]}>
+                      {selectedSuggestion === i && <View style={styles.suggestionCheckboxDot} />}
+                    </View>
+                  </Pressable>
+                ))}
+              </LinearGradient>
+            )}
           <View style={[styles.inputBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
             {/* Angular: messages.component.html:642-649 — the attachment icon
                 is a CHILD of the textarea itself (position: absolute; right:
@@ -902,7 +1144,7 @@ export default function ChatScreen({ navigation, route }: Props) {
                 separate button before it. */}
             <View style={styles.inputWrap}>
               {isRecording ? (
-                <Pressable style={styles.input} onPress={stopRecordingAndFinalize}>
+                <Pressable style={[styles.input, styles.inputRecording]} onPress={stopRecordingAndFinalize}>
                   <View style={styles.recordingRow}>
                     <CdnSvg uri={CDN + 'jodii-chat-mic-img-red.svg'} width={18} height={18} />
                     <View style={styles.recordingDot} />
@@ -910,7 +1152,7 @@ export default function ChatScreen({ navigation, route }: Props) {
                   </View>
                 </Pressable>
               ) : recordedAttachment ? (
-                <View style={styles.input}>
+                <View style={[styles.input, styles.inputRecorded]}>
                   <View style={styles.recordingRow}>
                     <Pressable onPress={handleCancelRecording} hitSlop={8}>
                       <CdnSvg uri={CDN + 'jodii-chat-cross-img-red.svg'} width={16} height={16} />
@@ -920,7 +1162,7 @@ export default function ChatScreen({ navigation, route }: Props) {
                 </View>
               ) : (
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, message.trim().length > 0 && styles.inputTyping]}
                   value={message}
                   onChangeText={setMessage}
                   placeholder={t('MESSAGES.TYPE_TEXT')}
@@ -964,6 +1206,7 @@ export default function ChatScreen({ navigation, route }: Props) {
               </Pressable>
             )}
           </View>
+          </>
         )}
       </KeyboardAvoidingView>
 
@@ -1044,9 +1287,11 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.white },
   flex1: { flex: 1 },
 
+  // Angular: `ion-row.pl-6.pt-12.pb-12.pr-8` (messages.component.html:4) —
+  // 6/8px horizontal (asymmetric, not a flat 12), 12/12 vertical (not 10).
   header: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 12, paddingVertical: 10,
+    paddingLeft: 6, paddingRight: 8, paddingTop: 12, paddingBottom: 12,
     backgroundColor: Colors.surface,
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.divider,
     // ThreeDotMenu.tsx's dropdown is `position: absolute` INSIDE this header —
@@ -1063,15 +1308,20 @@ const styles = StyleSheet.create({
   // here.
   avatarWrap: {},
   avatar: { backgroundColor: Colors.surfaceAlt },
+  // Angular: `.jodii-chat-online` (messages.component.scss:80-90) —
+  // background #35ab83 (not iOS green), 1.5px white border (not 2), and
+  // positive insets (bottom:3%, right:5%) that sit mostly INSIDE the avatar
+  // circle near its corner, not outside it.
   onlineDot: {
-    position: 'absolute', right: -1, bottom: -1,
+    position: 'absolute', right: '5%', bottom: '3%',
     width: 10, height: 10, borderRadius: 5,
-    backgroundColor: Colors.iOSGreen, borderWidth: 2, borderColor: Colors.surface,
+    backgroundColor: '#35ab83', borderWidth: 1.5, borderColor: Colors.surface,
   },
   headerText: { flex: 1, gap: 1 },
-  // Angular: h2.heading4-medium-16.black-color — MEDIUM weight (not
-  // semibold) at font16, pure black (not textDark).
-  headerName: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font16, color: Colors.black },
+  // Angular: h2.heading4-medium-16.black-color.mb-4.line-height-26 — MEDIUM
+  // weight (not semibold) at font16, pure black (not textDark), line-height
+  // 26, 4px bottom margin.
+  headerName: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font16, color: Colors.black, lineHeight: 26, marginBottom: 4 },
   // Angular: p.body3-regular-12.color-1f2721 — font12, a distinct near-black-
   // green (#1f2721), not this app's general textSecondary grey.
   headerStatus: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.chatLastSeenText },
@@ -1110,11 +1360,48 @@ const styles = StyleSheet.create({
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.chatNearBlackText,
   },
 
+  // Angular: .suggestions-for-you-block (messages.component.scss:837-842) —
+  // border-top 1px solid #F1B6C5, linear-gradient(218deg, #FFF7F9 0%,
+  // #FFF 91.61%). Angular positions this `fixed` above the composer;
+  // RN achieves the same effect by rendering it as a sibling directly above
+  // inputBar in the same non-scrolling footer area.
+  suggestionsBlock: {
+    paddingHorizontal: 24, paddingBottom: 24, paddingTop: 20,
+    borderTopWidth: 1, borderTopColor: '#F1B6C5',
+  },
+  // Angular: .font-14-semibold.color-333333
+  suggestionsTitle: {
+    fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: '#333333',
+    marginBottom: 16,
+  },
+  // Angular: .suggestion-box-text — border-radius 8, border 1px solid
+  // #545454, background #FFF; each ion-item repeats with mt-16 (16px gap).
+  suggestionItem: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    borderRadius: 8, borderWidth: 1, borderColor: '#545454', backgroundColor: Colors.white,
+    paddingHorizontal: 16, paddingVertical: 12, marginBottom: 16, gap: 12,
+  },
+  // Angular: .jodii-chat-suggestions-for-you-content-text — white-space:
+  // break-spaces (wraps, doesn't truncate), color #000000; body3-regular-12.
+  suggestionText: {
+    flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.black,
+  },
+  // Angular: ion-checkbox mode="md" — a plain square checkbox, not the radio
+  // dot this port's earlier (dead, commented-out) accordion variant used.
+  suggestionCheckbox: {
+    width: 20, height: 20, borderRadius: 4, borderWidth: 1.5, borderColor: '#8a8a8a',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  suggestionCheckboxChecked: { borderColor: Colors.primaryDark, backgroundColor: Colors.primaryDark },
+  suggestionCheckboxDot: { width: 10, height: 10, borderRadius: 2, backgroundColor: Colors.white },
+
   // Angular: .messages-bottom-block — background #FFF, border-top 1px solid
   // #E6E6E6, pb-16/pt-16 (16px top/bottom padding, not 8).
+  // Angular: `ion-cust-padding-start/end` (messages.component.html:639) —
+  // 24px horizontal, --ion-cust-padding — not 12.
   inputBar: {
     flexDirection: 'row', alignItems: 'flex-end', gap: 8,
-    paddingHorizontal: 12, paddingTop: 16, paddingBottom: 16,
+    paddingHorizontal: 24, paddingTop: 16, paddingBottom: 16,
     backgroundColor: Colors.surface,
     borderTopWidth: 1, borderTopColor: '#E6E6E6',
   },
@@ -1141,6 +1428,19 @@ const styles = StyleSheet.create({
     // color:#1f1e1b explicitly (body2-regular-14 itself carries no color).
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.chatNearBlackText,
   },
+  // Angular: `.jodii-chat-textarea-msg.jodii-chat-suggestion` — once there's
+  // typed text, the pill becomes a rounded RECT (8px radius, not 52), white
+  // (not grey), fixed ~72px tall (`.jodii-chat-suggestion{height:9vh}` @ this
+  // project's 800px reference height).
+  inputTyping: { borderRadius: 8, backgroundColor: '#ffffff', height: 72 },
+  // Angular: `.jodii-voice-textarea` — 8px radius, white, distinct padding
+  // (10/8/10/8, not the pill's 16/44/16/0).
+  inputRecording: {
+    borderRadius: 8, backgroundColor: '#fff',
+    paddingTop: 10, paddingRight: 8, paddingBottom: 10, paddingLeft: 8,
+  },
+  // Angular: `.jodii-voice-recorded` — 8px radius, white, fixed 45px height.
+  inputRecorded: { borderRadius: 8, backgroundColor: '#fff', height: 45 },
   sendBtn: {
     backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
   },
@@ -1150,7 +1450,16 @@ const styles = StyleSheet.create({
   // true center rather than dead center, matching Angular exactly.
   sendBtnPadded: { paddingTop: 12, paddingRight: 9, paddingBottom: 12, paddingLeft: 13 },
   sendBtnDisabled: { opacity: 0.5 },
-  sendBtnRecording: { backgroundColor: Colors.inputError },
+  // Angular: micStatus's `.jodii-chat-mic-img-with-shadow` does NOT swap the
+  // button's background — it stays `.jodii-chat-mic-img`'s #B50033
+  // (primaryDark) and adds a pulsing halo instead: box-shadow
+  // `0 0 0 5px rgba(181,0,51,0.2), 0 0 0 10px rgba(181,0,51,0.1)`. RN has no
+  // multi-ring box-shadow equivalent; approximated as a single soft glow in
+  // the same color rather than swapping to the unrelated inputError pink/red.
+  sendBtnRecording: {
+    shadowColor: 'rgba(181,0,51,0.3)', shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1, shadowRadius: 10, elevation: 8,
+  },
 
   recordingRow: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8 },
   recordingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: Colors.inputError },
@@ -1158,12 +1467,22 @@ const styles = StyleSheet.create({
   // Medium at font12, black — not the body-regular family/size this had.
   recordingTimer: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: FontSize.font12, color: Colors.black },
 
+  // Angular: reported → `messages-bottom-block.pb-24.pt-24` — white bg,
+  // border-top #E6E6E6 (not this app's general divider #f0f0f0), 24/24
+  // padding (not pt:20). by_me/by_them use a DIFFERENT class,
+  // `.jodii-unblock-chat-msg-restriction-block` (see blockedBannerGrey
+  // below) — same border/padding, but a visibly greyer #FAFAFA background.
+  // The by_me variant's text→button gap is `mt-16`, not 10 (only matters
+  // for that 2-child case; reported/by_them render a single child).
   blockedBanner: {
-    alignItems: 'center', justifyContent: 'center', gap: 10,
-    paddingTop: 20, paddingHorizontal: 24,
+    alignItems: 'center', justifyContent: 'center', gap: 16,
+    paddingTop: 24, paddingHorizontal: 24,
     backgroundColor: Colors.surface,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.divider,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E6E6E6',
   },
+  // Angular: `.jodii-unblock-chat-msg-restriction-block` (messages.component
+  // .scss:331-337) — bg #FAFAFA, distinct from the reported case's white.
+  blockedBannerGrey: { backgroundColor: '#FAFAFA' },
   // Angular: shared by REPORTED_PROFILE / OPP_BLOCK_TEXT / BLOCKED_CONTENT —
   // all three are body1-medium-14.color-1f1e1b (font14, Poppins-Medium,
   // #1f1e1b), not textDark.
@@ -1199,5 +1518,49 @@ const styles = StyleSheet.create({
   exploreMatchesColor: {
     color: Colors.link, fontWeight: '400', lineHeight: 20,
     borderWidth: 0, paddingHorizontal: 0, paddingVertical: 0,
+  },
+  // Angular: `iconPosition="end"` — the arrow GIF sits after the label,
+  // inline, not stacked or missing.
+  exploreMatchesRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  // Angular: `<img style="width: 24px; height: 20px;" src=".../right-arrow-
+  // animation.gif">` (button-revamp.component.html:15-17).
+  exploreMatchesArrow: { width: 24, height: 20 },
+
+  // Angular: .free-trial-expired (messages.component.scss:945-956) — the real
+  // border is a gradient border-image (transparent -> #B50033 -> transparent),
+  // approximated here as a flat color, same simplification this file's own
+  // send-one-msg-block banner already uses for the identical gradient-border
+  // trick. Background gradient likewise approximated to a single vertical
+  // fade (the CSS layers two overlapping gradients; the dominant one is a
+  // plain top-to-bottom #FFF7F9 -> #FFF).
+  blockerBanner: {
+    alignItems: 'center', paddingTop: 24, paddingHorizontal: 24,
+    borderTopWidth: 1, borderTopColor: Colors.primaryDark,
+  },
+  blockerBannerTitle: {
+    fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, color: Colors.black, textAlign: 'center',
+  },
+  blockerBannerSubtitle: {
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black,
+    lineHeight: 20, marginTop: 8, textAlign: 'center',
+  },
+  blockerBannerCta: {
+    width: '100%', height: 44, borderRadius: 8, marginTop: 24,
+    backgroundColor: Colors.primaryDark, alignItems: 'center', justifyContent: 'center',
+  },
+  blockerBannerCtaText: {
+    fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.white,
+  },
+
+  // Angular: .not-verified-note (messages.component.scss:938-943).
+  notVerifiedNote: {
+    borderTopWidth: 1, borderTopColor: '#FFCDCD',
+    borderBottomWidth: 1, borderBottomColor: '#FFCDCD',
+    backgroundColor: '#FFEFEF',
+    paddingVertical: 4, paddingHorizontal: 24,
+  },
+  notVerifiedNoteText: {
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: '#1f1e1b',
+    lineHeight: 20,
   },
 })

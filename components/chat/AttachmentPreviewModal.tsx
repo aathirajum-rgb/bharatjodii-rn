@@ -41,7 +41,7 @@ export default function AttachmentPreviewModal({ visible, attachment, uploading,
       <View style={[styles.screen, { paddingTop: insets.top }]}>
         <View style={styles.header}>
           <Pressable onPress={onCancel} hitSlop={12} style={styles.backBtn} disabled={uploading}>
-            <CdnSvg uri={BACK_ICON_URI} width={20} height={20} />
+            <CdnSvg uri={BACK_ICON_URI} width={24} height={24} />
           </Pressable>
           <Text style={styles.headerTitle}>
             {t(isVideo ? 'MESSAGES.PREVIEW_HEADER_3' : 'MESSAGES.PREVIEW_HEADER_5')}
@@ -49,9 +49,12 @@ export default function AttachmentPreviewModal({ visible, attachment, uploading,
         </View>
 
         <View style={styles.previewArea}>
-          {!!attachment && (isVideo
-            ? <PreviewVideoPlayer uri={attachment.uri} />
-            : <Image source={{ uri: attachment.uri }} style={styles.previewImage} resizeMode="contain" />
+          {!!attachment && (
+            <View style={[styles.previewMediaBox, isVideo && styles.previewMediaBoxVideo]}>
+              {isVideo
+                ? <PreviewVideoPlayer uri={attachment.uri} />
+                : <Image source={{ uri: attachment.uri }} style={styles.previewImage} resizeMode="cover" />}
+            </View>
           )}
         </View>
 
@@ -73,21 +76,35 @@ const styles = StyleSheet.create({
   // -named BACKGROUND utility (`background-color: white`), not a text color —
   // this screen is white, not the black backdrop it had.
   screen: { flex: 1, backgroundColor: Colors.white },
-  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 16, paddingVertical: 12 },
+  // Angular: `ion-row.pt-16.pl-16.pr-24` — asymmetric (24 on the right, not a
+  // flat 16/12).
+  header: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingTop: 16, paddingLeft: 16, paddingRight: 24 },
   backBtn: { padding: 4 },
   // Angular: `.color-333333 heading4-medium-16` — Poppins-MEDIUM (not
   // semibold), #333333 (not white — there's no dark backdrop to sit on).
   headerTitle: { fontFamily: Fonts.poppinsMedium, fontSize: 16, color: Colors.textDark },
 
-  previewArea: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  previewImage: { width: '100%', height: '100%' },
+  // Angular: the media box sits in a `pl-24 pr-24 mt-24` row.
+  previewArea: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
+  // Angular: `.attachment-img-size-block { height: 100vmin; border-radius: 8px }`
+  // — a fixed ~400px-tall box at this project's 400x800 reference viewport,
+  // not the image/video simply filling all remaining flex space.
+  previewMediaBox: { width: '100%', height: 400, borderRadius: 8, marginTop: 24, overflow: 'hidden' },
+  // Angular: `.video-measurement-search { border: 1px solid #c30047;
+  // background-color: #c30047 }` — a distinct red border+fill, not the same
+  // plain box as the image case.
+  previewMediaBoxVideo: { borderWidth: 1, borderColor: '#c30047', backgroundColor: '#c30047' },
+  // Angular: `.attachment-img-size { object-fit: cover; border-radius: 8px }`
+  // — cover (fills/crops), not contain (letterboxes).
+  previewImage: { width: '100%', height: '100%', borderRadius: 8 },
   previewVideo: { width: '100%', height: '100%' },
 
   footer: { paddingHorizontal: 24, paddingTop: 16 },
   // Angular: `.primary-cta-jodii { background: #B50033 }` — this app's
-  // primaryDark, not the brighter primary red.
+  // primaryDark, not the brighter primary red. `.primary-btn-ht { height:44px
+  // !important }` and 8px radius (a rounded rect), not a 48px-tall pill.
   sendBtn: {
-    height: 48, borderRadius: 24, backgroundColor: Colors.primaryDark,
+    height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
   },
   sendBtnDisabled: { opacity: 0.6 },

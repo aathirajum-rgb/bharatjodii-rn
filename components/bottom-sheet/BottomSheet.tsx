@@ -51,7 +51,6 @@ export type BottomSheetType =
   | 'profileRegisterTips'
   | 'successPopup'
   | 'blockProfile'
-  | 'enableNotification'
   | 'addPhotoPrompt'
   | 'viewPhoneConfirm'
   | 'photoPrivacy'

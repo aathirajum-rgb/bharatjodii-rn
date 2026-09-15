@@ -332,13 +332,17 @@ export const CompleteProfileSection = memo(function CompleteProfileSection({ car
               <Text style={s.cpTitle}>{card.label}</Text>
               <View style={s.cpCtaRow}>
                 <Text style={s.cpCtaText}>{card.ctaLabel}</Text>
-                {/* Angular: this button passes no [iconSize] at all (unlike
-                    the "Add photo" LINK_BTN config used elsewhere, which sets
-                    EIconSize.small=16) — button-revamp.component.ts's default
-                    (EIconSize.large) applies here, 24px not 16. iconType IS
-                    the static forward-icon-link.svg (not the animated GIF the
-                    header/ghost-card "See all" links use elsewhere on Home). */}
-                <CdnSvg uri={FWD_ICON} width={24} height={24} />
+                {/* Angular: button-revamp.component.scss's icon rule has NO
+                    `background-size` (the `contain` line is commented out) —
+                    so the `iconSize`/large-vs-small box (16 or 24) never
+                    actually scales the image at all; it only sizes an
+                    invisible centering box. The real on-screen size is
+                    forward-icon-link.svg's own native pixels: 7x10 (confirmed
+                    from the live file), not 24 (same root cause fixed in
+                    AppHeader.tsx and ButtonRevamp.tsx's ICON_URLS). iconType
+                    IS the static forward-icon-link.svg (not the animated GIF
+                    the header/ghost-card "See all" links use elsewhere on Home). */}
+                <CdnSvg uri={FWD_ICON} width={7} height={10} />
               </View>
             </View>
           </LinearGradient>
@@ -470,13 +474,42 @@ function parseGradientColors(bgColor: string | undefined): [string, string, ...s
   return hexColors.length === 1 ? [hexColors[0]!, hexColors[0]!] : [hexColors[0]!, hexColors[1]!, ...hexColors.slice(2)]
 }
 
+// Angular's explore-card.component.html wraps the label in one span with the
+// chevron as its last inline child, so the chevron always sits immediately
+// after the final rendered word — after "stars" on a 2-line label, or right
+// after a short one-line label, never pinned to the card's own edge. Each
+// pre-split line (server-provided "\n" breaks, see fetchExploreCategories())
+// renders as its own row; only the last one also carries the chevron.
+function CategoryLabel({ label }: { label: string }) {
+  const lines = label.split('\n')
+  return (
+    <View style={s.catLabelWrap}>
+      {lines.slice(0, -1).map((line, i) => (
+        <Text key={i} style={s.catLabel} numberOfLines={1}>{line}</Text>
+      ))}
+      <View style={s.catLabelLastLine}>
+        <Text style={s.catLabel} numberOfLines={1}>{lines[lines.length - 1]}</Text>
+        <SvgXml xml={CHEVRON_FORWARD_BLUE_XML} width={16} height={16} style={s.catChevron} />
+      </View>
+    </View>
+  )
+}
+
 export interface ExploreCategoriesSectionProps {
   categories: ExploreCategory[]
   onCategoryPress: (cat: ExploreCategory) => void
+  // Angular: this section's own "Discover matches" heading (home.enum.ts's
+  // sectionTitle.exploreMatches) only exists on the Home page's explore.component.html,
+  // which stacks several differently-titled sections. discover-matches.component.html
+  // reuses the exact same grid markup but has NO such in-page heading — that page's
+  // <ion-toolbar> already shows "Discover matches" once, in the header. Defaults to
+  // true so Home (this component's original/only caller until DiscoverMatchesScreen
+  // started reusing it) keeps its heading unchanged.
+  showTitle?: boolean
 }
 
 export const ExploreCategoriesSection = memo(function ExploreCategoriesSection({
-  categories, onCategoryPress,
+  categories, onCategoryPress, showTitle = true,
 }: ExploreCategoriesSectionProps) {
   const { t } = useTranslation()
   return (
@@ -484,7 +517,7 @@ export const ExploreCategoriesSection = memo(function ExploreCategoriesSection({
       {/* Angular: home.enum.ts's sectionTitle.exploreMatches = 'HOME.EXPLORE_MATCHES_TXT'
           ("Discover matches") — HOME.EXPLORE_MATCHES ("Explore matches based on")
           is a different, unused key. */}
-      <Text style={[s.sectionTitle, s.exploreSectionTitle]}>{t('HOME.EXPLORE_MATCHES_TXT')}</Text>
+      {showTitle && <Text style={[s.sectionTitle, s.exploreSectionTitle]}>{t('HOME.EXPLORE_MATCHES_TXT')}</Text>}
       <View style={[s.catGrid, { paddingLeft: EXPLORE_ROW_PL + EXPLORE_GRID_GAP, paddingRight: EXPLORE_ROW_PR, gap: EXPLORE_GRID_GAP }]}>
         {categories.map(cat => (
           <Pressable key={cat.id} onPress={() => onCategoryPress(cat)} style={{ width: EXPLORE_TILE_WIDTH }}>
@@ -502,14 +535,15 @@ export const ExploreCategoriesSection = memo(function ExploreCategoriesSection({
               <View style={s.catIconWrap}>
                 {!!cat.imageUrl && <CdnImage uri={cat.imageUrl} width={28} height={28} />}
               </View>
-              {/* Angular: the chevron is INLINE inside the (possibly-2-line)
-                  wrapping label span — RN's Text can only nest more Text, not
-                  a real icon, inline in wrapping text, so this is pinned to
-                  the tile's right edge instead (catTile's own alignItems:
-                  'center' vertically centers it, same as Angular's
-                  vertical-middle-position). */}
-              <Text style={s.catLabel} numberOfLines={2}>{cat.label}</Text>
-              <SvgXml xml={CHEVRON_FORWARD_BLUE_XML} width={16} height={16} style={s.catChevron} />
+              {/* Angular: the chevron is INLINE right after the label text —
+                  `homeService.ts`'s fetchExploreCategories() already turns a
+                  server-sent "<br>" into a real "\n" (server bakes the break
+                  in explicitly, e.g. "With matching\nstars"; it doesn't rely
+                  on the container naturally wrapping). Splitting on that "\n"
+                  and only attaching the chevron to the LAST line reproduces
+                  Angular's real placement (right after "stars", not pinned to
+                  the tile's own right edge/vertical center like before). */}
+              <CategoryLabel label={cat.label} />
             </LinearGradient>
           </Pressable>
         ))}
@@ -611,7 +645,7 @@ export const SelfHelpVideosSection = memo(function SelfHelpVideosSection({
       <View style={s.selfHelpSeeAllRow}>
         <Pressable style={s.selfHelpSeeAllBtn} onPress={onSeeAllPress}>
           <Text style={s.selfHelpSeeAllText}>{t('HOME.SEE_ALL_CTA')}</Text>
-          <SvgXml xml={CHEVRON_FORWARD_BLUE_XML} width={24} height={24} />
+          <SvgXml xml={CHEVRON_FORWARD_BLUE_XML} width={16} height={16} />
         </Pressable>
       </View>
     </>
@@ -661,7 +695,7 @@ export const HelpSection = memo(function HelpSection({
         <Text style={s.helpSub}>{t('FAQ_DETAILS.BANNER.BODY')}</Text>
         <Pressable style={s.helpCta} onPress={onCallPress}>
           <Text style={s.helpCtaText}>{t('FAQ_DETAILS.BANNER.CTA').replace('#CALL#', ctaPhone).trim()}</Text>
-          <SvgXml xml={CHEVRON_FORWARD_BLUE_XML} width={24} height={24} style={s.helpCtaChevron} />
+          <SvgXml xml={CHEVRON_FORWARD_BLUE_XML} width={18} height={18} style={s.helpCtaChevron} />
         </Pressable>
       </View>
       <CdnSvg uri={`${CDN}call-24-7.svg`} width={80} height={80} />
@@ -2315,8 +2349,9 @@ const s = StyleSheet.create({
   // Angular: this CTA is <app-button-revamp buttonSize="link">, whose
   // ctaFontSize defaults to EButtonFontSize.regular14 = body2-regular-14 —
   // font-size var(--font14) (0.875rem, dynamic — see FontSize's header
-  // comment), not a flat 14.
-  cpCtaText: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font14, color: '#29339B' },
+  // comment), not a flat 14. `ion-button.link span` also sets
+  // `line-height: 20px !important` explicitly.
+  cpCtaText: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font14, color: '#29339B', lineHeight: 20 },
 
   // Liked profiles tabs
   // Angular: app-swiper.component.scss's `ion-segment` for this section —
@@ -2401,9 +2436,16 @@ const s = StyleSheet.create({
   // Angular: `textcta-medium-12 black-color`, label wrapped in a
   // `line-height-16` span — font-size var(--font12) (0.75rem, dynamic — see
   // FontSize's header comment), pure black (not textPrimary).
-  catLabel:     { flex: 1, fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font12, color: Colors.black, lineHeight: 16 },
-  // Angular's `ml-2` on the icon itself.
-  catChevron:   { marginLeft: 8 },
+  catLabel:         { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font12, color: Colors.black, lineHeight: 16 },
+  // Fills the tile's remaining width (catLabel itself no longer does, now
+  // that it's a per-line, content-sized Text — see CategoryLabel's header
+  // comment above for why).
+  catLabelWrap:     { flex: 1 },
+  catLabelLastLine: { flexDirection: 'row', alignItems: 'center' },
+  // Angular's `ml-2` on the icon itself — 2px, not a flat 8 (that was
+  // compensating for the chevron being pinned to the tile's far edge instead
+  // of sitting right after the text, see CategoryLabel above).
+  catChevron:   { marginLeft: 2 },
 
   // Angular: .success-story-section { background: #FEF2F6 } and its own pb-24,
   // wrapped in an ion-grid that is `pt-0 pr-0 pl-0 pb-0` — so the heart
@@ -2470,7 +2512,11 @@ const s = StyleSheet.create({
   // border radius and no horizontal margin. Its row is
   // `ion-cust-padding-start pt-24 pr-24`, and --ion-cust-padding is 24px.
   // Rendering it as a 16px-inset rounded card was the wrong shape entirely.
-  helpWrap:      { flexDirection: 'row', alignItems: 'center', minHeight: SW * 0.35, paddingLeft: 24, paddingRight: 24, paddingTop: 24, paddingBottom: 24 },
+  // Note there is no bottom-padding class at all on that row (and
+  // `.help-banner` itself sets only min-height + background, no padding) —
+  // the content sits flush at the bottom, with only min-height (not real
+  // padding) creating any extra room below when content is short.
+  helpWrap:      { flexDirection: 'row', alignItems: 'center', minHeight: SW * 0.35, paddingLeft: 24, paddingRight: 24, paddingTop: 24 },
   helpTextCol:   { flex: 1 },
   // Angular: `heading4-medium-16` (Poppins-MEDIUM 16, not semibold). TITLECOLOR
   // isn't a key on FAQ_DETAILS.BANNER, so [ngStyle] sets nothing and the title

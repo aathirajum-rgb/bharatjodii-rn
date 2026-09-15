@@ -12,7 +12,7 @@ import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { FontSize, Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
-import ProfilePhoto, { type PhotoVariant } from '../profile-photo/ProfilePhoto'
+import ProfilePhoto, { type PhotoVariant, isPhotoRequestActive } from '../profile-photo/ProfilePhoto'
 import { getOppGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
 
 // Angular: core/config/button.config.ts's SEE_ALL — textColor: 'linkColor'
@@ -257,6 +257,15 @@ export default function ProfileCard({
     onWhatsApp,
   } as const
 
+  // Angular: profile-card.component.html's `.information-block` (type 1/2's
+  // name+basic-detail overlay) is `*ngIf="!whatsAppAddPhotoRequestFlag &&
+  // !whatsAppViewHiddenPhotoRequest"` — hidden whenever the WhatsApp photo-
+  // request overlay (ProfilePhoto's own showAddRequest/showViewRequest state)
+  // is showing, not stacked on top of it. Type 3's own overlay has no such
+  // gate, so this is only applied at the specific call sites below, not
+  // inside ProfilePhoto itself.
+  const hideInfoOverlay = isPhotoRequestActive(isPhotoAvailable, isPhotoProtect, showReqPhotoElement)
+
   // Omits education for 'matches' section (matches Angular getBasicDetail logic).
   function basicDetail(): string {
     const parts: string[] = [age].filter(Boolean) as string[]
@@ -297,12 +306,12 @@ export default function ProfileCard({
           {isDR ? (
             <View style={styles.photoInsetDR}>
               <ProfilePhoto {...photoProps} height={photoH} showGradientScrim>
-                <InfoOverlay name={name} detail={basicDetail()} />
+                {!hideInfoOverlay && <InfoOverlay name={name} detail={basicDetail()} />}
               </ProfilePhoto>
             </View>
           ) : (
             <ProfilePhoto {...photoProps} height={photoH} showGradientScrim>
-              <InfoOverlay name={name} detail={basicDetail()} />
+              {!hideInfoOverlay && <InfoOverlay name={name} detail={basicDetail()} />}
             </ProfilePhoto>
           )}
 
@@ -328,10 +337,12 @@ export default function ProfileCard({
       return (
         <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]} onPress={onPress}>
           <ProfilePhoto {...photoProps} height={photoH} showGradientScrim>
-            <InfoOverlay
-              name={name}
-              detail={[age, education].filter(Boolean).join(', ')}
-            />
+            {!hideInfoOverlay && (
+              <InfoOverlay
+                name={name}
+                detail={[age, education].filter(Boolean).join(', ')}
+              />
+            )}
           </ProfilePhoto>
 
           <View style={[styles.cardBottom, isLikedYou && styles.cardBottomPadded]}>
@@ -373,27 +384,47 @@ export default function ProfileCard({
         // variant 1/2's cards.
         <Pressable style={({ pressed }) => [styles.card, styles.cardInset3, pressed && { opacity: 0.85 }]} onPress={onPress}>
           <ProfilePhoto {...photoProps} height={photoH} variant="viewedyou">
-            <View style={[styles.viewedOverlay, isNew && styles.viewedOverlayNew]}>
-              <CdnSvg
-                uri={isNew ? IMG_CDN + 'revamp/eye-pink.svg' : IMG_CDN + 'viewed-icon-white.svg'}
-                width={14}
-                height={14}
-                style={styles.viewedIcon}
-              />
-              {/* Angular: the default (non-"new") label is `[ngClass]="(cardType ===
-                  'viewedbyme') ? 'font-10-nav' : 'body3-regular-12'"` — viewedbyme gets
-                  var(--font10), viewedyou/whoviewednumber get var(--font12); the "new"
-                  state's own markup isn't cardType-conditional and is always
-                  body3-regular-12 regardless of section. */}
-              <Text
-                style={[
-                  styles.viewedText,
-                  !isNew && section === 'viewedbyme' && styles.viewedTextSmall,
-                  isNew && styles.viewedTextNew,
-                ]}
-                numberOfLines={1}
-              >{labelText()}</Text>
-            </View>
+            {/* Angular: `.information-block-card-3` (default) is a real
+                transparent→black gradient overlay with 8/0/12/8 padding and a
+                60px min-height — not a flat rgba(0,0,0,0.5) box with even
+                10/8 padding. `.newly-viewed` (isNew) is a flat #FCEAF0 fill
+                with different 12/6 padding and its own bottom corner
+                radius (matching the card's own, since it sits flush at the
+                photo's bottom edge). */}
+            {isNew ? (
+              <View style={[styles.viewedOverlay, styles.viewedOverlayNew]}>
+                <CdnSvg
+                  uri={IMG_CDN + 'revamp/eye-pink.svg'}
+                  // Angular: eye-pink.svg's own native size (no size class
+                  // applied to it at all) — 13x10, not a flat 14x14.
+                  width={13}
+                  height={10}
+                  style={styles.viewedIcon}
+                />
+                <Text style={[styles.viewedText, styles.viewedTextNew]} numberOfLines={1}>{labelText()}</Text>
+              </View>
+            ) : (
+              <LinearGradient
+                colors={['rgba(0,0,0,0)', 'rgba(0,0,0,1)']}
+                style={styles.viewedOverlay}
+              >
+                <CdnSvg
+                  uri={IMG_CDN + 'viewed-icon-white.svg'}
+                  // Angular: viewed-icon-white.svg's own native size (no size
+                  // class applied to it either) — 16x16, not a flat 14x14.
+                  width={16}
+                  height={16}
+                  style={styles.viewedIcon}
+                />
+                {/* Angular: `[ngClass]="(cardType === 'viewedbyme') ? 'font-10-nav'
+                    : 'body3-regular-12'"` — viewedbyme gets var(--font10),
+                    viewedyou/whoviewednumber get var(--font12). */}
+                <Text
+                  style={[styles.viewedText, section === 'viewedbyme' && styles.viewedTextSmall]}
+                  numberOfLines={1}
+                >{labelText()}</Text>
+              </LinearGradient>
+            )}
           </ProfilePhoto>
 
           <View style={styles.cardInfo3}>
@@ -406,9 +437,17 @@ export default function ProfileCard({
                 → "View full profile" (locales/en.json:642), not "View Profile"
                 — and a real forward-chevron icon, not an embedded arrow
                 character (matches every other link-style CTA in this app). */}
-            <Pressable onPress={onPress} style={[styles.linkBtn, styles.linkBtnRow]}>
+            {/* Angular: type='3's own wrapper is `mt-4` (4px) — type='5's
+                is `mt-6` (6px), see that call site below. Different from
+                the shared linkBtn.marginTop guess, so overridden per case. */}
+            <Pressable onPress={onPress} style={[styles.linkBtn, styles.linkBtnMt4, styles.linkBtnRow]}>
               <Text style={styles.linkBtnText}>View full profile</Text>
-              <Image source={{ uri: FWD_ANIM_ICON }} style={styles.linkBtnIcon} />
+              {/* Angular's plain <img> has no object-fit (browser default
+                  fill/stretch); the GIF's real native frame is a 1200x1200
+                  SQUARE, and RN Image's own default (resizeMode:'cover')
+                  would crop it to fill this non-square box instead of
+                  stretching, visibly zooming the arrow in. */}
+              <Image source={{ uri: FWD_ANIM_ICON }} style={styles.linkBtnIcon} resizeMode="stretch" />
             </Pressable>
           </View>
         </Pressable>
@@ -455,9 +494,12 @@ export default function ProfileCard({
                 </View>
               ))}
             </View>
-            <Pressable onPress={onViewMorePress} style={[styles.linkBtn, styles.linkBtnCenter, styles.linkBtnRow]}>
+            {/* Angular: type='5's wrapper is `mt-6` (6px) — see type='3's
+                call site above for the 4px case this shared linkBtn used to
+                guess for both. */}
+            <Pressable onPress={onViewMorePress} style={[styles.linkBtn, styles.linkBtnMt6, styles.linkBtnCenter, styles.linkBtnRow]}>
               <Text style={styles.linkBtnText}>{viewMoreContent}</Text>
-              <Image source={{ uri: FWD_ANIM_ICON }} style={styles.linkBtnIcon} />
+              <Image source={{ uri: FWD_ANIM_ICON }} style={styles.linkBtnIcon} resizeMode="stretch" />
             </Pressable>
           </LinearGradient>
         </Pressable>
@@ -628,12 +670,14 @@ const styles = StyleSheet.create({
     color: Colors.white,
     marginBottom: 2,
   },
-  // Angular: .body2-regular-14 { font-size: var(--font14) !important; font-family: var(--english-regular-poppins) }
+  // Angular: .body2-regular-14.white-color { font-size: var(--font14) !important;
+  // font-family: var(--english-regular-poppins) } — plain full-opacity white,
+  // no alpha reduction in the real CSS (.information-block itself has no
+  // opacity rule either).
   overlayDetail: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize: FontSize.font14,
     color: Colors.white,
-    opacity: 0.88,
   },
 
   // ── Card bottom section (types 1 & 2) ──────────────────────────────────────
@@ -654,11 +698,12 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     paddingBottom: 10,
   },
-  // Angular: cardPadding is '' for whoviewednumber/viewedbyme (no extra
-  // horizontal padding class) — this case's own cardInset3 already provides
-  // the horizontal inset, so cardInfo would double it up.
+  // Angular: `{{cardPadding}} mt-12` — cardPadding is '' for whoviewednumber/
+  // viewedbyme (no extra horizontal padding class; this case's own
+  // cardInset3 already provides the horizontal inset, so cardInfo would
+  // double it up), leaving just `mt-12` = 12px margin-top, not 16.
   cardInfo3: {
-    paddingTop: 16,
+    paddingTop: 12,
   },
   // Angular: type='8's name/detail block sits flush with the photo's own
   // left edge (both inherit only the outer card8's 8px padding) — confirmed
@@ -704,11 +749,15 @@ const styles = StyleSheet.create({
   },
   // Angular: type='3's detail line is .black-color + .body2-regular-14 (var(--font14)),
   // not this shared style's gray — scoped here rather than changed on the shared
-  // style since variants 4/6/7/8 haven't been reviewed yet.
+  // style since variants 4/6/7/8 haven't been reviewed yet. Angular's own row is
+  // `mt-6` (6px above the detail line); nameText's shared marginBottom (4px,
+  // also unverified for those other variants) only supplies 4 of that, so the
+  // remaining 2px is added here rather than on the shared style.
   detailText3: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize: FontSize.font14,
     color: Colors.black,
+    marginTop: 2,
   },
   // Angular: case 4's date div is itself `.color-545454.body3-regular-12` (var(--font12),
   // english-regular-poppins) — this base supplies the family/size, dateText4 the color.
@@ -756,8 +805,14 @@ const styles = StyleSheet.create({
   },
 
   // ── Link / text button ─────────────────────────────────────────────────────
-  linkBtn: {
-    marginTop: 8,
+  // Angular: type='3's own wrapper is `mt-4`, type='5's is `mt-6` — a flat
+  // 8px here previously guessed at both. See linkBtnMt4/linkBtnMt6 below.
+  linkBtn: {},
+  linkBtnMt4: {
+    marginTop: 4,
+  },
+  linkBtnMt6: {
+    marginTop: 6,
   },
   linkBtnCenter: {
     alignSelf: 'center',
@@ -800,6 +855,9 @@ const styles = StyleSheet.create({
   },
 
   // ── Viewed overlay (type 3) — bottom of photo ─────────────────────────────
+  // Angular: `.information-block-card-3 { padding: 8px 0px 12px 8px;
+  // min-height: 60px }` — asymmetric padding (no right inset) and a real
+  // min-height, not a flat 10/8.
   viewedOverlay: {
     position: 'absolute',
     bottom: 0,
@@ -807,14 +865,14 @@ const styles = StyleSheet.create({
     right: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingTop: 8,
+    paddingRight: 0,
+    paddingBottom: 12,
+    paddingLeft: 8,
+    minHeight: 60,
     gap: 6,
   },
   viewedIcon: {
-    width: 14,
-    height: 14,
     flexShrink: 0,
   },
   // Angular: default (non-"new") state — `body3-regular-12` (var(--font12),
@@ -830,10 +888,26 @@ const styles = StyleSheet.create({
   viewedTextSmall: {
     fontSize: FontSize.font10,
   },
-  // Angular: profile-card.component.scss's .newly-viewed — solid light-pink
-  // background (#FCEAF0), not the default dark gradient overlay.
+  // Angular: profile-card.component.scss's `.newly-viewed { background:
+  // #FCEAF0; padding: 6px 12px }` plus `.viewedbyme.newly-viewed`/
+  // `.whoviewednumber.newly-viewed`'s own bottom-corner radius (12px,
+  // matching the photo's own — this block sits flush at its bottom edge) —
+  // a solid light-pink fill with its OWN padding/radius, not the default
+  // dark-gradient overlay's 8/0/12/8 + no radius.
   viewedOverlayNew: {
     backgroundColor: '#FCEAF0',
+    // Explicit per-edge values (not paddingVertical/paddingHorizontal) so
+    // these actually override viewedOverlay's own per-edge values above —
+    // Yoga resolves a specific edge over the equivalent shorthand regardless
+    // of style-array merge order, so a shorthand here would have silently
+    // lost to the base style's paddingTop/paddingLeft/etc.
+    paddingTop: 6,
+    paddingRight: 12,
+    paddingBottom: 6,
+    paddingLeft: 12,
+    minHeight: undefined,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
   },
   viewedTextNew: {
     color: '#DE2A68',

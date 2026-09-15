@@ -7,8 +7,12 @@
 // (no pinch-zoom, no paging) — chat only ever views ONE image/video at a
 // time, unlike that component's profile-photo gallery use case.
 import { useVideoPlayer, VideoView } from 'expo-video'
-import { Image, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Image, Modal, Pressable, StyleSheet, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import CdnSvg from '../cdn-svg/CdnSvg'
+import { CDN_REVAMP } from '../../constants/cdn'
+
+const CLOSE_ICON_URI = CDN_REVAMP + 'rounded-back-btn.svg'
 
 function ChatVideoPlayer({ uri }: { uri: string }) {
   const player = useVideoPlayer(uri, p => { p.play() })
@@ -28,8 +32,12 @@ export default function ChatMediaViewerModal({ visible, kind, uri, onClose }: Ch
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={onClose}>
       <View style={styles.backdrop}>
-        <Pressable style={[styles.closeBtn, { top: insets.top + 12 }]} onPress={onClose} hitSlop={12}>
-          <Text style={styles.closeBtnText}>✕</Text>
+        {/* Angular: `.likeback-btn` (image-view.component.css:2-7) — top-left
+            (top:5.84vmin, left:6.12vmin ≈ 24px at this project's reference
+            viewport), Angular's rounded-back-btn.svg icon, not a plain "✕"
+            glyph in the top-right corner. */}
+        <Pressable style={[styles.closeBtn, { top: insets.top + 16 }]} onPress={onClose} hitSlop={12}>
+          <CdnSvg uri={CLOSE_ICON_URI} width={32} height={32} />
         </Pressable>
         {!!uri && kind === 'image' && (
           <Image source={{ uri }} style={styles.image} resizeMode="contain" />
@@ -42,8 +50,7 @@ export default function ChatMediaViewerModal({ visible, kind, uri, onClose }: Ch
 
 const styles = StyleSheet.create({
   backdrop: { flex: 1, backgroundColor: '#000' },
-  closeBtn: { position: 'absolute', right: 16, zIndex: 1, padding: 8 },
-  closeBtnText: { fontSize: 22, color: '#fff' },
+  closeBtn: { position: 'absolute', left: 20, zIndex: 1, padding: 8 },
   image: { flex: 1 },
   video: { flex: 1 },
 })

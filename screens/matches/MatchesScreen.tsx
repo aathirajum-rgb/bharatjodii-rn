@@ -105,6 +105,7 @@ import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
 import StickyBanner from '../../components/sticky-banner/StickyBanner'
 import AppRatingModal from '../../components/app-rating/AppRatingModal'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
+import NotificationPermissionSheet from '../../components/notification-permission-sheet/NotificationPermissionSheet'
 import SurveyPopup from '../../components/survey-popup/SurveyPopup'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
 
@@ -2686,17 +2687,10 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
           onPrimaryPress={() => { setShowPhotoBulkLikePrompt(false); addPhoto.openAddPhoto(navigation); handleBulkLikeSent() }}
           onLinkPress={handleBulkLikePhotoPromptDismiss}
         />
-        <BottomSheet
+        <NotificationPermissionSheet
           visible={showNotificationPopup}
-          type="enableNotification"
-          data={{
-            lottie:   CDN_LOTTIE + 'notification-bell-popup.json',
-            title:    t('PN_SETTINGS.HEADER'),
-            content:  t('PN_SETTINGS.BODY'),
-            ctaLabel: t('PN_SETTINGS.CTA'),
-          }}
+          onEnable={handleNotificationCta}
           onClose={() => setShowNotificationPopup(false)}
-          onPrimaryPress={handleNotificationCta}
         />
         <AppRatingModal visible={showRatingPopup} onClose={() => setShowRatingPopup(false)} />
         <SurveyPopup visible={!!surveyData} data={surveyData} onClose={() => setSurveyData(null)} />
@@ -2908,17 +2902,10 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         onPrimaryPress={() => { setShowPhotoBulkLikePrompt(false); addPhoto.openAddPhoto(navigation); handleBulkLikeSent() }}
         onLinkPress={handleBulkLikePhotoPromptDismiss}
       />
-      <BottomSheet
+      <NotificationPermissionSheet
         visible={showNotificationPopup}
-        type="enableNotification"
-        data={{
-          lottie:   CDN_LOTTIE + 'notification-bell-popup.json',
-          title:    t('PN_SETTINGS.HEADER'),
-          content:  t('PN_SETTINGS.BODY'),
-          ctaLabel: t('PN_SETTINGS.CTA'),
-        }}
+        onEnable={handleNotificationCta}
         onClose={() => setShowNotificationPopup(false)}
-        onPrimaryPress={handleNotificationCta}
       />
       <AppRatingModal visible={showRatingPopup} onClose={() => setShowRatingPopup(false)} />
       <SurveyPopup visible={!!surveyData} data={surveyData} onClose={() => setSurveyData(null)} />

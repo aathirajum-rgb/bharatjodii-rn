@@ -22,6 +22,11 @@ export function formatClockTime(timestamp: number): string {
 
 // Angular: messager-list.component.ts's getTimeOfLastMsg() — "11:40 pm" for
 // today, "Yesterday" for exactly one day back, a short date otherwise.
+// Deliberately its OWN lowercase am/pm formatting, not formatClockTime()
+// above — getTimeOfLastMsg() builds `AmOrPm` manually ('pm'/'am'), it does
+// NOT go through the `date:'shortTime'` pipe (which is genuinely uppercase,
+// and is what ChatBubble.tsx's own timestamps correctly use formatClockTime
+// for) — reusing that function here rendered "12:13 PM" instead of "12:13 pm".
 export function formatChatTime(timestamp: number, yesterdayLabel: string): string {
   const diffDays = _diffDays(timestamp)
   if (diffDays === 1) return yesterdayLabel
@@ -29,7 +34,12 @@ export function formatChatTime(timestamp: number, yesterdayLabel: string): strin
     const date = new Date(timestamp)
     return `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`
   }
-  return formatClockTime(timestamp)
+  const date = new Date(timestamp)
+  const hours24 = date.getHours()
+  const amOrPm = hours24 >= 12 ? 'pm' : 'am'
+  const hours12 = hours24 % 12 || 12
+  const minutes = date.getMinutes().toString().padStart(2, '0')
+  return `${hours12}:${minutes} ${amOrPm}`
 }
 
 // Angular: messages.component.ts's getDayType() — the date-separator pill

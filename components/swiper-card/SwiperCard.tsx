@@ -460,7 +460,14 @@ export default function SwiperCard({
           {linkVisible && !!onSeeAllPress && (
             <Pressable onPress={onSeeAllPress} style={styles.seeAllBtn}>
               <Text style={styles.seeAllText}>{t('HOME.SEE_ALL_CTA')}</Text>
-              <Image source={{ uri: FWD_ANIM_ICON }} style={styles.seeAllIcon} />
+              {/* Angular: a plain <img style="width:24px;height:20px"> with no
+                  object-fit — the browser default (`fill`, non-uniform
+                  stretch, no cropping) applies. The GIF's real native frame
+                  is a 1200x1200 SQUARE; RN's Image defaults to `resizeMode:
+                  'cover'`, which for a square source in this 24x20 landscape
+                  box crops off the top/bottom to fill-and-overflow instead of
+                  stretching — a visibly zoomed-in/bigger arrow than Angular's. */}
+              <Image source={{ uri: FWD_ANIM_ICON }} style={styles.seeAllIcon} resizeMode="stretch" />
             </Pressable>
           )}
         </View>
@@ -499,12 +506,15 @@ const styles = StyleSheet.create({
   // Angular: .heading2-semibold-18.line-height-24 — font-family
   // var(--english-semibold-poppins), font-size var(--font18) (1.125rem, scales
   // with device width — see remPx()'s header comment), line-height a flat 24px
-  // (NOT rem-based, unlike the font-size).
+  // (NOT rem-based, unlike the font-size). Color: every app-swiper caller
+  // (home.enum.ts's *Section.headerbgColor) passes 'blackColor' — confirmed
+  // across all of newlyJoinedSection/dailyRecommendationSection/
+  // viewedbymeSection/etc — i.e. pure #000000, not textPrimary (#111111).
   headerTitle: {
     fontFamily: Fonts.poppinsSemiBold,
     fontSize:   FontSize.font18,
     lineHeight: 24,
-    color:      Colors.textPrimary,
+    color:      Colors.black,
     flexShrink: 1,
   },
   // Angular: .new-block (app-swiper.component.scss:961) — padding 3px 8px,

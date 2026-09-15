@@ -42,11 +42,12 @@ export default function AllMessagesEmptyState({ variant, onCtaPress, iconSize = 
 }
 
 const styles = StyleSheet.create({
+  // Angular: `pl-45 pr-45` — 45px each side, not 32.
   container: {
     flex:              1,
     alignItems:        'center',
     justifyContent:    'center',
-    paddingHorizontal: 32,
+    paddingHorizontal: 45,
     paddingTop:        40,
     gap:               16,
   },
@@ -57,13 +58,18 @@ const styles = StyleSheet.create({
     color:      Colors.black,
     textAlign:  'center',
   },
+  // Angular: `.paid-membership` (button-revamp.component.scss) — full-width,
+  // fixed 44px height, not just vertical padding around the label.
   btn: {
+    width:             '100%',
+    height:            44,
+    alignItems:        'center',
+    justifyContent:    'center',
     marginTop:         8,
     borderWidth:       1,
     borderColor:       Colors.primaryDark,
     borderRadius:      8,
     paddingHorizontal: 24,
-    paddingVertical:   12,
   },
   // Angular: SECONDARY_BTN default — body2-regular-14, textColor black (matches
   // MessagerListScreen.tsx's own emptyBtnLabel for the phoneviews empty state).

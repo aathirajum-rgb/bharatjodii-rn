@@ -2119,7 +2119,13 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                         </Text>
                         <View style={s.starMatchLinkRow}>
                           <Text style={[s.starMatchTeaser, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.PAID_MEMBER_REPORT')}</Text>
-                          <RNImage source={{ uri: LINK_ARROW_GIF_URI }} style={s.starMatchLinkArrow} />
+                          {/* Angular's plain <img> has no object-fit, so the
+                              browser default (fill/stretch) applies — the
+                              GIF's real native frame is a 1200x1200 SQUARE, and
+                              RN Image's own default (resizeMode:'cover') would
+                              crop it to fill this non-square box instead of
+                              stretching, visibly zooming the arrow in. */}
+                          <RNImage source={{ uri: LINK_ARROW_GIF_URI }} style={s.starMatchLinkArrow} resizeMode="stretch" />
                         </View>
                       </Pressable>
                     </LinearGradient>
@@ -2140,7 +2146,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                       </Text>
                       <View style={s.starMatchLinkRow}>
                         <Text style={[s.starMatchTeaser, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.FREE_MEMBER_REPORT')}</Text>
-                        <RNImage source={{ uri: LINK_ARROW_GIF_URI }} style={s.starMatchLinkArrow} />
+                        <RNImage source={{ uri: LINK_ARROW_GIF_URI }} style={s.starMatchLinkArrow} resizeMode="stretch" />
                       </View>
                     </Pressable>
                   </LinearGradient>

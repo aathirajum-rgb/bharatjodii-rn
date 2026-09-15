@@ -685,7 +685,10 @@ const s = StyleSheet.create({
   strikeThrough: {
     fontSize: 12, color: Colors.borderNeutral, textDecorationLine: 'line-through',
   },
-  finalTotal: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: '#1F1E1B' },
+  // Angular: .pay-now-amount (payment-mode.page.scss:159-163) — color is
+  // var(--black) (#000), not gray-color1 (#1F1E1B) — the pay-now amount is
+  // pure black, distinct from the softer #1F1E1B used elsewhere on this page.
+  finalTotal: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black },
 
   // ── Sections / cards ─────────────────────────────────────────────────────
   section:      { gap: 16 },

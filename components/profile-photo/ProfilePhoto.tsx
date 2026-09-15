@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import * as ImagePicker from 'expo-image-picker'
 import { useTranslation } from 'react-i18next'
 import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
-import { WhatsAppUnlockButton } from '../matches/matchesCard.shared'
+import { WhatsAppUnlockButton, getBlurPhotoUri } from '../matches/matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { SemanticFontsEnglish } from '../../src/theme/fonts'
@@ -138,6 +138,21 @@ function NewlyJoinedBadge() {
       <Text style={styles.newlyJoinedText}>{t('MATCHES.NEW_BADGE')}</Text>
     </View>
   )
+}
+
+// Angular: profile-card.component.html's `.information-block` (name/basic-
+// detail overlay, type 1/2 only) is gated `*ngIf="!whatsAppAddPhotoRequestFlag
+// && !whatsAppViewHiddenPhotoRequest"` — computed here once so ProfileCard.tsx
+// can gate its own <InfoOverlay> children the same way ProfilePhoto gates its
+// internal photo-source swap, instead of re-deriving the same two booleans.
+export function isPhotoRequestActive(
+  isPhotoAvailable: boolean | undefined,
+  isPhotoProtect:   boolean | undefined,
+  showReqPhotoElement: boolean | undefined,
+): boolean {
+  const showAddRequest  = !isPhotoAvailable && !!showReqPhotoElement && !isPhotoProtect
+  const showViewRequest = !!isPhotoProtect && !!showReqPhotoElement
+  return showAddRequest || showViewRequest
 }
 
 // ─── ProfilePhoto ─────────────────────────────────────────────────────────────
@@ -304,11 +319,35 @@ export default function ProfilePhoto({
       ]}
     >
       {/* ── Base photo ──
-          Fallback (no photo / failed load) is the opposite-gender SVG
-          silhouette — native <Image> can't decode a remote .svg (see
-          CdnSvg.tsx), so that branch routes through CdnImage instead of
-          reusing the same <Image> the real photo uses. */}
-      {showFallback ? (
+          Angular: app-swiper.component.ts's setProfileImg() — when
+          showWhatsAppPhotoRequest(profile) is true (no real photo at all,
+          WhatsApp nudge eligible), the bound [profileImg] is REPLACED
+          entirely with getWhatsAppAvatarImg() (a gender-specific blurred-
+          silhouette SVG, e.g. profile-blur-male.svg), overriding whatever
+          real photo/avatar would otherwise show — not just an overlay on top
+          of the normal fallback avatar. Same asset MatchesScreen.tsx's
+          MatchCard already uses via getBlurPhotoUri() for its own equivalent
+          states. Fallback (no photo / failed load, WhatsApp nudge NOT active)
+          is the plain opposite-gender SVG silhouette — native <Image> can't
+          decode a remote .svg (see CdnSvg.tsx), so both branches route
+          through CdnSvg/CdnImage instead of the real-photo <Image> below. */}
+      {showAddRequest ? (
+        <CdnSvg
+          uri={getBlurPhotoUri(oppGenderCode)}
+          width="100%"
+          height="100%"
+          style={[
+            styles.image,
+            {
+              borderTopLeftRadius:     r.tl,
+              borderTopRightRadius:    r.tr,
+              borderBottomLeftRadius:  r.bl,
+              borderBottomRightRadius: r.br,
+            },
+          ]}
+          cover
+        />
+      ) : showFallback ? (
         <CdnImage
           uri={resolvedDefault}
           width="100%"
@@ -390,7 +429,13 @@ export default function ProfilePhoto({
         />
       )}
 
-      {/* ── Card-level overlays passed from parent (InfoOverlay, eyeBadge, etc.) ── */}
+      {/* ── Card-level overlays passed from parent (InfoOverlay, eyeBadge, etc.) ──
+          Angular: profile-card.component.html's `.information-block` (type 1/2's
+          name+basic-detail text) is `*ngIf="!whatsAppAddPhotoRequestFlag &&
+          !whatsAppViewHiddenPhotoRequest"` — but type 3's OWN overlay (viewed-
+          icon+text) has NO such gate, so this can't be a blanket rule here.
+          ProfileCard.tsx's case 1/2 branches gate their own <InfoOverlay>
+          children using isPhotoRequestActive() (exported below) instead. */}
       {children}
 
       {/* ── Newly-joined badge (top-left ribbon) ── Angular: .newly-joined —

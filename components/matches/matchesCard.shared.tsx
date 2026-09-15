@@ -20,7 +20,7 @@ import Svg, { Path } from 'react-native-svg'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
-import { SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { decodeEntities } from '../../utils/htmlEntities'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 
@@ -157,6 +157,10 @@ export function LikeIcon({ width = 18, height = 19 }: IconProps) {
 // down, not just inherit whatever the wrapping <Text style> already set.
 const HTML_SPAN_CLASS_STYLES: Record<string, Record<string, any>> = {
   'height-revamp-text-small': { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 12 },
+  // Angular: `.font-14-semibold { font-size: var(--font14); font-family:
+  // english-semibold-poppins; font-weight: 600 }` — e.g. the emphasized
+  // "only one message" span inside MESSAGES.SEND_ONE_MESSAGE.
+  'font-14-semibold': { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 14 },
 }
 
 // Renders server HTML as styled React Native Text.
@@ -180,9 +184,13 @@ export function HtmlText({
     if (sm.index > last) {
       segs.push({ text: decodeEntities(cleaned.slice(last, sm.index).replace(/<[^>]*>/g, '')), segStyle: null })
     }
+    // Angular source HTML sometimes uses single quotes for attributes (e.g.
+    // MESSAGES.SEND_ONE_MESSAGE's `class='font-14-semibold'`) — matching only
+    // double quotes silently dropped the class match, so the span rendered
+    // completely unstyled.
     const attrs     = sm[1]
-    const inline    = attrs.match(/style="([^"]*)"/)?.[1] ?? ''
-    const classM    = attrs.match(/class="([^"]*)"/)?.[1] ?? ''
+    const inline    = attrs.match(/style=["']([^"']*)["']/)?.[1] ?? ''
+    const classM    = attrs.match(/class=["']([^"']*)["']/)?.[1] ?? ''
     const colorM    = inline.match(/color:\s*([^;]+)/)
     const fontSizeM = inline.match(/font-size:\s*([\d.]+)px/)
     const segStyle: Record<string, any> = { ...spanStyle }
