@@ -47,6 +47,22 @@ const stripHtml = stripAndDecodeHtml
 
 type Option = { key: string; label: string }
 
+// Angular: right-side-panel.component.ts moveSelectedMotherTongueToTop() —
+// MOTHERTONGUE panel only, floats the already-selected value to the top of
+// the list instead of leaving it in its natural position. Angular re-runs
+// this every time the panel is opened (it's a fresh component instance per
+// ionViewDidEnter), so this is applied both on load and on each panel open,
+// not just once from the persisted value.
+function moveToTop(list: Option[], key: string | null | undefined): Option[] {
+  if (!key) return list
+  const idx = list.findIndex(o => o.key === key)
+  if (idx <= 0) return list
+  const copy = [...list]
+  const [sel] = copy.splice(idx, 1)
+  copy.unshift(sel)
+  return copy
+}
+
 type Props = {
   navigation: any
   route: { params?: { pageNo?: string } }
@@ -80,7 +96,7 @@ export default function MotherTongueScreen({ navigation }: Props) {
       fetchMotherTongueOptions()
         .then(list => {
           const cleaned = list.map(o => ({ key: o.key, label: stripHtml(o.label) }))
-          setAllOptions(cleaned)
+          setAllOptions(moveToTop(cleaned, savedMT))
           if (savedMT) {
             const found = cleaned.find(o => o.key === savedMT)
             if (found) setSelected(found)
@@ -154,7 +170,10 @@ export default function MotherTongueScreen({ navigation }: Props) {
             </View>
             <Pressable
               style={styles.selectField}
-              onPress={() => setPanelVisible(true)}
+              onPress={() => {
+                setAllOptions(prev => moveToTop(prev, selected?.key))
+                setPanelVisible(true)
+              }}
               accessibilityRole="button"
               accessibilityLabel="Select mother tongue"
             >

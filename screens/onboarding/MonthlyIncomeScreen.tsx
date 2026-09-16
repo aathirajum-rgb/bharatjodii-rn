@@ -67,7 +67,6 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
 
   // Context
   const [createdBy,  setCreatedBy]  = useState('4')
-  const [gender,     setGender]     = useState('1')
   const [isNRI,      setIsNRI]      = useState(false)
 
   // Extracted so a language change can re-run it — the option labels below are
@@ -81,9 +80,8 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
       getItem(SK.User.COUNTRY_CODE),
       getRegValues(),
     ]).then(async ([cb, ccode, regVals]) => {
-      const { GENDER: gnd, COUNTRY: country, INCOME: savedIncome, INCOMETYPE: savedIncomeType } = regVals
+      const { COUNTRY: country, INCOME: savedIncome, INCOMETYPE: savedIncomeType } = regVals
       if (cb)  setCreatedBy(cb)
-      if (gnd) setGender(gnd)
 
       const nri = ccode !== '91' && !!ccode
       setIsNRI(nri)
@@ -152,8 +150,9 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
   ]
   const selectedCurrencyOption = currencyOptions.find(c => c.key === selectedCurrency) ?? null
 
-  // Navigation: GENDER='1' (male) → page 13 (Religion), female → page 21
-  const nextPage = gender === '1' ? '13' : '21'
+  // Angular: registration.config.ts landingNextPage[12] — always Religion
+  // (page 13), unconditional; no gender branch.
+  const nextPage = '13'
 
   // ─── Handlers ─────────────────────────────────────────────────────────────
 

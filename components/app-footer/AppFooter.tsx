@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
     shadowRadius:    8,
     elevation:       8,
   },
-  // Angular: `ion-tab-bar` is `min-height: 56px` (footer.component.scss:214) with
+  // Angular: `ion-tab-bar` is `min-height: 56px` (footer.component.scss:194) with
   // the tab-bar's own `gap-footer pl-2 pr-2` → gap + 2px side padding. It was a
   // FIXED 56px here, which clipped the second line of a wrapped label.
   tabBar: {
@@ -361,7 +361,15 @@ const styles = StyleSheet.create({
     color:      Colors.white,
     fontSize:   FontSize.font8,
   },
-  // Membership expiry red dot
+  // Membership expiry red dot. Angular's actual equivalent (footer.component.
+  // html:51-55, .membership-badge-message ion-badge) renders a full icon
+  // badge (membership-exclamationmark.svg) at background-color: rgba(222,
+  // 42,104,1) = #DE2A68 — the same red as every other notification badge in
+  // this file (footer.component.scss numbers-badge-* rules, #de2a68). This
+  // was Colors.primary (#C62828, a different brand red with no Angular or
+  // Figma source), which didn't match either reference. Simplified dot
+  // shape/size kept as-is (Figma node 8379:10131 shows a plain dot here, not
+  // the full icon badge) — only the color was wrong.
   redDot: {
     position:        'absolute',
     top:             -3,
@@ -369,6 +377,6 @@ const styles = StyleSheet.create({
     width:           8,
     height:          8,
     borderRadius:    4,
-    backgroundColor: Colors.primary,
+    backgroundColor: '#DE2A68',
   },
 })

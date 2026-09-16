@@ -393,20 +393,28 @@ const styles = StyleSheet.create({
     paddingBottom:     32,
   },
 
-  // Phone illustration — CDN SVG (Angular: signin.config.ts ICONTYPE → registration-new/mobile.svg)
+  // Phone illustration — CDN SVG (Angular: signin.config.ts ICONTYPE → registration-new/mobile.svg).
+  // Angular: signin.page.html:7-12 — the title's own <ion-col> carries `mt-32`
+  // (margin-top: 32px !important, global.scss:1306), which is the actual gap
+  // between the icon and the title (icon div itself has no bottom margin).
+  // This was 24 — the icon↔title and title↔input gaps were swapped with the
+  // ones below.
   phoneImg: {
     width:        48,
     height:       48,
-    marginBottom: 24,
+    marginBottom: 32,
   },
 
   // Title — "Enter your\nmobile number" (Figma + Angular heading1-semibold-22: Poppins SemiBold 22px)
+  // Angular: signin.page.html:21 — the mobile-number <ion-col> carries `mt-24`
+  // (margin-top: 24px !important, global.scss:1355), the gap between the
+  // title and the input box. This was 32 (swapped with phoneImg's gap above).
   title: {
     fontFamily:   Fonts.poppinsSemiBold,
     fontSize:     FontSize.font22,
     fontWeight:   '600',
     color:        Colors.textPrimary,
-    marginBottom: 32,
+    marginBottom: 24,
   },
 
   // ── Mobile input ────────────────────────────────────────────────────────────
@@ -426,6 +434,11 @@ const styles = StyleSheet.create({
     backgroundColor:   Colors.surface,
     paddingHorizontal: 4,
     zIndex:            10,
+    // Angular: signin.page.html:38 — `.floating body3-regular-12 black-color`.
+    // body3-regular-12 sets font-family: var(--english-regular-poppins) =
+    // Poppins-Regular (global.scss:2264). This was missing entirely, so the
+    // label silently fell back to the OS system font in every state.
+    fontFamily: Fonts.poppinsRegular,
   },
   inputRow: {
     flexDirection:     'row',
@@ -496,10 +509,13 @@ const styles = StyleSheet.create({
   },
 
   // ── Error ───────────────────────────────────────────────────────────────────
+  // Angular: signin.page.html:41 — `color-de2a68 mt-8 body3-regular-12`, no
+  // left-offset class at all (sits flush with the row's own pl-24 padding).
+  // mt-8 is margin-top: 8px !important (global.scss:1375) — this was 6, and
+  // the extra marginLeft: 4 had no Angular source.
   errorText: {
     fontFamily: Fonts.poppinsRegular,
-    marginTop:  6,
-    marginLeft: 4,
+    marginTop:  8,
     fontSize:   FontSize.font12,
     color:      Colors.inputError,
   },

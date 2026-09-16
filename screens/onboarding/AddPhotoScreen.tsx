@@ -484,7 +484,12 @@ export default function AddPhotoScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   scrollContent: {
     paddingHorizontal: 24,
-    paddingVertical:   24,
+    // No paddingTop here — the real top gap above the photo is the photo
+    // wrapper's own mt-32 (see photoAreaWrapper below), ported there
+    // directly instead of approximated on this generic wrapper, since this
+    // screen doesn't render the Angular header row (pl-24 pr-24 pt-16 pb-16)
+    // that mt-32 sits below (onboarding chrome lives elsewhere in the RN
+    // wizard shell).
     alignItems:        'center',
     // Angular: registration-revamp's page wrapper has
     // "height100 ... d-flex align-center-item" (align-items:center !important
@@ -496,9 +501,14 @@ const styles = StyleSheet.create({
     justifyContent:    'center',
   },
 
+  // Angular: add-photo.component.html:22 — the photo's own wrapper div is
+  // "d-flex justify-content-center mt-32 mb-20" — both margins now ported
+  // directly from that one div (was mb-20 only, with mt-32 approximated via
+  // scrollContent's generic padding above).
   photoAreaWrapper: {
     alignItems:    'center',
-    marginBottom:  24,
+    marginTop:     32,
+    marginBottom:  20,
   },
   photoArea: {
     width:    180,
@@ -518,31 +528,38 @@ const styles = StyleSheet.create({
   // plain black, NOT the generic `.heading1-semibold-22` page title (that's
   // cleared to '' for pageType 20 while showPhotoPromotion is true — see
   // registration-revamp.component.ts's getPageContent()).
+  // Angular: the title itself carries no margin — the gap to the card below
+  // it is the card wrapper's own `mt-20` (add-photo.component.html:69). This
+  // was 24.
   title: {
     fontSize:      FontSize.font20,
     fontWeight:    '600',
     color:         Colors.black,
     lineHeight:    32,
     textAlign:     'center',
-    marginBottom:  24,
+    marginBottom:  20,
 
   },
 
+  // Angular: `.only-add-photo` (add-photo.component.scss:1-6, applied
+  // whenever fromPage != 'notify', i.e. always for onboarding) —
+  // border-radius: 24px (was 16), no border at all (borderWidth/borderColor
+  // had no Angular source and are removed), padding: 20px 16px i.e.
+  // vertical 20 / horizontal 16 (paddingHorizontal was 20), and
+  // box-shadow: 0 6px 20px 0 rgba(0,0,0,0.12) → offset {0,6}/radius 20
+  // (opacity 0.12 already matched; offset/radius didn't).
   card: {
     width:             '100%',
     backgroundColor:   Colors.surface,
-    borderRadius:      16,
-    borderWidth:       1,
-    borderColor:       Colors.divider,
-    paddingHorizontal: 20,
+    borderRadius:      24,
+    paddingHorizontal: 16,
     paddingVertical:   20,
-    gap:               14,
     shadowColor:       Colors.black,
     shadowOpacity:     0.12,
-    shadowOffset:      { width: 0, height: 2 },
-    shadowRadius:      8,
+    shadowOffset:      { width: 0, height: 6 },
+    shadowRadius:      20,
     elevation:         3,
-    
+
   },
   // Angular: promotype '1'`s SUBHEADER row is `.body2-regular-14 black-color`
   // — no line-height class set, so none is invented here either.
@@ -551,10 +568,16 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     color:      Colors.black,
   },
+  // Angular: not a uniform gap — the ul-wrapper div's `mt-4`
+  // (add-photo.component.html:75) collapses with the first `<li>`'s own
+  // `mt-16` (both li's carry mt-16, and .padd0/.margin-0 leave nothing
+  // between them to block the collapse) to the larger value, 16px, both
+  // above the first bullet and between the two bullets.
   bulletRow: {
     flexDirection: 'row',
     alignItems:    'flex-start',
     gap:           10,
+    marginTop:     16,
   },
   // Angular: the real bullet is a `<li>` marker, colored via
   // `li::marker { color: #8A8A8A; }` (add-photo.component.scss) — not
@@ -576,13 +599,18 @@ const styles = StyleSheet.create({
     color:      Colors.black,
   },
 
+  // Angular: app-button-revamp with no [buttonSize] passed defaults to
+  // EButtonSize.standard (button-revamp.component.ts:39), which is
+  // height: 44px (button-revamp.component.scss's ion-button.standard →
+  // setButtonHeight($hValue: 44px)) — this was 52. marginTop is the button
+  // wrapper div's own `mt-32` (add-photo.component.html:86), not 4.
   addBtn: {
-    height:          52,
+    height:          44,
     backgroundColor: Colors.primaryDark,
     borderRadius:    8,
     alignItems:      'center',
     justifyContent:  'center',
-    marginTop:       4,
+    marginTop:       32,
   },
   addBtnDisabled: {
     opacity: 0.6,
@@ -614,13 +642,15 @@ const styles = StyleSheet.create({
     color:      Colors.textDark,
   },
   // Angular renders a real `<ion-icon name="chevron-forward-outline"
-  // class="color-333333">` here (not wrapped in app-button-revamp, so none
-  // of its iconSize/ctaFontSize defaults apply) — no explicit font-size
-  // utility class sets its size, only its color, so there's no verified
-  // Angular px value to port for this glyph's size; left as-is.
+  // class="ion-no-margin color-333333 mt-2">` here (not wrapped in
+  // app-button-revamp, so none of its iconSize/ctaFontSize defaults apply) —
+  // no explicit font-size utility class sets its size, only its color, so
+  // there's no verified Angular px value to port for this glyph's size;
+  // left as-is. mt-2 (margin-top: 2px) IS ported directly below.
   laterChevron: {
     fontSize:   FontSize.font18,
     color:      Colors.textDark,
     lineHeight: 22,
+    marginTop:  2,
   },
 })

@@ -28,5 +28,12 @@ export const PROFILE_SINGULAR: Record<string, string> = {
 
 // Sliding picker panel dimensions — used by all onboarding screens
 // that open a right-side animated modal (Religion, Caste, Gothra, etc.).
-export const PICKER_PANEL_WIDTH = Dimensions.get('window').width * 0.85
-export const PICKER_ITEM_HEIGHT = 52
+// Angular: right-side-panel.component.html uses `.right-popup` (the only one
+// of its two width rules actually referenced by this component's own
+// template — `.right_popup` at width:90% is dead CSS here), width: 86.7%
+// (right-side-panel.component.scss:89-102). This was 0.85.
+export const PICKER_PANEL_WIDTH = Dimensions.get('window').width * 0.867
+// Angular: right-side-panel.component.html's three `cdk-virtual-scroll-viewport`
+// instances (flat list, HOROCITY list, grouped list) all set `itemSize="50"` —
+// the real per-row height driving the list. This was 52.
+export const PICKER_ITEM_HEIGHT = 50

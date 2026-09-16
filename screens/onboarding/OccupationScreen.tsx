@@ -18,6 +18,7 @@ import {
   getRegValues,
   setRegValue,
   getRegValue,
+  isJobDetailEligible,
 } from '../../service/registrationService'
 import { CDN_REG, CDN_LOTTIE } from '../../constants/cdn'
 import CdnLottie from '../../components/CdnLottie'
@@ -53,7 +54,6 @@ export default function OccupationScreen({ navigation }: Props) {
   const [fetching,     setFetching]     = useState(true)
   const [selected,     setSelected]     = useState<Option | null>(null)
   const [createdBy,    setCreatedBy]    = useState('4')
-  const [gender,       setGender]       = useState('1')
   const [submitting,   setSubmitting]   = useState(false)
   const [panelVisible, setPanelVisible] = useState(false)
 
@@ -67,9 +67,8 @@ export default function OccupationScreen({ navigation }: Props) {
       getRegValue('CREATEDBY'),
       getRegValues(),
     ]).then(([cb, rv]) => {
-      const { GENDER: gnd, OCCUPATION: savedOcc } = rv as Record<string, string>
+      const { OCCUPATION: savedOcc } = rv as Record<string, string>
       if (cb)  setCreatedBy(cb)
-      if (gnd) setGender(gnd)
 
       fetchOccupationOptions()
         .then(list => {
@@ -94,8 +93,6 @@ export default function OccupationScreen({ navigation }: Props) {
     .replace('#PROFILETYPE#', translatedProfileType)
     .replace('  ', ' ')
     .trim()
-  const nextPage   = gender === '1' ? '12' : '13'
-
   // Angular: registration.config.ts LISTDATA — ISLABEL/LABEL: OCCUPATIONLABEL,
   // PLACEHOLDERTXT: SELECTOCCUPATION, ISSHOWSEARCHBAR: false.
   const fieldLabelText = t('REGISTRATION.OCCUPATIONLABEL', 'Occupation')
@@ -106,6 +103,10 @@ export default function OccupationScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       await setRegValue('OCCUPATION', selected.key)
+      // Angular: registration-revamp.component.ts's getNextUrlForPage11() —
+      // occupation '8' ("Not working") skips straight to Religion; every
+      // other occupation goes to Monthly Income. Not gender-based.
+      const nextPage = isJobDetailEligible(selected.key) ? '12' : '13'
       navigation.push('onboarding', { pageNo: nextPage })
       callPartialRegistrationAPI()
     } catch {

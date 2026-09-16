@@ -292,14 +292,21 @@ const styles = StyleSheet.create({
     marginBottom:      24,
   },
   // Angular: heading4-medium-16 (right-side-panel.component.html:12) —
-  // Poppins-Medium, 500, 16px (global.scss:2217-2221)
+  // Poppins-Medium, 500, 16px (global.scss:2217-2221). Angular's own class
+  // list is `black-color heading4-medium-16` — black-color is #000000
+  // exactly (global.scss:2076-2078), a deliberately distinct token from
+  // Colors.textPrimary (#111111) in this codebase.
   headerTitle: {
     fontSize:   FontSize.font16,
     fontWeight: '500',
-    color:      Colors.textPrimary,
+    color:      Colors.black,
   },
-  // Border stays a static grey (Colors.borderSubtle) whether or not the
-  // search input is focused — no accent-color change on focus.
+  // Border stays a static grey whether or not the search input is focused —
+  // no accent-color change on focus (Angular: right-side-panel.component.scss
+  // .mobile-number.item-has-focus keeps --border-color: rgba(176,176,176,1),
+  // same as the unfocused state). That grey is rgba(176,176,176,1) = #B0B0B0
+  // — Colors.inputBorder, not Colors.borderSubtle (#e6e6e6, which is actually
+  // the row-divider color below).
   searchBox: {
     flexDirection:     'row',
     alignItems:        'center',
@@ -307,37 +314,46 @@ const styles = StyleSheet.create({
     marginVertical:    12,
     height:            40,
     borderWidth:       1,
-    borderColor:       Colors.borderSubtle,
+    borderColor:       Colors.inputBorder,
     borderRadius:      8,
     paddingHorizontal: 10,
     gap:               8,
     backgroundColor:   Colors.surface,
   },
-  // Angular: body1-medium-14 (right-side-panel.component.html:20) — Poppins-Medium
-  searchInput:      { flex: 1, fontSize: FontSize.font14, color: Colors.textPrimary, padding: 0 },
+  // Angular: body1-medium-14 black-color (right-side-panel.component.html:20)
+  // — Poppins-Medium, color #000000 (black-color), not Colors.textPrimary.
+  searchInput:      { flex: 1, fontSize: FontSize.font14, color: Colors.black, padding: 0 },
   searchClear:      { fontSize: FontSize.font13, color: Colors.scrimLight, padding: 2 },
   emptyBox:         { padding: 32, alignItems: 'center' },
   emptyText:        { fontSize: FontSize.font14, color: Colors.scrimLight },
+  // Angular: .exact-height/.filter-section ion-item { border-bottom: 1px
+  // solid rgba(230,230,230,1) } = #e6e6e6 = Colors.borderSubtle, not
+  // Colors.surfaceDim (#f2f2f2, a different token entirely).
   item: {
     flexDirection:     'row',
     alignItems:        'center',
     paddingHorizontal: 20,
     height:            PICKER_ITEM_HEIGHT,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.surfaceDim,
+    borderBottomColor: Colors.borderSubtle,
   },
   itemSelected:     { backgroundColor: Colors.radioCheckedBg },
-  // Angular: body2-regular-14 (right-side-panel.component.html:41) — Poppins-Regular
-  itemText:         { flex: 1, fontSize: FontSize.font14, fontWeight: '400', color: Colors.textPrimary },
+  // Angular: body2-regular-14 black-color (right-side-panel.component.html:41)
+  // — Poppins-Regular, color #000000 (black-color), not Colors.textPrimary.
+  itemText:         { flex: 1, fontSize: FontSize.font14, fontWeight: '400', color: Colors.black },
 
   // ── Grouped sections (education detail) ──────────────────────────────────
   // Angular: .grouped-category-heading { margin-top: 24px } / :first-child
-  // { margin-top: 0 } / .edu-category-title { font-weight: 700; font-size: 14px }
+  // { margin-top: 0 } / .edu-category-title { font-weight: 700; font-size:
+  // 14px; } — the ion-label itself is also `black-color`. Note
+  // .edu-category-title's font-size is a flat 14px literal, NOT var(--font14)
+  // (which scales with device width in this app) — ported as a flat number
+  // to match, not FontSize.font14.
   groupHeader: {
     paddingHorizontal: 20,
     marginTop:         24,
     paddingVertical:   8,
   },
   groupHeaderFirst: { marginTop: 0 },
-  groupHeaderText:  { fontSize: FontSize.font14, fontWeight: '700', color: Colors.textPrimary },
+  groupHeaderText:  { fontSize: 14, fontWeight: '700', color: Colors.black },
 })
