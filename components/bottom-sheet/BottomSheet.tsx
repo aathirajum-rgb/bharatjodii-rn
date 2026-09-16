@@ -18,7 +18,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const CDN = CDN_SVG
 
@@ -383,25 +383,27 @@ export default function BottomSheet({
           {!!data?.content && <Text style={styles.content}>{data.content}</Text>}
 
           {/* Benefits list (e.g. auto-renewal incentives) — icon + text rows,
-              divided by hairlines (Figma: a Line between each row, none after
-              the last) */}
+              each with its own dashed bottom border except the last. */}
           {!!data?.benefits?.length && (
             <View style={styles.benefitsList}>
               {/* Angular: the SUBCONTENT heading sits inside the same bordered
                   benefits block, above the first row. */}
               {!!data?.subContent && <Text style={styles.benefitsHeading}>{data.subContent}</Text>}
               {data.benefits.map((b, i) => (
-                <View key={i}>
-                  {i > 0 && <View style={styles.benefitDivider} />}
-                  <View style={styles.benefitRow}>
-                    <CdnSvg uri={b.icon} width={20} height={20} style={styles.benefitIcon} />
-                    <Text style={styles.benefitText}>
-                      {b.value}
-                      {b.info && <Text style={styles.benefitInfo}>{'  ⓘ'}</Text>}
-                    </Text>
-                    {/* Angular: the row's trailing lockicon column. */}
-                    {!!b.lockIcon && <CdnSvg uri={b.lockIcon} width={16} height={16} />}
-                  </View>
+                // Angular (bottomsheet.component's autoRenewal-benefits block):
+                // each row gets a DASHED bottom border except the last one —
+                // not a leading hairline divider before every row but the first.
+                <View
+                  key={i}
+                  style={[styles.benefitRow, i < data.benefits!.length - 1 && styles.benefitRowBorder]}
+                >
+                  <CdnSvg uri={b.icon} width={20} height={20} style={styles.benefitIcon} />
+                  <Text style={styles.benefitText}>
+                    {b.value}
+                    {b.info && <Text style={styles.benefitInfo}>{'  ⓘ'}</Text>}
+                  </Text>
+                  {/* Angular: the row's trailing lockicon column. */}
+                  {!!b.lockIcon && <CdnSvg uri={b.lockIcon} width={16} height={16} />}
                 </View>
               ))}
             </View>
@@ -603,16 +605,21 @@ const styles = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
   },
-  // Angular: `.bottomsheet-cross { position: absolute; top: -40px; left: 45%; }`
-  // — a bare floating icon, not centered via a full-width flex row.
+  // Angular: `bottom-sheet.component.scss`'s `.bottomsheet-cross { position:
+  // absolute; top: -48px; left: 47%; }` — every real sheet type this port
+  // uses (profileValidation/photoPopUp/limitReachInfo/phonePrivacyInfo/
+  // photoBulkLike/blockProfile/paymentPromo) is driven by THIS component, not
+  // the sibling `bottomsheet.component.scss` (top:-40/left:45%, whose own
+  // real actions — payment/whatsAppPhotoRequestPayment/editPackPopUp/
+  // cancelAutoRenewal — have no live caller anywhere in this port).
   closeBtn: {
     position: 'absolute',
-    top:      -40,
-    left:     '45%',
+    top:      -48,
+    left:     '47%',
     zIndex:   10,
   },
   closeX: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      Colors.textMedium,
     fontWeight: '600',
   },
@@ -628,7 +635,7 @@ const styles = StyleSheet.create({
   phoneConfirmTitle: {
     flex:       1,
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     lineHeight: 22,
     color:      '#000',
     textAlign:  'left',
@@ -645,13 +652,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   phoneConfirmCloseX: {
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     color:      '#000',
     fontWeight: '600',
   },
   phoneConfirmQuota: {
     fontFamily:      SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:        12,
+    fontSize:        FontSize.font12,
     color:           '#000',
     backgroundColor: '#fcf4f5',
     padding:         12,
@@ -659,28 +666,40 @@ const styles = StyleSheet.create({
     marginTop:       16,
     marginBottom:    8,
   },
+  // Angular: the image row (`ion-col class="padd0 d-flex"`) has no
+  // centering class — it sits flush left like everything else in this block.
   sheetImage: {
-    alignSelf:    'center',
+    alignSelf:    'flex-start',
     marginBottom: 16,
   },
+  // Angular (bottom-sheet.component.html's default block): TITLE/CONTENT are
+  // plain left-aligned block text — no `ion-justify-content-center`/
+  // `text-align-center` class appears anywhere on this block. The gap below
+  // TITLE comes from CONTENT's own `mt-12` (below), not a margin on TITLE.
   title: {
-    fontFamily:   Fonts.poppinsSemiBold,
-    fontSize:     18,
-    color:        '#1f1e1b',
-    textAlign:    'center',
-    marginBottom: 8,
+    fontFamily: Fonts.poppinsSemiBold,
+    fontSize:   FontSize.font18,
+    color:      '#1f1e1b',
   },
+  // Angular: CONTENT's own class is `pr-32 mt-12` ON TOP OF the block's
+  // shared `pl-24 pr-24` — an extra 32px right inset (56px total) that
+  // narrows the paragraph relative to TITLE, not a symmetric center.
   content: {
-    fontFamily:   SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:     14,
-    color:        '#1f1e1b',
-    textAlign:    'center',
-    lineHeight:   20,
-    marginBottom: 20,
+    fontFamily:  SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize:    FontSize.font14,
+    color:       '#1f1e1b',
+    lineHeight:  20,
+    marginTop:   12,
+    paddingRight: 32,
   },
+  // Angular (bottomsheet.component's autoRenewal-benefits sheet — the only
+  // real caller of this generic benefits list): CTA row is `pt-24`, not the
+  // 16px `primaryBtn.marginTop` other generic sheets use below their plain
+  // CONTENT text. RN margins don't collapse like CSS, so this only needs to
+  // contribute the remaining 8px (8 + primaryBtn's 16 = 24).
   benefitsList: {
     width:        '100%',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   // ── paymentPromo (Angular bottom-sheet.component.scss) ──────────────────────
   // .bottomsheet-header: gradient + 12px top radius + hairline white border.
@@ -692,17 +711,17 @@ const styles = StyleSheet.create({
     paddingVertical:      24,
     paddingHorizontal:    12,
   },
-  // heading3-semibold-16 / body2-regular-14 — left-aligned, unlike the shared
-  // centered title/content used by every other sheet type.
+  // heading3-semibold-16 / body2-regular-14 — left-aligned, same as the
+  // shared title/content above.
   promoTitle: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     lineHeight: 22,
     color:      '#1f1e1b',
   },
   promoContent: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     lineHeight: 20,
     color:      '#1f1e1b',
     marginTop:  6,
@@ -728,7 +747,7 @@ const styles = StyleSheet.create({
   promoBenefitText: {
     flex:       1,
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     lineHeight: 20,
     color:      '#1f1e1b',
     paddingLeft: 4,
@@ -743,21 +762,26 @@ const styles = StyleSheet.create({
     paddingBottom:     8,
   },
 
-  // Angular: .paid-membership-benefits-block's body1-medium-14 heading.
+  // Angular: .paid-membership-benefits-block's body1-medium-14 heading —
+  // `black-color`, not the 1f1e1b tone used elsewhere in this block.
   benefitsHeading: {
     fontFamily:   Fonts.poppinsMedium,
-    fontSize:     14,
-    color:        '#1f1e1b',
+    fontSize:     FontSize.font14,
+    color:        Colors.black,
     marginBottom: 4,
   },
+  // Angular (bottomsheet.component's autoRenewal-benefits block): `pt-12
+  // pb-12` vertical padding (not 8), each row's OWN dashed bottom border
+  // (not a separate hairline element before every row but the first).
   benefitRow: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    paddingVertical: 8,
+    flexDirection:   'row',
+    alignItems:      'center',
+    paddingVertical: 12,
   },
-  benefitDivider: {
-    height:          1,
-    backgroundColor: Colors.divider,
+  benefitRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#E6E6E6',
+    borderStyle:        'dashed',
   },
   benefitIcon: {
     marginRight: 8,
@@ -765,12 +789,12 @@ const styles = StyleSheet.create({
   benefitText: {
     flex:       1,
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      '#1f1e1b',
     lineHeight: 20,
   },
   benefitInfo: {
-    fontSize: 12,
+    fontSize: FontSize.font12,
     color:    Colors.textTertiary,
   },
   primaryBtn: {
@@ -780,15 +804,21 @@ const styles = StyleSheet.create({
   secondaryBtn: {
     marginBottom: 8,
   },
+  // Angular (block-profile, the only real sideBySideCtas caller): `ion-row
+  // class="mt-32"` — not a flat 4px gap from the content above.
   sideBySideRow: {
     flexDirection: 'row',
     gap:           12,
-    marginTop:     4,
+    marginTop:     32,
     marginBottom:  8,
   },
+  // NOTE: unreached by any real caller today (the only data.orCtaText caller
+  // targets the dedicated viewPhoneConfirm layout, which doesn't render this
+  // branch at all) — fixed to match Angular's real `.or-color`/body3-regular-12
+  // anyway, in case a future caller reaches this generic branch.
   orText: {
-    fontSize:      13,
-    color:         Colors.textTertiary,
+    fontSize:      FontSize.font12,
+    color:         'rgba(0,0,0,0.5)',
     textAlign:     'center',
     marginVertical: 8,
   },
@@ -796,10 +826,13 @@ const styles = StyleSheet.create({
     alignItems:     'center',
     paddingVertical: 8,
   },
+  // Angular: componentData?.DOLATER — `body2-regular-14 color-333333`, no
+  // bold weight and no underline (the only real caller of this, photoBulkLike,
+  // deliberately also skips the trailing chevron Angular shows for other
+  // actions: `*ngIf="!['photoBulkLike','skipbulk'].includes(action)"`).
   linkCtaText: {
-    fontSize:          14,
-    color:             Colors.link,
-    fontWeight:        '600',
-    textDecorationLine: 'underline',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize:   FontSize.font14,
+    color:      '#333333',
   },
 })

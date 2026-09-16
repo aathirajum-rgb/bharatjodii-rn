@@ -31,7 +31,7 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { handleBack } from '../../utils/navigationRef'
 import { ICON } from '../menu/MenuScreen'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 type Props = { navigation: any }
 
@@ -126,51 +126,63 @@ export default function PhonePrivacyScreen({ navigation }: Props) {
     <View style={s.confirmBox}>
       <Text style={s.confirmTitle}>{confirmTitle}</Text>
       <Text style={s.confirmContent}>{t('PRIVACY.PHONE_POPUP_CONTENT')}</Text>
-      <View style={s.confirmRow}>
-        <View style={s.confirmBtn}>
-          <ButtonRevamp label={t('PRIVACY.PHONE_POPUP_CTA2')} variant="secondary" fullWidth onPress={handleConfirmNo} disabled={saving} />
-        </View>
-        <View style={s.confirmBtn}>
-          <ButtonRevamp label={t('PRIVACY.PHONE_POPUP_CTA1')} variant="primary" fullWidth loading={saving} onPress={handleConfirmYes} disabled={saving} />
-        </View>
+      {/* Angular: middlepopup.component.html:80-88 — the two CTAs are STACKED
+          (Yes on top, pt-16; No below, pt-12), not side-by-side, and "No"
+          uses .primary-disabled-cta-jodii — a muted grey look, not an active
+          outlined secondary button. */}
+      <View style={s.confirmYesWrap}>
+        <ButtonRevamp label={t('PRIVACY.PHONE_POPUP_CTA1')} variant="primary" size="standard" fullWidth loading={saving} onPress={handleConfirmYes} disabled={saving} />
       </View>
+      <Pressable style={s.confirmNoBtn} onPress={handleConfirmNo} disabled={saving} accessibilityRole="button">
+        <Text style={s.confirmNoText}>{t('PRIVACY.PHONE_POPUP_CTA2')}</Text>
+      </Pressable>
     </View>
   ) : (
     <>
-      <View style={s.assureBanner}>
-        <CdnSvg uri={ICON_VERIFIED} width={20} height={20} />
+      {/* Angular's blue banner bleeds edge-to-edge on mobile (only the row's
+          own pl-24/pr-24 insets the icon/text) — the desktop card's own
+          padding is a Figma-driven 40px, a different container this bleed
+          math doesn't apply to, so it's gated to mobile only. */}
+      <View style={[s.assureBanner, !isDesktop && s.assureBannerBleed]}>
+        {/* privacy-verified.svg's real intrinsic size is 24x24 (fetched
+            directly), not 20x20. */}
+        <CdnSvg uri={ICON_VERIFIED} width={24} height={24} />
         <Text style={s.assureText}>{t('PRIVACY.PHONE_PRIVACY_TITLE')}</Text>
       </View>
 
-      {options.map((opt, i) => {
-        const isSelected = selected === opt.value
-        return (
-          <Pressable
-            key={opt.value}
-            style={[s.option, i > 0 && s.optionDivider]}
-            onPress={() => setSelected(opt.value)}
-          >
-            <View style={s.optionText}>
-              <Text style={s.optionTitle}>{opt.title}</Text>
-              <Text style={s.optionContent}>{opt.content}</Text>
-              {opt.recommended && (
-                <View style={s.recommendedRow}>
-                  <View style={s.recommendedIconWrap}>
-                    <CdnSvg uri={ICON_STAR} width={12} height={12} />
+      {/* Angular: .list-block { gap: 12px } — the 12px space BETWEEN option
+          rows, distinct from each row's own 10px padding-top/bottom. */}
+      <View style={s.optionsList}>
+        {options.map((opt, i) => {
+          const isSelected = selected === opt.value
+          return (
+            <Pressable
+              key={opt.value}
+              style={[s.option, i > 0 && s.optionDivider]}
+              onPress={() => setSelected(opt.value)}
+            >
+              <View style={s.optionText}>
+                <Text style={s.optionTitle}>{opt.title}</Text>
+                <Text style={s.optionContent}>{opt.content}</Text>
+                {opt.recommended && (
+                  <View style={s.recommendedRow}>
+                    <View style={s.recommendedIconWrap}>
+                      <CdnSvg uri={ICON_STAR} width={12} height={12} />
+                    </View>
+                    <Text style={s.recommendedText}>{t('PRIVACY.POPUP_SHOW_ALL_PHOTO_HR_TXT')}</Text>
                   </View>
-                  <Text style={s.recommendedText}>{t('PRIVACY.POPUP_SHOW_ALL_PHOTO_HR_TXT')}</Text>
-                </View>
-              )}
-            </View>
-            <View style={[s.radio, isSelected && s.radioSelected]}>
-              {isSelected && <View style={s.radioDot} />}
-            </View>
-          </Pressable>
-        )
-      })}
+                )}
+              </View>
+              <View style={[s.radio, isSelected && s.radioSelected]}>
+                {isSelected && <View style={s.radioDot} />}
+              </View>
+            </Pressable>
+          )
+        })}
+      </View>
 
       <View style={s.submitRow}>
-        <ButtonRevamp label={t('GENERAL.SUBMIT')} variant="primary" fullWidth onPress={handleSubmit} />
+        <ButtonRevamp label={t('GENERAL.SUBMIT')} variant="primary" size="standard" fullWidth onPress={handleSubmit} />
       </View>
     </>
   )
@@ -211,8 +223,13 @@ const s = StyleSheet.create({
 
   header: { height: 56, flexDirection: 'row', alignItems: 'center' },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
-  mobileBody: { flex: 1, paddingHorizontal: 16 },
+  // Angular: .heading4-medium-16 (phone-privacy.component.html:31) — 16px
+  // Poppins-Medium — was missing fontFamily entirely (bare fontWeight).
+  headerTitle: { flex: 1, fontSize: FontSize.font16, fontFamily: SemanticFontsEnglish.headingEnglishMedium, color: '#333333', marginLeft: 6, marginRight: 16 },
+  // Angular: every section here (we-assure-block, the options row, the
+  // footer) uses 24px horizontal padding (`pl-24 pr-24` / `ion-cust-padding`),
+  // not 16.
+  mobileBody: { flex: 1, paddingHorizontal: 24 },
 
   desktopHeader: {
     width: 810, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24,
@@ -227,40 +244,87 @@ const s = StyleSheet.create({
 
   loadingBox: { paddingVertical: 32, alignItems: 'center' },
 
+  // Angular: .we-assure-block { background: #EFF9FF }, no border-radius —
+  // marginBottom matches the FOLLOWING options list's real `mt-20`
+  // (phone-privacy.component.html:59), not an arbitrary banner gap.
   assureBanner: {
     flexDirection: 'row', alignItems: 'flex-start', gap: 12,
-    backgroundColor: '#EAF4FF', borderRadius: 8, padding: 16, marginBottom: 16,
+    backgroundColor: '#EFF9FF', paddingVertical: 16, marginBottom: 20,
   },
-  assureText: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, lineHeight: 18, color: Colors.black },
+  // Mobile only (see render comment) — the row's own pl-24/pr-24 is INSIDE an
+  // ion-content with no side padding of its own, so the blue background
+  // bleeds edge-to-edge across the full screen width and only the ICON/TEXT
+  // are inset by 24px. RN's `mobileBody` applies paddingHorizontal:24 to
+  // every child, which was trapping the banner's background inside that
+  // inset instead of letting it bleed — cancelled with a matching negative
+  // marginHorizontal, then paddingHorizontal:24 re-applied so the icon/text
+  // land in the same place as before.
+  assureBannerBleed: { marginHorizontal: -24, paddingHorizontal: 24 },
+  // Angular: .body3-regular-12 — 12px, not 13.
+  assureText: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 18, color: Colors.black },
 
-  option: { paddingVertical: 16, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
-  optionDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.borderSubtle },
-  optionText: { flex: 1, gap: 6 },
-  optionTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
-  optionContent: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, lineHeight: 18, color: Colors.black },
+  // Angular: .list-block { gap: 12px } — the space between option rows.
+  optionsList: { gap: 12 },
+  // Angular: .show-photo-block { padding-top: 10px; padding-bottom: 10px }
+  // — 10, not 16 (RN's flat 16 had coincidentally summed to the same total
+  // gap between adjacent rows as 10+12(list gap)+10, but the first row's own
+  // gap from the banner above — 20(banner) + 10(this) — didn't match RN's
+  // 20+16 = 36 instead of the real 30).
+  option: { paddingVertical: 10, flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  // Angular: .show-photo-block { border-bottom: 1px solid #dddddd } —
+  // Colors.border (#dddddd), not Colors.borderSubtle (#e6e6e6).
+  optionDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.border },
+  // Angular: title's mb-8 and the recommended-block's mt-8 are both 8px, not 6.
+  optionText: { flex: 1, gap: 8 },
+  // Angular: .body1-medium-14 (phone-privacy.component.html:65) — 14px
+  // Poppins-MEDIUM, not SemiBold — plus its own line-height-18.
+  optionTitle: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, lineHeight: 18, color: Colors.black },
+  // Angular: .body2-regular-14 — 14px, not 13.
+  optionContent: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 18, color: Colors.black },
 
   recommendedRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, alignSelf: 'flex-start',
     backgroundColor: '#FBF2F5', borderRadius: 20, paddingVertical: 4, paddingHorizontal: 8,
   },
+  // Angular: .star-bg { background:#C70038; padding:6px; border-radius:50% }
+  // around a 12x12 icon — a 24x24 circle, not 16x16, and a distinct red from
+  // Colors.primaryDark (#B50033).
   recommendedIconWrap: {
-    width: 16, height: 16, borderRadius: 8, backgroundColor: Colors.primaryDark,
+    width: 24, height: 24, borderRadius: 12, backgroundColor: '#C70038',
     alignItems: 'center', justifyContent: 'center',
   },
-  recommendedText: { fontFamily: Fonts.poppinsMedium, fontSize: 12, color: Colors.primaryDark },
+  // Angular: .color-C70038 — not Colors.primaryDark.
+  recommendedText: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font12, color: '#C70038' },
 
+  // Angular: ion-radio's --color-checked: #B30033 — a distinct hex from
+  // Colors.primaryDark (#B50033). marginTop matches the radio's own real
+  // `mt-16` (phone-privacy.component.html:63), not a small 2px nudge.
   radio: {
     width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: Colors.borderNeutral,
-    alignItems: 'center', justifyContent: 'center', marginTop: 2,
+    alignItems: 'center', justifyContent: 'center', marginTop: 16,
   },
-  radioSelected: { borderColor: Colors.primaryDark },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primaryDark },
+  radioSelected: { borderColor: '#B30033' },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#B30033' },
 
   submitRow: { marginTop: 24, marginBottom: 16 },
 
   confirmBox: { paddingVertical: 8 },
-  confirmTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, textAlign: 'center' },
-  confirmContent: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.black, textAlign: 'center', marginTop: 8 },
-  confirmRow: { flexDirection: 'row', gap: 12, marginTop: 24 },
-  confirmBtn: { flex: 1 },
+  // Angular: middlepopup.component.html:59/66 — .heading3-semibold-16
+  // .color-1f1e1b, not Colors.black.
+  confirmTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: '#1f1e1b', textAlign: 'center' },
+  confirmContent: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font13, color: Colors.black, textAlign: 'center', marginTop: 8 },
+  // Angular: the two CTAs are stacked (pt-16 above Yes, pt-12 above No), not
+  // side-by-side.
+  confirmYesWrap: { marginTop: 16 },
+  // Angular: .primary-disabled-cta-jodii — a muted grey look (NOT an active
+  // outlined secondary button): background #F0F0F0, text #B0B0B0, radius 8,
+  // height:auto with --padding-top/-bottom:8px (content-hugging, not a fixed
+  // 44px slab like the real button above it).
+  confirmNoBtn: {
+    marginTop: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: '#F0F0F0',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  // Angular: line-height:16px, letter-spacing:0.05px (also declared on
+  // .primary-disabled-cta-jodii).
+  confirmNoText: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, lineHeight: 16, letterSpacing: 0.05, color: '#B0B0B0' },
 })

@@ -3,8 +3,10 @@
 // ("Liked by you" / "Liked you") swapping which list the carousel below shows.
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
+import { useTranslation } from 'react-i18next'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { CarouselSection, PhotoOverlayCard, useOppGenderAvatarUrl } from './DesktopHomeShared'
+import { ProfileBadge } from '../matches/matchesCard.shared'
 import type { LikedTab } from '../../screens/home/homeGating'
 import type { SwiperItem } from '../swiper-card/SwiperCard'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
@@ -19,13 +21,19 @@ type Props = {
   likedByMeTotal: number
   likedMe: SwiperItem[]
   likedMeTotal: number
+  // Angular: FUNC.getLogInGender() == 'F' gates the Verified-ID badge to female
+  // viewers only (matches-card.component.html); oppGender is the shown profile's
+  // gender, so oppGender === 'M' means the viewer is female — same convention
+  // as MatchCard (MatchesScreen.tsx) / MatchCardDesktop.tsx.
+  oppGender: 'M' | 'F'
   onCardPress: (item: SwiperItem) => void
   onSeeAllPress?: (() => void) | undefined
 }
 
 export default function LikedProfilesSection({
-  likedTab, onTabChange, likedByMe, likedByMeTotal, likedMe, likedMeTotal, onCardPress, onSeeAllPress,
+  likedTab, onTabChange, likedByMe, likedByMeTotal, likedMe, likedMeTotal, oppGender, onCardPress, onSeeAllPress,
 }: Props) {
+  const { t } = useTranslation()
   const avatarFallback = useOppGenderAvatarUrl()
 
   // Angular: app-swiper.component.ts's hasLikedYouData()/hasLikedByMeData() +
@@ -93,6 +101,21 @@ export default function LikedProfilesSection({
               />
             </View>
             <View style={s.body}>
+              {/* Figma "Jodii Desktop" node 629:11046 ("Liked profiles") — same
+                  paid/verified badge treatment MatchCardDesktop.tsx already
+                  implements for that exact node; this card was missing it
+                  entirely even though isPaidMember/isIdVerified were already
+                  present on every item. */}
+              {(item.isPaidMember || (item.isIdVerified && oppGender === 'M')) && (
+                <View style={s.badges}>
+                  {item.isPaidMember && (
+                    <ProfileBadge variant="paid" text={t('MENU.PAID_BADGE')} />
+                  )}
+                  {item.isIdVerified && oppGender === 'M' && (
+                    <ProfileBadge variant="verified" text={t('MATCHES.VERIFIED_ID')} />
+                  )}
+                </View>
+              )}
               <Text style={s.name} numberOfLines={1}>{item.name}</Text>
               <Text style={s.meta} numberOfLines={1}>
                 {[item.age, item.height, item.education].filter(Boolean).join(', ')}
@@ -148,6 +171,7 @@ const s = StyleSheet.create({
   },
   photoInset: { padding: 8 },
   body: { paddingHorizontal: 16, paddingBottom: 16, gap: 8 },
+  badges: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   name: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, lineHeight: 20, color: '#000000' },
   meta: { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: 14, lineHeight: 20, color: '#000000' },
   datePill: {

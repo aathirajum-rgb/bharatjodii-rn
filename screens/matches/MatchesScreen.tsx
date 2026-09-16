@@ -2682,6 +2682,9 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
             title:         t('MATCHES.BULK_LIKE_TITLE_1').replace(/<br\s*\/?>/gi, ' '),
             ctaLabel:      t('MATCHES.ADD_PHOTO'),
             linkCtaLabel:  t('MATCHES.LATER_CTA'),
+            // Angular: PHOTO_BULK_LIKE config sets showClose:false/showCross:false —
+            // this promo has no close button at all, only the "later" link.
+            showClose:     false,
           }}
           onClose={handleBulkLikePhotoPromptDismiss}
           onPrimaryPress={() => { setShowPhotoBulkLikePrompt(false); addPhoto.openAddPhoto(navigation); handleBulkLikeSent() }}

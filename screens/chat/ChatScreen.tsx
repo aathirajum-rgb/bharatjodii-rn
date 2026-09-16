@@ -859,19 +859,30 @@ export default function ChatScreen({ navigation, route }: Props) {
     setConfirmAction(null)
   }
 
+  // Angular: bottom-sheet.component.html's `action === 'block-profile'` block —
+  // CTA1 ("Yes"/"Unblock", the confirm action) is the OUTLINE button
+  // ([border]="'primaryBorder'" [background]="'whiteBg'"), CTA2 ("No"/"Cancel",
+  // the safe option) is the FILLED one (primaryBtnInfo) — a deliberate nudge
+  // away from the destructive action. BottomSheet's generic sideBySide layout
+  // always renders `ctaLabel` filled/primary and `secondaryCtaLabel` outline/
+  // ghost, so CTA2 goes to `ctaLabel`+onPrimaryPress (dismiss) and CTA1 goes to
+  // `secondaryCtaLabel`+onSecondaryPress (confirm) to keep the same visual
+  // hierarchy — not because CTA2 is "primary" in behavior.
   const confirmSheetData = confirmAction === 'block'
     ? {
+        image: CDN + 'confirm-block-jodii-chat-img.svg',
         title: t('PRIVACY.BLOCK_TITLE'),
         content: t('PRIVACY.BLOCK_SUBTITLE'),
-        ctaLabel: t('PRIVACY.BLOCK_CTA1'),
-        secondaryCtaLabel: t('PRIVACY.BLOCK_CTA2'),
+        ctaLabel: t('PRIVACY.BLOCK_CTA2'),
+        secondaryCtaLabel: t('PRIVACY.BLOCK_CTA1'),
         sideBySideCtas: true,
       }
     : {
+        image: CDN + 'confirm-block-jodii-chat-img.svg',
         title: t('PRIVACY.UNBLOCK_HEADER').replace('#NAME#', partnerName),
         content: t('PRIVACY.UNBLOCK_CONTENT').replace(/##[A-Z_]+##/g, ''),
-        ctaLabel: t('PRIVACY.UNBLOCK_CTA1'),
-        secondaryCtaLabel: t('PRIVACY.UNBLOCK_CTA2'),
+        ctaLabel: t('PRIVACY.UNBLOCK_CTA2'),
+        secondaryCtaLabel: t('PRIVACY.UNBLOCK_CTA1'),
         sideBySideCtas: true,
       }
 
@@ -1215,8 +1226,8 @@ export default function ChatScreen({ navigation, route }: Props) {
         type="blockProfile"
         data={confirmSheetData}
         onClose={() => setConfirmAction(null)}
-        onPrimaryPress={confirmBlockOrUnblock}
-        onSecondaryPress={() => setConfirmAction(null)}
+        onPrimaryPress={() => setConfirmAction(null)}
+        onSecondaryPress={confirmBlockOrUnblock}
       />
       <ReportProfileModal
         visible={showReportModal}

@@ -389,7 +389,7 @@ export default function BiodataScreen({ navigation }: Props) {
               </Pressable>
             )}
             {photoUnderValidation && (
-              <View style={s.photoActionBtn}>
+              <View style={s.photoValidationBtn}>
                 <Text style={s.photoActionText}>{t('BIO_DATA.UNDER_VALIDATION_TXT')}</Text>
               </View>
             )}
@@ -546,7 +546,7 @@ export default function BiodataScreen({ navigation }: Props) {
                     label={t('BIO_DATA.HORO_CTA')}
                     variant="primary"
                     onPress={() => navigation.navigate('EditProfileHoroscope')}
-                    style={{ marginTop: 12 }}
+                    style={{ marginTop: 16 }}
                   />
                 </View>
               )}
@@ -573,7 +573,7 @@ export default function BiodataScreen({ navigation }: Props) {
         </View>
       </ScrollView>
 
-      <View style={[s.footer, { paddingBottom: insets.bottom + 12 }]}>
+      <View style={[s.footer, { paddingBottom: insets.bottom + 24 }]}>
         {/* Angular's CTA carries a download glyph before the label
             (download-biodata-white.svg); this port had label-only. */}
         <ButtonRevamp
@@ -678,10 +678,14 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white,
     paddingHorizontal: 8, paddingVertical: 4,
   },
-  langPillText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
+  // Angular: same class as langLabel — .body2-regular-14 (14px), not 12px.
+  langPillText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
 
+  // Angular: .biodata-details-missing — background #FFF4F7 (not selectionBg's
+  // #FFF1F5), box-shadow 0 0px 5px 1px #e5e5e5.
   missingBanner: {
-    backgroundColor: Colors.selectionBg, paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: '#FFF4F7', paddingHorizontal: 16, paddingVertical: 12,
+    shadowColor: '#e5e5e5', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 5, elevation: 2,
   },
   missingBannerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   missingBannerText: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#333333' },
@@ -690,8 +694,8 @@ const s = StyleSheet.create({
   // (Angular's offset="1"). marginTop is its mt-6.
   missingBannerCta: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
-    marginTop: 12,
-    backgroundColor: Colors.primaryDark, borderRadius: 8, height: 40,
+    alignSelf: 'flex-start', marginLeft: 32, marginTop: 12,
+    backgroundColor: Colors.primaryDark, borderRadius: 8, height: 40, paddingHorizontal: 16,
   },
   missingBannerCtaText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 14, color: Colors.white },
 
@@ -745,11 +749,23 @@ const s = StyleSheet.create({
   },
   photo: { width: '100%', height: '100%' },
   photoPlaceholder: { width: '100%', height: '100%', backgroundColor: '#CFCFCF' },
+  // Angular: .biodata-photo-button { bottom: 8% } (percentage of the photo
+  // frame's own height, not a flat px) wraps .biodata-add-photo-btn
+  // (background #ECEFF2, radius 4px, border 1px solid #808080).
   photoActionBtn: {
-    position: 'absolute', bottom: 8, alignSelf: 'center',
-    backgroundColor: Colors.white, borderRadius: 12, paddingHorizontal: 8, paddingVertical: 4,
+    position: 'absolute', bottom: '8%', alignSelf: 'center',
+    backgroundColor: '#ECEFF2', borderRadius: 4, borderWidth: 1, borderColor: '#808080',
+    paddingHorizontal: 8, paddingVertical: 4,
   },
-  photoActionText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 10, color: '#333333' },
+  // Angular: .biodata-photo-validation-btn — same wrapper/position, but a
+  // DIFFERENT background (#DBD7D0, not #ECEFF2) and explicitly no border.
+  photoValidationBtn: {
+    position: 'absolute', bottom: '8%', alignSelf: 'center',
+    backgroundColor: '#DBD7D0', borderRadius: 4,
+    paddingHorizontal: 8, paddingVertical: 4,
+  },
+  // Angular: .textcta-medium-12 — 12px Poppins-Medium, not 10px.
+  photoActionText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 12, color: '#333333' },
   // Angular .biodata-profile-image-edit: `right: 10px; top: 10px;
   // background-color: #745430; border-radius: 50%; opacity: 0.8` — a
   // translucent brown disc in the TOP-right corner. This port had a white disc
@@ -799,8 +815,10 @@ const s = StyleSheet.create({
   // This port had a pink card with a hard red dashed border — the Figma node it
   // cites disagrees with the shipped Angular styling, and Angular is the
   // reference here.
+  // Angular: the inner content uses .ion-cust-padding-start/-end (24px each
+  // side), not a flat 16px.
   horoMissingBlock: {
-    marginTop: 8, padding: 16, borderRadius: 8, alignItems: 'center',
+    marginTop: 8, paddingHorizontal: 24, paddingVertical: 16, borderRadius: 8, alignItems: 'center',
     backgroundColor: '#FFFCF4', borderWidth: 1, borderStyle: 'dashed', borderColor: '#FFE17E',
   },
   horoMissingHeader: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: 16, color: '#EF4444', textAlign: 'center' },
@@ -809,15 +827,18 @@ const s = StyleSheet.create({
   // Angular .biodata-barcode-section: `border-top: 1px solid #a9907e;
   // margin-top: 24px` — a hairline rule separating the QR block from the
   // details above it. Missing entirely from this port.
+  // Angular: .biodata-barcode-section carries its own ml-12/mr-12 on TOP of
+  // the card's 12px inset (24px total), and the barcode itself has an
+  // additional mt-24 beyond the section's own marginTop.
   qrSection: {
-    alignItems: 'center', marginTop: 24, paddingTop: 16, gap: 16,
+    alignItems: 'center', marginTop: 24, marginHorizontal: 12, paddingTop: 24, gap: 16,
     borderTopWidth: 1, borderTopColor: '#A9907E',
   },
-  // Angular .biodata-barcode: 10vh square with `border: 1px solid #e6ca64;
-  // border-radius: 8px; overflow: hidden`. The gold border was missing — this
-  // is the "border is not shown" case.
+  // Angular .biodata-barcode: 10vh square — 80x80 at this project's 800px
+  // reference height (RN had 160, double the real size), with
+  // `border: 1px solid #e6ca64; border-radius: 8px; overflow: hidden`.
   qrImage: {
-    width: 160, height: 160,
+    width: 80, height: 80,
     borderWidth: 1, borderColor: '#E6CA64', borderRadius: 8,
   },
   qrCaption: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 12, color: '#1A1818', textAlign: 'center' },
@@ -835,7 +856,9 @@ const s = StyleSheet.create({
     marginTop: -1, position: 'relative', overflow: 'hidden',
   },
 
-  footer: { paddingHorizontal: 16, paddingTop: 12, backgroundColor: Colors.white },
+  // Angular: <ion-row class="pt-24 pb-24 ion-cust-padding-start ion-cust-padding-end">
+  // — 24px on every side, not 16/12.
+  footer: { paddingHorizontal: 24, paddingTop: 24, backgroundColor: Colors.white },
 
   swipeTipOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)',

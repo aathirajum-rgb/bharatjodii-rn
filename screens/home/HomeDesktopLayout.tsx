@@ -74,6 +74,7 @@ export interface HomeDesktopLayoutProps {
   likedByMeTotal:  number
   likedMe:         SwiperItem[]
   likedMeTotal:    number
+  oppGender:       'M' | 'F'
   categories:      ExploreCategory[]
   stories:         SwiperItem[]
   videos:          HelpVideo[]
@@ -91,7 +92,7 @@ export default function HomeDesktopLayout({
   allMatches, allMatchesTotal, viewedMe, viewedMeTotal,
   todayMatches, todayTotal, newlyJoined, newlyJoinedTotal,
   profilesViewed, profilesViewedTotal, completeCards, onCompleteProfileCardPress,
-  likedTab, onLikedTabChange, likedByMe, likedByMeTotal, likedMe, likedMeTotal,
+  likedTab, onLikedTabChange, likedByMe, likedByMeTotal, likedMe, likedMeTotal, oppGender,
   categories, stories, videos, selfHelpVisible, customerCare, onCardPress, onTabPress,
 }: HomeDesktopLayoutProps) {
   const [userId, setUserId] = useState('')
@@ -196,6 +197,7 @@ export default function HomeDesktopLayout({
               likedByMeTotal={likedByMeTotal}
               likedMe={likedMe}
               likedMeTotal={likedMeTotal}
+              oppGender={oppGender}
               onCardPress={onCardPress}
             />
           </View>

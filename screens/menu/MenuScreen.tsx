@@ -38,6 +38,7 @@ import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictShe
 import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import LanguagePillSheet from '../../components/language-pill/LanguagePillSheet'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,8 @@ export const ICON = {
   arrow:         R + 'menu_right_arrow.svg',
   camera:        R + 'menu_camera.svg',
   language:      R + 'setting_language_selection.svg',
+  // Angular: menu.page.html:235 — common.ImgDomain() + 'assets/images/svg/phone-privacy-settings.svg'.
+  phonePrivacy:  CDN_SVG + 'phone-privacy-settings.svg',
   deleteAccount: R + 'settings_delete_account.svg',
   privacy:       R + 'settings_privacy_ploicy.svg',
   terms:         R + 'settings_terms_condition.svg',
@@ -248,6 +251,10 @@ export default function MenuScreen({ navigation }: Props) {
   const [photoFailed,     setPhotoFailed]     = useState(false)
   const [entryType,     setEntryType]     = useState('')
   const [isVerified,    setIsVerified]    = useState(false)
+  // Angular: menu.page.html:233 — *ngIf="LOGINGENDER !== 'M'" gates the Phone
+  // Privacy row (SettingsScreen.tsx's desktop-only sibling already tracks this
+  // same flag under the name `isFemale`).
+  const [isFemale,      setIsFemale]      = useState(false)
   const [membershipExp, setMembershipExp] = useState('')
   const [appVersion,    setAppVersion]    = useState('')
   const [logoutSheetVisible, setLogoutSheetVisible] = useState(false)
@@ -284,12 +291,14 @@ export default function MenuScreen({ navigation }: Props) {
       // MAX_PHOTOS cap counts photos the member already has — passing 0 would
       // let them add a full set on top of an existing one.
       getItem('PHOTOCOUNT'),
-    ]).then(([session, id, photo, ver, ekyc, photoCnt]) => {
+      getItem(StorageKeys.User.LOGIN_GENDER),
+    ]).then(([session, id, photo, ver, ekyc, photoCnt, gender]) => {
       if (cancelled) return
       setUserName(String(session['NAME'] ?? ''))
       setUserId(id ?? '')
       setPhotoUrl(photo ?? '')
       setPhotoCount(Number(photoCnt ?? 0) || 0)
+      setIsFemale(gender !== 'M')
       // A newly arrived photo clears any earlier load failure, otherwise the
       // placeholder would stick for the life of the mount.
       setPhotoFailed(false)
@@ -615,6 +624,14 @@ export default function MenuScreen({ navigation }: Props) {
             onPress={() => setShowLanguageSheet(true)}
             showDivider
           />
+          {isFemale && (
+            <MenuRow
+              icon={ICON.phonePrivacy}
+              title={t('MENU.PHONE_PRIVACY')}
+              onPress={() => navigation.navigate('PhonePrivacy')}
+              showDivider
+            />
+          )}
           <MenuRow
             icon={ICON.deleteAccount}
             title={t('ACCOUNT.DEL_PRO')}
@@ -766,30 +783,31 @@ const s = StyleSheet.create({
     marginTop:     10,
   },
   promoLink: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     lineHeight: 18,
-    fontWeight: '600',
+    fontFamily: Fonts.poppinsSemiBold,
     color:      Colors.inputError,
   },
   promoLinkChevron: {
-    fontSize:   18,
+    fontSize:   FontSize.font18,
     lineHeight: 18,
-    fontWeight: '600',
+    fontFamily: Fonts.poppinsSemiBold,
     color:      Colors.inputError,
   },
   promoTextCol: {
     flexShrink: 1,
   },
   promoHeadline: {
-    fontSize:   17,
+    fontSize:   FontSize.font17,
     lineHeight: 22,
-    fontWeight: '700',
+    fontFamily: Fonts.poppinsBold,
     color:      '#1A1A1A',
   },
   promoSub: {
     marginTop:  2,
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     lineHeight: 18,
+    fontFamily: Fonts.poppinsRegular,
     color:      '#4A4A4A',
   },
   // Pill, not the 8pt rounded rect — radius is half the ~44pt tap height.
@@ -801,9 +819,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
   },
   promoBtnText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     lineHeight: 18,
-    fontWeight: '600',
+    fontFamily: Fonts.poppinsSemiBold,
     color:      Colors.white,
   },
 
@@ -850,19 +868,21 @@ const s = StyleSheet.create({
     marginBottom:  2,
   },
   profileName: {
-    fontSize:   16,
-    fontWeight: '700',
+    fontSize:   FontSize.font16,
+    fontFamily: Fonts.poppinsBold,
     color:      Colors.textPrimary,
     flexShrink: 1,
   },
   profileId: {
-    fontSize:     14,
+    fontSize:     FontSize.font14,
+    fontFamily:   Fonts.poppinsRegular,
     color:        '#372F3A',
     marginBottom: 6,
   },
   paidTagRow:  { marginBottom: 4 },
   expiryText: {
-    fontSize: 12,
+    fontSize: FontSize.font12,
+    fontFamily: Fonts.poppinsRegular,
     color:    '#888686',
     marginTop: 4,
   },
@@ -884,8 +904,8 @@ const s = StyleSheet.create({
   },
   rowTitle: {
     flex:       1,
-    fontSize:   14,
-    fontWeight: '500',
+    fontSize:   FontSize.font14,
+    fontFamily: Fonts.poppinsMedium,
     color:      Colors.textPrimary,
   },
   rowDivider: {
@@ -896,7 +916,8 @@ const s = StyleSheet.create({
 
   // ── Footer ──
   footerVersion: {
-    fontSize:  12,
+    fontSize:  FontSize.font12,
+    fontFamily: Fonts.poppinsRegular,
     color:     'rgba(0,0,0,0.5)',
     marginTop: 4,
   },
@@ -926,13 +947,14 @@ const ls = StyleSheet.create({
     marginBottom:  16,
   },
   title: {
-    fontSize:     18,
-    fontWeight:   '700',
+    fontSize:     FontSize.font18,
+    fontFamily:   Fonts.poppinsBold,
     color:        Colors.textPrimary,
     marginBottom: 10,
   },
   message: {
-    fontSize:     14,
+    fontSize:     FontSize.font14,
+    fontFamily:   Fonts.poppinsRegular,
     color:        Colors.textMedium,
     lineHeight:   22,
     marginBottom: 24,

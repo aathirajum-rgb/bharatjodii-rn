@@ -1899,6 +1899,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         likedByMeTotal={comTotalFor(comCount, 'likedbyme')}
         likedMe={likedMe}
         likedMeTotal={comTotalFor(comCount, 'likedyou')}
+        oppGender={gating.oppGender}
         categories={categories}
         stories={stories}
         videos={videos}
