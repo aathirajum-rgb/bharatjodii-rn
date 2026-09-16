@@ -37,7 +37,7 @@ export default function OnboardingDesktopLayout({
   return (
     <View style={s.screen}>
       <View style={s.topBar}>
-        <Text style={s.logo}>Jodii</Text>
+        <Text style={s.logo}>BharatJodii</Text>
         <View style={s.langPill}>
           <Text style={s.langPillText}>English ▾</Text>
         </View>

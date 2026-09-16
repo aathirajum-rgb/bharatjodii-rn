@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Animated,
   Dimensions,
+  Image,
   Modal,
   Pressable,
   StyleSheet,
@@ -14,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { LinearGradient } from 'expo-linear-gradient'
 import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
 import CdnLottie from '../CdnLottie'
+import { HtmlText } from '../matches/matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
@@ -23,6 +25,11 @@ import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 const CDN = CDN_SVG
 
 const SCREEN_H = Dimensions.get('window').height
+
+// Bundled brand mark for the 'bharatJodiiRename' sheet (ported from the native
+// Android app's drawable/ic_notify_logo.png) — fixed per-brand asset, not
+// caller-supplied data like every other sheet's `data.image`.
+const BHARATJODII_LOGO = require('../../assets/icons/bharatjodii-logo.png')
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -54,6 +61,7 @@ export type BottomSheetType =
   | 'addPhotoPrompt'
   | 'viewPhoneConfirm'
   | 'photoPrivacy'
+  | 'bharatJodiiRename'
 
 // A single bulleted row for BottomSheetData.benefits (icon + text).
 export interface BottomSheetBenefit {
@@ -225,6 +233,12 @@ export default function BottomSheet({
   // pair is inset only 8px (`pl-8 pr-8 pt-8 pb-8`) instead of the shared 24px.
   const isPaymentPromo = type === 'paymentPromo'
 
+  // Angular bottomsheet.component.html "bharatJodiiRename" block — 72x72 logo,
+  // an [innerHTML] title whose "BharatJodii" span is colored via HtmlText, a
+  // regular-14 #545454 body, and a single full-width CTA with a trailing
+  // right-arrow icon (no secondary/link CTA, no benefits list).
+  const isBharatJodiiRename = type === 'bharatJodiiRename'
+
   // Close button — Angular: mobile's `.bottomsheet-cross` is a bare
   // bottomsheet-cross.svg image floating ABOVE the sheet (top:-40px, left:45%)
   // with NO circular background behind it — bottomsheet.component.html/scss
@@ -238,7 +252,7 @@ export default function BottomSheet({
   // floated it absolutely over the top-right corner, which overlapped the
   // body text whenever a sheet had no title/image to naturally push content
   // down first (most of them — many BottomSheet uses are content-only).
-  const closeButton = showClose && !isViewPhoneConfirm && (
+  const closeButton = showClose && !isViewPhoneConfirm && !isBharatJodiiRename && (
     <Pressable onPress={() => onClose?.()} hitSlop={10} style={isDesktop ? styles.desktopCloseBtn : styles.closeBtn}>
       {isDesktop ? (
         <View style={styles.desktopCloseCircle}>
@@ -350,6 +364,26 @@ export default function BottomSheet({
                 onPress={() => onPrimaryPress?.()}
               />
             </View>
+          )}
+        </>
+      ) : isBharatJodiiRename ? (
+        /* Angular: <ion-row class="rename-popup"> ... 72x72 logo, HTML title
+           (color-B50033 span), regular-14 #545454 content, single full-width
+           CTA with a trailing right-arrow icon. */
+        <>
+          <Image source={BHARATJODII_LOGO} style={styles.renameLogo} resizeMode="contain" />
+          {!!data?.title && <HtmlText html={data.title} style={styles.renameTitle} />}
+          {!!data?.content && <HtmlText html={data.content} style={styles.renameContent} />}
+          {hasPrimary && (
+            <ButtonRevamp
+              label={data!.ctaLabel!}
+              variant="primary"
+              fullWidth
+              icon="right-arrow"
+              iconPosition="end"
+              style={styles.renameCta}
+              onPress={() => onPrimaryPress?.()}
+            />
           )}
         </>
       ) : children ? children : (
@@ -834,5 +868,30 @@ const styles = StyleSheet.create({
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize:   FontSize.font14,
     color:      '#333333',
+  },
+  // ── bharatJodiiRename (Angular bottomsheet.component.scss ".rename-*") ──────
+  renameLogo: {
+    width:        72,
+    height:       72,
+    marginBottom: 24,
+  },
+  renameTitle: {
+    fontFamily: Fonts.poppinsSemiBold,
+    fontSize:   FontSize.font18,
+    color:      '#1f1e1b',
+  },
+  renameContent: {
+    fontFamily:   SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize:     FontSize.font14,
+    color:        '#545454',
+    marginTop:    8,
+    paddingRight: 12,
+  },
+  renameCta: {
+    // Angular: .rename-cta { height: 48px; --border-radius: 8px } — taller
+    // than either of ButtonRevamp's 'standard' (44) or 'large' (40) presets.
+    height:       48,
+    marginTop:    24,
+    marginBottom: 8,
   },
 })

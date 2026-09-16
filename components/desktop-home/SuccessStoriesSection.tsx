@@ -27,8 +27,8 @@ export default function SuccessStoriesSection({ stories, onStoryPress, onSeeAllP
   return (
     <View style={s.section}>
       <View style={s.header}>
-        <SectionHeader title="Got married through Jodii" onPress={onHeaderPress} />
-        <Text style={s.subtitle}>Thousands have met their life partner through Jodii</Text>
+        <SectionHeader title="Got married through BharatJodii" onPress={onHeaderPress} />
+        <Text style={s.subtitle}>Thousands have met their life partner through BharatJodii</Text>
       </View>
 
       <View style={s.row}>

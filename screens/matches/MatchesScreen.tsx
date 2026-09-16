@@ -1064,6 +1064,13 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   // ── "Rate our app" popup ────────────────────────────────────────────────────
   const [showRatingPopup, setShowRatingPopup] = useState(false)
 
+  // ── BharatJodii rename announcement (one-time) ──────────────────────────────
+  // Angular: matches.page.ts's checkBharatJodiiRenameSheet() / BHARATJODII_RENAME
+  // bottom-sheet config. Angular gates on apptype=="115" AND version=="7.5"; this
+  // port gates on apptype only (see checkOnFocusPopups below) since RN's own
+  // version string isn't tied to that PWA-specific release.
+  const [showBharatJodiiRename, setShowBharatJodiiRename] = useState(false)
+
   // ── Survey popup ─────────────────────────────────────────────────────────────
   const [surveyData, setSurveyData] = useState<SurveyPopupData | null>(null)
 
@@ -1546,6 +1553,25 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
       }
     }
 
+    // BharatJodii rename announcement — Angular: matches.page.ts's
+    // checkBharatJodiiRenameSheet(), gated on apptype (this port drops the
+    // version half of Angular's gate — see the state declaration above) and a
+    // persisted once-only flag. The flag is set BEFORE showing the sheet, not
+    // after dismiss — this check re-fires on every return to Matches (back
+    // nav from explore/filter/profile), so a re-entry must find it already set.
+    let renameShown = false
+    if (!ctrl.cancelled && !bulkLikeShown) {
+      const [appType, renameAlreadyShown] = await Promise.all([
+        getItem(StorageKeys.Auth.APP_TYPE),
+        getItem(StorageKeys.App.BHARATJODII_RENAME_SHOWN),
+      ])
+      if (!ctrl.cancelled && appType === '115' && renameAlreadyShown !== '1') {
+        await setItem(StorageKeys.App.BHARATJODII_RENAME_SHOWN, '1')
+        renameShown = true
+        setShowBharatJodiiRename(true)
+      }
+    }
+
     // Angular: ionViewDidEnter() → getNotificationCount(). Feeds both the footer's
     // live like-count badge (#12) and the rating-popup trigger (#9) below.
     if (!ctrl.cancelled) {
@@ -1556,9 +1582,9 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
       }
 
       // "Rate our app" popup (#9) — Angular: passiveRatingPopup(). Skipped when the
-      // bulk-like modal already claimed this mount's one popup slot (no modal-stacking),
-      // mirroring Angular's SHOW_RATING_POPUP mutual-exclusion.
-      if (!ctrl.cancelled && !bulkLikeShown && await shouldShowRatingPopup(comCount)) {
+      // bulk-like modal or the rename announcement already claimed this mount's one
+      // popup slot (no modal-stacking), mirroring Angular's SHOW_RATING_POPUP mutual-exclusion.
+      if (!ctrl.cancelled && !bulkLikeShown && !renameShown && await shouldShowRatingPopup(comCount)) {
         setShowRatingPopup(true)
         await markRatingPopupShown()
       }
@@ -1567,7 +1593,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     // Survey popup (#11) — Angular: matches.page.ts:740-743, getSurveydetails():2167-2178.
     // One-time-consume: clear SURVEYPOPUP immediately so it won't fire again without a
     // fresh server flag on a future login (Angular: removeStorageValue('1','SURVEYPOPUP','')).
-    if (!ctrl.cancelled && !bulkLikeShown) {
+    if (!ctrl.cancelled && !bulkLikeShown && !renameShown) {
       const [loginCount, surveyFlag, paywallType] = await Promise.all([
         getItem(StorageKeys.Auth.LOGIN_COUNT),
         getItem('SURVEYPOPUP'),
@@ -1582,9 +1608,9 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
 
     // Income disclosure prompt — Angular: checkIncomeSheet() (matches.page.ts:
     // 2432-2456), its own 1.2s setTimeout ahead of showing. Gated the same way
-    // as survey/rating above (skip if the bulk-like modal already claimed this
-    // mount's one popup slot).
-    if (!bulkLikeShown) {
+    // as survey/rating above (skip if the bulk-like modal or rename announcement
+    // already claimed this mount's one popup slot).
+    if (!bulkLikeShown && !renameShown) {
       setTimeout(async () => {
         if (ctrl.cancelled) return
         if (!(await shouldShowIncomeSheet())) return
@@ -2696,6 +2722,17 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
           onClose={() => setShowNotificationPopup(false)}
         />
         <AppRatingModal visible={showRatingPopup} onClose={() => setShowRatingPopup(false)} />
+        <BottomSheet
+          visible={showBharatJodiiRename}
+          type="bharatJodiiRename"
+          data={{
+            title:    t('MATCHES.BJ_TITLE'),
+            content:  t('MATCHES.BJ_SUBTXT'),
+            ctaLabel: t('MATCHES.BJ_CTA'),
+          }}
+          onClose={() => setShowBharatJodiiRename(false)}
+          onPrimaryPress={() => setShowBharatJodiiRename(false)}
+        />
         <SurveyPopup visible={!!surveyData} data={surveyData} onClose={() => setSurveyData(null)} />
         <SearchablePicker
           visible={showIncomeSheet}
@@ -2911,6 +2948,17 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         onClose={() => setShowNotificationPopup(false)}
       />
       <AppRatingModal visible={showRatingPopup} onClose={() => setShowRatingPopup(false)} />
+      <BottomSheet
+        visible={showBharatJodiiRename}
+        type="bharatJodiiRename"
+        data={{
+          title:    t('MATCHES.BJ_TITLE'),
+          content:  t('MATCHES.BJ_SUBTXT'),
+          ctaLabel: t('MATCHES.BJ_CTA'),
+        }}
+        onClose={() => setShowBharatJodiiRename(false)}
+        onPrimaryPress={() => setShowBharatJodiiRename(false)}
+      />
       <SurveyPopup visible={!!surveyData} data={surveyData} onClose={() => setSurveyData(null)} />
       <SearchablePicker
         visible={showIncomeSheet}

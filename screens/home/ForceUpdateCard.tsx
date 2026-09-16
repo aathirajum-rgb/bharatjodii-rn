@@ -8,9 +8,10 @@ import { useTranslation } from 'react-i18next'
 import { SvgXml } from 'react-native-svg'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
+import { CDN_SVG } from '../../constants/cdn'
 import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
-const ALERT_ICON = 'https://imgs.jodii.app/assets/images/svg/activity-alert-img.svg'
+const ALERT_ICON = `${CDN_SVG}activity-alert-img.svg`
 // Angular: `<ion-icon class="cross-img-vp-revamp color-808080" name="close-outline">`
 // — a real Ionicons close-outline icon (same glyph HomeScreen.tsx's video-modal
 // close button uses), not a styled text character. Traced from ionicons'

@@ -97,6 +97,7 @@ import SelfieVerificationScreen     from '../screens/verify/SelfieVerificationSc
 import PhotoMismatchSelfieScreen    from '../screens/verify/PhotoMismatchSelfieScreen'
 import MenuContactsScreen           from '../screens/menu-contacts/MenuContactsScreen'
 import ValidationScreen            from '../screens/validation/ValidationScreen'
+import NameGenderRevalidationScreen from '../screens/validation/NameGenderRevalidationScreen'
 import DiscoverMatchesScreen       from '../screens/discover-matches/DiscoverMatchesScreen'
 import AddPhotoIntermediateScreen  from '../screens/addphoto-intermediate/AddPhotoIntermediateScreen'
 import StarMatchingScreen          from '../screens/star-matching/StarMatchingScreen'
@@ -261,6 +262,10 @@ export type AppStackParamList = {
   // insert response (Angular: callInsertApiAndHandleValidation); absent when
   // reached via the case-61 deep link, which reads stored VIOLATIONFIELDS.
   Validation: { mode?: 'confirm' | 'underReview'; violationFields?: string[] } | undefined
+  // Angular: webview.page.ts's page_id "62" (JODII-453) — AI-flagged NAME/GENDER
+  // re-validation edit sheet. Self-contained: fetches its own data on mount,
+  // same as every other resetTo-only screen in this file, so no params needed.
+  NameGenderRevalidation: undefined
   // Angular: pages/verify-id — STUB (see screens/verify/VerifyIdScreen.tsx),
   // real govt-ID verification flow not ported yet.
   'verify-id': undefined
@@ -686,6 +691,11 @@ export default function AppStack() {
       <Stack.Screen
         name="Validation"
         component={ValidationScreen}
+        options={{ gestureEnabled: false }}
+      />
+      <Stack.Screen
+        name="NameGenderRevalidation"
+        component={NameGenderRevalidationScreen}
         options={{ gestureEnabled: false }}
       />
       <Stack.Screen name="verify-id" component={VerifyIdScreen} />

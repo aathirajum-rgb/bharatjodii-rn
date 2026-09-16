@@ -103,6 +103,11 @@ export const StorageKeys = {
   App: {
     DYNAMIC: 'DYNAMIC',
     PP_SET_DATA: 'PPSETDATA',
+    // Angular: matches.page.ts's checkBharatJodiiRenameSheet() — 'BHARATJODIIRENAMESHOWN'
+    // localStorage key, same name kept here. Set BEFORE showing the sheet, not
+    // after dismiss, since the matches-focus check re-fires on every return to
+    // the screen.
+    BHARATJODII_RENAME_SHOWN: 'BHARATJODIIRENAMESHOWN',
     // Angular: common.ts's callNative() gallery/storage permission popup
     // escalation counter — see AddPhotoScreen.tsx's openGallery().
     STG_PERMISSION_COUNT: 'STG_PERMISSION_COUNT',

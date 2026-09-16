@@ -1,32 +1,47 @@
 const FLAVORS = {
   jodii: {
     appType: 115,
-    appName: 'Jodii',
+    appName: 'BharatJodii',
     applicationId: 'jodii.app',
     scheme: 'jodii',
     domain: 'jodii.app',
-    welcomeText: 'Welcome to Jodii',
+    // BharatJodii rebrand: old SMS links / OneLink shares already in
+    // circulation still point at jodii.app, so the new host is added
+    // alongside it (additive, matching the native Android app's own
+    // dual-host App Link migration) rather than replacing `domain` outright.
+    // Only the root flavor gets a second host — every other flavor is
+    // untouched by this rebrand's domain change.
+    domain2: 'bharatjodii.com',
+    welcomeText: 'Welcome to BharatJodii',
     icon: './assets/icon.png',
+    // BharatJodii rebrand: notification small-icon, ported from the native
+    // Android app's per-flavor drawable/ic_notify_logo.png (see app.config.js's
+    // expo-notifications plugin config). Only this flavor + the 8 below got a
+    // redesigned one in the reference migration — every other flavor falls
+    // back to its own `icon` above.
+    notifyIcon: './assets/icons/bharatjodii-logo.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodii.app&hl=en_US&gl=US',
   },
   tamil: {
     appType: 116,
-    appName: 'Tamil Jodii',
+    appName: 'TamilJodii',
     applicationId: 'jodiiapp.android.tamil',
     scheme: 'tamilmatrimony',
     domain: 'tamil.jodii.app',
     welcomeText: 'Welcome to Tamil Jodii',
     icon: './assets/icons/logos/tamil_jodii.png',
+    notifyIcon: './assets/icons/tamil-logo.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.tamil',
   },
   malayalam: {
     appType: 118,
-    appName: 'Malayalam Jodii',
+    appName: 'MalayalamJodii',
     applicationId: 'jodiiapp.android.malayalam',
     scheme: 'malayalammatrimony',
     domain: 'malayalam.jodii.app',
     welcomeText: 'Welcome to Malayalam Jodii',
     icon: './assets/icons/logos/malayalam_jodii.png',
+    notifyIcon: './assets/icons/malayalam-logo.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.malayalam',
   },
   // Remaining flavors ported from the old native Android project's
@@ -38,67 +53,73 @@ const FLAVORS = {
   // icons to be swapped in later.
   telugu: {
     appType: 117,
-    appName: 'Telugu Jodii',
+    appName: 'TeluguJodii',
     applicationId: 'jodiiapp.android.telugu',
     scheme: 'telugujodii',
     domain: 'telugu.jodii.app',
     welcomeText: 'Welcome to Telugu Jodii',
     icon: './assets/icons/logos/telugu_jodii.png',
+    notifyIcon: './assets/icons/telugu-logo.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.telugu',
   },
   kannada: {
     appType: 119,
-    appName: 'Kannada Jodii',
+    appName: 'KannadaJodii',
     applicationId: 'jodiiapp.android.kannada',
     scheme: 'kannadajodii',
     domain: 'kannada.jodii.app',
     welcomeText: 'Welcome to Kannada Jodii',
     icon: './assets/icons/logos/kannada_jodii.png',
+    notifyIcon: './assets/icons/kannada-logo.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.kannada',
   },
   oriya: {
     appType: 120,
-    appName: 'Oriya Jodii',
+    appName: 'OriyaJodii',
     applicationId: 'jodiiapp.android.oriya',
     scheme: 'oriyajodii',
     domain: 'oriya.jodii.app',
     welcomeText: 'Welcome to Oriya Jodii',
     icon: './assets/icons/logos/oriya_jodii.png',
+    notifyIcon: './assets/icons/oriya-logo.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.oriya',
   },
   bengali: {
     appType: 121,
-    appName: 'Bengali Jodii',
+    appName: 'BengaliJodii',
     applicationId: 'jodiiapp.android.bengali',
     scheme: 'bengalijodii',
     domain: 'bengali.jodii.app',
     welcomeText: 'Welcome to Bengali Jodii',
     icon: './assets/icons/logos/bengali_jodii.png',
+    notifyIcon: './assets/icons/bengali-logo.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.bengali',
   },
   marathi: {
     appType: 122,
-    appName: 'Marathi Jodii',
+    appName: 'MarathiJodii',
     applicationId: 'jodiiapp.android.marathi',
     scheme: 'marathijodii',
     domain: 'marathi.jodii.app',
     welcomeText: 'Welcome to Marathi Jodii',
     icon: './assets/icons/logos/marathi_jodii.png',
+    notifyIcon: './assets/icons/marathi-logo.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.marathi',
   },
   gujarati: {
     appType: 123,
-    appName: 'Gujarati Jodii',
+    appName: 'GujaratiJodii',
     applicationId: 'jodiiapp.android.gujarati',
     scheme: 'gujarathijodii',
     domain: 'gujarati.jodii.app',
     welcomeText: 'Welcome to Gujarati Jodii',
     icon: './assets/icons/logos/gujarati_jodii.png',
+    notifyIcon: './assets/icons/gujarati-logo.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.gujarati',
   },
   hindi: {
     appType: 124,
-    appName: 'Hindi Jodii',
+    appName: 'HindiJodii',
     applicationId: 'jodiiapp.android.hindi',
     scheme: 'hindijodii',
     domain: 'hindi.jodii.app',
@@ -108,17 +129,18 @@ const FLAVORS = {
   },
   punjabi: {
     appType: 125,
-    appName: 'Punjabi Jodii',
+    appName: 'PunjabiJodii',
     applicationId: 'jodiiapp.android.punjabi',
     scheme: 'punjabijodii',
     domain: 'punjabi.jodii.app',
     welcomeText: 'Welcome to Punjabi Jodii',
     icon: './assets/icons/logos/punjabi_jodii.png',
+    notifyIcon: './assets/icons/punjabi-logo.png',
     playStoreUrl: 'https://play.google.com/store/apps/details?id=jodiiapp.android.punjabi',
   },
   ninetysixkulimaratha: {
     appType: 301,
-    appName: 'Ninetysixkulimaratha Jodii',
+    appName: 'NinetysixkulimarathaJodii',
     applicationId: 'ninetysixkulimaratha.jodii.com',
     scheme: 'ninetysixkulimaratha',
     domain: 'ninetysixkulimaratha.jodii.com',
@@ -128,7 +150,7 @@ const FLAVORS = {
   },
   ezhava: {
     appType: 302,
-    appName: 'Ezhava Jodii',
+    appName: 'EzhavaJodii',
     applicationId: 'ezhava.jodii.com',
     scheme: 'ezhavajodii',
     domain: 'ezhava.jodii.com',
@@ -138,7 +160,7 @@ const FLAVORS = {
   },
   nair: {
     appType: 303,
-    appName: 'Nair Jodii',
+    appName: 'NairJodii',
     applicationId: 'nair.jodii.com',
     scheme: 'nairjodii',
     domain: 'nair.jodii.com',
@@ -148,7 +170,7 @@ const FLAVORS = {
   },
   kayastha: {
     appType: 304,
-    appName: 'Kayastha Jodii',
+    appName: 'KayasthaJodii',
     applicationId: 'kayastha.jodii.com',
     scheme: 'kayasthajodii',
     domain: 'kayastha.jodii.com',
@@ -158,7 +180,7 @@ const FLAVORS = {
   },
   lingayath: {
     appType: 305,
-    appName: 'Lingayath Jodii',
+    appName: 'LingayathJodii',
     applicationId: 'lingayath.jodii.com',
     scheme: 'lingayathjodii',
     domain: 'lingayath.jodii.com',
@@ -168,7 +190,7 @@ const FLAVORS = {
   },
   khandayat: {
     appType: 306,
-    appName: 'Khandayat Jodii',
+    appName: 'KhandayatJodii',
     applicationId: 'khandayat.jodii.com',
     scheme: 'khandayatjodii',
     domain: 'khandayat.jodii.com',
@@ -178,7 +200,7 @@ const FLAVORS = {
   },
   sc: {
     appType: 307,
-    appName: 'SC Jodii',
+    appName: 'SCJodii',
     applicationId: 'sc.jodii.com',
     scheme: 'scjodii',
     domain: 'sc.jodii.com',
@@ -188,7 +210,7 @@ const FLAVORS = {
   },
   vokkaliga: {
     appType: 308,
-    appName: 'Vokkaliga Jodii',
+    appName: 'VokkaligaJodii',
     applicationId: 'vokkaliga.jodii.com',
     scheme: 'vokkaligajodii',
     domain: 'vokkaliga.jodii.com',
@@ -198,7 +220,7 @@ const FLAVORS = {
   },
   vishwakarma: {
     appType: 309,
-    appName: 'Vishwakarma Jodii',
+    appName: 'VishwakarmaJodii',
     applicationId: 'vishwakarma.jodii.com',
     scheme: 'vishwakarmajodii',
     domain: 'vishwakarma.jodii.com',
@@ -208,7 +230,7 @@ const FLAVORS = {
   },
   patel: {
     appType: 310,
-    appName: 'Patel Jodii',
+    appName: 'PatelJodii',
     applicationId: 'patel.jodii.com',
     scheme: 'pateljodii',
     domain: 'patel.jodii.com',
@@ -218,7 +240,7 @@ const FLAVORS = {
   },
   adidravidar: {
     appType: 311,
-    appName: 'Adidravidar Jodii',
+    appName: 'AdidravidarJodii',
     applicationId: 'adidravidar.jodii.com',
     scheme: 'adidravidarjodii',
     domain: 'adidravidar.jodii.com',
@@ -228,7 +250,7 @@ const FLAVORS = {
   },
   teli: {
     appType: 312,
-    appName: 'Teli Jodii',
+    appName: 'TeliJodii',
     applicationId: 'teli.jodii.com',
     scheme: 'telijodii',
     domain: 'teli.jodii.com',
@@ -238,7 +260,7 @@ const FLAVORS = {
   },
   vanniyar: {
     appType: 313,
-    appName: 'Vanniyar Jodii',
+    appName: 'VanniyarJodii',
     applicationId: 'vanniyar.jodii.com',
     scheme: 'vanniyarjodii',
     domain: 'vanniyar.jodii.com',
@@ -248,7 +270,7 @@ const FLAVORS = {
   },
   reddy: {
     appType: 314,
-    appName: 'Reddy Jodii',
+    appName: 'ReddyJodii',
     applicationId: 'reddy.jodii.com',
     scheme: 'reddyjodii',
     domain: 'reddy.jodii.com',
@@ -258,7 +280,7 @@ const FLAVORS = {
   },
   kapu: {
     appType: 315,
-    appName: 'Kapu Jodii',
+    appName: 'KapuJodii',
     applicationId: 'kapu.jodii.com',
     scheme: 'kapujodii',
     domain: 'kapu.jodii.com',
@@ -268,7 +290,7 @@ const FLAVORS = {
   },
   viswabrahmin: {
     appType: 316,
-    appName: 'Viswabrahmin Jodii',
+    appName: 'ViswabrahminJodii',
     applicationId: 'viswabrahmin.jodii.com',
     scheme: 'viswabrahminjodii',
     domain: 'viswabrahmin.jodii.com',
@@ -278,7 +300,7 @@ const FLAVORS = {
   },
   thiyya: {
     appType: 317,
-    appName: 'Thiyya Jodii',
+    appName: 'ThiyyaJodii',
     applicationId: 'thiyya.jodii.com',
     scheme: 'thiyyajodii',
     domain: 'thiyya.jodii.com',
@@ -288,7 +310,7 @@ const FLAVORS = {
   },
   kuruba: {
     appType: 318,
-    appName: 'Kuruba Jodii',
+    appName: 'KurubaJodii',
     applicationId: 'kuruba.jodii.com',
     scheme: 'kurubajodii',
     domain: 'kuruba.jodii.com',
@@ -298,7 +320,7 @@ const FLAVORS = {
   },
   gowda: {
     appType: 319,
-    appName: 'Gowda Jodii',
+    appName: 'GowdaJodii',
     applicationId: 'gowda.jodii.com',
     scheme: 'gowdajodii',
     domain: 'gowda.jodii.com',
@@ -308,7 +330,7 @@ const FLAVORS = {
   },
   nadar: {
     appType: 320,
-    appName: 'Nadar Jodii',
+    appName: 'NadarJodii',
     applicationId: 'nadar.jodii.com',
     scheme: 'nadarjodii',
     domain: 'nadar.jodii.com',
@@ -318,7 +340,7 @@ const FLAVORS = {
   },
   aryavysya: {
     appType: 321,
-    appName: 'Aryavysya Jodii',
+    appName: 'AryavysyaJodii',
     applicationId: 'aryavysya.jodii.com',
     scheme: 'aryavysyajodii',
     domain: 'aryavysya.jodii.com',
@@ -328,7 +350,7 @@ const FLAVORS = {
   },
   prajapati: {
     appType: 322,
-    appName: 'Prajapati Jodii',
+    appName: 'PrajapatiJodii',
     applicationId: 'prajapati.jodii.com',
     scheme: 'prajapatijodii',
     domain: 'prajapati.jodii.com',
@@ -338,7 +360,7 @@ const FLAVORS = {
   },
   konguvellalar: {
     appType: 323,
-    appName: 'Konguvellalar Jodii',
+    appName: 'KonguvellalarJodii',
     applicationId: 'konguvellalar.jodii.com',
     scheme: 'konguvellalarjodii',
     domain: 'konguvellalar.jodii.com',
@@ -348,7 +370,7 @@ const FLAVORS = {
   },
   thevar: {
     appType: 324,
-    appName: 'Thevar Jodii',
+    appName: 'ThevarJodii',
     applicationId: 'thevar.jodii.com',
     scheme: 'thevarjodii',
     domain: 'thevar.jodii.com',
@@ -358,7 +380,7 @@ const FLAVORS = {
   },
   kshatriya: {
     appType: 325,
-    appName: 'Kshatriya Jodii',
+    appName: 'KshatriyaJodii',
     applicationId: 'kshatriya.jodii.com',
     scheme: 'kshatriyajodii',
     domain: 'kshatriya.jodii.com',
@@ -368,7 +390,7 @@ const FLAVORS = {
   },
   kamma: {
     appType: 326,
-    appName: 'Kamma Jodii',
+    appName: 'KammaJodii',
     applicationId: 'kamma.jodii.com',
     scheme: 'kammajodii',
     domain: 'kamma.jodii.com',
@@ -378,7 +400,7 @@ const FLAVORS = {
   },
   rajput: {
     appType: 327,
-    appName: 'Rajput Jodii',
+    appName: 'RajputJodii',
     applicationId: 'rajput.jodii.com',
     scheme: 'rajputjodii',
     domain: 'rajput.jodii.com',
@@ -388,7 +410,7 @@ const FLAVORS = {
   },
   agarwal: {
     appType: 328,
-    appName: 'Agarwal Jodii',
+    appName: 'AgarwalJodii',
     applicationId: 'agarwal.jodii.com',
     scheme: 'agarwaljodii',
     domain: 'agarwal.jodii.com',
@@ -398,7 +420,7 @@ const FLAVORS = {
   },
   yadav: {
     appType: 329,
-    appName: 'Yadav Jodii',
+    appName: 'YadavJodii',
     applicationId: 'yadav.jodii.com',
     scheme: 'yadavjodii',
     domain: 'yadav.jodii.com',
@@ -408,7 +430,7 @@ const FLAVORS = {
   },
   mali: {
     appType: 330,
-    appName: 'Mali Jodii',
+    appName: 'MaliJodii',
     applicationId: 'mali.jodii.com',
     scheme: 'malijodii',
     domain: 'mali.jodii.com',
@@ -418,7 +440,7 @@ const FLAVORS = {
   },
   st: {
     appType: 331,
-    appName: 'ST Jodii',
+    appName: 'STJodii',
     applicationId: 'st.jodii.com',
     scheme: 'stjodii',
     domain: 'st.jodii.com',
@@ -428,7 +450,7 @@ const FLAVORS = {
   },
   naidu: {
     appType: 332,
-    appName: 'Naidu Jodii',
+    appName: 'NaiduJodii',
     applicationId: 'naidu.jodii.com',
     scheme: 'naidujodii',
     domain: 'naidu.jodii.com',
@@ -438,7 +460,7 @@ const FLAVORS = {
   },
   mudaliyar: {
     appType: 333,
-    appName: 'Mudaliyar Jodii',
+    appName: 'MudaliyarJodii',
     applicationId: 'mudaliyar.jodii.com',
     scheme: 'mudaliyarjodii',
     domain: 'mudaliyar.jodii.com',
@@ -448,7 +470,7 @@ const FLAVORS = {
   },
   chettiyar: {
     appType: 334,
-    appName: 'Chettiyar Jodii',
+    appName: 'ChettiyarJodii',
     applicationId: 'chettiyar.jodii.com',
     scheme: 'chettiyarjodii',
     domain: 'chettiyar.jodii.com',
@@ -458,7 +480,7 @@ const FLAVORS = {
   },
   padmasali: {
     appType: 335,
-    appName: 'Padmasali Jodii',
+    appName: 'PadmasaliJodii',
     applicationId: 'padmasali.jodii.com',
     scheme: 'padmasalijodii',
     domain: 'padmasali.jodii.com',
@@ -468,7 +490,7 @@ const FLAVORS = {
   },
   jat: {
     appType: 336,
-    appName: 'Jat Jodii',
+    appName: 'JatJodii',
     applicationId: 'jat.jodii.com',
     scheme: 'jatjodii',
     domain: 'jat.jodii.com',
@@ -478,7 +500,7 @@ const FLAVORS = {
   },
   baniya: {
     appType: 337,
-    appName: 'Baniya Jodii',
+    appName: 'BaniyaJodii',
     applicationId: 'baniya.jodii.com',
     scheme: 'baniyajodii',
     domain: 'baniya.jodii.com',
@@ -488,7 +510,7 @@ const FLAVORS = {
   },
   pillai: {
     appType: 338,
-    appName: 'Pillai Jodii',
+    appName: 'PillaiJodii',
     applicationId: 'pillai.jodii.com',
     scheme: 'pillaijodii',
     domain: 'pillai.jodii.com',
@@ -498,7 +520,7 @@ const FLAVORS = {
   },
   brahmin: {
     appType: 504,
-    appName: 'Brahmin Jodii',
+    appName: 'BrahminJodii',
     applicationId: 'brahmin.jodii.com',
     scheme: 'brahminjodii',
     domain: 'brahmin.jodii.com',
@@ -508,7 +530,7 @@ const FLAVORS = {
   },
   christian: {
     appType: 501,
-    appName: 'Christian Jodii',
+    appName: 'ChristianJodii',
     applicationId: 'christian.jodii.com',
     scheme: 'christianjodii',
     domain: 'christian.jodii.com',
@@ -518,7 +540,7 @@ const FLAVORS = {
   },
   muslim: {
     appType: 502,
-    appName: 'Muslim Jodii',
+    appName: 'MuslimJodii',
     applicationId: 'muslim.jodii.com',
     scheme: 'muslimjodii',
     domain: 'muslim.jodii.com',
@@ -528,7 +550,7 @@ const FLAVORS = {
   },
   divorcee: {
     appType: 503,
-    appName: 'Divorcee Jodii',
+    appName: 'DivorceeJodii',
     applicationId: 'divorcee.jodii.com',
     scheme: 'divorceejodii',
     domain: 'divorcee.jodii.com',
@@ -538,7 +560,7 @@ const FLAVORS = {
   },
   jain: {
     appType: 505,
-    appName: 'Jain Jodii',
+    appName: 'JainJodii',
     applicationId: 'jain.jodii.com',
     scheme: 'jainjodii',
     domain: 'jain.jodii.com',
@@ -548,7 +570,7 @@ const FLAVORS = {
   },
   sikh: {
     appType: 506,
-    appName: 'Sikh Jodii',
+    appName: 'SikhJodii',
     applicationId: 'sikh.jodii.com',
     scheme: 'sikhjodii',
     domain: 'sikh.jodii.com',

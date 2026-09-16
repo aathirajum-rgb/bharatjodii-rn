@@ -20,7 +20,7 @@ import AppStack, { type AppStackParamList } from './AppStack'
 import AuthStack, { type AuthStackParamList } from './AuthStack'
 
 // ─── Web hash-based URL routing ───────────────────────────────────────────────
-// Target format: https://stgmobile.jodii.app/jodii/#/daily-recommendations?frm_page=login
+// Target format: https://stgmobile.bharatjodii.com/jodii/#/daily-recommendations?frm_page=login
 //
 // IMPORTANT: NavigationContainer's own built-in web linking already writes to
 // the browser URL on every navigation (history.pushState), driven by

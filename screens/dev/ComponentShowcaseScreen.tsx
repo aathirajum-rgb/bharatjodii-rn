@@ -24,6 +24,7 @@ import CheckboxGroup, { type CheckboxOption } from '../../components/checkbox/Ch
 import RadioGroup, { type RadioOption } from '../../components/radio/RadioGroup'
 import SelectableCard from '../../components/radio-checkbox-card/SelectableCard'
 import Dropdown from '../../components/dropdown/Dropdown'
+import { CDN_IMG, CDN_SVG } from '../../constants/cdn'
 
 // ─── Styles declared first so sections array can reference them ───────────────
 
@@ -536,8 +537,8 @@ function InputShowcase() {
 
 // ─── ProfileCard showcase ─────────────────────────────────────────────────────
 
-const MOCK_IMG   = 'https://imgs.jodii.app/assets/images/default-profile.jpg'
-const MOCK_THUMB = 'https://imgs.jodii.app/assets/images/default-profile.jpg'
+const MOCK_IMG   = CDN_IMG + 'default-profile.jpg'
+const MOCK_THUMB = CDN_IMG + 'default-profile.jpg'
 
 const profileCardItems: { label: string; desc: string; node: React.ReactNode }[] = [
   {
@@ -750,7 +751,7 @@ function LoaderShowcase() {
 
 // ─── Badge showcase ───────────────────────────────────────────────────────────
 
-const CDN_BADGE = 'https://imgs.jodii.app/assets/images/svg/'
+const CDN_BADGE = CDN_SVG
 
 const badgeItems: { label: string; desc: string; node: React.ReactNode }[] = [
   {
@@ -1184,7 +1185,7 @@ function DropdownShowcase() {
 
 // ─── ProfilePhoto showcase ────────────────────────────────────────────────────
 
-const PHOTO_URL = 'https://imgs.jodii.app/assets/images/default-profile.jpg'
+const PHOTO_URL = CDN_IMG + 'default-profile.jpg'
 
 function ProfilePhotoShowcase() {
   const items: { label: string; desc: string; node: React.ReactNode }[] = [
@@ -1297,8 +1298,8 @@ function ProfilePhotoShowcase() {
 // ─── MatchesCard showcase ─────────────────────────────────────────────────────
 
 const MATCHES_IMG = [
-  { IMAGE: 'https://imgs.jodii.app/assets/images/default-profile.jpg' },
-  { IMAGE: 'https://imgs.jodii.app/assets/images/default-profile.jpg' },
+  { IMAGE: CDN_IMG + 'default-profile.jpg' },
+  { IMAGE: CDN_IMG + 'default-profile.jpg' },
 ]
 
 function MatchesCardShowcase() {
@@ -1409,22 +1410,22 @@ function SwiperCardShowcase() {
   const swiperItems = [
     {
       profileId: 'S1', name: 'Priya S.', age: '26 Yrs', education: 'MBA',
-      profileImg: 'https://imgs.jodii.app/assets/images/default-profile.jpg',
+      profileImg: CDN_IMG + 'default-profile.jpg',
       likedStatus: '0' as const,
     },
     {
       profileId: 'S2', name: 'Divya K.', age: '24 Yrs', education: 'B.Tech',
-      profileImg: 'https://imgs.jodii.app/assets/images/default-profile.jpg',
+      profileImg: CDN_IMG + 'default-profile.jpg',
       likedStatus: '1' as const, isNewlyJoined: true,
     },
     {
       profileId: 'S3', name: 'Ananya R.', age: '27 Yrs', education: 'CA',
-      profileImg: 'https://imgs.jodii.app/assets/images/default-profile.jpg',
+      profileImg: CDN_IMG + 'default-profile.jpg',
       likedStatus: '0' as const,
     },
     {
       profileId: 'S4', name: 'Meena V.', age: '25 Yrs', education: 'B.Com',
-      profileImg: 'https://imgs.jodii.app/assets/images/default-profile.jpg',
+      profileImg: CDN_IMG + 'default-profile.jpg',
       likedStatus: '2' as const,
     },
   ]
@@ -1481,9 +1482,9 @@ function SwiperCardShowcase() {
 
 // ─── AppHeader showcase ───────────────────────────────────────────────────────
 
-const MOCK_USER_IMG = 'https://imgs.jodii.app/assets/images/default-profile.jpg'
-const MOCK_NOTIFICATION_ICON = 'https://imgs.jodii.app/assets/images/svg/revamp/notification.svg'
-const MOCK_CHAT_ICON = 'https://imgs.jodii.app/assets/images/svg/revamp/chat.svg'
+const MOCK_USER_IMG = CDN_IMG + 'default-profile.jpg'
+const MOCK_NOTIFICATION_ICON = CDN_SVG + 'revamp/notification.svg'
+const MOCK_CHAT_ICON = CDN_SVG + 'revamp/chat.svg'
 
 function AppHeaderShowcase() {
   const items: { label: string; desc: string; node: React.ReactNode }[] = [
@@ -1684,7 +1685,7 @@ const SHEET_VARIANTS: SheetVariant[] = [
     desc:  'Top illustration + title + content + upgrade CTA. Matches Angular payment bottomsheet.',
     type:  'payment',
     data: {
-      image:     'https://imgs.jodii.app/assets/images/svg/profile-not-activated-img.svg',
+      image:     CDN_SVG + 'profile-not-activated-img.svg',
       title:     'Become a Premium Member',
       content:   'Send unlimited likes and get priority placement in search results.',
       ctaLabel:  'Upgrade Now',

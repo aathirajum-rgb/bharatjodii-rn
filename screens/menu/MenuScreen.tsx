@@ -18,6 +18,8 @@ import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
+import { PRIVACY_POLICY_URL, TERMS_CONDITIONS_URL } from '../../constants/webLinks'
+import { EnvConfig } from '../../constants/env'
 import { StorageKeys } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
 import { getSession, getSessionValue } from '../../service/registrationService'
@@ -44,10 +46,6 @@ import { Fonts, FontSize } from '../../src/theme/fonts'
 
 const R = CDN_REACT + '/'
 const SCREEN_H = Dimensions.get('window').height
-
-// Angular: external-page.page.ts's hardcoded urlObjs = {1: privacy, 2: terms}.
-const PRIVACY_POLICY_URL   = 'https://www.jodii.com/privacy-policy.html'
-const TERMS_CONDITIONS_URL = 'https://www.jodii.com/terms.html'
 
 export const ICON = {
   back:          R + 'menu_back_arrow.svg',
@@ -123,7 +121,10 @@ export async function performLogout(): Promise<void> {
   // leaving the SPA on its own login screen instead of actually navigating away.
   if (Platform.OS === 'web' && typeof window !== 'undefined') {
     setTimeout(() => {
-      window.location.href = 'https://devwww.jodii.com'
+      // Was hardcoded to the dev marketing site regardless of build — used
+      // EnvConfig.web instead so a prod web build lands back on the real
+      // production site, not always devwww.
+      window.location.href = EnvConfig.web
     }, 10)
   }
 }

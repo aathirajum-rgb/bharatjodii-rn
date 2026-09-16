@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Jodii",
+    "name": "BharatJodii",
     "slug": "jodii",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -30,12 +30,12 @@
       "favicon": "./assets/favicon.png",
       "bundler": "metro",
       "output": "single",
-      "name": "Jodii",
-      "shortName": "Jodii",
+      "name": "BharatJodii",
+      "shortName": "BharatJodii",
       "lang": "en",
       "backgroundColor": "#ffffff",
       "themeColor": "#ffffff",
-      "description": "Jodii App"
+      "description": "BharatJodii App"
     },
      "experiments": {
       "baseUrl": "/jodii"

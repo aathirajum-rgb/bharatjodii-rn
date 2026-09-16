@@ -28,11 +28,11 @@ const otaManifestUrl = process.env.OTA_MANIFEST_URL;
 // under the API host (e.g. registration/linksms/v1 — see deepLinkService.ts's
 // handleApiHostLink) actually reach the app; update both if a host changes.
 const API_HOSTS = {
-  dev: 'stgoapi.jodii.app',
-  stg: 'stgoapi.jodii.app',
-  uat: 'stgoapi.jodii.app',
-  preprod: 'ppoapi.jodii.app',
-  prod: 'oapi.jodii.app',
+  dev: 'stgoapi.bharatjodii.com',
+  stg: 'stgoapi.bharatjodii.com',
+  uat: 'stgoapi.bharatjodii.com',
+  preprod: 'ppoapi.bharatjodii.com',
+  prod: 'oapi.bharatjodii.com',
 };
 const apiHost = API_HOSTS[appEnv] || API_HOSTS.dev;
 
@@ -98,6 +98,16 @@ module.exports = ({ config }) => ({
         data: [{ scheme: 'https', host: '${appHost}' }],
         category: ['BROWSABLE', 'DEFAULT'],
       },
+      // Second, additive App Link host — see flavorConfig.js's jodii.domain2
+      // comment (BharatJodii rebrand). ${appHost2} resolves to the same value
+      // as ${appHost} for flavors with no real second domain (withAndroidFlavors.js),
+      // so this is a harmless duplicate intent-filter for them, not a broken one.
+      {
+        action: 'VIEW',
+        autoVerify: true,
+        data: [{ scheme: 'https', host: '${appHost2}' }],
+        category: ['BROWSABLE', 'DEFAULT'],
+      },
       {
         action: 'VIEW',
         autoVerify: true,
@@ -109,7 +119,11 @@ module.exports = ({ config }) => ({
   ios: {
     ...config.ios,
     bundleIdentifier: f.applicationId,
-    associatedDomains: [`applinks:${f.domain}`, `applinks:${apiHost}`],
+    associatedDomains: [
+      `applinks:${f.domain}`,
+      ...(f.domain2 ? [`applinks:${f.domain2}`] : []),
+      `applinks:${apiHost}`,
+    ],
     // Unlike android/ (one Gradle tree hosts all 3 flavors via productFlavors),
     // ios/ is regenerated per-flavor by prebuild, so a single active file is correct here.
     googleServicesFile: `./firebase/GoogleService-Info.${flavor}.plist`,
@@ -165,8 +179,19 @@ module.exports = ({ config }) => ({
     'expo-web-browser',
     // Local (chat) notifications + badge only — remote push is owned end-to-end
     // by @react-native-firebase/messaging (see service/notificationService.ts).
-    // No custom icon/color yet — needs a monochrome status-bar asset from design.
-    'expo-notifications',
+    // icon/color here become the AndroidManifest's
+    // com.google.firebase.messaging.default_notification_icon/_color
+    // meta-data, which is what Firebase itself uses to render a
+    // background/quit-state push — notificationService.ts's notifee color
+    // (Colors.notificationAccent) only covers its own foreground display path.
+    // BharatJodii rebrand: matches the native Android app's FCM notification
+    // builders, which added this same app_logo_red accent color.
+    // f.notifyIcon only exists for the 9 flavors the BharatJodii migration
+    // actually redesigned a notification icon for; every other flavor falls
+    // back to its own regular app icon (f.icon) — this is plain Node string
+    // resolution (not a Metro require()), so referencing it dynamically here
+    // is safe, unlike the RN-side splash asset map (see SplashAnimationScreen.tsx).
+    ['expo-notifications', { icon: f.notifyIcon || f.icon, color: '#C70038' }],
     // iOS-only in practice: AppDelegate Firebase init + GoogleService-Info.plist
     // wiring. Its Android mods also run (harmless, see withFirebaseAndroid.js).
     '@react-native-firebase/app',

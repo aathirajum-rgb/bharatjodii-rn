@@ -90,6 +90,11 @@
 //    fetchEditFormValuesForValidation are real, wired Angular functions
 //    (registration.service.ts), confirmed by reading the source directly.
 //    See screens/validation/ValidationScreen.tsx.
+//  - 62 (JODII-453): handleNameGenderValidation — AI-flagged NAME/GENDER
+//    re-validation, added during the BharatJodii rebrand's scoped-separately
+//    follow-up work. See screens/validation/NameGenderRevalidationScreen.tsx.
+//    Gender edits save locally only, matching Angular's own still-blank
+//    GENDER_EDIT_TYPE — no confirmed backend TYPE code exists for it yet.
 
 import { loadDrProfiles } from './drService'
 import { fetchNotifCount, fetchMatches, fetchNearbyMatches } from './homeService'
@@ -432,6 +437,17 @@ export async function handlePageLanding(pageId: string | undefined, userId: stri
       if (violationList) await setJson('VIOLATIONFIELDS', violationList)
       const info = await fetchEditFormValuesForValidation()
       resetTo(info ? ENavigation.VALIDATION : ENavigation.MATCHES)
+      return
+    }
+
+    // JODII-453: AI calling landing validation — a name/gender re-check + edit
+    // sheet, distinct from case 61's confirm2 form above (NAME/GENDER aren't in
+    // CONFIRM2_EDITABLE_VIOLATION_FIELDS, so case 61 can never surface them).
+    // Self-contained screen — it does its own fetchEditFormValuesForValidation()
+    // call on mount and falls back to Matches on failure, so no pre-fetch is
+    // needed here (see screens/validation/NameGenderRevalidationScreen.tsx).
+    case '62': {
+      resetTo(ENavigation.NAME_GENDER_REVALIDATION)
       return
     }
 

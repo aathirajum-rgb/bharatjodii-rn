@@ -70,6 +70,10 @@ export enum ENavigation {
   ADD_PHOTO_PUBLISH      = 'addphoto-publish',
   PHOTO_REJECTION        = 'photo-rejection',
   VALIDATION             = 'Validation',
+  // Angular: webview.page.ts's page_id "62" (JODII-453) — AI-flagged NAME/GENDER
+  // re-validation edit sheet, distinct from VALIDATION's confirm2 form (NAME/
+  // GENDER aren't in CONFIRM2_EDITABLE_VIOLATION_FIELDS).
+  NAME_GENDER_REVALIDATION = 'NameGenderRevalidation',
   DISCOVER_MATCHES       = 'DiscoverMatches',
   SAFETY_TIPS            = 'safety-tips',
 }

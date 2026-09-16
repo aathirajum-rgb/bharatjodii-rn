@@ -9,4 +9,5 @@ export interface IEnvConfig {
   paymentNg:  string   // UPI autopay, checkout
   notify:     string   // socket / chat server
   image:      string   // CDN — image uploads, PHP scripts
+  web:        string   // marketing/web site — privacy policy, terms, ad banner, web logout redirect
 }

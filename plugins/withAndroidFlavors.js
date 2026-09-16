@@ -35,13 +35,18 @@ const ADAPTIVE_ICON_XML =
 function buildFlavorsBlock() {
   const entries = Object.entries(FLAVORS)
     .map(
-      ([name, { appType, applicationId, appName, scheme, domain }]) =>
+      ([name, { appType, applicationId, appName, scheme, domain, domain2 }]) =>
         `        ${name} {\n` +
         `            dimension "appType"\n` +
         `            applicationId('${applicationId}')\n` +
         `            buildConfigField "int", "APP_TYPE", "${appType}"\n` +
         `            resValue "string", "app_name", "${appName}"\n` +
-        `            manifestPlaceholders = [appScheme: "${scheme}", appHost: "${domain}"]\n` +
+        // appHost2 is a second, additive App Link host (see flavorConfig.js's
+        // jodii.domain2 comment) — every flavor MUST define it since they all
+        // share the one AndroidManifest.xml (below), even flavors with no real
+        // second domain, which just duplicate appHost here (a harmless no-op
+        // intent-filter, not a broken one).
+        `            manifestPlaceholders = [appScheme: "${scheme}", appHost: "${domain}", appHost2: "${domain2 || domain}"]\n` +
         `        }`
     )
     .join('\n');

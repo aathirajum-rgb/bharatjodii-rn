@@ -6,7 +6,7 @@
 // as a single Modal mounted once in App.tsx (see NetworkContext.tsx), so every
 // screen and action is covered without needing its own per-screen guard.
 //
-// No CDN illustration exists for this state (checked imgs.jodii.app for the
+// No CDN illustration exists for this state (checked imgs.bharatjodii.com for the
 // obvious filenames — 404 on all of them), so the icon is drawn inline with
 // react-native-svg instead of CdnSvg.
 import { useState } from 'react'

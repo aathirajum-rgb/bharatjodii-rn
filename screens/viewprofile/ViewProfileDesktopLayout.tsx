@@ -367,7 +367,7 @@ export default function ViewProfileDesktopLayout({
           either — the back control lives in the pagination row below, next to
           the "N / Total Profiles" text, confirmed against node 290:2220). */}
       <View style={s.topBar}>
-        <Text style={[s.logo, { fontFamily: langFonts.semiBold }]}>Jodii</Text>
+        <Text style={[s.logo, { fontFamily: langFonts.semiBold }]}>BharatJodii</Text>
         <Pressable style={s.langBtn} onPress={onLanguagePress}>
           <Text style={[s.langText, { fontFamily: langFonts.regular }]}>{LANG_LABELS[langCode] ?? 'English'}</Text>
           <Text style={s.langChevron}>{'▾'}</Text>

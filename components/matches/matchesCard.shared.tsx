@@ -196,6 +196,12 @@ export function HtmlText({
     const segStyle: Record<string, any> = { ...spanStyle }
     for (const cls of classM.split(/\s+/)) {
       if (HTML_SPAN_CLASS_STYLES[cls]) Object.assign(segStyle, HTML_SPAN_CLASS_STYLES[cls])
+      // Angular's `.color-XXXXXX` utility classes (e.g. `color-B50033` on the
+      // BharatJodii rename sheet's title) are generated per-hex-value rather
+      // than being a fixed named class, so they can't live in the lookup
+      // table above — matched generically instead.
+      const colorClassM = cls.match(/^color-([0-9A-Fa-f]{6})$/)
+      if (colorClassM) segStyle.color = `#${colorClassM[1]}`
     }
     if (colorM)    segStyle.color    = colorM[1].trim()
     if (fontSizeM) segStyle.fontSize = Number(fontSizeM[1])
@@ -426,7 +432,7 @@ const BADGE_BG_PATH: Record<ProfileBadgeVariant, { viewBox: string; d: string }>
 // Angular: badge.component.html's hasInfo span — a small info icon shown after
 // the badge text, only for badges that carry extra tap-for-detail content (e.g.
 // the Verified badge's "why verified" explainer). CDN URL confirmed live.
-const VERIFIED_INFO_ICON_URI = 'https://imgs.jodii.app/assets/images/svg/verified-info.svg'
+const VERIFIED_INFO_ICON_URI = `${CDN_SVG}verified-info.svg`
 
 // forwardRef so callers can measure() the badge's real screen position and pass
 // it as Popover's `anchor` (see Popover.tsx's own doc comment on that prop) —

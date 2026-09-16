@@ -108,7 +108,7 @@ export default function StarMatchingDesktopLayout({
     <View style={ds.screen}>
       {/* Top bar — logo + language only, same convention as ViewProfileDesktopLayout. */}
       <View style={ds.topBar}>
-        <Text style={ds.logo}>Jodii</Text>
+        <Text style={ds.logo}>BharatJodii</Text>
         <Pressable style={ds.langBtn} onPress={onLanguagePress}>
           <Text style={ds.langText}>{LANG_LABELS[langCode] ?? 'English'}</Text>
           <Text style={ds.langChevron}>{'▾'}</Text>

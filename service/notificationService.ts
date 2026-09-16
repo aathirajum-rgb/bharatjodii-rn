@@ -40,6 +40,7 @@ import { Endpoints } from './api.endpoints'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { resetTo, waitForNavigationReady } from '../utils/navigationRef'
 import { ENavigation } from '../types/enums/navigation.enum'
+import { Colors } from '../constants/colors'
 
 const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient
 
@@ -113,6 +114,10 @@ async function displayPushNotification(payload: PushNotificationPayload): Promis
       channelId,
       groupId: NOTIFICATION_GROUP_ID,
       pressAction: { id: 'default' },
+      // BharatJodii rebrand: matches Android's own FCM notification builders,
+      // which added this same accent color (app_logo_red) alongside the
+      // existing small icon.
+      color: Colors.notificationAccent,
       style: payload.photo
         ? { type: AndroidStyle.BIGPICTURE, picture: payload.photo }
         : { type: AndroidStyle.BIGTEXT, text: payload.title2 || payload.message || '' },

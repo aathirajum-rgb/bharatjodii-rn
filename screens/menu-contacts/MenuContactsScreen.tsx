@@ -213,7 +213,7 @@ export default function MenuContactsScreen({ navigation, route }: { navigation: 
     setAttentionInfo({
       title: t('GENERAL.ATTENTION', 'Attention!'),
       content: row.type === 'chat'
-        ? t('GENERAL.MEMBERSHIP_CHAT', 'Jodii chat messages sent to members who have deleted their profiles afterwards are also included in this count')
+        ? t('GENERAL.MEMBERSHIP_CHAT', 'BharatJodii chat messages sent to members who have deleted their profiles afterwards are also included in this count')
         : t('GENERAL.MEMBERSHIP_ATTENTION', 'Phone numbers viewed of members who have deleted their profiles afterwards are also included in this count'),
     })
   }

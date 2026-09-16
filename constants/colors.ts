@@ -9,6 +9,9 @@ export const Colors = {
   primaryLight:     '#e57373',   // light red (disabled button bg)
   primarySurface:   '#fff0f0',   // very light red (badge background)
   primarySurfaceAlt:'#fff5f5',   // light red tint (OTP box filled bg)
+  // Android's `app_logo_red` — the BharatJodii rebrand's notification accent
+  // color, distinct from primaryDark (#B50033) used for buttons/CTAs.
+  notificationAccent: '#C70038',
 
   // ── Input border states ───────────────────────────────────────────────────
   inputBorder:      '#B0B0B0',   // default / unfocused

@@ -2,11 +2,12 @@
 // piece of logic both platform files need: building the ad-embed URL.
 //
 // Angular: matches.page.ts loadGambanner() + core/config/matches.config.ts
-// gamBannerUrl = 'https://www.jodii.com/ad.html?DivID=60912'. Only gender/
+// gamBannerUrl (JODII-371 renamed this to bharatjodii.com too — confirmed via
+// git history, not just the general globals.ts domain swap). Only gender/
 // caste/domain are appended to the URL — photo/horo/user build a separate
 // "gamUserDetail" string Angular never actually sends anywhere, so it's not
 // replicated here.
-const GAM_BANNER_BASE_URL = 'https://www.jodii.com/ad.html?DivID=60912'
+import { GAM_BANNER_BASE_URL } from '../../constants/webLinks'
 
 export interface GamBannerParams {
   gender?: string

@@ -311,7 +311,7 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
           txnId:       checkout.txnid ?? '',
           productInfo: checkout.productinfo ?? '',
           firstName:   checkout.firstname ?? '',
-          email:       checkout.email || 'jodii@matrimony.com',
+          email:       checkout.email || 'bharatjodii@matrimony.com',
           // PayUBridgeModule.kt reads this via getString() (unlike Razorpay's
           // bridge, which uses getInt()) — the backend sends amount as a raw
           // JSON number, which crashes ReadableMap.getString() if not

@@ -45,7 +45,7 @@ import { getItem, setItem, removeItem, getJson } from '../../service/storageServ
 import { getRegistrationArrays, getSessionValue } from '../../service/registrationService'
 import { logScreen } from '../../service/analyticsService'
 import { StorageKeys } from '../../constants/storage.keys'
-import { CDN_LOTTIE, CDN_REACT } from '../../constants/cdn'
+import { CDN_LOTTIE, CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import { APP_VERSION } from '../../constants/appVersion'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
@@ -81,7 +81,7 @@ import {
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN = 'https://imgs.jodii.app/assets/images/svg/'
+const CDN = CDN_SVG
 const FWD_ICON = `${CDN}revamp/forward-icon-link.svg`
 
 // Angular: both the Help section's CTA and the video-faq-popup's close button

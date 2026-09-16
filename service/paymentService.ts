@@ -1158,10 +1158,10 @@ export async function initRazorpayPayment(
       amount:      checkoutDetail.amount,
       currency:    'INR',
       order_id:    checkoutDetail.orderId ?? '',
-      name:        'Jodii Matrimony',
+      name:        'BharatJodii Matrimony',
       prefill: {
         contact: checkoutDetail.MOBILENO ?? '',
-        email:   'jodii@matrimony.com',
+        email:   'bharatjodii@matrimony.com',
       },
       method: { [method.toLowerCase()]: true },
       // Pre-selects the bank on Razorpay's own netbanking checkout screen —
@@ -1185,7 +1185,7 @@ export async function initUPIPayment(
       amount:   upiDetails.amount,
       currency: 'INR',
       order_id: upiDetails.orderId ?? '',
-      name:     'Jodii Matrimony',
+      name:     'BharatJodii Matrimony',
       method:   { upi: true },
       'upi.vpa': upiDetails.VPA ?? '',
       theme: { color: '#C62828' },
@@ -1232,7 +1232,7 @@ export async function initRazorpayWebCheckout(
         amount:    upiDetails.amount,
         currency:  'INR',
         order_id:  upiDetails.orderId ?? '',
-        name:      'Jodii Matrimony',
+        name:      'BharatJodii Matrimony',
         method:    { upi: true },
         'upi.vpa': upiDetails.VPA ?? '',
         theme:     { color: '#C62828' },
@@ -1311,7 +1311,7 @@ export async function initRazorpayWebUpiAppPayment(
         currency: 'INR',
         method:   'upi',
         contact:  checkoutDetail.MOBILENO ?? '',
-        email:    'jodii@matrimony.com',
+        email:    'bharatjodii@matrimony.com',
         order_id: checkoutDetail.orderId ?? '',
       }
       // Angular: initCustomPayment() — recurring/customer_id are only added
@@ -1496,7 +1496,7 @@ export function initRazorpayNative(rawOptions: NativeCheckoutOptions): Promise<{
   // required") if email is empty — the real checkout response has no email
   // field to source this from (confirmed via a live capture), so fall back
   // to the same placeholder Angular's payment.service.ts hardcodes.
-  const options: NativeCheckoutOptions = { ...rawOptions, email: rawOptions.email || 'jodii@matrimony.com' }
+  const options: NativeCheckoutOptions = { ...rawOptions, email: rawOptions.email || 'bharatjodii@matrimony.com' }
 
   return new Promise(resolve => {
     let settled = false
