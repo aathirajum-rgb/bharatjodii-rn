@@ -23,6 +23,7 @@ import { Endpoints } from '../../service/api.endpoints'
 import { handleBack } from '../../utils/navigationRef'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import SuccessStoriesDesktopScreen from './SuccessStoriesDesktopScreen'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -380,7 +381,7 @@ const c = StyleSheet.create({
     justifyContent: 'center',
   },
   emptyText: {
-    fontSize:  14,
+    fontSize:  FontSize.font14,
     color:     '#777',
     marginTop: 16,
   },
@@ -406,7 +407,7 @@ const c = StyleSheet.create({
   },
   headerTitle: {
     flex:       1,
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '500',
     color:      '#333333',
     marginLeft: 6,
@@ -426,14 +427,14 @@ const c = StyleSheet.create({
     opacity:     0.33,
   },
   heroTitle: {
-    fontSize:     20,
+    fontSize:     FontSize.font20,
     fontWeight:   '600',
     color:        '#000',
     lineHeight:   26,
     marginBottom: 4,
   },
   heroSub: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#000',
   },
@@ -471,14 +472,14 @@ const c = StyleSheet.create({
     alignItems:        'center',
   },
   cardName: {
-    fontSize:     16,
+    fontSize:     FontSize.font16,
     fontWeight:   '500',
     color:        '#000000',
     lineHeight:   24,
     textAlign:    'center',
   },
   cardLocation: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#372f3a',
     lineHeight: 20,

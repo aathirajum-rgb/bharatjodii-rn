@@ -24,6 +24,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import LinkCTA from '../../components/link-cta/LinkCTA'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import HelpCenterDesktopScreen from './HelpCenterDesktopScreen'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -257,7 +258,7 @@ const s = StyleSheet.create({
   },
   headerTitle: {
     flex:        1,
-    fontSize:    16,
+    fontSize:    FontSize.font16,
     fontWeight:  '500',
     color:       '#333333',
     marginLeft:  6,
@@ -279,12 +280,12 @@ const s = StyleSheet.create({
   // ── Section ──
   section: { gap: 8 },
   sectionTitle: {
-    fontSize:   18,
+    fontSize:   FontSize.font18,
     fontWeight: '600',
     color:      '#000',
   },
   sectionTitleLg: {
-    fontSize:   20,
+    fontSize:   FontSize.font20,
     fontWeight: '600',
     color:      '#000',
   },
@@ -300,7 +301,7 @@ const s = StyleSheet.create({
   rowPressed: { opacity: 0.6 },
   rowTitle: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
     color:      Colors.textPrimary,
   },

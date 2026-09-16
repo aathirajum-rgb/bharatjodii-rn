@@ -38,7 +38,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
 import { Colors } from '../../constants/colors'
-import { CDN_REACT } from '../../constants/cdn'
+import { Fonts, FontSize } from '../../src/theme/fonts'
+import { CDN_REACT, CDN_REVAMP, CDN_SVG } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem, setItem } from '../../service/storageService'
 import { Endpoints } from '../../service/api.endpoints'
@@ -74,6 +75,22 @@ import EditProfileDesktopScreen from './EditProfileDesktopScreen'
 const ICON_BACK  = CDN_REACT + '/menu_back_arrow.svg'
 const ICON_ARROW = CDN_REACT + '/menu_right_arrow.svg'
 
+// "View Photo Guidelines" row — Angular: edit-profile.page.html:160-167.
+// The <ion-img> carries NO size class on this page (`.width-height-16` = 1.5rem
+// is registration-revamp's guidelines row, not this one), so it renders at the
+// asset's own intrinsic size — guidelins.svg is 16x16.
+const ICON_GUIDELINES = CDN_SVG + 'guidelins.svg'
+const GUIDELINES_ICON = 16
+
+// "Add photos" CTA — Angular: edit-profile.page.html:170-177. Its `.like-icon`
+// class is unreachable here: the only `.like-icon` rules in the project are
+// scoped inside `.button-banner` (global.scss:5052) and inside two
+// style-encapsulated components (button/, modalpopup/), none of which apply to
+// edit-profile.page.html. So the "+" also renders at its intrinsic size —
+// app-photos-edit-profile-img.svg is 18x18, a white stroke-only glyph.
+const ICON_ADD_PHOTO = CDN_SVG + 'app-photos-edit-profile-img.svg'
+const ADD_PHOTO_ICON = 18
+
 // Missing-field warning triangle, shown at the right edge of any row whose
 // value isn't set yet (Figma) — it replaces the grey chevron rather than
 // sitting next to it. Drawn at its own 18x17 intrinsic size: the asset is not
@@ -81,7 +98,7 @@ const ICON_ARROW = CDN_REACT + '/menu_right_arrow.svg'
 // design and leave uneven padding on one axis.
 // Leading icon on the "Photo privacy" link (Figma node 3366:13117 — a 32px
 // icon box, gap 4, then the underlined label).
-const ICON_PRIVACY = CDN_REACT + '/edit_privacy.svg'
+const ICON_PRIVACY = CDN_SVG + '/photo-privacy.svg'
 const PRIVACY_ICON_SIZE = 32
 
 const ICON_MISS_WARN = CDN_REACT + '/edit_miss_warn.svg'
@@ -96,12 +113,18 @@ const MISSING_CHEVRON = 16
 // CDN_REACT folder as the nav chevrons. File names are the ones uploaded to the
 // server, verified reachable on the staging CDN.
 //
-// SIX ROWS HAVE NO ICON YET — Jodii ID, Profile created by, Marital status,
-// Children, Physical status and Mobile number. Nothing matching them exists in
-// the react/ folder (probed every plausible name), so those rows render an
-// empty icon slot: the space is still reserved via ROW_ICON so every label in
-// the section stays on the same left edge instead of some rows jumping inward.
-// Drop the files in and add them here — no other change needed.
+// Five of the six previously-iconless rows (Jodii ID, Profile created by,
+// Marital status, Physical status, Mobile number) are now mapped. Three of them
+// are NOT in the react/ folder — they reuse assets from the Angular app's own
+// svg/ tree, so they go through CDN_SVG rather than CDN_REACT. Every one was
+// verified 200 on both the staging (stgimg.jodii.app) and production
+// (imgs.jodii.app) hosts, so they resolve under EnvConfig.image in every
+// environment — nothing here is a hardcoded absolute URL.
+//
+// ONE ROW STILL HAS NO ICON — Children. It keeps rendering an empty icon slot:
+// the space is still reserved via ROW_ICON so every label in the section stays
+// on the same left edge instead of some rows jumping inward. Drop a file in and
+// add it here — no other change needed.
 //
 // Not mapped: edit_vehicle.svg. This screen has exactly one "Properties owned"
 // row and property codes 5/6/7 (the vehicle ones) are deliberately excluded
@@ -110,6 +133,23 @@ const MISSING_CHEVRON = 16
 // separate change (the data is already parsed as `profile.vehicles`).
 const ROW_ICON = 24
 const R_ICON = {
+  // Jodii ID and Profile created by deliberately reuse two icons that already
+  // appear elsewhere in this same list (mother tongue / name). That is the
+  // requested mapping, not an oversight — it does mean edit_mothertongue.svg
+  // and edit_name.svg each render twice in the Basic details section.
+  jodiiId:        CDN_REACT + '/edit_mothertongue.svg',
+  createdBy:      CDN_REACT + '/edit_name.svg',
+  // Angular svg/ tree, not react/. 19x19 intrinsic, stroke #545454 — scaled up
+  // to the 24 ROW_ICON box like every other row icon.
+  maritalStatus:  CDN_SVG + 'viewprofile/marital-status-icon.svg',
+  // 24x24 intrinsic, fill #858585 — already exactly ROW_ICON size.
+  physicalStatus: CDN_SVG + 'physical-status.svg',
+  // revamp-img/ tree, not svg/. 20x21 intrinsic, stroke #333 — reads clearly on
+  // the white row background and fits the 24 ROW_ICON box like the others.
+  // Replaces svg/revamp/call-icon-white.svg, which was `stroke="white"` and so
+  // rendered invisible against these rows.
+  mobileNo:       CDN_REVAMP + 'call.svg',
+
   name:           CDN_REACT + '/edit_name.svg',
   age:            CDN_REACT + '/edit_age.svg',
   height:         CDN_REACT + '/edit_height.svg',
@@ -186,7 +226,7 @@ function photoSlotPosition(i: number, m: MosaicMetrics): { left: number; top: nu
   return { left: m.third, top: m.third }
 }
 
-type Props = { navigation: any }
+type Props = { navigation: any; route?: any }
 
 type Opt = { key: string; label: string }
 
@@ -282,7 +322,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 // ─── EditProfileScreen ────────────────────────────────────────────────────────
 
-export default function EditProfileScreen({ navigation }: Props) {
+export default function EditProfileScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
   const isDesktop = useIsDesktopWeb()
@@ -495,6 +535,17 @@ export default function EditProfileScreen({ navigation }: Props) {
 
   useFocusEffect(useCallback(() => { load() }, [load]))
 
+  // The Photo Guidelines screen's "Continue to upload photo" CTA sends us back
+  // here with this flag (Angular calls the native picker directly from that
+  // page; ours lives on this screen). Cleared immediately so returning to this
+  // screen any other way — or a re-render — doesn't reopen the picker.
+  useEffect(() => {
+    if (!route?.params?.openPhotoPicker) return
+    navigation.setParams({ openPhotoPicker: undefined })
+    openGalleryPicker()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route?.params?.openPhotoPicker])
+
   // Opens the photo picker directly — no navigation to the onboarding
   // wizard's own routes, so there's nothing to "come back from". On web this
   // has to be the file input's own .click() call, right here, so it stays a
@@ -586,6 +637,16 @@ export default function EditProfileScreen({ navigation }: Props) {
 
   function openPreview() {
     navigation.navigate('viewProfile', { matriId: ownId, fromPage: 'menu' })
+  }
+
+  // Angular: guidelinePageRedirection() — router.navigate(
+  // ['/addphoto-intermediate/showguidelines'], { queryParams: { frm_page:
+  // 'edit-profile' } }) (edit-profile.page.ts:1161). Same route, same params.
+  function openPhotoGuidelines() {
+    navigation.navigate('addphoto-intermediate', {
+      page: 'showguidelines',
+      frm_page: 'edit-profile',
+    })
   }
 
   // Angular's edit-profile.page.html pattern for the seven one-time-editable
@@ -695,10 +756,41 @@ export default function EditProfileScreen({ navigation }: Props) {
           })}
         </View>
 
+        {/* ── View photo guidelines ──
+            Angular: edit-profile.page.html:160-167 — a `mt-16` row sitting
+            directly under the photo grid, no gender/photo-count gate. */}
+        <Pressable style={s.guidelinesRow} onPress={openPhotoGuidelines} hitSlop={8} accessibilityRole="button">
+          <CdnSvg uri={ICON_GUIDELINES} width={GUIDELINES_ICON} height={GUIDELINES_ICON} />
+          <Text style={s.guidelinesText}>{t('GENERAL.VIEW_GUIDELINE')}</Text>
+        </Pressable>
+
+        {/* ── Add photos ──
+            Angular: edit-profile.page.html:170-177 — `*ngIf="photoCount <
+            photoMaxLimit"`, so the CTA disappears once the album is full
+            rather than going disabled. Same photo-add entry point as an empty
+            mosaic slot (Angular's callNative('photo_add') for both). */}
+        {photos.length < MAX_PHOTOS && (
+          <Pressable
+            style={({ pressed }) => [s.addPhotoBtn, pressed && s.addPhotoBtnPressed]}
+            onPress={openGalleryPicker}
+            disabled={photoUploading}
+            accessibilityRole="button"
+          >
+            {photoUploading ? (
+              <ActivityIndicator color={Colors.white} />
+            ) : (
+              <>
+                <CdnSvg uri={ICON_ADD_PHOTO} width={ADD_PHOTO_ICON} height={ADD_PHOTO_ICON} />
+                <Text style={s.addPhotoBtnText}>{t('EDITPROFILE.ADDPHOTO_CTA')}</Text>
+              </>
+            )}
+          </Pressable>
+        )}
+
         {/* ── Basic details ── */}
         <Section title={t('EDITPROFILE.BASIC_DETAILS')}>
-          <FieldRow label={t('EDITPROFILE.JODIIID')} value={ownId} onPress={() => {}} hideArrow showDivider />
-          <FieldRow label={t('EDITPROFILE.CREATEDFOR')} value={createdByLabel} onPress={() => {}} hideArrow showDivider />
+          <FieldRow label={t('EDITPROFILE.JODIIID')} value={ownId} onPress={() => {}} hideArrow icon={R_ICON.jodiiId} showDivider />
+          <FieldRow label={t('EDITPROFILE.CREATEDFOR')} value={createdByLabel} onPress={() => {}} hideArrow icon={R_ICON.createdBy} showDivider />
           <FieldRow label={t('EDITPROFILE.NAME')} value={profile.name} onPress={restrictedNav(profile.nameEditable, 'EditProfileBasic')} icon={R_ICON.name} showDivider />
           <FieldRow label={t('EDITPROFILE.AGE')} value={profile.age ? `${profile.age} years old` : undefined} onPress={restrictedNav(profile.ageEditable, 'EditProfileAgeHeight')} icon={R_ICON.age} showDivider />
           <FieldRow label={t('EDITPROFILE.HEIGHT')} value={heightLabel} onPress={() => navigation.navigate('EditProfileAgeHeight')} icon={R_ICON.height} showDivider />
@@ -706,6 +798,7 @@ export default function EditProfileScreen({ navigation }: Props) {
             label={t('EDITPROFILE.MARITALSTATUS')}
             value={labelFor(labels.maritalStatus ?? [], profile.maritalStatus)}
             onPress={() => navigation.navigate('EditProfileMarital')}
+            icon={R_ICON.maritalStatus}
             showDivider
           />
           {childrenVisible && (
@@ -720,6 +813,7 @@ export default function EditProfileScreen({ navigation }: Props) {
             label={t('EDITPROFILE.PHYSICALSTATUS')}
             value={labelFor(labels.physicalStatus ?? [], profile.physicalStatus)}
             onPress={() => navigation.navigate('EditProfileMarital')}
+            icon={R_ICON.physicalStatus}
             showDivider
           />
           <FieldRow label={t('EDITPROFILE.MOTHERTONGUE')} value={labelFor(labels.motherTongue ?? [], profile.motherTongue)} onPress={restrictedNav(profile.motherTongueEditable, 'EditProfileBasic')} icon={R_ICON.motherTongue} showDivider />
@@ -727,7 +821,7 @@ export default function EditProfileScreen({ navigation }: Props) {
           {homeTownVisible && (
             <FieldRow label={t('EDITPROFILE.NATIVE_PLACE')} value={homeCityLabel} onPress={() => navigation.navigate('EditProfileBasic')} icon={R_ICON.hometown} showDivider />
           )}
-          <FieldRow label={t('EDITPROFILE.MOBILENO')} value={profile.mobileNo} onPress={() => {}} hideArrow />
+          <FieldRow label={t('EDITPROFILE.MOBILENO')} value={profile.mobileNo} onPress={() => {}} hideArrow icon={R_ICON.mobileNo} />
         </Section>
 
         {/* ── Professional details ── */}
@@ -875,7 +969,15 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
+  // App-wide screen-header convention (same 16/Medium/#333333 as every other
+  // stack screen). NOT Angular's own edit-profile header, which is
+  // `heading1-semibold-20 black-color` (edit-profile.page.html:8) — 20px
+  // semibold #000000. Left on the RN convention deliberately so this one
+  // screen's header doesn't diverge from the rest of the app.
+  headerTitle: {
+    flex: 1, fontSize: FontSize.font16, fontFamily: Fonts.poppinsMedium,
+    color: '#333333', marginLeft: 6, marginRight: 16,
+  },
 
   scrollContent: { paddingHorizontal: CONTENT_PAD, paddingTop: 24 },
 
@@ -884,7 +986,14 @@ const s = StyleSheet.create({
   // underlined — the icon must stay outside the <Text> or the underline runs
   // beneath it too.
   photoPrivacyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  photoPrivacyLink: { fontSize: 14, color: Colors.link, textDecorationLine: 'underline' },
+  // Angular: edit-profile.page.html:49 `textcta-medium-12 color-29339B` —
+  // global.scss .textcta-medium-12 = var(--font12) + --english-medium-poppins
+  // (Poppins-Medium); .color-29339B = #29339B (== Colors.link). Was 14px with
+  // no family.
+  photoPrivacyLink: {
+    fontSize: FontSize.font12, fontFamily: Fonts.poppinsMedium,
+    color: Colors.link, textDecorationLine: 'underline',
+  },
 
   // Square mosaic; its edge is supplied per-render from mosaicMetrics() so the
   // 3 tiles + 2 gaps land flush with the rows and section titles below at any
@@ -905,9 +1014,12 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primaryDark,
     paddingHorizontal: 8, borderTopRightRadius: 16, borderBottomLeftRadius: 8,
   },
+  // Angular: edit-profile.page.html:93 `profile-picture textcta-medium-12
+  // white-color` — var(--font12) + Poppins-Medium + #ffffff. Size/colour
+  // already matched; the bare fontWeight '500' is replaced by the real family.
   mainPhotoBadgeText: {
-    fontSize: 12, lineHeight: 14, letterSpacing: 0.12,
-    fontWeight: '500', color: Colors.white, textTransform: 'capitalize',
+    fontSize: FontSize.font12, lineHeight: 14, letterSpacing: 0.12,
+    fontFamily: Fonts.poppinsMedium, color: Colors.white, textTransform: 'capitalize',
   },
 
   photoAddSlot: {
@@ -915,7 +1027,42 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(230,230,230,0.3)', alignItems: 'center', justifyContent: 'center',
   },
 
-  photoHint: { fontSize: 12, color: '#585858', marginTop: 8 },
+  // Unused — nothing renders this. Kept and tokenised rather than deleted; its
+  // Angular counterpart (edit-profile.page.html:157 `textcta-medium-12
+  // color-585858`, the "*Hold & Drag photos to reorder" hint) is commented out
+  // there too, so both sides are dead in the same way.
+  photoHint: { fontSize: FontSize.font12, fontFamily: Fonts.poppinsMedium, color: '#585858', marginTop: 8 },
+
+  // Angular: `<ion-row class="mt-16 ion-cust-padding-start ion-cust-padding-end">`
+  // — 16 above the row; the label's own `ml-8` is the 8 between icon and text.
+  guidelinesRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 16 },
+  // Angular: `textcta-medium-12 color-29339B` wrapped in <u> — global.scss:2270
+  // = var(--font12) + --english-medium-poppins (Poppins-Medium); #29339B is
+  // Colors.link.
+  guidelinesText: {
+    fontSize: FontSize.font12, fontFamily: Fonts.poppinsMedium,
+    color: Colors.link, textDecorationLine: 'underline',
+  },
+
+  // Angular: `.primary-cta-jodii` (global.scss:26257) — width 100%,
+  // background #B50033, border-radius 8, --box-shadow none. Height follows this
+  // screen's own footer Preview CTA (44) rather than primary-cta-jodii's
+  // min-height 40, so the screen's two full-width red CTAs match each other.
+  //
+  // marginTop 24 = the row's `ion-cust-padding-top` (var(--ion-cust-padding)).
+  // Deliberately NO marginBottom: Angular's own `pb-12` on this row plus the
+  // Basic-details grid's `mt-8` + inner `mt-24` sum to exactly 44 — which is
+  // what `section.marginTop` already supplies below. Adding 12 here would
+  // stack on top of that 44 (RN margins don't collapse) and push the first
+  // section down to 56.
+  addPhotoBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark, marginTop: 24,
+  },
+  addPhotoBtnPressed: { opacity: 0.8 },
+  // Angular: `<span class="body1-medium-14 white-color ml-8">` — var(--font14)
+  // + Poppins-Medium + #ffffff. The ml-8 is the row's `gap: 8` above.
+  addPhotoBtnText: { fontSize: FontSize.font14, fontFamily: Fonts.poppinsMedium, color: Colors.white },
 
   // 44, not 24 — derived from the design's own absolute offsets: every section
   // in the frame starts 44px after the previous one's last row ends (Basic 554,
@@ -925,7 +1072,22 @@ const s = StyleSheet.create({
   // Figma: h-[20px] block, then a 24px gap before the first row. lineHeight is
   // the design's block height rather than its leading-16 — 16 on a 20px face
   // clips descenders on Android, and 20 is what the layout maths uses anyway.
-  sectionTitle: { fontSize: 20, lineHeight: 20, fontWeight: '600', color: Colors.black, marginBottom: 24 },
+  // Angular: every section heading is `heading-03-bold-20 color-333333`
+  // (edit-profile.page.html:43, 335, 670, 896, 971) — var(--font20) +
+  // var(--heading-03-*-Bold) (= Poppins-Bold for English) and #333333, NOT
+  // #000000. Was fontWeight '600' with no family, which fell back to the OS
+  // system font at a synthetic semibold.
+  //
+  // Caveat: .heading-03-bold-20 is only declared inside global.scss's
+  // per-language blocks (.tamil, .gujarati, .punjabi, …) — there is no English
+  // declaration, so on English the web page actually inherits body's
+  // Poppins-Regular at the inherited size. All nine language declarations are
+  // identical (Bold + --font20), so that is the intended styling and an
+  // Angular-side gap, not a different design.
+  sectionTitle: {
+    fontSize: FontSize.font20, lineHeight: 20, fontFamily: Fonts.poppinsBold,
+    color: Colors.textDark, marginBottom: 24,
+  },
   // Cancels the first row's top padding and the last row's bottom padding —
   // see the Section() comment.
   sectionRows: { marginTop: -20, marginBottom: -20 },
@@ -935,7 +1097,10 @@ const s = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: 'rgba(204,204,204,0.5)',
   },
   previewBtn: { height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark, alignItems: 'center', justifyContent: 'center' },
-  previewBtnText: { color: Colors.white, fontSize: 14, fontWeight: '500' },
+  // Angular's primary CTA copy is `primary-cta-jodii body1-medium-14
+  // white-color` (edit-profile.page.html:172) — var(--font14) +
+  // --english-medium-poppins + #ffffff.
+  previewBtnText: { color: Colors.white, fontSize: FontSize.font14, fontFamily: Fonts.poppinsMedium },
 })
 
 const r = StyleSheet.create({
@@ -952,8 +1117,13 @@ const r = StyleSheet.create({
   rowText: { flex: 1, gap: 8 },
   // lineHeight 16 on both lines is what makes a row 40px of content (16+8+16)
   // and therefore 80px overall — the figure the design's own offsets rely on.
-  rowLabel: { fontSize: 14, lineHeight: 16, color: Colors.black },
-  rowValue: { fontSize: 14, lineHeight: 16, fontWeight: '500', color: Colors.black },
+  // Angular: every row's <h2> is `body2-regular-14 color-4c4c4c` — global.scss
+  // .body2-regular-14 = var(--font14) + --english-regular-poppins
+  // (Poppins-Regular); .color-4c4c4c = #4c4c4c, a grey, not black.
+  rowLabel: { fontSize: FontSize.font14, lineHeight: 16, fontFamily: Fonts.poppinsRegular, color: '#4c4c4c' },
+  // Angular: every row's value <p> is `mt-5 body1-medium-14 color-333333` —
+  // var(--font14) + --english-medium-poppins (Poppins-Medium) + #333333.
+  rowValue: { fontSize: FontSize.font14, lineHeight: 16, fontFamily: Fonts.poppinsMedium, color: Colors.textDark },
   // Figma draws a 1px rule; hairlineWidth renders 0.33-0.5px on most devices,
   // which read as a washed-out gap rather than a divider.
   rowDivider: { height: 1, backgroundColor: 'rgba(204,204,204,0.5)' },
@@ -963,5 +1133,7 @@ const r = StyleSheet.create({
   // text column instead of sitting directly after the label. Height matches a
   // value line (16) so a missing row is exactly as tall as a filled one.
   missingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, alignSelf: 'flex-start' },
-  missingText: { fontSize: 14, lineHeight: 16, color: Colors.link },
+  // Angular: `mt-5 body1-medium-14 color-29339B add-details-txt` — same
+  // Poppins-Medium/--font14 as a filled value, recoloured to #29339B.
+  missingText: { fontSize: FontSize.font14, lineHeight: 16, fontFamily: Fonts.poppinsMedium, color: Colors.link },
 })

@@ -10,7 +10,7 @@ import { Colors } from '../../constants/colors'
 import { CDN, CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { type PaymentMethodItem } from '../../service/paymentService'
 
 // Angular: payment-failed.page.html:15 — confirmed real asset path.
@@ -88,9 +88,9 @@ export default function PlainRetryFailureSheet({
 const s = StyleSheet.create({
   container: { width: '100%' },
   icon:      { marginBottom: 16 },
-  title:     { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black, marginBottom: 8 },
+  title:     { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font20, color: Colors.black, marginBottom: 8 },
   subtitle:  {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.textSecondary,
     lineHeight: 20, marginBottom: 20,
   },
 
@@ -115,8 +115,8 @@ const s = StyleSheet.create({
     width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: Colors.borderSubtle,
     alignItems: 'center', justifyContent: 'center',
   },
-  rowLabel:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
-  otherLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  rowLabel:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
+  otherLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
 
   radioCircle: {
     width: 24, height: 24, borderRadius: 12, borderWidth: 1.5, borderColor: Colors.borderNeutral,

@@ -25,6 +25,7 @@ import {
 import PhotoVerdictSheet, { type VerdictPhoto } from '../../components/photo-validation/PhotoVerdictSheet'
 import VerificationSuccessSheet from '../../components/bottom-sheet/VerificationSuccessSheet'
 import { os } from './onboardingStyles'
+import { FontSize } from '../../src/theme/fonts'
 
 const MAX_PHOTOS = 10
 
@@ -230,13 +231,13 @@ const styles = StyleSheet.create({
     gap:               16,
   },
   title: {
-    fontSize:   22,
+    fontSize:   FontSize.font22,
     fontWeight: '700',
     color:      '#111',
     textAlign:  'center',
   },
   subtitle: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      '#666',
     textAlign:  'center',
     lineHeight: 20,
@@ -252,7 +253,7 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.6 },
   btnLabel: {
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '600',
     color:      '#fff',
   },

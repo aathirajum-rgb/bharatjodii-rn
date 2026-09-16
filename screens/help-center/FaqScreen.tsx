@@ -28,6 +28,7 @@ import LinkCTA from '../../components/link-cta/LinkCTA'
 import { fetchFaqContent, stripHtml, type FaqType, type FaqContentItem } from '../../service/faqService'
 import { setFilterEventType } from '../../service/filterService'
 import { handleBack } from '../../utils/navigationRef'
+import { FontSize } from '../../src/theme/fonts'
 
 const R = CDN_REACT + '/'
 const ICON_BACK  = R + 'menu_back_arrow.svg'
@@ -277,36 +278,36 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
+  headerTitle: { flex: 1, fontSize: FontSize.font16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
 
   scrollContent: { paddingHorizontal: 24, paddingTop: 16 },
   card: { width: '100%' },
 
   row: { flexDirection: 'row', alignItems: 'center', paddingVertical: 20, gap: 12 },
   rowPressed: { opacity: 0.6 },
-  rowTitle: { flex: 1, fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
+  rowTitle: { flex: 1, fontSize: FontSize.font14, fontWeight: '500', color: Colors.textPrimary },
   rowDivider: { height: StyleSheet.hairlineWidth, backgroundColor: 'rgba(204,204,204,0.5)' },
 
   detailContent: { padding: 24, gap: 16 },
-  detailTitle: { fontSize: 18, fontWeight: '600', color: '#000' },
-  detailBody:  { fontSize: 14, color: '#333', lineHeight: 20 },
+  detailTitle: { fontSize: FontSize.font18, fontWeight: '600', color: '#000' },
+  detailBody:  { fontSize: FontSize.font14, color: '#333', lineHeight: 20 },
 
   stepsList: { gap: 8 },
   stepRow: { flexDirection: 'row', gap: 8 },
-  stepBullet: { fontSize: 14, color: Colors.textPrimary },
-  stepText: { flex: 1, fontSize: 14, color: Colors.textPrimary, lineHeight: 20 },
+  stepBullet: { fontSize: FontSize.font14, color: Colors.textPrimary },
+  stepText: { flex: 1, fontSize: FontSize.font14, color: Colors.textPrimary, lineHeight: 20 },
 
   videoLink: { paddingVertical: 8 },
-  videoLinkText: { fontSize: 14, fontWeight: '500', color: Colors.link },
+  videoLinkText: { fontSize: FontSize.font14, fontWeight: '500', color: Colors.link },
   video: { width: '100%', aspectRatio: 16 / 9, borderRadius: 8, backgroundColor: '#000' },
 
   ctaBtn: {
     height: 48, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
   },
-  ctaBtnText: { color: Colors.white, fontSize: 14, fontWeight: '600' },
+  ctaBtnText: { color: Colors.white, fontSize: FontSize.font14, fontWeight: '600' },
   ctaBtnOutline: { backgroundColor: 'transparent', borderWidth: 1, borderColor: Colors.primaryDark },
-  ctaBtnOutlineText: { color: Colors.primaryDark, fontSize: 14, fontWeight: '600' },
+  ctaBtnOutlineText: { color: Colors.primaryDark, fontSize: FontSize.font14, fontWeight: '600' },
 
   footerLink: { marginTop: 16 },
 })

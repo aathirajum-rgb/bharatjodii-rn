@@ -204,7 +204,7 @@ const styles = StyleSheet.create({
   },
   chipRadioTick: {
     color:      Colors.surface,
-    fontSize:   11,
+    fontSize:   FontSize.font11,
     fontWeight: '700',
     lineHeight: 13,
   },

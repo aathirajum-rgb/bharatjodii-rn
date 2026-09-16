@@ -73,7 +73,7 @@ import SearchablePicker, { type PickerOption } from '../../components/searchable
 import MultiSelectPicker, { type MultiSelectOption } from '../../components/multi-select-picker/MultiSelectPicker'
 import { ICON } from '../viewprofile/ViewProfileScreen'
 import CheckboxGroup from '../../components/checkbox/CheckboxGroup'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -1560,8 +1560,8 @@ const s = StyleSheet.create({
   // (was a plain system-font 500 weight, #333333); Reset is Poppins-Regular/14
   // and Colors.link (#29339B, indigo) — was Colors.primaryDark, the app's dark
   // RED brand color, a genuinely wrong color for this specific text.
-  headerTitle: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, lineHeight: 24, color: Colors.black, marginLeft: 6 },
-  resetText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.link, paddingHorizontal: 12 },
+  headerTitle: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: FontSize.font16, lineHeight: 24, color: Colors.black, marginLeft: 6 },
+  resetText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 16, color: Colors.link, paddingHorizontal: 12 },
   resetTextDisabled: { opacity: 0.4 },
 
   // Angular: the strict-filter block sits flush under the header (full-bleed,
@@ -1577,7 +1577,7 @@ const s = StyleSheet.create({
     padding: 10,
     marginBottom: 4,
   },
-  subHeaderText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 20, color: Colors.black },
+  subHeaderText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 20, color: Colors.black },
 
   // Angular `.strict-filter-card` (+ its `pr-24 pl-24 pt-16 pb-16`): a
   // full-bleed tinted band, NOT an inset rounded card — no radius and no side
@@ -1586,17 +1586,17 @@ const s = StyleSheet.create({
     backgroundColor: '#FBF2F5', borderWidth: 1, borderColor: '#FFE3EC',
     paddingHorizontal: 24, paddingVertical: 16, gap: 6,
   },
-  strictBannerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, lineHeight: 20, color: Colors.black },
+  strictBannerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, lineHeight: 20, color: Colors.black },
   // Angular: `.strict-filter-desc` + `mb-16` — 16px below the copy before the
   // CTA (6 of it from the container's own gap).
-  strictBannerDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 18, color: Colors.black, marginBottom: 10 },
+  strictBannerDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 18, color: Colors.black, marginBottom: 10 },
   // Angular FILTER_BTN: button-revamp `large` — 40px tall, 8px radius,
   // transparent fill, 1px primary border, primary text at body-14.
   manageStrictBtn: {
     height: 40, borderWidth: 1, borderColor: Colors.primaryDark, borderRadius: 8,
     alignItems: 'center', justifyContent: 'center',
   },
-  manageStrictBtnText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.primaryDark },
+  manageStrictBtnText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 16, color: Colors.primaryDark },
 
   // Angular: `<ion-list class="pl-24 pr-24">` in an `mt-8` row — a flat list
   // straight on the page.
@@ -1640,8 +1640,8 @@ const s = StyleSheet.create({
     marginLeft:      8,
   },
   // Angular: label `body2-regular-14`, value `body1-medium-14` — both black.
-  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.black },
-  rowValue: { fontFamily: Fonts.poppinsMedium, fontSize: 14, lineHeight: 16, color: Colors.black },
+  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 16, color: Colors.black },
+  rowValue: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, lineHeight: 16, color: Colors.black },
 
   // Angular: `ion-footer.footer-shadow` with the CTA at `ml-24 mr-24 pt-16 pb-16`.
   footer: {
@@ -1665,5 +1665,5 @@ const s = StyleSheet.create({
   // Angular button-revamp's default ctaFontSize is `body2-regular-14` +
   // `line-height-16`, and the PP/Filters footer CTA doesn't override it — so
   // the button label is Poppins-REGULAR 14, not medium or semibold.
-  applyText: { color: Colors.white, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16 },
+  applyText: { color: Colors.white, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 16 },
 })

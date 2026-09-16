@@ -26,6 +26,7 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileWebsiteNameDesktopLayout from './DeleteProfileWebsiteNameDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { handleBack } from '../../utils/navigationRef'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -222,7 +223,7 @@ const s = StyleSheet.create({
   },
   headerTitle: {
     flex:       1,
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '500',
     color:      '#333333',
     marginLeft: 6,
@@ -236,7 +237,7 @@ const s = StyleSheet.create({
 
   // ── Content ──
   subtitle: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#1f1e1b',
     lineHeight: 20,
@@ -252,7 +253,7 @@ const s = StyleSheet.create({
     backgroundColor:   Colors.white,
   },
   input: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#000000',
     padding:    0,

@@ -44,6 +44,7 @@ import { os } from './onboardingStyles'
 import { CDN_LOTTIE } from '../../constants/cdn'
 import CdnLottie from '../../components/CdnLottie'
 import { getFileSizeSafe } from '../../utils/getFileSize'
+import { FontSize } from '../../src/theme/fonts'
 
 // expo-media-library's Asset has no mimeType getter (unlike expo-image-picker
 // assets) — derive it from the filename extension, same fallback Android's own
@@ -633,16 +634,16 @@ const styles = StyleSheet.create({
     alignItems:    'center',
   },
   albumLabel: {
-    fontSize:   17,
+    fontSize:   FontSize.font17,
     fontWeight: '700',
     color:      '#111',
   },
   albumChevron: {
-    fontSize: 15,
+    fontSize: FontSize.font15,
     color:    '#111',
   },
   selectedCount: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '600',
     color:      Colors.textSecondary,
   },
@@ -660,7 +661,7 @@ const styles = StyleSheet.create({
     borderColor:     '#fff',
   },
   cameraLabel: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '500',
     color:      '#fff',
   },
@@ -695,7 +696,7 @@ const styles = StyleSheet.create({
     elevation:         8,
   },
   limitText: {
-    fontSize:  12,
+    fontSize:  FontSize.font12,
     lineHeight: 16,
     color:     Colors.inputError,
     textAlign: 'center',
@@ -711,7 +712,7 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   nextBtnLabel: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
     color:      '#fff',
   },
@@ -730,7 +731,7 @@ const styles = StyleSheet.create({
     maxHeight:            '60%',
   },
   albumSheetTitle: {
-    fontSize:     16,
+    fontSize:     FontSize.font16,
     fontWeight:   '700',
     color:        '#111',
     marginBottom: 16,
@@ -744,7 +745,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f0f0f0',
   },
   albumRowText: {
-    fontSize: 15,
+    fontSize: FontSize.font15,
     color:    '#333',
   },
   albumRowActive: {
@@ -752,7 +753,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   albumRowCheck: {
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     color:      Colors.primary,
     fontWeight: '700',
   },
@@ -765,13 +766,13 @@ const styles = StyleSheet.create({
     gap:               12,
   },
   permTitle: {
-    fontSize:   18,
+    fontSize:   FontSize.font18,
     fontWeight: '700',
     color:      '#111',
     textAlign:  'center',
   },
   permSub: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      '#666',
     textAlign:  'center',
     lineHeight: 20,

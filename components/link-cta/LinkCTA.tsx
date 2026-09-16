@@ -1,7 +1,7 @@
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { CDN_SVG } from '../../constants/cdn'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
   // fell back to the platform system font instead of Poppins.
   message: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     lineHeight: 18,
     color:      Colors.textPrimary,
     textAlign:  'center',
@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
   // Poppins-Medium, weight 500, #29339B.
   contactText: {
     fontFamily: Fonts.poppinsMedium,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
     lineHeight: 18,
     color:      Colors.link,

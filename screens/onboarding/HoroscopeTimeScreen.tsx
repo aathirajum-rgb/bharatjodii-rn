@@ -443,12 +443,12 @@ const styles = StyleSheet.create({
     // so they don't switch to the per-language NotoSans family the way the
     // title/labels do via useLanguageFonts().
     fontFamily: Fonts.poppinsRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      '#808080',   // Angular: .picker-item color, exact match
   },
   wheelTextSel: {
     fontFamily: Fonts.poppinsRegular,
-    fontSize:   20,
+    fontSize:   FontSize.font20,
     fontWeight: '500',
     color:      Colors.black,
   },
@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
     height:     ACTIVE_H,       // matches the box's height so its own line-height
     lineHeight: ACTIVE_H,       // centers vertically within that same top-aligned
     fontFamily: Fonts.poppinsRegular,
-    fontSize:   24,             // space, now that wheelBody uses flex-start
+    fontSize:   FontSize.font24,             // space, now that wheelBody uses flex-start
     fontWeight: '700',
     color:      Colors.black,
     textAlign:  'center',

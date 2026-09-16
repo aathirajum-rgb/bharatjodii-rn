@@ -1357,7 +1357,7 @@ const styles = StyleSheet.create({
   // No Angular equivalent — an empty thread never renders bare in Angular
   // (there's always at least the phone-view system row or a real message);
   // left as-is, not sourced from any Angular class.
-  emptyTitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary, textAlign: 'center' },
+  emptyTitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.textSecondary, textAlign: 'center' },
 
   // Angular: messages.component.html:115-120 — plain centered ion-label, NO
   // background/border/shadow/card of any kind (confirmed: no matching CSS

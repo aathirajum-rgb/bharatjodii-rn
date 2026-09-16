@@ -18,7 +18,7 @@ import AppHeader from '../../components/app-header/AppHeader'
 import OTPSuccessSheet from '../../components/bottom-sheet/OTPSuccessSheet'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
-import { Fonts } from '../../src/theme/fonts'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 import { parseAndStoreWebViewURL, resendOTP, verifyOTP } from '../../service/registrationService'
 import { getItem, setItem } from '../../service/storageService'
 import { StorageKeys } from '../../constants/storage.keys'
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
   // Title — "Enter OTP" (Figma: Poppins SemiBold 22px)
   title: {
     fontFamily:   Fonts.poppinsSemiBold,
-    fontSize:     22,
+    fontSize:     FontSize.font22,
     fontWeight:   '600',
     color:        Colors.textPrimary,
     lineHeight:   28,
@@ -507,7 +507,7 @@ const styles = StyleSheet.create({
   },
   subtitleText: {
     fontFamily: Fonts.poppinsRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.textPrimary,
     lineHeight: 20,
   },
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
   },
   phoneNumber: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '600',
     color:      Colors.textPrimary,
     lineHeight: 20,
@@ -534,7 +534,7 @@ const styles = StyleSheet.create({
   },
   editText: {
     fontFamily: Fonts.poppinsRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.link,    // #29339B — matches Figma "Edit" blue
     lineHeight: 20,
   },
@@ -551,7 +551,7 @@ const styles = StyleSheet.create({
     borderWidth:        1,
     borderRadius:       8,
     fontFamily:         Fonts.poppinsRegular,
-    fontSize:           22,
+    fontSize:           FontSize.font22,
     fontWeight:         '400',
     color:              Colors.textPrimary,
     backgroundColor:    Colors.surface,
@@ -578,7 +578,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.poppinsRegular,
     marginTop:  4,
     marginLeft: 4,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      Colors.inputError,
     lineHeight: 16,
   },
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
   },
   resendText: {
     fontFamily: Fonts.poppinsRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.textPrimary,
     lineHeight: 20,
   },

@@ -20,6 +20,7 @@ import { PICKER_PANEL_WIDTH } from '../../constants/registration.constants'
 import CheckboxGroup, { type CheckboxOption } from '../checkbox/CheckboxGroup'
 import type { OptionGroup } from '../../service/registrationService'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize } from '../../src/theme/fonts'
 
 // Multi-select sibling of SearchablePicker — mirrors Angular's right-side-panel
 // checkbox mode (search box + checkbox list + Apply button), used for filter
@@ -350,7 +351,7 @@ const styles = StyleSheet.create({
   // SearchablePicker's. Was a system-font 600, one step too heavy.
   headerTitle: {
     flex:       1,
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     color:      Colors.textPrimary,
   },
   searchBox: {
@@ -366,10 +367,10 @@ const styles = StyleSheet.create({
     gap:               8,
     backgroundColor:   Colors.surface,
   },
-  searchInput: { flex: 1, fontSize: 14, color: Colors.textPrimary, padding: 0 },
-  searchClear: { fontSize: 13, color: Colors.scrimLight, padding: 2 },
+  searchInput: { flex: 1, fontSize: FontSize.font14, color: Colors.textPrimary, padding: 0 },
+  searchClear: { fontSize: FontSize.font13, color: Colors.scrimLight, padding: 2 },
   emptyBox:    { padding: 32, alignItems: 'center' },
-  emptyText:   { fontSize: 14, color: Colors.scrimLight },
+  emptyText:   { fontSize: FontSize.font14, color: Colors.scrimLight },
   applyBtn: {
     marginHorizontal: 16,
     marginTop:        12,
@@ -388,7 +389,7 @@ const styles = StyleSheet.create({
   // not a 600 weight.
   applyText: {
     color:      Colors.white,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     lineHeight: 16,
   },
 })

@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 
 const SCREEN_H = Dimensions.get('window').height
 
@@ -93,7 +94,7 @@ const s = StyleSheet.create({
     elevation:            16,
   },
   title: {
-    fontSize:     18,
+    fontSize:     FontSize.font18,
     fontWeight:   '700',
     color:        Colors.textPrimary,
     marginBottom: 40,

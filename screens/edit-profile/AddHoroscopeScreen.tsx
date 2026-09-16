@@ -29,6 +29,7 @@ import { useTranslation } from 'react-i18next'
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 import { CDN_REACT } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { setItem } from '../../service/storageService'
@@ -369,11 +370,23 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
+  // App-wide screen-header convention (16/Medium/#333333), not Angular's own
+  // edit-profile header (`heading1-semibold-20 black-color`).
+  headerTitle: {
+    flex: 1, fontSize: FontSize.font16, fontFamily: Fonts.poppinsMedium,
+    color: '#333333', marginLeft: 6, marginRight: 16,
+  },
 
   content: { paddingHorizontal: 24, paddingTop: 32 },
-  heading: { fontSize: 16, fontWeight: '500', color: Colors.textSecondary, marginBottom: 24 },
-  dobMissing: { fontSize: 13, color: Colors.inputError, marginBottom: 12 },
+  // FLAGGED, not matched to Angular: this renders EDITPROFILE.ADDYOURHORO, which
+  // in Angular is the compact promo blurb inside .add-horoscope-block
+  // (edit-profile.page.html:878, `textcta-medium-12 mb-6` = 12px Poppins-Medium)
+  // — a different role from a full-screen heading, so its 12px is not
+  // transferable here. Size left at 16 and only tokenised; the bare fontWeight
+  // has no fontFamily (see the audit note) and is likewise left alone.
+  heading: { fontSize: FontSize.font16, fontWeight: '500', color: Colors.textSecondary, marginBottom: 24 },
+  // RN-only copy (no date of birth on file) — no Angular counterpart; tokenised only.
+  dobMissing: { fontSize: FontSize.font13, color: Colors.inputError, marginBottom: 12 },
   dobRow: { flexDirection: 'row', gap: 8, marginBottom: 20 },
   dobField: { flex: 1 },
 
@@ -382,5 +395,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginTop: 12,
   },
   submitBtnDisabled: { opacity: 0.5 },
-  submitBtnText: { color: Colors.white, fontSize: 14, fontWeight: '500' },
+  // Angular primary CTA copy: `primary-cta-jodii body1-medium-14 white-color`
+  // = var(--font14) + --english-medium-poppins (Poppins-Medium) + #ffffff.
+  submitBtnText: { color: Colors.white, fontSize: FontSize.font14, fontFamily: Fonts.poppinsMedium },
 })

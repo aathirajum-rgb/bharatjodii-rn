@@ -29,6 +29,7 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileDesktopLayout from './DeleteProfileDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { handleBack } from '../../utils/navigationRef'
+import { FontSize } from '../../src/theme/fonts'
 
 const SCREEN_H = Dimensions.get('window').height
 
@@ -443,7 +444,7 @@ const s = StyleSheet.create({
     marginLeft:     14,
   },
   headerTitle: {
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '500',
     color:      '#333333',
     marginLeft: 6,
@@ -477,7 +478,7 @@ const s = StyleSheet.create({
   },
   cardLabel: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#000000',
   },
@@ -516,7 +517,7 @@ const s = StyleSheet.create({
     marginTop: 24,
   },
   concernTitle: {
-    fontSize:     18,
+    fontSize:     FontSize.font18,
     fontWeight:   '600',
     color:        '#000000',
     marginBottom: 12,
@@ -528,7 +529,7 @@ const s = StyleSheet.create({
     borderColor:       '#e6e6e6',
     paddingHorizontal: 16,
     paddingVertical:   12,
-    fontSize:          14,
+    fontSize:          FontSize.font14,
     fontWeight:        '400',
     color:             '#000000',
     backgroundColor:   Colors.white,
@@ -589,19 +590,19 @@ const bs = StyleSheet.create({
     justifyContent: 'center',
   },
   closeIcon: {
-    fontSize:   18,
+    fontSize:   FontSize.font18,
     color:      '#666666',
     lineHeight: 22,
   },
   sheetTitle: {
-    fontSize:     16,
+    fontSize:     FontSize.font16,
     fontWeight:   '600',
     color:        '#1f1e1b',
     lineHeight:   24,
     marginBottom: 8,
   },
   title: {
-    fontSize:     14,
+    fontSize:     FontSize.font14,
     fontWeight:   '400',
     color:        '#333333',
     lineHeight:   22,
@@ -617,7 +618,7 @@ const bs = StyleSheet.create({
     justifyContent: 'center',
   },
   deleteBtnText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#545454',
     lineHeight: 20,

@@ -19,7 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { handleBack } from '../../utils/navigationRef'
 import { fetchSafetyTipsContent, type SafetyTipsContent } from '../../service/safetyTipsService'
 
@@ -96,14 +96,14 @@ const s = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#e5e5e5',
   },
   // Angular: .heading4-medium-16 — 16px, Poppins-Medium, weight 500, #333333.
-  headerTitle: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 16, color: '#333333' },
+  headerTitle: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: FontSize.font16, color: '#333333' },
 
   content: { paddingHorizontal: 24, paddingTop: 16 },
   // Angular: .heading3-semibold-16 — 16px, Poppins-SEMIBOLD (not Medium),
   // weight 600, #1f1e1b (not #333333 — this one's genuinely a different,
   // slightly darker color than the header title/tip text below it).
   subheading: {
-    fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 16,
+    fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: FontSize.font16,
     color: '#1f1e1b', marginBottom: 8,
   },
 
@@ -112,9 +112,9 @@ const s = StyleSheet.create({
   row: { flexDirection: 'row', gap: 8, marginTop: 24 },
   rowText: { flex: 1, gap: 6 },
   // Angular: .safety-tips-item-heading — button-english-Medium, 14px, #333333.
-  rowTitle: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: '#333333' },
+  rowTitle: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: FontSize.font14, color: '#333333' },
   // Angular: .body2-regular-14 — 14px, Poppins-Regular, weight 400, #333333
   // (not Colors.textSecondary — Angular's tip body uses the same #333333 as
   // the title above it, just a different weight/family, not a lighter gray).
-  rowBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#333333', lineHeight: 19 },
+  rowBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: '#333333', lineHeight: 19 },
 })

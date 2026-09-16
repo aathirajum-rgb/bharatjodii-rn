@@ -2,6 +2,7 @@ import { StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import CdnSvg, { CdnSvgBackground } from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -132,7 +133,7 @@ const styles = StyleSheet.create({
     marginTop: -12,
   },
   label: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '600',
     flexShrink: 1,
   },

@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View, type TextStyle, type ViewStyle } fro
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -122,7 +123,7 @@ const styles = StyleSheet.create({
 
   // Angular: color-1f1e1b body2-regular-14
   label: {
-    fontSize:  14,
+    fontSize:  FontSize.font14,
     color:     Colors.textPrimary,
     flexShrink: 1,
   },
@@ -138,7 +139,7 @@ const styles = StyleSheet.create({
     marginLeft:      2,
   },
   countText: {
-    fontSize:   10,
+    fontSize:   FontSize.font10,
     fontWeight: '700',
     color:      Colors.white,
   },

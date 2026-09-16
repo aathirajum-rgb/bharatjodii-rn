@@ -488,7 +488,7 @@ const styles = StyleSheet.create({
     justifyContent:  'center',
   },
   reviewText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '600',
     color:      '#fff',
   },
@@ -502,7 +502,7 @@ const styles = StyleSheet.create({
     gap:             6,
   },
   processingText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      '#fff',
     fontWeight: '500',
   },
@@ -550,7 +550,7 @@ const styles = StyleSheet.create({
     justifyContent:  'center',
   },
   slotPlus: {
-    fontSize:   28,
+    fontSize:   FontSize.font28,
     fontWeight: '300',
     color:      '#aaa',
   },
@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   addMoreText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '600',
     color:      Colors.primary,
   },
@@ -586,7 +586,7 @@ const styles = StyleSheet.create({
   },
 
   emptyHint: {
-    fontSize:  14,
+    fontSize:  FontSize.font14,
     color:     '#999',
     textAlign: 'center',
     marginTop: 40,

@@ -234,8 +234,8 @@ const s = StyleSheet.create({
   desktopHeader: {
     width: 810, flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 24,
   },
-  desktopBackArrow: { fontSize: 22, color: Colors.black },
-  desktopTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 22, color: Colors.black },
+  desktopBackArrow: { fontSize: FontSize.font22, color: Colors.black },
+  desktopTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font22, color: Colors.black },
   desktopCard: {
     width: 810, backgroundColor: Colors.white, borderRadius: 24, padding: 40,
     shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 0 }, shadowOpacity: 0.12, shadowRadius: 8,

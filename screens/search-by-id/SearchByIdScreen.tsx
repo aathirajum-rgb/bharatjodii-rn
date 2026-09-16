@@ -35,6 +35,7 @@ import { StorageKeys } from '../../constants/storage.keys'
 import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { handleBack } from '../../utils/navigationRef'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { FontSize } from '../../src/theme/fonts'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
@@ -141,10 +142,10 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
+  headerTitle: { flex: 1, fontSize: FontSize.font16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
 
   content: { flex: 1, paddingHorizontal: 24, paddingTop: 32 },
-  heading: { fontSize: 18, fontWeight: '600', color: Colors.textPrimary, marginBottom: 24 },
+  heading: { fontSize: FontSize.font18, fontWeight: '600', color: Colors.textPrimary, marginBottom: 24 },
   input: { marginBottom: 0 },
 
   footer: { marginTop: 'auto' },

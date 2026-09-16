@@ -12,7 +12,7 @@ import { CallIcon, WhatsAppIcon } from './matchesCard.shared'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 
 export interface ContactDetailsSheetProps {
   visible:         boolean
@@ -144,24 +144,24 @@ const s = StyleSheet.create({
     alignItems:     'flex-start',
     marginBottom:   16,
   },
-  closeX: { fontSize: 16, color: '#1f1e1b' },
+  closeX: { fontSize: FontSize.font16, color: '#1f1e1b' },
   // Figma: Poppins-SemiBold 20px, lineHeight 28, #1f1e1b, left-aligned (this
   // used 18px centered before).
   title: {
     flex:       1,
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   20,
+    fontSize:   FontSize.font20,
     lineHeight: 28,
     color:      '#1f1e1b',
   },
   // Angular: VERIFIED_NOTE row (modalpopup.component.html:417) — body2-regular-14,
   // color-1f1e1b, mt-8 relative to the title above it.
-  notVerifiedNote: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#1f1e1b', marginTop: 8 },
+  notVerifiedNote: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: '#1f1e1b', marginTop: 8 },
   infoBlock: { gap: 4, marginTop: 24 },
   row: { flexDirection: 'row' },
-  label: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular,  fontSize: 14, lineHeight: 25, color: '#1f1e1b' },
+  label: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular,  fontSize: FontSize.font14, lineHeight: 25, color: '#1f1e1b' },
   // Figma: value is SemiBold (not Medium) with a slight letter-spacing.
-  value: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, lineHeight: 25, letterSpacing: 0.14, color: '#1f1e1b' },
+  value: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, lineHeight: 25, letterSpacing: 0.14, color: '#1f1e1b' },
   // Angular: --ion-color-grey-color: #545454 (theme/variables.scss:179) — used
   // for BOTH the border and text on this button (not a brand-red border/black
   // text, a previous guess here).
@@ -170,21 +170,21 @@ const s = StyleSheet.create({
     gap: 4, height: 44, borderRadius: 8, marginTop: 16, paddingHorizontal: 24,
     backgroundColor: Colors.white, borderWidth: 1, borderColor: '#545454',
   },
-  waBtnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: '#545454' },
+  waBtnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: FontSize.font14, color: '#545454' },
   callBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 4, height: 44, borderRadius: 8, paddingHorizontal: 24,
     backgroundColor: Colors.primaryDark,
   },
-  btnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.white },
+  btnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: FontSize.font14, color: Colors.white },
   shareRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     gap: 8, marginTop: 24,
   },
-  shareLinkText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, letterSpacing: 0.035, color: Colors.link },
+  shareLinkText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, letterSpacing: 0.035, color: Colors.link },
   divider: { marginTop: 16, marginBottom: 16 },
   counter: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.black,
     textAlign: 'center',
   },
 })

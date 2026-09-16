@@ -2,6 +2,7 @@ import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -136,7 +137,7 @@ const styles = StyleSheet.create({
   // Angular ion-label: margin-top 8, margin-bottom 8, margin-left 24
   label: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     lineHeight: 16,
     color:      Colors.textPrimary,
     marginLeft: 24,
@@ -169,7 +170,7 @@ const styles = StyleSheet.create({
   },
   tick: {
     color:      Colors.white,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '700',
     lineHeight: 18,
   },

@@ -18,7 +18,7 @@ import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
 import { WhatsAppUnlockButton, getBlurPhotoUri } from '../matches/matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import { SemanticFontsEnglish } from '../../src/theme/fonts'
+import { SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { getItem } from '../../service/storageService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { getOppGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
@@ -572,7 +572,7 @@ const styles = StyleSheet.create({
   newlyJoinedText: {
     fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium,
     color:      Colors.white,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     marginLeft:  4,
   },
 
@@ -597,7 +597,7 @@ const styles = StyleSheet.create({
   },
   shortlistText: {
     color:      Colors.white,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '500',
     marginLeft:  4,
   },
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
   },
   threeDotText: {
     color:      Colors.white,
-    fontSize:   18,
+    fontSize:   FontSize.font18,
     fontWeight: '700',
     lineHeight: 22,
   },
@@ -643,7 +643,7 @@ const styles = StyleSheet.create({
   },
   dontShowText: {
     color:      Colors.white,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '500',
     marginLeft:  8,
   },
@@ -670,7 +670,7 @@ const styles = StyleSheet.create({
   },
   whatsappOverlayText: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     color:      Colors.white,
     textAlign:  'center',
     lineHeight: 18,
@@ -696,7 +696,7 @@ const styles = StyleSheet.create({
   },
   uploadLabel: {
     color:      Colors.white,
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     fontWeight: '600',
   },
 })

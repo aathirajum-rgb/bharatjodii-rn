@@ -493,5 +493,5 @@ const styles = StyleSheet.create({
   // No Angular equivalent — app-audio-wave (wavesurfer.js) isn't ported, so
   // this scrubber's elapsed/duration readout has no source class to check
   // against; left as-is.
-  audioTime: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 11, color: Colors.textPrimary },
+  audioTime: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font11, color: Colors.textPrimary },
 })

@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react'
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../src/theme/fonts'
 import { subscribeWebAlerts, popWebAlert, type WebAlertRequest } from '../utils/webAlertBridge'
 
 export default function WebAlertHost() {
@@ -69,15 +69,15 @@ const s = StyleSheet.create({
     width: 340, maxWidth: '100%', backgroundColor: Colors.white, borderRadius: 14,
     paddingTop: 20, paddingHorizontal: 20, overflow: 'hidden',
   },
-  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, textAlign: 'center' },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: Colors.black, textAlign: 'center' },
   message: {
-    fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: 14, color: Colors.textDark,
+    fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: FontSize.font14, color: Colors.textDark,
     textAlign: 'center', marginTop: 8,
   },
   buttonList: { marginTop: 20, marginHorizontal: -20 },
   button: { height: 46, alignItems: 'center', justifyContent: 'center' },
   buttonDivider: { borderTopWidth: 1, borderTopColor: Colors.divider },
-  buttonText: { fontFamily: Fonts.poppinsMedium, fontSize: 15, color: Colors.primaryDark },
+  buttonText: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font15, color: Colors.primaryDark },
   buttonTextDestructive: { color: Colors.inputError },
   buttonTextCancel: { color: Colors.textSecondary, fontFamily: Fonts.poppinsRegular },
 })

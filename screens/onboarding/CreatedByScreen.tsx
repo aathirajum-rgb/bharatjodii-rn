@@ -218,7 +218,7 @@ const styles = StyleSheet.create({
   // White checkmark rendered inside the filled circle
   checkmark: {
     color:      Colors.surface,
-    fontSize:   11,
+    fontSize:   FontSize.font11,
     fontWeight: '700',
     lineHeight: 13,
   },

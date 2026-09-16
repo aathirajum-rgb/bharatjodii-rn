@@ -306,8 +306,10 @@ const s = StyleSheet.create({
   insetRow: {
     minHeight: 0,
   },
+  // A '✕' text glyph standing in for Angular's own close <ion-img> asset, so
+  // no Angular typography class governs it — size tokenised only, unchanged.
   closeText: {
-    fontSize: 16,
+    fontSize: FontSize.font16,
     color:    Colors.white,
   },
   // Angular: .jodii-membership-banner-block { min-height: 42vmin !important }

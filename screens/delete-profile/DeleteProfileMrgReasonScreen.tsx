@@ -23,6 +23,7 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileMrgReasonDesktopLayout from './DeleteProfileMrgReasonDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { handleBack } from '../../utils/navigationRef'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -284,7 +285,7 @@ const s = StyleSheet.create({
     marginLeft:     14,
   },
   headerTitle: {
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '500',
     color:      '#333333',
     marginLeft: 6,
@@ -297,19 +298,19 @@ const s = StyleSheet.create({
   },
 
   congratsTitle: {
-    fontSize:   24,
+    fontSize:   FontSize.font24,
     fontWeight: '600',
     color:      '#000000',
   },
   congratsSub: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#000000',
     marginTop:  8,
     lineHeight: 20,
   },
   sectionTitle: {
-    fontSize:   18,
+    fontSize:   FontSize.font18,
     fontWeight: '600',
     color:      '#000000',
     marginTop:  24,
@@ -343,7 +344,7 @@ const s = StyleSheet.create({
   },
   cardLabel: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#000000',
     lineHeight: 20,

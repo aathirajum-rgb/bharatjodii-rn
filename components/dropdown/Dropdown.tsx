@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -112,7 +113,7 @@ const styles = StyleSheet.create({
     backgroundColor:   Colors.surface,
     paddingHorizontal: 4,
     zIndex:            10,
-    fontSize:          12,
+    fontSize:          FontSize.font12,
     lineHeight:        16,
     color:             Colors.textPrimary,
   },
@@ -134,7 +135,7 @@ const styles = StyleSheet.create({
   },
   triggerText: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
     color:      Colors.textDark,
   },
@@ -143,7 +144,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
   },
   arrow: {
-    fontSize:   10,
+    fontSize:   FontSize.font10,
     color:      Colors.textTertiary,
     marginLeft: 8,
   },
@@ -174,7 +175,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.chipSurfaceSelected,
   },
   optionText: {
-    fontSize: 14,
+    fontSize: FontSize.font14,
     color:    Colors.textDark,
   },
   optionTextSelected: {

@@ -52,8 +52,12 @@ export interface MatchesDesktopLayoutProps {
   loadingMore:        boolean
   onLoadMore:         () => void
 
-  selectedChip:       string
+  selectedChips:      string[]
   onChipSelect:       (key: string) => void
+  // Forwarded straight to MatchesFilterSidebar, which already accepts it and
+  // otherwise falls back to a noop — so desktop Reset silently did nothing.
+  onResetFilters?:    (() => void) | undefined
+  onApplyFilters?:    (() => void) | undefined
 
   addPhotoBannerMatches?: any
   onActivateProfile:      () => void
@@ -65,7 +69,7 @@ export default function MatchesDesktopLayout({
   ownEntryType, femaleFreeEligible, indNumbersLeft,
   onProfilePress, onLike, onDontShow, onViewLater, onCall, onWhatsApp, onMessage,
   onEditPreferences, loadingMore, onLoadMore,
-  selectedChip, onChipSelect,
+  selectedChips, onChipSelect, onResetFilters, onApplyFilters,
   addPhotoBannerMatches, onActivateProfile,
 }: MatchesDesktopLayoutProps) {
   const { t } = useTranslation()
@@ -91,8 +95,10 @@ export default function MatchesDesktopLayout({
       <View style={s.body}>
         <MatchesFilterSidebar
           totalCount={totalCount}
-          selectedChip={selectedChip}
+          selectedChips={selectedChips}
           onChipSelect={onChipSelect}
+          onResetFilters={onResetFilters}
+          onApplyFilters={onApplyFilters}
           onEditPreferences={onEditPreferences}
         />
 
@@ -105,7 +111,7 @@ export default function MatchesDesktopLayout({
               <Text style={s.title}>New Matches</Text>
               <FilterChipsRow
                 chips={DESKTOP_FILTER_CHIPS}
-                selected={selectedChip}
+                selected={selectedChips}
                 onSelect={onChipSelect}
                 selectedBg={Colors.radioCheckedBg}
                 selectedTextColor={Colors.black}
@@ -140,7 +146,7 @@ export default function MatchesDesktopLayout({
                   </View>
                   <FilterChipsRow
                     chips={DESKTOP_FILTER_CHIPS}
-                    selected={selectedChip}
+                    selected={selectedChips}
                     onSelect={onChipSelect}
                     selectedBg={Colors.radioCheckedBg}
                     selectedTextColor={Colors.black}

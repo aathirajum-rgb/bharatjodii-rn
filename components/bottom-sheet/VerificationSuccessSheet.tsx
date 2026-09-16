@@ -4,6 +4,7 @@ import { Animated, Dimensions, Modal, StyleSheet, Text, View } from 'react-nativ
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_LOTTIE } from '../../constants/cdn'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -155,7 +156,7 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize:     18,
+    fontSize:     FontSize.font18,
     fontWeight:   '600',
     color:        Colors.textPrimary,
     lineHeight:   24,
@@ -163,7 +164,7 @@ const styles = StyleSheet.create({
   },
 
   subtitle: {
-    fontSize:     14,
+    fontSize:     FontSize.font14,
     color:        Colors.textPrimary,
     lineHeight:   20,
     marginBottom: 8,

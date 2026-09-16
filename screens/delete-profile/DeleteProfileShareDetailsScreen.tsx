@@ -27,6 +27,7 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileShareDetailsDesktopLayout from './DeleteProfileShareDetailsDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { handleBack } from '../../utils/navigationRef'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -549,7 +550,7 @@ const s = StyleSheet.create({
     marginLeft:     14,
   },
   headerTitle: {
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '500',
     color:      '#333333',
     marginLeft: 6,
@@ -574,13 +575,13 @@ const s = StyleSheet.create({
     flex: 1,
   },
   bannerLine: {
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '400',
     color:      '#000000',
     lineHeight: 24,
   },
   bannerHighlight: {
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '600',
     color:      '#c9050b',
     lineHeight: 24,
@@ -608,7 +609,7 @@ const s = StyleSheet.create({
     borderColor: ERROR_COLOR,
   },
   textInput: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#000000',
     padding:    0,
@@ -622,17 +623,17 @@ const s = StyleSheet.create({
     alignItems:    'center',
   },
   placeholderText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      '#8a8a8a',
     lineHeight: 20,
   },
   placeholderAsterisk: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      '#f11b37',
     lineHeight: 20,
   },
   nameError: {
-    fontSize:  12,
+    fontSize:  FontSize.font12,
     color:     ERROR_COLOR,
     marginTop: 4,
   },
@@ -683,7 +684,7 @@ const chip = StyleSheet.create({
     backgroundColor: 'rgba(181,0,51,0.02)',
   },
   label: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#000000',
   },
@@ -715,14 +716,14 @@ const fl = StyleSheet.create({
     zIndex:            1,
   },
   label: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
     color:      '#000000',
     lineHeight: 16,
   },
   value: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
     color:      '#000000',
   },
@@ -766,7 +767,7 @@ const mp = StyleSheet.create({
     backgroundColor: 'rgba(181,0,51,0.04)',
   },
   rowText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#000000',
   },
@@ -809,7 +810,7 @@ const mds = StyleSheet.create({
     zIndex:            10,
   },
   fieldLabelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
     color:      '#8a8a8a',
   },
@@ -822,7 +823,7 @@ const mds = StyleSheet.create({
   },
   fieldText: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
     color:      '#000000',
   },
@@ -831,7 +832,7 @@ const mds = StyleSheet.create({
     color:      '#8a8a8a',
   },
   chevron: {
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     color:      '#8a8a8a',
     lineHeight: 18,
   },
@@ -863,7 +864,7 @@ const mds = StyleSheet.create({
     backgroundColor: 'rgba(181,0,51,0.05)',
   },
   dropdownItemText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#000000',
   },

@@ -29,6 +29,7 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileUploadPhotoDesktopLayout from './DeleteProfileUploadPhotoDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { handleBack } from '../../utils/navigationRef'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -310,7 +311,7 @@ const s = StyleSheet.create({
   },
   headerTitle: {
     flex:       1,
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '500',
     color:      '#333333',
     marginLeft: 6,
@@ -320,7 +321,7 @@ const s = StyleSheet.create({
     paddingVertical:   8,
   },
   skipText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#000000',
   },
@@ -333,13 +334,13 @@ const s = StyleSheet.create({
 
   // ── Title ──
   title: {
-    fontSize:   18,
+    fontSize:   FontSize.font18,
     fontWeight: '600',
     color:      '#000000',
     lineHeight: 26,
   },
   optional: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      'rgba(0,0,0,0.4)',
     marginTop:  4,
@@ -372,14 +373,14 @@ const s = StyleSheet.create({
     justifyContent:  'center',
   },
   plusText: {
-    fontSize:   22,
+    fontSize:   FontSize.font22,
     lineHeight: 26,
     color:      '#666',
     fontWeight: '300',
   },
   addPhotoText: {
     marginTop:  10,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
     color:      '#000000',
   },
@@ -400,7 +401,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white,
   },
   addressInput: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#000000',
     padding:    0,

@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
   },
   radioCheckmark: {
     color:      Colors.surface,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '700',
   },
 
@@ -632,7 +632,7 @@ const styles = StyleSheet.create({
     color:      Colors.black,
   },
   panelCloseTxt: {
-    fontSize: 16,
+    fontSize: FontSize.font16,
     color:    Colors.textPrimary,
     padding:  4,
   },
@@ -641,7 +641,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   panelEmptyText: {
-    fontSize: 14,
+    fontSize: FontSize.font14,
     color:    Colors.scrimLight,
   },
 

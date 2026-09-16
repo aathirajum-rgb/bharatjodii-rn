@@ -22,7 +22,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize, RupeeSymbolFont } from '../../src/theme/fonts'
 import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import { handleBack } from '../../utils/navigationRef'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
@@ -482,7 +482,7 @@ const s = StyleSheet.create({
   },
   // Angular: .heading3-semibold-16 (global.scss:2204) — 16px, Poppins SemiBold,
   // weight 600 — plus .flex-1 .text-align-left .black-color.
-  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, flex: 1, textAlign: 'left' },
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: Colors.black, flex: 1, textAlign: 'left' },
   // Angular: .ml-12 (global.scss:1226) — 12px, not 16.
   headerClose: { marginLeft: 12 },
 
@@ -499,7 +499,7 @@ const s = StyleSheet.create({
   content: { paddingHorizontal: 24, paddingTop: 10, paddingBottom: 12, gap: 20 },
 
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  emptyText:  { fontSize: 14, color: Colors.textSecondary },
+  emptyText:  { fontSize: FontSize.font14, color: Colors.textSecondary },
 
   cardWrap: { marginTop: 20 },
 
@@ -511,7 +511,7 @@ const s = StyleSheet.create({
   // English font-family var is Poppins-REGULAR (weight:500 is a plain, non-
   // !important override on top of that static file, not a distinct Medium
   // font file) — not the specialCta/buttonMedium Poppins-Medium file.
-  onlyForYouText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 10, color: Colors.white },
+  onlyForYouText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font10, color: Colors.white },
 
   // Angular: .most-popular (benefits-card.component.scss:58-66) — a child of
   // the card, top:-1.4rem (-22.4px), left:27px, padding 4px 8px, radius 20.
@@ -530,7 +530,7 @@ const s = StyleSheet.create({
   // No line-height class is applied there, so RN pins one here to keep the
   // badge the same ~23px tall (15 + 4px padding x2) that the -22.4px top
   // offset is calibrated against.
-  mostSoldText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 10, lineHeight: 15, color: Colors.white },
+  mostSoldText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font10, lineHeight: 15, color: Colors.white },
 
   // Angular: .intermediate-item-block (benefits-card.component.scss:1-13) —
   // 12px padding all round, radius 16, white, 1px #8A8A8A border and NO
@@ -563,25 +563,41 @@ const s = StyleSheet.create({
 
   // Angular: .mt-4 .font-14-semibold .mb-4 .black-color — 14px Poppins
   // SemiBold with 4px above AND below.
-  durationText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black, marginTop: 4, marginBottom: 4 },
+  durationText: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.black, marginTop: 4, marginBottom: 4 },
   // Angular: .color-222222 .body2-regular-14 .pl-2 — the 2px is padding-LEFT,
   // not a top margin (the 4px gap above comes from durationText's own mb-4).
-  typeText:     { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#222222', paddingLeft: 2 },
+  typeText:     { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: '#222222', paddingLeft: 2 },
 
   cardTopRight: { alignItems: 'flex-end' },
   // Angular: .d-flex .align-center-item .mb-4 — the 4px gap between the two
   // prices is the final price's own .ml-4, and both carry .mt-4.
   priceRow:     { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-  // Angular: <del> .body3-regular-12 .mt-4 .color-999999 — 12px, #999999,
-  // line-through from the <del> element itself.
-  strikePrice:  { fontSize: 12, color: Colors.textPlaceholder, textDecorationLine: 'line-through', marginTop: 4 },
-  // Angular: .heading3-semibold-16 .mt-4 .ml-4 .black-color — 16px SemiBold.
-  // Angular: .heading3-semibold-16 .poppins-family — 16px semibold. Kept
-  // semibold here (the .poppins-family override only swaps the FAMILY to
-  // Roboto, which RN has no equivalent for) and the SIZE trimmed instead, so
-  // it stops reading larger than Angular's.
+  // Angular: benefits-card.component.html:21 — <del class="body3-regular-12 mt-4
+  // color-999999" [class]="(lang=='en') ? 'poppins-family' : ''"> — 12px,
+  // #999999, line-through from the <del> element itself.
+  //
+  // The family was MISSING here entirely, so this rendered in the OS system
+  // font. For English the markup adds `poppins-family`, which global.scss:2316
+  // resolves to var(--english-poppins) = Roboto-Regular — declared AFTER
+  // .body3-regular-12 (:2264) at equal specificity, so it wins. That swap is
+  // deliberate: _variable.scss:24 comments it "varible use for Rupess symbol",
+  // because Poppins doesn't render ₹ correctly — and this element is a price.
+  strikePrice:  { fontFamily: RupeeSymbolFont, fontSize: FontSize.font12, color: Colors.textPlaceholder, textDecorationLine: 'line-through', marginTop: 4 },
+  // Angular: benefits-card.component.html:22 — `heading3-semibold-16 mt-4 ml-4
+  // black-color` plus `poppins-family` for English. Size/colour/margins match.
+  //
+  // FLAGGED, family left as Poppins-SemiBold: an earlier note here said RN "has
+  // no equivalent" for the .poppins-family → Roboto swap. That is wrong — the
+  // family IS available (Fonts.robotoRegular / RupeeSymbolFont, registered in
+  // config/fonts.ts), and strikePrice/saveText above now use it. It is not
+  // applied HERE because only Roboto-REGULAR is registered: Angular renders
+  // Roboto synthetically bolded by .heading3-semibold-16's font-weight:600,
+  // which RN cannot do, so switching would silently drop this price from
+  // semibold to regular — the most prominent number on the card. Either
+  // register a Roboto-SemiBold face or accept Poppins here; both are product
+  // calls, not CSS facts.
   // ADJUSTABLE — fontSize is the price's size.
-  finalPrice:   { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, marginTop: 4, marginLeft: 4 },
+  finalPrice:   { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: Colors.black, marginTop: 4, marginLeft: 4 },
   // Angular: .textcta-medium-12 + .font-10-nav both apply; .font-10-nav sits
   // later in global.scss so 10px wins the size, while .textcta-medium-12's
   // !important weight:500 wins the weight. Family is .font-10-nav's own
@@ -589,7 +605,12 @@ const s = StyleSheet.create({
   // class RN can't port (same untranslatable override as finalPrice below) —
   // Poppins-Regular is the closest available stand-in, not Poppins-Medium.
   // Plus .pr-2 (padding-right 2px) — there is no top margin on this element.
-  saveText:     { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 10, color: '#00A650', paddingRight: 2 },
+  // Family corrected to Roboto-Regular: benefits-card.component.html:24 adds
+  // `poppins-family` for English, which overrides .font-10-nav's own
+  // Poppins-Regular (see strikePrice above for why — this line carries a ₹
+  // amount too). Both faces are Regular weight, so this swap changes only the
+  // glyph source, not the visual weight.
+  saveText:     { fontFamily: RupeeSymbolFont, fontSize: FontSize.font10, color: '#00A650', paddingRight: 2 },
 
   // Angular: .hr-line-payment (benefits-card.component.scss:45-50) — a 1px
   // #e6e6e6 filled div inset 5px each side, with .mt-12/.mb-12 around it.
@@ -601,10 +622,10 @@ const s = StyleSheet.create({
   // Angular: row 2's icon carries .ml-2 to re-centre the narrower 18px glyph.
   benefitIconSm: { marginLeft: 2 },
   // Angular: .body3-regular-12 .line-height-16 — 12px, line-height 16.
-  benefitText: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black, lineHeight: 16 },
+  benefitText: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.black, lineHeight: 16 },
   // Angular: recharge.page.html:113 — the emphasis span carries `.font-14-semibold`
   // (14px, Poppins-Semibold, weight 600), not the surrounding 12px body text.
-  benefitBold: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, fontWeight: '600' },
+  benefitBold: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, fontWeight: '600' },
 
   // Angular: app-button-revamp buttonSize=linkmedium (button-revamp.component
   // .scss:213) — padding 6px top/bottom, 0 left/right, height auto, and NO
@@ -620,17 +641,17 @@ const s = StyleSheet.create({
   // `span{font-weight:500}`, which outranks the plain .body2-regular-14 class
   // on specificity, so weight 500 wins over the family's own 400.
   // textColor greyColor = --ion-color-grey-color (#545454, variables.scss:179).
-  viewAllText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, fontWeight: '500', color: '#545454', lineHeight: 20 },
+  viewAllText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, fontWeight: '500', color: '#545454', lineHeight: 20 },
 
   couponRow: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     borderRadius: 8, paddingVertical: 12, paddingHorizontal: 16,
     backgroundColor: Colors.membershipCardBg,
   },
-  couponCode:       { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black, flexShrink: 1 },
-  couponApplied:    { fontFamily: Fonts.poppinsSemiBold, fontSize: 12, color: Colors.discountGreen },
-  couponApplyLabel: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: 12, color: Colors.primaryDark },
-  couponUndo:       { fontSize: 16, color: Colors.textSecondary, paddingHorizontal: 4 },
+  couponCode:       { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.black, flexShrink: 1 },
+  couponApplied:    { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font12, color: Colors.discountGreen },
+  couponApplyLabel: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: FontSize.font12, color: Colors.primaryDark },
+  couponUndo:       { fontSize: FontSize.font16, color: Colors.textSecondary, paddingHorizontal: 4 },
   couponSpacer:     { flex: 1 },
 
   offerBanner: {
@@ -640,7 +661,7 @@ const s = StyleSheet.create({
   // Angular: recharge.page.html:151 — `.div-note` (color:#7A1739, no font
   // rules) + `.textcta-medium-12` (global.scss:2270) — 12px Poppins-MEDIUM,
   // weight 500 !important, not Regular.
-  offerBannerText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 12, color: '#7A1739', textAlign: 'center', lineHeight: 16 },
+  offerBannerText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: FontSize.font12, color: '#7A1739', textAlign: 'center', lineHeight: 16 },
 
   // Angular: <ion-footer class="footer-shadow"> (recharge.page.scss:391) —
   // box-shadow 0 -3px 16px rgba(0,0,0,.08); the inner row is .pl-24 .pr-24
@@ -672,7 +693,7 @@ const s = StyleSheet.create({
   // (8px gap, not 4), and the number is .body1-medium-14-all .line-height-18
   // .color-29339B with .ml-4 from the phone icon.
   needHelpRow:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginTop: 12 },
-  needHelpText:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black, lineHeight: 18, marginRight: 8 },
+  needHelpText:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.black, lineHeight: 18, marginRight: 8 },
   needHelpContact: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
-  needHelpNumber:  { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.link, lineHeight: 18, marginLeft: 4 },
+  needHelpNumber:  { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: FontSize.font14, color: Colors.link, lineHeight: 18, marginLeft: 4 },
 })

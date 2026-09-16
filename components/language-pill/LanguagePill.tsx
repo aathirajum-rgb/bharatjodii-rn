@@ -30,6 +30,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import LanguagePillSheet from './LanguagePillSheet'
 import { CDN_SVG } from '../../constants/cdn'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize } from '../../src/theme/fonts'
 
 const CDN = CDN_SVG
 
@@ -84,7 +85,7 @@ const s = StyleSheet.create({
     paddingVertical:   4,
   },
   text: {
-    fontSize: 12,
+    fontSize: FontSize.font12,
     color:    '#000000',
   },
 })

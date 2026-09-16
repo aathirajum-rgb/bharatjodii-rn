@@ -25,6 +25,7 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileUnsatisfactoryDesktopLayout from './DeleteProfileUnsatisfactoryDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { handleBack } from '../../utils/navigationRef'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -336,7 +337,7 @@ const s = StyleSheet.create({
   },
   headerTitle: {
     flex:       1,
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '500',
     color:      '#333333',
     marginLeft: 6,
@@ -350,7 +351,7 @@ const s = StyleSheet.create({
 
   // ── Title ──
   title: {
-    fontSize:     18,
+    fontSize:     FontSize.font18,
     fontWeight:   '600',
     color:        '#000000',
     marginBottom: 20,
@@ -383,7 +384,7 @@ const s = StyleSheet.create({
   },
   cardLabel: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#000000',
     lineHeight: 20,
@@ -409,7 +410,7 @@ const s = StyleSheet.create({
     backgroundColor: PRIMARY,
   },
   checkmark: {
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     fontWeight: '700',
     color:      Colors.white,
     lineHeight: 16,
@@ -420,7 +421,7 @@ const s = StyleSheet.create({
     marginTop: 28,
   },
   concernTitle: {
-    fontSize:     18,
+    fontSize:     FontSize.font18,
     fontWeight:   '600',
     color:        '#000000',
     marginBottom: 12,
@@ -432,7 +433,7 @@ const s = StyleSheet.create({
     borderColor:       '#e6e6e6',
     paddingHorizontal: 16,
     paddingVertical:   12,
-    fontSize:          14,
+    fontSize:          FontSize.font14,
     fontWeight:        '400',
     color:             '#000000',
     backgroundColor:   Colors.white,
@@ -445,7 +446,7 @@ const s = StyleSheet.create({
     gap:        12,
   },
   supportText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      '#000000',
     textAlign:  'center',
@@ -458,7 +459,7 @@ const s = StyleSheet.create({
     paddingVertical: 8,
   },
   phoneText: {
-    fontSize:          12,
+    fontSize:          FontSize.font12,
     fontWeight:        '500',
     color:             Colors.link,
     textDecorationLine:'underline',

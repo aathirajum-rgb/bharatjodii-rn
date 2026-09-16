@@ -24,6 +24,7 @@ import {
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 import { CDN_REACT } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
@@ -554,11 +555,18 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
+  // App-wide screen-header convention (16/Medium/#333333), not Angular's own
+  // edit-profile header (`heading1-semibold-20 black-color`).
+  headerTitle: {
+    flex: 1, fontSize: FontSize.font16, fontFamily: Fonts.poppinsMedium,
+    color: '#333333', marginLeft: 6, marginRight: 16,
+  },
 
   content: { paddingHorizontal: 24, paddingTop: 32 },
-  heading: { fontSize: 20, fontWeight: '600', color: Colors.black, marginBottom: 24 },
-  fieldGroupLabel: { fontSize: 14, fontWeight: '600', color: Colors.textSecondary, marginBottom: 12 },
+  // Same section heading as the hub's section titles — Angular:
+  // `heading-03-bold-20 color-333333` = var(--font20) + Poppins-Bold + #333333.
+  heading: { fontSize: FontSize.font20, fontFamily: Fonts.poppinsBold, color: Colors.textDark, marginBottom: 24 },
+  fieldGroupLabel: { fontSize: FontSize.font14, fontWeight: '600', color: Colors.textSecondary, marginBottom: 12 },
   fieldGroupLabelSpaced: { marginTop: 28 },
 
   submitBtn: {
@@ -566,7 +574,9 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', marginTop: 24,
   },
   submitBtnDisabled: { opacity: 0.5 },
-  submitBtnText: { color: Colors.white, fontSize: 14, fontWeight: '500' },
+  // Angular primary CTA copy: `primary-cta-jodii body1-medium-14 white-color`
+  // = var(--font14) + --english-medium-poppins (Poppins-Medium) + #ffffff.
+  submitBtnText: { color: Colors.white, fontSize: FontSize.font14, fontFamily: Fonts.poppinsMedium },
 })
 
 const h = StyleSheet.create({
@@ -578,50 +588,50 @@ const h = StyleSheet.create({
   },
   dateFieldOpen: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomColor: Colors.surface },
   dateFieldLabel: { position: 'absolute', top: -8, left: 12, backgroundColor: Colors.surface, paddingHorizontal: 4, zIndex: 10 },
-  dateFieldLabelText: { fontSize: 12, fontWeight: '400', color: Colors.textSecondary },
+  dateFieldLabelText: { fontSize: FontSize.font12, fontWeight: '400', color: Colors.textSecondary },
   dateFieldPressable: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, height: 48 },
-  dateFieldText: { flex: 1, fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
+  dateFieldText: { flex: 1, fontSize: FontSize.font14, fontWeight: '500', color: Colors.textPrimary },
   dateFieldPlaceholder: { fontWeight: '500', color: Colors.textPrimary },
-  chevron: { fontSize: 14, color: Colors.textSecondary, lineHeight: 20 },
+  chevron: { fontSize: FontSize.font14, color: Colors.textSecondary, lineHeight: 20 },
 
   ageBadge: {
     marginBottom: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1,
     borderColor: 'rgba(181,0,51,0.1)', borderRadius: 8, alignSelf: 'flex-start', backgroundColor: 'rgba(181,0,51,0.03)',
   },
-  ageBadgeText: { fontSize: 14, fontWeight: '400', color: Colors.textPrimary },
+  ageBadgeText: { fontSize: FontSize.font14, fontWeight: '400', color: Colors.textPrimary },
   ageBadgeYears: { fontWeight: '600' },
-  currentAgeText: { fontSize: 13, color: Colors.textSecondary, marginBottom: 8 },
+  currentAgeText: { fontSize: FontSize.font13, color: Colors.textSecondary, marginBottom: 8 },
 
   orRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 16, gap: 8 },
   orLine: { flex: 1, height: 1, backgroundColor: '#e0e0e0' },
-  orText: { fontSize: 14, color: 'rgba(0,0,0,0.5)' },
+  orText: { fontSize: FontSize.font14, color: 'rgba(0,0,0,0.5)' },
 
   enterAgeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  enterAgeLink: { fontSize: 14, fontWeight: '400', color: Colors.link, textDecorationLine: 'underline', lineHeight: 20 },
-  enterAgeCaret: { fontSize: 16, fontWeight: '600', color: Colors.link, lineHeight: 20 },
+  enterAgeLink: { fontSize: FontSize.font14, fontWeight: '400', color: Colors.link, textDecorationLine: 'underline', lineHeight: 20 },
+  enterAgeCaret: { fontSize: FontSize.font16, fontWeight: '600', color: Colors.link, lineHeight: 20 },
 
   // Height rows
   row: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10 },
   rowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle },
   rowSelected: { backgroundColor: Colors.selectionBg },
   rowLabels: { flex: 1 },
-  rowLabel: { fontSize: 14, fontWeight: '400', color: Colors.textPrimary },
+  rowLabel: { fontSize: FontSize.font14, fontWeight: '400', color: Colors.textPrimary },
   rowLabelSelected: { fontWeight: '500' },
-  rowSubtitle: { fontSize: 14, fontWeight: '400', color: 'rgba(0,0,0,0.6)', marginTop: 2 },
+  rowSubtitle: { fontSize: FontSize.font14, fontWeight: '400', color: 'rgba(0,0,0,0.6)', marginTop: 2 },
   rowSubtitleSelected: { fontWeight: '500' },
 
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: '#545454', alignItems: 'center', justifyContent: 'center' },
   radioSelected: { borderColor: Colors.primaryDark, backgroundColor: Colors.primaryDark },
-  radioTick: { color: Colors.surface, fontSize: 10, fontWeight: '700', lineHeight: 12 },
+  radioTick: { color: Colors.surface, fontSize: FontSize.font10, fontWeight: '700', lineHeight: 12 },
 
   exactField: {
     flexDirection: 'row', alignItems: 'center', height: 48, borderWidth: 1, borderColor: Colors.inputBorder,
     borderRadius: 8, paddingLeft: 16, paddingRight: 12, backgroundColor: Colors.surface,
   },
   exactFieldActive: {},
-  exactFieldText: { flex: 1, fontSize: 14, fontWeight: '400', color: Colors.textPrimary },
+  exactFieldText: { flex: 1, fontSize: FontSize.font14, fontWeight: '400', color: Colors.textPrimary },
   exactFieldTextActive: { fontWeight: '500' },
-  exactFieldArrow: { fontSize: 22, color: Colors.textPrimary, lineHeight: 26 },
+  exactFieldArrow: { fontSize: FontSize.font22, color: Colors.textPrimary, lineHeight: 26 },
 
   // Dropdown (date picker)
   dropdown: {
@@ -634,33 +644,33 @@ const h = StyleSheet.create({
   },
   dropdownItem: { height: ITEM_H, justifyContent: 'center', paddingHorizontal: 10 },
   dropdownItemSel: { backgroundColor: 'rgba(181,0,51,0.05)' },
-  dropdownItemText: { fontSize: 14, fontWeight: '400', color: Colors.textPrimary },
+  dropdownItemText: { fontSize: FontSize.font14, fontWeight: '400', color: Colors.textPrimary },
   dropdownItemTextSel: { fontWeight: '600', color: Colors.primaryDark },
 
   overlay: { flex: 1, backgroundColor: Colors.scrimMedium },
 
   ageSheet: { backgroundColor: Colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 24, paddingTop: 20 },
   dragHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.borderSoft, alignSelf: 'center', marginBottom: 12 },
-  ageSheetTitle: { fontSize: 20, fontWeight: '600', color: Colors.textPrimary, marginBottom: 28, marginTop: 8 },
+  ageSheetTitle: { fontSize: FontSize.font20, fontWeight: '600', color: Colors.textPrimary, marginBottom: 28, marginTop: 8 },
   ageInputOuter: { position: 'relative', marginTop: 8 },
-  ageInputBox: { height: 48, borderWidth: 1, borderColor: Colors.inputBorder, borderRadius: 8, paddingHorizontal: 12, fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
+  ageInputBox: { height: 48, borderWidth: 1, borderColor: Colors.inputBorder, borderRadius: 8, paddingHorizontal: 12, fontSize: FontSize.font14, fontWeight: '500', color: Colors.textPrimary },
   ageLabelWrap: { position: 'absolute', top: -8, left: 12, backgroundColor: Colors.surface, paddingHorizontal: 4 },
-  ageLabelText: { fontSize: 12, fontWeight: '400', color: Colors.textSecondary },
-  ageError: { marginTop: 8, fontSize: 12, color: Colors.inputError, lineHeight: 16 },
+  ageLabelText: { fontSize: FontSize.font12, fontWeight: '400', color: Colors.textSecondary },
+  ageError: { marginTop: 8, fontSize: FontSize.font12, color: Colors.inputError, lineHeight: 16 },
   ageConfirmBtn: { marginTop: 28, marginBottom: 0 },
 
   panelContainer: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end' },
   backdrop: { flex: 1, backgroundColor: Colors.scrimMedium },
   panel: { width: PICKER_PANEL_WIDTH, backgroundColor: Colors.surface, elevation: 8, shadowColor: Colors.shadow, shadowOpacity: 0.2, shadowOffset: { width: -2, height: 0 }, shadowRadius: 8 },
   panelHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle },
-  panelTitle: { flex: 1, fontSize: 16, fontWeight: '600', color: Colors.textPrimary },
-  panelCloseTxt: { fontSize: 16, color: Colors.textPrimary, padding: 4 },
+  panelTitle: { flex: 1, fontSize: FontSize.font16, fontWeight: '600', color: Colors.textPrimary },
+  panelCloseTxt: { fontSize: FontSize.font16, color: Colors.textPrimary, padding: 4 },
   panelEmpty: { padding: 32, alignItems: 'center' },
-  panelEmptyText: { fontSize: 14, color: Colors.scrimLight },
+  panelEmptyText: { fontSize: FontSize.font14, color: Colors.scrimLight },
   sectionHeader: { paddingHorizontal: 20, paddingVertical: 8, backgroundColor: Colors.surfaceAlt, borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle },
-  sectionHeaderText: { fontSize: 12, fontWeight: '600', color: 'rgba(0,0,0,0.5)', textTransform: 'uppercase', letterSpacing: 0.6 },
+  sectionHeaderText: { fontSize: FontSize.font12, fontWeight: '600', color: 'rgba(0,0,0,0.5)', textTransform: 'uppercase', letterSpacing: 0.6 },
   heightItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, height: 52, borderBottomWidth: 1, borderBottomColor: Colors.surfaceDim },
   heightItemSelected: { backgroundColor: Colors.selectionBg },
-  heightItemText: { flex: 1, fontSize: 14, fontWeight: '400', color: Colors.textPrimary },
+  heightItemText: { flex: 1, fontSize: FontSize.font14, fontWeight: '400', color: Colors.textPrimary },
   heightItemTextSelected: { fontWeight: '500', color: Colors.primaryDark },
 })

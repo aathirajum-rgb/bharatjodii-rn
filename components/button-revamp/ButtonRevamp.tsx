@@ -3,6 +3,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -141,15 +142,15 @@ type SizeTokens = {
 
 const SIZE_TOKENS: Record<BtnSize, SizeTokens> = {
   // standard: height 44, borderRadius 8 — primary form CTAs
-  standard: { height: 44, paddingH: 16, radius: 8,  fontSize: 14, fontWeight: '500' },
+  standard: { height: 44, paddingH: 16, radius: 8,  fontSize: FontSize.font14, fontWeight: '500' },
   // large: height 40, borderRadius 8 — most action buttons
-  large:    { height: 40, paddingH: 16, radius: 8,  fontSize: 14, fontWeight: '500' },
+  large:    { height: 40, paddingH: 16, radius: 8,  fontSize: FontSize.font14, fontWeight: '500' },
   // medium: height 32, borderRadius 94 (pill) — compact CTAs
-  medium:   { height: 32, paddingH: 12, radius: 94, fontSize: 12, fontWeight: '400' },
+  medium:   { height: 32, paddingH: 12, radius: 94, fontSize: FontSize.font12, fontWeight: '400' },
   // small: height 24, borderRadius 30 — tags / badges
-  small:    { height: 24, paddingH: 10, radius: 30, fontSize: 12, fontWeight: '400' },
+  small:    { height: 24, paddingH: 10, radius: 30, fontSize: FontSize.font12, fontWeight: '400' },
   // callwhatsapp: height 40, borderRadius 30 — pill-shaped contact buttons
-  callwhatsapp: { height: 40, paddingH: 16, radius: 30, fontSize: 14, fontWeight: '500' },
+  callwhatsapp: { height: 40, paddingH: 16, radius: 30, fontSize: FontSize.font14, fontWeight: '500' },
 }
 
 // ─── ButtonRevamp ─────────────────────────────────────────────────────────────

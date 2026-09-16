@@ -8,6 +8,7 @@ import { clearSession } from '../../service/apiClient'
 import { setItem } from '../../service/storageService'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileSuccessDesktopLayout from './DeleteProfileSuccessDesktopLayout'
+import { FontSize } from '../../src/theme/fonts'
 
 const SUCCESS_GIF = CDN_REACT + '/delete_success.gif'
 
@@ -101,7 +102,7 @@ const s = StyleSheet.create({
   },
   message: {
     marginTop:     24,
-    fontSize:      18,
+    fontSize:      FontSize.font18,
     fontWeight:    '600',
     color:         '#1f1e1b',
     letterSpacing: 0.09,

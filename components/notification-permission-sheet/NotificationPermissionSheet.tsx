@@ -7,6 +7,7 @@ import CdnLottie from '../CdnLottie'
 import { Colors } from '../../constants/colors'
 import { CDN_LOTTIE } from '../../constants/cdn'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize } from '../../src/theme/fonts'
 
 // Angular: auto-start.component.html's action='enableNotification' branch —
 // same AutoStartComponent as GalleryAccessSheet.tsx's 'enableStorage' sibling
@@ -173,14 +174,14 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize:   22,
+    fontSize:   FontSize.font22,
     fontWeight: '600',
     color:      '#1f1e1b',
     lineHeight: 26,
     textAlign:  'left',
   },
   body: {
-    fontSize:     14,
+    fontSize:     FontSize.font14,
     fontWeight:   '400',
     color:        '#1f1e1b',
     lineHeight:   18,
@@ -199,7 +200,7 @@ const styles = StyleSheet.create({
     height:          44,
   },
   ctaLabel: {
-    fontSize:  14,
+    fontSize:  FontSize.font14,
     fontWeight: '400',
     color:     Colors.white,
     textAlign: 'center',

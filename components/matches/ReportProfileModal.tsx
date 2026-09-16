@@ -20,7 +20,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import { fetchReportReasons, submitReport, type ReportReason } from '../../service/reportProfileService'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 const BACK_ICON_URI = CDN_SVG + 'arrow-back-activity.svg'
@@ -211,7 +211,7 @@ const m = StyleSheet.create({
   },
   // Angular: .report-profile-heading { font-family: heading-02-english-Medium;
   // font-size:16px; color:#333333 } — Medium weight, not SemiBold.
-  headerTitle: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, color: '#333333' },
+  headerTitle: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: FontSize.font16, color: '#333333' },
   // Angular: .report-profile-name { color: #de2a68 } — the reported person's
   // name is colored differently from the rest of the "Report X" title.
   headerTitleName: { color: '#de2a68' },
@@ -223,7 +223,7 @@ const m = StyleSheet.create({
   // Angular: .heading3-semibold-16.color-1f1e1b, classes "mt-32 mb-24" — a
   // real heading (SemiBold 16px), not the small Regular-13px caption this
   // previously used.
-  subtitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: '#1f1e1b', marginTop: 32, marginBottom: 24 },
+  subtitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: '#1f1e1b', marginTop: 32, marginBottom: 24 },
   // Angular: report-profile.component.html:37 — `.report-profile-reason`
   // (border:1px solid #545454; border-radius:8px; background:#FFF) + "mt-16"
   // applied to EACH reason individually (inside the *ngFor), not one shared
@@ -243,14 +243,14 @@ const m = StyleSheet.create({
   // Angular wraps title + "Already reported" in one block-level <div> next to
   // ion-radio (slot="end") — a column, not a row splitting text/label apart.
   reasonTextCol: { flex: 1, paddingRight: 12 },
-  reasonTitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black,paddingRight: 40 },
+  reasonTitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black,paddingRight: 40 },
   reasonTitleDisabled: { color: Colors.textSecondary },
   // Angular: class="text-disabled report-profile-steps-content" — color:
   // #ef4444 from .text-disabled, but font-family is
   // var(--specialCta-english-Medium) from .report-profile-steps-content
   // (Medium weight), not the body-regular font this previously used. Sits
   // BELOW the title (see reasonTextCol), not beside it.
-  alreadyReported: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: 12, color: '#ef4444', marginTop: 8, marginBottom: 4 },
+  alreadyReported: { fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium, fontSize: FontSize.font12, color: '#ef4444', marginTop: 8, marginBottom: 4 },
   // Unselected border a bit more visible than the near-invisible Colors.divider
   // (#f0f0f0) — matches the real screenshot's clearly-visible thin gray ring.
   radioOuter: {
@@ -287,7 +287,7 @@ const m = StyleSheet.create({
   // real ripple via android_ripple above) — a slightly darker red overlay,
   // not a plain opacity dim.
   submitBtnPressed: { backgroundColor: Colors.primary },
-  submitBtnText: { fontSize: 16, color: Colors.white },
+  submitBtnText: { fontSize: FontSize.font16, color: Colors.white },
   // Dark-gray text reads correctly against the light-gray disabled bg —
   // white-on-white-ish gray would be nearly invisible.
   submitBtnTextDisabled: { color: Colors.textSecondary },
@@ -309,9 +309,9 @@ const m = StyleSheet.create({
   successLottieWrap: { width: 100, height: 100, alignSelf: 'flex-start', marginBottom: 16 },
   successLottie: { width: 100, height: 100 },
   // Angular: heading2-semibold-18 color-1f1e1b
-  successTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: '#1f1e1b', marginBottom: 12 },
+  successTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, color: '#1f1e1b', marginBottom: 12 },
   // Angular: body2-regular-14 color-1f1e1b, pr-32 mt-12
-  successContent: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#1f1e1b', lineHeight: 20, marginBottom: 24 },
+  successContent: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: '#1f1e1b', lineHeight: 20, marginBottom: 24 },
 })
 
 // Angular runs Ionic in mode="md" here — real touch feedback is

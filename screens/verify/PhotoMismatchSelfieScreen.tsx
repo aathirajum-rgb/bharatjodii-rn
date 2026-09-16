@@ -34,6 +34,7 @@ import { Endpoints } from '../../service/api.endpoints'
 import { requestCameraPermission } from '../../service/permissionService'
 import { snapshotWebFile } from '../../utils/webFileSnapshot'
 import { pollPhotoValidation } from '../../service/photoValidationService'
+import { FontSize } from '../../src/theme/fonts'
 
 const ICONS = {
   back:    CDN_REACT + '/menu_back_arrow.svg',
@@ -287,8 +288,8 @@ const s = StyleSheet.create({
 
   content: { flex: 1, paddingHorizontal: 24, paddingTop: 24 },
   warningIcon: { marginBottom: 16 },
-  heading: { fontSize: 18, fontWeight: '600', color: Colors.textPrimary, marginBottom: 8 },
-  tip: { fontSize: 14, color: Colors.textDark, lineHeight: 20, marginBottom: 24 },
+  heading: { fontSize: FontSize.font18, fontWeight: '600', color: Colors.textPrimary, marginBottom: 8 },
+  tip: { fontSize: FontSize.font14, color: Colors.textDark, lineHeight: 20, marginBottom: 24 },
   ctaSpacing: { marginTop: 24 },
 
   statusRow: {
@@ -300,8 +301,8 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(249,230,235,0.5)',
     borderWidth: 1, borderColor: 'rgba(181,0,51,0.2)',
   },
-  statusLabel: { flex: 1, fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
-  chevron: { fontSize: 20, color: Colors.textDark },
+  statusLabel: { flex: 1, fontSize: FontSize.font14, fontWeight: '500', color: Colors.textPrimary },
+  chevron: { fontSize: FontSize.font20, color: Colors.textDark },
 
   facepileRow: { flexDirection: 'row' },
   facepileImg: {
@@ -311,11 +312,11 @@ const s = StyleSheet.create({
   facepileOverlap: { marginLeft: -8 },
 
   helpRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 8 },
-  helpText: { fontSize: 13, color: Colors.link },
+  helpText: { fontSize: FontSize.font13, color: Colors.link },
 
   laterRow: { alignItems: 'center', paddingTop: 8 },
   laterRowInline: { alignItems: 'center', marginTop: 16 },
-  laterText: { fontSize: 14, color: Colors.textDark },
+  laterText: { fontSize: FontSize.font14, color: Colors.textDark },
 
   previewWrap: { flex: 1, backgroundColor: Colors.black },
   previewImage: { flex: 1, width: '100%' },
@@ -326,7 +327,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  closeIcon: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  closeIcon: { color: Colors.white, fontSize: FontSize.font16, fontWeight: '700' },
 
   previewActions: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
@@ -335,7 +336,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   previewIconBtn: { paddingVertical: 12, paddingHorizontal: 16 },
-  previewIconText: { color: Colors.white, fontSize: 14, fontWeight: '600' },
+  previewIconText: { color: Colors.white, fontSize: FontSize.font14, fontWeight: '600' },
 
   uploadingOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -344,5 +345,5 @@ const s = StyleSheet.create({
     gap: 16,
   },
   uploadingLottie: { opacity: 0.9 },
-  uploadingText: { color: Colors.white, fontSize: 16, fontWeight: '600', textAlign: 'center', paddingHorizontal: 32 },
+  uploadingText: { color: Colors.white, fontSize: FontSize.font16, fontWeight: '600', textAlign: 'center', paddingHorizontal: 32 },
 })

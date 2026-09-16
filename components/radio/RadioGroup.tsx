@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -146,7 +147,7 @@ const styles = StyleSheet.create({
   },
   // Angular ion-label: margin 0 16 0 0, overflow visible
   pillLabel: {
-    fontSize:    14,
+    fontSize:    FontSize.font14,
     lineHeight:  16,
     color:       Colors.textPrimary,
     marginRight: 8,
@@ -173,13 +174,13 @@ const styles = StyleSheet.create({
   },
   // Angular ion-label: body1-medium-14 black-color
   listLabel: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
     color:      Colors.textPrimary,
   },
   // Angular div: body2-regular-14 (optional subtitle, e.g. height range text)
   listSub: {
-    fontSize:  14,
+    fontSize:  FontSize.font14,
     color:     Colors.textSecondary,
     marginTop: 2,
   },

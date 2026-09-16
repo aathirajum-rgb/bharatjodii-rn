@@ -29,7 +29,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import BottomSheet from '../bottom-sheet/BottomSheet'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
-import { Fonts, FontsByLanguage } from '../../src/theme/fonts'
+import { Fonts, FontsByLanguage, FontSize } from '../../src/theme/fonts'
 import { loadFonts } from '../../src/config/fonts'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import i18n from '../../i18n'
@@ -192,7 +192,7 @@ export default function LanguagePillSheet({ visible, onClose, allLanguages = fal
 // (1px #e1e1e1 border / 8px radius / 12px top margin, item-radio-checked ->
 // #FEFAFB bg + #B30033 border) + ion-radio 16x16 (--color-checked:#B30033).
 const s = StyleSheet.create({
-  title: { fontSize: 22, fontWeight: '600', color: Colors.textPrimary, marginBottom: 24 },
+  title: { fontSize: FontSize.font22, fontWeight: '600', color: Colors.textPrimary, marginBottom: 24 },
   // allLanguages variant: bumped outer cap for the 11-item scroll body
   // (BottomSheet's own default maxHeight:'95%' still applies as the ceiling).
   allLangSheet: { maxHeight: '85%' },
@@ -203,7 +203,7 @@ const s = StyleSheet.create({
     position: 'absolute', top: 16, right: 16, zIndex: 10,
     width: 32, height: 32, alignItems: 'center', justifyContent: 'center',
   },
-  closeX: { fontSize: 20, color: Colors.textPrimary },
+  closeX: { fontSize: FontSize.font20, color: Colors.textPrimary },
   allLangTitle: { marginTop: 8, paddingRight: 32 },
   scroll: { marginBottom: 16 },
   // flexWrap (not a fixed 2-up row) — a patched-in 3rd language (see
@@ -217,12 +217,12 @@ const s = StyleSheet.create({
   },
   cardSelected: { borderColor: '#B30033', backgroundColor: '#FEFAFB' },
   cardText: { flex: 1, paddingRight: 8 },
-  nativeName: { fontSize: 16, fontWeight: '600', color: Colors.textPrimary },
+  nativeName: { fontSize: FontSize.font16, fontWeight: '600', color: Colors.textPrimary },
   nativeNameSelected: { color: '#1f1e1b' },
   // Always the English name (e.g. "Tamil", "Telugu") regardless of the card's
   // own language — always Poppins, never that card's FontsByLanguage script
   // font (which was leaving it on the RN system-default font instead).
-  englishName: { fontFamily: Fonts.poppinsRegular, fontSize: 12, color: Colors.textPrimary, marginTop: 2 },
+  englishName: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font12, color: Colors.textPrimary, marginTop: 2 },
   radio: {
     width: 16, height: 16, borderRadius: 8, borderWidth: 1.5, borderColor: '#cccccc',
     alignItems: 'center', justifyContent: 'center', flexShrink: 0,

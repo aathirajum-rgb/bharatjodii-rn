@@ -20,7 +20,7 @@ import Svg, { Path } from 'react-native-svg'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { decodeEntities } from '../../utils/htmlEntities'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 
@@ -118,7 +118,7 @@ const waButtonStyles = StyleSheet.create({
   },
   text: {
     fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.white,
   },
 })
@@ -156,11 +156,11 @@ export function LikeIcon({ width = 18, height = 19 }: IconProps) {
 // own bold/medium style — so this class must actually knock weight/size back
 // down, not just inherit whatever the wrapping <Text style> already set.
 const HTML_SPAN_CLASS_STYLES: Record<string, Record<string, any>> = {
-  'height-revamp-text-small': { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 12 },
+  'height-revamp-text-small': { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: FontSize.font12 },
   // Angular: `.font-14-semibold { font-size: var(--font14); font-family:
   // english-semibold-poppins; font-weight: 600 }` — e.g. the emphasized
   // "only one message" span inside MESSAGES.SEND_ONE_MESSAGE.
-  'font-14-semibold': { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 14 },
+  'font-14-semibold': { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: FontSize.font14 },
 }
 
 // Renders server HTML as styled React Native Text.
@@ -485,7 +485,7 @@ const badgeStyles = StyleSheet.create({
   },
   text: {
     fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     left: +8,
   },
   // Angular: badge.component.html's hasInfo span — class="ml-4" (4px left margin).
@@ -715,7 +715,7 @@ const swiperStyles = StyleSheet.create({
   arrowRight: { right: 8 },
   arrowText: {
     color:      Colors.white,
-    fontSize:   20,
+    fontSize:   FontSize.font20,
     lineHeight: 20,
   },
 })

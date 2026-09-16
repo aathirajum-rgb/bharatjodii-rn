@@ -15,7 +15,7 @@ import {
 import { useTranslation } from 'react-i18next'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { CDN, CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import CdnLottie from '../../components/CdnLottie'
@@ -635,12 +635,12 @@ const s = StyleSheet.create({
   backBtn:     { padding: 4, marginRight: 4 },
   // Angular: .heading3-semibold-16 .line-height-20 — 16px Poppins-SemiBold,
   // line-height 20. The rem scale here resolves ~16 → ~17 at 412px width.
-  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 17, lineHeight: 20, color: Colors.black, flex: 1 },
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font17, lineHeight: 20, color: Colors.black, flex: 1 },
 
   content: { padding: 16, gap: 24 },
 
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
-  emptyText:  { fontSize: 14, color: Colors.textSecondary, textAlign: 'center' },
+  emptyText:  { fontSize: FontSize.font14, color: Colors.textSecondary, textAlign: 'center' },
 
   // ── Plan summary card ────────────────────────────────────────────────────
   // Angular: .payment-revamp-intermediate-block (payment-mode.page.scss:39-44)
@@ -662,11 +662,11 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
   },
   planNameRow: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
-  planName:     { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
-  planDuration: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textSecondary, marginRight: 4 },
+  planName:     { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.black },
+  planDuration: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.textSecondary, marginRight: 4 },
   // Angular: .body3-regular-12 .poppins-family .black-color .line-height-16
   // (payment-mode.page.html:56) — 12px, #000. RN had #4C4C4C, a grey.
-  planPrice:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black, lineHeight: 16 },
+  planPrice:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.black, lineHeight: 16 },
 
   discountRow: {
     flexDirection:  'row',
@@ -674,25 +674,25 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop:      8,
   },
-  discountLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
-  discountValue: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.discountGreen },
+  discountLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.black },
+  discountValue: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.discountGreen },
 
   divider: { height: 1, backgroundColor: '#F1F5F9', borderRadius: 8, marginVertical: 16 },
 
   totalRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  totalLabel:  { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  totalLabel:  { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.black },
   totalValues: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   strikeThrough: {
-    fontSize: 12, color: Colors.borderNeutral, textDecorationLine: 'line-through',
+    fontSize: FontSize.font12, color: Colors.borderNeutral, textDecorationLine: 'line-through',
   },
   // Angular: .pay-now-amount (payment-mode.page.scss:159-163) — color is
   // var(--black) (#000), not gray-color1 (#1F1E1B) — the pay-now amount is
   // pure black, distinct from the softer #1F1E1B used elsewhere on this page.
-  finalTotal: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black },
+  finalTotal: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, color: Colors.black },
 
   // ── Sections / cards ─────────────────────────────────────────────────────
   section:      { gap: 16 },
-  sectionLabel: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  sectionLabel: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.black },
   // Angular: .payment-revamp-intermediate-block (payment-mode.page.scss:39-44)
   // — radius 8 (RN had 16) and shadow -1px 3px 6px 1px #40434343 (an 8-digit
   // hex = #404343 at 26.7% alpha). Inner gutters are 16px on the Recommended
@@ -727,7 +727,7 @@ const s = StyleSheet.create({
     width: 32, height: 32, borderRadius: 8, borderWidth: 1, borderColor: Colors.borderSubtle,
     backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center',
   },
-  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
 
   radioTouch: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
   radioCircle: {
@@ -755,6 +755,6 @@ const s = StyleSheet.create({
   // Angular: ion-checkbox --checkbox-background-checked #B50033 — matches
   // CheckboxGroup.tsx's established filled-checked style.
   checkboxChecked: { backgroundColor: Colors.primaryDark, borderColor: Colors.primaryDark },
-  tick: { fontSize: 11, color: Colors.white, fontWeight: '700', lineHeight: 12 },
-  renewLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
+  tick: { fontSize: FontSize.font11, color: Colors.white, fontWeight: '700', lineHeight: 12 },
+  renewLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.black },
 })

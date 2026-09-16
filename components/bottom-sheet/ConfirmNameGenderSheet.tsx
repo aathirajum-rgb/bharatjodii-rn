@@ -6,7 +6,7 @@ import ButtonRevamp from '../button-revamp/ButtonRevamp'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import { Fonts } from '../../src/theme/fonts'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import type { GenderOption } from '../../service/registrationService'
 
@@ -205,7 +205,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   title: {
-    fontSize:     18,
+    fontSize:     FontSize.font18,
     color:        Colors.textPrimary,
     lineHeight:   24,
   },
@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical:   0,
     fontFamily:        Fonts.poppinsMedium,
-    fontSize:          14,
+    fontSize:          FontSize.font14,
     fontWeight:        '500',
     color:             Colors.textPrimary,
   },
@@ -235,13 +235,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
   },
   labelText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '400',
     color:      Colors.textPrimary,
   },
   violationText: {
     marginTop:  8,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      Colors.inputError,
     lineHeight: 16,
   },
@@ -249,7 +249,7 @@ const styles = StyleSheet.create({
   // Section heading above the pills — Angular: font-14-semibold black-color, mt-24
   genderLabel: {
     marginTop:  24,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '600',
     color:      Colors.textPrimary,
   },
@@ -313,7 +313,7 @@ const styles = StyleSheet.create({
 
   // Angular body2-regular-14 line-height-16, switching to Medium once selected
   pillText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     lineHeight: 16,
     color:      Colors.textPrimary,
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
   // Helper line under the pills — Angular body1-medium-14-all black-color, mt-8
   genderText: {
     marginTop:  8,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
     lineHeight: 20,
     color:      Colors.textPrimary,

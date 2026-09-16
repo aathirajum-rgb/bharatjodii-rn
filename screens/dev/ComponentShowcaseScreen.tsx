@@ -25,6 +25,7 @@ import RadioGroup, { type RadioOption } from '../../components/radio/RadioGroup'
 import SelectableCard from '../../components/radio-checkbox-card/SelectableCard'
 import Dropdown from '../../components/dropdown/Dropdown'
 import { CDN_IMG, CDN_SVG } from '../../constants/cdn'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Styles declared first so sections array can reference them ───────────────
 
@@ -38,13 +39,13 @@ const styles = StyleSheet.create({
     paddingBottom: 48,
   },
   pageTitle: {
-    fontSize: 26,
+    fontSize: FontSize.font26,
     fontWeight: '800',
     color: Colors.textPrimary,
     marginBottom: 4,
   },
   pageSubtitle: {
-    fontSize: 13,
+    fontSize: FontSize.font13,
     color: Colors.textTertiary,
     marginBottom: 24,
   },
@@ -52,7 +53,7 @@ const styles = StyleSheet.create({
     marginBottom: 28,
   },
   sectionTitle: {
-    fontSize: 13,
+    fontSize: FontSize.font13,
     fontWeight: '700',
     color: Colors.primary,
     textTransform: 'uppercase',
@@ -82,13 +83,13 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   typeBadgeText: {
-    fontSize: 11,
+    fontSize: FontSize.font11,
     fontWeight: '700',
     color: Colors.primary,
     fontFamily: 'monospace',
   },
   cardDesc: {
-    fontSize: 13,
+    fontSize: FontSize.font13,
     color: Colors.textSecondary,
     lineHeight: 18,
     marginBottom: 14,
@@ -113,7 +114,7 @@ const styles = StyleSheet.create({
     alignSelf:         'flex-start',
   },
   showSheetBtnText: {
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     fontWeight: '600',
     color:      Colors.primary,
   },
@@ -723,7 +724,7 @@ function LoaderShowcase() {
             onDismiss={() => setModalVisible(false)}
           />
           <Text
-            style={{ color: Colors.primary, fontWeight: '600', fontSize: 14, textAlign: 'center' }}
+            style={{ color: Colors.primary, fontWeight: '600', fontSize: FontSize.font14, textAlign: 'center' }}
             onPress={() => setModalVisible(true)}
           >
             Tap to preview ModalLoader →

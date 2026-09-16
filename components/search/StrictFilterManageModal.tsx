@@ -16,7 +16,7 @@ import {
   STRICT_FIELD_ORDER, STRICT_EXCLUDED_FIELDS, STRICT_FILTERS_TITLE, STRICT_FILTERS_NOTE, FILTER_CTA_NOTE,
 } from '../../constants/strictFilter.config'
 import type { FieldKey } from '../../screens/search/SearchScreen'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 
 // Close icon: revamp-img/close-icon-gray.svg — what Angular's own
 // manageStrictFilter header uses (search.component.html:9,
@@ -142,8 +142,8 @@ const s = StyleSheet.create({
   // line-height 1.4; the note is `body3-regular-12` with line-height 1.5.
   // RN takes weight from the font file, so these name a family instead of a
   // fontWeight (which left them on the system font).
-  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, lineHeight: 22, color: Colors.black, marginBottom: 4 },
-  subtitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 18, color: Colors.black, marginBottom: 24 },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, lineHeight: 22, color: Colors.black, marginBottom: 4 },
+  subtitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 18, color: Colors.black, marginBottom: 24 },
 
   list: {},
   row: {
@@ -156,8 +156,8 @@ const s = StyleSheet.create({
   rowText: { flex: 1, gap: 8 },
   // Same two-line row as the PP list: label `body2-regular-14`,
   // value `body1-medium-14`.
-  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.black },
-  rowValue: { fontFamily: Fonts.poppinsMedium, fontSize: 14, lineHeight: 16, color: Colors.black },
+  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 16, color: Colors.black },
+  rowValue: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, lineHeight: 16, color: Colors.black },
   rowRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   toggleSlot: { width: TOGGLE_WIDTH, alignItems: 'flex-end' },
 
@@ -167,11 +167,11 @@ const s = StyleSheet.create({
   },
   // Angular: "(This might reduce your matches)" is `body2-regular-14
   // color-545454` — 14px, not 12.
-  footerNote: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#545454' },
+  footerNote: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: '#545454' },
   showMatchesBtn: {
     alignSelf: 'stretch', height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
   },
   // button-revamp's default ctaFontSize: `body2-regular-14` + `line-height-16`.
-  showMatchesText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.white },
+  showMatchesText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 16, color: Colors.white },
 })

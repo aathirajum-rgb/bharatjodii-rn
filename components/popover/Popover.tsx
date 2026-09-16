@@ -10,6 +10,7 @@ import {
 } from 'react-native'
 import { Colors } from '../../constants/colors'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
+import { FontSize } from '../../src/theme/fonts'
 
 const SCREEN_W = Dimensions.get('window').width
 const SCREEN_H = Dimensions.get('window').height
@@ -180,13 +181,13 @@ const styles = StyleSheet.create({
     elevation:       12,
   },
   attentionTitle: {
-    fontSize:     16,
+    fontSize:     FontSize.font16,
     fontWeight:   '700',
     color:        Colors.textPrimary,
     marginBottom: 8,
   },
   attentionContent: {
-    fontSize:  14,
+    fontSize:  FontSize.font14,
     color:     Colors.textSecondary,
     lineHeight: 20,
   },
@@ -205,7 +206,7 @@ const styles = StyleSheet.create({
   },
   // Angular: span.body2-regular-14.black-color — 14px regular, black.
   tooltipText: {
-    fontSize:  14,
+    fontSize:  FontSize.font14,
     color:     Colors.black,
     lineHeight: 20,
   },

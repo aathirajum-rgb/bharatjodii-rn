@@ -28,7 +28,7 @@ import {
   getBioDataDownloadLink, type BiodataProfile, type BiodataTheme,
 } from '../../service/biodataService'
 import { getOwnGenderAvatarUrl } from '../../utils/avatar'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 
 const ICON_BACK        = CDN_REACT + '/menu_back_arrow.svg'
@@ -656,7 +656,11 @@ function FieldRow({
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.white },
   centered: { alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
-  errorText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center' },
+  // FLAGGED: no fontFamily — falls back to the OS system font (this app
+  // registers Poppins as four separate named families, so a missing family is
+  // never Poppins). No Angular counterpart either: download-biodata has no
+  // load-failure state. Size tokenised only, value unchanged.
+  errorText: { fontSize: FontSize.font14, color: Colors.textSecondary, textAlign: 'center' },
 
   // Angular: pt-16/pb-16 on the row rather than a fixed height, and no
   // space-between — the arrow is its own column and the language group is
@@ -668,7 +672,10 @@ const s = StyleSheet.create({
   // Matches the back arrow's width so the centred group isn't biased right.
   headerSpacer: { width: 24 },
   langGroup: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  langLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  // FLAGGED: Angular's language <select> (.language-selection-biodata) is
+  // COMMENTED OUT (download-biodata.component.html:20-22), so there is no live
+  // equivalent for this pill's typography. Tokenised only, value unchanged.
+  langLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
   // Angular .language-selection-biodata: border 1px solid #333333, radius 8,
   // padding 4px 24px 4px 8px, white bg, 12px chevron at right 8px. That 24px
   // right padding exists to clear the chevron, so it becomes a gap here.
@@ -679,7 +686,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 4,
   },
   // Angular: same class as langLabel — .body2-regular-14 (14px), not 12px.
-  langPillText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  langPillText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
 
   // Angular: .biodata-details-missing — background #FFF4F7 (not selectionBg's
   // #FFF1F5), box-shadow 0 0px 5px 1px #e5e5e5.
@@ -688,7 +695,7 @@ const s = StyleSheet.create({
     shadowColor: '#e5e5e5', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 5, elevation: 2,
   },
   missingBannerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  missingBannerText: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#333333' },
+  missingBannerText: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: '#333333' },
   // alignSelf so the pill hugs its content instead of stretching the banner
   // width; marginLeft aligns it under the message, past the alert icon
   // (Angular's offset="1"). marginTop is its mt-6.
@@ -697,7 +704,12 @@ const s = StyleSheet.create({
     alignSelf: 'flex-start', marginLeft: 32, marginTop: 12,
     backgroundColor: Colors.primaryDark, borderRadius: 8, height: 40, paddingHorizontal: 16,
   },
-  missingBannerCtaText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 14, color: Colors.white },
+  // FLAGGED: Angular's "Add Now" span is `ml-6 cta-medium-10 white-color`
+  // (download-biodata.component.html:43), but `.cta-medium-10` is not declared
+  // in ANY stylesheet in the project — it contributes no size or family, so the
+  // real rendered size is ion-button's own default. No citable value, so 14 is
+  // left as-is and only tokenised.
+  missingBannerCtaText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: FontSize.font14, color: Colors.white },
 
   // Angular's outer themed <ion-col> — carries theme.BGCOLOR behind the top
   // image, the white card and the bottom decoration alike.
@@ -765,7 +777,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 4,
   },
   // Angular: .textcta-medium-12 — 12px Poppins-Medium, not 10px.
-  photoActionText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 12, color: '#333333' },
+  photoActionText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: FontSize.font12, color: '#333333' },
   // Angular .biodata-profile-image-edit: `right: 10px; top: 10px;
   // background-color: #745430; border-radius: 50%; opacity: 0.8` — a
   // translucent brown disc in the TOP-right corner. This port had a white disc
@@ -793,20 +805,26 @@ const s = StyleSheet.create({
   // Angular: <ion-col class="padd0 mt-24"> around the name label — a 24pt gap
   // between the photo frame and the name, which this port had at 0 so the name
   // sat directly against the frame's bottom border.
-  name: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: '#333333', marginTop: 24 },
-  matriId: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 12, color: '#333333', marginTop: 8 },
+  name: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: '#333333', marginTop: 24 },
+  matriId: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: FontSize.font12, color: '#333333', marginTop: 8 },
 
-  sectionTitle: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: 14, color: '#333333', marginTop: 16, marginBottom: 8 },
+  sectionTitle: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: FontSize.font14, color: '#333333', marginTop: 16, marginBottom: 8 },
 
   fieldRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 12, gap: 8 },
-  fieldLabel: { flex: 5, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#333333' },
-  fieldValue: { flex: 7, fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 12, color: '#333333' },
+  fieldLabel: { flex: 5, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: '#333333' },
+  fieldValue: { flex: 7, fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: FontSize.font12, color: '#333333' },
   fieldAddLink: { flex: 7, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  fieldAddLinkText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 12, color: '#D99C00' },
+  fieldAddLinkText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: FontSize.font12, color: '#D99C00' },
 
   horoRow: { flexDirection: 'row', gap: 16, marginTop: 8 },
   horoCol: { flex: 1, alignItems: 'center' },
-  horoLabel: { fontFamily: Fonts.poppinsSemiBold, fontSize: 10, color: '#D8AD6E', marginBottom: 8 },
+  // Angular: `heading-03-bold-10 color-d8ad6e mt-8 mb-8`
+  // (download-biodata.component.html:404, 410) — var(--heading-03-*-Bold), i.e.
+  // Poppins-Bold for English, not SemiBold. .color-d8ad6e = #d8ad6e (already
+  // matched). Caveat: .heading-03-bold-10 is only declared inside global.scss's
+  // nine per-language blocks with no English declaration; all nine agree on
+  // Bold + --font10, so that is the intent.
+  horoLabel: { fontFamily: Fonts.poppinsBold, fontSize: FontSize.font10, color: '#D8AD6E', marginBottom: 8 },
   horoImg: { width: '100%', height: 100 },
   // Angular .biodata-horoscope-block (+ .biodata-horoscope-block-border, which
   // is applied only when HOROSCOPEAVAILABLE=='N', i.e. exactly this block):
@@ -821,8 +839,8 @@ const s = StyleSheet.create({
     marginTop: 8, paddingHorizontal: 24, paddingVertical: 16, borderRadius: 8, alignItems: 'center',
     backgroundColor: '#FFFCF4', borderWidth: 1, borderStyle: 'dashed', borderColor: '#FFE17E',
   },
-  horoMissingHeader: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: 16, color: '#EF4444', textAlign: 'center' },
-  horoMissingBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#4C4C4C', textAlign: 'center', marginTop: 4 },
+  horoMissingHeader: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: FontSize.font16, color: '#EF4444', textAlign: 'center' },
+  horoMissingBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: '#4C4C4C', textAlign: 'center', marginTop: 4 },
 
   // Angular .biodata-barcode-section: `border-top: 1px solid #a9907e;
   // margin-top: 24px` — a hairline rule separating the QR block from the
@@ -841,7 +859,7 @@ const s = StyleSheet.create({
     width: 80, height: 80,
     borderWidth: 1, borderColor: '#E6CA64', borderRadius: 8,
   },
-  qrCaption: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 12, color: '#1A1818', textAlign: 'center' },
+  qrCaption: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: FontSize.font12, color: '#1A1818', textAlign: 'center' },
 
   // Butts straight onto the card — no overlap. The -35 that used to be here was
   // sized for the old (wrongly 100pt-tall) slab and painted over the QR caption,
@@ -864,6 +882,13 @@ const s = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)',
     alignItems: 'center', justifyContent: 'center', padding: 32, gap: 16,
   },
-  swipeTipTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.white, textAlign: 'center' },
-  swipeTipBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.white, textAlign: 'center' },
+  // The swipe hint is Angular's `action=='bioDataSwipe'` modal
+  // (modalpopup.component.html:967-987), opened by download-biodata's
+  // swipePopup(). Title is `heading-03-bold-24 white-color` — var(--font24) +
+  // Poppins-Bold, NOT 20/SemiBold. Body is `white-color body-01-regular-16` —
+  // var(--font16) + --body-01-english-Regular (Poppins-Regular), NOT 14. Both
+  // classes are declared only in the nine per-language blocks; all nine agree,
+  // same English gap as heading-03-bold-10 above.
+  swipeTipTitle: { fontFamily: Fonts.poppinsBold, fontSize: FontSize.font24, color: Colors.white, textAlign: 'center' },
+  swipeTipBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font16, color: Colors.white, textAlign: 'center' },
 })

@@ -25,6 +25,7 @@ import { CDN_SVG } from '../../constants/cdn'
 import { fetchCustomerCare } from '../../service/homeService'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import BottomSheet from '../bottom-sheet/BottomSheet'
+import { FontSize } from '../../src/theme/fonts'
 
 // Angular's exact asset paths from the editFieldRestrict template.
 const ICON_ALERT = CDN_SVG + 'entry-alert-popup-img.svg'
@@ -86,12 +87,12 @@ export default function FieldRestrictedSheet({ visible, onClose }: Props) {
 
 const s = StyleSheet.create({
   closeBtn:   { alignSelf: 'flex-end', padding: 4 },
-  closeX:     { fontSize: 16, color: Colors.textPrimary, fontWeight: '400' },
+  closeX:     { fontSize: FontSize.font16, color: Colors.textPrimary, fontWeight: '400' },
 
   alertIcon:  { alignSelf: 'center', marginTop: 8 },
 
-  title:      { fontSize: 18, fontWeight: '600', color: Colors.textPrimary, textAlign: 'center', marginTop: 20 },
-  content:    { fontSize: 14, color: '#4c4c4c', textAlign: 'center', lineHeight: 20, marginTop: 12, paddingHorizontal: 8 },
+  title:      { fontSize: FontSize.font18, fontWeight: '600', color: Colors.textPrimary, textAlign: 'center', marginTop: 20 },
+  content:    { fontSize: FontSize.font14, color: '#4c4c4c', textAlign: 'center', lineHeight: 20, marginTop: 12, paddingHorizontal: 8 },
 
   // Angular: an <ion-item> row inside .reportprofile-section — number on the
   // left, tappable call icon on the right, inside a light rounded box.
@@ -100,5 +101,5 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.borderSubtle, borderRadius: 8,
     paddingHorizontal: 16, paddingVertical: 14, marginTop: 24,
   },
-  phoneText: { fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
+  phoneText: { fontSize: FontSize.font14, fontWeight: '500', color: Colors.textPrimary },
 })

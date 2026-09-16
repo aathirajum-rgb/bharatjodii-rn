@@ -30,6 +30,7 @@ import { Endpoints } from '../../service/api.endpoints'
 import { redirectToIntermediatePage } from '../../service/paymentService'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
 import BottomSheet from '../bottom-sheet/BottomSheet'
+import { FontSize } from '../../src/theme/fonts'
 
 type UiValue = '1' | '2' | '3'
 
@@ -212,8 +213,8 @@ export default function PhotoPrivacySheet({ visible, onClose, onSaved }: Props) 
 const s = StyleSheet.create({
   loadingBox: { paddingVertical: 32, alignItems: 'center' },
 
-  title: { fontSize: 18, fontWeight: '600', color: Colors.textPrimary, marginBottom: 8 },
-  subtitle: { fontSize: 13, color: Colors.textSecondary, lineHeight: 18, marginBottom: 16 },
+  title: { fontSize: FontSize.font18, fontWeight: '600', color: Colors.textPrimary, marginBottom: 8 },
+  subtitle: { fontSize: FontSize.font13, color: Colors.textSecondary, lineHeight: 18, marginBottom: 16 },
 
   option: { paddingVertical: 16 },
   optionDivider: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: Colors.divider },
@@ -222,16 +223,16 @@ const s = StyleSheet.create({
     alignSelf: 'flex-start', backgroundColor: Colors.primarySurface,
     paddingHorizontal: 8, paddingVertical: 3, borderRadius: 4, marginBottom: 8,
   },
-  recommendedFlagText: { fontSize: 11, fontWeight: '600', color: Colors.primaryDark },
+  recommendedFlagText: { fontSize: FontSize.font11, fontWeight: '600', color: Colors.primaryDark },
 
   optionRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
   optionText: { flex: 1, gap: 4 },
   optionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  optionTitle: { fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
-  optionContent: { fontSize: 13, color: Colors.textSecondary, lineHeight: 18 },
+  optionTitle: { fontSize: FontSize.font14, fontWeight: '500', color: Colors.textPrimary },
+  optionContent: { fontSize: FontSize.font13, color: Colors.textSecondary, lineHeight: 18 },
 
   paidBadge: { backgroundColor: Colors.badgePaidBg, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
-  paidBadgeText: { fontSize: 10, fontWeight: '600', color: Colors.badgePaidText },
+  paidBadgeText: { fontSize: FontSize.font10, fontWeight: '600', color: Colors.badgePaidText },
 
   radio: {
     width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: Colors.borderNeutral,
@@ -240,7 +241,7 @@ const s = StyleSheet.create({
   radioSelected: { borderColor: Colors.primaryDark },
   radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primaryDark },
 
-  confirmText: { fontSize: 14, color: Colors.textPrimary, lineHeight: 20 },
+  confirmText: { fontSize: FontSize.font14, color: Colors.textPrimary, lineHeight: 20 },
   confirmTextSpaced: { marginTop: 12, fontWeight: '500' },
   confirmRow: { flexDirection: 'row', gap: 12, marginTop: 24 },
   confirmBtn: { flex: 1 },

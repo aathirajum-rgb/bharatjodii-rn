@@ -14,7 +14,7 @@
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import Toggle from '../toggle/Toggle'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 
 export interface PreferenceFieldModalProps {
   visible:           boolean
@@ -91,11 +91,11 @@ const s = StyleSheet.create({
     padding: 24, gap: 24, alignItems: 'flex-end',
   },
   closeBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
-  closeX: { fontSize: 16, color: Colors.black },
+  closeX: { fontSize: FontSize.font16, color: Colors.black },
 
   title: {
     alignSelf: 'stretch', textAlign: 'center',
-    fontFamily: Fonts.poppinsSemiBold, fontSize: 18, lineHeight: 24, color: Colors.black,
+    fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, lineHeight: 24, color: Colors.black,
   },
   // zIndex here (not just on DesktopSelectField's own internal wrapperOpen)
   // is what actually lets an open dropdown escape ABOVE this View's own
@@ -110,18 +110,18 @@ const s = StyleSheet.create({
     borderRadius: 8, padding: 12,
   },
   strictTextCol: { flex: 1, gap: 4 },
-  strictTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, lineHeight: 20, color: Colors.black },
-  strictDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 16, color: Colors.black },
+  strictTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, lineHeight: 20, color: Colors.black },
+  strictDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 16, color: Colors.black },
 
   footer: {
     alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 26,
   },
   matchesCol: { gap: 4 },
-  matchesLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 20, color: Colors.black },
-  matchesCount: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, lineHeight: 20, color: Colors.black },
+  matchesLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 20, color: Colors.black },
+  matchesCount: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, lineHeight: 20, color: Colors.black },
   applyBtn: {
     flex: 1, height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
   },
-  applyText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.white },
+  applyText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: FontSize.font14, color: Colors.white },
 })

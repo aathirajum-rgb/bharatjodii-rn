@@ -14,7 +14,7 @@ import { useTranslation } from 'react-i18next'
 import { Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import Svg, { Circle, Line, Path } from 'react-native-svg'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 
 function NoWifiIcon({ size = 96 }: { size?: number }) {
   return (
@@ -81,13 +81,13 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   18,
+    fontSize:   FontSize.font18,
     color:      Colors.textPrimary,
     textAlign:  'center',
   },
   message: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.textSecondary,
     textAlign:  'center',
   },
@@ -101,7 +101,7 @@ const styles = StyleSheet.create({
   },
   btnLabel: {
     fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.textDark,
   },
 })

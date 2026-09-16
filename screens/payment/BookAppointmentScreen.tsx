@@ -17,7 +17,7 @@ import { CDN, CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import CdnLottie from '../../components/CdnLottie'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import { getPostBookingDestination, submitStoreAppointment } from '../../service/paymentService'
 
@@ -281,16 +281,16 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white,
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
-  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, marginLeft: 16, flex: 1 },
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: Colors.black, marginLeft: 16, flex: 1 },
 
   content: { padding: 16, gap: 16 },
-  sectionLabel: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  sectionLabel: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.black },
 
   branchCard: {
     borderRadius: 12, borderWidth: 1, borderColor: Colors.borderSubtle, padding: 16, gap: 4,
   },
-  branchTitle:   { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
-  branchAddress: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary },
+  branchTitle:   { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.black },
+  branchAddress: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font13, color: Colors.textSecondary },
 
   card: {
     backgroundColor: Colors.white, borderRadius: 12,
@@ -302,8 +302,8 @@ const s = StyleSheet.create({
   },
   rowLast: { borderBottomWidth: 0 },
   rowTextBlock: { flexShrink: 1, gap: 2 },
-  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 11, color: Colors.textSecondary },
-  rowValue: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font11, color: Colors.textSecondary },
+  rowValue: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.black },
 
   radioList: { paddingBottom: 8 },
   radioRow: {

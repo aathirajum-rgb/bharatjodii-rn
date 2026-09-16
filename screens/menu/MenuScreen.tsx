@@ -868,10 +868,20 @@ const s = StyleSheet.create({
     alignItems:    'center',
     marginBottom:  2,
   },
+  // Angular (LIVE block): `heading4-medium-16 color-333333`
+  // (menu.page.html:16) — global.scss:2215 = var(--font16) +
+  // --english-medium-poppins, and .color-333333 = #333333. Size already
+  // matched; the colour did not (#111111 is neither block's value — the
+  // disabled redesign block says `black-color` = #000000).
+  //
+  // FLAGGED, not changed: the WEIGHT. Live says Medium (500), the disabled
+  // redesign block says SemiBold (600), this port has Bold (700) — all three
+  // disagree, and dropping the name two weights is a visual/product call, not
+  // a CSS fact. See the audit notes.
   profileName: {
     fontSize:   FontSize.font16,
     fontFamily: Fonts.poppinsBold,
-    color:      Colors.textPrimary,
+    color:      Colors.textDark,
     flexShrink: 1,
   },
   profileId: {
@@ -903,23 +913,44 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     flexShrink:     0,
   },
+  // Angular (LIVE block): every menu row's <h2> is `body1-medium-14
+  // color-333333` — global.scss:2235 = var(--font14) +
+  // --english-medium-poppins (Poppins-Medium), .color-333333 = #333333.
+  // Size and family already matched; #111111 matched neither block (the
+  // disabled redesign block uses `black-color` = #000000).
   rowTitle: {
     flex:       1,
     fontSize:   FontSize.font14,
     fontFamily: Fonts.poppinsMedium,
-    color:      Colors.textPrimary,
+    color:      Colors.textDark,
   },
+  // Angular: `.border-bottom-menu { border-bottom: 1px solid
+  // rgba(204, 204, 204, 0.50) }` (menu.page.scss) — the colour already matched
+  // exactly; the rule is a full 1px. hairlineWidth renders 0.33-0.5px on most
+  // devices and reads as a washed-out gap rather than a divider — the same
+  // reasoning EditProfileScreen's rowDivider already documents for this very
+  // same rgba value.
   rowDivider: {
-    height:           StyleSheet.hairlineWidth,
+    height:           1,
     backgroundColor:  'rgba(204,204,204,0.5)',
     marginHorizontal: 12,
   },
 
   // ── Footer ──
+  // Angular (LIVE block): the app-version row is `<ion-col class="btmcnt2">`
+  // (menu.page.html:271, 277, 283) — global.scss:4104 sets
+  // color: var(--ion-color-medium-tint) and font-size: var(--font-size-sm).
+  // theme/variables.scss resolves those to #9d9fa6 and 12px. Size/family
+  // already matched (btmcnt2 sets no family, so it inherits body's
+  // Poppins-Regular); the colour was an approximation.
+  //
+  // Note: `.app-version`, the other class on that row, is declared NOWHERE —
+  // its only definition in menu.page.scss is commented out — so it contributes
+  // nothing.
   footerVersion: {
     fontSize:  FontSize.font12,
     fontFamily: Fonts.poppinsRegular,
-    color:     'rgba(0,0,0,0.5)',
+    color:     '#9d9fa6',
     marginTop: 4,
   },
 })

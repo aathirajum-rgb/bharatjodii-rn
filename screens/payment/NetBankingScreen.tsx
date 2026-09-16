@@ -26,7 +26,7 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import { useNetwork } from '../../contexts/NetworkContext'
-import { SemanticFontsEnglish } from '../../src/theme/fonts'
+import { SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import {
   getFinalAmount, getNetBankingList, getRetryRemainingMs,
   type NetBankingItem, type SelectedPackage,
@@ -263,12 +263,12 @@ const s = StyleSheet.create({
   // Angular: ion-col.heading-03-bold-20.color-1f1e1b — the page heading is a
   // separate row below the back-button bar, not the header bar's own title.
   pageTitle: {
-    fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 20, color: '#1f1e1b',
+    fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: FontSize.font20, color: '#1f1e1b',
     paddingLeft: 16, paddingRight: 16, paddingTop: 4, paddingBottom: 8,
   },
 
   content: { padding: 16, gap: 16 },
-  sectionLabel: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 14, color: Colors.black, marginBottom: 8 },
+  sectionLabel: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: FontSize.font14, color: Colors.black, marginBottom: 8 },
 
   popularGrid: { flexDirection: 'row', gap: 20, flexWrap: 'wrap' },
   popularItem: { width: 58, alignItems: 'center', gap: 6 },
@@ -276,13 +276,13 @@ const s = StyleSheet.create({
     width: 58, height: 58, borderRadius: 8, borderWidth: 1, borderColor: '#E6E6E6',
     backgroundColor: Colors.white, alignItems: 'center', justifyContent: 'center',
   },
-  popularLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black, textAlign: 'center' },
+  popularLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.black, textAlign: 'center' },
 
   // Angular: .or-text — a circular white "or" chip, no visible connecting
   // line rendered (the ::before divider line is commented out in source).
   orRow: { alignItems: 'center' },
   orText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.black,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font13, color: Colors.black,
     backgroundColor: Colors.white, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 15,
   },
 
@@ -293,7 +293,7 @@ const s = StyleSheet.create({
     minHeight: 40, borderWidth: 1, borderColor: '#E5E5E5', borderRadius: 4,
     paddingHorizontal: 12,
   },
-  collapsedRowText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 16, color: Colors.black, flexShrink: 1 },
+  collapsedRowText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font16, color: Colors.black, flexShrink: 1 },
 
   otherList: { gap: 8 },
   // Angular: .custom-radio ion-item — 1px #F1F1F1 border, 4px radius, 40px
@@ -303,7 +303,7 @@ const s = StyleSheet.create({
     minHeight: 40, paddingHorizontal: 12,
     borderWidth: 1, borderColor: '#F1F1F1', borderRadius: 4,
   },
-  otherLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, flexShrink: 1 },
+  otherLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, flexShrink: 1 },
   // Angular: .custom-radio ion-item.item-radio-checked — solid #de2a68
   // background, white bold label.
   otherRowChecked: { backgroundColor: '#de2a68', borderColor: '#de2a68' },

@@ -579,7 +579,7 @@ const styles = StyleSheet.create({
   // No Angular equivalent — these phone-view sub-tab chips always pass
   // [countShow]="false" in messager-list.component.html, so app-chip's own
   // unread-count overlay never renders there; left as-is.
-  unreadBadgeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 11, color: Colors.white },
+  unreadBadgeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font11, color: Colors.white },
 
   // Angular: `ion-grid class="padd0"` around the *ngFor — the list itself
   // adds no padding; each row (ConversationRow.tsx) carries its own full

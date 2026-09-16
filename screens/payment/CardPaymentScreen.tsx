@@ -22,7 +22,7 @@ import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
 import { useNetwork } from '../../contexts/NetworkContext'
 import { getSessionValue } from '../../service/registrationService'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import {
   getFinalAmount, getRetryRemainingMs, type SelectedPackage,
 } from '../../service/paymentService'
@@ -316,7 +316,7 @@ const s = StyleSheet.create({
   // Angular: .body2-regular-14 .color-333333 — 14px Poppins-REGULAR at
   // #333333, not the 16px semibold black this port used. That's why the title
   // reads lighter and smaller here than on the other payment screens.
-  headerTitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 15, color: '#333333', marginLeft: 8, flex: 1 },
+  headerTitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font15, color: '#333333', marginLeft: 8, flex: 1 },
 
   // Angular: <ion-row class="ion-cust-padding-start"> gives 24px on the left
   // (--ion-cust-padding, theme/variables.scss:33); the vertical space is the
@@ -325,7 +325,7 @@ const s = StyleSheet.create({
   // ADJUSTABLE — paddingTop/paddingLeft are the heading's top and left gaps.
   pageTitle: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize: 17,
+    fontSize: FontSize.font17,
     color: '#1f1e1b',
     paddingLeft: 24,
     paddingRight: 24,
@@ -375,7 +375,7 @@ const s = StyleSheet.create({
   // states (the span's own color wins over the disabled button's #B0B0B0).
   payBtnLabel: {
     fontFamily: Fonts.poppinsMedium,
-    fontSize: 15,
+    fontSize: FontSize.font15,
     lineHeight: 16,
     letterSpacing: 0.05,
     color: Colors.white,

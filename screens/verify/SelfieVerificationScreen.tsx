@@ -29,7 +29,7 @@ import CdnLottie from '../../components/CdnLottie'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
 import { apiCall, uploadFile } from '../../service/apiClient'
@@ -193,11 +193,11 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  headerTitle: { flex: 1, fontSize: 16, fontFamily: SemanticFontsEnglish.headingEnglishMedium, color: '#333333', marginLeft: 6, marginRight: 16 },
+  headerTitle: { flex: 1, fontSize: FontSize.font16, fontFamily: SemanticFontsEnglish.headingEnglishMedium, color: '#333333', marginLeft: 6, marginRight: 16 },
 
   content: { flex: 1, paddingHorizontal: 24, paddingTop: 32 },
-  heading: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textPrimary, marginBottom: 16 },
-  tip: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary, lineHeight: 20, marginBottom: 8 },
+  heading: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, color: Colors.textPrimary, marginBottom: 16 },
+  tip: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.textSecondary, lineHeight: 20, marginBottom: 8 },
   ctaSpacing: { marginTop: 24 },
 
   previewWrap: { flex: 1, backgroundColor: Colors.black },
@@ -209,7 +209,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
-  closeIcon: { color: Colors.white, fontSize: 16, fontWeight: '700' },
+  closeIcon: { color: Colors.white, fontSize: FontSize.font16, fontWeight: '700' },
 
   previewActions: {
     position: 'absolute', left: 0, right: 0, bottom: 0,
@@ -218,7 +218,7 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.5)',
   },
   previewIconBtn: { paddingVertical: 12, paddingHorizontal: 16 },
-  previewIconText: { color: Colors.white, fontSize: 14, fontWeight: '600' },
+  previewIconText: { color: Colors.white, fontSize: FontSize.font14, fontWeight: '600' },
 
   uploadingOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
@@ -226,5 +226,5 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     gap: 16,
   },
-  uploadingText: { color: Colors.white, fontSize: 14, textAlign: 'center', paddingHorizontal: 32 },
+  uploadingText: { color: Colors.white, fontSize: FontSize.font14, textAlign: 'center', paddingHorizontal: 32 },
 })

@@ -8,7 +8,7 @@ import { Image } from 'expo-image'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import { getItem } from '../../service/storageService'
 import { handleBack as goBackCentral } from '../../utils/navigationRef'
@@ -304,7 +304,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   backBtn: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, color: Colors.textDark },
+  headerTitle: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: FontSize.font16, color: Colors.textDark },
 
   scroll: { backgroundColor: Colors.starMatchPageBg },
   content: { paddingBottom: 24 },
@@ -325,10 +325,10 @@ const s = StyleSheet.create({
   // known, or the fixed silhouette-icon ratio) — see DEFAULT_PHOTO_RATIO/
   // AVATAR_ICON_RATIO above.
   avatar: { width: '100%', borderRadius: 4, backgroundColor: Colors.divider, marginBottom: 8 },
-  profileName: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 14, color: Colors.textDark },
-  profileMeta: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textSecondary, marginTop: 2 },
+  profileName: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: FontSize.font14, color: Colors.textDark },
+  profileMeta: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.textSecondary, marginTop: 2 },
 
-  ratioText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black, textAlign: 'center', marginTop: 24 },
+  ratioText: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font20, color: Colors.black, textAlign: 'center', marginTop: 24 },
   starsRow: { flexDirection: 'row', justifyContent: 'center', marginTop: 8 },
   starIcon: { width: 24, height: 24, marginRight: 2 },
   progressTrack: {
@@ -336,32 +336,32 @@ const s = StyleSheet.create({
     alignSelf: 'center', marginTop: 8, overflow: 'hidden',
   },
   progressFill: { height: 8, borderRadius: 20, backgroundColor: Colors.starMatchYes },
-  starMatchingLine: { fontFamily: Fonts.poppinsMedium, fontSize: 12, color: '#334155', textAlign: 'center', marginTop: 12 },
+  starMatchingLine: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font12, color: '#334155', textAlign: 'center', marginTop: 12 },
   starMatchingValue: { color: Colors.starMatchYes },
 
   // Angular: no margin class on this ion-col — its only top spacing is the
   // card's own pt-24 padding, already applied by `card` above. An extra
   // marginTop here would double that gap.
-  sectionHeader: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black },
+  sectionHeader: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font20, color: Colors.black },
   compatRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 16,
   },
-  compatKey: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: '#555555', paddingRight: 12 },
+  compatKey: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: '#555555', paddingRight: 12 },
   compatValueCol: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   compatIcon: { width: 16, height: 16 },
-  compatYes: { fontFamily: Fonts.poppinsMedium, fontSize: 14, color: Colors.starMatchYes },
-  compatNo: { fontFamily: Fonts.poppinsMedium, fontSize: 14, color: Colors.starMatchNo },
+  compatYes: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, color: Colors.starMatchYes },
+  compatNo: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, color: Colors.starMatchNo },
 
   detailBtn: {
     backgroundColor: Colors.starMatchCtaBg, borderRadius: 8, height: 36,
     alignItems: 'center', justifyContent: 'center', marginTop: 24,
   },
-  detailBtnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 12, color: Colors.textDark },
+  detailBtnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: FontSize.font12, color: Colors.textDark },
 
   // Angular: .star-match-report { padding: 10px 12px 10px 12px } — asymmetric,
   // not a uniform 12.
   noteBox: { backgroundColor: Colors.starMatchNoteBg, borderRadius: 4, paddingVertical: 10, paddingHorizontal: 12, marginTop: 24 },
-  noteText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.starMatchNoteText, lineHeight: 16 },
+  noteText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.starMatchNoteText, lineHeight: 16 },
   noteLabel: { fontFamily: Fonts.poppinsMedium },
 
   // Angular's moreDetailTemplate lays "{{i+1}}. KEY [icon] VALUE" out as one
@@ -369,7 +369,7 @@ const s = StyleSheet.create({
   // value-pinned-right table row, so detailKey must NOT flex:1 here (that's
   // only correct for the summary view's compatRow above).
   detailItemHeader: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
-  detailKey: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, color: Colors.textDark },
-  detailBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.textDark, lineHeight: 16, marginTop: 12 },
-  detailResult: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textDark, lineHeight: 18, marginTop: 12 },
+  detailKey: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: FontSize.font16, color: Colors.textDark },
+  detailBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.textDark, lineHeight: 16, marginTop: 12 },
+  detailResult: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.textDark, lineHeight: 18, marginTop: 12 },
 })

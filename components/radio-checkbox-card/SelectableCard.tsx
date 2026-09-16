@@ -1,5 +1,6 @@
 import { Pressable, StyleSheet, Text, View, type ViewStyle } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -79,7 +80,7 @@ const styles = StyleSheet.create({
   },
   label: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
     color:      Colors.textPrimary,
     paddingRight: 8,
@@ -118,7 +119,7 @@ const styles = StyleSheet.create({
   },
   checkMark: {
     color:      Colors.white,
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     fontWeight: '700',
     lineHeight: 16,
   },

@@ -116,7 +116,7 @@ const m = StyleSheet.create({
     color:      '#000000',
   },
   closeText: {
-    fontSize:   24,
+    fontSize:   FontSize.font24,
     color:      Colors.textSecondary,
     lineHeight: 24,
   },
@@ -144,7 +144,7 @@ const m = StyleSheet.create({
   },
   checkMark: {
     color:      Colors.white,
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     lineHeight: 15,
   },
   // Angular: filter.component.html ion-label body2-regular-14 → var(--font14)
@@ -165,7 +165,7 @@ const m = StyleSheet.create({
   },
   applyText: {
     fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
-    fontSize:   15,
+    fontSize:   FontSize.font15,
     color:      Colors.white,
   },
 })

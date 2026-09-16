@@ -16,6 +16,7 @@ import {
   requestPushNotificationPermission,
   requestStoragePermission,
 } from '../service/permissionService';
+import { FontSize } from '../src/theme/fonts'
 
 const STATUS_COLOR: Record<PermissionResult, string> = {
   granted: '#34C759',
@@ -277,12 +278,12 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   heading: {
-    fontSize: 22,
+    fontSize: FontSize.font22,
     fontWeight: '700',
     color: '#1a1a1a',
   },
   subheading: {
-    fontSize: 13,
+    fontSize: FontSize.font13,
     color: '#888',
     marginTop: -8,
     marginBottom: 4,
@@ -304,12 +305,12 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   permLabel: {
-    fontSize: 15,
+    fontSize: FontSize.font15,
     fontWeight: '600',
     color: '#1a1a1a',
   },
   permDesc: {
-    fontSize: 12,
+    fontSize: FontSize.font12,
     color: '#888',
     marginTop: 2,
   },
@@ -323,7 +324,7 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: FontSize.font14,
     fontWeight: '600',
   },
   card: {
@@ -333,7 +334,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   statusBadge: {
-    fontSize: 12,
+    fontSize: FontSize.font12,
     fontWeight: '700',
     letterSpacing: 0.8,
     marginBottom: 2,
@@ -343,11 +344,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   infoLabel: {
-    fontSize: 13,
+    fontSize: FontSize.font13,
     color: '#888',
   },
   infoValue: {
-    fontSize: 13,
+    fontSize: FontSize.font13,
     fontWeight: '600',
     color: '#1a1a1a',
   },
@@ -356,11 +357,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0',
   },
   deniedText: {
-    fontSize: 13,
+    fontSize: FontSize.font13,
     color: '#666',
   },
   grantedText: {
-    fontSize: 13,
+    fontSize: FontSize.font13,
     color: '#34C759',
   },
 });

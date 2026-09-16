@@ -222,7 +222,7 @@ const styles = StyleSheet.create({
   // Angular: `h2.body1-medium-14` — no color rule of its own; it inherits
   // #000000 from the wrapping ion-row's `reallyblack` class (or #b3b3b3 from
   // `color-b3b3b3` when deleted — see nameGreyed).
-  name: { fontFamily: Fonts.poppinsMedium, fontSize: 14, color: Colors.black },
+  name: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, color: Colors.black },
   nameGreyed: { color: Colors.chatDeletedRowText },
 
   // minWidth: 0 — flexbox default is min-width: auto, which on web keeps a row

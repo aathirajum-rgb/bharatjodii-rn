@@ -24,6 +24,7 @@ import { Endpoints } from '../../service/api.endpoints'
 import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
 import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
 import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictSheets'
+import { FontSize } from '../../src/theme/fonts'
 
 const ICONS = {
   header:   CDN_SVG + 'updated-images/verify-your-identity-img-updated.svg',
@@ -291,13 +292,13 @@ const styles = StyleSheet.create({
   },
   title: {
     marginTop:  8,
-    fontSize:   24,
+    fontSize:   FontSize.font24,
     fontWeight: '700',
     color:      '#1f1e1b',
   },
   body: {
     marginTop:  24,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      '#4c4c4c',
     lineHeight: 20,
   },
@@ -330,7 +331,7 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     flex:       1,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '600',
     color:      '#333333',
   },
@@ -342,12 +343,12 @@ const styles = StyleSheet.create({
   },
   attemptsText: {
     marginTop:  2,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '500',
     color:      '#ef4444',
   },
   chevron: {
-    fontSize:   20,
+    fontSize:   FontSize.font20,
     color:      '#333333',
   },
   chevronMuted: {
@@ -366,7 +367,7 @@ const styles = StyleSheet.create({
     backgroundColor:   Colors.primaryDark,
   },
   supportBtnText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '600',
     color:      Colors.white,
   },
@@ -380,7 +381,7 @@ const styles = StyleSheet.create({
     paddingTop:        12,
   },
   helpText: {
-    fontSize: 12,
+    fontSize: FontSize.font12,
     color:    '#4c4c4c',
   },
   helpLink: {

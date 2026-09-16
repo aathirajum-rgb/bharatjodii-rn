@@ -16,7 +16,7 @@ import CheckboxGroup from '../checkbox/CheckboxGroup'
 import { QUICK_FILTER_ICON } from '../../service/filterService'
 import { useFilterDisplayValues, type FilterFieldKey } from '../../hooks/useFilterDisplayValues'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 
 // Same field SET and ORDER as SearchScreen.tsx's own `rows` (the mobile "Edit
 // preferences" screen, itself matching Angular) — this previously dropped
@@ -149,12 +149,12 @@ const s = StyleSheet.create({
   },
   title: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     color:      Colors.textDark,
   },
   reset: {
     fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     color:      Colors.link,
   },
   list: {
@@ -174,7 +174,7 @@ const s = StyleSheet.create({
   },
   matchCount: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.textDark,
   },
   actions: {
@@ -192,7 +192,7 @@ const s = StyleSheet.create({
   },
   resetBtnText: {
     fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      Colors.primaryDark,
   },
   applyBtn: {
@@ -205,7 +205,7 @@ const s = StyleSheet.create({
   },
   applyBtnText: {
     fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      Colors.white,
   },
 })

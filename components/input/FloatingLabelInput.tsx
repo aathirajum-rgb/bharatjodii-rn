@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { CDN_SVG } from '../../constants/cdn'
 import CdnSvg from '../cdn-svg/CdnSvg'
 
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
   // (~16-17px at 412px wide), noticeably larger than the box variant's 14px,
   // and .select-width's --inner-padding-start indents the text by 10px.
   inputUnderline: {
-    fontSize: 16,
+    fontSize: FontSize.font16,
     paddingLeft: 10,
   },
   // Matches .select-width's --inner-padding-start: 10px so the resting
@@ -364,7 +364,7 @@ const styles = StyleSheet.create({
   inputCard: {
     fontFamily: Fonts.poppinsMedium,
     fontWeight: '400',
-    fontSize: 15,
+    fontSize: FontSize.font15,
     color: Colors.black,
   },
   // Angular: .input-fields-text-absolute .color-b3b3b3 .body3-regular-12 —
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     paddingHorizontal: 5,
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize: 12,
+    fontSize: FontSize.font12,
     color: '#b3b3b3',
     letterSpacing: 0.03,
   },
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize: 14,
+    fontSize: FontSize.font14,
     color: Colors.textPrimary,
     paddingVertical: 0,
     textAlignVertical: 'center',  // Android
@@ -414,14 +414,14 @@ const styles = StyleSheet.create({
     paddingLeft: 8,
   },
   eyeText: {
-    fontSize: 12,
+    fontSize: FontSize.font12,
     color: Colors.inputFocus,
     fontWeight: '600',
   },
   errorText: {
     marginTop: 4,
     marginLeft: 4,
-    fontSize: 12,
+    fontSize: FontSize.font12,
     color: Colors.inputError,
   },
 })

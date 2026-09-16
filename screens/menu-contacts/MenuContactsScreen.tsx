@@ -59,7 +59,7 @@ import { getMembershipTierTheme } from './membershipTierTheme'
 import MenuContactsDesktopLayout from './MenuContactsDesktopLayout'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import { handleFooterTabPress } from '../../utils/footerTabPress'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 const ICONS = {
   back:      CDN_REACT + '/menu_back_arrow.svg',
@@ -707,16 +707,27 @@ export default function MenuContactsScreen({ navigation, route }: { navigation: 
   )
 }
 
-// Angular scales its ROOT font-size with the viewport — global.scss:334 sets
-// html { font-size: calc(13px + 1vw) } (theme/variables.scss:15) — so every
-// --fontNN token, which is a rem value, renders larger than its name suggests.
-// At the 412px width these screens are compared at the root is ~17.1px, making
-// --font16 (1rem) ≈ 17.1, --font14 (0.875rem) ≈ 15.0 and --font12 (0.75rem)
-// ≈ 12.8. RN has no root-relative unit, so the nominal 16/14/12 read visibly
-// smaller than Angular; these are the resolved sizes instead.
-const FS16 = 17
-const FS14 = 15
-const FS12 = 13
+// NOTE (was FontSize.font16/FontSize.font14/FontSize.font12 = 17/15/13): the reasoning behind those constants
+// was right — Angular's root font-size DOES scale with the viewport, so every
+// rem-based --fontNN renders larger than its name — but both the formula and
+// the fixed-number approach were wrong:
+//
+//  1. They were derived from theme/variables.scss:15's
+//     `--font-auto-resize: calc(13px + 1vw)`, which is OVERRIDDEN. Both that
+//     file and _variable.scss:194 declare --font-auto-resize on :root at equal
+//     specificity, and angular.json's styles array loads theme/variables.scss
+//     BEFORE global.scss (which @imports _variable.scss) — so the later
+//     declaration wins and the app actually renders with
+//     `calc(0.325em + 3vw)`.
+//  2. Being flat numbers they only matched at one screen width. At the 412px
+//     they were tuned for the real values are 17.6/15.4/13.2 (close enough),
+//     but on a 360px phone they are ~6% too large (real: 16.0/14.0/12.0) and
+//     on a 430px one ~6% too small (real: 18.1/15.8/13.6).
+//
+// src/theme/fonts.ts's FontSize.fontNN already implements the WINNING formula
+// (REM_BASE_PX = 0.325*16 + 0.03*SCREEN_W) and is what every other screen in
+// this app uses, so the three constants are replaced by the tokens for the
+// exact same --font16 / --font14 / --font12 they were standing in for.
 
 const s = StyleSheet.create({
   // Angular: no --ion-background-color override exists for this page, so
@@ -735,13 +746,15 @@ const s = StyleSheet.create({
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
   // Angular: .heading4-medium-16 (global.scss:2217) — 16px, Poppins-Medium,
   // weight 500, #333333.
-  headerTitle: { flex: 1, fontSize: FS16, fontFamily: SemanticFontsEnglish.headingEnglishMedium, color: '#333333', marginLeft: 6, marginRight: 16 },
+  headerTitle: { flex: 1, fontSize: FontSize.font16, fontFamily: SemanticFontsEnglish.headingEnglishMedium, color: '#333333', marginLeft: 6, marginRight: 16 },
   // Angular: with the back button hidden its column collapses to size 0 and
   // the row itself takes .pl-16 (global.scss:877) instead.
   headerTitleNoBack: { marginLeft: 16 },
 
   loaderContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  emptyText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  // No Angular counterpart — menu-contacts.page has no load-failure state.
+  // Tokenised only, value unchanged.
+  emptyText: { fontSize: FontSize.font14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
 
   // Angular: the body is .pl-24 .pr-24 (--ion-cust-padding = 24px) on a plain
   // white ion-content, with .mt-24 above the hero card and .mb-24 at the end.
@@ -784,23 +797,23 @@ const s = StyleSheet.create({
   // variant 4px 8px — the two are not interchangeable.
   statusBadgeActive: { backgroundColor: '#10B981', paddingHorizontal: 24 },
   statusBadgeWarn: { backgroundColor: '#EF4444', paddingHorizontal: 8 },
-  statusBadgeText: { fontSize: FS12, fontFamily: Fonts.poppinsMedium, color: Colors.white },
+  statusBadgeText: { fontSize: FontSize.font12, fontFamily: Fonts.poppinsMedium, color: Colors.white },
   statusBadgeTextActive: {},
   statusBadgeTextWarn: {},
 
   // Angular: .heading3-semibold-16 .color-1f1e1b .margin-0 .pt-20
   // (menu-contacts.page.html:15) — 16px Poppins-SemiBold, #1f1e1b.
-  planTitle: { fontSize: FS16, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
+  planTitle: { fontSize: FontSize.font16, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
   // Angular: .body2-regular-14 .black-color .mt-4 (menu-contacts.page.html:16)
   // — 14px Poppins-Regular, #000, 4px above. RN had 13px/#4C4C4C/2px.
-  planDuration: { fontSize: FS14, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black, marginTop: 4 },
+  planDuration: { fontSize: FontSize.font14, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black, marginTop: 4 },
   // Angular: menu-contacts.page.html:673 — the EXPIRED heading is a
   // DIFFERENT class than the active state's: .heading4-medium-16
   // .color-1f1e1b (16px Poppins-MEDIUM, not SemiBold).
-  planTitleExpired: { fontSize: FS16, fontFamily: Fonts.poppinsMedium, color: '#1F1E1B' },
+  planTitleExpired: { fontSize: FontSize.font16, fontFamily: Fonts.poppinsMedium, color: '#1F1E1B' },
   // Angular: menu-contacts.page.html:674 — .body3-regular-12 .black-color
   // .mt-4 (12px Poppins-Regular, #000) — NOT the active state's 14px.
-  planDurationExpired: { fontSize: FS12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black, marginTop: 4 },
+  planDurationExpired: { fontSize: FontSize.font12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black, marginTop: 4 },
 
   crownBadge: {
     width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', flexShrink: 0,
@@ -817,9 +830,9 @@ const s = StyleSheet.create({
   renewTextCol: { flex: 1 },
   // Angular: .heading3-semibold-16 .color-1f1e1b .pt-8 (menu-contacts.page.html:506)
   // — 16px Poppins-SemiBold, not the 14px Poppins-Medium RN had.
-  renewLabel: { fontSize: FS16, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
+  renewLabel: { fontSize: FontSize.font16, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B' },
   // Angular: .body3-regular-12 .color-545454 .mt-4 — 12px Poppins-Regular, 4px above.
-  renewSub: { fontSize: FS12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: '#545454', marginTop: 4 },
+  renewSub: { fontSize: FontSize.font12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: '#545454', marginTop: 4 },
 
   // Angular: menu-contacts.page.html:515-524 — .auto-renewal-refund-box, a
   // bordered white box (1px #e5e5e5, radius 8), margin 16px sides/bottom,
@@ -830,10 +843,10 @@ const s = StyleSheet.create({
   },
   // Angular: .body3-regular-12 .black-color — 12px Poppins-Regular, #000
   // (RN had #1F1E1B).
-  refundNoteText: { fontSize: FS12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black, lineHeight: 18 },
+  refundNoteText: { fontSize: FontSize.font12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black, lineHeight: 18 },
   // Angular: .body1-medium-14 .color-29339B (menu-contacts.page.html:521) —
   // 14px Poppins-MEDIUM (not SemiBold), no underline in the source.
-  refundLink: { fontSize: FS14, fontFamily: Fonts.poppinsMedium, color: Colors.link },
+  refundLink: { fontSize: FontSize.font14, fontFamily: Fonts.poppinsMedium, color: Colors.link },
 
   renewPlanBtn: { marginHorizontal: 16, marginBottom: 16 },
 
@@ -848,16 +861,16 @@ const s = StyleSheet.create({
     backgroundColor: '#F7FAFF',
   },
   // Angular: .body3-regular-12 .black-color — 12px Poppins-Regular, #000.
-  expiryText: { flex: 1, fontSize: FS12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black },
+  expiryText: { flex: 1, fontSize: FontSize.font12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black },
 
   // Angular has THREE different section-heading styles, not one:
   //  - "Package Usage Details" — .font-14-semibold .clr0 .mt-40 → 14px/600/#000
   //  - "Payment status"        — .heading3-semibold-16 .clr0    → 16px/600/#000
   //  - "All Transactions"      — .heading3-semibold-16 .color-1f1e1b → 16px/600/#1f1e1b
   // All sit OUTSIDE their cards, so none carry the card's inner padding.
-  sectionTitle: { fontSize: FS16, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B', marginTop: 32 },
-  sectionTitleUsage: { fontSize: FS14, fontFamily: Fonts.poppinsSemiBold, color: Colors.black, marginTop: 40 },
-  sectionTitlePayment: { fontSize: FS16, fontFamily: Fonts.poppinsSemiBold, color: Colors.black, marginTop: 32 },
+  sectionTitle: { fontSize: FontSize.font16, fontFamily: Fonts.poppinsSemiBold, color: '#1F1E1B', marginTop: 32 },
+  sectionTitleUsage: { fontSize: FontSize.font14, fontFamily: Fonts.poppinsSemiBold, color: Colors.black, marginTop: 40 },
+  sectionTitlePayment: { fontSize: FontSize.font16, fontFamily: Fonts.poppinsSemiBold, color: Colors.black, marginTop: 32 },
 
   // Angular: .how-it-works-block (menu-contacts.page.html:601) — a bordered
   // box (1px #E3E3E5, radius 12, NO shadow), separate from the payment-status
@@ -870,12 +883,12 @@ const s = StyleSheet.create({
   emiStep: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   // Angular: .textcta-medium-12 .black-color (menu-contacts.page.html:610) —
   // 12px Poppins-Medium, #000 (RN had no fontFamily and grey textSecondary).
-  emiKey: { flex: 1, fontSize: FS12, fontFamily: Fonts.poppinsMedium, color: Colors.black },
+  emiKey: { flex: 1, fontSize: FontSize.font12, fontFamily: Fonts.poppinsMedium, color: Colors.black },
   // Angular: .body3-regular-12 .poppins-family .black-color
   // (menu-contacts.page.html:616) — poppins-family's Roboto-Regular override
   // (declared later than body3-regular-12 in global.scss) wins, so this
   // renders in Roboto-Regular, not Poppins-SemiBold/#1F1E1B.
-  emiValue: { fontSize: FS12, fontFamily: Fonts.robotoRegular, color: Colors.black },
+  emiValue: { fontSize: FontSize.font12, fontFamily: Fonts.robotoRegular, color: Colors.black },
 
   // Angular: .payment-status-block-membership (menu-contacts.page.scss:179) —
   // radius 16 (vs 8 on the usage card and 10 on the hero: three different
@@ -898,12 +911,12 @@ const s = StyleSheet.create({
   paymentTextCol: { flex: 1 },
   // Angular: .body1-medium-14 .color-1e1e1e — 14px Poppins-Medium, #1e1e1e
   // (RN had SemiBold/#1F1E1B).
-  paymentContent: { fontSize: FS14, fontFamily: Fonts.poppinsMedium, color: '#1e1e1e' },
+  paymentContent: { fontSize: FontSize.font14, fontFamily: Fonts.poppinsMedium, color: '#1e1e1e' },
   // Angular: .body3-regular-12 .poppins-family .mt-6 — 12px, 6px above, and
   // NO color class, so it inherits black (RN had textSecondary grey). The
   // poppins-family class (declared later in global.scss than body3-regular-12)
   // wins the cascade, so this renders in Roboto-Regular, not Poppins-Regular.
-  paymentContent2: { fontSize: FS12, fontFamily: Fonts.robotoRegular, color: Colors.black, marginTop: 6 },
+  paymentContent2: { fontSize: FontSize.font12, fontFamily: Fonts.robotoRegular, color: Colors.black, marginTop: 6 },
 
   // Angular: .payment-revamp-intermediate-block (menu-contacts.page.scss:320)
   // — radius 8 (not 16), white, shadow -1px 3px 6px 1px rgba(64,67,67,.267)
@@ -943,13 +956,20 @@ const s = StyleSheet.create({
   // 14px medium the class name suggests. Matching what actually renders.
   // Also carries .mr-6 (menu-contacts.page.html:553) — 6px before the
   // attention icon.
-  usageTitle: { flex: 1, fontSize: FS16, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black, marginRight: 6 },
+  // FLAGGED — Angular's markup here is `semibold-14-font black-color mr-6`
+  // (menu-contacts.page.html:73), but `.semibold-14-font` has NO English
+  // declaration: global.scss defines it only inside one per-language block, so
+  // on English it contributes neither size nor family and the label falls back
+  // to body's inherited Poppins-Regular. The family below matches that real
+  // fallback; the size has no reliable source (the class name implies --font14,
+  // the rendered fallback is the inherited size), so it is left as-is.
+  usageTitle: { flex: 1, fontSize: FontSize.font16, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black, marginRight: 6 },
   // Angular: .body3-regular-12 .black-color .line-height-16.
-  usageSub: { fontSize: FS12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black, lineHeight: 16 },
+  usageSub: { fontSize: FontSize.font12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: Colors.black, lineHeight: 16 },
   // Angular: .heading3-semibold-16 — 16px Poppins-SemiBold.
-  usageBalance: { fontSize: FS16, fontFamily: Fonts.poppinsSemiBold, color: Colors.black },
+  usageBalance: { fontSize: FontSize.font16, fontFamily: Fonts.poppinsSemiBold, color: Colors.black },
   // Angular: .body1-medium-14 — the "/total" half is 14px Poppins-Medium.
-  usageTotal: { fontSize: FS14, fontFamily: Fonts.poppinsMedium, color: Colors.black },
+  usageTotal: { fontSize: FontSize.font14, fontFamily: Fonts.poppinsMedium, color: Colors.black },
   // Angular: .color-ef4444 applies to BOTH spans when balance <= warningcnt.
   usageBalanceWarn: { color: '#ef4444' },
   infoBtn: { paddingLeft: 4 },
@@ -968,12 +988,12 @@ const s = StyleSheet.create({
   },
   txnRightCol: { alignItems: 'flex-end' },
   // Angular: .body1-medium-14 .black-color — 14px Poppins-Medium, #000.
-  txnName:   { fontSize: FS14, fontFamily: Fonts.poppinsMedium, color: Colors.black },
+  txnName:   { fontSize: FontSize.font14, fontFamily: Fonts.poppinsMedium, color: Colors.black },
   // Angular: .color-545454 .body3-regular-12 .mt-4 — 12px regular, #545454.
-  txnSub:    { fontSize: FS12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: '#545454', marginTop: 4 },
+  txnSub:    { fontSize: FontSize.font12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: '#545454', marginTop: 4 },
   // Angular: .body1-medium-14 .poppins-family .f-500 .black-color — but
   // .poppins-family maps to Roboto-Regular (--english-poppins, _variable.scss:24,
   // applied !important and declared later than the medium class), so the ₹
   // amount renders in a REGULAR face, not Poppins-Medium.
-  txnAmount: { fontSize: FS14, fontFamily: Fonts.robotoRegular, color: Colors.black },
+  txnAmount: { fontSize: FontSize.font14, fontFamily: Fonts.robotoRegular, color: Colors.black },
 })

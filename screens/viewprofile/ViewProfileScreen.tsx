@@ -2489,10 +2489,10 @@ const s = StyleSheet.create({
   screen:       { flex: 1, backgroundColor: Colors.background },
   loaderScreen: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: Colors.background },
   // fontFamily applied inline (langFonts.medium) — see Text usage.
-  notFoundText: { fontWeight: '500', fontSize: 14, color: Colors.textSecondary },
+  notFoundText: { fontWeight: '500', fontSize: FontSize.font14, color: Colors.textSecondary },
   backBtnInline:     { paddingHorizontal: 16, paddingVertical: 8 },
   // fontFamily applied inline (langFonts.medium) — see Text usage.
-  backBtnInlineText: { fontWeight: '500', fontSize: 14, color: Colors.link },
+  backBtnInlineText: { fontWeight: '500', fontSize: FontSize.font14, color: Colors.link },
 
   scrollView:    { flex: 1 },
   scrollContent: {},
@@ -2535,7 +2535,7 @@ const s = StyleSheet.create({
   },
   profileArrowLeft:  { left: 8 },
   profileArrowRight: { right: 8 },
-  profileArrowText: { color: Colors.white, fontSize: 20, lineHeight: 20 },
+  profileArrowText: { color: Colors.white, fontSize: FontSize.font20, lineHeight: 20 },
   // Feature 2 prev/next-PROFILE arrows — Angular renders these as image assets,
   // not a CSS circle: vp-revamp-left-arw.svg / vp-revamp-right-arw.svg, a dark
   // (#333) half-pill flush against the screen edge with a white chevron baked
@@ -2571,11 +2571,11 @@ const s = StyleSheet.create({
   },
   // fontFamily applied inline (langFonts.regular) — see Text usage.
   coachMarkText: {
-    fontWeight: '400', fontSize: 14, color: Colors.black, textAlign: 'center',
+    fontWeight: '400', fontSize: FontSize.font14, color: Colors.black, textAlign: 'center',
   },
   // fontFamily applied inline (langFonts.semiBold) — see Text usage.
   coachMarkDismiss: {
-    fontWeight: '600', fontSize: 14, color: Colors.primaryDark,
+    fontWeight: '600', fontSize: FontSize.font14, color: Colors.primaryDark,
   },
   photoOverlay: {
     ...StyleSheet.absoluteFill,
@@ -2593,7 +2593,7 @@ const s = StyleSheet.create({
   },
   // fontFamily applied inline (langFonts.medium) — see Text usage.
   overlayText: {
-    fontWeight: '500', fontSize: 13, color: Colors.white,
+    fontWeight: '500', fontSize: FontSize.font13, color: Colors.white,
     textAlign: 'center', lineHeight: 17, width: '70%', alignSelf: 'center',
   },
 
@@ -2625,7 +2625,7 @@ const s = StyleSheet.create({
   // fontFamily applied inline (langFonts.semiBold) — see Text usage.
   name:    { flex: 1, fontWeight: '600', fontSize: FontSize.font22, color: Colors.black },
   // Angular: body2-regular-14 black-color — fontFamily applied inline (langFonts.regular).
-  jodiId:  { fontWeight: '400', fontSize: 14, color: Colors.black, marginTop: 4, marginBottom: 18 },
+  jodiId:  { fontWeight: '400', fontSize: FontSize.font14, color: Colors.black, marginTop: 4, marginBottom: 18 },
   // Angular: viewprofile.page.html:479 — .black-color body1-medium-14 (font14,
   // Poppins-Medium/weight 500, pure black) — NOT likedStripText pink/Regular/12.
   // fontFamily applied inline (langFonts.medium) — see Text usage.
@@ -2680,14 +2680,14 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
   // fontFamily applied inline (langFonts.regular) — see Text usage.
-  ctaDontShowText: { fontWeight: '400', fontSize: 14, color: '#545454' },
+  ctaDontShowText: { fontWeight: '400', fontSize: FontSize.font14, color: '#545454' },
   ctaViewLater: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, backgroundColor: Colors.white,
     borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
   // fontFamily applied inline (langFonts.regular) — see Text usage.
-  ctaViewLaterText: { fontWeight: '400', fontSize: 14, color: '#545454' },
+  ctaViewLaterText: { fontWeight: '400', fontSize: FontSize.font14, color: '#545454' },
   // Angular: button-revamp.component.scss:13-21 — `ion-button[disabled]` only
   // overrides background (#e6e6e6) and text (#8A8A8A) via `--background`/
   // `--color`, `opacity: unset !important` (explicitly NOT dimmed) — the
@@ -2700,7 +2700,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primaryDark, borderRadius: 8, gap: 6,
   },
   // fontFamily applied inline (langFonts.semiBold) — see Text usage.
-  ctaLikeText: { fontWeight: '600', fontSize: 14, color: Colors.white },
+  ctaLikeText: { fontWeight: '600', fontSize: FontSize.font14, color: Colors.white },
   // One-shot burst overlay for the ctaLike button above — anchored to the
   // bottom of ctaBlock (where the CTA section sits) rather than nested inside
   // the button itself, since showLikeCTA flips false (unmounting the button in
@@ -2730,14 +2730,14 @@ const s = StyleSheet.create({
   },
   afterLikeTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   // fontFamily applied inline (langFonts.medium) — see Text usage.
-  afterLikeText:   { flex: 1, fontWeight: '500', fontSize: 13, color: Colors.black },
+  afterLikeText:   { flex: 1, fontWeight: '500', fontSize: FontSize.font13, color: Colors.black },
   ctaSendInterestWrap: { position: 'relative', flexShrink: 0 },
   ctaSendInterest: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, backgroundColor: Colors.primaryDark, borderRadius: 8, paddingHorizontal: 16,
   },
   // fontFamily applied inline (langFonts.regular) — see Text usage.
-  ctaSendInterestText: { fontWeight: '400', fontSize: 14, color: Colors.white },
+  ctaSendInterestText: { fontWeight: '400', fontSize: FontSize.font14, color: Colors.white },
   freeBadge: {
     position: 'absolute', top: -10, right: 8, zIndex: 1,
     backgroundColor: Colors.badgeNewBg, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2,
@@ -2768,9 +2768,9 @@ const s = StyleSheet.create({
   detailIconCol: { width: 20, flexShrink: 0 },
   detailTextCol: { flex: 1, paddingLeft: 12 },
   // fontFamily applied inline (langFonts.regular) — see Text usage.
-  detailLabel: { fontWeight: '400', fontSize: 14, color: Colors.black },
+  detailLabel: { fontWeight: '400', fontSize: FontSize.font14, color: Colors.black },
   // fontFamily applied inline (langFonts.medium) — see Text usage.
-  detailValue: { fontWeight: '500', fontSize: 14, color: Colors.black, marginTop: 8 },
+  detailValue: { fontWeight: '500', fontSize: FontSize.font14, color: Colors.black, marginTop: 8 },
 
   // Angular: .like-this-profile — border-image linear-gradient(transparent →
   // rgb(255,192,0) 50% → transparent); RN has no border-image, approximated with
@@ -2810,18 +2810,18 @@ const s = StyleSheet.create({
   },
 
   // fontFamily applied inline (langFonts.regular) — see Text usage.
-  horoActionLink:    { fontWeight: '400', fontSize: 14, color: Colors.link, marginTop: 8 },
+  horoActionLink:    { fontWeight: '400', fontSize: FontSize.font14, color: Colors.link, marginTop: 8 },
   // Feature 6 — own-profile "add missing section" prompts, replacing a section
   // that would otherwise render nothing when its data is empty.
   addDetailPrompt: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
   // fontFamily applied inline (langFonts.medium) — see Text usage.
-  addDetailPromptText: { fontWeight: '500', fontSize: 14, color: Colors.link },
+  addDetailPromptText: { fontWeight: '500', fontSize: FontSize.font14, color: Colors.link },
 
   biodataQrSection: { alignItems: 'center', paddingTop: 24, gap: 16 },
   biodataQrImage: { width: 160, height: 160 },
   // fontFamily applied inline (langFonts.medium) — see Text usage.
   biodataQrCaption: {
-    fontWeight: '500', fontSize: 12, color: '#1a1818', textAlign: 'center',
+    fontWeight: '500', fontSize: FontSize.font12, color: '#1a1818', textAlign: 'center',
   },
 
   // Angular: app-swiper.component.html:2 — `ion-row class="pt-32 ... pb-24"` — header
@@ -2942,7 +2942,7 @@ const s = StyleSheet.create({
   },
   missingBannerCta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
   // fontFamily applied inline (langFonts.regular) — see Text usage.
-  missingBannerCtaText: { fontSize: 12, color: Colors.link },
+  missingBannerCtaText: { fontSize: FontSize.font12, color: Colors.link },
 
   // Angular: ion-back-button .default-back — --icon-font-size: 24px. Pinned to
   // an exact 48x48 per a manual UI tweak, then trimmed to 42x42 to bring the
@@ -2995,5 +2995,5 @@ const s = StyleSheet.create({
     paddingHorizontal: 16, paddingVertical: 12,
   },
   // fontFamily applied inline (langFonts.regular) — see Text usage.
-  menuItemText: { fontWeight: '400', fontSize: 14, color: Colors.black },
+  menuItemText: { fontWeight: '400', fontSize: FontSize.font14, color: Colors.black },
 })

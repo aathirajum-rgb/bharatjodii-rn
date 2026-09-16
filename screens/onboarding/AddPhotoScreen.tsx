@@ -619,7 +619,7 @@ const styles = StyleSheet.create({
   // utility class sets its size, only its color, so there's no verified
   // Angular px value to port for this glyph's size; left as-is.
   laterChevron: {
-    fontSize:   18,
+    fontSize:   FontSize.font18,
     color:      Colors.textDark,
     lineHeight: 22,
   },

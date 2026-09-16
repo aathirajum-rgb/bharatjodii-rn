@@ -30,7 +30,7 @@ import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import RadioGroup, { type RadioOption } from '../../components/radio/RadioGroup'
 import FloatingLabelInput from '../../components/input/FloatingLabelInput'
 import VerificationSuccessSheet from '../../components/bottom-sheet/VerificationSuccessSheet'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { Colors } from '../../constants/colors'
 import { CDN, CDN_SVG, CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
@@ -648,11 +648,11 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  headerTitle: { flex: 1, fontSize: 16, fontFamily: SemanticFontsEnglish.headingEnglishMedium, color: '#333333', marginLeft: 6, marginRight: 16 },
+  headerTitle: { flex: 1, fontSize: FontSize.font16, fontFamily: SemanticFontsEnglish.headingEnglishMedium, color: '#333333', marginLeft: 6, marginRight: 16 },
 
   content: { paddingHorizontal: 24, paddingTop: 24 },
-  heading: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textPrimary, marginBottom: 12 },
-  body:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textSecondary, lineHeight: 20, marginBottom: 20 },
+  heading: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, color: Colors.textPrimary, marginBottom: 12 },
+  body:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.textSecondary, lineHeight: 20, marginBottom: 20 },
 
   radioList: { marginTop: 8 },
 
@@ -660,24 +660,24 @@ const s = StyleSheet.create({
   dobRow:   { flexDirection: 'row', gap: 12 },
   dobField: { flex: 1 },
 
-  linkText: { fontSize: 14, fontWeight: '600', color: Colors.link, marginBottom: 20 },
-  consent:  { fontSize: 12, color: Colors.textSecondary, lineHeight: 18, marginBottom: 20 },
+  linkText: { fontSize: FontSize.font14, fontWeight: '600', color: Colors.link, marginBottom: 20 },
+  consent:  { fontSize: FontSize.font12, color: Colors.textSecondary, lineHeight: 18, marginBottom: 20 },
 
   uploadRow: {
     flexDirection: 'row', alignItems: 'center', gap: 16,
     marginBottom: 16, paddingHorizontal: 24, paddingVertical: 14,
     borderRadius: 8, backgroundColor: '#fef6db',
   },
-  rowLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: '#333333' },
+  rowLabel: { flex: 1, fontSize: FontSize.font14, fontWeight: '600', color: '#333333' },
 
   callBtn: {
     flexDirection: 'row', alignItems: 'center', gap: 8,
     paddingVertical: 12, paddingHorizontal: 24, borderRadius: 24,
     backgroundColor: Colors.primary, marginTop: 24,
   },
-  callBtnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.white },
+  callBtnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: FontSize.font14, color: Colors.white },
 
   helpRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingVertical: 16 },
-  helpText: { fontSize: 12, color: '#4c4c4c' },
+  helpText: { fontSize: FontSize.font12, color: '#4c4c4c' },
   helpLink: { color: '#bd8800', textDecorationLine: 'underline' },
 })

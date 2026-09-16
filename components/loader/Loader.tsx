@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native'
 import { Colors } from '../../constants/colors'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -225,7 +226,7 @@ const styles = StyleSheet.create({
   },
   message: {
     marginTop: 18,
-    fontSize: 17,
+    fontSize: FontSize.font17,
     fontWeight: '600',
     color: Colors.textPrimary,
     textAlign: 'center',

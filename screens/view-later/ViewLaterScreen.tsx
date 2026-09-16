@@ -49,6 +49,7 @@ import { CDN_REACT } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
+import { FontSize } from '../../src/theme/fonts'
 
 const FROM_PAGE = 'viewinglater'
 const LIMIT = 20
@@ -349,14 +350,14 @@ export default function ViewLaterScreen({ navigation }: Props) {
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.background },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 },
-  emptyText: { fontSize: 14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
+  emptyText: { fontSize: FontSize.font14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
 
   header: {
     height: 56, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white,
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
+  headerTitle: { flex: 1, fontSize: FontSize.font16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
 
   listContent: { paddingTop: 16, paddingHorizontal: 16 },
   footerLoader: { paddingVertical: 24 },

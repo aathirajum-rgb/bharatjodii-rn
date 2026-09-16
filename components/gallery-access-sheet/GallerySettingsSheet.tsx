@@ -7,6 +7,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize } from '../../src/theme/fonts'
 
 // Angular: auto-start.component.html's close icon — same as GalleryAccessSheet.
 const CLOSE_ICON_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="32" d="M368 368L144 144M368 144L144 368"/></svg>`
@@ -224,7 +225,7 @@ const styles = StyleSheet.create({
   // line-height set (browser default "normal" for Poppins ≈ 1.2×) — 26,
   // not the 28/18 both used before.
   title: {
-    fontSize:     22,
+    fontSize:     FontSize.font22,
     fontWeight:   '600',
     color:        '#1f1e1b',
     lineHeight:   26,
@@ -234,7 +235,7 @@ const styles = StyleSheet.create({
   // the title that was missing here (body sat flush against it). No explicit
   // line-height in Angular either — 18 (≈1.3×14), not 20.
   body: {
-    fontSize:     14,
+    fontSize:     FontSize.font14,
     fontWeight:   '400',
     color:        '#1f1e1b',
     lineHeight:   18,
@@ -246,7 +247,7 @@ const styles = StyleSheet.create({
   // (gap from body), individual <ol> items have no extra per-item margin —
   // only the first line needs that 24px top gap, not every line.
   instructionLine: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
     color:      '#1f1e1b',
     lineHeight: 18,
@@ -271,7 +272,7 @@ const styles = StyleSheet.create({
     marginTop:       24,
   },
   ctaPrimaryLabel: {
-    fontSize: 14,
+    fontSize: FontSize.font14,
     color:    Colors.white,
   },
   ctaSecondary: {
@@ -281,7 +282,7 @@ const styles = StyleSheet.create({
     marginTop:       12,
   },
   ctaSecondaryLabel: {
-    fontSize: 14,
+    fontSize: FontSize.font14,
     color:    '#B50033',
   },
 })

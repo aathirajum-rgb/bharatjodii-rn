@@ -7,6 +7,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_LOTTIE, CDN_SVG } from '../../constants/cdn'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import CdnSvg from '../cdn-svg/CdnSvg'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -158,7 +159,7 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize:     18,
+    fontSize:     FontSize.font18,
     fontWeight:   '600',
     color:        '#1f1e1b',
     lineHeight:   24,
@@ -174,7 +175,7 @@ const styles = StyleSheet.create({
     height:          52,
   },
   ctaLabel: {
-    fontSize:     16,
+    fontSize:     FontSize.font16,
     fontWeight:   '700',
     color:        Colors.surface,
     marginRight:  6,

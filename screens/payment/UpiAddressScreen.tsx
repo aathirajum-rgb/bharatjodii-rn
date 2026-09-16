@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize, remPx } from '../../src/theme/fonts'
 import { CDN, CDN_REACT } from '../../constants/cdn'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
@@ -424,21 +424,21 @@ const s = StyleSheet.create({
   backRow: { alignSelf: 'flex-start', marginLeft: 4, marginTop: 12, paddingVertical: 8 },
   // Angular: .heading1-semibold-20 .black-color (global.scss:2166) — 20px
   // Poppins-SemiBold. The rem scale resolves ~20 → ~21 at 412px width.
-  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 21, color: Colors.black, marginTop: 4 },
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: remPx(21 / 16), color: Colors.black, marginTop: 4 },
   // Angular: .existing-upi has NO definition anywhere in the codebase, so this
   // line inherits the Ionic default — Poppins-Regular at the base size, black —
   // not the grey medium this port used.
-  headerSubtitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 17, color: Colors.black, marginTop: 8 },
+  headerSubtitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font17, color: Colors.black, marginTop: 8 },
 
   content:  { padding: 16 },
-  subtitle: { fontFamily: Fonts.poppinsMedium, fontSize: 14, color: Colors.textSecondary, marginBottom: 16 },
+  subtitle: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, color: Colors.textSecondary, marginBottom: 16 },
   // The underline shape itself comes from shape="underline" — these border
   // overrides would land on the outer wrapper, not the field, so they're not
   // set here.
   field:    { marginBottom: 8 },
   // Angular: .you-will-receive-request inherits the body default — black at
   // the base size, not a 12px grey.
-  note:     { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 15, color: Colors.black },
+  note:     { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font15, color: Colors.black },
   // Angular: .primary-cta-jodii-small-pay / .primary-disabled-cta-jodii
   // (global.scss:26281 / 26353) with .width-auto .pt-6 .pb-6 .pl-6 .pr-6 —
   // radius 8 (RN had 4), 6px padding all round, sized to its label rather
@@ -467,7 +467,7 @@ const s = StyleSheet.create({
   },
   appRowLast: { borderBottomWidth: 0 },
   appRowLeft: { flexDirection: 'row', alignItems: 'center', gap: 16, flexShrink: 1 },
-  appLabel:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  appLabel:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
 
   radioCircle: {
     width: 20, height: 20, borderRadius: 10, borderWidth: 1.5, borderColor: Colors.borderNeutral,

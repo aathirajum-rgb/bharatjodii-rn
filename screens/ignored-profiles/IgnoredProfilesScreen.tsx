@@ -44,6 +44,7 @@ import CdnLottie from '../../components/CdnLottie'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import IgnoredProfilesDesktopScreen from './IgnoredProfilesDesktopScreen'
+import { FontSize } from '../../src/theme/fonts'
 
 const DEFAULT_PHOTO_MALE   = CDN_REACT + '/ignore_profile_male.svg'
 const DEFAULT_PHOTO_FEMALE = CDN_REACT + '/ignore_profile_female.svg'
@@ -349,7 +350,7 @@ const s = StyleSheet.create({
   // Angular's caption is `pt-48 heading4-medium-16` — 48pt clear of the
   // animation, 16px medium (not the 14px secondary-grey this had).
   emptyText: {
-    fontSize: 16, fontWeight: '500', color: '#333333',
+    fontSize: FontSize.font16, fontWeight: '500', color: '#333333',
     textAlign: 'center', lineHeight: 24, marginTop: 48,
   },
 
@@ -359,7 +360,7 @@ const s = StyleSheet.create({
   },
   header: { height: 56, flexDirection: 'row', alignItems: 'center' },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
+  headerTitle: { flex: 1, fontSize: FontSize.font16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
 
   // Angular: menu-profiles.page.html's `.messages-top-block` row plus
   // menu-profiles.page.scss:
@@ -391,7 +392,7 @@ const s = StyleSheet.create({
   // Inactive: body2-regular-14 + black. Active: body1-medium-14 + #B50033.
   // Both line-height 18. Angular sets no letter-spacing — the 0.42 here was
   // invented.
-  tabText: { fontSize: 14, fontWeight: '400', lineHeight: 18, color: Colors.black },
+  tabText: { fontSize: FontSize.font14, fontWeight: '400', lineHeight: 18, color: Colors.black },
   tabTextActive: { fontWeight: '500', color: '#B50033' },
 
   footerLoader: { paddingVertical: 24 },
@@ -413,9 +414,9 @@ const c = StyleSheet.create({
   },
   photo: { width: 102, height: 102, borderRadius: 4 },
   info: { flex: 1, marginLeft: 12, justifyContent: 'center' },
-  name: { fontSize: 16, fontWeight: '600', color: Colors.textPrimary, marginBottom: 6 },
-  subText: { fontSize: 14, color: Colors.black, lineHeight: 20 },
-  deletedText: { fontSize: 13, color: Colors.textSecondary, marginTop: 2, fontStyle: 'italic' },
+  name: { fontSize: FontSize.font16, fontWeight: '600', color: Colors.textPrimary, marginBottom: 6 },
+  subText: { fontSize: FontSize.font14, color: Colors.black, lineHeight: 20 },
+  deletedText: { fontSize: FontSize.font13, color: Colors.textSecondary, marginTop: 2, fontStyle: 'italic' },
   linkBtn: { marginTop: 8, alignSelf: 'flex-start' },
-  linkText: { fontSize: 14, color: Colors.link, fontWeight: '500' },
+  linkText: { fontSize: FontSize.font14, color: Colors.link, fontWeight: '500' },
 })

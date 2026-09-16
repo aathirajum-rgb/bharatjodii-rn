@@ -49,6 +49,7 @@ import { deletePhoto, setMainPhoto } from '../../service/profileService'
 import {
   getPhotoConfig, validatePhotoAsset, getRejectReasons, describeRejection,
 } from '../../service/photoValidationService'
+import { FontSize } from '../../src/theme/fonts'
 
 const ICON_BACK   = CDN_REACT + '/menu_back_arrow.svg'
 const ICON_DELETE = CDN_REACT + '/edit-profile-photo-delete-icon.svg'
@@ -288,11 +289,11 @@ const s = StyleSheet.create({
     height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, fontSize: 20, fontWeight: '600', color: Colors.black, marginLeft: 6 },
+  headerTitle: { flex: 1, fontSize: FontSize.font20, fontWeight: '600', color: Colors.black, marginLeft: 6 },
   deleteBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
 
   counter: {
-    marginTop: 32, fontSize: 20, fontWeight: '400', color: Colors.black, textAlign: 'center',
+    marginTop: 32, fontSize: FontSize.font20, fontWeight: '400', color: Colors.black, textAlign: 'center',
   },
 
   sliderWrap: { marginTop: 16, position: 'relative' },
@@ -304,7 +305,7 @@ const s = StyleSheet.create({
     backgroundColor: '#4c4c4c', paddingVertical: 3, paddingHorizontal: 21,
     borderBottomRightRadius: 8,
   },
-  tagText: { fontSize: 10, color: '#fffefe' },
+  tagText: { fontSize: FontSize.font10, color: '#fffefe' },
 
   // Dynamic-bullet style dot pagination (Angular swiper dynamicBullets)
   dotsRow: {
@@ -321,10 +322,10 @@ const s = StyleSheet.create({
     height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
   },
-  primaryBtnText: { fontSize: 14, fontWeight: '500', color: Colors.white },
+  primaryBtnText: { fontSize: FontSize.font14, fontWeight: '500', color: Colors.white },
   secondaryBtn: {
     height: 44, borderRadius: 8, backgroundColor: Colors.divider,
     alignItems: 'center', justifyContent: 'center',
   },
-  secondaryBtnText: { fontSize: 14, fontWeight: '500', color: Colors.inputBorder },
+  secondaryBtnText: { fontSize: FontSize.font14, fontWeight: '500', color: Colors.inputBorder },
 })

@@ -25,7 +25,7 @@ import { Image } from 'expo-image'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 
 const DELETE_ICON  = CDN_REACT + '/edit-profile-photo-delete-icon.svg'
 const CHEVRON_ICON = CDN_REACT + '/photo-viewer-chevron-icon.svg'
@@ -131,7 +131,7 @@ const s = StyleSheet.create({
     position: 'absolute', top: 24, right: 24, width: 36, height: 36, borderRadius: 18,
     alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.background,
   },
-  closeIcon: { fontSize: 16, color: Colors.textDark },
+  closeIcon: { fontSize: FontSize.font16, color: Colors.textDark },
 
   photoBox: {
     width: PHOTO_SIZE, height: PHOTO_SIZE, borderRadius: 8, overflow: 'hidden',
@@ -140,7 +140,7 @@ const s = StyleSheet.create({
   photoImg: { width: '100%', height: '100%' },
   deleteBtn: { position: 'absolute', top: 15, right: 16 },
 
-  counter: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, marginTop: 8 },
+  counter: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, marginTop: 8 },
 
   // Figma node 735:29585: chevrons sit within the card's own side margins
   // around the centered photo, not outside the card — (680-360)/2=160px
@@ -159,10 +159,10 @@ const s = StyleSheet.create({
     height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
   },
-  primaryBtnText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.white },
+  primaryBtnText: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.white },
   secondaryBtn: {
     height: 44, borderRadius: 8, borderWidth: 1, borderColor: '#545454',
     alignItems: 'center', justifyContent: 'center',
   },
-  secondaryBtnText: { fontFamily: Fonts.poppinsRegular, fontSize: 14, color: '#545454' },
+  secondaryBtnText: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font14, color: '#545454' },
 })

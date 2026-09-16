@@ -55,7 +55,7 @@ import {
 import type { SimilarProfileCard, StarMatchResult, BiodataTheme } from '../../service/viewProfileService'
 import { getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { CDN_SVG, CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
 import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interface'
 
@@ -1296,7 +1296,7 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primaryDark, height: 24,
     paddingLeft: 8, paddingRight: 12, borderBottomRightRadius: 10, gap: 4,
   },
-  newBadgeText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 12, color: Colors.white },
+  newBadgeText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: FontSize.font12, color: Colors.white },
   // Feature 6 own-profile theme-cycle chevrons (distinct from profileNavBtn below).
   profileArrowBtn: {
     position: 'absolute', top: PHOTO_HEIGHT - 32,
@@ -1307,7 +1307,7 @@ const s = StyleSheet.create({
   },
   profileArrowLeft:  { left: 8 },
   profileArrowRight: { right: 8 },
-  profileArrowText: { color: Colors.white, fontSize: 20, lineHeight: 20 },
+  profileArrowText: { color: Colors.white, fontSize: FontSize.font20, lineHeight: 20 },
   // Feature 2 prev/next-PROFILE arrows — Angular renders these as image assets
   // (vp-revamp-left-arw.svg / vp-revamp-right-arw.svg). `top` is set inline at
   // the render site since these are now a screen-fixed overlay.
@@ -1332,10 +1332,10 @@ const s = StyleSheet.create({
     alignItems: 'center', gap: 12, maxWidth: '70%',
   },
   coachMarkText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.black, textAlign: 'center',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: FontSize.font14, color: Colors.black, textAlign: 'center',
   },
   coachMarkDismiss: {
-    fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 14, color: Colors.primaryDark,
+    fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: FontSize.font14, color: Colors.primaryDark,
   },
   photoOverlay: {
     ...StyleSheet.absoluteFill,
@@ -1352,7 +1352,7 @@ const s = StyleSheet.create({
     alignItems: 'center', gap: 16,
   },
   overlayText: {
-    fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 13, color: Colors.white,
+    fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: FontSize.font13, color: Colors.white,
     textAlign: 'center', lineHeight: 17, width: '70%', alignSelf: 'center',
   },
 
@@ -1374,10 +1374,10 @@ const s = StyleSheet.create({
 
   nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   // Angular: heading1-semibold-22 black-color
-  name:    { flex: 1, fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 24, color: Colors.black },
+  name:    { flex: 1, fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: FontSize.font24, color: Colors.black },
   // Angular: body2-regular-14 black-color
-  jodiId:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.black, marginTop: 4, marginBottom: 18 },
-  likedMsg: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 12, color: Colors.likedStripText, marginTop: 6 },
+  jodiId:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: FontSize.font14, color: Colors.black, marginTop: 4, marginBottom: 18 },
+  likedMsg: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: FontSize.font12, color: Colors.likedStripText, marginTop: 6 },
 
   // Angular: viewprofile.page.html:469-489 — Call/WhatsApp icon buttons beside the name.
   nameIconsRow: { flexDirection: 'row', alignItems: 'center', gap: 32 },
@@ -1413,13 +1413,13 @@ const s = StyleSheet.create({
     height: 44, backgroundColor: Colors.white,
     borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
-  ctaDontShowText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 14, color: '#545454' },
+  ctaDontShowText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: FontSize.font14, color: '#545454' },
   ctaViewLater: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, backgroundColor: Colors.white,
     borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
-  ctaViewLaterText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 14, color: '#545454' },
+  ctaViewLaterText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: FontSize.font14, color: '#545454' },
   // Angular: `ion-button[disabled]` only overrides background (#e6e6e6) and text
   // (#8A8A8A), `opacity: unset !important` — the #545454 border is left untouched.
   ctaDisabled: { backgroundColor: '#e6e6e6' },
@@ -1428,7 +1428,7 @@ const s = StyleSheet.create({
     height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.primaryDark, borderRadius: 8, gap: 6,
   },
-  ctaLikeText: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 14, color: Colors.white },
+  ctaLikeText: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: FontSize.font14, color: Colors.white },
   // One-shot burst overlay for the ctaLike button above — anchored to the
   // bottom of ctaBlock (where the CTA section sits) rather than nested inside
   // the button itself, since showLikeCTA flips false (unmounting the button in
@@ -1447,27 +1447,27 @@ const s = StyleSheet.create({
     height: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.primaryDark, borderRadius: 8, marginTop: 16,
   },
-  biodataCtaText: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 14, color: Colors.white },
+  biodataCtaText: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: FontSize.font14, color: Colors.white },
 
   afterLikeRow: {
     backgroundColor: Colors.afterLikeBg, borderRadius: 8, borderWidth: 1,
     borderColor: Colors.afterLikeBorder, paddingHorizontal: 14, paddingVertical: 10,
   },
   afterLikeTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
-  afterLikeText:   { flex: 1, fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 13, color: Colors.black },
+  afterLikeText:   { flex: 1, fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: FontSize.font13, color: Colors.black },
   ctaSendInterestWrap: { position: 'relative', flexShrink: 0 },
   ctaSendInterest: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, backgroundColor: Colors.primaryDark, borderRadius: 8, paddingHorizontal: 16,
   },
-  ctaSendInterestText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 14, color: Colors.white },
+  ctaSendInterestText: { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: FontSize.font14, color: Colors.white },
   freeBadge: {
     position: 'absolute', top: -10, right: 8, zIndex: 1,
     backgroundColor: Colors.badgeNewBg, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2,
   },
-  freeBadgeText: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 10, color: Colors.badgeNewText },
+  freeBadgeText: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: FontSize.font10, color: Colors.badgeNewText },
   contactsLeftText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 11, color: Colors.textSecondary, textAlign: 'center', marginTop: 8,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: FontSize.font11, color: Colors.textSecondary, textAlign: 'center', marginTop: 8,
   },
 
   // Angular: icon column + text column — label directly above value, pt-20/pb-20,
@@ -1478,8 +1478,8 @@ const s = StyleSheet.create({
   detailRowBorder: { borderBottomWidth: 1, borderBottomColor: 'rgba(204,204,204,0.5)' },
   detailIconCol: { width: 20, flexShrink: 0 },
   detailTextCol: { flex: 1, paddingLeft: 12 },
-  detailLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.black },
-  detailValue: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 14, color: Colors.black, marginTop: 8 },
+  detailLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: FontSize.font14, color: Colors.black },
+  detailValue: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: FontSize.font14, color: Colors.black, marginTop: 8 },
 
   // Angular: .like-this-profile — border-image gradient approximated with a
   // solid gold top+bottom border matching the gradient's peak color.
@@ -1490,9 +1490,9 @@ const s = StyleSheet.create({
   },
   starMatchTextWrap: { flex: 1 },
   // Only the rating number itself is semibold — the rest of the sentence is regular.
-  starMatchText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 13, color: Colors.textDark },
+  starMatchText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: FontSize.font13, color: Colors.textDark },
   starMatchRating: { fontFamily: Fonts.poppinsSemiBold, fontWeight: '600' },
-  starMatchTeaser: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 13, color: Colors.link },
+  starMatchTeaser: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: FontSize.font13, color: Colors.link },
   starMatchLinkRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8, gap: 4 },
   starMatchLinkArrow: { width: 18, height: 18 },
   // Angular: .blur-text-vp-revamp — filter: blur(5px) on the teaser score for
@@ -1503,22 +1503,22 @@ const s = StyleSheet.create({
     textShadowColor: '#333333', textShadowRadius: 5, textShadowOffset: { width: 0, height: 0 },
   },
 
-  horoActionLink:    { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: 14, color: Colors.link, marginTop: 8 },
+  horoActionLink:    { fontFamily: Fonts.poppinsRegular, fontWeight: '400', fontSize: FontSize.font14, color: Colors.link, marginTop: 8 },
   // Feature 6 — own-profile "add missing section" prompts.
   addDetailPrompt: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 12 },
-  addDetailPromptText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 14, color: Colors.link },
+  addDetailPromptText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: FontSize.font14, color: Colors.link },
 
   biodataQrSection: { alignItems: 'center', paddingTop: 24, gap: 16 },
   biodataQrImage: { width: 160, height: 160 },
   biodataQrCaption: {
-    fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: 12, color: '#1a1818', textAlign: 'center',
+    fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: FontSize.font12, color: '#1a1818', textAlign: 'center',
   },
 
   // Angular: app-swiper.component.html:2 — header text aligned with the rest of
   // the padded content, but the card row itself bleeds to the screen edges.
   similarSection: { paddingTop: 32, paddingBottom: 24 },
   similarHeader: {
-    fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: 20, color: Colors.black,
+    fontFamily: Fonts.poppinsSemiBold, fontWeight: '600', fontSize: FontSize.font20, color: Colors.black,
     marginBottom: 10, paddingHorizontal: 24,
   },
   // paddingVertical gives each card's shadow room to render.
@@ -1543,24 +1543,24 @@ const s = StyleSheet.create({
     backgroundColor: Colors.selectionBg, paddingHorizontal: 16, paddingVertical: 12,
   },
   missingBannerText: {
-    flex: 1, marginRight: 12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12,
+    flex: 1, marginRight: 12, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12,
     color: '#1e1e1e', letterSpacing: 0.24,
   },
   missingBannerCta: { flexDirection: 'row', alignItems: 'center', gap: 2 },
-  missingBannerCtaText: { fontFamily: Fonts.poppinsRegular, fontSize: 12, color: Colors.link },
+  missingBannerCtaText: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font12, color: Colors.link },
 
   // Angular: ion-back-button .default-back — 42x42 per a manual UI tweak.
   headerBackBtn: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
   headerSpacer: { flex: 1 },
   // Angular: `.vp-profile-name` — Poppins-Medium, `--gray-color1` (#1f1e1b).
-  headerName: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: 18, color: '#1f1e1b' },
+  headerName: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: FontSize.font18, color: '#1f1e1b' },
   headerIconBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   // Angular: .width-height-18 — box sized exactly to the 18x18 icon (hitSlop
   // covers the touch area instead).
   headerIconBtn18: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center' },
   // Angular: message icon (mr-16) — 6px here plus headerBar's own gap:10 = 16px.
   headerIconBtnMsg: { width: 18, height: 18, alignItems: 'center', justifyContent: 'center', marginRight: 6 },
-  menuDots: { fontSize: 24, lineHeight:20, color: '#333333', fontWeight: '700' },
+  menuDots: { fontSize: FontSize.font24, lineHeight:20, color: '#333333', fontWeight: '700' },
 
   // Angular: dropdown.component.scss .lang-selection — pinned to 108x38.
   langPill: {
@@ -1569,7 +1569,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
     backgroundColor: Colors.white, width: 108, height: 38,
   },
-  langPillText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: 13, color: '#000000' },
+  langPillText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: FontSize.font13, color: '#000000' },
 
   menuDropdown: {
     position: 'absolute', top: 34, right: 0, minWidth: 200,
@@ -1578,6 +1578,6 @@ const s = StyleSheet.create({
     elevation: 6, zIndex: 10,
   },
   menuItem: { paddingHorizontal: 16, paddingVertical: 12 },
-  menuItemText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: 14, color: Colors.textDark },
+  menuItemText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontWeight: '400', fontSize: FontSize.font14, color: Colors.textDark },
   menuItemDanger: { color: Colors.primary },
 })

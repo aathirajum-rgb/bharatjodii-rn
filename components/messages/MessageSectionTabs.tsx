@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   // body1-medium-14 + .message-section-tab-text-active { color: #B50033 }
   label: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.black,
   },
   labelActive: {

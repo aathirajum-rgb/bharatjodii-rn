@@ -25,7 +25,7 @@ import { Modal, Pressable, StyleSheet, Text } from 'react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_REG } from '../../constants/cdn'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 
 const ILLUSTRATION = CDN_REG + 'delete-photo.svg'
 
@@ -75,15 +75,15 @@ const s = StyleSheet.create({
     position: 'absolute', top: 16, right: 16, width: 32, height: 32, borderRadius: 16,
     alignItems: 'center', justifyContent: 'center',
   },
-  closeIcon: { fontSize: 16, color: Colors.textDark },
+  closeIcon: { fontSize: FontSize.font16, color: Colors.textDark },
 
   illustration: { marginTop: 8, marginBottom: 16 },
-  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, color: Colors.black, textAlign: 'center' },
-  message: { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: 14, color: Colors.textDark, textAlign: 'center', marginTop: 8 },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font20, color: Colors.black, textAlign: 'center' },
+  message: { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: FontSize.font14, color: Colors.textDark, textAlign: 'center', marginTop: 8 },
 
   deleteBtn: {
     width: '100%', height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center', marginTop: 24,
   },
-  deleteBtnText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.white },
+  deleteBtnText: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.white },
 })

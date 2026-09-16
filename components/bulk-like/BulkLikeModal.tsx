@@ -22,7 +22,7 @@ import SelectableProfileTile from './SelectableProfileTile'
 import BulkLikeSentSheet from './BulkLikeSentSheet'
 import { sendBulkLikes } from '../../service/profileService'
 import { Colors } from '../../constants/colors'
-import { Fonts } from '../../src/theme/fonts'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 
 export default function BulkLikeModal({
   visible, candidates, showPhotoPromo, onClose, onSent, onSentNeedsPhoto,
@@ -153,6 +153,13 @@ export default function BulkLikeModal({
 
 const s = StyleSheet.create({
   screen: { flex: 1 },
+  // FLAGGED — diverges from Angular's `.full-popup-header pb-16 pl-16 pr-16`
+  // (fullpage-modalpopup.component.html:6) plus the close row's own `pt-16`:
+  //   - paddingRight 20 vs Angular's pr-16
+  //   - paddingVertical 24 vs Angular's 16 top / 16 bottom
+  //   - the 1px bottom border has no Angular source at all — .full-popup-header
+  //     (…scss:14) sets only position/top/z-index/flex-shrink, no border.
+  // Left as-is: reshaping the header is a layout change, not a typography fix.
   header: {
     flexDirection:     'row',
     alignItems:        'center',
@@ -163,18 +170,35 @@ const s = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: Colors.borderSubtle,
   },
+  // Angular: fullpage-modalpopup.component.html:12 —
+  // `bulk-title color-1f1e1b heading2-semibold-18 line-height-24 pb-8`.
+  // heading2-semibold-18 = var(--font18) + --english-semibold-poppins, and
+  // line-height-24 is a flat 24 — both already matched. The colour did not:
+  // .color-1f1e1b is #1f1e1b, not textPrimary's #111111.
+  //
+  // FLAGGED, not restructured: Angular stacks the close button on its OWN row
+  // ABOVE this title (a `justify-content-flex-end pt-16` row), whereas this
+  // port puts title and close side by side on one row.
   title: {
     flex:       1,
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   18,
+    fontSize:   FontSize.font18,
     lineHeight: 24,
-    color:      Colors.textPrimary,
+    color:      '#1F1E1B',
     paddingRight: 12,
   },
+  // Angular renders an <ion-img> close-btn.svg here, not a text glyph, so no
+  // typography rule governs this. Size tokenised only, value unchanged.
   close: {
-    fontSize: 18,
+    fontSize: FontSize.font18,
     color:    Colors.textPrimary,
   },
+  // gap 20 == Angular's `mb-20` on each .list-view-card grid — exact.
+  // FLAGGED: the insets are not. Angular's `.full-popup-list pl-4 pr-4 pt-16`
+  // gives 4 of side padding, and each card's own `.card.bulklike`
+  // (list-view-card.component.scss:5) adds 16 — 20 total per side, vs 16 here
+  // with none on the tile. Its `padding-bottom: 5rem` (~80) is also far more
+  // than the 16 below.
   list: {
     paddingHorizontal: 16,
     paddingTop:        16,
@@ -194,7 +218,7 @@ const s = StyleSheet.create({
   },
   sendBtnText: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   15,
+    fontSize:   FontSize.font15,
     color:      Colors.white,
   },
 })

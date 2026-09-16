@@ -21,7 +21,7 @@ import {
   strictFieldCopy, STRICT_EXCLUDED_FIELDS, STRICT_FIELD_ORDER, strictPromptText,
 } from '../../constants/strictFilter.config'
 import type { FieldKey } from '../../screens/search/SearchScreen'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
@@ -172,11 +172,11 @@ const s = StyleSheet.create({
   // weight from the font FILE, so every style below names a family and drops
   // fontWeight — a bare fontWeight left these on the system font and let
   // Android synthesize a fake bold on top of it.
-  headerTitle: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, color: '#333333', marginLeft: 6, marginRight: 16 },
+  headerTitle: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: FontSize.font16, color: '#333333', marginLeft: 6, marginRight: 16 },
 
   content: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 24, gap: 24 },
   // Angular: the "Select preferred X" subtitle is `heading4-medium-16` too.
-  title: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 16, color: Colors.black },
+  title: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: FontSize.font16, color: Colors.black },
 
   fieldsWrap: { gap: 24 },
 
@@ -189,13 +189,13 @@ const s = StyleSheet.create({
   // Angular `.setting-title body1-medium-14` — Poppins-MEDIUM 14/16, not
   // SemiBold (SemiBold at 14 is `font-14-semibold`, used only by the PP page's
   // own strict-filter card title and the pickers' group headers).
-  strictTitle: { fontFamily: Fonts.poppinsMedium, fontSize: 14, lineHeight: 16, color: Colors.black },
+  strictTitle: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, lineHeight: 16, color: Colors.black },
   // Angular `.setting-description body3-regular-12` — 12/16 Poppins-Regular.
-  strictDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 16, color: Colors.black },
+  strictDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 16, color: Colors.black },
 
   // Angular: `line-height-16 body3-regular-12` on both the range prompt and
   // the reduced-matches note.
-  promptText:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 16, color: Colors.black },
+  promptText:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 16, color: Colors.black },
   warningText: { color: Colors.inputError },
 
   // Angular's <ion-footer> is a COLUMN: the RANGE prompt row, then the
@@ -209,7 +209,7 @@ const s = StyleSheet.create({
   // itself so the text stops short of the edge.
   footerPrompt: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize: 12, lineHeight: 16, color: Colors.black,
+    fontSize: FontSize.font12, lineHeight: 16, color: Colors.black,
     paddingRight: 12, marginBottom: 16,
   },
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: 26 },
@@ -218,14 +218,14 @@ const s = StyleSheet.create({
   // `body2-regular-14` with the block's own `font-weight: 600` + 24 line-height
   // override — expressed here as the SemiBold family, since RN can't add
   // weight to Poppins-Regular the way the browser synthesizes it.
-  matchesLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, lineHeight: 16, color: Colors.black },
-  matchesCount: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, lineHeight: 24, color: Colors.black },
+  matchesLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 16, color: Colors.black },
+  matchesCount: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, lineHeight: 24, color: Colors.black },
   reducedRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   // Angular `.matches-count-reduced` (14/20): the struck-out old count and the
   // "to" keep weight 400 (`.matches-old`), the new count goes 600 (`.matches-new`).
-  reducedOld: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 20, color: Colors.black, textDecorationLine: 'line-through' },
-  reducedTo:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 20, color: Colors.black },
-  reducedNew: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, lineHeight: 20, color: Colors.inputError },
+  reducedOld: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 20, color: Colors.black, textDecorationLine: 'line-through' },
+  reducedTo:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 20, color: Colors.black },
+  reducedNew: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, lineHeight: 20, color: Colors.inputError },
   applyBtn: {
     flex: 1, height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
@@ -233,7 +233,7 @@ const s = StyleSheet.create({
   // Angular button-revamp's default ctaFontSize is `body2-regular-14` (+
   // `line-height-16`) — every CTA on the filter side is Poppins-REGULAR 14,
   // not medium/semibold. None of the filter-side call sites overrides it.
-  applyText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 16, color: Colors.white },
+  applyText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 16, color: Colors.white },
 })
 
 // ─── Compact "input field" summary row (Figma's Input field component) ───────
@@ -273,6 +273,6 @@ const cs = StyleSheet.create({
   },
   // Angular `.right-popup-open`: the value line is `body2-regular-14` and the
   // floating label `body3-regular-12` — both Poppins-Regular.
-  label: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
-  value: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  label: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.black },
+  value: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
 })

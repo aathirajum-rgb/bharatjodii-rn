@@ -20,7 +20,7 @@ import { CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
 import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import { setFilterEventType } from '../../service/filterService'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 
 const ICON = {
   editProfile:     `${CDN_SVG}menu/edit-profile.svg`,
@@ -130,8 +130,8 @@ const s = StyleSheet.create({
   },
   avatar: { width: 100, height: 100 },
 
-  name: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, lineHeight: 22, color: Colors.black, textAlign: 'center', marginTop: 14 },
-  id:   { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: 16, lineHeight: 22, color: '#545454', textAlign: 'center', marginTop: 4, marginBottom: 24 },
+  name: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, lineHeight: 22, color: Colors.black, textAlign: 'center', marginTop: 14 },
+  id:   { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: FontSize.font16, lineHeight: 22, color: '#545454', textAlign: 'center', marginTop: 4, marginBottom: 24 },
 
   card: {
     backgroundColor: Colors.white,
@@ -150,8 +150,8 @@ const s = StyleSheet.create({
   rowPressed: { backgroundColor: Colors.surfaceInput },
   rowActive:  { backgroundColor: Colors.selectionBg },
   rowIconWrap: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  rowTitle:   { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, lineHeight: 18, color: Colors.black },
+  rowTitle:   { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 18, color: Colors.black },
   rowTitleActive: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, color: Colors.primaryDark },
-  rowChevron: { fontSize: 18, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: '#8a8a8a' },
+  rowChevron: { fontSize: FontSize.font18, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, color: '#8a8a8a' },
   divider: { height: 1, backgroundColor: Colors.borderSubtle, marginVertical: 6 },
 })

@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../../constants/colors'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize } from '../../src/theme/fonts'
 
 // A read-only, tap-to-open counterpart to FloatingLabelInput — same visual
 // language (bordered box, label riding above the border) but the box is a
@@ -57,10 +58,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     zIndex: 10,
   },
-  label: { fontSize: 11, color: Colors.inputBorder },
-  value: { flex: 1, fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
+  label: { fontSize: FontSize.font11, color: Colors.inputBorder },
+  value: { flex: 1, fontSize: FontSize.font14, fontWeight: '500', color: Colors.textPrimary },
   placeholder: { fontWeight: '400', color: Colors.textPlaceholder },
-  arrow: { fontSize: 22, color: Colors.textPrimary, lineHeight: 26 },
+  arrow: { fontSize: FontSize.font22, color: Colors.textPrimary, lineHeight: 26 },
   containerLocked: { backgroundColor: Colors.surfaceDim },
   valueLocked: { color: Colors.textTertiary },
 })

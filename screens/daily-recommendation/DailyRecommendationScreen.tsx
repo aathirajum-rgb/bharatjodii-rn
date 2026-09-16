@@ -46,7 +46,7 @@ import { ENavigation } from '../../types/enums/navigation.enum'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 
 const { width: SW } = Dimensions.get('window')
 
@@ -863,7 +863,7 @@ const styles = StyleSheet.create({
   // black (#000000), not textPrimary (#111111).
   headerText: {
     fontFamily: Fonts.poppinsMedium,
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '500',
     color:      Colors.black,
     flexShrink: 1,
@@ -902,15 +902,19 @@ const styles = StyleSheet.create({
   // (already correct here) — only the font family was missing.
   stampText: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   18,
+    fontSize:   FontSize.font18,
     fontWeight: '600',
     color:      '#FFFFFF',
   },
+  // Angular: .viewed-all-banner (daily-recommendation.component.scss:78-88)
+  // — border-radius 20, 1px solid #ccc, background #fff, padding 24px 16px
+  // 48px. Everything matched except the border colour: #ccc is Colors.borderLight
+  // (#cccccc), not Colors.border (#dddddd).
   endCard: {
     width:             '100%',
     borderRadius:      20,
     borderWidth:       1,
-    borderColor:       Colors.border,
+    borderColor:       Colors.borderLight,
     backgroundColor:   Colors.surface,
     paddingHorizontal: 16,
     paddingTop:        24,
@@ -927,7 +931,7 @@ const styles = StyleSheet.create({
   endTitle: {
     marginTop:  16,
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '600',
     color:      Colors.black,
     textAlign:  'center',
@@ -937,7 +941,7 @@ const styles = StyleSheet.create({
   endSub: {
     marginTop:  20,
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.black,
     textAlign:  'center',
   },
@@ -979,7 +983,7 @@ const styles = StyleSheet.create({
   tooltipText: {
     marginTop:  4,
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   18,
+    fontSize:   FontSize.font18,
     fontWeight: '600',
     color:      Colors.black,
     textAlign:  'center',

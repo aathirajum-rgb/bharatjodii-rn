@@ -14,7 +14,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { getPayAtBankList, type PayAtBankItem } from '../../service/paymentService'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
@@ -128,10 +128,10 @@ const s = StyleSheet.create({
     backgroundColor: Colors.white,
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
-  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, marginLeft: 16, flex: 1 },
+  headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: Colors.black, marginLeft: 16, flex: 1 },
 
   content: { padding: 16, gap: 16 },
-  note: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: Colors.textSecondary, lineHeight: 20 },
+  note: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font13, color: Colors.textSecondary, lineHeight: 20 },
   link: { color: Colors.link, fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium },
 
   tabsRow: { flexGrow: 0 },
@@ -141,14 +141,14 @@ const s = StyleSheet.create({
     minWidth: 84,
   },
   tabSelected: { borderColor: Colors.primaryDark, backgroundColor: Colors.selectionBg },
-  tabLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 11, color: Colors.black, textAlign: 'center' },
+  tabLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font11, color: Colors.black, textAlign: 'center' },
 
   detailCard: {
     backgroundColor: Colors.white, borderRadius: 12, padding: 16, gap: 12,
     borderWidth: 1, borderColor: Colors.borderSubtle,
   },
   detailRow: { flexDirection: 'row' },
-  detailLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, width: 130 },
-  detailColon: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, width: 12 },
-  detailValue: { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black, flexShrink: 1 },
+  detailLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, width: 130 },
+  detailColon: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, width: 12 },
+  detailValue: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.black, flexShrink: 1 },
 })

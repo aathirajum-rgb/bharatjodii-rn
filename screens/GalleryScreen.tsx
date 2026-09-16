@@ -33,6 +33,7 @@ import {
 import { getItem, setItem } from '../service/storageService';
 import PhotoVerdictSheet, { type VerdictPhoto } from '../components/photo-validation/PhotoVerdictSheet';
 import VerificationSuccessSheet from '../components/bottom-sheet/VerificationSuccessSheet';
+import { FontSize } from '../src/theme/fonts'
 
 const NUM_COLUMNS = 3;
 const GAP = 2;
@@ -590,12 +591,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 32,
   },
   emptyTitle: {
-    fontSize: 18,
+    fontSize: FontSize.font18,
     fontWeight: '600',
     color: '#fff',
   },
   emptyDesc: {
-    fontSize: 14,
+    fontSize: FontSize.font14,
     color: '#888',
     textAlign: 'center',
   },
@@ -623,12 +624,12 @@ const styles = StyleSheet.create({
   },
   albumButtonText: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: FontSize.font15,
     fontWeight: '600',
   },
   albumChevron: {
     color: '#aaa',
-    fontSize: 11,
+    fontSize: FontSize.font11,
   },
   doneButton: {
     backgroundColor: Colors.iOSBlue,
@@ -645,7 +646,7 @@ const styles = StyleSheet.create({
   doneText: {
     color: '#fff',
     fontWeight: '600',
-    fontSize: 14,
+    fontSize: FontSize.font14,
   },
 
   // Album dropdown — floats over the grid
@@ -681,17 +682,17 @@ const styles = StyleSheet.create({
   },
   albumRowTitle: {
     color: '#fff',
-    fontSize: 15,
+    fontSize: FontSize.font15,
     fontWeight: '500',
   },
   albumRowCount: {
     color: '#888',
-    fontSize: 12,
+    fontSize: FontSize.font12,
     marginTop: 2,
   },
   albumRowCheck: {
     color: Colors.iOSBlue,
-    fontSize: 16,
+    fontSize: FontSize.font16,
     fontWeight: '700',
     marginLeft: 8,
   },
@@ -718,7 +719,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   cameraLabel: {
-    fontSize: 12,
+    fontSize: FontSize.font12,
     fontWeight: '500',
     color: '#fff',
   },
@@ -745,7 +746,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     color: '#fff',
-    fontSize: 11,
+    fontSize: FontSize.font11,
     fontWeight: '700',
   },
   loadingMore: {

@@ -19,7 +19,7 @@ import AppHeader from '../../components/app-header/AppHeader'
 import { CDN_REG, CDN_SVG } from '../../constants/cdn'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Colors } from '../../constants/colors'
-import { Fonts } from '../../src/theme/fonts'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 import { StorageKeys } from '../../constants/storage.keys'
 import { callPartialRegistrationAPI, login, setRegValues } from '../../service/registrationService'
 import { getItem, setItem } from '../../service/storageService'
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
   // Title — "Enter your\nmobile number" (Figma + Angular heading1-semibold-22: Poppins SemiBold 22px)
   title: {
     fontFamily:   Fonts.poppinsSemiBold,
-    fontSize:     22,
+    fontSize:     FontSize.font22,
     fontWeight:   '600',
     color:        Colors.textPrimary,
     marginBottom: 32,
@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
   },
   codeText: {
     fontFamily: Fonts.poppinsMedium,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '500',
     color:      Colors.textPrimary,
   },
@@ -456,7 +456,7 @@ const styles = StyleSheet.create({
   textInput: {
     flex:            1,
     fontFamily:      Fonts.poppinsRegular,
-    fontSize:        14,
+    fontSize:        FontSize.font14,
     color:           Colors.textPrimary,
     paddingVertical: 0,
   },
@@ -486,7 +486,7 @@ const styles = StyleSheet.create({
   },
   dropText: {
     fontFamily: Fonts.poppinsRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.textPrimary,
   },
   dropTextActive: {
@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.poppinsRegular,
     marginTop:  6,
     marginLeft: 4,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      Colors.inputError,
   },
 

@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   checkmark: {
     fontFamily: Fonts.poppinsBold,
     color:      Colors.surface,
-    fontSize:   11,
+    fontSize:   FontSize.font11,
     fontWeight: '700',
     lineHeight: 13,
   },

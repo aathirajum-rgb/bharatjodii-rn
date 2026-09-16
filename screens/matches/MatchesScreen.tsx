@@ -632,6 +632,12 @@ function SimplePromoBanner({
   )
 }
 
+// FLAGGED — no matching Angular visual. These promo banners come from
+// <app-breather>, whose PAYMENT / IDVERIFY / ADDPHOTO branches are all
+// full-bleed banners with `min-height: 387px` (breather.component.scss's
+// .matches-breather-block / .breather-block). This port renders a compact
+// 12px-padded card with a 40px icon instead, so none of the sizes below map
+// onto an Angular rule — they are tokenised for consistency only, not verified.
 const spb = StyleSheet.create({
   card: {
     flexDirection:     'row',
@@ -652,7 +658,7 @@ const spb = StyleSheet.create({
   // fontFamily applied inline (langFonts.medium) — see SimplePromoBanner's Text usage.
   title: {
     flex:       1,
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     color:      Colors.textDark,
   },
   cta: {
@@ -665,7 +671,7 @@ const spb = StyleSheet.create({
   },
   // fontFamily applied inline (langFonts.semiBold) — see SimplePromoBanner's Text usage.
   ctaText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      Colors.white,
   },
 })
@@ -856,6 +862,8 @@ function IdVerifyBanner({ onPress }: { onPress: () => void }) {
   )
 }
 
+// FLAGGED — same as spb above: Angular's IDVERIFY breather (bannerSlot 1010)
+// is a 387px full-bleed banner, not this compact card. Sizes tokenised only.
 const iv = StyleSheet.create({
   card: {
     flexDirection:     'row',
@@ -870,12 +878,12 @@ const iv = StyleSheet.create({
   textCol: { flex: 1 },
   // fontFamily applied inline (langFonts.semiBold) — see IdVerifyBanner's Text usage.
   title: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.textDark,
   },
   // fontFamily applied inline (langFonts.regular) — see IdVerifyBanner's Text usage.
   body: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      Colors.textSecondary,
     marginTop:  2,
   },
@@ -887,7 +895,7 @@ const iv = StyleSheet.create({
   },
   // fontFamily applied inline (langFonts.semiBold) — see IdVerifyBanner's Text usage.
   ctaText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      Colors.white,
   },
 })
@@ -3095,7 +3103,7 @@ const c = StyleSheet.create({
   // hasRealPhoto/isHiddenPhoto cover every branch MatchCard actually takes).
   noPhoto:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   noPhotoIcon: { width: 56, height: 56, opacity: 0.35 },
-  noPhotoText: { fontSize: 14, color: Colors.textMuted },
+  noPhotoText: { fontSize: FontSize.font14, color: Colors.textMuted },
 
   // Angular: .newly-joined posabsolute — uses newly-joined.svg as bg, top-left of photo
   newBadge: {
@@ -3113,7 +3121,7 @@ const c = StyleSheet.create({
   },
   // fontFamily applied inline (langFonts.medium) — see MatchCard's Text usage.
   newBadgeText: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      Colors.white,
   },
 
@@ -3127,7 +3135,7 @@ const c = StyleSheet.create({
   },
   // fontFamily applied inline (langFonts.medium) — see MatchCard's Text usage.
   activityText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.black,
     flex:       1,
   },
@@ -3135,7 +3143,7 @@ const c = StyleSheet.create({
   // Angular: getContentAfterLike() text above Send Interest CTA
   // fontFamily applied inline (langFonts.medium) — see MatchCard's Text usage.
   afterLikeText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.black,
     textAlign:  'center',
     marginBottom: 8,
@@ -3161,7 +3169,7 @@ const c = StyleSheet.create({
   },
   // fontFamily applied inline (langFonts.regular) — see MatchCard's Text usage.
   overlayText: {
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     color:      Colors.white,
     textAlign:  'center',
     lineHeight: 18,
@@ -3191,7 +3199,7 @@ const c = StyleSheet.create({
   },
   // fontFamily applied inline (langFonts.medium) — see MatchCard's Text usage.
   waBtnText: {
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     color:      Colors.white,
   },
 
@@ -3226,7 +3234,7 @@ const c = StyleSheet.create({
   },
   likedIcon: { width: 20, height: 20, flexShrink: 0 },
   // fontFamily applied inline (langFonts.regular) — see MatchCard's Text usage.
-  likedText: { fontSize: 12, color: Colors.likedStripText },
+  likedText: { fontSize: FontSize.font12, color: Colors.likedStripText },
 
   // Angular: d-flex align-center-item mt-12 pl-16 pr-16
   nameRow: {
@@ -3237,7 +3245,7 @@ const c = StyleSheet.create({
     gap:              12,
   },
   // Figma: #000000 — fontFamily applied inline (langFonts.semiBold) — see MatchCard's Text usage.
-  name:       { fontSize: 18, color: '#000000' },
+  name:       { fontSize: FontSize.font18, color: '#000000' },
   iconBtn:    { flexShrink: 0 },
   nameRowIcon:  { width: 24, height: 24 },
   nameRowIconWa:{ width: 28, height: 28 },
@@ -3246,7 +3254,7 @@ const c = StyleSheet.create({
   // Figma: solid #000000; the "|" separators alone drop to 20% opacity
   // fontFamily applied inline (langFonts.regular) — see MatchCard's Text usage.
   basicView: {
-    fontSize:         14,
+    fontSize:         FontSize.font14,
     color:            '#000000',
     lineHeight:       20,
     marginTop:        4,
@@ -3265,7 +3273,7 @@ const c = StyleSheet.create({
   },
   // fontFamily applied inline (langFonts.medium) — see MatchCard's Text usage.
   viewProfileText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.link,
   },
   viewProfileArrow: { width: 20, height: 16 },
@@ -3309,7 +3317,7 @@ const c = StyleSheet.create({
     borderRadius:   8,
   },
   // fontFamily applied inline (langFonts.regular) — see MatchCard's Text usage.
-  ctaDontShowText: { fontSize: 14, color: '#545454' },
+  ctaDontShowText: { fontSize: FontSize.font14, color: '#545454' },
 
   ctaViewLater: {
     flex:           1,
@@ -3323,7 +3331,7 @@ const c = StyleSheet.create({
     borderRadius:   8,
   },
   // fontFamily applied inline (langFonts.regular) — see MatchCard's Text usage.
-  ctaViewLaterText: { fontSize: 14, color: '#545454' },
+  ctaViewLaterText: { fontSize: FontSize.font14, color: '#545454' },
 
   // Angular: button-revamp.component.scss:13-21 — `ion-button[disabled]` only
   // overrides background (#e6e6e6) and text (#8A8A8A) via `--background`/
@@ -3357,7 +3365,7 @@ const c = StyleSheet.create({
     pointerEvents: 'none',
   },
   // fontFamily applied inline (langFonts.semiBold) — see MatchCard's Text usage.
-  ctaLikeText: { fontSize: 14, color: Colors.white },
+  ctaLikeText: { fontSize: FontSize.font14, color: Colors.white },
 
   // Angular: matches-cta-bg-color (pink gradient) + "Send Interest" primary CTA
   afterLikeRow: {
@@ -3394,7 +3402,7 @@ const c = StyleSheet.create({
     gap:             8,
   },
   ctaMessageText: {
-    fontSize: 14,
+    fontSize: FontSize.font14,
     color:    Colors.primaryDark,
   },
   ctaSendInterestIconBox: {
@@ -3406,7 +3414,7 @@ const c = StyleSheet.create({
   },
   // fontFamily applied inline (langFonts.medium) — see MatchCard's Text usage.
   ctaSendInterestText: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.white,
     lineHeight: 20,
   },
@@ -3420,15 +3428,34 @@ const c = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical:   2,
   },
+  // Angular: matches-card.component.html:227 `free textcta-medium-12
+  // black-color` — global.scss:2270 = var(--font12) + --english-medium-poppins.
+  // Size was 10.
+  //
+  // FLAGGED, colour + container left alone: Angular's `.free` is not a chip at
+  // all — it's a background-image ribbon (free-rectangle.svg, positioned
+  // absolute at top:-1vmin/right:-1.9vmin) plus a `.free-extra` black CSS
+  // triangle (matches-card.component.scss:192-215). This port renders a green
+  // rounded pill (badgeNewBg/badgeNewText) instead, so Angular's `black-color`
+  // text isn't transferable without porting the ribbon too.
   // fontFamily applied inline (langFonts.semiBold) — see MatchCard's Text usage.
   freeBadgeText: {
-    fontSize:   10,
+    fontSize:   FontSize.font12,
     color:      Colors.badgeNewText,
   },
+  // Angular: matches-card.component.html:269 `body3-regular-12 black-color
+  // contacts-count-reduce` — global.scss:2264 = var(--font12) +
+  // --english-regular-poppins, and black-color = #000000. Was 11px/#666666.
+  //
+  // FLAGGED, not added: `.contacts-count-reduce`
+  // (matches-card.component.scss:230-238) also gives this line a container —
+  // width 100%, max-width 328px, height 24px, a horizontal
+  // linear-gradient(90deg, transparent, #FFF9E6 50%, transparent) and 1px
+  // top/bottom borders. This port renders bare centred text with no such band.
   // fontFamily applied inline (langFonts.regular) — see MatchCard's Text usage.
   contactsLeftText: {
-    fontSize:   11,
-    color:      Colors.textSecondary,
+    fontSize:   FontSize.font12,
+    color:      '#000000',
     textAlign:  'center',
     marginTop:  8,
   },
@@ -3483,8 +3510,8 @@ const e = StyleSheet.create({
   // rather than black. Not touching fontSize either since it looks tuned to fit
   // this fixed 52px circle rather than a straight port of 14/12.
   // fontFamily applied inline (langFonts.semiBold/.regular) — see ExtendedMatchesCard's Text usage.
-  countNum:   { fontSize: 13, color: Colors.white, lineHeight: 16 },
-  countLabel: { fontSize: 10, color: Colors.white, lineHeight: 13 },
+  countNum:   { fontSize: FontSize.font13, color: Colors.white, lineHeight: 16 },
+  countLabel: { fontSize: FontSize.font10, color: Colors.white, lineHeight: 13 },
   // Angular: end-card.component.html — heading1-semibold-20 color-4c4c4c (was
   // mistakenly ported as 18px; Angular's own class is the 20px size).
   title: {

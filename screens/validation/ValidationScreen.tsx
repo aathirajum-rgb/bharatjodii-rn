@@ -56,6 +56,7 @@ import RegistrationSuccessSheet from '../../components/registration-success-shee
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { CDN_SVG } from '../../constants/cdn'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1000,10 +1001,10 @@ const s = StyleSheet.create({
 
   content: { paddingHorizontal: 24, paddingTop: 24 },
   // Angular: icon has mb-24, title heading2-semibold-18 with mb-32
-  title: { fontSize: 18, fontWeight: '600', color: '#1f1e1b', marginTop: 24, marginBottom: 32, lineHeight: 24 },
+  title: { fontSize: FontSize.font18, fontWeight: '600', color: '#1f1e1b', marginTop: 24, marginBottom: 32, lineHeight: 24 },
 
   // Angular: .font-14-semibold black-color, mt-32 above the home-town pills
-  sectionLabel: { marginTop: 8, marginBottom: 12, fontSize: 14, fontWeight: '600', color: Colors.textPrimary },
+  sectionLabel: { marginTop: 8, marginBottom: 12, fontSize: FontSize.font14, fontWeight: '600', color: Colors.textPrimary },
 
   // Angular: .gender-pill-group / .gender-pill — reused verbatim for the
   // home-town Yes/No toggle in the same template.
@@ -1027,14 +1028,14 @@ const s = StyleSheet.create({
     borderLeftColor: Colors.white, borderBottomColor: Colors.white,
     transform: [{ rotate: '-50deg' }], marginTop: -3,
   },
-  pillText: { fontSize: 14, fontWeight: '400', lineHeight: 16, color: Colors.textPrimary },
+  pillText: { fontSize: FontSize.font14, fontWeight: '400', lineHeight: 16, color: Colors.textPrimary },
   pillTextSelected: { fontWeight: '500' },
 
   homeLocationFields: { marginTop: 24 },
 
   // Angular: mt-12 body2-regular-14 black-color under the DOB row
   ageStatement: {
-    marginTop: 12, marginBottom: 12, fontSize: 14, lineHeight: 20,
+    marginTop: 12, marginBottom: 12, fontSize: FontSize.font14, lineHeight: 20,
     color: Colors.textPrimary,
   },
 
@@ -1046,8 +1047,8 @@ const s = StyleSheet.create({
     height: 48, borderWidth: 1, borderColor: Colors.inputBorder, borderRadius: 8,
     paddingHorizontal: 16, marginBottom: 20, justifyContent: 'center',
   },
-  ageLabel: { position: 'absolute', left: 12, top: -9, backgroundColor: Colors.white, paddingHorizontal: 4, fontSize: 11, color: Colors.inputBorder },
-  ageInput: { fontSize: 14, fontWeight: '500', color: Colors.textPrimary },
+  ageLabel: { position: 'absolute', left: 12, top: -9, backgroundColor: Colors.white, paddingHorizontal: 4, fontSize: FontSize.font11, color: Colors.inputBorder },
+  ageInput: { fontSize: FontSize.font14, fontWeight: '500', color: Colors.textPrimary },
 
   footer: {
     paddingHorizontal: 24, paddingTop: 12, backgroundColor: Colors.white,
@@ -1058,7 +1059,7 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   submitBtnDisabled: { opacity: 0.5 },
-  submitBtnText: { color: Colors.white, fontSize: 16, fontWeight: '600' },
+  submitBtnText: { color: Colors.white, fontSize: FontSize.font16, fontWeight: '600' },
 
   // Follow-up sheet (mother tongue/caste/subcaste/gothra) — BottomSheet caps
   // its card at 95% of screen height, so the field list scrolls internally
@@ -1075,5 +1076,5 @@ const s = StyleSheet.create({
   },
   underReviewImg: { marginBottom: 24 },
   // Angular heading2-semibold-18 color-1f1e1b, centred
-  underReviewTitle: { fontSize: 18, fontWeight: '600', color: '#1f1e1b', textAlign: 'center' },
+  underReviewTitle: { fontSize: FontSize.font18, fontWeight: '600', color: '#1f1e1b', textAlign: 'center' },
 })

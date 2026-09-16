@@ -18,6 +18,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_REVAMP } from '../../constants/cdn'
 import { PICKER_ITEM_HEIGHT, PICKER_PANEL_WIDTH } from '../../constants/registration.constants'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize } from '../../src/theme/fonts'
 
 // Angular: right-side-panel.component.html:6 — close-icon-gray.svg
 const CDN_CLOSE_ICON = CDN_REVAMP + 'close-icon-gray.svg'
@@ -293,7 +294,7 @@ const styles = StyleSheet.create({
   // Angular: heading4-medium-16 (right-side-panel.component.html:12) —
   // Poppins-Medium, 500, 16px (global.scss:2217-2221)
   headerTitle: {
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     fontWeight: '500',
     color:      Colors.textPrimary,
   },
@@ -313,10 +314,10 @@ const styles = StyleSheet.create({
     backgroundColor:   Colors.surface,
   },
   // Angular: body1-medium-14 (right-side-panel.component.html:20) — Poppins-Medium
-  searchInput:      { flex: 1, fontSize: 14, color: Colors.textPrimary, padding: 0 },
-  searchClear:      { fontSize: 13, color: Colors.scrimLight, padding: 2 },
+  searchInput:      { flex: 1, fontSize: FontSize.font14, color: Colors.textPrimary, padding: 0 },
+  searchClear:      { fontSize: FontSize.font13, color: Colors.scrimLight, padding: 2 },
   emptyBox:         { padding: 32, alignItems: 'center' },
-  emptyText:        { fontSize: 14, color: Colors.scrimLight },
+  emptyText:        { fontSize: FontSize.font14, color: Colors.scrimLight },
   item: {
     flexDirection:     'row',
     alignItems:        'center',
@@ -327,7 +328,7 @@ const styles = StyleSheet.create({
   },
   itemSelected:     { backgroundColor: Colors.radioCheckedBg },
   // Angular: body2-regular-14 (right-side-panel.component.html:41) — Poppins-Regular
-  itemText:         { flex: 1, fontSize: 14, fontWeight: '400', color: Colors.textPrimary },
+  itemText:         { flex: 1, fontSize: FontSize.font14, fontWeight: '400', color: Colors.textPrimary },
 
   // ── Grouped sections (education detail) ──────────────────────────────────
   // Angular: .grouped-category-heading { margin-top: 24px } / :first-child
@@ -338,5 +339,5 @@ const styles = StyleSheet.create({
     paddingVertical:   8,
   },
   groupHeaderFirst: { marginTop: 0 },
-  groupHeaderText:  { fontSize: 14, fontWeight: '700', color: Colors.textPrimary },
+  groupHeaderText:  { fontSize: FontSize.font14, fontWeight: '700', color: Colors.textPrimary },
 })

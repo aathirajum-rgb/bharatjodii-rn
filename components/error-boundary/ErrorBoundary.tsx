@@ -6,6 +6,7 @@
 import { Component, type ReactNode } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import { logCrash } from '../../utils/crashLogger'
+import { FontSize } from '../../src/theme/fonts'
 
 interface Props {
   children: ReactNode
@@ -41,6 +42,6 @@ export class ErrorBoundary extends Component<Props, State> {
 
 const styles = StyleSheet.create({
   container: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, backgroundColor: '#fff' },
-  title: { fontSize: 18, fontWeight: '600', marginBottom: 8, color: '#222' },
-  message: { fontSize: 14, color: '#666', textAlign: 'center' },
+  title: { fontSize: FontSize.font18, fontWeight: '600', marginBottom: 8, color: '#222' },
+  message: { fontSize: FontSize.font14, color: '#666', textAlign: 'center' },
 })

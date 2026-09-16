@@ -11,7 +11,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import type { PickedChatAttachment } from '../../service/chatMediaService'
 
 const BACK_ICON_URI = CDN_SVG + 'arrow-back-activity.svg'
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   backBtn: { padding: 4 },
   // Angular: `.color-333333 heading4-medium-16` — Poppins-MEDIUM (not
   // semibold), #333333 (not white — there's no dark backdrop to sit on).
-  headerTitle: { fontFamily: Fonts.poppinsMedium, fontSize: 16, color: Colors.textDark },
+  headerTitle: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font16, color: Colors.textDark },
 
   // Angular: the media box sits in a `pl-24 pr-24 mt-24` row.
   previewArea: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
@@ -109,5 +109,5 @@ const styles = StyleSheet.create({
   },
   sendBtnDisabled: { opacity: 0.6 },
   // Angular: `white-color body1-medium-14` — 14px (not 15), Poppins-Medium, white.
-  sendBtnLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.white },
+  sendBtnLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: FontSize.font14, color: Colors.white },
 })

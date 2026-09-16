@@ -11,7 +11,7 @@ import { Animated, Dimensions, Modal, StyleSheet, Text } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_LOTTIE } from '../../constants/cdn'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 
 const SCREEN_H      = Dimensions.get('window').height
 const LOTTIE_URL    = CDN_LOTTIE + 'success-new.json'
@@ -122,14 +122,14 @@ const s = StyleSheet.create({
   },
   title: {
     fontFamily:   Fonts.poppinsSemiBold,
-    fontSize:     20,
+    fontSize:     FontSize.font20,
     color:        '#1f1e1b',
     lineHeight:   28,
     marginBottom: 8,
   },
   subtitle: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      '#1f1e1b',
   },
 })

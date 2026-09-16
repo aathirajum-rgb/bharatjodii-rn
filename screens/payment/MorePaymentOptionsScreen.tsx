@@ -19,7 +19,7 @@ import { Colors } from '../../constants/colors'
 import { CDN, CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import LinkCTA from '../../components/link-cta/LinkCTA'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import { useNetwork } from '../../contexts/NetworkContext'
 import {
@@ -288,7 +288,7 @@ const s = StyleSheet.create({
   // regular-poppins at font20 (20px), color gray-color1 #1f1e1b (not semibold
   // 16px black).
   headerTitle: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 20, color: '#1f1e1b',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font20, color: '#1f1e1b',
     marginLeft: 16, flex: 1,
   },
 
@@ -318,7 +318,7 @@ const s = StyleSheet.create({
     width: 32, height: 32, alignItems: 'center', justifyContent: 'center',
   },
   // Angular: .payment-mode-labels ion-label — color #1F1F1F (not pure black).
-  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 16, color: '#1F1F1F' },
+  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font16, color: '#1F1F1F' },
 
   helpline: { marginTop: 32 },
 
@@ -327,14 +327,14 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.borderSubtle,
   },
   qrTitle: {
-    fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.black, textAlign: 'center',
+    fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: Colors.black, textAlign: 'center',
   },
   qrImageWrap: { padding: 8, backgroundColor: Colors.white, borderRadius: 8 },
   // Angular: .qr-3-sub (more-payment-option.page.scss) — color #1f1f1f, the
   // same dark near-black used for rowLabel above, not the lighter
   // textSecondary grey (#666666).
   qrNote: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 13, color: '#1F1F1F',
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font13, color: '#1F1F1F',
     textAlign: 'center', lineHeight: 20,
   },
   whatsappBtn: {
@@ -342,14 +342,14 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.borderNeutral, borderRadius: 24,
     paddingVertical: 10, paddingHorizontal: 20,
   },
-  whatsappLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.black },
+  whatsappLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: FontSize.font14, color: Colors.black },
 
   payLinkRow: {
     marginTop: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     paddingVertical: 16, paddingHorizontal: 16, borderRadius: 12,
     borderWidth: 1, borderColor: Colors.borderSubtle,
   },
-  payLinkLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  payLinkLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
 
   // Angular: .bottom-right-design — position fixed, right 0, bottom 0,
   // z-index -1. Same SVG/treatment as CardPaymentScreen's footer rangoli.

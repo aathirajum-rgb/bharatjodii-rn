@@ -16,6 +16,7 @@ import { useTranslation } from 'react-i18next'
 import { Colors } from '../../constants/colors'
 import { CDN_LOTTIE } from '../../constants/cdn'
 import CdnLottie from '../CdnLottie'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -205,13 +206,13 @@ const styles = StyleSheet.create({
     gap:           16,
   },
   uploadingText: {
-    fontSize:   18,
+    fontSize:   FontSize.font18,
     fontWeight: '600',
     color:      Colors.textPrimary,
   },
 
   title: {
-    fontSize:     18,
+    fontSize:     FontSize.font18,
     fontWeight:   '600',
     color:        Colors.textPrimary,
     marginBottom: 16,
@@ -228,7 +229,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   approvedHeader: {
-    fontSize:      14,
+    fontSize:      FontSize.font14,
     fontWeight:    '600',
     color:         Colors.discountGreen,
     marginBottom:  16,
@@ -253,7 +254,7 @@ const styles = StyleSheet.create({
   },
 
   rejectedHeader: {
-    fontSize:      14,
+    fontSize:      FontSize.font14,
     fontWeight:    '600',
     color:         Colors.inputError,
     marginBottom:  12,
@@ -294,12 +295,12 @@ const styles = StyleSheet.create({
     gap:  2,
   },
   reasonTitle: {
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     fontWeight: '600',
     color:      Colors.inputError,
   },
   reasonSubtitle: {
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      Colors.textPrimary,
     lineHeight: 16,
   },
@@ -313,7 +314,7 @@ const styles = StyleSheet.create({
     marginBottom:    16,
   },
   primaryBtnLabel: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '600',
     color:      Colors.white,
   },
@@ -321,7 +322,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   laterText: {
-    fontSize: 14,
+    fontSize: FontSize.font14,
     color:    Colors.textDark,
   },
 })

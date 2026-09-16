@@ -18,6 +18,7 @@ import ButtonRevamp from '../button-revamp/ButtonRevamp'
 import { clickingOnBtn } from '../../service/buttonService'
 import { getItem } from '../../service/storageService'
 import { CDN_SVG } from '../../constants/cdn'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -537,7 +538,7 @@ const styles = StyleSheet.create({
     gap:           8,
   },
   menuText: {
-    fontSize: 14,
+    fontSize: FontSize.font14,
     color:    Colors.textPrimary,
   },
 
@@ -548,7 +549,7 @@ const styles = StyleSheet.create({
     gap:           8,
   },
   textRowLabel: {
-    fontSize: 14,
+    fontSize: FontSize.font14,
     color:    Colors.textPrimary,
   },
 

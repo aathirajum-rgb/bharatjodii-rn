@@ -3,9 +3,23 @@
 // and the user hasn't locally dismissed it this session (homeGating.ts's
 // computeShowAssistBanner). Content comes from paymentService.getMenuPromo()'s
 // ASSISTEDPROMO fields.
+//
+// ⚠️ NO LIVE ANGULAR VISUAL TO MATCH. explore.component.html:19-21 renders
+// <app-breather [bannerSlot]="'1001'" [assistFlag]="assistFlag">, and for exactly
+// that pair breather.component.ts:86-91 sets breatherType = 'ASSIST' — but
+// breather.component.html has NO *ngIf branch for 'ASSIST' (it only handles
+// 'PCS', 'PAYMENT', 'ADDPHOTO', 'ADDPHOTOPAID'/'IDVERIFY'; the string "ASSIST"
+// does not appear in that template at all). The .assist-breather-block /
+// .assisted-benefits / .assist-header rules in breather.component.scss are
+// likewise referenced by no markup. So on web this renders nothing inside
+// explore.component.scss's .assist-block { min-height: 387px } box.
+//
+// Every size/colour below is therefore this port's own — there is no Angular
+// value to cite or correct. Sizes are tokenised for consistency only; do NOT
+// treat them as verified against Angular.
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 export interface AssistBannerContent {
   title:    string
@@ -49,18 +63,18 @@ const s = StyleSheet.create({
     zIndex:   1,
   },
   closeText: {
-    fontSize: 16,
+    fontSize: FontSize.font16,
     color:    Colors.textSecondary,
   },
   title: {
     fontFamily:   Fonts.poppinsSemiBold,
-    fontSize:     15,
+    fontSize:     FontSize.font15,
     color:        Colors.textPrimary,
     paddingRight: 20,
   },
   body: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     color:      Colors.textSecondary,
   },
   cta: {
@@ -73,7 +87,7 @@ const s = StyleSheet.create({
   },
   ctaText: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     color:      Colors.white,
   },
 })

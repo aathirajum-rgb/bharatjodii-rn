@@ -211,7 +211,10 @@ export type AppStackParamList = {
   IgnoredProfiles: undefined
   ViewLater: undefined
   SearchById: undefined
-  EditProfile: undefined
+  // openPhotoPicker: set by the Photo Guidelines screen's "Continue to upload
+  // photo" CTA (Angular: callNative('registrationAddPhoto')) so returning to
+  // this screen opens its gallery picker.
+  EditProfile: { openPhotoPicker?: boolean } | undefined
   EditProfileReligious: undefined
   EditProfileProfessional: undefined
   EditProfileBasic: undefined
@@ -253,7 +256,9 @@ export type AppStackParamList = {
   // Angular: pages/addphoto-intermediate/:page — webview.page.ts's page_id "23"
   // (CONGRATS) plus drService.ts's handleAfterDr() cases 27/59/60 (ADDPHOTO/
   // ADDPHOTOPUBLISH).
-  'addphoto-intermediate': { page?: string } | undefined
+  // 'showguidelines' (Photo Guidelines, reached from Edit Profile's
+  // "View Photo Guidelines" link) carries Angular's own frm_page query param.
+  'addphoto-intermediate': { page?: string; frm_page?: string } | undefined
   // Angular: pages/blockerpage — webview.page.ts's page_id "51" (fraud blocker)
   BlockerPage: undefined
   // Angular: components/validation — webview.page.ts's page_id "61" (AI profile

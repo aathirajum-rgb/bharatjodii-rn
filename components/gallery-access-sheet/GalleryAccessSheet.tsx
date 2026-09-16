@@ -7,6 +7,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { FontSize } from '../../src/theme/fonts'
 
 // Angular: auto-start.component.html's close icon — Ionic's "close-outline",
 // top-right of the sheet (ion-col class="text-align-right pr-16 pt-16").
@@ -202,7 +203,7 @@ const styles = StyleSheet.create({
   // line-height set (browser default "normal" for Poppins ≈ 1.2×) — 26,
   // not the 28/18 both used before.
   title: {
-    fontSize:     22,
+    fontSize:     FontSize.font22,
     fontWeight:   '600',
     color:        '#1f1e1b',
     lineHeight:   26,
@@ -212,7 +213,7 @@ const styles = StyleSheet.create({
   // the title, then "mt-24" before the CTA. No explicit line-height in
   // Angular either — 18 (≈1.3×14), not 20.
   body: {
-    fontSize:     14,
+    fontSize:     FontSize.font14,
     fontWeight:   '400',
     color:        '#1f1e1b',
     lineHeight:   18,
@@ -232,7 +233,7 @@ const styles = StyleSheet.create({
     height:          44,
   },
   ctaLabel: {
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      Colors.white,
     textAlign:  'center',

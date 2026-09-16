@@ -17,6 +17,7 @@ import { useTranslation } from 'react-i18next'
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import { Fonts, FontSize } from '../../src/theme/fonts'
 import { CDN_REACT } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
@@ -213,14 +214,28 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: '500', color: '#333333', marginLeft: 6, marginRight: 16 },
+  // App-wide screen-header convention (16/Medium/#333333), not Angular's own
+  // edit-profile header (`heading1-semibold-20 black-color`) — kept so this
+  // screen's header matches every other stack screen.
+  headerTitle: {
+    flex: 1, fontSize: FontSize.font16, fontFamily: Fonts.poppinsMedium,
+    color: '#333333', marginLeft: 6, marginRight: 16,
+  },
 
   content: { paddingHorizontal: 24, paddingTop: 32 },
-  heading: { fontSize: 20, fontWeight: '600', color: Colors.black, marginBottom: 24 },
+  // Same section heading as the Edit Profile hub's section titles — Angular:
+  // `heading-03-bold-20 color-333333` (edit-profile.page.html:335, 670, 896,
+  // 971) = var(--font20) + var(--heading-03-*-Bold) (Poppins-Bold) + #333333.
+  heading: {
+    fontSize: FontSize.font20, fontFamily: Fonts.poppinsBold,
+    color: Colors.textDark, marginBottom: 24,
+  },
 
   submitBtn: {
     height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center', marginTop: 12,
   },
-  submitBtnText: { color: Colors.white, fontSize: 14, fontWeight: '500' },
+  // Angular primary CTA copy: `primary-cta-jodii body1-medium-14 white-color`
+  // = var(--font14) + --english-medium-poppins (Poppins-Medium) + #ffffff.
+  submitBtnText: { color: Colors.white, fontSize: FontSize.font14, fontFamily: Fonts.poppinsMedium },
 })

@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   },
   checkmark: {
     color:      Colors.white,
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     fontWeight: '700',
     lineHeight: 16,
   },

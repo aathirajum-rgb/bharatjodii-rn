@@ -258,6 +258,79 @@ export async function getRejectReasons(force = false): Promise<Record<string, Re
   return {}
 }
 
+// ─────────────────────────────────────────────────────────────
+//  PHOTO GUIDELINES  (server copy + illustration grid)
+//  Angular: pages/addphoto-intermediate/addphoto-intermediate.page.ts's
+//  callphotoRejection() — POST initialfetch with
+//  `type=PHOTOREJECTION&LANG=<lang>&ccode=<MCODE>`. Drives both the
+//  'showguidelines' and 'photorejection' variants of that page; only
+//  'showguidelines' is wired up so far (see AddPhotoIntermediateScreen.tsx).
+//
+//  Verified against the live staging response: RESPONSE.PHOTOGUIDELINE carries
+//  TITLE / NOTE / CTA / LINK_CTA / TITLE2 / BOTTOM_SHEET_TITLE plus a GUIDELINES
+//  array of six { MIMG, FIMG, REASON } entries (Blurred photo, Watermark, Side
+//  face, Irrelevant photo, Contact details, Group photo). MIMG/FIMG are absolute
+//  URLs on a different host than EnvConfig.image, so they are used verbatim.
+// ─────────────────────────────────────────────────────────────
+
+export interface PhotoGuidelineItem {
+  maleImg:   string
+  femaleImg: string
+  reason:    string
+}
+
+export interface PhotoGuidelines {
+  title:   string
+  note:    string
+  cta:     string
+  linkCta: string
+  items:   PhotoGuidelineItem[]
+}
+
+const GUIDELINES_KEY = 'PHOTO_GUIDELINES'
+
+// Cache-then-network, same shape as getRejectReasons above: a cached copy is
+// returned immediately on a later visit, and a failed fetch falls back to it
+// rather than rendering an empty page. Cached per language, because the server
+// localises TITLE/NOTE/REASON via the LANG param.
+export async function fetchPhotoGuidelines(): Promise<PhotoGuidelines | null> {
+  const [lang, mCode] = await Promise.all([
+    getItem(SK.Auth.LANG),
+    getItem(SK.User.MEMBER_CODE),
+  ])
+  const activeLang = lang ?? 'en'
+  const cacheKey   = `${GUIDELINES_KEY}_${activeLang}`
+
+  const parseCached = async (): Promise<PhotoGuidelines | null> => {
+    const cached = await getItem(cacheKey)
+    if (!cached) return null
+    try { return JSON.parse(cached) } catch { return null }
+  }
+
+  try {
+    const params = `type=PHOTOREJECTION&LANG=${activeLang}&ccode=${mCode ?? '91'}`
+    const res = await apiCall(Endpoints.registration.initialFetch, 'POST', params)
+    const g = res?.RESPONSE?.PHOTOGUIDELINE
+    if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0 && g) {
+      const parsed: PhotoGuidelines = {
+        title:   String(g.TITLE    ?? ''),
+        note:    String(g.NOTE     ?? ''),
+        cta:     String(g.CTA      ?? ''),
+        linkCta: String(g.LINK_CTA ?? ''),
+        items: (Array.isArray(g.GUIDELINES) ? g.GUIDELINES : []).map((it: any) => ({
+          maleImg:   String(it?.MIMG   ?? ''),
+          femaleImg: String(it?.FIMG   ?? ''),
+          reason:    String(it?.REASON ?? ''),
+        })).filter((it: PhotoGuidelineItem) => !!it.reason),
+      }
+      await setItem(cacheKey, JSON.stringify(parsed))
+      return parsed
+    }
+  } catch {}
+
+  return parseCached()
+}
+
 // Android: PhotoUtils.mapError — trims the title's trailing period, joins with the
 // subtitle, falls back to "UNKNOWN__" then a generic message.
 export function describeRejection(

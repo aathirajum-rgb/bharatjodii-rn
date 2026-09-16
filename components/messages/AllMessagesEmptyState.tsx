@@ -10,7 +10,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 interface Props {
   variant:    'paywall' | 'empty'
@@ -54,12 +54,15 @@ const styles = StyleSheet.create({
   // Angular: `heading3-semibold-16 black-color` — pure #000000, not textPrimary.
   title: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     color:      Colors.black,
     textAlign:  'center',
   },
-  // Angular: `.paid-membership` (button-revamp.component.scss) — full-width,
-  // fixed 44px height, not just vertical padding around the label.
+  // Angular: `.paid-membership` — button-revamp.component.scss:443 is the real
+  // rule (note there is ALSO a "paid-membership" key in the $imageUrl icon map
+  // at :361, which is an icon path, not styling): height 44px !important,
+  // width 100%, border-radius 8px, --padding-start/end 24px. All four match
+  // the values below exactly.
   btn: {
     width:             '100%',
     height:            44,
@@ -75,7 +78,7 @@ const styles = StyleSheet.create({
   // MessagerListScreen.tsx's own emptyBtnLabel for the phoneviews empty state).
   btnLabel: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   14,
+    fontSize:   FontSize.font14,
     color:      Colors.black,
   },
 })

@@ -10,7 +10,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { Colors } from '../../constants/colors'
 import { CDN, CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../cdn-svg/CdnSvg'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { type PaymentFailedDetail, type PaymentMethodItem } from '../../service/paymentService'
 
 // Angular: payment-failed.page.html:171 — confirmed real asset path, used
@@ -128,11 +128,11 @@ const s = StyleSheet.create({
   container: { width: '100%', alignItems: 'center' },
   icon:      { marginBottom: 16 },
   title: {
-    fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black,
+    fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, color: Colors.black,
     textAlign: 'center', marginBottom: 8,
   },
   subtitle: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black,
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black,
     textAlign: 'center', lineHeight: 20, marginBottom: 16,
   },
 
@@ -141,8 +141,8 @@ const s = StyleSheet.create({
     backgroundColor: '#F2FFF6', borderWidth: 1, borderColor: '#D7EFDF', borderRadius: 8,
     paddingHorizontal: 16, paddingVertical: 8, marginBottom: 16,
   },
-  timerValue: { fontFamily: Fonts.poppinsSemiBold, fontSize: 24, color: Colors.black },
-  timerUnit:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
+  timerValue: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font24, color: Colors.black },
+  timerUnit:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.black },
 
   priceBox: {
     width: '100%', borderRadius: 12, padding: 12, marginBottom: 16,
@@ -151,23 +151,23 @@ const s = StyleSheet.create({
   },
   priceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   priceRowLeft: { flexDirection: 'row', alignItems: 'baseline', gap: 4 },
-  packageName:     { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 14, color: Colors.black },
-  packageDuration: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: '#545454' },
-  amount:          { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  packageName:     { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: FontSize.font14, color: Colors.black },
+  packageDuration: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: '#545454' },
+  amount:          { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.black },
 
-  discountLabel:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.black },
-  discountAmount: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 12, color: Colors.discountGreen },
+  discountLabel:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.black },
+  discountAmount: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.discountGreen },
 
   bonusBox: {
     backgroundColor: '#F5DCE2', borderWidth: 1, borderColor: '#F5DCE2', borderRadius: 8,
     padding: 8, gap: 4,
   },
-  bonusLabel: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: 12, color: Colors.black },
-  bonusTotal: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  bonusLabel: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: FontSize.font12, color: Colors.black },
+  bonusTotal: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
 
   priceDivider: { height: 1, backgroundColor: Colors.divider },
-  totalLabel:   { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
-  totalAmount:  { fontFamily: Fonts.poppinsSemiBold, fontSize: 14, color: Colors.black },
+  totalLabel:   { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.black },
+  totalAmount:  { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.black },
 
   methodsCard: {
     width: '100%', backgroundColor: Colors.white, borderRadius: 12,
@@ -181,8 +181,8 @@ const s = StyleSheet.create({
     minHeight: 56, paddingVertical: 12,
   },
   rowLeft:  { flexDirection: 'row', alignItems: 'center', gap: 12, flexShrink: 1 },
-  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black },
+  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
 
   otherModesBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 8 },
-  otherModesText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.link },
+  otherModesText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.link },
 })

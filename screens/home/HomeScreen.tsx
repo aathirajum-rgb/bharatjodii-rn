@@ -2380,16 +2380,20 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 7,
   },
-  // Angular: --indicator-box-shadow: 0 0 5px rgba(0, 0, 0, 0.16) — an even glow
-  // with no offset, not the softer offset shadow this used.
+  // --indicator-box-shadow: 0 0 5px rgba(0, 0, 0, 0.16) — an even glow with no
+  // offset. NOTE: that is Ionic's own segment-button.ios.css :host default, NOT
+  // an app rule (app-swiper.component.scss never sets it); the value is right,
+  // it just isn't declared in this project. Same source as tabPill's
+  // --border-radius: 7px and min-height: 28px below.
   tabPillActive:      { backgroundColor: Colors.white, shadowColor: Colors.shadow, shadowOpacity: 0.16, shadowRadius: 5, shadowOffset: { width: 0, height: 0 }, elevation: 2 },
   // Angular: --color: #000000 (unselected) at body3-regular-12; --color-checked:
   // #8B4800 (a brown) at body1-medium-14 — the selected tab is a size up, and
   // neither color is the generic text token this used.
   // body3-regular-12's font-size is var(--font12) — 0.75rem, dynamic (see
-  // FontSize's header comment); lineHeight:17 has no Angular class behind
-  // it (an unselected ion-segment-button gets no explicit line-height there),
-  // kept as an existing tuned value.
+  // FontSize's header comment). lineHeight 17 DOES have a source, contrary to
+  // an earlier note here: app-swiper.component.scss:1073 sets
+  // `ion-segment-button ion-label { line-height: 1.4 }`, and 1.4 x 12 = 16.8
+  // ≈ 17. The active pill's 20 is the same rule at 14 (1.4 x 14 = 19.6).
   tabPillText:        { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 17, color: '#000000', textAlign: 'center' },
   // global.scss's .body1-medium-14 is --english-medium-poppins @ var(--font14)
   // (0.875rem, dynamic), i.e. Poppins-Medium — SemanticFontsEnglish has no

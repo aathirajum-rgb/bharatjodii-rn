@@ -9,7 +9,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native'
 import ProfilePhoto from '../profile-photo/ProfilePhoto'
 import BasicInfoLine from './BasicInfoLine'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // Shared with SelectableProfileCardDesktop.tsx, which renders the "|"
 // separators dimmed and so needs the raw parts rather than a joined string.
@@ -65,21 +65,27 @@ const s = StyleSheet.create({
     gap:             12,
     backgroundColor: Colors.surface,
     borderRadius:    12,
+    // Angular: .list-view-card (list-view-card.component.scss:9-13) —
+    // `box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.12)`. Offset/radius/radius-12
+    // already matched; the opacity was 0.08.
     shadowColor:     Colors.shadow,
     shadowOffset:    { width: 0, height: 6 },
-    shadowOpacity:   0.08,
+    shadowOpacity:   0.12,
     shadowRadius:    16,
     elevation:       3,
   },
+  // FLAGGED: Angular's text column is `offset="0.5"` (4.17% of the row) +
+  // `pl-8`, and the basicView div carries `pr-16` when showCheckbox is set —
+  // 16, not the 24 here.
   info: { flex: 1, paddingRight: 24 },
   name: {
     fontFamily: Fonts.poppinsSemiBold,
-    fontSize:   16,
+    fontSize:   FontSize.font16,
     color:      Colors.black,
   },
   basicLine: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     lineHeight: 16,
     color:      Colors.black,
     marginTop:  4,
@@ -101,9 +107,14 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primaryDark,
     borderColor:     Colors.primaryDark,
   },
+  // FLAGGED — bare fontWeight with no fontFamily, so this glyph falls back to
+  // the OS system font (this app registers Poppins as four separate named
+  // families). Angular doesn't draw a text tick at all: ion-checkbox renders
+  // its own ::part(mark), scaled 0.7 (list-view-card.component.scss:39-45), so
+  // there is no font to port. Size tokenised only.
   checkmark: {
     color:      Colors.white,
-    fontSize:   12,
+    fontSize:   FontSize.font12,
     fontWeight: '700',
   },
 })

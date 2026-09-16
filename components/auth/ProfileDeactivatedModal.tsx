@@ -10,7 +10,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { WhatsAppIcon } from '../matches/matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import { CDN, CDN_SVG } from '../../constants/cdn'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 
 const ICON_CLOSE = CDN_SVG + 'revamp/close-icon.svg'
 const ICON_CALL  = CDN + 'call-white.svg'
@@ -92,18 +92,18 @@ const s = StyleSheet.create({
     position: 'absolute', top: 16, right: 16, width: 28, height: 28,
     alignItems: 'center', justifyContent: 'center',
   },
-  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.black, textAlign: 'center' },
-  body:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.black, lineHeight: 20, textAlign: 'center' },
+  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, color: Colors.black, textAlign: 'center' },
+  body:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, lineHeight: 20, textAlign: 'center' },
 
   ctaRow: { gap: 12, marginTop: 8 },
   callBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
   },
-  callBtnText:     { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.white },
+  callBtnText:     { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: FontSize.font14, color: Colors.white },
   whatsappBtn: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
     height: 44, borderRadius: 8, borderWidth: 1, borderColor: '#25D366',
   },
-  whatsappBtnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: '#128C7E' },
+  whatsappBtnText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: FontSize.font14, color: '#128C7E' },
 })

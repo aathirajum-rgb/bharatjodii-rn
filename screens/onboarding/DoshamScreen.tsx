@@ -329,7 +329,7 @@ const styles = StyleSheet.create({
   },
   yesNoCheckmark: {
     color:      Colors.surface,
-    fontSize:   11,
+    fontSize:   FontSize.font11,
     fontWeight: '700',
   },
 
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryDark,
   },
   checkmark: {
-    fontSize:   13,
+    fontSize:   FontSize.font13,
     fontWeight: '700',
     color:      Colors.white,
     lineHeight: 16,
