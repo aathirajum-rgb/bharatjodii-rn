@@ -1304,7 +1304,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingLeft: 6, paddingRight: 8, paddingTop: 12, paddingBottom: 12,
     backgroundColor: Colors.surface,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.divider,
+    // Angular: .jodii-messages-top-header-bottom (messages.component.scss:97-99)
+    // — border-bottom: 1px solid #e5e5e5, applied to this header row in
+    // messages.component.html:4. Was hairlineWidth (0.33-0.5px on most devices)
+    // in Colors.divider #f0f0f0 — both the width and the colour were off, and
+    // inputBar below already uses a full 1px for its own Angular border.
+    borderBottomWidth: 1, borderBottomColor: '#e5e5e5',
     // ThreeDotMenu.tsx's dropdown is `position: absolute` INSIDE this header —
     // its own zIndex:9999 only ranks it among header's children, not against the
     // FlatList thread below, which paints on top of header (Android sibling
@@ -1489,7 +1494,10 @@ const styles = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center', gap: 16,
     paddingTop: 24, paddingHorizontal: 24,
     backgroundColor: Colors.surface,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#E6E6E6',
+    // Angular: .jodii-unblock-chat-msg-restriction-block (scss:331-337) —
+    // border-top: 1px solid #E6E6E6. Colour already matched; the width was
+    // hairlineWidth, unlike inputBar's own 1px for the same #E6E6E6 rule.
+    borderTopWidth: 1, borderTopColor: '#E6E6E6',
   },
   // Angular: `.jodii-unblock-chat-msg-restriction-block` (messages.component
   // .scss:331-337) — bg #FAFAFA, distinct from the reported case's white.

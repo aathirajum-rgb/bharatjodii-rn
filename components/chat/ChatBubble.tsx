@@ -42,7 +42,7 @@ const audioStopListeners = new Set<() => void>()
 // unchanged for both sent/received bubbles) driving a wavesurfer.js waveform.
 // wavesurfer isn't ported here (no RN equivalent); a plain progress bar
 // stands in for the waveform, showing the same play position.
-function AudioBubble({ item, isOwnMessage, readStatus, avatarUri, avatarFallbackGender, avatarSize }: { item: ChatMessageItem; isOwnMessage: boolean; readStatus: number; avatarUri?: string | undefined; avatarFallbackGender: 'M' | 'F'; avatarSize: number }) {
+function AudioBubble({ item, isOwnMessage, readStatus, avatarUri, avatarFallbackGender, avatarSize, maxWidth }: { item: ChatMessageItem; isOwnMessage: boolean; readStatus: number; avatarUri?: string | undefined; avatarFallbackGender: 'M' | 'F'; avatarSize: number; maxWidth: number }) {
   const player = useAudioPlayer(item.text)
   const status = useAudioPlayerStatus(player)
 
@@ -82,7 +82,7 @@ function AudioBubble({ item, isOwnMessage, readStatus, avatarUri, avatarFallback
   return (
     <View style={[styles.row, isOwnMessage ? styles.rowOwn : styles.rowPartner]}>
       {!isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} size={avatarSize} />}
-      <View style={[styles.audioBubble, isOwnMessage ? styles.bubbleOwn : styles.bubblePartner]}>
+      <View style={[styles.audioBubble, { maxWidth }, isOwnMessage ? styles.bubbleOwn : styles.bubblePartner]}>
         <Pressable onPress={toggle} hitSlop={8}>
           <CdnSvg uri={CDN + (status.playing ? 'revamp/pause-pink.svg' : 'revamp/play-pink.svg')} width={28} height={28} />
         </Pressable>
@@ -160,6 +160,29 @@ const ChatBubble = memo(function ChatBubble({ item, onPressMedia, oppGender = 'M
   // was previously a fixed 45x45, only coincidentally close at a ~400pt-wide
   // reference device.
   const avatarSize = (Math.min(winW, winH) * 11.12) / 100
+  // Angular: .image-video-send-receive { height: 65vmin; width: 45vmin }
+  // (messages.component.scss:442-445) — VIEWPORT units, so they scale. These
+  // were frozen at 180x260, correct only at the 400pt reference width
+  // (vmin 4 -> 45x4=180, 65x4=260); at 360pt Angular renders 162x234 and at
+  // 430pt 193x280. Same Math.min(winW, winH) basis as avatarSize above.
+  const mediaVmin      = Math.min(winW, winH) / 100
+  const mediaThumbSize = { width: mediaVmin * 45, height: mediaVmin * 65 }
+  // Bubble width cap. This WAS `maxWidth: '72%'` in the stylesheet, which never
+  // applied: a percentage resolves against the parent's width, and the bubble's
+  // parent (`bubbleRow`) is an auto-width flex item with no definite width, so
+  // Yoga drops the constraint entirely. A long unbroken run (e.g. Tamil text,
+  // which has few break opportunities) then grew the bubble past the screen —
+  // leftward, since own-message rows are right-aligned.
+  //
+  // Angular never hits this because each row reserves a hard inset on the far
+  // side: sent rows carry `pl-50` (messages.component.html:126) and received
+  // rows `ion-cust-padding-end` = 24 (html:300). `row` here already spends 12
+  // of that as its own paddingHorizontal, so the extra reserve is 50-12=38 for
+  // own and 24-12=12 for partner. Subtract the avatar and its 6px gap too.
+  // (At 390pt this lands at ~71% own / ~78% partner — i.e. what the old 72%
+  // was aiming for, but actually enforced.)
+  const bubbleMaxWidth = (own: boolean) =>
+    winW - 12 * 2 - avatarSize - 6 - (own ? 38 : 12)
   const avatarUri = item.isOwnMessage ? ownPhoto : partnerPhoto
   // getAvatarFallbackUri's param is "which gender's avatar to show" — for the
   // own-message side that's the LOGGED-IN user's own gender (opposite of
@@ -231,7 +254,7 @@ const ChatBubble = memo(function ChatBubble({ item, onPressMedia, oppGender = 'M
   }
 
   if (item.kind === 'audio') {
-    return <AudioBubble item={item} isOwnMessage={item.isOwnMessage} readStatus={item.readStatus} avatarUri={avatarUri} avatarFallbackGender={avatarFallbackGender} avatarSize={avatarSize} />
+    return <AudioBubble item={item} isOwnMessage={item.isOwnMessage} readStatus={item.readStatus} avatarUri={avatarUri} avatarFallbackGender={avatarFallbackGender} avatarSize={avatarSize} maxWidth={bubbleMaxWidth(item.isOwnMessage)} />
   }
 
   if (item.kind === 'image' || item.kind === 'video') {
@@ -247,17 +270,17 @@ const ChatBubble = memo(function ChatBubble({ item, onPressMedia, oppGender = 'M
           <View style={[styles.bubbleRow, item.isOwnMessage && styles.bubbleRowOwn]}>
             {!item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} size={avatarSize} />}
             <Pressable
-              style={[styles.mediaBubble, item.isOwnMessage ? styles.bubbleOwn : styles.bubblePartner]}
+              style={[styles.mediaBubble, { maxWidth: bubbleMaxWidth(item.isOwnMessage) }, item.isOwnMessage ? styles.bubbleOwn : styles.bubblePartner]}
               onPress={() => onPressMedia?.(item.kind as 'image' | 'video', item.text)}
             >
               {item.kind === 'image' ? (
-                <Image source={{ uri: item.text }} style={styles.mediaThumb} resizeMode="cover" />
+                <Image source={{ uri: item.text }} style={[styles.mediaThumb, mediaThumbSize]} resizeMode="cover" />
               ) : (
                 // Angular: poster="rectangle_bg.svg" — a generic placeholder
                 // rectangle, not an extracted video frame; the play icon is a
                 // small circular badge (`.download-img-block`), not a full-
                 // thumbnail dark tint with a large centered icon.
-                <View style={styles.mediaThumb}>
+                <View style={[styles.mediaThumb, mediaThumbSize]}>
                   <View style={styles.videoPlayBadge}>
                     <CdnSvg uri={CDN + 'play-btn-chat-img.svg'} width={24} height={24} />
                   </View>
@@ -293,7 +316,7 @@ const ChatBubble = memo(function ChatBubble({ item, onPressMedia, oppGender = 'M
       <View style={item.isOwnMessage ? styles.systemColOwn : styles.systemColPartner}>
         <View style={[styles.bubbleRow, item.isOwnMessage && styles.bubbleRowOwn]}>
           {!item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} size={avatarSize} />}
-          <View style={[styles.bubble, item.isOwnMessage ? styles.bubbleOwn : styles.bubblePartner]}>
+          <View style={[styles.bubble, { maxWidth: bubbleMaxWidth(item.isOwnMessage) }, item.isOwnMessage ? styles.bubbleOwn : styles.bubblePartner]}>
             <Text style={[styles.text, item.isOwnMessage ? styles.textOwn : styles.textPartner]}>{bodyText}</Text>
           </View>
           {item.isOwnMessage && <Avatar uri={avatarUri} fallbackGender={avatarFallbackGender} size={avatarSize} />}
@@ -343,7 +366,10 @@ const styles = StyleSheet.create({
   // background color. padding: 14px all sides (not 12h/8v). bubbleOwn/
   // bubblePartner carry background+border directly (not just on `bubble`) so
   // they still apply when combined with mediaBubble/audioBubble instead.
-  bubble: { maxWidth: '72%', paddingHorizontal: 14, paddingVertical: 14 },
+  // maxWidth is supplied per-render from bubbleMaxWidth() — see its comment
+  // above for why the old '72%' never took effect. flexShrink lets the bubble
+  // give way inside the row as a second line of defence.
+  bubble: { flexShrink: 1, paddingHorizontal: 14, paddingVertical: 14 },
   bubbleOwn: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E6E6E6', borderRadius: 12, borderTopRightRadius: 0 },
   bubblePartner: { backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E6E6E6', borderRadius: 12, borderTopLeftRadius: 0 },
 
@@ -467,11 +493,13 @@ const styles = StyleSheet.create({
   // msg-block` wrapper as text (14px padding all around, not 4) — the
   // border/background/notch-radius come from bubbleOwn/bubblePartner
   // applied alongside this in the JSX.
-  mediaBubble: { maxWidth: '65%', padding: 14 },
+  mediaBubble: { flexShrink: 1, padding: 14 },
   // Angular: `.image-video-send-receive { height:65vmin; width:45vmin }` —
   // at this project's 400x800 reference viewport, 180x260 (a tall
   // rectangle), not a 200x200 square.
-  mediaThumb: { width: 180, height: 260, borderRadius: 10, backgroundColor: Colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
+  // Dimensions come from mediaThumbSize (computed per-render above) — Angular's
+  // own 45vmin x 65vmin. Only the non-dimensional bits live here.
+  mediaThumb: { borderRadius: 10, backgroundColor: Colors.surfaceAlt, alignItems: 'center', justifyContent: 'center' },
   // Angular: `.download-img-block` (messages.component.scss:468-480) — a
   // small circular badge (24px icon + 12px padding = 48px), not a large
   // centered icon over a dark full-thumbnail tint.
@@ -485,7 +513,7 @@ const styles = StyleSheet.create({
   // border/background/notch-radius come from bubbleOwn/bubblePartner
   // applied alongside this in the JSX.
   audioBubble: {
-    flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: '78%',
+    flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 1,
     padding: 14,
   },
   audioTrack: { flex: 1, height: 3, borderRadius: 2, backgroundColor: 'rgba(128,128,128,0.35)', overflow: 'hidden' },

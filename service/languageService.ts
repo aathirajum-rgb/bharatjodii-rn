@@ -16,13 +16,35 @@ import { getPPSetData } from './profileService'
 // written, and the array lists are always force-refreshed, so a first-run
 // selection of the default language still persists and still populates.
 export async function submitLanguage(currentLang: string, selectedLang: string): Promise<any> {
-  // Angular: common.removeStorageBasedOnLanguageChangeEvent() — clears the
-  // language-dependent caches (REGISTRATIONARRAYS is not in that list; it gets
-  // overwritten by the forced re-fetch below instead).
+  // Angular: common.removeStorageBasedOnLanguageChangeEvent() (common.ts:1467-
+  // 1487) — clears the language-dependent caches (REGISTRATIONARRAYS is not in
+  // that list; it gets overwritten by the forced re-fetch below instead).
+  //
+  // WHY THIS LIST IS LONG: apiClient appends `&LANG=<current>` to essentially
+  // every request (see buildCommonParams), so ANY cached API response holds
+  // server-translated copy for whatever language was active when it was
+  // fetched. Caching those under language-agnostic keys meant a switch left
+  // promo banners, membership/plan copy, paywall text and PP labels rendering
+  // in the PREVIOUS language until the cache happened to expire. Only
+  // FILTERDATALIST / PPSETDATA / DOMAINLANG were being cleared before; the rest
+  // of Angular's own list is restored here.
   await Promise.all([
     removeItem('FILTERDATALIST'),
-    removeItem(SK.App.PP_SET_DATA),
+    removeItem(SK.App.PP_SET_DATA),          // 'PPSETDATA'
     removeItem('DOMAINLANG'),
+    // Promo / payment copy — all server-translated.
+    removeItem('MENU_PROMO_V2'),             // paymentService's current key
+    removeItem('MENU_PROMO'),                // retired key, cleared for safety
+    removeItem('PAYCONFIG'),
+    removeItem('HERO_BANNER'),               // Angular: HOME_PAY_BANNER
+    removeItem('CONTACT_DETAIL'),
+    // Partner-preference / matches label + count caches.
+    removeItem('SYSTEMSETPP'),
+    removeItem('ISCALLEDAPI'),
+    removeItem('FREEMATCHESTOTALCOUNT'),
+    removeItem('MATCHESPPTOTALCOUNT'),
+    // Daily-recommendation profiles carry translated basic-view strings.
+    removeItem('DR_PROFILES'),
   ])
 
   await setItem('PREVLANGUAGE', currentLang)

@@ -20,7 +20,6 @@ import {
   View,
 } from 'react-native'
 import LottieView from 'lottie-react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import CdnLottie from '../../components/CdnLottie'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
