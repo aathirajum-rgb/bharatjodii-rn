@@ -24,7 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish, FontSize, RupeeSymbolFont } from '../../src/theme/fonts'
 import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
-import { handleBack } from '../../utils/navigationRef'
+import { handleBack, resetTo } from '../../utils/navigationRef'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import CdnLottie from '../../components/CdnLottie'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
@@ -150,7 +150,12 @@ export default function RechargeScreen({ navigation, route }: Props) {
   // a previous page always exists.
   function handleClose() {
     if (navigation.canGoBack()) handleBack()
-    else navigation.reset({ index: 0, routes: [{ name: 'Matches' }] })
+    // 'Matches' lives inside MainTabs' nested tab navigator, not as a direct
+    // AppStack route — a plain navigation.reset({routes:[{name:'Matches'}]})
+    // fails with "RESET action was not handled by any navigator" because this
+    // screen's `navigation` prop is scoped to AppStack. resetTo() already
+    // knows to nest it under MainTabs (see utils/navigationRef.ts).
+    else resetTo('Matches')
   }
 
   function openAllPlans() {

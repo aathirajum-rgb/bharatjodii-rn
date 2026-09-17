@@ -340,7 +340,14 @@ export async function handlePageLanding(pageId: string | undefined, userId: stri
     case '32':
       if (pageId === '6' || pageId === '10' || pageId === '32') await paymentTrack(46)
       if (pageId === '26') await paymentTrack(32)
-      await redirectToIntermediatePage('notify')
+      // replace=true (unlike this function's default): this is a post-login
+      // LANDING page, same as every other case in this switch, all of which
+      // resetTo() rather than push. A web open of #/recharge?from=notify
+      // already resolves the deep link straight to the `recharge` route
+      // before login finishes; pushing a second one on top here (the old
+      // default) stacked a duplicate recharge screen instead of landing on
+      // a single one.
+      await redirectToIntermediatePage('notify', undefined, undefined, true)
       return
 
     // case "43": biodata-intermediate landing — simplified to a plain Matches

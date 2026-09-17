@@ -173,7 +173,24 @@ module.exports = ({ config }) => ({
     // has allowBackup=true with no other exclusion rules, so without this the
     // encrypted-but-backed-up value could still round-trip through a backup.
     ['expo-secure-store', { faceIDPermission: false }],
-    'expo-splash-screen',
+    // `image` here is the small square app icon (f.icon), NOT one of
+    // SplashAnimationScreen.tsx's full-bleed splash-*.png assets. Android's
+    // OS-level splash (the Android 12+ SplashScreen API this plugin
+    // configures) can only ever show a small centered icon — feeding it a
+    // tall full-bleed asset just renders as a tiny fragment stranded in the
+    // middle of the screen. It's also not optional: expo-splash-screen's own
+    // Android styles.xml unconditionally references @drawable/
+    // splashscreen_logo, so omitting `image` leaves a dangling resource and
+    // breaks the native build.
+    // The old native Android app (see SplashScreenActivity.kt/
+    // activity_splash.xml in the legacy project) never used that OS API at
+    // all — its full-bleed splash was its own plain Activity, same idea as
+    // SplashAnimationScreen.tsx here. So this native splash is intentionally
+    // just a brief icon-on-brand-color screen before the JS splash (which
+    // owns the real full-bleed art) mounts and takes over — backgroundColor
+    // matches SplashAnimationScreen.tsx's container so the handoff (see its
+    // hideNativeSplash) is seamless.
+    ['expo-splash-screen', { image: f.icon, imageWidth: 200, backgroundColor: '#d40c49' }],
     'expo-status-bar',
     'expo-video',
     'expo-web-browser',
