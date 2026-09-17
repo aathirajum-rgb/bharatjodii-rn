@@ -25,6 +25,7 @@ import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish, FontSize, RupeeSymbolFont } from '../../src/theme/fonts'
 import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import { handleBack, resetTo } from '../../utils/navigationRef'
+import { getItem, removeItem } from '../../service/storageService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import CdnLottie from '../../components/CdnLottie'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
@@ -45,6 +46,9 @@ import {
 // not a back arrow on the left. The back-arrow markup is the '0'/'2'/'3'
 // variant (line 83), which this screen isn't.
 const ICON_CLOSE     = CDN_SVG + 'close-light-black.svg'
+// Angular: recharge.page.html's back control — back-btn-revamp.svg, rendered
+// BEFORE the title (margin-right-auto mr-12) for paymentPageType '0'/'3'.
+const ICON_BACK      = CDN_SVG + 'back-btn-revamp.svg'
 const ICON_WHATSAPP  = CDN_SVG + 'revamp/whatsapp-revamp.svg'
 const ICON_MESSAGE   = CDN_SVG + 'message-matches.svg'
 const ICON_HOROSCOPE = CDN_SVG + 'viewprofile/horoscope-icon.svg'
@@ -78,6 +82,44 @@ export default function RechargeScreen({ navigation, route }: Props) {
   // arrow, no tab bar). The caller distinguishes these via this param —
   // see handleTabPress() in every screen with an AppFooter.
   const fromTab = !!route?.params?.fromTab
+
+  // ── Header control: back arrow vs close ✕ vs nothing ────────────────────────
+  // Angular: recharge.page.ts:211 — `paymentPageType = localStorage
+  // .getItem('PAYMENTPAGETYPE') || '3'`, cleared again in ngOnDestroy (line 785)
+  // so the next entry falls back to the default. recharge.page.html then renders
+  //   ['0','2','3'] → back-btn-revamp.svg BEFORE the title, but '2' also carries
+  //                   [class.d-none], so only '0'/'3' actually show it
+  //   ['1']         → close-light-black.svg AFTER the title
+  // Writers: pay-wall.service.ts:78, webview.page.ts (page-landing) and
+  // dr.service.ts (handleAfterDr) all set '1'; footer.component.ts:168 sets '2';
+  // nothing sets '3' — it is the default an ordinary in-app CTA falls through to.
+  //
+  // So: CTA inside the app → back arrow, bottom nav → nothing, landing → ✕.
+  // fromTab is this port's own equivalent of Angular's footer writing '2' (the
+  // footer tab navigates with that param rather than through storage), so it
+  // wins over whatever the key happens to hold.
+  const [paymentPageType, setPaymentPageType] = useState(fromTab ? '2' : '3')
+  useEffect(() => {
+    let cancelled = false
+    if (fromTab) {
+      setPaymentPageType('2')
+    } else {
+      getItem('PAYMENTPAGETYPE').then(v => {
+        if (!cancelled) setPaymentPageType(v || '3')
+      }).catch(() => {})
+    }
+    return () => {
+      cancelled = true
+      // Angular: ngOnDestroy's localStorage.removeItem('PAYMENTPAGETYPE') — a
+      // landing's '1' must not leak into the next, CTA-driven visit.
+      removeItem('PAYMENTPAGETYPE').catch(() => {})
+    }
+  }, [fromTab])
+
+  // Angular's *ngIf also lists '2', but pairs it with [class.d-none] — so the
+  // back arrow is only ever visible for '0'/'3'.
+  const showBackArrow = paymentPageType === '0' || paymentPageType === '3'
+  const showCloseIcon = paymentPageType === '1'
 
   // The post-registration "welcome payment page". payWallService's openPaywall()
   // maps every STARTDAY wall — '1', '2', and the '1~2' that drService's
@@ -234,11 +276,19 @@ export default function RechargeScreen({ navigation, route }: Props) {
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={s.header}>
+        {/* Angular: the back control sits BEFORE the title (margin-right-auto
+            mr-12) — shown when this page was reached from an in-app CTA. */}
+        {showBackArrow && (
+          <Pressable style={s.headerBack} onPress={handleClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back">
+            <CdnSvg uri={ICON_BACK} width={24} height={24} />
+          </Pressable>
+        )}
         <Text style={s.headerTitle} numberOfLines={1}>{data?.title ?? ''}</Text>
         {/* Angular: recharge.page.html:88-93 — the close ✕ sits AFTER the
-            title (margin-left-auto ml-12), and JODII-415 hides it entirely
-            when the page is opened from the bottom nav bar. */}
-        {!fromTab && (
+            title (margin-left-auto ml-12), and is only rendered for
+            paymentPageType '1' (a landing). Reaching this page from the bottom
+            nav bar shows neither control. */}
+        {showCloseIcon && (
           <Pressable style={s.headerClose} onPress={handleClose} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
             <CdnSvg uri={ICON_CLOSE} width={32} height={32} />
           </Pressable>
@@ -502,6 +552,10 @@ const s = StyleSheet.create({
   headerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: Colors.black, flex: 1, textAlign: 'left' },
   // Angular: .ml-12 (global.scss:1226) — 12px, not 16.
   headerClose: { marginLeft: 12 },
+  // Angular: the back control carries .mr-12 (global.scss) — 12px to the right
+  // of the arrow, before the title. `margin-right-auto` is a no-op next to the
+  // title's own flex:1, which already pushes everything after it.
+  headerBack: { marginRight: 12 },
 
   // Angular: the list wrapper (recharge.page.html:138-139) is .pl-24-rem
   // .pr-24-rem .pb-12 — 24px each side, 12px BELOW, and NO top padding at

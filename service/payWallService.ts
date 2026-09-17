@@ -62,6 +62,10 @@ export async function openPaywall(paywallType: string): Promise<void> {
   const resolvedType = typeMap[paywallType] ?? '12'
 
   await setItem('PAYWALLTYPE', paywallType)
+  // Angular: pay-wall.service.ts:78 — FUNC.setPaymentPageType('1') right before
+  // the redirect. RechargeScreen reads this to pick its header control: '1' (a
+  // landing, nothing underneath) gets a close ✕ on the right, not a back arrow.
+  await setItem('PAYMENTPAGETYPE', '1')
   await setItem(SK.Payment.PAYMENT_WALL, JSON.stringify([{ PAYWALLTYPE: '0', PAYWALLDELAY: '0' }]))
 
   await redirectToIntermediatePage('paywall', undefined, resolvedType)

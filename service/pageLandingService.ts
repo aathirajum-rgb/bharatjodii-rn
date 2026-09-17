@@ -340,6 +340,12 @@ export async function handlePageLanding(pageId: string | undefined, userId: stri
     case '32':
       if (pageId === '6' || pageId === '10' || pageId === '32') await paymentTrack(46)
       if (pageId === '26') await paymentTrack(32)
+      // Angular: webview.page.ts's redirectPaymentPage() (line 398, reached by
+      // cases 6/10/15/16/32) and case 26's own inline call both run
+      // FUNC.setPaymentPageType('1') before redirecting. RechargeScreen reads
+      // this to show a close ✕ rather than a back arrow — these are landings,
+      // with nothing underneath to go back to.
+      await setItem('PAYMENTPAGETYPE', '1')
       // replace=true (unlike this function's default): this is a post-login
       // LANDING page, same as every other case in this switch, all of which
       // resetTo() rather than push. A web open of #/recharge?from=notify
