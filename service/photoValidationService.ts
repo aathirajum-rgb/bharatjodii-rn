@@ -285,9 +285,19 @@ export interface PhotoGuidelines {
   cta:     string
   linkCta: string
   items:   PhotoGuidelineItem[]
+  // Angular: guideLineContent?.PHOTOGUIDELINE?.TITLE2 — the "Your photo is
+  // rejected" heading, shown by the photorejection variant only.
+  title2:  string
+  // Angular: resultData?.RESPONSE?.PHOTOREASON — a sibling of PHOTOGUIDELINE,
+  // not a field inside it. Keyed by PHOTOSTATUSARRAY.REASON (defaulting to
+  // '1'), it supplies the overlay caption on the rejected photo.
+  reasons: Record<string, string>
 }
 
-const GUIDELINES_KEY = 'PHOTO_GUIDELINES'
+// Bumped from 'PHOTO_GUIDELINES' when title2/reasons were added: a cache
+// written by the previous shape has neither field, and the photorejection
+// variant cannot render without them.
+const GUIDELINES_KEY = 'PHOTO_GUIDELINES_V2'
 
 // Cache-then-network, same shape as getRejectReasons above: a cached copy is
 // returned immediately on a later visit, and a failed fetch falls back to it
@@ -312,11 +322,18 @@ export async function fetchPhotoGuidelines(): Promise<PhotoGuidelines | null> {
     const res = await apiCall(Endpoints.registration.initialFetch, 'POST', params)
     const g = res?.RESPONSE?.PHOTOGUIDELINE
     if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0 && g) {
+      const rawReasons = res?.RESPONSE?.PHOTOREASON
       const parsed: PhotoGuidelines = {
         title:   String(g.TITLE    ?? ''),
         note:    String(g.NOTE     ?? ''),
         cta:     String(g.CTA      ?? ''),
         linkCta: String(g.LINK_CTA ?? ''),
+        title2:  String(g.TITLE2   ?? ''),
+        reasons: rawReasons && typeof rawReasons === 'object'
+          ? Object.fromEntries(
+              Object.entries(rawReasons).map(([k, v]) => [String(k), String(v ?? '')]),
+            )
+          : {},
         items: (Array.isArray(g.GUIDELINES) ? g.GUIDELINES : []).map((it: any) => ({
           maleImg:   String(it?.MIMG   ?? ''),
           femaleImg: String(it?.FIMG   ?? ''),

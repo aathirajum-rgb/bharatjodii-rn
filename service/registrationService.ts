@@ -2047,7 +2047,9 @@ export async function submitFullRegistration(): Promise<{
     `Date=${rv.DATE ?? ''}`,
     `Year=${rv.YEAR ?? ''}`,
     `Age=${rv.AGE ?? ''}`,
-    `Height=${rv.HEIGHT ?? ''}`,
+    // Angular: callRegistrationAPIFunc()'s updateHeight — HEIGHTCATEGORY, then
+    // HEIGHT, then '102' (Average) as the last-resort default.
+    `Height=${resolveHeightParam(rv, '102')}`,
     `MotherTongue=${rv.MOTHERTONGUE ?? ''}`,
     `country=${rv.COUNTRY ?? ''}`,
     `City=${rv.CITY ?? ''}`,
@@ -2101,6 +2103,33 @@ export async function submitFullRegistration(): Promise<{
   return result
 }
 
+// ─── Height param ─────────────────────────────────────────────────────────────
+// Angular sends ONE `Height` param carrying either the banded HEIGHTCATEGORY
+// (101-104, the "Below average / Average / Above average / Tall" rows) or the
+// exact HEIGHT key — whichever the member picked:
+//
+//   registration.page.ts:7629 (sendPartialRegistrationData)
+//     partialRegHeight = isValidparam(HEIGHTCATEGORY) ? HEIGHTCATEGORY
+//                      : isValidparam(HEIGHT)         ? HEIGHT : ''
+//   registration.page.ts:6465 (callRegistrationAPIFunc) — same order, but
+//     falls back to '102' (Average) instead of ''.
+//   form-fields.component.ts:1345 carries its own identical copy.
+//
+// HeightScreen.tsx writes exactly one of the two and blanks the other, so
+// reading rv.HEIGHT alone sent `Height=` empty for every banded answer — the
+// selection never reached the server.
+//
+// `isValidparam(x)` (type 1) and `!isValidparam(x, 3)` are the same predicate:
+// '0' and '-' count as unset, not just ''/null/undefined.
+function resolveHeightParam(rv: Record<string, string>, fallback = ''): string {
+  const isSet = (v: unknown) =>
+    v !== undefined && v !== null && v !== '' && v !== '-' &&
+    v !== '0' && v !== 'undefined' && v !== 'null'
+  if (isSet(rv.HEIGHTCATEGORY)) return rv.HEIGHTCATEGORY
+  if (isSet(rv.HEIGHT))         return rv.HEIGHT
+  return fallback
+}
+
 // Mirrors Angular's callPartialRegistrationAPI() — sends ALL accumulated reg values
 // to partialreg/v1 as a fire-and-forget progress save on each onboarding step.
 // Call after setRegValue() and navigate immediately — do NOT await this.
@@ -2139,7 +2168,9 @@ async function _doPartialReg(): Promise<void> {
     `Month=${rv.MONTH ?? ''}`,
     `Date=${rv.DATE   ?? ''}`,
     `Age=${rv.AGE     ?? ''}`,
-    `Height=${rv.HEIGHT ?? ''}`,
+    // Angular: sendPartialRegistrationData()'s partialRegHeight — HEIGHTCATEGORY,
+    // then HEIGHT, then empty.
+    `Height=${resolveHeightParam(rv)}`,
     `MotherTongue=${rv.MOTHERTONGUE   ?? ''}`,
     `country=${country}`,
     `City=${rv.CITY           ?? ''}`,
@@ -2237,6 +2268,10 @@ export async function callAiProfileValidation(matriId: string, type: number | st
     `Month=${rv.MONTH ?? ''}`,
     `Date=${rv.DATE ?? ''}`,
     `Age=${rv.AGE ?? ''}`,
+    // FLAGGED, deliberately NOT given the HEIGHTCATEGORY fallback above: Angular's
+    // own aiprofilevalidation branch (core/functions/api-params-functions.ts:194)
+    // sends the bare registrationValues["HEIGHT"], unlike its registration and
+    // partial-registration payloads. Kept at parity rather than "fixed".
     `Height=${rv.HEIGHT ?? ''}`,
     `MotherTongue=${rv.MOTHERTONGUE ?? ''}`,
     `country=${rv.COUNTRY ?? ''}`,

@@ -88,7 +88,7 @@ import { checkProfileValidation, type ProfileValidationInfo } from '../../servic
 import { fetchMonthlyIncomeOptions } from '../../service/registrationService'
 import { subscribeIdVerified } from '../../service/eventBus'
 import { getItem, setItem, getJson, removeItem } from '../../service/storageService'
-import { enablePaywall } from '../../service/payWallService'
+import { enablePaywall, getPaymentWallType } from '../../service/payWallService'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
 import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
 import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
@@ -2251,12 +2251,33 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   // Angular: openFullpageModal()'s onDidDismiss — reload the matches list from
   // start=0 only when likes were actually sent; a plain close/skip doesn't reload.
 
-  function handleBulkLikeClose() {
-    setShowBulkLike(false)
+  // Angular: openFullpageModal()'s onDidDismiss (matches.page.ts:1800-1804) —
+  // once the bulk-like modal closes, the paywall armed for this member fires.
+  // After registration that is PAYWALLTYPE '1~2' (the welcome payment page), set
+  // by drService's navigateToMatchesAfterRegistration(), which is what puts the
+  // welcome offer AFTER Daily recommendations and the bulk-like prompt rather
+  // than in front of them. Angular reads its cached this.PAYMENTWALL here; this
+  // reads storage live, since the bulkLike() branch below may have consumed it.
+  //
+  // Angular's own guard skips it for types '0'/'3'/'4' ('3' and '4' are the
+  // mid-session and expired walls, which have their own triggers) and when
+  // another ion-modal is still open — the latter is why the add-photo upsell
+  // path passes openWelcomePaywall=false: it hands straight over to another
+  // sheet plus the photo picker.
+  async function openWelcomePaywallAfterBulkLike() {
+    const type = await getPaymentWallType()
+    if (!type || ['0', '3', '4'].includes(type)) return
+    await enablePaywall()
   }
 
-  async function handleBulkLikeSent() {
+  function handleBulkLikeClose() {
     setShowBulkLike(false)
+    openWelcomePaywallAfterBulkLike().catch(() => {})
+  }
+
+  async function handleBulkLikeSent(openWelcomePaywall = true) {
+    setShowBulkLike(false)
+    if (openWelcomePaywall) openWelcomePaywallAfterBulkLike().catch(() => {})
     apiStartRef.current = 0
     // A full reload restarts the regular matches feed from page 0 — don't leave
     // fetchList()/loadMore() pointed at the extendedmatches/v1 branch with a
@@ -2720,7 +2741,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
             showClose:     false,
           }}
           onClose={handleBulkLikePhotoPromptDismiss}
-          onPrimaryPress={() => { setShowPhotoBulkLikePrompt(false); addPhoto.openAddPhoto(navigation); handleBulkLikeSent() }}
+          onPrimaryPress={() => { setShowPhotoBulkLikePrompt(false); addPhoto.openAddPhoto(navigation); handleBulkLikeSent(false) }}
           onLinkPress={handleBulkLikePhotoPromptDismiss}
         />
         <NotificationPermissionSheet
@@ -2946,7 +2967,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
           linkCtaLabel:  t('MATCHES.LATER_CTA'),
         }}
         onClose={handleBulkLikePhotoPromptDismiss}
-        onPrimaryPress={() => { setShowPhotoBulkLikePrompt(false); addPhoto.openAddPhoto(navigation); handleBulkLikeSent() }}
+        onPrimaryPress={() => { setShowPhotoBulkLikePrompt(false); addPhoto.openAddPhoto(navigation); handleBulkLikeSent(false) }}
         onLinkPress={handleBulkLikePhotoPromptDismiss}
       />
       <NotificationPermissionSheet

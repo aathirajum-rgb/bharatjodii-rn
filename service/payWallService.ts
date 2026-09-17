@@ -8,12 +8,24 @@ import { redirectToIntermediatePage, updatePaywall } from './paymentService'
 
 interface PaywallEntry {
   PAYWALLTYPE: string
-  PAYWALLDELAY: string
+  // Absent on Angular's own {PAYWALLFLAG, PAYWALLTYPE} object shape — treated as
+  // a 0s delay there, which is also what Angular does for the '1~2' welcome wall
+  // (pay-wall.service.ts calls openPaywall() for it with no setTimeout at all).
+  PAYWALLDELAY?: string
 }
 
 // ─── enablePaywall ────────────────────────────────────────────────────────────
-// Called after login / app resume. Reads stored PAYMENTWALL array and schedules
-// each entry. Only male free users see paywalls (LOGINGENDER==M, ENTRYTYPE==F).
+// Called after login / app resume. Reads stored PAYMENTWALL and schedules each
+// entry. Only male free users see paywalls (LOGINGENDER==M, ENTRYTYPE==F).
+//
+// Angular stores PAYMENTWALL as a single OBJECT ({PAYWALLFLAG, PAYWALLTYPE}) —
+// that is what pay-wall.service.ts reads, and what registration.service.ts's
+// navigateToMatches() writes when it arms the post-registration welcome offer.
+// This port's own server-response path (profileService.ts) can hand back the
+// ARRAY form instead. Reading only one of the two shapes threw on the other
+// (".filter is not a function") inside a promise every caller already
+// .catch()es, so the paywall silently never fired — normalize to a list the way
+// getPaymentWallType() below already does rather than betting on either shape.
 
 export async function enablePaywall(): Promise<void> {
   const raw    = await getItem(SK.Payment.PAYMENT_WALL)
@@ -21,11 +33,13 @@ export async function enablePaywall(): Promise<void> {
 
   if (!raw || gender !== 'M') return
 
-  let paywallArr: PaywallEntry[]
-  try { paywallArr = JSON.parse(raw) } catch { return }
+  let parsed: unknown
+  try { parsed = JSON.parse(raw) } catch { return }
+
+  const paywallArr = (Array.isArray(parsed) ? parsed : [parsed]) as PaywallEntry[]
 
   const validEntries = paywallArr.filter(
-    e => e.PAYWALLTYPE && e.PAYWALLTYPE !== '0',
+    e => e?.PAYWALLTYPE && e.PAYWALLTYPE !== '0',
   )
 
   validEntries.forEach((entry, index) => {
@@ -38,8 +52,12 @@ export async function enablePaywall(): Promise<void> {
 // Maps PAYWALLTYPE (server value) to the payment page variant, then navigates.
 
 export async function openPaywall(paywallType: string): Promise<void> {
+  // Angular: pay-wall.service.ts's openPaywall() — '1~2' is the post-registration
+  // "welcome offer" (STARTDAY) wall that drService's
+  // navigateToMatchesAfterRegistration() arms; it resolves to the same
+  // intermediate-page type '12' as '1'/'2'.
   const typeMap: Record<string, string> = {
-    '1': '12', '2': '12', '3': '13', '4': '4',
+    '1': '12', '2': '12', '1~2': '12', '3': '13', '4': '4',
   }
   const resolvedType = typeMap[paywallType] ?? '12'
 

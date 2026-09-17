@@ -5,24 +5,36 @@
 // components/bottom-sheet/BottomSheet.tsx, is a transparent scrim+sheet, not
 // a true full-screen cover), so this is a new pattern.
 //
-// Scoped simplifications from the Angular reference (see plan):
-// - Skips the 3-way post-submit bottom-sheet branching (plain success /
-//   male-photo-upsell / skip-with-continue-prompt) — this shows a lightweight
-//   inline confirmation instead, then closes.
-// - The 'bulklikechk' trigger flag (Angular: registration.service.ts's
+// Angular's three bottom sheets around this modal are all ported:
+// - skip (CONFIG.SKIP_BULK_LIKE, action 'skipbulk') — opened by the header ✕,
+//   NOT by closing outright: bulkSkip() offers "Send interests & continue"
+//   (-> sendLikes()) or "Skip" (-> dismiss). Non-dismissable otherwise
+//   (backdropDismiss:false, showClose:false).
+// - success (CONFIG.BULK_LIKE, action 'Successbtmpopup') — BulkLikeSentSheet,
+//   auto-dismissed after 2s, then the modal closes.
+// - male photo upsell (CONFIG.PHOTO_BULK_LIKE) — raised by the parent via
+//   onSentNeedsPhoto(), since MatchesScreen owns the photo picker.
+//
+// The 'bulklikechk' trigger flag (Angular: registration.service.ts's
 //   handleRegistrationSuccess(), set once right after registration) is now
-//   wired: registrationService.ts's submitFullRegistration() sets it, and
-//   MatchesScreen.tsx's load effect reads/consumes it — so this only shows
-//   once, right after registering, not on every Matches mount.
-import { useEffect, useRef, useState } from 'react'
+// wired: registrationService.ts's submitFullRegistration() sets it, and
+// MatchesScreen.tsx's load effect reads/consumes it — so this only shows once,
+// right after registering, not on every Matches mount.
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Animated, Easing, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import SelectableProfileTile from './SelectableProfileTile'
 import BulkLikeSentSheet from './BulkLikeSentSheet'
+import BottomSheet from '../bottom-sheet/BottomSheet'
 import { sendBulkLikes } from '../../service/profileService'
 import { Colors } from '../../constants/colors'
 import { Fonts, FontSize } from '../../src/theme/fonts'
+
+// MATCHES.SKIP_SUBCONTENT carries a literal <br> (Angular renders it through
+// [innerHTML]); RN's <Text> has no markup, so collapse it to a space.
+const stripBreaks = (s: string) =>
+  s.replace(/<br[^>]*>/gi, ' ').split(' ').filter(Boolean).join(' ')
 
 export default function BulkLikeModal({
   visible, candidates, showPhotoPromo, onClose, onSent, onSentNeedsPhoto,
@@ -37,10 +49,14 @@ export default function BulkLikeModal({
   onSent:     () => void
   onSentNeedsPhoto: () => void
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sending,  setSending]  = useState(false)
   const [sent,     setSent]     = useState(false)
+  // Angular: closeModal() -> bulkSkip() -> bottomSheetService.skipBulkLike().
+  // The ✕ never closes this modal directly; it raises this sheet, and only its
+  // "Skip" link actually dismisses.
+  const [showSkip, setShowSkip] = useState(false)
   // Tracks the "brief confirmation, then close" timer in handleSend so it
   // can be cancelled — matching BulkLikeDesktopModal.tsx's own autoCloseRef
   // pattern — instead of firing onSent() against an already-unmounted modal
@@ -49,11 +65,25 @@ export default function BulkLikeModal({
 
   // Reset selection (all pre-checked, matching Angular) whenever a fresh
   // candidate batch is shown.
+  //
+  // The `else` branch is what tears the success sheet back down, and it is not
+  // optional. Angular runs two INDEPENDENT ion-modals here: BulkLikepopup()
+  // dismisses its own sheet on a 2000ms timer while sendLikes() dismisses the
+  // full page on a second 2000ms timer. In this port BulkLikeSentSheet is a
+  // sibling of the <Modal> below — outside it — driven by `sent`, and this
+  // component stays mounted for the life of MatchesScreen (only `visible`
+  // flips). Resetting `sent` only under `if (visible)` therefore never fired on
+  // the CLOSE transition, so the confirmation stayed pinned on screen over
+  // whatever opened next (the welcome paywall) indefinitely.
   useEffect(() => {
     if (visible) {
       setSelected(new Set(candidates.map(c => String(c.MATRIID))))
       setSending(false)
       setSent(false)
+      setShowSkip(false)
+    } else {
+      setSent(false)
+      setShowSkip(false)
     }
     if (autoCloseRef.current) clearTimeout(autoCloseRef.current)
   }, [visible, candidates])
@@ -61,6 +91,69 @@ export default function BulkLikeModal({
   useEffect(() => {
     return () => { if (autoCloseRef.current) clearTimeout(autoCloseRef.current) }
   }, [])
+
+  // ── Showcase auto-scroll ───────────────────────────────────────────────────
+  // Angular: runScrollAnimation()/startAnimate()/animateScroll() — 1.5s after the
+  // list renders it glides all the way down, pauses 1s, then glides back to the
+  // top, so the member sees there are more matches below the fold. Duration is
+  // clamp(4s, 4ms/px, 10s) with an ease-in-out-quad curve, and ANY touch
+  // (Angular listens on touchstart/wheel/mousedown/pointerdown) cancels it.
+  //
+  // Angular drives el.scrollTop from requestAnimationFrame; the RN equivalent is
+  // one Animated.Value whose listener calls scrollToOffset — useNativeDriver is
+  // necessarily false, since scroll offset is not a native-animatable prop.
+  const listRef     = useRef<FlatList<Record<string, any>> | null>(null)
+  const contentHRef = useRef(0)
+  const layoutHRef  = useRef(0)
+  const scrollAnim  = useRef(new Animated.Value(0)).current
+  const scrollRunRef   = useRef<Animated.CompositeAnimation | null>(null)
+  const startTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const retryTimerRef  = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const stopShowcaseScroll = useCallback(() => {
+    if (startTimerRef.current) { clearTimeout(startTimerRef.current); startTimerRef.current = null }
+    if (retryTimerRef.current) { clearTimeout(retryTimerRef.current); retryTimerRef.current = null }
+    scrollRunRef.current?.stop()
+    scrollRunRef.current = null
+  }, [])
+
+  const runShowcaseScroll = useCallback(() => {
+    const start = (): boolean => {
+      const maxScroll = contentHRef.current - layoutHRef.current
+      if (maxScroll <= 0) return false
+
+      const duration = Math.min(Math.max(4000, maxScroll * 4), 10000)
+      const easing   = Easing.inOut(Easing.quad)
+
+      scrollAnim.setValue(0)
+      const run = Animated.sequence([
+        Animated.timing(scrollAnim, { toValue: maxScroll, duration, easing, useNativeDriver: false }),
+        Animated.delay(1000),
+        Animated.timing(scrollAnim, { toValue: 0, duration, easing, useNativeDriver: false }),
+      ])
+      scrollRunRef.current = run
+      run.start(() => { scrollRunRef.current = null })
+      return true
+    }
+
+    // Angular: when scrollHeight is still 0 the list hasn't laid out yet — one
+    // 500ms retry, then give up.
+    if (!start()) retryTimerRef.current = setTimeout(start, 500)
+  }, [scrollAnim])
+
+  useEffect(() => {
+    const id = scrollAnim.addListener(({ value }) => {
+      listRef.current?.scrollToOffset({ offset: value, animated: false })
+    })
+    return () => scrollAnim.removeListener(id)
+  }, [scrollAnim])
+
+  useEffect(() => {
+    if (!visible) { stopShowcaseScroll(); return }
+    // Angular: fetchMatches() -> setTimeout(runScrollAnimation, 1500).
+    startTimerRef.current = setTimeout(() => runShowcaseScroll(), 1500)
+    return () => stopShowcaseScroll()
+  }, [visible, candidates, runShowcaseScroll, stopShowcaseScroll])
 
   function toggle(id: string) {
     setSelected(prev => {
@@ -81,13 +174,42 @@ export default function BulkLikeModal({
           onSentNeedsPhoto()   // caller shows the photo-upsell bottom sheet instead
         } else {
           setSent(true)
-          autoCloseRef.current = setTimeout(onSent, 1200)   // brief confirmation, then close + reload
+          // Angular: bottomSheetService.BulkLikepopup() auto-dismisses at 2000ms
+          // and sendLikes() fires its own modal dismiss on the same 2000ms timer.
+          autoCloseRef.current = setTimeout(onSent, 2000)
         }
       }
     } finally {
       setSending(false)
     }
   }
+
+  // Angular: closeModal() { this.bulkSkip() } — the ✕ does not close anything on
+  // its own, it opens the skip sheet. Cancel the showcase scroll first, exactly
+  // as any other touch would.
+  function handleClosePress() {
+    stopShowcaseScroll()
+    setShowSkip(true)
+  }
+
+  // Angular bulkSkip(): resp.data.action === 'sendLikesAndContinue' -> sendLikes()
+  function handleSkipSendLikes() {
+    setShowSkip(false)
+    handleSend()
+  }
+
+  // Angular bulkSkip(): resp.data.action === 'later' -> modalCtrl.dismiss()
+  function handleSkipLater() {
+    setShowSkip(false)
+    onClose()
+  }
+
+  // Angular's bulkLikeCtaKey getter: a single selected profile in English reads
+  // "Send like" (singular); every other case falls back to the translated key.
+  // Angular renders no selection count on this button.
+  const ctaLabel = i18n.language === 'en' && selected.size === 1
+    ? 'Send like'
+    : t('MATCHES.BULK_LIKE_CTA')
 
   return (
     // Two sibling <Modal>s, not one nested inside the other — same convention
@@ -108,22 +230,33 @@ export default function BulkLikeModal({
         end={{ x: 0, y: 1 }}
         style={s.screen}
       >
-        <View style={s.header}>
+        {/* Angular: [style.pointer-events]="sendingLikes ? 'none' : 'auto'" on
+            both the header and the list — nothing is tappable mid-submit. */}
+        <View style={s.header} pointerEvents={sending ? 'none' : 'auto'}>
           {/* Figma (119:268) renders this as two literal lines, not a single
               wrapped line — replacing <br> with a space instead produced a
               double space, since the translation already has one before it. */}
           <Text style={s.title}>
             {t('MATCHES.BULK_LIKE_TITLE').split(/<br\s*\/?>/gi).map(line => line.trim()).join('\n')}
           </Text>
-          <Pressable onPress={onClose} hitSlop={8}>
+          <Pressable onPress={handleClosePress} hitSlop={8}>
             <Text style={s.close}>✕</Text>
           </Pressable>
         </View>
 
         <FlatList
+          ref={listRef}
           data={candidates}
           keyExtractor={c => String(c.MATRIID)}
           contentContainerStyle={s.list}
+          pointerEvents={sending ? 'none' : 'auto'}
+          scrollEnabled={!sending}
+          onLayout={e => { layoutHRef.current = e.nativeEvent.layout.height }}
+          onContentSizeChange={(_w, h) => { contentHRef.current = h }}
+          // Angular addScrollListeners(): touchstart/wheel/mousedown/pointerdown
+          // all abort the showcase scroll the moment the member takes over.
+          onTouchStart={stopShowcaseScroll}
+          onScrollBeginDrag={stopShowcaseScroll}
           renderItem={({ item }) => (
             <SelectableProfileTile
               candidate={item}
@@ -140,13 +273,32 @@ export default function BulkLikeModal({
         >
           {sending
             ? <ActivityIndicator size="small" color={Colors.white} />
-            : <Text style={s.sendBtnText}>{t('MATCHES.BULK_LIKE_CTA')} ({selected.size})</Text>
+            : <Text style={s.sendBtnText}>{ctaLabel}</Text>
           }
         </Pressable>
       </LinearGradient>
     </Modal>
 
     <BulkLikeSentSheet visible={sent} />
+
+    {/* Angular: CONFIG.SKIP_BULK_LIKE rendered through bottom-sheet.component's
+        'skipbulk' action — no image, no cross, backdropDismiss:false, primary
+        CTA 'sendLikesAndContinue' and a plain DOLATER link 'later'. */}
+    <BottomSheet
+      visible={showSkip}
+      type="skipBulk"
+      dismissOnBackdrop={false}
+      data={{
+        title:        t('MATCHES.SKIP_TITLE'),
+        content:      stripBreaks(t('MATCHES.SKIP_SUBCONTENT')),
+        ctaLabel:     t('MATCHES.SKIP_CTA'),
+        linkCtaLabel: t('MATCHES.SKIP'),
+        showClose:    false,
+      }}
+      onClose={() => {}}
+      onPrimaryPress={handleSkipSendLikes}
+      onLinkPress={handleSkipLater}
+    />
     </>
   )
 }

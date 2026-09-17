@@ -879,8 +879,19 @@ export function toPaise(rupees: number): number {
   return Math.round(rupees * 100)
 }
 
-export async function getMembershipPlans(): Promise<MembershipPlansData | null> {
-  const promotionId = String((await getSessionValue('S&FPROMOTION')) ?? '7')
+// The post-registration welcome payment page must ask nbpromotion for TYPE=7,
+// whatever S&FPROMOTION happens to hold for the rest of the app (the server can
+// set it to '8'/'9'/'11' via registrationService.ts's session seed, and Angular
+// would otherwise forward the intermediate-page type '12' straight through as
+// the promotionId — recharge.page.ts:132-140 + payment.service.ts:113).
+export const WELCOME_PROMOTION_TYPE = '7'
+
+// `promotionIdOverride` is Angular's navigation-state promotionId
+// (recharge.page.ts:132-140), which takes precedence over the S&FPROMOTION
+// default on line 75 of that file. Passed by the welcome payment page only —
+// every other caller omits it and keeps the stored default.
+export async function getMembershipPlans(promotionIdOverride?: string): Promise<MembershipPlansData | null> {
+  const promotionId = promotionIdOverride ?? String((await getSessionValue('S&FPROMOTION')) ?? '7')
   const promotion = await getPromotionDetails(promotionId)
   if (!promotion) return null
 

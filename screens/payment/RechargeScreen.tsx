@@ -36,6 +36,7 @@ import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import RechargeDesktopLayout from './RechargeDesktopLayout'
 import {
   checkAvailOffer, claimNow, getMembershipPlans, getPaymentConfig, invalidateMenuPromoCache, paymentTrack,
+  WELCOME_PROMOTION_TYPE,
   type MembershipPlan, type MembershipPlansData, type SelectedPackage,
 } from '../../service/paymentService'
 
@@ -78,6 +79,15 @@ export default function RechargeScreen({ navigation, route }: Props) {
   // see handleTabPress() in every screen with an AppFooter.
   const fromTab = !!route?.params?.fromTab
 
+  // The post-registration "welcome payment page". payWallService's openPaywall()
+  // maps every STARTDAY wall — '1', '2', and the '1~2' that drService's
+  // navigateToMatchesAfterRegistration() arms — to intermediate-page type '12',
+  // and is the only caller that reaches this screen with from='paywall'. The
+  // mid-session ('13') and expired ('4') walls are deliberately excluded: this
+  // TYPE=7 override is for the welcome page alone.
+  const isWelcomePaywall =
+    route?.params?.from === 'paywall' && String(route?.params?.type ?? '') === '12'
+
   // Membership tap is a no-op here — already on the Membership destination,
   // and re-firing openMembershipTab()'s own navigate() would push a
   // duplicate instance of this screen on top of itself.
@@ -109,7 +119,9 @@ export default function RechargeScreen({ navigation, route }: Props) {
       // the plan list itself (matches Angular's own fire-and-forget usage),
       // so they run alongside getMembershipPlans() rather than before it.
       const [result] = await Promise.all([
-        getMembershipPlans(),
+        // Welcome page → nbpromotion payload carries TYPE=7; every other entry
+        // point keeps the stored S&FPROMOTION default.
+        getMembershipPlans(isWelcomePaywall ? WELCOME_PROMOTION_TYPE : undefined),
         getPaymentConfig(),
         checkAvailOffer(),
         paymentTrack('0'),

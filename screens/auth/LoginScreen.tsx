@@ -40,6 +40,33 @@ const COUNTRIES = [
 
 type Country = (typeof COUNTRIES)[number]
 
+// Converts a Phone Number Hint result into the LOCAL (national) number this
+// field expects, i.e. without the country dial code.
+//
+// Prefers the library's own `e164` — it is derived by Android's bundled
+// libphonenumber against the SIM's region, so when it is present the leading
+// country code is known to be there and stripping it is safe.
+//
+// The previous implementation only had the raw `number` and used
+// `digits.startsWith(country.code)` as the test. That silently CORRUPTS any
+// national number whose own first digits happen to match the dial code — an
+// Indian mobile like 9188888888 (10 digits, no country code) starts with "91",
+// so it was cut down to "88888888" and the field ended up with the wrong
+// number. The length check below is what makes the fallback safe: only strip
+// when the number is actually longer than a local one can be.
+function toLocalNumber(hint: { number: string; e164: string | null }, country: Country): string {
+  const e164Digits = hint.e164 ? hint.e164.replace(/\D/g, '') : ''
+  if (e164Digits.startsWith(country.code)) {
+    return e164Digits.slice(country.code.length).slice(0, country.maxLen)
+  }
+
+  const digits = hint.number.replace(/\D/g, '')
+  const stripped = digits.length > country.maxLen && digits.startsWith(country.code)
+    ? digits.slice(country.code.length)
+    : digits
+  return stripped.slice(0, country.maxLen)
+}
+
 // Angular signin.page.ts validateMobileNumber() — exact regex match
 function isValidMobile(mobile: string, country: Country): boolean {
   if (mobile.length < country.minLen || mobile.length > country.maxLen) return false
@@ -107,14 +134,22 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
     try {
       if (!(await isAvailableAsync())) return
       const result = await showPhoneNumberHintAsync()
-      if (result.canceled) return
-      const digitsOnly = result.hint.number.replace(/\D/g, '')
-      const stripped = digitsOnly.startsWith(country.code)
-        ? digitsOnly.slice(country.code.length)
-        : digitsOnly
-      setMobile(stripped.slice(0, country.maxLen))
-    } catch {
-      // non-fatal — user can just type their number
+      if (result.canceled) {
+        // Dismissing the picker must not burn the one-shot guard — otherwise
+        // re-focusing the field never offers the number again.
+        phoneHintRequested.current = false
+        return
+      }
+      setMobile(toLocalNumber(result.hint, country))
+    } catch (e) {
+      // Non-fatal — the user can still type their number. But DO NOT swallow
+      // silently: the native module rejects with real, diagnosable codes
+      // (ERR_EXTRACTION_FAILED, ERR_PLAY_SERVICES_UNAVAILABLE,
+      // ERR_NO_HINT_AVAILABLE, ERR_ALREADY_IN_PROGRESS...), and an empty catch
+      // made "picker opens, selection does nothing" impossible to diagnose.
+      if (__DEV__) console.warn('[LoginScreen] phone number hint failed:', e)
+      // Let the user try again by re-focusing the field.
+      phoneHintRequested.current = false
     }
   }
 

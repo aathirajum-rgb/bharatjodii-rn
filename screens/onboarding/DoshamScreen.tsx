@@ -16,7 +16,7 @@ import {
   setRegValue,
   submitHoroscopeDetails,
 } from '../../service/registrationService'
-import { setItem } from '../../service/storageService'
+import { navigateToMatchesAfterRegistration } from '../../service/drService'
 import { refreshSession } from '../../service/homeService'
 import { CDN_REG, CDN_LOTTIE } from '../../constants/cdn'
 import CdnLottie from '../../components/CdnLottie'
@@ -41,7 +41,7 @@ type Props = {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function DoshamScreen({ navigation }: Props) {
+export default function DoshamScreen(_props: Props) {
   const { t } = useTranslation()
   const langFonts = useLanguageFonts()
 
@@ -125,8 +125,7 @@ export default function DoshamScreen({ navigation }: Props) {
         await setRegValue('DOSHAM', doshamValue)
         await submitHoroscopeDetails(star, raasi, doshamValue)
         await refreshSession()
-        await setItem('LASTAPPLOGINAT', new Date().toISOString())
-        navigation.navigate('MainTabs', { screen: 'Home' })
+        await navigateToMatchesAfterRegistration()
       } catch {
         // allow retry
       } finally {
@@ -141,8 +140,7 @@ export default function DoshamScreen({ navigation }: Props) {
         await setRegValue('DOSHAM', '2')
         await submitHoroscopeDetails(star, raasi, '2')
         await refreshSession()
-        await setItem('LASTAPPLOGINAT', new Date().toISOString())
-        navigation.navigate('MainTabs', { screen: 'Home' })
+        await navigateToMatchesAfterRegistration()
       } catch {
         setSubmitting(false)
       }
@@ -157,8 +155,7 @@ export default function DoshamScreen({ navigation }: Props) {
 
   async function handleSkip() {
     await refreshSession()
-    await setItem('LASTAPPLOGINAT', new Date().toISOString())
-    navigation.navigate('MainTabs', { screen: 'Home' })
+    await navigateToMatchesAfterRegistration()
   }
 
   const possessiveKey = PROFILE_POSSESSIVE[createdBy]?.toUpperCase()
