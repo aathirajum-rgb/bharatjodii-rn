@@ -1026,6 +1026,7 @@ export default function ActivityScreen({ navigation, route }: Props) {
           ownEntryType={gating.ownEntryType}
           femaleFreeEligible={gating.femaleFreeEligible}
           indNumbersLeft={gating.indNumbersLeft}
+          waPhotoFlag={gating.waPhotoFlag}
           onPress={() => handlePress(item)}
           onLike={() => handleLike(item)}
           onDontShow={() => handleDontShow(item)}

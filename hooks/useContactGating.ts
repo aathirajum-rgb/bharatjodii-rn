@@ -24,12 +24,21 @@ export interface ContactGating {
   // in #VAR#. See MatchesScreen.tsx's getContactConfirmContent() for the
   // exact selection logic this mirrors.
   contactQuota:       { viewed: string; left: string; expiry: string; total: string }
+  // Angular: FUNC.whatsAppPhotoFlag() — the session WAPHOTOFLAG, '0' when
+  // absent. MatchCard needs it for getWhatsAppViewHiddenPhotoRequest(), which
+  // decides whether a hidden-photo card prompts "Get #HER_HIS# Photos on
+  // WhatsApp" (WhatsApp CTA) or the shortlist copy (Like CTA). Angular passes
+  // that getter on every screen rendering this card — activity.component.html:
+  // 205, daily-recommendation.component.html:45, matches.page.html:173 — so it
+  // belongs on the shared gating object, not one screen.
+  waPhotoFlag:        string
   loaded:             boolean
 }
 
 const INITIAL: ContactGating = {
   oppGender: 'F', loginGender: 'F', ownEntryType: '', femaleFreeEligible: false,
-  indNumbersLeft: '0', contactQuota: { viewed: '0', left: '', expiry: '', total: '' }, loaded: false,
+  indNumbersLeft: '0', contactQuota: { viewed: '0', left: '', expiry: '', total: '' },
+  waPhotoFlag: '0', loaded: false,
 }
 
 export function useContactGating(): ContactGating {
@@ -42,10 +51,11 @@ export function useContactGating(): ContactGating {
       // Angular: common.ts's getContactDetails() — populates CONTACT_DETAIL
       // before it's read below (must resolve first, same ordering MatchesScreen uses).
       await fetchContactDetails().catch(() => {})
-      const [entryType, femaleFreeRaw, contactDetail] = await Promise.all([
+      const [entryType, femaleFreeRaw, contactDetail, waFlag] = await Promise.all([
         getSessionValue('ENTRYTYPE'),
         getSessionValue('FEMALEFREECONACT'),
         getJson<Record<string, any>>('CONTACT_DETAIL'),
+        getSessionValue(StorageKeys.App.WA_PHOTO_FLAG),
       ])
       if (cancelled) return
       const loginGender: 'M' | 'F' = lg === 'M' ? 'M' : 'F'
@@ -65,6 +75,8 @@ export function useContactGating(): ContactGating {
           expiry: String(contactDetail?.expiryTextValue ?? ''),
           total:  String(contactDetail?.totalProfileCountData ?? ''),
         },
+        // Angular: whatsAppPhotoFlag() defaults to '0' when the key is absent.
+        waPhotoFlag: String(waFlag ?? '0'),
         loaded: true,
       })
     })()

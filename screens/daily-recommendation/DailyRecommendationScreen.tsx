@@ -595,14 +595,19 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
   // spec doesn't call for Call/WhatsApp on this screen's flow, but MatchCard
   // always renders those CTA affordances as part of its after-like state, so it
   // still needs real values here rather than placeholders.
-  const [gating, setGating] = useState({ oppGender: 'F' as 'M' | 'F', ownEntryType: '', femaleFreeEligible: false, indNumbersLeft: '0' })
+  // waPhotoFlag: Angular's daily-recommendation.component.html:45 passes
+  // getWhatsAppViewHiddenPhotoRequest(profile) here too, so a hidden-photo card
+  // on DR shows the same WhatsApp prompt Matches does — see MatchCard's own
+  // waPhotoFlag prop.
+  const [gating, setGating] = useState({ oppGender: 'F' as 'M' | 'F', ownEntryType: '', femaleFreeEligible: false, indNumbersLeft: '0', waPhotoFlag: '0' })
   useEffect(() => {
     (async () => {
-      const [lg, entryType, femaleFreeRaw, contactDetail] = await Promise.all([
+      const [lg, entryType, femaleFreeRaw, contactDetail, waFlag] = await Promise.all([
         getItem(SK.User.LOGIN_GENDER),
         getSessionValue('ENTRYTYPE'),
         getSessionValue('FEMALEFREECONACT'),
         getJson<Record<string, any>>('CONTACT_DETAIL'),
+        getSessionValue(SK.App.WA_PHOTO_FLAG),
       ])
       const loginGender: 'M' | 'F' = lg === 'M' ? 'M' : 'F'
       setGating({
@@ -610,6 +615,8 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
         ownEntryType: entryType ?? '',
         femaleFreeEligible: String((femaleFreeRaw as any)?.FLAG) === '1' && loginGender === 'F' && String((femaleFreeRaw as any)?.Left ?? '0') !== '0',
         indNumbersLeft: String(contactDetail?.IndNumbersLeft ?? '0'),
+        // Angular: whatsAppPhotoFlag() defaults to '0' when the key is absent.
+        waPhotoFlag: String(waFlag ?? '0'),
       })
     })()
   }, [])
@@ -629,6 +636,7 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
           ownEntryType={gating.ownEntryType}
           femaleFreeEligible={gating.femaleFreeEligible}
           indNumbersLeft={gating.indNumbersLeft}
+          waPhotoFlag={gating.waPhotoFlag}
           onPress={() => {}}
           onLike={() => {}}
           onDontShow={() => {}}
@@ -654,6 +662,7 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
             ownEntryType={gating.ownEntryType}
             femaleFreeEligible={gating.femaleFreeEligible}
             indNumbersLeft={gating.indNumbersLeft}
+            waPhotoFlag={gating.waPhotoFlag}
             onPress={() => navigate(ENavigation.VIEW_PROFILE, { matriId: profile.profileId, fromPage: 'dailyrecommendations' })}
             onLike={() => commitButtonSwipe('like')}
             onDontShow={() => commitButtonSwipe('skip')}

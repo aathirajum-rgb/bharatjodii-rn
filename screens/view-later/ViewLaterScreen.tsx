@@ -327,6 +327,7 @@ export default function ViewLaterScreen({ navigation }: Props) {
               ownEntryType={gating.ownEntryType}
               femaleFreeEligible={gating.femaleFreeEligible}
               indNumbersLeft={gating.indNumbersLeft}
+              waPhotoFlag={gating.waPhotoFlag}
               onPress={() => handlePress(item)}
               onLike={noop}
               onDontShow={noop}

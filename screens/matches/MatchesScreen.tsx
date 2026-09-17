@@ -145,7 +145,7 @@ function buildMergedList(
 export const MatchCard = memo(function MatchCard({
   profile, oppGender, ownEntryType, femaleFreeEligible, indNumbersLeft,
   onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp, onMessage,
-  showLikedBadge, singlePhoto, hideVerifiedBadge, photoHeight,
+  showLikedBadge, singlePhoto, hideVerifiedBadge, photoHeight, waPhotoFlag = '0',
 }: {
   profile:    MatchProfile
   oppGender:  'M' | 'F'
@@ -182,6 +182,22 @@ export const MatchCard = memo(function MatchCard({
   // horizontal card padding its stacked-card layout reserves. Defaults to
   // PHOTO_H (Matches' own height) when not passed.
   photoHeight?: number | undefined
+  // Session-level WAPHOTOFLAG (registrationService.ts's storeWebURLData copies
+  // it off the login response). Angular reads it inside
+  // FUNC.getWhatsAppViewHiddenPhotoRequest(profile) —
+  //   whatsAppPhotoFlag() == '1' && IsPhotoAvailable(p) && getPhotoProtect(p)
+  // — and every screen that renders this card passes that getter's result
+  // (matches.page.html:173, activity.component.html:205,
+  // daily-recommendation.component.html:45, app-swiper.component.html:91).
+  // Threaded as a prop rather than read here because it is an async session
+  // read and this card renders once per list row.
+  //
+  // Defaults to '0' (the same default whatsAppPhotoFlag() itself returns when
+  // the key is absent), so a caller that does not pass it keeps the
+  // shortlist-based hidden-photo overlay rather than silently switching to the
+  // WhatsApp one — the same "don't let the default turn the overlay on"
+  // reasoning homeGating.ts's applyWhatsAppPhotoRequestFlags() documents.
+  waPhotoFlag?: string | undefined
 }) {
   const { t } = useTranslation()
   const langFonts = useLanguageFonts()
@@ -199,6 +215,16 @@ export const MatchCard = memo(function MatchCard({
   // Angular: photo-new.component.ts getHiddenPhotoContent() — once liked/shortlisted,
   // the "request" is considered sent and only the waiting text remains (no CTA).
   const hiddenPhotoPending = profile.likedStatus === '1' || profile.likedStatus === '3'
+  // Angular: FUNC.getWhatsAppViewHiddenPhotoRequest(profile) — when the session
+  // WAPHOTOFLAG is on, a hidden-photo card shows the "Get #HER_HIS# Photos on
+  // WhatsApp" prompt INSTEAD of the shortlist one, and its CTA is WhatsApp, not
+  // Like (photo-new.component.html:103's
+  // `whatsAppViewHiddenPhotoRequest ? 'GENERAL.WHATSAPP' : 'GENERAL.SHORTLIST'`,
+  // and getHiddenPhotoContent()'s own first branch). This card only ever
+  // rendered the shortlist variant. The other two conditions Angular's getter
+  // checks — PHOTOAVAILABLE=='Y' and PHOTOPROTECTED=='Y' — are exactly
+  // isHiddenPhoto, already computed above, so only the flag is left to test.
+  const whatsAppViewHiddenPhoto = waPhotoFlag === '1'
   const dontShowDisabled  = disableDontShow(profile.dontShowStatus)
   const viewLaterDisabled = disableViewLater(profile.viewLaterStatus)
 
@@ -246,13 +272,36 @@ export const MatchCard = memo(function MatchCard({
             />
             <View style={c.photoOverlay}>
               <View style={c.overlayCard}>
-                <Text style={[c.overlayText, { fontFamily: langFonts.regular }]}>
-                  {t(hiddenPhotoPending ? 'VIEWPROFILE.HORO_HIDDEN_PHOTO' : 'VIEWPROFILE.HORO_HIDDEN_LIKE')
-                    .replace(/##HE_SHE##/g, t(`PRONOUN.${oppGender}.heshe`))
-                    .replace(/##HIS_HER##/g, t(`PRONOUN.${oppGender}.hisher`))
-                    .replace(/##he_she##/g, t(`PRONOUN.${oppGender}.heshe`).toLowerCase())}
-                </Text>
-                {!hiddenPhotoPending && (
+                {whatsAppViewHiddenPhoto ? (
+                  /* Angular: getHiddenPhotoContent() → getHiddenPhotoRequestText().
+                     Unlike the shortlist variant below, this one is NOT gated on
+                     likedStatus — photo-new.component.html:98 renders it for every
+                     protected photo, and photo-request.component.html:8 keeps the
+                     CTA row visible whenever whatsAppViewHiddenPhotoRequest is set.
+                     Uses the same string + PRONOUN replacement ProfilePhoto.tsx:508
+                     already renders for this case; Angular reaches for
+                     getGenderPrefix_Him_Her ('him'/'her') rather than the
+                     his/her used here, which differs only for a male profile. */
+                  <Text style={[c.overlayText, { fontFamily: langFonts.regular }]}>
+                    {t('GENERAL.REQUEST_HIDDEN_PHOTO_WHATSAPP')
+                      .replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
+                  </Text>
+                ) : (
+                  <Text style={[c.overlayText, { fontFamily: langFonts.regular }]}>
+                    {t(hiddenPhotoPending ? 'VIEWPROFILE.HORO_HIDDEN_PHOTO' : 'VIEWPROFILE.HORO_HIDDEN_LIKE')
+                      .replace(/##HE_SHE##/g, t(`PRONOUN.${oppGender}.heshe`))
+                      .replace(/##HIS_HER##/g, t(`PRONOUN.${oppGender}.hisher`))
+                      .replace(/##he_she##/g, t(`PRONOUN.${oppGender}.heshe`).toLowerCase())}
+                  </Text>
+                )}
+                {whatsAppViewHiddenPhoto && (
+                  /* Angular routes this through the SAME handler as the no-photo
+                     WhatsApp overlay below (communication.service.ts:202-254's
+                     whatsAppPhotoRequestBtnClickOn) — there is no separate
+                     "request sent" state for the hidden-photo variant. */
+                  <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={onWhatsApp} />
+                )}
+                {!whatsAppViewHiddenPhoto && !hiddenPhotoPending && (
                   <Pressable onPress={handleLikePress}>
                     {/* Angular: EButtonBackground.whatsApp = --ion-color-whatsapp-bg =
                         linear-gradient(180deg, #4AC14B 0%, #06853A 100%) (theme/variables
@@ -1168,6 +1217,11 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   const [ownEntryType,      setOwnEntryType]      = useState('')
   const [femaleFreeEligible, setFemaleFreeEligible] = useState(false)
   const [indNumbersLeft,    setIndNumbersLeft]    = useState('0')
+  // Angular: FUNC.whatsAppPhotoFlag() — session WAPHOTOFLAG, '0' when absent.
+  // Drives MatchCard's hidden-photo overlay (WhatsApp prompt vs shortlist one);
+  // matches.page.html:173 passes the same flag via
+  // getWhatsAppViewHiddenPhotoRequest(profile).
+  const [waPhotoFlag,       setWaPhotoFlag]       = useState('0')
 
   // ── Extra promo banners (#26: 1011/1012/1014/1015 + hero-banner extension) ──────
   const [addPhotoPromoActive, setAddPhotoPromoActive] = useState(false)
@@ -1324,7 +1378,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
             // was previously never called anywhere, so indNumbersLeft always
             // read the '0' fallback.
             await fetchContactDetails().catch(() => {})
-            const [entryType, reg, femaleFreeRaw, horoAvailable, contactDetail, ekycStatus, paidFlag] = await Promise.all([
+            const [entryType, reg, femaleFreeRaw, horoAvailable, contactDetail, ekycStatus, paidFlag, waFlag] = await Promise.all([
               getSessionValue('ENTRYTYPE'),
               getRegistrationArrays(),
               getSessionValue('FEMALEFREECONACT'),
@@ -1332,11 +1386,14 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
               getJson<Record<string, any>>('CONTACT_DETAIL'),
               getItem('PI_EKYCSTATUS'),
               getItem(StorageKeys.Payment.PAY_P_FLAG),
+              getSessionValue(StorageKeys.App.WA_PHOTO_FLAG),
             ])
             const photoStatus = ppSetData?.PI_PHOTOSTATUS ?? 'N'
 
             if (!ctrl.cancelled) {
               setOwnEntryType(entryType ?? '')
+              // Angular: whatsAppPhotoFlag() defaults to '0' when the key is absent.
+              setWaPhotoFlag(String(waFlag ?? '0'))
 
               // Free-female-contact eligibility (#24) — Angular: getFree3Contact() && !getfreephoneviewOver()
               const femaleFree: any = femaleFreeRaw
@@ -2661,12 +2718,13 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         onCall={() => handleCall(item)}
         onWhatsApp={() => handleWhatsApp(item)}
         onMessage={() => handleMessage(item)}
+        waPhotoFlag={waPhotoFlag}
       />
     )
   }, [
     renderBannerItem, oppGender, ownEntryType, femaleFreeEligible,
     indNumbersLeft, navigation, handleLike, handleDontShow, handleViewLater, handleCall,
-    handleWhatsApp, handleMessage, profileIds,
+    handleWhatsApp, handleMessage, profileIds, waPhotoFlag,
   ])
 
   // ── Desktop web layout (Figma "Jodii Desktop") ──────────────────────────────
