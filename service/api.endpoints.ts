@@ -165,6 +165,12 @@ export const Endpoints = {
     upiAutoPay:          `${payNg}payment/nbupiautopay`,
     upiPayLink:          `${api}payment/nbupipaylink/v1`,
     autopayRefund:       `${api}payment/autopayrefund/v1`,
+    // iOS StoreKit package catalog — GET .../iospackagelogin/{userId}. Returns
+    // { CountryCode, CurrencyCode, ProductArray: [{ ProductId, Price, LocalPrice }] }.
+    // See service/iapService.ts fetchIosPackages(). No verify/activate-membership
+    // endpoint exists yet for iOS receipts — that contract is still pending from
+    // backend (see verifyAndActivateIosMembership() in the same file).
+    iosPackageLogin:     `${payNg}iospayment/iospackagelogin`,
   },
 
   notify: {

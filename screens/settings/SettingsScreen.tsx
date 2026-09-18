@@ -17,7 +17,7 @@
 // convention a couple of older files use.
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import DesktopPageShell from '../../components/desktop-page-shell/DesktopPageShell'
 import LogoutConfirmModal from '../../components/home-sidebar/LogoutConfirmModal'
@@ -31,6 +31,7 @@ import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { handleBack } from '../../utils/navigationRef'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { ICON, LogoutSheet, performLogout } from '../menu/MenuScreen'
+import { restoreIosPurchases } from '../../service/iapService'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 
 type Props = { navigation: any }
@@ -65,6 +66,17 @@ export default function SettingsScreen({ navigation }: Props) {
     await performLogout()
   }
 
+  // Apple requires a visible "Restore Purchases" affordance for
+  // non-consumable/subscription IAPs — see service/iapService.ts.
+  async function handleRestorePurchases() {
+    const result = await restoreIosPurchases()
+    if (result.status === 'success') {
+      Alert.alert('Restore Purchases', 'Your purchases have been restored.')
+    } else {
+      Alert.alert('Restore Purchases', result.message ?? 'No purchases to restore.')
+    }
+  }
+
   const rows = [
     {
       key: 'language', icon: ICON.language, title: t('MENU.TTTLE_6'),
@@ -73,6 +85,13 @@ export default function SettingsScreen({ navigation }: Props) {
     ...(isFemale ? [{
       key: 'phonePrivacy', icon: CDN_SVG + 'phone-privacy-settings.svg', title: t('MENU.PHONE_PRIVACY'),
       onPress: () => navigation.navigate('PhonePrivacy'),
+    }] : []),
+    // No dedicated "restore purchases" icon exists in ICON yet (see
+    // MenuScreen.tsx) — reusing `support` as a neutral placeholder pending a
+    // real asset from design.
+    ...(Platform.OS === 'ios' ? [{
+      key: 'restorePurchases', icon: ICON.support, title: t('ACCOUNT.RESTORE_PURCHASES'),
+      onPress: handleRestorePurchases,
     }] : []),
     {
       key: 'deleteProfile', icon: ICON.deleteAccount, title: t('ACCOUNT.DEL_PRO'),

@@ -1,7 +1,8 @@
 import Constants from 'expo-constants';
+import { Image } from 'expo-image';
 import * as SplashScreen from 'expo-splash-screen';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Image, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { CDN_SPLASH_STATIC } from '../constants/cdn';
 
@@ -32,6 +33,13 @@ const NATIVE_SPLASH_FALLBACK_MS = 2000;
 // the 9 flavors that migration actually redesigned. require() needs a static
 // literal path per call for Metro to bundle the asset, so this can't be built
 // from a dynamic flavor string — every flavor gets its own explicit entry.
+// react-native's core Image (Android/Fresco) briefly rendered this at the
+// wrong scale on real devices — a zoomed-in fragment of the top-left corner
+// for a frame or two before snapping to a correct full-bleed "cover" — for
+// a large local PNG mounted at full-screen size with no explicit width/height
+// (confirmed via on-device screenshots timed right after JS start). expo-image
+// (already used the same way for large photos elsewhere, e.g.
+// ViewProfileContent.tsx) doesn't have this issue.
 const BUNDLED_SPLASH: Record<string, ReturnType<typeof require>> = {
   jodii:     require('../assets/splash-bharatjodii.png'),
   tamil:     require('../assets/splash-tamil.png'),
@@ -85,7 +93,7 @@ export default function SplashAnimationScreen({ onFinish }: Props) {
         <Image
           source={bundledSplash}
           style={styles.image}
-          resizeMode="cover"
+          contentFit="cover"
           onLoadEnd={hideNativeSplash}
         />
       ) : !cdnImageFailed ? (
@@ -96,7 +104,7 @@ export default function SplashAnimationScreen({ onFinish }: Props) {
         <Image
           source={{ uri: splashUri }}
           style={styles.image}
-          resizeMode="cover"
+          contentFit="cover"
           onLoadEnd={hideNativeSplash}
           onError={() => {
             setCdnImageFailed(true);

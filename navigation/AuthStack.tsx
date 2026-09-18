@@ -21,6 +21,7 @@ export type AuthStackParamList = {
 const Stack = createNativeStackNavigator<AuthStackParamList>()
 
 export default function AuthStack() {
+  console.log('[TRACE] AuthStack: MOUNTED')
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
 

@@ -75,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function checkAuth() {
+    console.log('[TRACE] checkAuth: START')
     // Native-app / deep-link handoff — #/webview/:type/:param/:page_id/:token
     // (or the 5-segment buildparam.REGISTER=='1' fresh-registration variant).
     // Checked first, before the normal stored-token path: a fresh browser tab
@@ -169,9 +170,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // must never block getting the user to their landing screen.
       requestPermissionAndGetToken()
 
+      console.log('[TRACE] checkAuth: awaiting waitForNavigationReady')
       const ready = await waitForNavigationReady()
+      console.log('[TRACE] checkAuth: navigationReady =', ready)
       if (ready) {
+        console.log('[TRACE] checkAuth: awaiting refreshSession')
         const { pageId, deactivateInfo: deactivated } = await refreshSession()
+        console.log('[TRACE] checkAuth: refreshSession resolved, pageId =', pageId, 'deactivated =', !!deactivated)
         if (deactivated) {
           await handleDeactivation(deactivated)
         } else {
@@ -182,7 +187,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           // this one landing decision — see deepLinkService.ts.
           const pendingDeepLinkPageId = await consumePendingDeepLinkPageId()
           const landingPageId = pendingDeepLinkPageId || pageId || storedPageId || undefined
+          console.log('[TRACE] checkAuth: awaiting handlePageLanding, landingPageId =', landingPageId)
           await handlePageLanding(landingPageId, userId)
+          console.log('[TRACE] checkAuth: handlePageLanding resolved')
         }
       }
     }
@@ -235,6 +242,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   useEffect(() => {
+    console.log('[TRACE] AuthProvider: mount effect firing')
     logoutRef.current = logoutUpdate
     registerLogoutCallback(() => logoutRef.current())
     checkAuth()

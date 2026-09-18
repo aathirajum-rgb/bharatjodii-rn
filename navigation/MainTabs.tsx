@@ -77,6 +77,7 @@ function MainTabsBar({ state, navigation }: BottomTabBarProps) {
 const Tab = createBottomTabNavigator<MainTabsParamList>()
 
 export default function MainTabs() {
+  console.log('[TRACE] MainTabs: MOUNTED')
   return (
     <FooterBadgesProvider>
       <Tab.Navigator

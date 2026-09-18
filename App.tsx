@@ -25,6 +25,7 @@ import { setupNotificationHandlers } from './service/notificationService'
 import { initAnalytics } from './service/analyticsService'
 import { getItem, setItem } from './service/storageService'
 import { loadFonts } from './src/config/fonts'
+import { usePendingPurchase } from './service/iapService'
 
 // Keep native splash visible until SplashAnimationScreen mounts and calls hideAsync()
 SplashScreen.preventAutoHideAsync()
@@ -136,6 +137,11 @@ async function initializeAppConfig(): Promise<string> {
 export default function App() {
   useOTAUpdate()
   useNativeAppUpdate()
+  // iOS only (see service/iapService.ts) — no-ops on Android/web. Mounted
+  // once here (not per-screen) so a killed-app-mid-purchase transaction gets
+  // recovered on every cold launch, not just when RechargeScreen happens to
+  // be visited.
+  usePendingPurchase()
   const [appReady, setAppReady] = useState(false)
   const [fontsReady, setFontsReady] = useState(false)
 

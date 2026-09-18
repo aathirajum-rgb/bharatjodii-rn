@@ -270,6 +270,8 @@ export default function RootNavigation() {
     return () => sub.remove()
   }, [])
 
+  console.log('[TRACE] RootNavigation render: loading =', loading, 'isAuthenticated =', isAuthenticated)
+
   // Blank while we check AsyncStorage — prevents a flash of the wrong stack
   if (loading) {
     return (

@@ -681,6 +681,7 @@ export default function AppStack() {
   // now lives inside MainTabs (whose own initialRouteName is already
   // 'Matches'), not as a flat screen on this stack.
   const stackInitialRoute = initialRoute === 'Matches' ? 'MainTabs' : initialRoute
+  console.log('[TRACE] AppStack: MOUNTED, initialRoute =', initialRoute, 'stackInitialRoute =', stackInitialRoute)
 
   return (
     <Stack.Navigator

@@ -16,8 +16,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import {
-  Alert, BackHandler, Linking, Platform, Pressable, ScrollView, StyleSheet, Text,
-  useWindowDimensions, View,
+  Alert, BackHandler,Linking, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useTranslation } from 'react-i18next'
@@ -42,6 +41,7 @@ import {
   WELCOME_PROMOTION_TYPE,
   type MembershipPlan, type MembershipPlansData, type SelectedPackage,
 } from '../../service/paymentService'
+import { useHandlePurchase } from '../../service/iapService'
 
 // Angular: recharge.page.html:92 — paymentPageType '1' (this port's variant)
 // renders the title FIRST and a close ✕ on the RIGHT (close-light-black.svg),
@@ -144,6 +144,9 @@ export default function RechargeScreen({ navigation, route }: Props) {
   // Angular: promotions.component.ts couponStatus — '0' unapplied, '1'
   // applied, '2' dismissed/undone (visually identical to '0', re-appliable).
   const [couponStatus, setCouponStatus] = useState<'0' | '1' | '2'>('0')
+
+  // iOS-only (see service/iapService.ts) — no-op on Android/web.
+  const { handlePurchase } = useHandlePurchase()
 
   // "View other packages" sheet — its own independent selection, seeded from
   // the main page's current selection when opened (matches Angular: the
@@ -260,6 +263,11 @@ export default function RechargeScreen({ navigation, route }: Props) {
   // this screen (and the "View other packages" sheet) only hand off the
   // chosen plan. Angular: payNow(data) — same target regardless of which of
   // the two selection surfaces the plan came from.
+  //
+  // iOS never shows PaymentOptionsScreen at all — there's no PhonePe/GPay/UPI
+  // equivalent to pick between on iOS, only Apple's own payment sheet, so
+  // tapping Pay here goes straight to the native StoreKit purchase (see
+  // service/iapService.ts's useHandlePurchase()).
   function proceedWithPlan(plan?: MembershipPlan) {
     if (!plan) return
     // Defense-in-depth alongside the global OfflineScreen overlay — don't
@@ -274,8 +282,24 @@ export default function RechargeScreen({ navigation, route }: Props) {
       discountamount: plan.discountamount,
       autopayflag:    plan.autopayflag,
       isEmi:          plan.isEmi,
+      iosProductId:   plan.iosProductId,
     }
     setShowAllPlans(false)
+
+    if (Platform.OS === 'ios') {
+      // plan.iosProductId isn't populated by getMembershipPlans() yet — no
+      // backend field for it exists (see the comment on MembershipPlan in
+      // service/paymentService.ts). Fails loudly instead of guessing an Apple
+      // product ID, since guessing wrong here means charging for the wrong
+      // package.
+      if (!plan.iosProductId) {
+        Alert.alert('Error', 'This plan is not yet available for purchase on iOS.')
+        return
+      }
+      handlePurchase(plan.iosProductId, selectedPackage)
+      return
+    }
+
     navigation.navigate('payment-options', { selectedPackage })
   }
 
@@ -346,7 +370,7 @@ export default function RechargeScreen({ navigation, route }: Props) {
               scrollbar on mobile; RN's ScrollView shows one by default, which
               is the grey vertical line running down the right edge. */}
           <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-            {data.plans.map(plan => (
+            {/* {data.plans.map(plan => (
               <PlanCard
                 key={plan.productid}
                 plan={plan}
@@ -354,7 +378,7 @@ export default function RechargeScreen({ navigation, route }: Props) {
                 selected={selectedId === plan.productid}
                 onPress={() => setSelected(plan.productid)}
               />
-            ))}
+            ))} */}
 
             {/* Angular: promotions.component.html:254-297 — a server-driven
                 "Apply Coupon" banner (not a user-typed code field). Hidden

@@ -14,6 +14,21 @@ const FLAVORS = {
     domain2: 'bharatjodii.com',
     welcomeText: 'Welcome to BharatJodii',
     icon: './assets/icon.png',
+    // Android adaptive icons mask/zoom the foreground layer down to a ~66%
+    // safe zone (this is what Android itself uses when auto-wrapping legacy
+    // icons, and what the old native app's icon effectively respected via
+    // its own generous text padding — see app_logo.xml). `icon` above fills
+    // the full 1024x1024 canvas edge-to-edge (fine for iOS/splash/store
+    // listing), so feeding it straight to adaptiveIcon.foregroundImage let
+    // the "Bharat Jodii" text get clipped by the mask on real devices. This
+    // is the same artwork pre-scaled to 66% on a matching maroon background
+    // so nothing gets cropped.
+    adaptiveIcon: './assets/icons/bharatjodii-adaptive-icon.png',
+    // Sampled from assets/icon.png's own corner pixel — matches the maroon
+    // card the logo is drawn on, instead of the old unrelated light-blue
+    // default (plugins/withAndroidFlavors.js and app.config.js both fall
+    // back to that old default for every other flavor, unchanged).
+    adaptiveIconBackground: '#ffffff',
     // BharatJodii rebrand: notification small-icon, ported from the native
     // Android app's per-flavor drawable/ic_notify_logo.png (see app.config.js's
     // expo-notifications plugin config). Only this flavor + the 8 below got a

@@ -483,9 +483,10 @@
        "OPP_BLOCK_TEXT":"You cannot message this user"
     },
     "ACCOUNT":{
-        "HEADER":"Manage account", 
+        "HEADER":"Manage account",
         "1":"Logout",
         "2":"Delete profile",
+        "RESTORE_PURCHASES":"Restore Purchases",
         "LOGOUTMSG":"Are you sure you want to logout?",
         "YES":"Yes",
         "NO":"No",

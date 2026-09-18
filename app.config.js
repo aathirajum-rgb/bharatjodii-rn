@@ -55,8 +55,11 @@ module.exports = ({ config }) => ({
   android: {
     ...config.android,
     adaptiveIcon: {
-      foregroundImage: f.icon,
-      backgroundColor: '#E6F4FE',
+      // f.adaptiveIcon is a pre-padded (safe-zone) version of the icon where
+      // one exists (currently just the jodii flavor — see flavorConfig.js);
+      // other flavors fall back to the flat f.icon as before.
+      foregroundImage: f.adaptiveIcon || f.icon,
+      backgroundColor: f.adaptiveIconBackground || '#E6F4FE',
     },
     package: f.applicationId,
     predictiveBackGestureEnabled: false,
@@ -159,6 +162,7 @@ module.exports = ({ config }) => ({
     './plugins/withFirebaseIOS',
     './plugins/withRazorpayAndroidBridge',
     './plugins/withPayUAndroidBridge',
+    './plugins/withIosStoreKitBridge',
     'expo-audio',
     'expo-font',
     'expo-image',

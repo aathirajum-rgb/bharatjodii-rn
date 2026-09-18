@@ -30,7 +30,14 @@ async function runOTACheck() {
 
   try {
     const check = await Updates.checkForUpdateAsync();
-    if (!check.isAvailable) return;
+    // TEMP DIAGNOSTIC — remove once the "update shows on some devices but not
+    // others" issue is root-caused. Surfaces the "checked OK, nothing to
+    // install" case, which otherwise looks identical to a silently swallowed
+    // network/DNS failure (no popup either way).
+    if (!check.isAvailable) {
+      Alert.alert('OTA Debug', `Checked server — no update available.\nchannel: ${Updates.channel}\nruntimeVersion: ${Updates.runtimeVersion}`);
+      return;
+    }
 
     Alert.alert(
       'Update Available',
@@ -51,8 +58,10 @@ async function runOTACheck() {
         },
       ]
     );
-  } catch {
-    // silently ignore — update check errors are non-fatal
+  } catch (e: any) {
+    // TEMP DIAGNOSTIC — was previously a silent no-op, which is why this bug
+    // was invisible. Remove this alert once root-caused.
+    Alert.alert('OTA Check Failed', `${e?.code ?? ''} ${e?.message ?? String(e)}\nchannel: ${Updates.channel}\nruntimeVersion: ${Updates.runtimeVersion}`);
   }
 }
 

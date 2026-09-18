@@ -68,7 +68,16 @@ async function generateFlavorIcons(projectRoot) {
     return;
   }
 
-  for (const [flavorName, { icon }] of Object.entries(FLAVORS)) {
+  for (const [flavorName, flavor] of Object.entries(FLAVORS)) {
+    // adaptiveIcon/adaptiveIconBackground are optional per-flavor overrides
+    // (currently only set for jodii — see flavorConfig.js). A flat `icon`
+    // resized 1:1 into the foreground layer with no safe-zone padding gets
+    // its content clipped once Android masks/zooms the adaptive icon on
+    // real devices, so flavors that hit that need a pre-padded source here
+    // instead of the flat store/splash icon. Flavors without an override
+    // keep the exact prior behavior.
+    const icon = flavor.adaptiveIcon || flavor.icon;
+    const backgroundColor = flavor.adaptiveIconBackground || '#E6F4FE';
     const iconSrc = path.resolve(projectRoot, icon.replace('./', ''));
     if (!fs.existsSync(iconSrc)) {
       console.warn(`[withAndroidFlavors] Icon missing for flavor "${flavorName}": ${iconSrc}`);
@@ -84,14 +93,14 @@ async function generateFlavorIcons(projectRoot) {
 
       const { source: iconImg } = await generateImageAsync(
         { projectRoot },
-        { src: iconSrc, name: 'ic_launcher.png', width: iconSize, height: iconSize, resizeMode: 'cover', backgroundColor: '#E6F4FE' }
+        { src: iconSrc, name: 'ic_launcher.png', width: iconSize, height: iconSize, resizeMode: 'cover', backgroundColor }
       );
       fs.writeFileSync(path.join(outDir, 'ic_launcher.png'), iconImg);
       fs.writeFileSync(path.join(outDir, 'ic_launcher_round.png'), iconImg);
 
       const { source: fgImg } = await generateImageAsync(
         { projectRoot },
-        { src: iconSrc, name: 'ic_launcher_foreground.png', width: fgSize, height: fgSize, resizeMode: 'contain', backgroundColor: '#E6F4FE' }
+        { src: iconSrc, name: 'ic_launcher_foreground.png', width: fgSize, height: fgSize, resizeMode: 'contain', backgroundColor }
       );
       fs.writeFileSync(path.join(outDir, 'ic_launcher_foreground.png'), fgImg);
     }
@@ -100,6 +109,22 @@ async function generateFlavorIcons(projectRoot) {
     fs.mkdirSync(anydpiDir, { recursive: true });
     fs.writeFileSync(path.join(anydpiDir, 'ic_launcher.xml'), ADAPTIVE_ICON_XML);
     fs.writeFileSync(path.join(anydpiDir, 'ic_launcher_round.xml'), ADAPTIVE_ICON_XML);
+
+    // iconBackground is a @color reference (see ADAPTIVE_ICON_XML) resolved
+    // from android/app/src/main/res/values/colors.xml, which every flavor
+    // shares and which only reflects whichever flavor Expo's own icon config
+    // plugin last ran for (same "last prebuild wins" trap the manifestPlaceholders
+    // block above works around for scheme/host). Writing it per-flavor here too
+    // makes each flavor's build self-contained regardless of prebuild order.
+    const valuesDir = path.join(resDir, 'values');
+    fs.mkdirSync(valuesDir, { recursive: true });
+    fs.writeFileSync(
+      path.join(valuesDir, 'colors.xml'),
+      '<?xml version="1.0" encoding="utf-8"?>\n' +
+        '<resources>\n' +
+        `    <color name="iconBackground">${backgroundColor}</color>\n` +
+        '</resources>\n'
+    );
   }
 
   console.log('[withAndroidFlavors] All flavor icons generated');

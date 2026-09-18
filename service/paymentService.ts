@@ -104,6 +104,12 @@ export interface SelectedPackage {
   // isEmiFlow() — EMIPRODUCTID.includes(productid), computed once in
   // getMembershipPlans() below rather than re-deriving it per screen.
   isEmi?:            boolean | undefined
+  // App Store product identifier for this plan (e.g. "com.matrimony.jodii_3INR")
+  // — see service/iapService.ts. No backend field for this exists yet
+  // (getMembershipPlans() never sets it); RechargeScreen's iOS branch checks
+  // for its presence and shows an error instead of guessing a SKU, since a
+  // wrong guess here means charging the wrong Apple product.
+  iosProductId?:     string | undefined
 }
 
 // Angular: botton-sheet.config.ts AUTO_RENEWAL_BENEFITS — static fallback shown
@@ -811,6 +817,12 @@ export interface MembershipPlan {
   // isEmiFlow() — EMIPRODUCTID.includes(productid), computed once in
   // getMembershipPlans() below rather than re-deriving it per screen.
   isEmi?:         boolean | undefined
+  // App Store product identifier for this plan (e.g. "com.matrimony.jodii_3INR")
+  // — see service/iapService.ts. No backend field for this exists yet
+  // (getMembershipPlans() never sets it); RechargeScreen's iOS branch checks
+  // for its presence and shows an error instead of guessing a SKU, since a
+  // wrong guess here means charging the wrong Apple product.
+  iosProductId?:  string | undefined
 }
 
 export interface MembershipPlansData {
