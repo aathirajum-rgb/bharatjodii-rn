@@ -5,6 +5,7 @@ import {
   type LinkingOptions,
 } from '@react-navigation/native'
 import * as Linking from 'expo-linking'
+import * as SplashScreen from 'expo-splash-screen'
 import { useCallback, useEffect, useState } from 'react'
 import { ActivityIndicator, BackHandler, Platform, View } from 'react-native'
 import { useAuth } from '../contexts/AuthContext'
@@ -271,6 +272,17 @@ export default function RootNavigation() {
   }, [])
 
   console.log('[TRACE] RootNavigation render: loading =', loading, 'isAuthenticated =', isAuthenticated)
+
+  // AuthStack's own SplashAnimationScreen hides the native splash itself, timed
+  // to its brand-image paint (see comment there) — but a returning logged-in
+  // user mounts AppStack directly and never renders that screen, so nothing
+  // would ever call hideAsync() and the native splash/logo would stay up
+  // forever. Hide it here for that path only, once the auth check resolves.
+  useEffect(() => {
+    if (!loading && isAuthenticated) {
+      SplashScreen.hideAsync().catch(() => {})
+    }
+  }, [loading, isAuthenticated])
 
   // Blank while we check AsyncStorage — prevents a flash of the wrong stack
   if (loading) {

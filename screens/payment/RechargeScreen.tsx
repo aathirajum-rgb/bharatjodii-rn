@@ -370,7 +370,7 @@ export default function RechargeScreen({ navigation, route }: Props) {
               scrollbar on mobile; RN's ScrollView shows one by default, which
               is the grey vertical line running down the right edge. */}
           <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-            {/* {data.plans.map(plan => (
+            {data.plans.map(plan => (
               <PlanCard
                 key={plan.productid}
                 plan={plan}
@@ -378,7 +378,7 @@ export default function RechargeScreen({ navigation, route }: Props) {
                 selected={selectedId === plan.productid}
                 onPress={() => setSelected(plan.productid)}
               />
-            ))} */}
+            ))}
 
             {/* Angular: promotions.component.html:254-297 — a server-driven
                 "Apply Coupon" banner (not a user-typed code field). Hidden
