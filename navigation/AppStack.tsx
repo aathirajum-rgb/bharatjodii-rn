@@ -19,6 +19,7 @@ import { handleBack as centralizedHandleBack } from '../utils/navigationRef'
 import { useAuth } from '../contexts/AuthContext'
 import { useIsDesktopWeb } from '../hooks/useIsDesktopWeb'
 import { useLanguageFonts } from '../hooks/useLanguageFonts'
+// import { isWebApp } from '../service/common'
 
 // Angular's LINK_BTN (button.config.ts) plays a looping Lottie
 // (forward-animation-link, right-arrow-animation.json/.gif) next to the link
@@ -322,6 +323,7 @@ const DESKTOP_PAGE_NOS = new Set([
 ])
 
 function OnboardingRouter({ navigation, route }: { navigation: any; route: any }) {
+  // const isWebApplication = isWebApp();
   const pageNo = route.params?.pageNo ?? '1'
   const isDesktop = useIsDesktopWeb()
   const insets = useSafeAreaInsets()

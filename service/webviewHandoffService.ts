@@ -11,6 +11,7 @@ import { getItem, setItem, setMultiple } from './storageService'
 import { StorageKeys } from '../constants/storage.keys'
 import { clearSession } from './apiClient'
 import { storeWebURLData, setRegValues, resetRegValues } from './registrationService'
+import { isWebApp } from './common'
 
 export interface WebviewHandoff {
   type: string
