@@ -37,6 +37,7 @@ import {
 import MatchesDesktopLayout from './MatchesDesktopLayout'
 import LanguagePillSheet from '../../components/language-pill/LanguagePillSheet'
 import MembershipBanner from '../../components/matches/MembershipBanner'
+import JobsPromoBanner from '../../components/matches/JobsPromoBanner'
 import { useNetwork } from '../../contexts/NetworkContext'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
@@ -2641,10 +2642,8 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         const jobsPromo = menuPromo.MANYJOBSPROMO
         const jobsUrl   = jobsPromo.URL ?? jobsPromo.LINK
         return (
-          <SimplePromoBanner
-            imageUri={jobsPromo.BANNERIMG}
-            title={jobsPromo.TITLE ?? ''}
-            cta={jobsPromo.CTA ?? ''}
+          <JobsPromoBanner
+            data={jobsPromo}
             onPress={() => { if (jobsUrl) Linking.openURL(jobsUrl) }}
           />
         )
