@@ -18,6 +18,7 @@ import { getLinkingPrefixes, handleResolverURL } from '../service/deepLinkServic
 import { handleBack, navigationRef } from '../utils/navigationRef'
 import AppStack, { type AppStackParamList } from './AppStack'
 import AuthStack, { type AuthStackParamList } from './AuthStack'
+import { isWebApp, isBrowser } from '../service/common'
 
 // ─── Web hash-based URL routing ───────────────────────────────────────────────
 // Target format: https://stgmobile.bharatjodii.com/jodii/#/daily-recommendations?frm_page=login
