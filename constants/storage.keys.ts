@@ -144,4 +144,19 @@ export const StorageKeys = {
     FREE_MATCHES_TOTAL_COUNT: 'FREEMATCHESTOTALCOUNT',
   },
 
+  // Angular: services/app-rating.service.ts — the flat localStorage keys its
+  // cooldown gate reads/writes, plus the two per-action counters that
+  // activeRatingPopup() increments. Same key names kept.
+  Rating: {
+    // Star value the server reports in the login response's RATING field
+    // ('0' = never rated). '4'/'5' permanently suppresses the popup.
+    RATING_VALUE: 'APPRATINGVALUE',
+    // Login response's RATINGDATE — when that rating was given.
+    RATING_DATE:  'APPRATINGDATE',
+    // When the popup was last PRESENTED, rated or not.
+    SHOWN_DATE:   'SHOWAPPRATINGDATE',
+    VP_COUNT:     'RATINGCOUNTVP',
+    LIKE_COUNT:   'RATINGLIKESENT',
+  },
+
 } as const

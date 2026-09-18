@@ -1641,6 +1641,25 @@ export async function storeWebURLData(data: Record<string, any>): Promise<void> 
     ops.push(setItem(SK.User.MEMBER_CODE, data.CCODE))
   }
 
+  // Angular registration.service.ts:1521-1533 — the login response's RATING /
+  // RATINGDATE are stored under DIFFERENT key names (APPRATINGVALUE /
+  // APPRATINGDATE), and TIMECREATED is stored verbatim. All three are flat
+  // localStorage keys in Angular because app-rating.service.ts reads them with
+  // a raw localStorage.getItem(), not through the session blob — kept flat here
+  // for the same reason (appRatingService.ts reads them the same way).
+  // Without these the rating gate had no inputs at all: APPRATINGVALUE always
+  // read '0' and TIMECREATED was never set, so the "account is 14+ days old"
+  // and "already rated 4-5, never ask again" rules could never fire.
+  //
+  // NOTE: Angular passes RATINGDATE through common.getStorageValuebyKey(), which
+  // does localStorage.getItem(<the date string>) — i.e. it looks the date up as
+  // if it were a KEY and therefore always yields ''. That is a bug, and
+  // reproducing it would permanently disable the 30-day re-ask branch for users
+  // who rated 1-3. The real date is stored here instead.
+  if (data.RATING !== undefined)      ops.push(setItem(SK.Rating.RATING_VALUE, String(data.RATING)))
+  if (data.RATINGDATE !== undefined)  ops.push(setItem(SK.Rating.RATING_DATE,  String(data.RATINGDATE)))
+  if (data.TIMECREATED !== undefined) ops.push(setItem(SK.User.TIME_CREATED,   String(data.TIMECREATED)))
+
   // All session/profile data → single USER_SESSION object
   const session: Record<string, any> = await getSession()
 

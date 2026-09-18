@@ -14,12 +14,14 @@
 // The plan-swipe/EPR/old PageType=='2' variants are intentionally not built —
 // out of scope for this Figma.
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
-  Alert, Linking, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View,
+  Alert, BackHandler, Linking, Platform, Pressable, ScrollView, StyleSheet, Text,
+  useWindowDimensions, View,
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { useTranslation } from 'react-i18next'
+import { useFocusEffect } from '@react-navigation/native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish, FontSize, RupeeSymbolFont } from '../../src/theme/fonts'
@@ -211,6 +213,43 @@ export default function RechargeScreen({ navigation, route }: Props) {
     // knows to nest it under MainTabs (see utils/navigationRef.ts).
     else resetTo('Matches')
   }
+
+  // Angular: app-navigation.service.ts's device-back chain — for currentPath
+  // '/recharge' it clicks #rechargeButton (recharge.page.html's close control,
+  // bound to closeIntermediatePage()) and RETURNS TRUE, so the press never
+  // reaches the appNativeEvent('{"event_name":"ExitPopup"}') branch that the
+  // same chain falls through to on matches.
+  //
+  // Without this, Android back on this screen hit the centralized handleBack()
+  // (utils/navigationRef.ts), found canGoBack() === false, and showed the "Do
+  // you want to exit?" sheet — because free/unpaid users land here as
+  // AppStack's INITIAL route (AuthContext's resolveInitialRoute(): ENTRYTYPE
+  // !== 'P' → 'recharge'), so there is nothing underneath to pop to. The X
+  // button already handled that case via handleClose(); hardware back now
+  // routes to the exact same function, so the two can't diverge.
+  //
+  // useFocusEffect, not a bare useEffect: this screen stays MOUNTED once
+  // PaymentOptions/checkout is pushed on top of it, and BackHandler runs its
+  // subscriptions last-registered-first — an always-on listener here would
+  // swallow the back press meant for whichever screen is actually on top.
+  useFocusEffect(
+    useCallback(() => {
+      if (Platform.OS !== 'android') return
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        // Angular: '/recharge/viewall' is its own ROUTE, whose back press
+        // clicks #viewAllBtn to close it. Here that same full plan list is a
+        // bottom sheet on this screen, so back closes the sheet first and
+        // only leaves the screen once it's already shut.
+        if (showAllPlans) {
+          setShowAllPlans(false)
+          return true
+        }
+        handleClose()
+        return true
+      })
+      return () => sub.remove()
+    }, [showAllPlans]),
+  )
 
   function openAllPlans() {
     setSheetSelected(selectedId)

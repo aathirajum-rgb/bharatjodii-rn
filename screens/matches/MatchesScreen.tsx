@@ -79,7 +79,7 @@ import {
   getHeroBannerDetails, openMembershipTab, fetchUpgradePaymentPromo, redirectToIntermediatePage,
   type UpgradePaymentPromo,
 } from '../../service/paymentService'
-import { shouldShowRatingPopup, markRatingPopupShown } from '../../service/appRatingService'
+import { passiveRatingPopup, markRatingPopupOpened, type RatingTrigger } from '../../service/appRatingService'
 import { requestPushNotificationPermission } from '../../service/permissionService'
 import { fetchSurveyPopup, type SurveyPopupData } from '../../service/surveyService'
 import { shouldShowIncomeSheet, saveIncome, snoozeIncomeSheet } from '../../service/incomeSheetService'
@@ -1085,7 +1085,10 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   const [showNotificationPopup, setShowNotificationPopup] = useState(false)
 
   // ── "Rate our app" popup ────────────────────────────────────────────────────
-  const [showRatingPopup, setShowRatingPopup] = useState(false)
+  // Angular: app-rating.service.ts hands the popup an actionNo (its SOURCE
+  // param, 1-5) identifying which rule opened it — so the trigger object, not a
+  // bare boolean, is what drives visibility here.
+  const [ratingTrigger, setRatingTrigger] = useState<RatingTrigger | null>(null)
 
   // ── BharatJodii rename announcement (one-time) ──────────────────────────────
   // Angular: matches.page.ts's checkBharatJodiiRenameSheet() / BHARATJODII_RENAME
@@ -1615,9 +1618,16 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
       // "Rate our app" popup (#9) — Angular: passiveRatingPopup(). Skipped when the
       // bulk-like modal or the rename announcement already claimed this mount's one
       // popup slot (no modal-stacking), mirroring Angular's SHOW_RATING_POPUP mutual-exclusion.
-      if (!ctrl.cancelled && !bulkLikeShown && !renameShown && await shouldShowRatingPopup(comCount)) {
-        setShowRatingPopup(true)
-        await markRatingPopupShown()
+      // passiveRatingPopup() itself only evaluates once per app session and
+      // honours the cooldown, so re-focusing Matches can't re-ask.
+      if (!ctrl.cancelled && !bulkLikeShown && !renameShown) {
+        const trigger = await passiveRatingPopup(comCount)
+        if (!ctrl.cancelled && trigger) {
+          // Angular: openRatingPopup() stamps SHOWAPPRATINGDATE and fires the
+          // source's payment track at present() time, not on dismiss.
+          await markRatingPopupOpened(trigger)
+          setRatingTrigger(trigger)
+        }
       }
     }
 
@@ -2774,7 +2784,11 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
           onEnable={handleNotificationCta}
           onClose={() => setShowNotificationPopup(false)}
         />
-        <AppRatingModal visible={showRatingPopup} onClose={() => setShowRatingPopup(false)} />
+        <AppRatingModal
+          visible={!!ratingTrigger}
+          source={ratingTrigger?.source ?? '1'}
+          onClose={() => setRatingTrigger(null)}
+        />
         <BottomSheet
           visible={showBharatJodiiRename}
           type="bharatJodiiRename"
@@ -3000,7 +3014,11 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         onEnable={handleNotificationCta}
         onClose={() => setShowNotificationPopup(false)}
       />
-      <AppRatingModal visible={showRatingPopup} onClose={() => setShowRatingPopup(false)} />
+      <AppRatingModal
+        visible={!!ratingTrigger}
+        source={ratingTrigger?.source ?? '1'}
+        onClose={() => setRatingTrigger(null)}
+      />
       <BottomSheet
         visible={showBharatJodiiRename}
         type="bharatJodiiRename"
