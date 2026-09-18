@@ -755,14 +755,14 @@ export default function ViewProfileContent(props: ViewProfileContentProps) {
                 <Text style={s.newBadgeText}>{t('MATCHES.NEW')}</Text>
               </View>
             )}
-            {showCoachMark && (
-              <Pressable style={s.coachMarkOverlay} onPress={onDismissCoachMark} disabled={!interactive}>
-                <View style={s.coachMarkCard}>
-                  <Text style={s.coachMarkText}>{t('VIEWPROFILE.GUIDEMOVENEXT')}</Text>
-                  <Text style={s.coachMarkDismiss}>{t('GENERAL.OK_PENDING')}</Text>
-                </View>
-              </Pressable>
-            )}
+            {/* {showCoachMark && ( */
+             /* <Pressable style={s.coachMarkOverlay} onPress={onDismissCoachMark} disabled={!interactive}>
+               <View style={s.coachMarkCard}>
+                 <Text style={s.coachMarkText}>{t('VIEWPROFILE.GUIDEMOVENEXT')}</Text>
+                   <Text style={s.coachMarkDismiss}>{t('GENERAL.OK_PENDING')}</Text>
+                 </View>
+             </Pressable> */
+            /* )} */}
             </View>
           </GestureDetector>
           {/* Feature 6 biodata theming — Angular's biodata-back-arrow-img/
