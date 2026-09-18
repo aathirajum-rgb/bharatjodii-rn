@@ -11,7 +11,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useFocusEffect } from '@react-navigation/native'
 import { useTranslation } from 'react-i18next'
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
@@ -70,7 +70,6 @@ const TAB_VALUES: Record<MessageTab, number> = { whoseviewednumber: 6, whoviewed
 
 export default function MessagerListScreen({ navigation }: Props) {
   const { t } = useTranslation()
-  const insets = useSafeAreaInsets()
   const isDesktop = useIsDesktopWeb()
   const { isOffline } = useNetwork()
 
@@ -437,7 +436,7 @@ export default function MessagerListScreen({ navigation }: Props) {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <SafeAreaView edges={['top']} style={styles.screen}>
 
       {/* ── Header ── */}
       <View style={styles.header}>
@@ -526,7 +525,7 @@ export default function MessagerListScreen({ navigation }: Props) {
       )}
 
       <Toast request={toastRequest} bottomOffset={56 + 16} />
-    </View>
+    </SafeAreaView>
   )
 }
 

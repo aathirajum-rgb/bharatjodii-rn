@@ -56,7 +56,7 @@ export default function NeftRtgsScreen({ navigation }: Props) {
       {loading ? (
         <ActivityIndicator color={Colors.primaryDark} style={{ marginTop: 40 }} />
       ) : (
-        <ScrollView contentContainerStyle={s.content}>
+        <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 16 }]}>
           {!!tollFree && (
             <Text style={s.note}>
               Share the transaction details with us after payment at{' '}

@@ -106,7 +106,7 @@ export default function PayAtStoreScreen({ navigation, route }: Props) {
         <Text style={s.headerTitle} numberOfLines={1}>Pay at our stores</Text>
       </View>
 
-      <ScrollView contentContainerStyle={s.content}>
+      <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 16 }]}>
         {/* ── State ── */}
         {!!selectedState && !pickingState && (
           <Pressable style={s.selectedRow} onPress={() => setPickingState(true)}>

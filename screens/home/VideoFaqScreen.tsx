@@ -68,7 +68,7 @@ export default function VideoFaqScreen({ navigation }: { navigation: any }) {
       <FlatList
         data={videos}
         keyExtractor={i => i.id}
-        contentContainerStyle={s.list}
+        contentContainerStyle={[s.list, { paddingBottom: 24 + insets.bottom }]}
         renderItem={({ item }) => (
           <Pressable style={s.card} onPress={() => item.videoUrl && setVideoModalUrl(item.videoUrl)}>
             {item.thumbUrl

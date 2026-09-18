@@ -128,7 +128,7 @@ export default function SelfieVerificationScreen({ navigation: _navigation }: { 
       </View>
 
       {(step === 'idle') && (
-        <View style={s.content}>
+        <View style={[s.content, { paddingBottom: insets.bottom }]}>
           <Text style={s.heading}>{t('VERIFY_BLOCKER.TAKE_SELFIE', 'Take a selfie')}</Text>
           <Text style={s.tip}>{`•  ${t('VERIFY_ID.GOOD_LIGHT', 'Make sure you are in a good light')}`}</Text>
           <Text style={s.tip}>{`•  ${t('VERIFY_ID.HOLD_PHONE', 'Hold your phone at eye level and look straight in the camera')}`}</Text>
@@ -170,7 +170,7 @@ export default function SelfieVerificationScreen({ navigation: _navigation }: { 
       )}
 
       {step === 'failed' && (
-        <View style={s.content}>
+        <View style={[s.content, { paddingBottom: insets.bottom }]}>
           <Text style={s.heading}>{t('VERIFY_ID.SELFIE_VERIFY_FAILED', 'Selfie Verification failed !')}</Text>
           <Text style={s.tip}>{errorMsg}</Text>
           <ButtonRevamp

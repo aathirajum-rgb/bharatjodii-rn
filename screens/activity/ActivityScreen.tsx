@@ -33,7 +33,7 @@ import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator, FlatList, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { useFooterBadges } from '../../contexts/FooterBadgesContext'
@@ -152,7 +152,6 @@ function isDeletedProfile(profile: MatchProfile): boolean {
 
 export default function ActivityScreen({ navigation, route }: Props) {
   const { t } = useTranslation()
-  const insets = useSafeAreaInsets()
   const isDesktop = useIsDesktopWeb()
   const gating = useContactGating()
 
@@ -1121,7 +1120,7 @@ export default function ActivityScreen({ navigation, route }: Props) {
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <SafeAreaView edges={['top']} style={styles.screen}>
 
       {/* ── Header — Angular renders the plain title+language row for the
           activity tabs, and a back-button + title row in viewed-list mode. ── */}
@@ -1332,7 +1331,7 @@ export default function ActivityScreen({ navigation, route }: Props) {
       <Toast request={toastRequest} bottomOffset={56 + 16} />
       <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
       <AddPhotoVerdictSheets addPhoto={addPhoto} />
-    </View>
+    </SafeAreaView>
   )
 }
 

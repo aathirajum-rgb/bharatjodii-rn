@@ -319,7 +319,7 @@ export default function ViewLaterScreen({ navigation }: Props) {
         <FlatList
           data={profiles}
           keyExtractor={item => item.profileId}
-          contentContainerStyle={s.listContent}
+          contentContainerStyle={[s.listContent, { paddingBottom: insets.bottom + 16 }]}
           renderItem={({ item }) => (
             <MatchCard
               profile={item}

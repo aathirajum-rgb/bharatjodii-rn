@@ -186,7 +186,7 @@ export default function MorePaymentOptionsScreen({ navigation, route }: Props) {
         <Text style={s.headerTitle} numberOfLines={1}>{t('RECHARGE.MOREOPTION')}</Text>
       </View>
 
-      <ScrollView contentContainerStyle={s.content}>
+      <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 16 }]}>
         {methods.map(item => (
           <Pressable
             key={item.KEY}
