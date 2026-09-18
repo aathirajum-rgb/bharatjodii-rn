@@ -599,13 +599,13 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // happens immediately, animation is what's gradual," not "animation
   // finishes, then swap."
   const screenSlideX = useSharedValue(0)
-  const PAGE_TRANSITION_DURATION = 400
-  const pageTransitionEasing = Easing.bezier(0.4, 0, 0.2, 1)
+  const PAGE_TRANSITION_DURATION = 500
+  const pageTransitionEasing = Easing.bezier(0.5, 0, 0.25, 1)
   const screenSlideStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: screenSlideX.value }],
   }))
   function animateProfileChange(direction: 'prev' | 'next', nextId: string) {
-    const outTo = direction === 'next' ? -SCREEN_WIDTH : SCREEN_WIDTH
+    const outTo = direction === 'prev' ? -SCREEN_WIDTH : SCREEN_WIDTH
     screenSlideX.value = outTo
     setMatriId(nextId)
     screenSlideX.value = withTiming(0, { duration: PAGE_TRANSITION_DURATION, easing: pageTransitionEasing })
@@ -2087,14 +2087,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                 <Text style={[s.newBadgeText, { fontFamily: langFonts.medium }]}>{t('MATCHES.NEW')}</Text>
               </View>
             )}
-            {showCoachMark && (
-              <Pressable style={s.coachMarkOverlay} onPress={dismissCoachMark}>
-                <View style={s.coachMarkCard}>
-                  <Text style={[s.coachMarkText, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.GUIDEMOVENEXT')}</Text>
-                  <Text style={[s.coachMarkDismiss, { fontFamily: langFonts.semiBold }]}>{t('GENERAL.OK_PENDING')}</Text>
-                </View>
-              </Pressable>
-            )}
+          
             </View>
           </GestureDetector>
           {/* Feature 6 biodata theming — Angular's biodata-back-arrow-img/

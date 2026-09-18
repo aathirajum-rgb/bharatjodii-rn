@@ -246,7 +246,7 @@ export default function PhotoMismatchSelfieScreen({ navigation, route }: Props) 
       )}
 
       {step === 'success' && (
-        <View style={s.content}>
+        <View style={[s.content, { paddingBottom: insets.bottom }]}>
           <CdnLottie uri={CDN_LOTTIE + 'success-new.json'} width={80} height={80} loop={false} />
           <Text style={s.heading}>{t('AI_PHOTO_VALIDATION.VERIFICATION_COMPLETED', 'Verification completed!')}</Text>
           <Text style={s.tip}>{t('AI_PHOTO_VALIDATION.VERIFICATION_COMPLETED_BODY', 'Your profile is verified. You can start viewing matches')}</Text>
@@ -255,7 +255,7 @@ export default function PhotoMismatchSelfieScreen({ navigation, route }: Props) 
       )}
 
       {step === 'mismatch' && (
-        <View style={s.content}>
+        <View style={[s.content, { paddingBottom: insets.bottom }]}>
           <CdnSvg uri={ICONS.alert} width={56} height={56} style={s.warningIcon} />
           <Text style={s.heading}>{t('AI_PHOTO_VALIDATION.PROFILE_PHOTO_MISMATCH', 'Profile photo mismatch')}</Text>
           <Text style={s.tip}>{mismatchReason ?? t('AI_PHOTO_VALIDATION.MISMATCH_BODY', 'Upload a real photo of yourself to complete verification.')}</Text>
@@ -267,7 +267,7 @@ export default function PhotoMismatchSelfieScreen({ navigation, route }: Props) 
       )}
 
       {step === 'failed' && (
-        <View style={s.content}>
+        <View style={[s.content, { paddingBottom: insets.bottom }]}>
           <CdnSvg uri={ICONS.alert} width={56} height={56} style={s.warningIcon} />
           <Text style={s.heading}>{t('VERIFY_ID.SELFIE_VERIFY_FAILED', 'Selfie Verification failed !')}</Text>
           <Text style={s.tip}>{t('AI_PHOTO_VALIDATION.SELFIE_PHOTO_MISMATCH', 'Photo mismatch')}</Text>

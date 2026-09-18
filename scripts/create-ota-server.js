@@ -63,24 +63,54 @@ $channel  = $_SERVER['HTTP_EXPO_CHANNEL_NAME'] ?? 'production';
 $flavor   = $_SERVER['HTTP_EXPO_FLAVOR'] ?? 'jodii';
 $current  = $_SERVER['HTTP_EXPO_CURRENT_UPDATE_ID'] ?? '';
 
+// The written protocol spec (docs.expo.dev/technical-specs/expo-updates-1) says
+// a plain-JSON (non-multipart) "no update" response SHOULD be 406. The actual
+// expo-updates Android client does NOT implement that: FileDownloader.kt checks
+// OkHttp's response.isSuccessful (true only for 2xx), and 406 fails that check
+// immediately — before it ever reaches the code that treats 204 as a clean
+// no-op. Only 204 gets that special no-op handling, and only when these
+// protocol headers are present (without expo-protocol-version, a bare 204 is
+// treated as "Invalid update response: Empty body" instead). So despite what
+// the spec says, headers + 204 is the combination the real client accepts —
+// headers + 406 throws "Remote update request not successful", and a
+// header-less 204 (the original bug) throws "Failed to check for update".
+function sendProtocolHeaders() {
+    header('expo-protocol-version: 1');
+    header('expo-sfv-version: 0');
+    header('expo-manifest-filters: ');
+    header('expo-server-defined-headers: ');
+    header('cache-control: private, max-age=0');
+}
+
 $file = __DIR__ . "/ota-files/$flavor/$channel/$platform/latest.json";
 
 if (!file_exists($file)) {
+    sendProtocolHeaders();
     http_response_code(204);
     exit;
 }
 
-$manifest = json_decode(file_get_contents($file), true);
+$raw = file_get_contents($file);
+$manifest = json_decode($raw, true);
 
 if ($manifest['id'] === $current) {
+    sendProtocolHeaders();
     http_response_code(204);
     exit;
 }
 
+// Forward the ORIGINAL bytes, not json_encode($manifest) — PHP's array/object
+// json_decode+json_encode round-trip can't tell an empty JSON object ({}) from
+// an empty JSON array ([]) (both decode to array()), so deploy-ota.js's
+// "metadata": {} was silently coming back out as "metadata": []. The native
+// Android client requires metadata to be a JSON object and throws
+// "Value [] at metadata ... cannot be converted to JSONObject" on every
+// single check when it isn't — which is what was actually causing the
+// permanent "Failed to check for update" failure (separate from, and on top
+// of, the missing-headers/204-vs-406 issue fixed above).
 header('Content-Type: application/json');
-header('expo-protocol-version: 1');
-header('cache-control: no-store');
-echo json_encode($manifest);
+sendProtocolHeaders();
+echo $raw;
 `,
 
   // Plain-Node standalone server — same manifest logic as manifest.php, for
@@ -123,8 +153,25 @@ const server = http.createServer((req, res) => {
 
     const latestJsonPath = path.join(OTA_FILES_PATH, flavor, channelName, platform, 'latest.json');
 
+    // The written protocol spec (docs.expo.dev/technical-specs/expo-updates-1) says
+    // a plain-JSON (non-multipart) "no update" response SHOULD be 406. The actual
+    // expo-updates Android client does NOT implement that: FileDownloader.kt checks
+    // OkHttp's response.isSuccessful (true only for 2xx), and 406 fails that check
+    // immediately — before it ever reaches the code that treats 204 as a clean
+    // no-op. Only 204 gets that special no-op handling, and only when these
+    // protocol headers are present (without expo-protocol-version, a bare 204 is
+    // treated as "Invalid update response: Empty body" instead). So despite what
+    // the spec says, headers + 204 is the combination the real client accepts.
+    const protocolHeaders = {
+      'expo-protocol-version': '1',
+      'expo-sfv-version': '0',
+      'expo-manifest-filters': '',
+      'expo-server-defined-headers': '',
+      'cache-control': 'private, max-age=0',
+    };
+
     if (!fs.existsSync(latestJsonPath)) {
-      res.writeHead(204);
+      res.writeHead(204, protocolHeaders);
       res.end();
       return;
     }
@@ -133,22 +180,21 @@ const server = http.createServer((req, res) => {
 
     // App already has this update
     if (manifest.id === currentUpdateId) {
-      res.writeHead(204);
+      res.writeHead(204, protocolHeaders);
       res.end();
       return;
     }
 
     // Runtime version mismatch — needs native store update
     if (manifest.runtimeVersion !== runtimeVersion) {
-      res.writeHead(204);
+      res.writeHead(204, protocolHeaders);
       res.end();
       return;
     }
 
     res.writeHead(200, {
       'content-type': 'application/json',
-      'expo-protocol-version': '1',
-      'cache-control': 'no-store',
+      ...protocolHeaders,
     });
     res.end(JSON.stringify(manifest));
     return;

@@ -155,6 +155,10 @@ module.exports = ({ config }) => ({
     playStoreUrl: f.playStoreUrl,
   },
   plugins: [
+    // Must be first — see its own header comment (config-plugin manifest
+    // mods run in reverse registration order, so "first" here means "runs
+    // last", after every other plugin below has made its manifest changes).
+    './plugins/withManifestMergeFixes',
     './plugins/withAndroidFlavors',
     './plugins/withAndroidBuildCustomizations',
     './plugins/withAndroidManifestHardening',
@@ -194,7 +198,7 @@ module.exports = ({ config }) => ({
     // owns the real full-bleed art) mounts and takes over — backgroundColor
     // matches SplashAnimationScreen.tsx's container so the handoff (see its
     // hideNativeSplash) is seamless.
-    ['expo-splash-screen', { image: f.icon, imageWidth: 200, backgroundColor: '#d40c49' }],
+    ['expo-splash-screen', { image: f.icon, imageWidth: 200, backgroundColor: '#ffffff' }],
     'expo-status-bar',
     'expo-video',
     'expo-web-browser',

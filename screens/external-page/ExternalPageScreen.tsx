@@ -53,7 +53,7 @@ export default function ExternalPageScreen({ navigation: _navigation, route }: P
   if (!url) return null
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={[s.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={s.header}>
         <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />

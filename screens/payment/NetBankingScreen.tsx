@@ -144,7 +144,7 @@ export default function NetBankingScreen({ navigation, route }: Props) {
       {loading ? (
         <ActivityIndicator color={Colors.primaryDark} style={{ marginTop: 40 }} />
       ) : (
-        <ScrollView contentContainerStyle={s.content}>
+        <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 16 }]}>
           {popularBanks.length > 0 && (
             <>
               <Text style={s.sectionLabel}>{t('RECHARGE.POPULARBANK')}</Text>

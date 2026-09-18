@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   LocationData,
   PermissionResult,
@@ -41,6 +42,7 @@ type LoadingState = {
 };
 
 export default function PermissionDemoScreen() {
+  const insets = useSafeAreaInsets();
   const [permissions, setPermissions] = useState<PermissionState>({
     location: null,
     notification: null,
@@ -96,7 +98,10 @@ export default function PermissionDemoScreen() {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    // Top inset is already handled by the native-stack header this route
+    // renders with (headerShown:true in AppStack.tsx) — only the bottom
+    // (home indicator / gesture bar) needs handling here.
+    <ScrollView contentContainerStyle={[styles.container, { paddingBottom: CONTAINER_PADDING_BOTTOM + insets.bottom }]}>
       <Text style={styles.heading}>App Permissions</Text>
       <Text style={styles.subheading}>Tap Allow to request each permission</Text>
 
@@ -268,12 +273,17 @@ function DeniedMessage({
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
+// Referenced directly (not read back off styles.container, which StyleSheet.
+// create may compile to an opaque id rather than a plain object) so the
+// bottom-inset addition below has a real number to add insets.bottom to.
+const CONTAINER_PADDING_BOTTOM = 40;
+
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
     backgroundColor: '#f7f7f7',
     paddingTop: 24,
-    paddingBottom: 40,
+    paddingBottom: CONTAINER_PADDING_BOTTOM,
     paddingHorizontal: 20,
     gap: 16,
   },

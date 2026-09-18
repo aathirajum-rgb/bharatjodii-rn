@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { SafeAreaView } from 'react-native-safe-area-context'
 import AppHeader from '../../components/app-header/AppHeader'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import ProfilePhoto from '../../components/profile-photo/ProfilePhoto'
@@ -1805,7 +1806,11 @@ function PopoverShowcase() {
 
 export default function ComponentShowcaseScreen() {
   return (
-    <ScrollView style={styles.root} contentContainerStyle={styles.content}>
+    // This dev-only screen has no header/tab bar to absorb the status bar or
+    // home-indicator inset (its Stack.Screen doesn't opt into headerShown),
+    // so it needs to handle both edges itself like every other top-level screen.
+    <SafeAreaView edges={['top', 'bottom']} style={styles.root}>
+    <ScrollView contentContainerStyle={styles.content}>
       <Text style={styles.pageTitle}>Component Library</Text>
       <Text style={styles.pageSubtitle}>
         {totalItems} button variants across {sections.length} categories · Input Fields
@@ -1845,5 +1850,6 @@ export default function ComponentShowcaseScreen() {
       <BottomSheetShowcase />
       <PopoverShowcase />
     </ScrollView>
+    </SafeAreaView>
   )
 }

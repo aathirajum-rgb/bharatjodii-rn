@@ -753,7 +753,7 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
 
   return (
     <ScreenBackground>
-      <SafeAreaView style={styles.safe} edges={['top']}>
+      <SafeAreaView style={styles.safe} edges={['top', 'bottom']}>
         {!contentLoaded ? (
           <View style={styles.loaderContainer}>
             <LottieView source={{ uri: LOTTIE.loader }} autoPlay loop style={styles.loaderLottie} />

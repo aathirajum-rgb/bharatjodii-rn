@@ -28,7 +28,7 @@ const FLAVORS = {
     // card the logo is drawn on, instead of the old unrelated light-blue
     // default (plugins/withAndroidFlavors.js and app.config.js both fall
     // back to that old default for every other flavor, unchanged).
-    adaptiveIconBackground: '#ffffff',
+    adaptiveIconBackground: '#C70038',
     // BharatJodii rebrand: notification small-icon, ported from the native
     // Android app's per-flavor drawable/ic_notify_logo.png (see app.config.js's
     // expo-notifications plugin config). Only this flavor + the 8 below got a
