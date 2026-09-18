@@ -12,6 +12,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { HtmlText } from './matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 function parseCssColor(style: string | undefined, prop: string): string | undefined {
   if (!style) return undefined
@@ -46,7 +47,7 @@ export default function MembershipBanner({ data, onPress }: { data: any; onPress
   // flat approximation from OFFERTAG's background color instead (accepted simplification).
   const validBg     = parseCssColor(data.OFFERTAG, 'background') ?? '#FFF3CD'
   const validBorder = parseCssColor(data.OFFERTAG, 'border') ?? validBg
-
+  const langFonts = useLanguageFonts()
   return (
     <Pressable style={mb.card} onPress={onPress}>
       {/* Full-bleed campaign background art (Angular: background: url(BGIMG) on the whole card) */}
@@ -66,14 +67,14 @@ export default function MembershipBanner({ data, onPress }: { data: any; onPress
             doesn't work on React Native Web — it silently no-ops there, so numberOfLines={1}
             alone just truncated the text with "..." instead of shrinking to fit.) */}
         {!!data.TITLE && (
-          <Text style={[mb.title, { color: textColor }]}>
+          <Text style={[mb.title, { color: textColor, fontFamily: langFonts.semiBold }]} numberOfLines={2}>
             {stripHtml(data.TITLE)}
           </Text>
         )}
 
         {/* Festival subtitle */}
         {!!data.FESTIVALSUBTITLE && (
-          <HtmlText html={data.FESTIVALSUBTITLE} style={[mb.subtitle, { color: textColor }]} />
+          <HtmlText html={data.FESTIVALSUBTITLE} style={[mb.subtitle, { color: textColor, fontFamily: langFonts.semiBold }]} />
         )}
 
         {/* Subtitle — "Get up to <span>₹200 OFF</span> on paid membership!" — Angular gives
@@ -82,7 +83,7 @@ export default function MembershipBanner({ data, onPress }: { data: any; onPress
         {!!data.SUBTITLE && (
           <HtmlText
             html={data.SUBTITLE}
-            style={[mb.subtitle, { color: textColor }]}
+            style={[mb.subtitle, { color: textColor, fontFamily: langFonts.semiBold }]}
             spanStyle={mb.subtitleAmount}
           />
         )}
@@ -90,7 +91,7 @@ export default function MembershipBanner({ data, onPress }: { data: any; onPress
         {/* Validity / timer pill — ribbon shape: rounded left corners only, no right border
             (Angular: border-t/border-b/border-l but no border-r, rounded-tl/rounded-bl only) */}
         {!!valid && (
-          <Text style={[mb.valid, { backgroundColor: validBg, borderColor: validBorder, color: isWhite ? Colors.white : Colors.black }]}>
+          <Text style={[mb.valid, { backgroundColor: validBg, borderColor: validBorder, color: isWhite ? Colors.white : Colors.black, fontFamily: langFonts.semiBold }]}>
             {valid}
           </Text>
         )}
@@ -104,7 +105,7 @@ export default function MembershipBanner({ data, onPress }: { data: any; onPress
                 {!!b.IMG && (
                   <CdnSvg uri={b.IMG} width={20} height={20} style={mb.benefitIcon} />
                 )}
-                <Text style={[mb.benefitText, { color: textColor }]} numberOfLines={2}>
+                <Text style={[mb.benefitText, { color: textColor, fontFamily: langFonts.medium }]} numberOfLines={2}>
                   {stripHtml(b.VALUE ?? '')}
                 </Text>
               </View>
@@ -117,7 +118,7 @@ export default function MembershipBanner({ data, onPress }: { data: any; onPress
           style={[mb.ctaBtn, { backgroundColor: resolveCtaBg(data.CTABGCOLOR) }]}
           onPress={onPress}
         >
-          <Text style={[mb.ctaText, { color: resolveCtaTextColor(data.CTACOLOR) }]}>{cta}</Text>
+          <Text style={[mb.ctaText, { color: resolveCtaTextColor(data.CTACOLOR), fontFamily: langFonts.semiBold }]}>{cta}</Text>
         </Pressable>
       </View>
     </Pressable>
@@ -163,7 +164,7 @@ const mb = StyleSheet.create({
   // Angular: breather.component.html:38 — heading1-semibold-22 (English/most languages),
   // heading2-semibold-18 for tm/ml. 22px, not 24 — that was from a different Figma node.
   title: {
-    fontFamily: Fonts.poppinsSemiBold,
+    
     fontSize:   FontSize.font22,
     color:      Colors.textStrong,
     lineHeight: 24,
@@ -171,7 +172,7 @@ const mb = StyleSheet.create({
   // Figma: "on paid membership!" line — 14px Poppins-Medium, tracking 0.28
   // (Angular: breather.component.html:38 FESTIVALSUBTITLE — body1-medium-14 line-height-20)
   subtitle: {
-    fontFamily:    Fonts.poppinsMedium,
+   
     fontSize:      FontSize.font14,
     color:         Colors.textDark,
     marginTop:     8,
@@ -182,7 +183,7 @@ const mb = StyleSheet.create({
   // the server-sent SUBTITLE span itself carries class heading1-semibold-22 (22px
   // Poppins-SemiBold, var(--font22)) — 24px here was a Figma-node mismeasurement.
   subtitleAmount: {
-    fontFamily: Fonts.poppinsSemiBold,
+   
     fontSize:   FontSize.font22,
   },
   // Figma: ribbon pill — 14px Poppins-Regular, h-24 (py-4), rounded left corners only,
@@ -190,7 +191,7 @@ const mb = StyleSheet.create({
   // Angular: breather.component.scss .offerTag { margin-top: 10px } (English) — the pill
   // text itself is body2-regular-14 (breather.component.html:49).
   valid: {
-    fontFamily:              SemanticFontsEnglish.bodyEnglishRegular,
+   
     fontSize:                FontSize.font14,
     lineHeight:              20,
     marginTop:               10,
@@ -213,6 +214,7 @@ const mb = StyleSheet.create({
     flexDirection: 'row',
     alignItems:    'flex-start',
     gap:           8,
+    width:        '77%',
   },
   // Figma: Tick is 20×20
   benefitIcon: {
@@ -222,7 +224,7 @@ const mb = StyleSheet.create({
   },
   // Figma: 14px Poppins-Medium (not Regular/13)
   benefitText: {
-    fontFamily: Fonts.poppinsMedium,
+   
     fontSize:   FontSize.font14,
     color:      Colors.textDark,
     flex:       1,
@@ -235,14 +237,14 @@ const mb = StyleSheet.create({
   ctaBtn: {
     marginTop:         16,
     height:            40,
-    width:             '60%',
+    width:             '65%',
     borderRadius:      8,
     paddingHorizontal: 16,
     alignItems:        'center',
     justifyContent:    'center',
   },
   ctaText: {
-    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
+   
     fontSize:   FontSize.font14,
   },
 })

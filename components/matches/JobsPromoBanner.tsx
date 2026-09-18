@@ -11,6 +11,7 @@ import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // Angular's own fallback background art for this promo (many-jobs-bg-male.svg) —
 // used only if the server payload doesn't send BGIMG.
@@ -23,7 +24,7 @@ export default function JobsPromoBanner({ data, onPress }: { data: any; onPress:
   const title = stripHtml(data.TITLE ?? '')
   const cta   = stripHtml(data.CTA ?? 'Download now')
   const benefits: Array<{ IMG?: string; VALUE?: string }> = Array.isArray(data.BENEFITS) ? data.BENEFITS : []
-
+  const langFonts = useLanguageFonts()
   return (
     <Pressable style={jp.card} onPress={onPress}>
       <Image source={{ uri: data.BGIMG || FALLBACK_BG }} style={jp.bgImg} resizeMode="cover" />
@@ -33,7 +34,7 @@ export default function JobsPromoBanner({ data, onPress }: { data: any; onPress:
           <CdnSvg uri={data.TITLEIMG} width={240} height={32} style={jp.titleImg} />
         )}
 
-        {!!title && <Text style={jp.title}>{title}</Text>}
+        {!!title && <Text style={[jp.title,{ fontFamily: langFonts.semiBold }]}>{title}</Text>}
 
         {benefits.length > 0 && (
           <View style={jp.benefitsList}>
@@ -42,7 +43,7 @@ export default function JobsPromoBanner({ data, onPress }: { data: any; onPress:
                 {!!b.IMG && (
                   <CdnSvg uri={b.IMG} width={20} height={20} style={jp.benefitIcon} />
                 )}
-                <Text style={jp.benefitText} numberOfLines={2} >
+                <Text style={[jp.benefitText, { fontFamily: langFonts.medium }]} numberOfLines={2} >
                   {stripHtml(b.VALUE ?? '')}
                 </Text>
               </View>
@@ -57,7 +58,7 @@ export default function JobsPromoBanner({ data, onPress }: { data: any; onPress:
           style={[jp.ctaBtn, data.CTABGCOLOR?.startsWith?.('#') ? { backgroundColor: data.CTABGCOLOR } : null]}
           onPress={onPress}
         >
-          <Text style={[jp.ctaText, data.CTACOLOR?.startsWith?.('#') ? { color: data.CTACOLOR } : null]}>
+          <Text style={[jp.ctaText, { fontFamily: langFonts.medium }, data.CTACOLOR?.startsWith?.('#') ? { color: data.CTACOLOR } : null]}>
             {cta}
           </Text>
         </Pressable>
@@ -88,7 +89,7 @@ const jp = StyleSheet.create({
   },
   // Angular: black-color heading1-semibold-22
   title: {
-    fontFamily: Fonts.poppinsSemiBold,
+   
     fontSize:   FontSize.font22,
     color:      Colors.black,
     lineHeight: 24,
@@ -104,7 +105,7 @@ const jp = StyleSheet.create({
     flexDirection: 'row',
     alignItems:    'flex-start',
     gap:           4,
-    width:        '75%',
+    width:        '77%',
   },
   // Angular: "min-width-20 mt-2" — icon nudged down 2px to align with the label's cap-height
   benefitIcon: {
@@ -115,7 +116,7 @@ const jp = StyleSheet.create({
   },
   // Angular: "ml-4 body1-medium-14 black-color"
   benefitText: {
-    fontFamily: Fonts.poppinsMedium,
+    
     fontSize:   FontSize.font14,
     color:      Colors.black,
     flex:       1,
@@ -125,7 +126,7 @@ const jp = StyleSheet.create({
   ctaBtn: {
     marginTop:         16,
     height:            40,
-    width:             '60%',
+    width:             '66%',
     borderRadius:      8,
     backgroundColor:   Colors.primaryDark,
     alignItems:        'center',
@@ -133,7 +134,7 @@ const jp = StyleSheet.create({
     paddingHorizontal: 16,
   },
   ctaText: {
-    fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
+    
     fontSize:   FontSize.font14,
     color:      Colors.white,
   },
