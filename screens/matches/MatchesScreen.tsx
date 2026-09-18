@@ -85,7 +85,7 @@ import { fetchSurveyPopup, type SurveyPopupData } from '../../service/surveyServ
 import { shouldShowIncomeSheet, saveIncome, snoozeIncomeSheet } from '../../service/incomeSheetService'
 import { checkProfileValidation, type ProfileValidationInfo } from '../../service/profileValidationService'
 import { fetchMonthlyIncomeOptions } from '../../service/registrationService'
-import { subscribeIdVerified } from '../../service/eventBus'
+import { subscribeIdVerified, subscribeVpNeedMoreProfiles, emitVpProfileListUpdated } from '../../service/eventBus'
 import { getItem, setItem, getJson, removeItem } from '../../service/storageService'
 import { enablePaywall, getPaymentWallType } from '../../service/payWallService'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
@@ -1768,11 +1768,61 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     })
   }, [])
 
+  // ── ViewProfile prev/next paging ────────────────────────────────────────────
+  // Angular: viewprofile.page.ts:1073's emitVPNextProfileList({module, start}),
+  // which the LIST page answers by fetching the next page — the ViewProfile
+  // screen never pages by itself, because this screen is the one that owns the
+  // cursor, the active filters and the free-match paywall bound.
+  //
+  // Through a ref, not a dep: loadMore() is re-created every render (it closes
+  // over totalCount/extendedLoaded/…), and re-subscribing on each of those would
+  // churn the listener; an empty dep list without the ref would instead pin the
+  // FIRST render's stale closure and page from a frozen cursor forever.
+  const loadMoreRef = useRef(loadMore)
+  loadMoreRef.current = loadMore
+  useEffect(() => subscribeVpNeedMoreProfiles(() => { void loadMoreRef.current() }), [])
+
+  // ...and hand the grown list straight back. profileIds is a useMemo over
+  // `profiles`, so this fires exactly once per appended page.
+  useEffect(() => {
+    if (profileIds.length > 0) emitVpProfileListUpdated(profileIds)
+  }, [profileIds])
+
   // ── Pagination ──────────────────────────────────────────────────────────────
   // Angular: doInfinite() → calls callMatchesApi() when scroll reaches end.
   // Once extended-matches mode is active (extendedLoaded), doInfinite() compares
   // `start` against extendedMatchesCount instead of totalCount (matches.page.ts:
   // 1449-1454) — same infinite-scroll mechanism, different cursor/bound/source.
+  // Hero-banner CTA — Angular: matches.page.html:143's
+  // (homeBannerEventEmit)="onclickPayNowCTA(heroBannerActionType)", whose body
+  // (matches.page.ts:2936-2942) is only two branches:
+  //
+  //   addPhotoPromotion    -> callNative('Add_photo')
+  //   nonIdVerifyPromotion -> callNative('missed_verify', 'verifyId')
+  //
+  // and that second one (common.ts:1780-1785) PLACES A CALL:
+  //
+  //   let verifybyCall = localStorage.getItem('VERIFIEDBYCALLNUM') || '';
+  //   if (isValidparam(verifybyCall)) appNativeEvent({event_name:'missed_verify', PHONENO: verifybyCall})
+  //
+  // It does not open a verification screen — the CTA literally reads "Call us
+  // to verify". This used to do navigation.navigate('verifyid'), which is not a
+  // registered route name either (AppStack registers 'verify-id', with the
+  // hyphen), so the tap silently did nothing at all.
+  async function handleHeroBannerPress() {
+    if (heroBannerTarget === 'Gallery') {
+      addPhoto.openAddPhoto(navigation)
+      return
+    }
+    const callNum = ((await getItem('VERIFIEDBYCALLNUM')) ?? '').trim()
+    // Angular guards on isValidparam() — no number, no action, rather than
+    // opening the dialer empty.
+    if (!callNum) return
+    Linking.openURL(`tel:${callNum}`).catch(e => {
+      if (__DEV__) console.error('[Matches] verify-call dial error:', e)
+    })
+  }
+
   async function loadMore() {
     if (loadingMoreRef.current) return
     // Defense-in-depth alongside the global OfflineScreen overlay — don't fire
@@ -2956,7 +3006,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
             showPhotoPromotion && photoBannerData ? (
               <PhotoPromotionBanner
                 data={photoBannerData}
-                onPress={() => heroBannerTarget === 'Gallery' ? addPhoto.openAddPhoto(navigation) : navigation.navigate(heroBannerTarget)}
+                onPress={handleHeroBannerPress}
               />
           ) : null
           }
@@ -3120,7 +3170,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
           Toast's default 24px clearance alone left it overlapping the footer. */}
       <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
       <AddPhotoVerdictSheets addPhoto={addPhoto} />
-      <Toast request={toastRequest} bottomOffset={56 + 16} />
+      <Toast request={toastRequest} />
     </View>
   )
 }
@@ -3370,7 +3420,18 @@ const c = StyleSheet.create({
     borderRadius:   8,
   },
   // fontFamily applied inline (langFonts.regular) — see MatchCard's Text usage.
-  ctaDontShowText: { fontSize: FontSize.font14, color: '#545454' },
+  // The three CTA labels sit in a `flexDirection:'row'` + `alignItems:'center'`
+  // button beside a 24x24 icon, so what gets centred is the Text's LINE BOX, not
+  // the glyphs inside it. With no explicit lineHeight, RN sizes that box from the
+  // font's own ascent/descent — and on Android adds `includeFontPadding` space on
+  // top of that — both of which are asymmetric, so the label settled visibly
+  // lower than the icon it was supposed to be centred against.
+  //
+  // lineHeight 20 is the 14px body line-height used everywhere else in this port
+  // (Angular's own .line-height-20); includeFontPadding:false drops Android's
+  // extra metric padding (same fix OTPScreen.tsx:561 already uses); and
+  // textAlignVertical centres the glyphs within whatever box remains.
+  ctaDontShowText: { fontSize: FontSize.font14, color: '#545454', lineHeight: 20, includeFontPadding: false, textAlignVertical: 'center' as const },
 
   ctaViewLater: {
     flex:           1,
@@ -3384,7 +3445,7 @@ const c = StyleSheet.create({
     borderRadius:   8,
   },
   // fontFamily applied inline (langFonts.regular) — see MatchCard's Text usage.
-  ctaViewLaterText: { fontSize: FontSize.font14, color: '#545454' },
+  ctaViewLaterText: { fontSize: FontSize.font14, color: '#545454', lineHeight: 20, includeFontPadding: false, textAlignVertical: 'center' as const },
 
   // Angular: button-revamp.component.scss:13-21 — `ion-button[disabled]` only
   // overrides background (#e6e6e6) and text (#8A8A8A) via `--background`/
@@ -3407,7 +3468,7 @@ const c = StyleSheet.create({
   },
   ctaLikeIcon: { width: 24, height: 24 },
   // fontFamily applied inline (langFonts.semiBold) — see MatchCard's Text usage.
-  ctaLikeText: { fontSize: FontSize.font14, color: Colors.white },
+  ctaLikeText: { fontSize: FontSize.font14, color: Colors.white, lineHeight: 20, includeFontPadding: false, textAlignVertical: 'center' as const },
 
   // Angular: matches-cta-bg-color (pink gradient) + "Send Interest" primary CTA
   afterLikeRow: {

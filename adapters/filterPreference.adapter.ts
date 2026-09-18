@@ -36,7 +36,19 @@ export function isAnySelection(v: unknown): boolean {
 // since neither caller shares an i18n instance with this adapter module.
 export function resolveFilterLabel(opts: FilterOption[], keys: unknown, anyLabel: string): string {
   if (isAnySelection(keys)) return anyLabel
-  const labels = (keys as string[]).map(k => opts.find(o => o.key === k)?.label ?? k)
+  // A key with no matching option is DROPPED, not printed. Angular
+  // (search.component.ts:838-845) only pushes a key when it matches
+  // (`isSelected > -1`), and its object branch only when
+  // `isValidparam(filterLists[key])` — an unknown code never reaches the label
+  // string. The `?? k` fallback here surfaced raw codes to the member instead,
+  // e.g. the Caste field reading "24 Manai Telugu Chettiar,771,772,Chettiar".
+  //
+  // Everything unresolved leaves labels empty, and the caller falls through to
+  // anyLabel below — which is Angular's own behaviour too (valueList empty ->
+  // it resets the field to ['0'], i.e. "Any").
+  const labels = (keys as string[])
+    .map(k => opts.find(o => o.key === k)?.label)
+    .filter((l): l is string => !!l)
   // Angular joins a multi-value selection with a bare comma and no space
   // (filter-popup.component.ts's getArrayData -> `keyList.join(',')`), e.g.
   // "Krishna,Guntur,East Godavari" or "Christian,Hindu,Muslim - Shia".

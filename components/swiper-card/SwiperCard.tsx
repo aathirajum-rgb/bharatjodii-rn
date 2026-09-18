@@ -85,6 +85,10 @@ export interface SwiperItem {
   name?:       string | undefined
   age?:        string | undefined
   height?:     string | undefined
+  // The member's OWN height ("5'11\" feet") is `height`; this is the banded
+  // bucket ("5.7 - 5.11 feet height"). Angular binds a DIFFERENT one per
+  // surface, so both have to travel — see toProfile()/MatchProfileAdapter.
+  heightCategory?: string | undefined
   education?:  string | undefined
   location?:   string | undefined
   profileImg?: string | undefined

@@ -1063,12 +1063,21 @@ export async function fetchPhysicalStatusOptions(): Promise<Array<{ key: string;
 // which is what makes Hindu+Christian list every caste AND every division in
 // the single panel titled "Caste".
 //
-// Angular sends an extra `page=search` on this call. That flag makes the
-// endpoint ignore `religion` and `mothertongue` entirely and answer with the
-// master list of every caste and division across all religions — so Angular's
-// Christian member opens "Division" onto Hindu castes. Dropped deliberately:
-// the requirement is a religion-scoped list per selection, and the merge above
-// already produces the combined list for the one case that wants it.
+// Angular sends an extra `page=search` on this call (search.component.ts:907 and
+// filter-popup.component.ts:892, both exactly
+// `type=caste&page=search&mothertongue=<mt>&religion=<value>`). It was dropped
+// here on the reasoning that a religion-scoped list is what a filter wants.
+//
+// That reasoning cost two real bugs, both visible at once on the Caste panel:
+//
+//   1. The list came back SHORT — scoped to one religion + the member's own
+//      mother tongue, instead of the broader `page=search` list.
+//   2. Any already-selected key that wasn't in that narrower list had no label
+//      to resolve to, so the field rendered the RAW KEY: "24 Manai Telugu
+//      Chettiar,771,772,Chettiar".
+//
+// The flag is sent again. `religion` is still passed per Angular, which passes
+// it too.
 //
 // Deliberately NOT fetchCasteOptions(): that one short-circuits on the
 // REGISTRATIONARRAYS.CASTE blob, the list for the member's OWN religion
@@ -1112,7 +1121,7 @@ export async function fetchSearchCasteOptions(
   }
 
   const lists = await Promise.all(religionKeys.map(async key => {
-    const paramStr = `type=caste&religion=${key}&mothertongue=${mothertongue}&LANG=${lang}`
+    const paramStr = `type=caste&page=search&religion=${key}&mothertongue=${mothertongue}&LANG=${lang}`
     const res      = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
     return toList(res?.RESPONSE?.CASTE ?? res?.CASTE)
   }))

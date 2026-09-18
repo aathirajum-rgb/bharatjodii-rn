@@ -335,6 +335,20 @@ export default function ViewProfileContent(props: ViewProfileContentProps) {
   // Feature 2 prev/next-profile swipe, covering everything from the info card
   // down to the end of the scroll content (the actual area Angular's gesture is
   // live over, once its own exclusions are accounted for).
+  // NOTE on where this gesture's <GestureDetector> CLOSES (see below): it ends
+  // right before the "Other profiles like X" carousel, deliberately.
+  //
+  // That carousel is a horizontal FlatList with its own scroll gesture. While it
+  // sat inside this pan's area, the pan claimed any horizontal movement past
+  // 10px, so swiping the carousel navigated to the next PROFILE instead of
+  // scrolling it. A gesture relation (Gesture.Native() on the list +
+  // requireExternalGestureToFail) did NOT fix it — RNGH does not reliably attach
+  // a native handler to a plain RN FlatList this way.
+  //
+  // Angular solves the same collision structurally, by keeping the surfaces that
+  // own a horizontal gesture OUT of its pan's area (`.disable-swipe`, the photo
+  // swiper, the pagination dots). Same thing here: the swipe zone simply stops
+  // above the carousel.
   const detailSwipeGesture = Gesture.Pan()
     .enabled(interactive && (hasPrevProfile || hasNextProfile))
     .activeOffsetX([-10, 10])
@@ -1080,6 +1094,13 @@ export default function ViewProfileContent(props: ViewProfileContentProps) {
           {ownProfile ? renderBiodataCta() : renderCtaBlock()}
         </View>
 
+        </View>
+        </GestureDetector>
+
+        {/* ── Below here is OUTSIDE the prev/next-profile swipe zone, on purpose:
+            the carousel below owns its own horizontal gesture and the pan would
+            swallow it (see detailSwipeGesture's comment). ─────────────────────── */}
+
         {/* ── Other profiles like X — Angular: app-swiper similarprofiles carousel.
             Renders outside infoCard's padding — the card row bleeds to the screen
             edges, only the header text lines up with the rest of the padded content.
@@ -1122,9 +1143,6 @@ export default function ViewProfileContent(props: ViewProfileContentProps) {
         {!sameGender && menuPromo?.MATCHESSLOT && (
           <MembershipBanner data={menuPromo.MATCHESSLOT} onPress={onMembershipBannerPress} />
         )}
-
-        </View>
-        </GestureDetector>
       </Animated.ScrollView>
 
       {/* Prev/next-PROFILE arrows — a screen-fixed overlay (sibling of the

@@ -304,7 +304,12 @@ export async function getSimilarProfiles(matriId: string): Promise<SimilarProfil
     .map(toSimilarCard)
     .filter(p => p.matriId)
 
-  if (primary.length > 2) {
+  // Angular: `if (res['TOTALFOUND'] > 2 && res?.RESPONSE?.MATCHES)` — the
+  // SERVER's own TOTALFOUND decides, not the length of the page it returned.
+  // The two differ whenever the response is capped by ENDLIMIT, and the
+  // length test then sent a perfectly good result down the fallback path.
+  const totalFound = Number(result?.['TOTALFOUND'] ?? 0)
+  if (totalFound > 2 && primary.length > 0) {
     return primary
   }
 
@@ -315,7 +320,13 @@ export async function getSimilarProfiles(matriId: string): Promise<SimilarProfil
   const fallbackResult = await apiCall(Endpoints.listing.matches, 'POST', fallbackParams)
   const fallbackOk = (fallbackResult?.RESPONSECODE === '1' || fallbackResult?.RESPONSECODE == 1)
     && (fallbackResult?.ERRCODE === '0' || fallbackResult?.ERRCODE == 0)
-  const fallbackRaw = fallbackOk && Array.isArray(fallbackResult?.RESPONSE) ? fallbackResult.RESPONSE : []
+  // Angular gates the fallback on `res['TOTAL'] > 2` too — below that it leaves
+  // similarProfiles empty and the whole section stays hidden, rather than
+  // showing a one- or two-card carousel.
+  const fallbackTotal = Number(fallbackResult?.['TOTAL'] ?? 0)
+  const fallbackRaw = fallbackOk && fallbackTotal > 2 && Array.isArray(fallbackResult?.RESPONSE)
+    ? fallbackResult.RESPONSE
+    : []
   const fallback = fallbackRaw
     .filter((p: any) => p && !p['BANNERSLOT'])
     .map(toSimilarCard)

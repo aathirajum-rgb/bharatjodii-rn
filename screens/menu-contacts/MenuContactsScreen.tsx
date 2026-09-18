@@ -144,7 +144,10 @@ export default function MenuContactsScreen({ navigation, route }: { navigation: 
     let cancelled = false
     ;(async () => {
       const [, ppSetData, entryType] = await Promise.all([
-        fetchContactDetails(),
+        // Angular menu-contacts.page.ts:164 — the one page-load caller that
+        // passes Flag=1: this screen exists to SHOW the quota, so it always
+        // refetches rather than trusting the cache.
+        fetchContactDetails(true),
         getPPSetData(),
         getSessionValue('ENTRYTYPE'),
       ])

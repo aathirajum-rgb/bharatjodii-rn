@@ -32,7 +32,15 @@ export class MatchProfileAdapter implements Adapter<MatchProfile> {
     }
 
     // Optional fields — only set when present so strictNullChecks stays happy
-    if (item.height)              profile.height       = item.height
+    // Angular: matches.page.html:157 (and Activity/DR/Draft) bind
+    // [height]="profile.HEIGHTCATEGORY" — the banded bucket, NOT the member's
+    // own exact height. Only the Home carousel (app-swiper.component.html:80)
+    // uses raw HEIGHT, and that surface renders SwiperItem directly without
+    // passing through here. This model feeds MatchesCard/MatchCardDesktop/DR,
+    // all HEIGHTCATEGORY surfaces, so the card showed 7'0" feet where Angular
+    // shows the category.
+    const heightValue = item.heightCategory || item.height
+    if (heightValue)              profile.height       = heightValue
     if (item.education)           profile.education    = item.education
     if (item.occupation)          profile.occupation   = item.occupation
     if (item.income)              profile.income       = item.income

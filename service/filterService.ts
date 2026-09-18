@@ -553,22 +553,73 @@ function incomeParams(obj: Record<string, any>): string {
   return 'STARTINCOME=0&ENDINCOME='
 }
 
-// STRICKPP is the strict state the getpreference API returned (stored by
-// setStrictFilterStateFromPP, and updated in place by the Manage Strict
-// Filters toggles) — serialized and sent back UNCHANGED on every search-form
-// call, identically from Edit Preference and from Filters.
+// Angular: filter.service.ts's getStrictFilterParam(). The saved strict state
+// (what getpreference answered with, kept up to date by the Manage Strict
+// Filters toggles) is the BASE, and Angular layers two adjustments over it:
 //
-// It deliberately does NOT depend on the current selection or on which mode
-// the screen is in. Angular's getStrictFilterParam() layers two adjustments on
-// top (in Filters mode it forces a '1' for every field holding a non-"Any"
-// selection, and it forces CASTE to '0' whenever religion is "Any"), which is
-// why the two surfaces were sending different STRICKPP strings for the same
-// stored value. Both are dropped here per the stated contract: one stored
-// value, one payload.
-export function getStrictFilterParam(strictState: Record<FieldKey, boolean>): string {
+//   1. In Filters mode only, every field the temporary filter holds a
+//      selection in goes out as '1' — "a field selected in the temporary
+//      filter is a strict one as well". A saved 1|0|0|0… with religion picked
+//      in the filter goes out as 1|0|0|1….
+//   2. CASTE goes out as '0' whenever religion is "Any", since caste only
+//      means anything under a specific caste-bearing religion.
+//
+// An earlier version of this port dropped both, on a "one stored value, one
+// payload" premise. That is not what the server is told by the Angular app:
+// filtering by religion/star/education silently went out as non-strict, and a
+// stale CASTE '1' kept being sent under "Any religion".
+export function getStrictFilterParam(
+  strictState: Record<FieldKey, boolean>,
+  opts: { selectedStrictKeys?: FieldKey[]; religionIsAny?: boolean } = {},
+): string {
+  const { selectedStrictKeys = [], religionIsAny = false } = opts
   return STRICT_FIELD_ORDER
-    .map(key => (strictState[key] ? '1' : '0'))
+    .map(key => {
+      if (selectedStrictKeys.includes(key)) return '1'
+      if (key === 'CASTE' && religionIsAny) return '0'
+      return strictState[key] ? '1' : '0'
+    })
     .join('|')
+}
+
+// Angular: filter.service.ts's isSelectionAny() — a selection array counts as
+// "Any" (no real preference) when it is empty or every entry is a zero/blank
+// sentinel.
+function isSelectionAny(val: any): boolean {
+  return !val || val.length === 0
+    || val.every((x: any) => x === '0' || x === '' || x === 0)
+}
+
+// Angular: filter.service.ts's getSelectedFilterStrictKeys() — the STRICKPP
+// keys of the fields the TEMPORARY filter holds a selection in. It reads three
+// sources and unions them, exactly as Angular does:
+//   - the in-memory selectedFilters map (here: the caller's editedRows)
+//   - the persisted SELECTEDFILTERS map, which is what the Filters chip's
+//     count badge also reads
+//   - SEARCHVALUES, whose per-field isAnyChanges flag is only ever set while
+//     the filter event is on
+//
+// Range fields are stored as STARTAGE/ENDHEIGHT-style keys, so a leading
+// START/END is stripped before the field-key lookup (Angular does the same).
+async function getSelectedFilterStrictKeys(): Promise<FieldKey[]> {
+  const keys: FieldKey[] = []
+  const add = (fieldType: string) => {
+    const key = STRICT_FIELD_KEY_MAP[fieldType]
+      ?? STRICT_FIELD_KEY_MAP[fieldType.replace(/^(START|END)/, '')]
+    if (key && !keys.includes(key)) keys.push(key)
+  }
+
+  const [savedFilters, searchValues] = await Promise.all([
+    getJson<Record<string, boolean>>(K.FILTERS),
+    getJson<Record<string, { isAnyChanges?: boolean }>>('SEARCHVALUES'),
+  ])
+
+  Object.keys(savedFilters ?? {}).forEach(f => { if (savedFilters?.[f] === true) add(f) })
+  Object.keys(searchValues ?? {}).forEach(f => {
+    if (searchValues?.[f]?.isAnyChanges === true) add(f)
+  })
+
+  return keys
 }
 
 export interface SearchParamOptions {
@@ -577,9 +628,13 @@ export interface SearchParamOptions {
   // and not persisted as SEARCH_PARAMS. Every live matches-count call is one —
   // the Edit-Preference footer count and both strict-filter screens' count.
   forCount?: boolean
-  // The strict-filter apply ("Show N matches" inside Manage Strict Filters).
-  // FILTERPP goes out only on a real field-edit apply, never on this one:
-  // turning a strict toggle isn't a field edit.
+  // Kept for call-site compatibility, but it no longer changes the payload.
+  // Angular's Manage Strict Filters view is a MODE of the Partner Preference
+  // page (search.component.html's `manageStrictFilter` branch), sharing the
+  // page's ONE footer CTA — `(click)="contentLoaded ? applyFilter() : ''"`,
+  // i.e. the very same getUrlParams(1). So its apply sends an identical
+  // SETPP/FILTERPP/STRICKPP triple; suppressing FILTERPP here made the two
+  // surfaces disagree.
   strictFilterApply?: boolean
 }
 
@@ -592,13 +647,13 @@ export interface SearchParamOptions {
 //              (see getStrictFilterParam).
 //   SETPP    — all '1' ONLY on an Edit-Preference apply. Filters mode and
 //              every count call send all '0'.
-//   FILTERPP — only on a field-edit apply (Edit Preference or Filters), with
-//              the edited field's own position set to '1'. Not on counts, not
-//              on the strict-filter apply.
+//   FILTERPP — every apply (Edit Preference, Filters, Manage Strict Filters),
+//              with each edited field's own position set to '1'. Never on a
+//              count call — Angular's countParam has no FILTERPP at all.
 export async function buildSearchParams(
   matriId: string, start = 0, limit = 20, opts: SearchParamOptions = {},
 ): Promise<string> {
-  const { forCount = false, strictFilterApply = false } = opts
+  const { forCount = false } = opts
   const obj       = await getSelectedObject()
   const ppCheckBox = await getSearchPPCheckBox()
   const isFilter  = (await getItem(K.EVTYPE)) === 'filter'
@@ -620,9 +675,26 @@ export async function buildSearchParams(
   // stored array that never reached them is padded out to 17 here.
   const filterPPLength = isFilter ? 17 : 14
   const filterPPFlags  = Array.from({ length: filterPPLength }, (_, i) => ppCheckBox[i] ?? '0')
-  const filterPP = (forCount || strictFilterApply) ? '' : `&FILTERPP=${filterPPFlags.join('|')}`
+  const filterPP = forCount ? '' : `&FILTERPP=${filterPPFlags.join('|')}`
 
-  const params = `ID=${matriId}&START=${start}&LIMIT=${limit}&LIKED=1&VIEWED=1&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&BANNERFLAG=0&${baseParams(obj)}&${incomeParams(obj)}${extra}&SETPP=${setPP.join('|')}${filterPP}&STRICKPP=${getStrictFilterParam(strictState)}`
+  // Angular: filter.service.ts's getStrictFilterParam() applies the
+  // "selected in the temporary filter ⇒ strict" override in Filters mode
+  // ONLY (`checkFilterEventType() ? getSelectedFilterStrictKeys() : []`).
+  // The religion-is-Any caste override is unconditional.
+  const selectedStrictKeys = isFilter ? await getSelectedFilterStrictKeys() : []
+  const strickPP = getStrictFilterParam(strictState, {
+    selectedStrictKeys,
+    religionIsAny: isSelectionAny(obj.RELIGION),
+  })
+
+  // VIEWED=0, not 1. Angular sends VIEWED=0 on BOTH search/searchform/v1 calls:
+  // the count one (filter.service.ts's countParam) and the list one
+  // (matches.page.ts:989 — its VIEWED is `newMatches == "1" ? 1 : 0`, and the
+  // searchPage branch at :1002 forces `this.newMatches = "0"` right before
+  // appending SearchURL). VIEWED=1 asks the server to include already-viewed
+  // profiles, so filtered results and the count above them were both drawn
+  // from a wider set than Angular's.
+  const params = `ID=${matriId}&START=${start}&LIMIT=${limit}&LIKED=1&VIEWED=0&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&BANNERFLAG=0&${baseParams(obj)}&${incomeParams(obj)}${extra}&SETPP=${setPP.join('|')}${filterPP}&STRICKPP=${strickPP}`
   // Angular only stores SEARCH_PARAMS for the search call — letting the
   // debounced count overwrite it would leave a LIMIT=1 URL behind as "the
   // last search".

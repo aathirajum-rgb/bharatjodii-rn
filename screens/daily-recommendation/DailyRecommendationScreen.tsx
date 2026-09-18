@@ -663,7 +663,15 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
             femaleFreeEligible={gating.femaleFreeEligible}
             indNumbersLeft={gating.indNumbersLeft}
             waPhotoFlag={gating.waPhotoFlag}
-            onPress={() => navigate(ENavigation.VIEW_PROFILE, { matriId: profile.profileId, fromPage: 'dailyrecommendations' })}
+            // profileIds: Angular seeds the SAME shared VPPREVNEXT prev/next cache
+            // from the DR list (viewprofile.page.ts's DR_PROFILES branches), which
+            // is what makes its arrows work inside DR too. Without this the RN
+            // screen had nothing to step through and hid both arrows.
+            onPress={() => navigate(ENavigation.VIEW_PROFILE, {
+              matriId: profile.profileId,
+              fromPage: 'dailyrecommendations',
+              profileIds: profiles.map(p => p.profileId),
+            })}
             onLike={() => commitButtonSwipe('like')}
             onDontShow={() => commitButtonSwipe('skip')}
             onViewLater={() => commitButtonSwipe('viewlater')}
@@ -711,7 +719,11 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
           onLike={() => commitButtonSwipe('like')}
           onDontShow={() => commitButtonSwipe('skip')}
           onViewLater={() => commitButtonSwipe('viewlater')}
-          onViewProfile={p => navigate(ENavigation.VIEW_PROFILE, { matriId: p.profileId, fromPage: 'dailyrecommendations' })}
+          onViewProfile={p => navigate(ENavigation.VIEW_PROFILE, {
+            matriId: p.profileId,
+            fromPage: 'dailyrecommendations',
+            profileIds: profiles.map(pr => pr.profileId),
+          })}
         />
 
         <BottomSheet

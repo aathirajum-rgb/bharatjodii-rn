@@ -61,7 +61,8 @@ import { handleBack } from '../../utils/navigationRef'
 import { fetchMenuPromo } from '../../service/homeService'
 import { getItem, getJson } from '../../service/storageService'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
-import { redirectToViewProfile } from '../../service/buttonService'
+import { ENavigation } from '../../types/enums/navigation.enum'
+import { emitVpNeedMoreProfiles, subscribeVpProfileListUpdated } from '../../service/eventBus'
 import { shouldShowCoachMark, markCoachMarkShown } from '../../service/coachMarkService'
 import { StorageKeys } from '../../constants/storage.keys'
 import { Colors } from '../../constants/colors'
@@ -257,12 +258,34 @@ export function SimilarProfileCardItem({
   size?: number | undefined
 }) {
   const langFonts = useLanguageFonts()
+
+  // Angular: FUNC.getPartnerImg() can never return nothing — PHOTO[0].IMAGE
+  // falls back to THUMBIMG and then to getAvatarImg(getOppGenderType()) — and
+  // on top of that every profile <img> carries common-funtions.ts's global
+  // onImgErrorHandler(), which swaps a FAILED load for that same avatar.
+  // This card had neither: a URL the CDN rejects (dead link, S3 AccessDenied,
+  // 404) left an empty box, so the card rendered as a flat grey rectangle with
+  // only its name/age caption on it. Same failed-load -> CdnSvg avatar pattern
+  // PhotoSwiper already uses (expo-image cannot decode a remote .svg, so the
+  // silhouette needs CdnSvg rather than an Image source swap).
+  const [photoFailed, setPhotoFailed] = useState(false)
+  useEffect(() => { setPhotoFailed(false) }, [card.photoUri])
+
   return (
     <Pressable style={[s.similarCard, size ? { width: size, height: size } : null]} onPress={onPress}>
       <View style={s.similarCardClip}>
         {card.isPhotoAvailable && card.photoUri ? (
           <>
-            <Image source={{ uri: card.photoUri }} style={s.similarCardImg} contentFit="cover" />
+            {photoFailed ? (
+              <CdnSvg uri={getAvatarFallbackUri(oppGender)} width="100%" height="100%" cover />
+            ) : (
+              <Image
+                source={{ uri: card.photoUri }}
+                style={s.similarCardImg}
+                contentFit="cover"
+                onError={() => setPhotoFailed(true)}
+              />
+            )}
             {/* Angular: app-profile-card caption — name, age, education over a bottom
                 gradient scrim, shown only for cards that actually have a photo
                 (confirmed against screenshot — no-photo/WhatsApp-request cards carry
@@ -319,6 +342,12 @@ export function SimilarProfileCardItem({
 
 // ─── Screen ─────────────────────────────────────────────────────────────────────
 
+// How close to the end of the loaded id list the member has to get before the
+// list screen is asked for the next page. Angular's own trigger points are
+// indices 4, 8 and 17 of each 20 (common.ts:689) — i.e. it always keeps at
+// least three profiles of runway ahead of the member.
+const VP_PAGING_LOOKAHEAD = 3
+
 export default function ViewProfileScreen({ navigation, route }: { navigation: any; route: any }) {
   const { t } = useTranslation()
   const langFonts = useLanguageFonts()
@@ -343,10 +372,63 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // redirectToViewProfile's profileIds param / MatchesScreen's call sites).
   // Angular hides the prev/next arrows entirely for own-profile too
   // (viewprofile.page.html:1497 — `*ngIf="... && !ownProfile"`).
-  const profileIds: string[] = route?.params?.profileIds ?? []
+  // Angular: viewprofile.page.ts's removeProfile() SPLICES the acted-on profile
+  // out of the VPPREVNEXT list, so the list shrinks as the member skips or
+  // view-laters their way through it. The route param is only the STARTING
+  // list — it can't stay a bare read, because animateProfileChange() swaps
+  // matriId in place rather than re-navigating, so route.params never changes
+  // again for the life of this screen.
+  const [profileIds, setProfileIds] = useState<string[]>(route?.params?.profileIds ?? [])
   const profileIndex = profileIds.indexOf(matriId)
-  const hasPrevProfile = !isDrMode && !ownProfile && profileIndex > 0
-  const hasNextProfile = !isDrMode && !ownProfile && profileIndex >= 0 && profileIndex < profileIds.length - 1
+  // Angular: viewprofile.page.html:1547 gates the arrow block on
+  // `(hidetoolBar && !isSwipingRight) && !profilePreview && !ownProfile` — there
+  // is NO daily-recommendation exclusion. The one that existed (JODII-210,
+  // "hide the left and right navigation arrow button in the DR VP page") was
+  // COMMENTED OUT at viewprofile.page.ts:463-469, and the live code right below
+  // it has two branches that deliberately ENABLE next inside DR:
+  //
+  //   len == 1 && url '/dailyrecommendations/viewprofile'  -> nextButtonDisable = false
+  //   next.id == '' && url '/dailyrecommendations/...'      -> both = false
+  //
+  // So DR keeps its arrows; this port was suppressing them on a rule Angular
+  // had already withdrawn. isDrMode still gates the things JODII-210 really
+  // did drop in DR — the similar-profiles section and the membership banner.
+  const hasPrevProfile = !ownProfile && profileIndex > 0
+  const hasNextProfile = !ownProfile && profileIndex >= 0 && profileIndex < profileIds.length - 1
+
+  // Ids the member has skipped / view-latered on this screen. The list screen
+  // still has them in its own `profiles` state, so without this they would come
+  // straight back on the next page append.
+  const removedIdsRef = useRef<Set<string>>(new Set())
+
+  // ── Prev/next paging ────────────────────────────────────────────────────────
+  // The bug this fixes: profileIds is a snapshot of the list screen's FIRST page
+  // (LIMIT=20), so stepping to the 20th profile hit the end of the array and
+  // hasNextProfile went false — the Next button vanished with hundreds of
+  // matches still unseen.
+  //
+  // Angular never reaches that state: common.ts:689 tags the profile at index 4,
+  // 8 and 17 of every 20-item page with VPNEXTHIT='1', and stepping onto a
+  // tagged one fires the next-page fetch (viewprofile.page.ts:1073). By the time
+  // the member is at #20 the list is already 40 long. Rather than replicate
+  // those three magic indices (they silently mean "a quarter / half / near the
+  // end of a 20-page" and break on any other page size), this asks whenever the
+  // member gets within LOOKAHEAD of the end — same effect, same generous runway.
+  useEffect(() => {
+    if (isDrMode || ownProfile) return
+    if (profileIndex < 0) return
+    if (profileIndex < profileIds.length - VP_PAGING_LOOKAHEAD) return
+    emitVpNeedMoreProfiles()
+  }, [profileIndex, profileIds.length, isDrMode, ownProfile])
+
+  // The list screen answers with its full, grown id list.
+  useEffect(() => subscribeVpProfileListUpdated(incoming => {
+    setProfileIds(prev => {
+      const seen = new Set(prev)
+      const fresh = incoming.filter(id => !seen.has(id) && !removedIdsRef.current.has(id))
+      return fresh.length > 0 ? [...prev, ...fresh] : prev
+    })
+  }), [])
   // In-memory one-ahead/one-behind prefetch (not persisted — Angular's
   // localStorage-backed cache is more than this screen needs) so swiping to a
   // neighbor already fetched shows instantly instead of a loading flash.
@@ -661,7 +743,13 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 
       const cached = prefetchCache.current.get(matriId)
       const raw = cached ?? await getViewProfile(matriId)
-      prefetchCache.current.delete(matriId)
+      // KEEP the entry rather than deleting it on consume. Deleting it made every
+      // Next tap re-request the profile the member had just left: it becomes
+      // idx-1 of the new position, the neighbour sweep below sees it missing from
+      // the cache, and fetches it again. Combined with the genuinely-new idx+2,
+      // that is the two profile/view calls per tap. The window prune further
+      // down keeps this from growing without bound.
+      if (raw) prefetchCache.current.set(matriId, raw)
       if (cancelled) return
       if (raw) {
         const adapted = viewProfileAdapter.adapt(raw)
@@ -722,13 +810,23 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         // actually lands there — with only ±1, landing on idx+1 needs idx+2's
         // preview immediately for its "Next" button, which hadn't been fetched
         // yet and popped in a moment later once the request finished, reading
-        // as a flicker. Skipped in DR mode, which has no prev/next affordance at all.
+        // as a flicker. This used to be skipped in DR mode, on the premise that DR
+        // had no prev/next affordance — it does (see hasPrevProfile above), so
+        // warming its neighbours keeps its arrows as instant as everywhere else.
         const idx = profileIds.indexOf(matriId)
-        const neighborIds = isDrMode ? [] : [
-          profileIds[idx - 2], profileIds[idx - 1], profileIds[idx + 1], profileIds[idx + 2],
-        ].filter(
-          (id): id is string => !!id && !prefetchCache.current.has(id),
-        )
+        const windowIds = [
+          profileIds[idx - 2], profileIds[idx - 1], matriId, profileIds[idx + 1], profileIds[idx + 2],
+        ].filter((id): id is string => !!id)
+
+        // Now that consumed entries are kept, drop anything that has fallen
+        // outside the +/-2 window — otherwise the cache would hold every profile
+        // of a long session's worth of stepping.
+        const keep = new Set(windowIds)
+        prefetchCache.current.forEach((_v, id) => {
+          if (!keep.has(id)) prefetchCache.current.delete(id)
+        })
+
+        const neighborIds = windowIds.filter(id => id !== matriId && !prefetchCache.current.has(id))
         neighborIds.forEach(id => {
           getViewProfile(id).then(res => {
             if (!res) return
@@ -872,6 +970,21 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // above, so this can't fight the vertical ScrollView it sits inside. Angular:
   // deltaX>0 (drag right) → prev, deltaX<0 (drag left) → next — same mapping
   // goToPrev/goToNext already use for the chevron buttons.
+  //
+  // NOTE on where this gesture's <GestureDetector> CLOSES: it ends right after
+  // the second CTA block, ABOVE the "Other profiles like X" carousel, on purpose.
+  //
+  // That carousel is a horizontal FlatList with its own scroll gesture. While it
+  // sat inside this pan's area, the pan claimed any horizontal movement past
+  // 10px, so swiping the carousel navigated to the next PROFILE instead of
+  // scrolling it. A gesture relation (Gesture.Native() on the list +
+  // requireExternalGestureToFail) did NOT fix it — RNGH does not reliably attach
+  // a native handler to a plain RN FlatList that way.
+  //
+  // Angular solves the same collision structurally, by keeping the surfaces that
+  // own a horizontal gesture OUT of its pan's area (`.disable-swipe`, the photo
+  // swiper, the pagination dots). Same here: the swipe zone stops above the
+  // carousel.
   const detailSwipeGesture = Gesture.Pan()
     .enabled(hasPrevProfile || hasNextProfile)
     .activeOffsetX([-10, 10])
@@ -943,11 +1056,51 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     } catch { /* keep optimistic state */ }
   }
 
+  // Angular: btnEmitAction()'s dontshow/viewlater branch ends in removeProfile()
+  // (viewprofile.page.ts:1818), which relinks the VPPREVNEXT neighbours around
+  // the acted-on profile, deletes its entry, and then:
+  //
+  //   list now empty  -> redirectToFromPage()            (leave for matches/activity)
+  //   otherwise       -> nextpreProfile('next') after 300ms  (ADVANCE)
+  //
+  // This port called handleBack() in BOTH cases, so every skip / view-later
+  // bounced the member out to Matches instead of moving to the next profile.
+  function removeCurrentAndAdvance() {
+    if (!profile) return
+    // matriId, NOT profile.profileId. profileIds is built from the LIST the
+    // member came from (MatchesScreen passes item.profileId), and matriId is
+    // the value taken straight out of it — every other lookup on this screen
+    // uses profileIds.indexOf(matriId) for exactly that reason. profile.profileId
+    // is re-derived by viewProfile.adapter from the DETAIL response
+    // (MATRID ?? MATRIID ?? NBID ?? ID), so it can come back in a different
+    // shape; when it did, indexOf returned -1 and this fell into the
+    // "not in a list" branch — leaving for Matches on every skip/view-later,
+    // which is the exact symptom this was meant to fix.
+    const id  = matriId
+    const idx = profileIds.indexOf(id)
+    const remaining = profileIds.filter(x => x !== id)
+
+    // Angular's `else` of `isValidparam(retrievedObject[viewedid])` — a profile
+    // that isn't part of a list at all (DR mode, a deep link, a notification
+    // landing) has no next to go to, so it still leaves the page. Same for the
+    // last one standing, which is Angular's IsEmptyObject() branch.
+    if (idx < 0 || remaining.length === 0) { handleBack(); return }
+
+    // After the splice, whatever sat at idx+1 now sits at idx. Skipping the
+    // LAST profile leaves nothing ahead, so step back onto the new last one
+    // rather than running off the end.
+    const nextId = idx < remaining.length ? remaining[idx]! : remaining[remaining.length - 1]!
+    removedIdsRef.current.add(id)
+    setProfileIds(remaining)
+    // Angular's own 300ms beat before nextpreProfile().
+    setTimeout(() => animateProfileChange('next', nextId), 300)
+  }
+
   async function handleDontShow() {
     if (!profile) return
     try {
       await communicationBtnOnClick(fromPage, 'skip', { MATRIID: profile.profileId })
-      handleBack()
+      removeCurrentAndAdvance()
     } catch { /* ignore */ }
   }
 
@@ -955,7 +1108,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     if (!profile) return
     try {
       await communicationBtnOnClick(fromPage, 'viewlater', { MATRIID: profile.profileId })
-      handleBack()
+      removeCurrentAndAdvance()
     } catch { /* ignore */ }
   }
 
@@ -1308,8 +1461,27 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 
   // Angular: clickOnViewProfile('similarprofiles', MATRIID) — opens that profile's
   // own View Profile page (app-swiper.component.ts:392-437).
+  // Tapping a card in "Other profiles like X".
+  //
+  // navigation.push, NOT redirectToViewProfile's navigate(): we are ALREADY on
+  // 'viewProfile', and React Navigation's navigate() to the route it is already
+  // focused on does not push — it merges params into the current screen. This
+  // screen reads matriId into STATE at mount (so it can swap profiles in place
+  // for prev/next), so a params merge changes nothing at all and the tap looked
+  // completely dead. push() gives the tapped profile its own screen, which is
+  // also what Angular does (router.navigate to a fresh viewprofile URL) and
+  // keeps Back returning to the profile the member came from.
   function handleSimilarProfilePress(card: SimilarProfileCard) {
-    redirectToViewProfile('', card.matriId, 'similarprofiles')
+    // Angular: nbcommon.matriIdDBset(res['RESPONSE']['MATCHES'], 0, 'similarprofiles')
+    // (viewprofile.page.ts:1417) seeds the prev/next cache with the SIMILAR list
+    // under its own 'similarprofiles' module key — so inside the opened profile,
+    // prev/next and skip/view-later walk the carousel, not the matches list.
+    navigation.push(ENavigation.VIEW_PROFILE, {
+      matriId:    card.matriId,
+      fromPage:   'similarprofiles',
+      showRating: false,
+      profileIds: similarProfiles.map(c => c.matriId),
+    })
   }
 
   function handleMembershipBannerPress() {
@@ -2277,6 +2449,13 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           {ownProfile ? renderBiodataCta() : renderCtaBlock()}
         </View>
 
+        </View>
+        </GestureDetector>
+
+        {/* ── Below here is OUTSIDE the prev/next-profile swipe zone, on purpose:
+            the carousel below owns its own horizontal gesture and the pan would
+            swallow it (see detailSwipeGesture's comment). ─────────────────────── */}
+
         {/* ── Other profiles like X — Angular: app-swiper similarprofiles carousel.
             Renders outside infoCard's padding — the card row bleeds to the screen
             edges, only the header text lines up with the rest of the padded content.
@@ -2319,9 +2498,6 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         {!sameGender && menuPromo?.MATCHESSLOT && (
           <MembershipBanner data={menuPromo.MATCHESSLOT} onPress={handleMembershipBannerPress} />
         )}
-
-        </View>
-        </GestureDetector>
       </Animated.ScrollView>
 
       {/* Prev/next-PROFILE arrows — a screen-fixed overlay (sibling of the

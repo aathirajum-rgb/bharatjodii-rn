@@ -189,13 +189,13 @@ const s = StyleSheet.create({
   // Angular `.setting-title body1-medium-14` — Poppins-MEDIUM 14/16, not
   // SemiBold (SemiBold at 14 is `font-14-semibold`, used only by the PP page's
   // own strict-filter card title and the pickers' group headers).
-  strictTitle: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, lineHeight: 16, color: Colors.black },
+  strictTitle: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, lineHeight: 20, color: Colors.black },
   // Angular `.setting-description body3-regular-12` — 12/16 Poppins-Regular.
-  strictDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 16, color: Colors.black },
+  strictDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 18, color: Colors.black },
 
   // Angular: `line-height-16 body3-regular-12` on both the range prompt and
   // the reduced-matches note.
-  promptText:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 16, color: Colors.black },
+  promptText:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 18, color: Colors.black },
   warningText: { color: Colors.inputError },
 
   // Angular's <ion-footer> is a COLUMN: the RANGE prompt row, then the
@@ -209,7 +209,7 @@ const s = StyleSheet.create({
   // itself so the text stops short of the edge.
   footerPrompt: {
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
-    fontSize: FontSize.font12, lineHeight: 16, color: Colors.black,
+    fontSize: FontSize.font12, lineHeight: 18, color: Colors.black,
     paddingRight: 12, marginBottom: 16,
   },
   footerRow: { flexDirection: 'row', alignItems: 'center', gap: 26 },
@@ -218,7 +218,7 @@ const s = StyleSheet.create({
   // `body2-regular-14` with the block's own `font-weight: 600` + 24 line-height
   // override — expressed here as the SemiBold family, since RN can't add
   // weight to Poppins-Regular the way the browser synthesizes it.
-  matchesLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 16, color: Colors.black },
+  matchesLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 18, color: Colors.black },
   matchesCount: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, lineHeight: 24, color: Colors.black },
   reducedRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   // Angular `.matches-count-reduced` (14/20): the struck-out old count and the
@@ -233,7 +233,7 @@ const s = StyleSheet.create({
   // Angular button-revamp's default ctaFontSize is `body2-regular-14` (+
   // `line-height-16`) — every CTA on the filter side is Poppins-REGULAR 14,
   // not medium/semibold. None of the filter-side call sites overrides it.
-  applyText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 16, color: Colors.white },
+  applyText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 20, color: Colors.white },
 })
 
 // ─── Compact "input field" summary row (Figma's Input field component) ───────

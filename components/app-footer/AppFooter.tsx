@@ -84,9 +84,18 @@ export const TAB_ICONS: Record<FooterTab, [string, string]> = {
 }
 
 // Angular: footer.component.ts maps these from res['GENERAL'] as ICON_0/1/3/5/6.
-// Two-word labels wrap to 2 lines in the tab bar by design — numberOfLines={2} on
-// the Text below handles that; no forced '\n' since Tamil/other-language word
-// lengths don't line up with the English break point.
+// Angular sizes each tab with `ion-tab-button { min-width: 15%; max-width:
+// min-content }` (footer.component.scss:33-34). min-content is the width of the
+// widest UNBREAKABLE run — i.e. the longest single WORD — so a multi-word label
+// puts one word per line ALWAYS, however much room the row has. That is why
+// "Liked profiles" is two lines in the real app.
+//
+// numberOfLines alone cannot reproduce that: RN's flex columns are far wider
+// than min-content, so the label fit on one line and the row read as
+// mis-aligned against its neighbours. RN has no min-content, so the break is
+// made explicit at the call site below — exactly the layout min-content
+// produces, and language-agnostic: it breaks on whatever spaces the
+// translation itself has, rather than assuming an English break point.
 export const TAB_LABEL_KEYS: Record<FooterTab, string> = {
   0: 'GENERAL.ICON_0',
   1: 'GENERAL.ICON_1',
@@ -161,7 +170,11 @@ export default function AppFooter({
       <View style={styles.tabBar}>
         {TAB_ORDER.map(tab => {
           const isActive = activeTab === tab
-          const label = t(TAB_LABEL_KEYS[tab])
+          // One word per line — see TAB_LABEL_KEYS' note on Angular's
+          // max-width: min-content. Whitespace runs collapse first, so a
+          // translation with a stray double space can't yield a blank line.
+          const rawLabel = t(TAB_LABEL_KEYS[tab]).trim()
+          const label = rawLabel.replace(/\s+/g, '\n')
           const size = iconSize(tab)
 
           // Count badge per tab (matches Figma: Likes shows 99+)
@@ -177,7 +190,9 @@ export default function AppFooter({
               onPress={() => onTabPress(tab)}
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
-              accessibilityLabel={label}
+              // rawLabel, not label: the newline in `label` is a layout device,
+              // and a screen reader must not pause mid-phrase on it.
+              accessibilityLabel={rawLabel}
             >
               {/* ── Icon area ── */}
               <View style={styles.iconWrap}>
@@ -232,7 +247,7 @@ export default function AppFooter({
                   tab === 4 && styles.tabLabelMessage,
                   isActive && styles.tabLabelActive,
                 ]}
-                numberOfLines={2}
+                numberOfLines={3}
               >
                 {label}
               </Text>
@@ -266,13 +281,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: 2,
     paddingVertical:   4,
     minHeight:         56,
-    // Angular's gap is 12px, but its buttons are `flex: 0 0 auto; max-width:
-    // min-content`, so each one only takes the width of its widest word and the
-    // leftover space is spread by space-around. RN lays these out as five EQUAL
-    // flex:1 columns, so the same 12px would over-narrow them; 8px reproduces
-    // Angular's actual rendered column width (~58dp at 360dp) — which is what
-    // makes "Liked profiles" wrap onto two lines there and not here.
-    gap:               8,
+    // Angular: `.gap-footer { gap: 12px }` (footer.component.scss:105-107).
+    // This was dropped to 8 to buy each flex:1 column enough width that a
+    // two-word label would not sit on one line — which it did anyway. Now that
+    // the label breaks per word (see TAB_LABEL_KEYS), column width no longer
+    // has to carry that job, so Angular's real value applies.
+    gap:               12,
   },
   tabBtn: {
     flex:           1,
