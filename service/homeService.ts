@@ -96,10 +96,18 @@ export function toProfile(p: Record<string, any>): SwiperItem {
     // server sends ("28 years") is what shows. Stripping it and re-appending
     // " Yrs" rendered "28 Yrs" where Angular renders "28 years".
     age:                 p['AGE'] ? String(p['AGE']) : undefined,
-    // Angular binds [height]="cardContent.HEIGHT" — the profile's OWN height
-    // ("5'11\" feet"). HEIGHTCATEGORY is a banded range ("5.7 - 5.11 feet
-    // height"), so preferring it put a partner-preference band on the card.
+    // Both are carried, because Angular does NOT bind the same one everywhere:
+    //
+    //   app-swiper.component.html:80   [height]="cardContent.HEIGHT"          (Home carousels)
+    //   matches.page.html:157          [height]="profile.HEIGHTCATEGORY"      (Matches list)
+    //   activity.component.html:187    [height]="profile.HEIGHTCATEGORY"
+    //   daily-recommendation:26        [height]="profile.HEIGHTCATEGORY"
+    //   draft.page.html:145,160        [height]="profile.HEIGHTCATEGORY"
+    //
+    // Home's SwiperCard reads `height` (raw HEIGHT) straight off this item;
+    // everything that goes through MatchProfileAdapter prefers heightCategory.
     height:              p['HEIGHT'] ?? p['HEIGHTCATEGORY'],
+    heightCategory:      p['HEIGHTCATEGORY'],
     education:           p['EDUCATION'],
     // Angular: bindBasicView() — NRI profiles show "{NRISTATE}, {NRICOUNTRY}" instead of
     // city/state when both are present; otherwise LOCATION first, then CITY+STATE.

@@ -17,6 +17,17 @@ import { useTranslation } from 'react-i18next'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 
+// Angular: presentToast() (common.ts:558) creates an ion-toast with NO `position`,
+// so it takes Ionic's default — 'bottom', rendered in the app's overlay portal at
+// the very bottom of the VIEWPORT. Ionic does not lift it above ion-tabs, so it
+// sits right at the footer.
+//
+// Screens here used to pass bottomOffset={56 + 16} to clear AppFooter, which
+// floated the toast well above the footer and — since only four screens did it —
+// put it in a different place depending on which screen you were on. One margin
+// above the safe-area inset for every toast, matching Ionic.
+const TOAST_BOTTOM_MARGIN = 16
+
 export interface ToastRequest {
   message:  string
   key:      number   // increments on every show() call so repeat messages still re-trigger the effect
@@ -25,14 +36,12 @@ export interface ToastRequest {
 }
 
 export default function Toast({
-  request, duration = 2000, bottomOffset = 24,
+  request, duration = 2000, bottomOffset = TOAST_BOTTOM_MARGIN,
 }: {
   request: ToastRequest | null; duration?: number
-  // Extra clearance ABOVE the safe-area inset, so the toast doesn't overlap a
-  // fixed bottom tab bar on screens that have one (e.g. MatchesScreen's
-  // AppFooter, 56px tall — the default 24 alone left the toast's bottom edge
-  // sitting inside the footer's own space). Screens with no bottom tab bar
-  // (e.g. IgnoredProfilesScreen) keep the plain default.
+  // Clearance above the safe-area inset. Overriding this is the exception now,
+  // not the rule — see TOAST_BOTTOM_MARGIN. Kept for a screen that genuinely
+  // needs the toast lifted; none currently do.
   bottomOffset?: number
 }) {
   const { t } = useTranslation()

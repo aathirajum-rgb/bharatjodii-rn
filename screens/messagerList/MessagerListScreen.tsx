@@ -524,7 +524,7 @@ export default function MessagerListScreen({ navigation }: Props) {
         </>
       )}
 
-      <Toast request={toastRequest} bottomOffset={56 + 16} />
+      <Toast request={toastRequest} />
     </SafeAreaView>
   )
 }

@@ -390,6 +390,9 @@ const styles = StyleSheet.create({
   applyText: {
     color:      Colors.white,
     fontSize:   FontSize.font14,
-    lineHeight: 16,
+    // Angular's CSS line-height on a button never clips (the glyph just overflows
+    // a centred line box); RN's lineHeight is a hard clip, so 14/16 cut Indic
+    // ascenders/descenders off the CTA label.
+    lineHeight: 20,
   },
 })

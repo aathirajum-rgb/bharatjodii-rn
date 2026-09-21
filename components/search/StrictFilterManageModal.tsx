@@ -156,8 +156,8 @@ const s = StyleSheet.create({
   rowText: { flex: 1, gap: 8 },
   // Same two-line row as the PP list: label `body2-regular-14`,
   // value `body1-medium-14`.
-  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 16, color: Colors.black },
-  rowValue: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, lineHeight: 16, color: Colors.black },
+  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 20, color: Colors.black },
+  rowValue: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, lineHeight: 20, color: Colors.black },
   rowRight: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   toggleSlot: { width: TOGGLE_WIDTH, alignItems: 'flex-end' },
 
@@ -173,5 +173,5 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   // button-revamp's default ctaFontSize: `body2-regular-14` + `line-height-16`.
-  showMatchesText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 16, color: Colors.white },
+  showMatchesText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 20, color: Colors.white },
 })

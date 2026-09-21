@@ -111,7 +111,7 @@ const s = StyleSheet.create({
   },
   strictTextCol: { flex: 1, gap: 4 },
   strictTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, lineHeight: 20, color: Colors.black },
-  strictDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 16, color: Colors.black },
+  strictDesc:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 18, color: Colors.black },
 
   footer: {
     alignSelf: 'stretch', flexDirection: 'row', alignItems: 'center', gap: 26,

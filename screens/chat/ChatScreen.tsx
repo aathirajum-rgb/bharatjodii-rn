@@ -1271,7 +1271,7 @@ export default function ChatScreen({ navigation, route }: Props) {
         onSecondaryPress={() => phoneInfo.secondaryPress(addPhoto.openAddPhoto, navigation)}
         onLinkPress={phoneInfo.close}
       />
-      <Toast request={toastRequest} bottomOffset={80} />
+      <Toast request={toastRequest} />
       <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
       <AddPhotoVerdictSheets addPhoto={addPhoto} />
 

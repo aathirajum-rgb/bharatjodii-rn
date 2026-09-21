@@ -8,7 +8,7 @@
 // Call/WhatsApp = SvgUri (always calls the server, no caching), the rest = SvgXml
 // (bundled strings).
 
-import { forwardRef, useRef, useState } from 'react'
+import { forwardRef, useCallback, useRef, useState } from 'react'
 import {
   Pressable, StyleSheet, Text, View,
 } from 'react-native'
@@ -558,6 +558,31 @@ export function PhotoSwiper({ images, width, height, oppGender, onPress, showArr
   // shouldn't force every OTHER slide over to the fallback avatar too.
   const [failedIndices, setFailedIndices] = useState<Record<number, boolean>>({})
 
+  // Angular's Swiper.js pagination is PROGRESS-driven: the bullets track the
+  // drag continuously, so the active one has already moved by the time the
+  // finger lifts. onSnapToItem alone can't do that — it fires only once the
+  // snap ANIMATION has finished settling, so the dot visibly lagged a beat
+  // behind the photo.
+  //
+  // absoluteProgress is the fractional index (0, 0.4, 1.0 ...), updated every
+  // frame of the drag. Rounding it flips the dot at the halfway point, which
+  // reads as instant. The functional updater matters: React bails out of the
+  // re-render when the value is unchanged, so this costs one render per actual
+  // dot change rather than one per frame.
+  //
+  // A plain (non-worklet) function is correct here — the library itself wraps a
+  // function-valued onProgressChange in runOnJS (hooks/useOnProgressChange.js:34);
+  // passing it a SharedValue instead is the other supported form.
+  //
+  // useCallback, not an inline arrow: the library re-registers its
+  // useAnimatedReaction whenever this prop's identity changes.
+  const lastIndex = images.length - 1
+  const handleProgressChange = useCallback((_offsetProgress: number, absoluteProgress: number) => {
+    // Overscroll/bounce can push absoluteProgress just past either end.
+    const nearest = Math.min(Math.max(Math.round(absoluteProgress), 0), Math.max(lastIndex, 0))
+    setActiveIndex(prev => (prev === nearest ? prev : nearest))
+  }, [lastIndex])
+
   return (
     // overflow:'hidden' here too, not just on the parent photoBox — on Android, the
     // carousel's own native scroll surface could escape an ancestor's borderRadius clip
@@ -570,6 +595,9 @@ export function PhotoSwiper({ images, width, height, oppGender, onPress, showArr
         height={height}
         loop={false}
         onConfigurePanGesture={configureSwiperPanGesture}
+        onProgressChange={handleProgressChange}
+        // Kept as the settled-value backstop (programmatic scrollTo from the
+        // desktop arrows, and the final value after a fling).
         onSnapToItem={setActiveIndex}
         renderItem={({ item, index }) => (
           <Pressable style={{ width, height }} onPress={() => onPress?.(index)}>

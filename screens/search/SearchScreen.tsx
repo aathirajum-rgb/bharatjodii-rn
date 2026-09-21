@@ -1561,7 +1561,7 @@ const s = StyleSheet.create({
   // and Colors.link (#29339B, indigo) — was Colors.primaryDark, the app's dark
   // RED brand color, a genuinely wrong color for this specific text.
   headerTitle: { flex: 1, fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: FontSize.font16, lineHeight: 24, color: Colors.black, marginLeft: 6 },
-  resetText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 16, color: Colors.link, paddingHorizontal: 12 },
+  resetText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 20, color: Colors.link, paddingHorizontal: 12 },
   resetTextDisabled: { opacity: 0.4 },
 
   // Angular: the strict-filter block sits flush under the header (full-bleed,
@@ -1596,7 +1596,7 @@ const s = StyleSheet.create({
     height: 40, borderWidth: 1, borderColor: Colors.primaryDark, borderRadius: 8,
     alignItems: 'center', justifyContent: 'center',
   },
-  manageStrictBtnText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 16, color: Colors.primaryDark },
+  manageStrictBtnText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 20, color: Colors.primaryDark },
 
   // Angular: `<ion-list class="pl-24 pr-24">` in an `mt-8` row — a flat list
   // straight on the page.
@@ -1640,8 +1640,8 @@ const s = StyleSheet.create({
     marginLeft:      8,
   },
   // Angular: label `body2-regular-14`, value `body1-medium-14` — both black.
-  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 16, color: Colors.black },
-  rowValue: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, lineHeight: 16, color: Colors.black },
+  rowLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 20, color: Colors.black },
+  rowValue: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, lineHeight: 20, color: Colors.black },
 
   // Angular: `ion-footer.footer-shadow` with the CTA at `ml-24 mr-24 pt-16 pb-16`.
   footer: {
@@ -1665,5 +1665,5 @@ const s = StyleSheet.create({
   // Angular button-revamp's default ctaFontSize is `body2-regular-14` +
   // `line-height-16`, and the PP/Filters footer CTA doesn't override it — so
   // the button label is Poppins-REGULAR 14, not medium or semibold.
-  applyText: { color: Colors.white, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 16 },
+  applyText: { color: Colors.white, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 20 },
 })

@@ -479,7 +479,22 @@ async function showContactDetails(
 // RESPONSE written as-is: IndNumbersLeft/phoneNumbersLeft/expiryTextValue/
 // totalProfileCountData) so getIndNumbersLeft()-style reads have real data
 // instead of the '0' fallback before any phoneviewed call has ever happened.
-export async function fetchContactDetails(): Promise<void> {
+// `force` is Angular's own Flag param, with Angular's own semantics:
+//
+//   if (Flag === 1 || (Flag === 0 && !localStorage.getItem('CONTACT_DETAIL')))
+//
+// i.e. the DEFAULT call is a cache-fill, not a refetch — once CONTACT_DETAIL
+// exists it does nothing at all. Every page-load caller passes 0 (Matches,
+// Activity, Explore, Menu, Messages, ViewProfile, payment.service:57); only
+// menu-contacts:164, congratulations:68, webview:318 and the post-payment
+// path pass 1.
+//
+// This port had no guard, so it re-hit nbcontacts on EVERY page load — most
+// visibly when stepping through profiles, where each Next tap fired another
+// one. The quota it returns only changes when the member views a number, and
+// that path forces its own refresh.
+export async function fetchContactDetails(force = false): Promise<void> {
+  if (!force && (await getJson<Record<string, any>>('CONTACT_DETAIL'))) return
   const [loginId, gender, entryType, femaleFreeData] = await Promise.all([
     getItem(SK.Auth.USER_ID),
     getItem(SK.User.LOGIN_GENDER),
