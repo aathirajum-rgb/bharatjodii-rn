@@ -51,7 +51,7 @@ export default function ActivateMembershipBanner({ data, onPress }: { data: any;
 
 const am = StyleSheet.create({
   card: {
-    borderRadius: 12,
+    borderRadius: 0,
   },
   // Angular: "add-photo-height" — no cited px value for this class, so this
   // sizes the illustration by content (contain) rather than guessing a crop.
@@ -59,8 +59,8 @@ const am = StyleSheet.create({
   // itself) left-aligns this image — alignSelf:'flex-start' pins it there
   // instead of stretching to the card's full width.
   img: {
-    width:      200,
-    height:     150,
+    width:      160,
+    height:     120,
     marginTop:  16,
     alignSelf:  'flex-start',
   },
