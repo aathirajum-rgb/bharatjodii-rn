@@ -69,7 +69,7 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
       {/* Rendered above whatever screen is mounted, same as AuthContext's
           ProfileDeactivatedModal — blocks the whole app while offline rather
           than gating individual actions (see OfflineScreen.tsx for why). */}
-      <OfflineScreen visible={isOffline} onRetry={refresh} />
+      {/* <OfflineScreen visible={isOffline} onRetry={refresh} /> */}
     </NetworkContext.Provider>
   )
 }

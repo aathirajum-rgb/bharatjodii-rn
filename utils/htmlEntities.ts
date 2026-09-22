@@ -68,3 +68,17 @@ export function stripAndDecodeHtml(raw?: string | null): string {
     .replace(/<[^>]+>/g, '')
   return decodeEntities(withoutMarkup).trim()
 }
+
+// Same as stripAndDecodeHtml, but collapses <br> to a single space instead of a
+// newline. Some locale strings carry a <br> meant for a two-line title (e.g. a
+// section header rendered into a plain multi-line <Text>) but get reused in a
+// numberOfLines={1} context (a page header, a card counter) — a literal '\n'
+// there just truncates everything after it instead of wrapping.
+export function stripAndDecodeHtmlInline(raw?: string | null): string {
+  if (!raw || typeof raw !== 'string') return ''
+  const withoutMarkup = raw
+    .replace(/<script[^>]*>[\S\s]*?<\/script>/gim, '')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<[^>]+>/g, '')
+  return decodeEntities(withoutMarkup).replace(/\s+/g, ' ').trim()
+}

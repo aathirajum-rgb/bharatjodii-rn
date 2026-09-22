@@ -50,6 +50,7 @@ import { APP_VERSION } from '../../constants/appVersion'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import { stripAndDecodeHtml } from '../../utils/htmlEntities'
 import HomeDesktopLayout from './HomeDesktopLayout'
 import HeroBanner, { type HeroBannerContent } from './HeroBanner'
 import AssistBanner, { type AssistBannerContent } from './AssistBanner'
@@ -827,7 +828,7 @@ const TodayMatchesSection = memo(function TodayMatchesSection({
         {/* Angular: home.config.ts's drmatches is the only swiper config with
             coverflowEffect — a centered, tilted-neighbor carousel. */}
         <CoverflowSwiper
-          swiperHeader={`${t('DAILYRECOMMENDATIONS.DAILY_RECOMMENDATIONS')} (${total})`}
+          swiperHeader={`${stripAndDecodeHtml(t('DAILYRECOMMENDATIONS.DAILY_RECOMMENDATIONS'))} (${total})`}
           items={items.slice(0, 4)}
           moreItems={moreItemsFrom(items, 4)}
           onCardPress={onCardPress}

@@ -24,6 +24,7 @@ import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG, CDN_LOTTIE } from '../../constants/cdn'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { stripAndDecodeHtmlInline } from '../../utils/htmlEntities'
 
 const CONTENT_W  = 1088
 const STRIP_SIZE = 160
@@ -142,7 +143,7 @@ export default function DailyRecommendationDesktopLayout({
               </Pressable>
 
               <Text style={s.title} numberOfLines={1}>
-                {t('DAILYRECOMMENDATIONS.DAILY_RECOMMENDATIONS')} ({currentIndex}/{totalCount})
+                {stripAndDecodeHtmlInline(t('DAILYRECOMMENDATIONS.DAILY_RECOMMENDATIONS'))} ({currentIndex}/{totalCount})
               </Text>
 
               {!showEndCard && profiles.length > 0 && (

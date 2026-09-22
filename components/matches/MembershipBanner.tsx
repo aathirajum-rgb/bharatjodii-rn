@@ -55,7 +55,7 @@ export default function MembershipBanner({ data, onPress }: { data: any; onPress
         <Image source={{ uri: data.BGIMG }} style={mb.bgImg} resizeMode="cover" />
       )}
 
-      <View style={mb.content}>
+      <View style={[mb.content,{minHeight:"387px"}]}>
         {/* TITLEIMG is an SVG logo/icon — CdnSvg (not plain Image) so it decodes on native */}
         {!!data.TITLEIMG && (
           <CdnSvg uri={data.TITLEIMG} width={140} height={28} style={mb.titleImg} />
@@ -155,6 +155,7 @@ const mb = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop:        38,
     paddingBottom:     24,
+    justifyContent: "center"
   },
   titleImg: {
     width:        140,

@@ -37,6 +37,7 @@ import { toProfile, fetchAndStorePPSetData, fetchMatches } from '../../service/h
 import { communicationBtnOnClick, type CommActionResult } from '../../service/communicationService'
 import { checkAddPhotoPromotion } from '../../service/buttonService'
 import { markProfileViewed } from '../../service/viewProfileService'
+import { stripAndDecodeHtmlInline } from '../../utils/htmlEntities'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
 import { paymentTrack } from '../../service/paymentService'
 import { handleFooterTabPress } from '../../utils/footerTabPress'
@@ -199,7 +200,7 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
 
   // ─── Header ───────────────────────────────────────────────────────────────
   // Angular: getHeaderText() — "Daily recommendations (i/total)"
-  const headerText = `${t('DAILYRECOMMENDATIONS.DAILY_RECOMMENDATIONS')} (${currentIndex}/${totalCount})`
+  const headerText = `${stripAndDecodeHtmlInline(t('DAILYRECOMMENDATIONS.DAILY_RECOMMENDATIONS'))} (${currentIndex}/${totalCount})`
 
   // ─── navigatteToPaywall() equivalent — used by the close icon and by the
   // end-card's login-with-no-fallback-profile branch ──────────────────────────
