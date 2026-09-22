@@ -38,6 +38,9 @@ import HoroscopeSvgViewerModal from '../../components/matches/HoroscopeSvgViewer
 import ReportProfileModal from '../../components/matches/ReportProfileModal'
 import LanguagePillSheet from '../../components/language-pill/LanguagePillSheet'
 import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
+import Toast, { type ToastRequest } from '../../components/toast/Toast'
+import AppRatingModal from '../../components/app-rating/AppRatingModal'
+import { useAppRating } from '../../hooks/useAppRating'
 import Popover, { type PopoverAnchor } from '../../components/popover/Popover'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import ViewProfileDesktopLayout from './ViewProfileDesktopLayout'
@@ -461,6 +464,22 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // Angular: paymentPromoPopUp() → bottom-sheet.component's `paymentPromo` block —
   // the real upgrade sheet shown for Call/WhatsApp/Message when the viewer is free.
   const [paymentPromo, setPaymentPromo] = useState<UpgradePaymentPromo | null>(null)
+
+  // Angular: the Like/Undo toast comes from button.component.ts, the SHARED
+  // button both the matches card and this page render — so liking from here
+  // raises the same toaster. This screen had no Toast at all, so every
+  // like/undo response message was swallowed.
+  const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
+
+  // Angular: viewprofile.page.ts:2037 fires the ACTIVE "profiles viewed"
+  // trigger from this page, and communication.service.ts:441 the "like sent"
+  // one for a like sent from here. Both need a host for the sheet, which in
+  // Ionic is the global modal stack and here is this screen.
+  const appRating = useAppRating()
+
+  function showToast(message: string, onUndo?: () => void, duration?: number) {
+    setToastRequest({ message, key: Date.now(), onUndo, duration })
+  }
   // ── Contact-reveal flow (Angular button.component.ts's two-step confirm →
   // phoneviewed API → Contact Details sheet) — mirrors MatchesScreen.tsx's own
   // fix for the exact same gap: this previously skipped straight to dialing on
@@ -755,6 +774,15 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         const adapted = viewProfileAdapter.adapt(raw)
         setProfile(adapted)
         setEnlargedPhotos(null)
+        // Angular: viewprofile.page.ts:2033-2039 — a profile that actually
+        // rendered counts as one "profile seen", unless it is the member
+        // looking at their own card or a same-gender one
+        // (`!this.ownProfile || !this.sameGender`). Angular also skips it
+        // while another modal or the coach mark owns the screen; the coach
+        // mark is the one this port has.
+        if (!showCoachMark && (!ownProfile || adapted.gender !== loginGender)) {
+          appRating.onProfileViewed()
+        }
         // Angular: getStarMatch() (viewprofile.page.ts:1880-1913) — paid viewers
         // only, fired once the profile's loaded so the inline teaser can show the
         // real ratio immediately, not just on "View details" click. Needs the
@@ -1047,12 +1075,36 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 
   // ── Actions — same communicationBtnOnClick plumbing Matches uses ─────────────
 
+  // Angular button.component.ts:486 showCustomToaster() — its Undo button fires
+  // a plain `dislike` call, exactly as MatchesScreen.handleUndoLike() does.
+  async function handleUndoLike(profileId: string) {
+    setProfile(prev => prev && { ...prev, likedStatus: '0' })
+    try {
+      await communicationBtnOnClick(fromPage, 'dislike', { MATRIID: profileId })
+    } catch (e) {
+      if (__DEV__) console.error('[ViewProfile] undo-like error:', e)
+    }
+  }
+
   async function handleLike() {
     if (!profile) return
+    const profileId = profile.profileId
     setProfile(prev => prev && { ...prev, likedStatus: '1' })
     try {
-      const result = await communicationBtnOnClick(fromPage, 'like', { MATRIID: profile.profileId })
-      if (result.type === 'error') setProfile(prev => prev && { ...prev, likedStatus: '0' })
+      const result = await communicationBtnOnClick(fromPage, 'like', { MATRIID: profileId })
+      // Angular button.component.ts:454-468 — `like`/`dislike` route their
+      // response MSG to showCustomToaster() (with Undo) on BOTH the success
+      // and the message-carrying failure path (e.g. "You have already liked").
+      // 1500ms is that toast's own duration, not the 2000 default.
+      if (result.type === 'error') {
+        setProfile(prev => prev && { ...prev, likedStatus: '0' })
+        showToast(result.message, () => handleUndoLike(profileId), 1500)
+      } else if (result.type === 'api_success' && result.message) {
+        showToast(result.message, () => handleUndoLike(profileId), 1500)
+      }
+      // Angular: communication.service.ts:441 — every like except one sent
+      // from Daily Recommendation counts towards the active threshold.
+      appRating.onLikeSent()
     } catch { /* keep optimistic state */ }
   }
 
@@ -1686,8 +1738,12 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     // TS can't narrow `profile` through this closure — re-guard explicitly (the
     // caller only ever invokes this after the outer `if (!profile) return` above).
     if (!profile || sameGender) return null
+    // Angular: `.bottom-cta-bg` IS the footer — the pink starts at its top edge,
+    // with nothing white above it. So in the after-like state this wrapper and
+    // its host both give up their top spacing and let the band run flush; the
+    // Like-CTA state keeps the original 16.
     return (
-      <View style={s.ctaBlock}>
+      <View style={[s.ctaBlock, showAfterLikeCTA(profile.likedStatus) && s.ctaBlockFlush]}>
         {/* Same layout/design as Matches' own MatchCard CTA (MatchesScreen.tsx) —
             Row 1: Don't show + View later (flex:1 each); Row 2: Like, full width. */}
         {showLikeCTA(profile.likedStatus) && (
@@ -1721,26 +1777,47 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           </View>
         )}
 
+        {/* Angular: viewprofile.page.html:1315-1430 — this is NOT a rounded,
+            inset pink card with the text and the CTA side by side. The whole
+            sticky grid takes `.bottom-cta-bg` (viewprofile.page.scss:274-282):
+            a FULL-WIDTH band, pink at the top fading to white, with a hairline
+            top border that fades out towards both ends. Inside it the content
+            line is its own CENTRED row (`ion-col ... d-flex
+            justify-content-center` + `text-align-center`) and the CTA is a
+            separate `hasFullWidth` button underneath — never beside it. */}
         {showAfterLikeCTA(profile.likedStatus) && (
-          <View style={s.afterLikeRow}>
-            <View style={s.afterLikeTopRow}>
-              <Text style={[s.afterLikeText, { fontFamily: langFonts.medium }]}>{getAfterLikeContentText(ctaCtx, t)}</Text>
-              <View style={s.ctaSendInterestWrap}>
-                {showFreeBadge(ctaCtx) && (
-                  <View style={s.freeBadge} pointerEvents="none">
-                    <Text style={[s.freeBadgeText, { fontFamily: langFonts.medium }]}>{t('GENERAL.FREE')}</Text>
-                  </View>
-                )}
-                <Pressable style={s.ctaSendInterest} onPress={handleCall}>
-                  <CdnSvg uri={getAfterLikeCtaIcon(ctaCtx)} width={16} height={16} />
-                  <Text style={[s.ctaSendInterestText, { fontFamily: langFonts.regular }]}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
-                </Pressable>
-              </View>
+          <LinearGradient
+            colors={[Colors.afterLikeBandTop, Colors.white]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 0, y: 1 }}
+            style={s.afterLikeBand}
+          >
+            {/* `border-image: linear-gradient(to right, transparent,
+                rgba(245,189,208,1) 50%, transparent)` on a 1px top border —
+                a hairline that is pinkest mid-span and gone at either end. */}
+            <LinearGradient
+              colors={[Colors.afterLikeBorderFade, Colors.afterLikeBorder, Colors.afterLikeBorderFade]}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={s.afterLikeBandTopLine}
+              pointerEvents="none"
+            />
+            <Text style={[s.afterLikeText, { fontFamily: langFonts.medium }]}>{getAfterLikeContentText(ctaCtx, t)}</Text>
+            <View style={s.ctaSendInterestWrap}>
+              {showFreeBadge(ctaCtx) && (
+                <View style={s.freeBadge} pointerEvents="none">
+                  <Text style={[s.freeBadgeText, { fontFamily: langFonts.medium }]}>{t('GENERAL.FREE')}</Text>
+                </View>
+              )}
+              <Pressable style={s.ctaSendInterest} onPress={handleCall}>
+                <CdnSvg uri={getAfterLikeCtaIcon(ctaCtx)} width={16} height={16} />
+                <Text style={[s.ctaSendInterestText, { fontFamily: langFonts.regular }]}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
+              </Pressable>
             </View>
             {showContactsLeftBanner(ctaCtx) && (
               <Text style={[s.contactsLeftText, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
             )}
-          </View>
+          </LinearGradient>
         )}
 
       </View>
@@ -1886,6 +1963,14 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         />
 
         <LanguagePillSheet visible={showLanguageSheet} onClose={() => setShowLanguageSheet(false)} />
+
+        <AppRatingModal
+          visible={!!appRating.trigger}
+          source={appRating.trigger?.source ?? '1'}
+          onClose={appRating.close}
+        />
+
+        <Toast request={toastRequest} />
       </View>
     )
   }
@@ -2438,7 +2523,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
             details, before Similar Profiles (confirmed against real screenshots).
             ref+onLayout feed refreshCta2Y, which decides when the floating
             top CTA above should hand off to this one — see its own comment. */}
-        <View ref={cta2Ref} style={s.ctaBlockOuter} onLayout={refreshCta2Y}>
+        <View
+          ref={cta2Ref}
+          style={[s.ctaBlockOuter, !ownProfile && showAfterLikeCTA(profile.likedStatus) && s.ctaHostFlush]}
+          onLayout={refreshCta2Y}
+        >
           {ownProfile ? renderBiodataCta() : renderCtaBlock()}
         </View>
 
@@ -2523,7 +2612,12 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           mounted (no conditional unmount) — opacity alone drives visibility,
           so there's no mount/unmount pop and no gap between the two CTAs. */}
       <Animated.View
-        style={[s.floatingCtaBar, { paddingBottom: 12 + insets.bottom }, floatingCtaAnimStyle]}
+        style={[
+          s.floatingCtaBar,
+          { paddingBottom: 12 + insets.bottom },
+          !ownProfile && showAfterLikeCTA(profile.likedStatus) && s.ctaHostFlush,
+          floatingCtaAnimStyle,
+        ]}
         pointerEvents={cta2Visible ? 'none' : 'auto'}
       >
         {renderCtaBlock()}
@@ -2632,6 +2726,14 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         uri={horoscopeSvgUrl}
         onClose={() => setHoroscopeSvgUrl(null)}
       />
+
+      <AppRatingModal
+        visible={!!appRating.trigger}
+        source={appRating.trigger?.source ?? '1'}
+        onClose={appRating.close}
+      />
+
+      <Toast request={toastRequest} />
     </Animated.View>
   )
 }
@@ -2783,13 +2885,20 @@ const s = StyleSheet.create({
   likedMsg: { fontWeight: '500', fontSize: FontSize.font14, color: Colors.black, marginTop: 6 },
 
   // Angular: viewprofile.page.html:469-489 — Call/WhatsApp icon buttons beside the name.
-  nameIconsRow: { flexDirection: 'row', alignItems: 'center', gap: 32 },
+  // Angular: viewprofile.page.html:489-515 — the three icon columns are
+  // `size="1.2"/"1.3"` with `offset="0.5"` between them: half a grid column,
+  // ~12px at phone widths, NOT the 32 this had. Same 12 the matches card
+  // (MatchesScreen.tsx nameRow) already uses for the identical icon trio.
+  nameIconsRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   nameIconBtn: { alignItems: 'center', justifyContent: 'center' },
 
   // Angular: .button-banner — regular inline content (NOT position:fixed/sticky —
   // confirmed against real screenshots showing more content, incl. a second copy of
   // this exact block, both above and below it in the normal scroll flow).
   ctaBlock: { marginTop: 16 },
+  // See the after-like band's comment in renderCtaBlock().
+  ctaBlockFlush: { marginTop: 0 },
+  ctaHostFlush:  { paddingTop: 0 },
   // Second CTA's own wrapper — matches infoCard's horizontal padding since it now
   // sits outside infoCard (see the onLayout comment at its call site). Angular:
   // .sticky-btm { background: #ffffff } — an explicit opaque white card, always
@@ -2864,14 +2973,22 @@ const s = StyleSheet.create({
   // fontFamily applied inline (langFonts.medium) — see Text usage.
   biodataCtaText: { fontWeight: '500', fontSize: FontSize.font14, color: Colors.white },
 
-  afterLikeRow: {
-    backgroundColor: Colors.afterLikeBg, borderRadius: 8, borderWidth: 1,
-    borderColor: Colors.afterLikeBorder, paddingHorizontal: 14, paddingVertical: 10,
+  // Angular: `.bottom-cta-bg` — a full-bleed band, so it has to escape the 24px
+  // horizontal padding every host of renderCtaBlock() applies (ctaBlockOuter,
+  // floatingCtaBar, and PhotoViewerModal's own footer all use the same 24).
+  // Its own insets are Angular's: pl-16/pr-16 around the button, mt-12 above
+  // the content line.
+  afterLikeBand: {
+    marginHorizontal: -24, paddingHorizontal: 16, paddingTop: 12, paddingBottom: 12, gap: 12,
   },
-  afterLikeTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  afterLikeBandTopLine: { position: 'absolute', top: 0, left: 0, right: 0, height: 1 },
+  // Angular: `body1-medium-14 black-color text-align-center` — 14px Medium,
+  // centred on its own line (font13 + flex:1 was the side-by-side row layout).
   // fontFamily applied inline (langFonts.medium) — see Text usage.
-  afterLikeText:   { flex: 1, fontWeight: '500', fontSize: FontSize.font13, color: Colors.black },
-  ctaSendInterestWrap: { position: 'relative', flexShrink: 0 },
+  afterLikeText:   { fontWeight: '500', fontSize: FontSize.font14, color: Colors.black, textAlign: 'center' },
+  // Full width now (Angular `hasFullWidth`) — the Pressable inside stretches to
+  // this wrapper, which the freeBadge still anchors to.
+  ctaSendInterestWrap: { position: 'relative' },
   ctaSendInterest: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, backgroundColor: Colors.primaryDark, borderRadius: 8, paddingHorizontal: 16,

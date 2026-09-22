@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View, type TextStyle, type ViewStyle } fro
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import { FontSize } from '../../src/theme/fonts'
+import { FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -128,19 +128,35 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
 
-  // Angular .count-chip-block-message: bg primary, borderRadius 20, 24×20, centered
+  // Angular .count-chip-block-message (chip.component.scss:78-87): background
+  // var(--ion-color-primary-color) = #DE2A68, borderRadius 20, 24×20, centered,
+  // margin-left 4.
   countBadge: {
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.countBadge,
     borderRadius:    20,
     width:           24,
     height:          20,
     alignItems:      'center',
     justifyContent:  'center',
-    marginLeft:      2,
+    marginLeft:      4,
   },
+  // Angular: `white-color font-12-all` (global.scss:2276) — 12px, Poppins
+  // REGULAR/400, white. This was 10px with a bare fontWeight 700, which RN
+  // resolves to the system font plus a synthetic bold.
+  //
+  // The centring comes from lineHeight + includeFontPadding, not from the
+  // parent's justifyContent alone: the badge centres the text's LINE BOX, and
+  // the digit sits inside that box per the font's ascent/descent, which left it
+  // a pixel low in a 20px badge. Pinning lineHeight to the badge height makes
+  // box and badge the same rectangle, and includeFontPadding:false drops the
+  // extra top/bottom padding Android adds outside those metrics.
   countText: {
-    fontSize:   FontSize.font10,
-    fontWeight: '700',
-    color:      Colors.white,
+    fontFamily:         SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize:           FontSize.font12,
+    lineHeight:         20,
+    color:              Colors.white,
+    textAlign:          'center',
+    textAlignVertical:  'center',
+    includeFontPadding: false,
   },
 })

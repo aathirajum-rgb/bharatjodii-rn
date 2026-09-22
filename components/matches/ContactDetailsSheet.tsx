@@ -8,11 +8,18 @@
 import { Modal, Pressable, Share, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
-import { CallIcon, WhatsAppIcon } from './matchesCard.shared'
+import { WhatsAppIcon } from './matchesCard.shared'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import { CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
+
+// Angular: `EButtonIcons.callIconWhite` -> revamp/call-icon-white.svg
+// (button-revamp.component.scss:340) — a bare WHITE-stroke handset, for use on
+// the crimson button. Deliberately NOT the shared CallIcon: that one is
+// revamp/call-revamp.svg, a white circle with a green border, right for the
+// light-background name rows it serves and unreadable on this button.
+const CDN_CALL_WHITE = CDN_SVG + 'revamp/call-icon-white.svg'
 
 export interface ContactDetailsSheetProps {
   visible:         boolean
@@ -47,11 +54,25 @@ export default function ContactDetailsSheet({
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={s.scrim} onPress={onClose} />
       <View style={[s.sheet, { paddingBottom: insets.bottom + 24 }]}>
+        {/* modalpopup.component.html:404-406 — the close control is a
+            `.bottomsheet-cross` image floating ABOVE the sheet
+            (modalpopup.component.scss:1995 — top:-60px, left:47%), the same
+            revamp/bottomsheet-cross.svg the shared BottomSheet renders. It is
+            NOT a ✕ glyph in the title row: that drew in the system font and
+            put the control somewhere Angular never has one. */}
+        <Pressable
+          style={s.closeBtn}
+          onPress={onClose}
+          hitSlop={10}
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+        >
+          <CdnSvg uri={CDN_SVG + 'revamp/bottomsheet-cross.svg'} width={32} height={32} />
+        </Pressable>
+
+        {/* Angular: the title sits alone on its row (`ion-col size="10"`). */}
         <View style={s.headerRow}>
           <Text style={s.title}>{t('VIEWPROFILE.CONTACT_DETAILS')}</Text>
-          <Pressable onPress={onClose} hitSlop={10}>
-            <Text style={s.closeX}>✕</Text>
-          </Pressable>
         </View>
 
         {showNotVerifiedNote && (
@@ -92,12 +113,21 @@ export default function ContactDetailsSheet({
             CALL_CTA / GENERAL.CALL_CTA), not "View phone number" — that's the
             BEFORE-reveal button elsewhere; this popup IS the revealed state. */}
         <Pressable style={[s.callBtn, { marginTop: whatsappNumber ? 12 : 16 }]} onPress={onCall}>
-          <CallIcon width={24} height={24} />
+          {/* Angular: app-button-revamp iconType callIconWhite + iconSize large —
+              ion-icon.large is a 24x24 BOX, but the icon is a CSS
+              `background: url(...) no-repeat` with no background-size, so the
+              file draws at its own intrinsic 18x18 inside that box (24 here
+              rendered the handset visibly larger/heavier than Angular). */}
+          <CdnSvg uri={CDN_CALL_WHITE} width={16} height={16} />
           <Text style={s.btnText}>{t('GENERAL.CALL_CTA')}</Text>
         </Pressable>
 
         <Pressable onPress={handleShare} style={s.shareRow} hitSlop={6}>
-          <CdnSvg uri={CDN_SVG + 'share-img-contact-details-popup.svg'} width={10} height={12} />
+          {/* modalpopup.component.html:463-465 — the share icon sits in a
+              `.height-width-24` wrapper, i.e. 24x24 (the file itself is a 20x20
+              share-nodes glyph with its own padding). 10x12 shrank it to an
+              unreadable smudge. */}
+          <CdnSvg uri={CDN_SVG + 'share-img-contact-details-popup.svg'} width={26} height={26} />
           <Text style={s.shareLinkText}>{t('VIEWPROFILE.CONTACT_DETAIL_SHARE')}</Text>
         </Pressable>
 
@@ -144,7 +174,9 @@ const s = StyleSheet.create({
     alignItems:     'flex-start',
     marginBottom:   16,
   },
-  closeX: { fontSize: FontSize.font16, color: '#1f1e1b' },
+  // modalpopup.component.scss:1995 `.bottomsheet-cross` — the 32x32 asset
+  // carries its own #545454 circle, so nothing is drawn behind it here.
+  closeBtn: { position: 'absolute', top: -60, left: '47%', zIndex: 10 },
   // Figma: Poppins-SemiBold 20px, lineHeight 28, #1f1e1b, left-aligned (this
   // used 18px centered before).
   title: {

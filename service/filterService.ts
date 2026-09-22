@@ -250,43 +250,21 @@ function filterPPIndex(selectionKey: string): number {
   return field ? STRICT_FIELD_ORDER.indexOf(field as FieldKey) : -1
 }
 
-function sameAsDefault(value: any, fallback: any): boolean {
-  if (Array.isArray(value) || Array.isArray(fallback)) {
-    const a = Array.isArray(value)    ? value    : [value]
-    const b = Array.isArray(fallback) ? fallback : [fallback]
-    return a.length === b.length && a.every((v, i) => String(v ?? '') === String(b[i] ?? ''))
-  }
-  return String(value ?? '') === String(fallback ?? '')
-}
 
-// Angular: `searchValueList[field].isAnyChanges`, mirrored into
-// filterService.selectedFilters — one flag per ROW, which drives both the red
-// "edited" dot on the filter row and the count badge on the Filters chip.
+// The red "edited" dot on a filter row, and the count badge on the Filters
+// chip, both come from ONE flag per row: Angular's
+// `searchValueList[field].isAnyChanges`, mirrored into
+// filterService.selectedFilters and persisted as SELECTEDFILTERS — the map
+// getSelectedFilters()/getFilterEditedCount() below read.
 //
-// The baseline is the member's saved PARTNER PREFERENCE, not DEFAULT_FILTER:
-// the filter screen opens showing the preference (setsearchValueList seeds it
-// from the getpreference payload) and Angular's setsearchValueList explicitly
-// clears every isAnyChanges as it does so — "it should be true for showing the
-// red dot" only once the member changes something in Filters mode. So a dot
-// means "different from your saved preference", and Reset — which restores the
-// preference — clears them all. Falls back to DEFAULT_FILTER when the
-// preference hasn't loaded yet.
+// It is written at each edit site, against the field the member is editing
+// (filter.component.ts:754/774/789/1449 all key off `filterType`/`pageName`),
+// and SearchScreen.updateField() is this port's single equivalent funnel.
 //
-// DERIVED rather than tracked as its own mutable flag: Angular sets
-// isAnyChanges at each write site and has to remember to clear it again, which
-// is what makes a reset there a multi-step teardown. A comparison cannot drift.
-export function computeEditedRows(
-  obj: Record<string, any>,
-  baseline: Record<string, any> = DEFAULT_FILTER,
-): Record<string, boolean> {
-  const edited: Record<string, boolean> = {}
-  for (const key of Object.keys(DEFAULT_FILTER)) {
-    const row = filterRowKey(key)
-    if (!row) continue
-    if (!sameAsDefault(obj?.[key], baseline?.[key] ?? DEFAULT_FILTER[key])) edited[row] = true
-  }
-  return edited
-}
+// It deliberately is NOT computed by diffing the selection against the saved
+// preference. A field the member never touched can still change value —
+// picking a religion resets Caste and Division — and a diff cannot tell that
+// apart from an edit, so one religion change lit up two rows.
 
 // Angular: filter.service.ts's isAnyOneFieldEdited() — the guard Reset uses to
 // decide whether there is anything to undo.

@@ -49,7 +49,7 @@ import {
   getFilterEventType, resetFilter, buildSearchParams, DEFAULT_FILTER, DEFAULT_PP_CHECKBOX,
   markFilterPPEdited,
   getStrictFilterState, setStrictFilterState, QUICK_FILTER_ICON,
-  computeEditedRows, isAnyFieldEdited,
+  getSelectedFilters, isAnyFieldEdited, filterRowKey,
   ppSelectionFromPPSet, hasStoredFilterSelection,
 } from '../../service/filterService'
 import { getPPSetData } from '../../service/profileService'
@@ -182,13 +182,24 @@ export default function SearchScreen({ navigation }: Props) {
   //   checkFilterEventType()            // FILTEREVENTTYPE === 'filter'
   //   && item.isAnyChanges              // this row was actually changed
   // so in Partner-Preference mode the dot never appears, however much is set.
-  // Derived, never stored: see computeEditedRows() for why. Declared up here
-  // beside `selected` because the debounced count effect persists it too.
   //
-  // The baseline is the member's saved partner preference — the screen opens
-  // ON it, so a dot marks a Filters-mode change away from it, and Reset (which
-  // restores it) clears every dot. DEFAULT_FILTER stands in until it loads.
-  const editedRows     = useMemo(() => computeEditedRows(selected, ppBaseline), [selected, ppBaseline])
+  // TRACKED, not derived from the values. Angular carries an explicit
+  // per-field `isAnyChanges` written ONLY on the field being edited
+  // (filter.component.ts:754/774/789/1449 all key off `filterType`/`pageName`),
+  // mirrored into filterService.selectedFilters — the SELECTEDFILTERS map this
+  // port already persists and already counts for the Filters chip badge.
+  //
+  // Diffing the selection against the saved preference looked equivalent and is
+  // not: a field the member never touched can still CHANGE value. Picking a
+  // religion resets Caste and Division (see the RELIGION branch in the
+  // MultiSelectPicker below, mirroring Angular's own dependent-field reset), and
+  // the diff then reported Caste as edited — a red dot, and a Filters-chip count
+  // of 2, for one religion change. Only an explicit flag can tell "this value
+  // moved" apart from "the member moved it".
+  //
+  // Seeded from storage on open (Angular: getSelectedValues() reads
+  // SELECTEDFILTERS back) so dots survive leaving and re-entering the screen.
+  const [editedRows, setEditedRows] = useState<Record<string, boolean>>({})
   const isRowEdited    = (key: string) => eventType === 'filter' && editedRows[key] === true
   // Angular's Reset guard, `if (!isAnyOneFieldEdited()) return` — the same
   // predicate decides whether the button does anything at all.
@@ -288,9 +299,10 @@ export default function SearchScreen({ navigation }: Props) {
       // can't show a stale STRICKPP.
       const ppSet = await getPPSetData(true).catch(() => null)
 
-      const [obj, hasStored, evType, id, gen, name, occupation, strict, arrays] = await Promise.all([
+      const [obj, hasStored, storedEdited, evType, id, gen, name, occupation, strict, arrays] = await Promise.all([
         getSelectedObject(),
         hasStoredFilterSelection(),
+        getSelectedFilters(),
         getFilterEventType(),
         getItem(SK.Auth.USER_ID),
         getItem(SK.User.LOGIN_GENDER),
@@ -343,6 +355,11 @@ export default function SearchScreen({ navigation }: Props) {
       const baseline = ppSelectionFromPPSet(ppSet as Record<string, any> | null)
       setPpBaseline(baseline)
       setSelected(hasStored ? obj : baseline)
+      // The dots belong to the stored filter session. No session stored means
+      // the screen is opening on the saved preference, where nothing has been
+      // edited yet — Angular's setsearchValueList() clears every isAnyChanges
+      // on exactly that path.
+      setEditedRows(hasStored ? storedEdited : {})
       // FILTERPP reports the fields edited in THIS visit, so the flags start
       // clean on every open — a stale '1' left by an earlier visit would
       // otherwise ride along and break "only the edited field is 1". Both
@@ -412,13 +429,28 @@ export default function SearchScreen({ navigation }: Props) {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  function updateField(key: string, value: any) {
+  // `cascade` = this write is a DEPENDENT reset the app performed, not a field
+  // the member edited (religion changing clears caste/division). Angular never
+  // sets isAnyChanges for those: every write site keys it off the page the
+  // member is actually on. So a cascade updates the value and nothing else —
+  // no red dot, no Filters-chip count, no FILTERPP position. It also restores
+  // what markFilterPPEdited's own comment already says this port intends
+  // ("editing RELIGION also set CASTE's position … would report a field the
+  // member never edited") — which the CASTE/DIVISION resets were quietly
+  // undoing by going through the normal path.
+  function updateField(key: string, value: any, opts?: { cascade?: boolean }) {
     setSelected(prev => ({ ...prev, [key]: value }))
+    if (opts?.cascade) return
     // FILTERPP: flag this field's own position as edited (Angular does the
     // same inside each field editor — filter-popup.component.ts:1377). Every
     // edit on both mobile and desktop funnels through here, so this is the one
     // place that needs it.
     setPpCheckBox(prev => markFilterPPEdited(prev, key))
+    // …and the same for the row flag behind the red dot / chip count. Several
+    // selection keys share one ROW (STARTAGE+ENDAGE → AGE, COUNTRY/STATE/CITY
+    // → LOCATION), which is exactly what filterRowKey() resolves.
+    const row = filterRowKey(key)
+    if (row) setEditedRows(prev => (prev[row] ? prev : { ...prev, [row]: true }))
   }
 
   async function ensureOptions(key: string, loader: () => Promise<MultiSelectOption[]>) {
@@ -993,9 +1025,10 @@ export default function SearchScreen({ navigation }: Props) {
       // until the screen remounted.
       setPpCheckBox([...DEFAULT_PP_CHECKBOX])
       setLabelCache({})
-      // editedRows recomputes off `selected`, so every dot clears and the
-      // Filters-chip count lands on 0 with no separate bookkeeping. The Matches
-      // screen re-reads both from storage on focus.
+      // resetFilter() above already purged SELECTEDFILTERS; clear the in-memory
+      // copy with it so every dot goes and the Filters-chip count lands on 0.
+      // The Matches screen re-reads the stored map on focus.
+      setEditedRows({})
     } finally {
       setResetting(false)
     }
@@ -1393,8 +1426,10 @@ export default function SearchScreen({ navigation }: Props) {
             updateField(multiEditor, keys)
             if (multiEditor === 'RELIGION') {
               // Religion changed — stale caste/subcaste cache must be dropped.
-              updateField('CASTE', ['0'])
-              updateField('DIVISION', ['0'])
+              // `cascade`: the member edited RELIGION, not these two, so they
+              // must not light up as edited rows of their own.
+              updateField('CASTE', ['0'], { cascade: true })
+              updateField('DIVISION', ['0'], { cascade: true })
               setLabelCache(prev => { const n = { ...prev }; delete n.CASTE; delete n.DIVISION; return n })
             }
           }}

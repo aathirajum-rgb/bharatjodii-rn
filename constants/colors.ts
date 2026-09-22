@@ -21,6 +21,12 @@ export const Colors = {
   // edited" marker. Same hex as inputError, but a different meaning, so it gets
   // its own name rather than borrowing the error token.
   editedDot:        '#DE2A68',
+  // Angular `--ion-color-primary-color` (theme/variables.scss:168) — the pink
+  // every count badge sits on (chip.component.scss's .count-chip-block-message,
+  // the footer's numbers-badge-* rules). NOT Colors.primary (#C62828): that is
+  // the app's main brand red, and using it here made the Filters chip's count
+  // a brick-red disc instead of this pink.
+  countBadge:       '#DE2A68',
 
   // ── Text ──────────────────────────────────────────────────────────────────
   textPrimary:      '#111111',   // headings, body
@@ -108,7 +114,17 @@ export const Colors = {
   likedStripText:   '#96286E',              // liked-profile strip text
   afterLikeBg:      '#FCEAF0',              // post-like CTA row background
   afterLikeBorder:  '#F5BDD0',              // post-like CTA row top border
+  // Angular: `.bottom-cta-bg` paints `linear-gradient(180deg, #FCEAF0 -45.36%,
+  // #FFFFFF 100%)`. The stop sits ABOVE the band, so the colour actually visible
+  // at its top edge is ~31% of the way to white — #FDF1F5, matching a pixel
+  // sample of the Angular screen.
+  afterLikeBandTop: '#FDF1F5',              // post-like CTA band gradient top (→ white)
+  afterLikeBorderFade: 'rgba(245,189,208,0)', // that border's transparent ends
   extendedCardTitle:'#4C4C4C',              // end-of-list "view more" card title
+  // Angular end-card.component.scss:41 `.avatar-images { background-color:
+  // #e5e5e5 }` — the plate behind both the avatar silhouettes and the "+N more"
+  // circle on that card.
+  extendedCardPlate:'#e5e5e5',              // end-of-list card avatar/count plate
 
   // ── Promo banners (MatchesScreen) ────────────────────────────────────────────
   photoPromoGradientStart: '#FFDDDD',   // free-trial photo-promo banner gradient start (→ white)

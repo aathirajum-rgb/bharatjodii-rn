@@ -39,6 +39,8 @@ import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { useFooterBadges } from '../../contexts/FooterBadgesContext'
 import LanguagePill from '../../components/language-pill/LanguagePill'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
+import AppRatingModal from '../../components/app-rating/AppRatingModal'
+import { useAppRating } from '../../hooks/useAppRating'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import CdnSvg, { CdnImage } from '../../components/cdn-svg/CdnSvg'
 import StickyBanner from '../../components/sticky-banner/StickyBanner'
@@ -240,6 +242,11 @@ export default function ActivityScreen({ navigation, route }: Props) {
   function showToast(message: string) {
     setToastRequest({ message, key: Date.now() })
   }
+
+  // Angular fires the ACTIVE "like sent" trigger from the shared
+  // communication.service.ts:441, so a like from these lists counts the same
+  // as one from the matches card. Only Daily Recommendation is excluded.
+  const appRating = useAppRating()
 
   // ── Data helpers ─────────────────────────────────────────────────────────────
 
@@ -544,6 +551,7 @@ export default function ActivityScreen({ navigation, route }: Props) {
       } else if (result.type === 'api_success' && result.message) {
         showToast(result.message)
       }
+      appRating.onLikeSent()
     } catch { /* keep optimistic state — matches MatchesScreen's own silent-catch convention */ }
   }
 
@@ -967,7 +975,17 @@ export default function ActivityScreen({ navigation, route }: Props) {
           onSecondaryPress={() => phoneInfo.secondaryPress(addPhoto.openAddPhoto, navigation)}
           onLinkPress={phoneInfo.close}
         />
-        <Toast request={toastRequest} />
+        <AppRatingModal
+          visible={!!appRating.trigger}
+          source={appRating.trigger?.source ?? '1'}
+          onClose={appRating.close}
+        />
+        <AppRatingModal
+        visible={!!appRating.trigger}
+        source={appRating.trigger?.source ?? '1'}
+        onClose={appRating.close}
+      />
+      <Toast request={toastRequest} />
         <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />
         <AddPhotoVerdictSheets addPhoto={addPhoto} />
       </ActivityDesktopLayout>
@@ -1327,6 +1345,11 @@ export default function ActivityScreen({ navigation, route }: Props) {
         onPrimaryPress={() => phoneInfo.primaryPress(navigation)}
         onSecondaryPress={() => phoneInfo.secondaryPress(addPhoto.openAddPhoto, navigation)}
         onLinkPress={phoneInfo.close}
+      />
+      <AppRatingModal
+        visible={!!appRating.trigger}
+        source={appRating.trigger?.source ?? '1'}
+        onClose={appRating.close}
       />
       <Toast request={toastRequest} />
       <WebPhotoInput inputRef={addPhoto.webInputRef} onChange={addPhoto.handleWebFiles} />

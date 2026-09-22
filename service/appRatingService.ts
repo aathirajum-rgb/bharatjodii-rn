@@ -9,14 +9,14 @@
 // ModalController has no RN equivalent, and this app has no global modal host).
 // A decision comes back as a RatingTrigger, which the screen hands straight to
 // <AppRatingModal source=... />.
-import { Linking } from 'react-native'
 import Constants from 'expo-constants'
 import { apiCall } from './apiClient'
 import { Endpoints } from './api.endpoints'
 import { paymentTrack } from './paymentService'
-import { getItem, setItem } from './storageService'
+import { logEvent, dispatchNativeEvent } from './analyticsService'
+import { getItem, setItem, removeMultiple } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
-import { CDN, CDN_SVG, CDN_LOTTIE } from '../constants/cdn'
+import { CDN_SVG, CDN_LOTTIE } from '../constants/cdn'
 import { APP_VERSION } from '../constants/appVersion'
 import type { ComCountEntry } from './homeService'
 
@@ -85,6 +85,24 @@ function readOr(raw: string | null, fallback: string): string {
   return isValidParam(raw) ? String(raw) : fallback
 }
 
+/**
+ * Every threshold below splits on gender, and LOGIN_GENDER is not a settled
+ * encoding in this port: it is written straight from the login payload's
+ * GENDER (registrationService.storeWebURLData), which the webview hands over as
+ * 'M'/'F' in some flows and '1'/'0' in others — the same ambiguity
+ * SearchScreen.memberGender documents and normalises. A bare `=== 'F'` therefore
+ * read a female member as male whenever her gender arrived as '0', and silently
+ * applied the male thresholds (3 likes instead of 2, 12 profiles instead of 15).
+ *
+ * Anything unrecognised stays '' and falls to the male branch, which is what
+ * Angular's own `gender === 'F'` does with an empty value.
+ */
+function normalizeGender(raw: string): 'M' | 'F' | '' {
+  if (['F', 'f', '0'].includes(raw)) return 'F'
+  if (['M', 'm', '1'].includes(raw)) return 'M'
+  return ''
+}
+
 function countFor(comCount: ComCountEntry[], type: string): number {
   const entry = comCount.find(c => c.comtype === type)
   return Number(entry?.totalCount ?? 0)
@@ -151,14 +169,83 @@ export const RATING_SECTIONS: Record<RatingSection, RatingSectionConfig> = {
   },
 }
 
-/** Angular: bindStarImage() — the two CDN star glyphs the rating row is built from. */
-export const STAR_IMG = {
-  filled: CDN + 'feedback/yellow-plain.svg',
-  empty:  CDN + 'feedback/grey-plain.svg',
+/**
+ * Angular: bindStarImage() — feedback/yellow-plain.svg when the star is lit,
+ * feedback/grey-plain.svg when it is not.
+ *
+ * Those two CDN files are NOT a yellow star and a grey star. Both are the same
+ * yellow (#F6D539) star; the "grey" one simply paints a second copy of the path
+ * over it in white with `style="mix-blend-mode:hue"`, and the browser
+ * desaturates the yellow underneath to #E6E6E6. react-native-svg implements no
+ * blend modes, so on native that overlay lands as plain opaque white and the
+ * unlit stars vanish into the white sheet.
+ *
+ * So the star is drawn inline here — same path, same 46x46 viewBox, taken
+ * straight from the CDN asset — with the blend's own computed result as a flat
+ * fill. Identical to Angular on web, and it now survives on native.
+ */
+const STAR_PATH = 'M1.157 17.746c.422-1.176 1.466-1.57 2.617-1.719 2.677-.349 5.347-.755 8.032-1.027 2.244-.227 3.923-.928 4.837-3.287 1.042-2.69 2.49-5.222 3.76-7.823C20.91 2.854 21.54 2.048 22.86 2h.194c1.321.045 1.953.849 2.462 1.884 1.276 2.598 2.73 5.127 3.778 7.814.92 2.357 2.6 3.053 4.846 3.275 2.685.266 5.356.666 8.034 1.008 1.151.148 2.196.538 2.621 1.713.446 1.234-.098 2.188-1.016 3.06-2.392 2.274-4.716 4.621-7.096 6.91-.908.871-1.247 1.797-.99 3.086a212.141 212.141 0 0 1 1.643 9.456c.18 1.171.385 2.49-.818 3.311-1.153.787-2.28.33-3.39-.27-2.774-1.5-5.572-2.954-8.353-4.442-.616-.33-1.191-.491-1.774-.48-.583-.01-1.158.153-1.774.484-2.777 1.495-5.572 2.956-8.342 4.463-1.109.603-2.235 1.062-3.39.277-1.204-.818-1.002-2.137-.826-3.309.477-3.163 1.001-6.321 1.62-9.46.255-1.29-.087-2.214-.996-3.084-2.386-2.282-4.715-4.624-7.114-6.893-.92-.87-1.466-1.822-1.022-3.057z'
+
+function starXml(fill: string): string {
+  return `<svg width="46" height="46" viewBox="0 0 46 46" xmlns="http://www.w3.org/2000/svg">`
+    + `<path fill-rule="evenodd" clip-rule="evenodd" d="${STAR_PATH}" fill="${fill}"/></svg>`
 }
+
+export const STAR_IMG = {
+  filled: starXml('#F6D539'),
+  empty:  starXml('#E6E6E6'),
+}
+
+/**
+ * Angular activeRatingPopup(): the like-triggered popup is deferred by 600ms
+ * (`actionNo == '2' ? 600 : 0`) so it does not land on top of the like
+ * animation and its undo toast.
+ */
+export const LIKE_POPUP_DELAY_MS = 600
 
 /** Angular: Thanks-Rating auto-dismiss — setTimeout(dismiss, 3000). */
 export const THANKS_AUTO_DISMISS_MS = 3000
+
+// ─── Per-member scoping ───────────────────────────────────────────────────────
+
+// The three values this module WRITES itself. Everything else it touches
+// (APPRATINGVALUE / APPRATINGDATE) is written from the login response by
+// registrationService.storeWebURLData, so those already describe whoever is
+// logged in now and must not be cleared here — doing so would throw away the
+// server's "already rated 5" the moment the first trigger ran.
+const RATING_LOCAL_KEYS = [
+  SK.Rating.VP_COUNT,
+  SK.Rating.LIKE_COUNT,
+  SK.Rating.SHOWN_DATE,
+]
+
+/**
+ * Resets the local rating bookkeeping when the logged-in member is not the one
+ * it was counted for.
+ *
+ * Without this, the counters and the "last shown" stamp are device-wide and
+ * outlive the account: a freshly created profile inherited a like count of 8
+ * from earlier testing, so its 2nd like hit the male "every 3rd" rule (9 % 3)
+ * while its 3rd did not, and the inherited SHOWAPPRATINGDATE suppressed the
+ * popup for 7 days on top of that. Real members hit the same thing after a
+ * logout-and-login as someone else.
+ *
+ * Runs at the head of both trigger paths, so it cannot be bypassed.
+ */
+async function ensureRatingOwner(): Promise<void> {
+  const [rawUserId, owner] = await Promise.all([
+    getItem(SK.Auth.USER_ID),
+    getItem(SK.Rating.OWNER),
+  ])
+  const userId = String(rawUserId ?? '')
+  // No session yet: nothing to scope to, and wiping now would clear state that
+  // still belongs to the member who is about to be restored.
+  if (!userId) return
+  if (owner === userId) return
+
+  await removeMultiple(RATING_LOCAL_KEYS)
+  await setItem(SK.Rating.OWNER, userId)
+}
 
 // ─── Eligibility ──────────────────────────────────────────────────────────────
 
@@ -167,6 +254,42 @@ export interface RatingTrigger {
   source: string
   /** Angular's CurrentDate — the stamp to write to SHOWAPPRATINGDATE on open. */
   currentDate: string
+  /**
+   * Angular activeRatingPopup(): `let timer = (actionNo == '2') ? 600 : 0` — a
+   * like-triggered popup waits 600ms so the like animation and its toast are
+   * done before the sheet slides over them. Every other trigger opens at once.
+   */
+  delayMs: number
+}
+
+/**
+ * Angular: checkEligiable() — the ACTIVE-action thresholds, i.e. things the
+ * member does: likes they SEND and profiles they OPEN.
+ *
+ *              like sent      profiles viewed
+ *   male  <15d     3               12
+ *   male  >15d     2               10
+ *   female <15d    2               15
+ *   female >15d    2               18
+ *
+ * Modulo, not ">=", and that is deliberate on two counts: the counter keeps
+ * running across the 15-day boundary ("when the user transitions from LT15 to
+ * GT15 the count carries forward"), and once a popup has been shown the next
+ * one is another full N actions away — Angular's stand-in for "the count
+ * resets", without a reset that could lose actions mid-session.
+ *
+ * Returns Angular's actionNo: '2' = like sent, '3' = profiles viewed, '0' =
+ * not eligible. Like wins when both land on the same action.
+ */
+export function checkEligiable(
+  gender = '', like = 0, vpView = 0, isGTDay = false,
+): string {
+  const isFemale  = gender === 'F'
+  const likeCnt   = isFemale ? 2 : (isGTDay ? 2 : 3)
+  const vpViewCnt = isFemale ? (isGTDay ? 18 : 15) : (isGTDay ? 10 : 12)
+  const likeAct = (like % likeCnt === 0 && like !== 0) ? '2' : '0'
+  const vpAct   = (vpView % vpViewCnt === 0 && vpView !== 0) ? '3' : '0'
+  return likeAct !== '0' ? likeAct : vpAct
 }
 
 /**
@@ -200,7 +323,7 @@ export function checkLoginEligiable(
  *   - rated 4-5                → never again.
  */
 export async function checkRatingCount(
-  show = false, actionNo = '1',
+  show = false, actionNo = '1', delayMs = 0,
 ): Promise<RatingTrigger | null> {
   if (!show) return null
   if (ratingPopupOpen) return null   // Angular: isOpenedRationPopup guard
@@ -228,8 +351,9 @@ export async function checkRatingCount(
 
   const firstAsk = shownDate === '' && shownDaysAgo < 8 && !['4', '5'].includes(appRatingVal)
   const reAsk    = ratedDaysAgo > 30 && shownDaysAgo > 30 && ['1', '2', '3'].includes(appRatingVal)
+  const allowed  = firstAsk || reAsk
 
-  return (firstAsk || reAsk) ? { source: actionNo, currentDate } : null
+  return allowed ? { source: actionNo, currentDate, delayMs } : null
 }
 
 /**
@@ -241,6 +365,8 @@ export async function passiveRatingPopup(
 ): Promise<RatingTrigger | null> {
   if (passiveChecked) return null
   passiveChecked = true
+
+  await ensureRatingOwner()
 
   const currentDate = getCurrentDateTime()
   const [rawCreated, rawGender, rawValue, rawShown] = await Promise.all([
@@ -255,7 +381,8 @@ export async function passiveRatingPopup(
   const vpCount      = countFor(comCount, 'viewedyou')
   const likeCount    = countFor(comCount, 'likedyou')
 
-  const action = checkLoginEligiable(readOr(rawGender, ''), likeCount, vpCount, accountAge > 15)
+  const gender = normalizeGender(readOr(rawGender, ''))
+  const action = checkLoginEligiable(gender, likeCount, vpCount, accountAge > 15)
   if (action !== '0') return checkRatingCount(true, action)
 
   // Fallback nudge: a 14-day-old account that has never rated and has never been
@@ -263,10 +390,49 @@ export async function passiveRatingPopup(
   // still honours the open-popup guard.
   const appRatingVal = readOr(rawValue, '0')
   const shownDate    = readOr(rawShown, '')
-  if (!ratingPopupOpen && accountAge >= 14 && appRatingVal === '0' && shownDate === '') {
-    return { source: '1', currentDate }
-  }
+  const fallback = !ratingPopupOpen && accountAge >= 14 && appRatingVal === '0' && shownDate === ''
+  if (fallback) return { source: '1', currentDate, delayMs: 0 }
   return null
+}
+
+/**
+ * Angular: activeRatingPopup(type) — called on every like SENT (outside Daily
+ * Recommendation) and every profile OPENED. Bumps that action's running count,
+ * asks checkEligiable() whether this is the Nth one, and runs the same cooldown
+ * gate the passive path uses.
+ *
+ * The counters are per-action and persist (RATINGCOUNTVP / RATINGLIKESENT), so
+ * they carry across sessions and across the 15-day boundary, which is what the
+ * "count is cumulative from day 0 till they hit the target" rule asks for.
+ */
+export async function activeRatingPopup(type: 'vp' | 'like'): Promise<RatingTrigger | null> {
+  await ensureRatingOwner()
+
+  const isVp = type === 'vp'
+  const countKey = isVp ? SK.Rating.VP_COUNT : SK.Rating.LIKE_COUNT
+
+  const currentDate = getCurrentDateTime()
+  const [rawCount, rawCreated, rawGender] = await Promise.all([
+    getItem(countKey),
+    getItem(SK.User.TIME_CREATED),
+    getItem(SK.User.LOGIN_GENDER),
+  ])
+
+  // Angular increments and persists FIRST, then tests — so the count survives
+  // even when this action is not the one that opens the popup.
+  const count = (Number(rawCount) || 0) + 1
+  await setItem(countKey, String(count))
+
+  // Angular: getDayDiffer() — account age from TIMECREATED decides which
+  // column of the threshold table applies.
+  const accountAge = daysDiffer(currentDate, readOr(rawCreated, currentDate))
+  const gender     = normalizeGender(readOr(rawGender, ''))
+  const action = isVp
+    ? checkEligiable(gender, 0, count, accountAge > 15)
+    : checkEligiable(gender, count, 0, accountAge > 15)
+  if (action === '0') return null
+
+  return checkRatingCount(true, action, action === '2' ? LIKE_POPUP_DELAY_MS : 0)
 }
 
 // ─── Open / close bookkeeping ─────────────────────────────────────────────────
@@ -385,16 +551,31 @@ export async function submitRating({
 // ─── Play Store ───────────────────────────────────────────────────────────────
 
 /**
- * Angular: reDirectToPlaystore() — fires an appNativeEvent, which on APPVERSION
- * > 4.1 asks the native shell for Google's in-app review sheet and otherwise
- * opens the store URL. This build has no in-app-review module and no native
- * shell to post to, so both paths collapse to opening the flavor's store page.
+ * Angular: reDirectToPlaystore(hasInApp) — one function, two destinations:
+ *
+ *   hasInApp && APPVERSION > 4.1 → appNativeEvent 'GooglePlayStoreReview', i.e.
+ *       Google's own in-app review sheet, fired the moment the thank-you step
+  *       opens (openRatingPopup's dismiss handler calls it alongside
+ *       openRatingThanks). The member never leaves the app.
+ *   otherwise → appNativeEvent 'playstore_rating' with the flavour's store URL,
+ *       fired when the member taps "Rate Us" on that thank-you step.
+ *
+ * Both go through the native-event dispatcher, so the in-app branch has one
+ * place to become real once an in-app-review module is added to the build — see
+ * analyticsService's own note on that case. Until then it falls through to the
+ * store URL, which is the honest behaviour rather than a silent no-op.
  */
-export async function redirectToPlayStore(): Promise<void> {
+export async function redirectToPlayStore(hasInApp = false): Promise<void> {
   const url = String(Constants.expoConfig?.extra?.['playStoreUrl'] ?? DEFAULT_PLAYSTORE_URL)
-  try {
-    await Linking.openURL(url)
-  } catch (e) {
-    if (__DEV__) console.error('[appRatingService] open store error:', e)
+  const appVersion = parseFloat(String((await getItem(SK.App.APP_VERSION)) ?? APP_VERSION)) || 0
+
+  // Angular: pushfirebaseEvents("AppRatingPopup", {category, action, label}) —
+  // fired on BOTH branches, so the funnel counts the in-app sheet too.
+  logEvent({ category: 'AppRatingPopup', action: 'ReviewinPlaystore', label: 'Clicked' })
+
+  if (hasInApp && appVersion > 4.1) {
+    dispatchNativeEvent({ event_name: 'GooglePlayStoreReview' })
+    return
   }
+  dispatchNativeEvent({ event_name: 'playstore_rating', url })
 }

@@ -520,7 +520,19 @@ export async function fetchDailyRecommendations(): Promise<SwiperItem[]> {
 // Angular: getExtendedMatchesCount() — called after matches load, START=0&LIMIT=1 to get count only
 // Returns 0 if no extended matches or if on a filter page.
 
-export async function fetchExtendedMatchesCount(): Promise<number> {
+// Angular getExtendedMatchesCount() keeps BOTH halves of this response: TOTAL
+// (extendedMatchesCount) and RESPONSE (extendedMatchesProfile / moreMatchesArray),
+// which feeds the end card's avatar circles. This returned the count alone, so the
+// card had no photos to show and fell back to a hardcoded avatar.
+export interface ExtendedMatchesCountResult {
+  count:         number
+  // THUMBIMGs of the preview profiles, in response order. LIMIT=1 below means
+  // this is normally a single entry — the card only uses real photos once there
+  // are 4+, matching end-card.component.html:14.
+  previewPhotos: string[]
+}
+
+export async function fetchExtendedMatchesCount(): Promise<ExtendedMatchesCountResult> {
   const [session, userId] = await Promise.all([
     getSession(),
     getItem(StorageKeys.Auth.USER_ID),
@@ -541,9 +553,13 @@ export async function fetchExtendedMatchesCount(): Promise<number> {
   ].join('&')
   const res = await apiCall(Endpoints.listing.extendedMatches, 'POST', params)
   if (res['ERRCODE'] === '0' && Number(res['TOTAL']) > 0) {
-    return Number(res['TOTAL'])
+    const raw = Array.isArray(res['RESPONSE']) ? res['RESPONSE'] : []
+    return {
+      count: Number(res['TOTAL']),
+      previewPhotos: raw.map((p: any) => String(p?.['THUMBIMG'] ?? '')).filter(Boolean),
+    }
   }
-  return 0
+  return { count: 0, previewPhotos: [] }
 }
 
 // ─── Extended matches (real fetch, not just the count) ───────────────────────

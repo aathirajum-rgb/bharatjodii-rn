@@ -17,6 +17,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
@@ -28,6 +29,7 @@ import {
   WhatsAppIcon, WhatsAppUnlockButton, CallIcon, MessageIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   buildBasicViewParts, showLikeCTA, showAfterLikeCTA,
   getBlurPhotoUri, NEWLY_JOINED_STAR_URI, RIGHT_ARROW_ANIMATION_URI, ProfileBadge,
+  MALE_AVATAR_URI, FEMALE_AVATAR_URI,
   PhotoSwiper,
   getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showContactsLeftBanner, showFreeBadge,
   showAfterLikeContentLine, showAfterLikeMessageCta, getMessageBtnText,
@@ -52,7 +54,7 @@ import {
   fetchExplore,
   fetchSearchResults,
   type ExploreFacet,
-  fetchExtendedMatchesCount,
+  fetchExtendedMatchesCount, type ExtendedMatchesCountResult,
   fetchExtendedMatches,
   fetchAndStorePPSetData,
   fetchMenuPromo,
@@ -69,7 +71,7 @@ import {
 import { fetchBulkLikeMatches, getPPSetData } from '../../service/profileService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import {
-  setFilterEventType, buildSearchParams,
+  setFilterEventType, getFilterEventType, buildSearchParams,
   getActiveQuickFilters, toggleQuickFilter, getFilterEditedCount,
   setMatchTotals, decrementMatchTotals, getPreferenceMatchCount,
   type QuickFilterChip,
@@ -80,7 +82,7 @@ import {
   getHeroBannerDetails, openMembershipTab, fetchUpgradePaymentPromo, redirectToIntermediatePage,
   type UpgradePaymentPromo,
 } from '../../service/paymentService'
-import { passiveRatingPopup, markRatingPopupOpened, type RatingTrigger } from '../../service/appRatingService'
+import { useAppRating } from '../../hooks/useAppRating'
 import { requestPushNotificationPermission } from '../../service/permissionService'
 import { fetchSurveyPopup, type SurveyPopupData } from '../../service/surveyService'
 import { shouldShowIncomeSheet, saveIncome, snoozeIncomeSheet } from '../../service/incomeSheetService'
@@ -146,6 +148,7 @@ export const MatchCard = memo(function MatchCard({
   profile, oppGender, ownEntryType, femaleFreeEligible, indNumbersLeft,
   onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp, onMessage,
   showLikedBadge, singlePhoto, hideVerifiedBadge, photoHeight, waPhotoFlag = '0',
+  showExtendedIntro,
 }: {
   profile:    MatchProfile
   oppGender:  'M' | 'F'
@@ -198,6 +201,11 @@ export const MatchCard = memo(function MatchCard({
   // WhatsApp one — the same "don't let the default turn the overlay on"
   // reasoning homeGating.ts's applyWhatsAppPhotoRequestFlags() documents.
   waPhotoFlag?: string | undefined
+  // Angular: [extendedMatchesFirstId]="profile?.ISEXTENDEDMATCHES" — set on the
+  // FIRST extended-matches profile only (matches.page.ts:1296). Turns this card
+  // into the section opener for "matches recommended by BharatJodii": the
+  // heading plus the backdrop behind it (matches-card.component.html:9-13).
+  showExtendedIntro?: boolean | undefined
 }) {
   const { t } = useTranslation()
   const langFonts = useLanguageFonts()
@@ -236,6 +244,23 @@ export const MatchCard = memo(function MatchCard({
 
   return (
     <View style={c.card}>
+
+      {/* ── Extended-matches section opener (JODII-226) ─────────────────────
+          Angular: `.recommended-jodii-position` is a recommended-jodii-bg.svg
+          painted absolutely from the card's top edge, 100% wide and 100vmin
+          tall, with the heading sitting over it (z-index 99) — so the wash runs
+          behind the heading AND the photo below it. 100vmin on a portrait phone
+          is the screen width, which is also this square asset's natural box. */}
+      {showExtendedIntro && (
+        <>
+          <View style={c.extendedIntroBg} pointerEvents="none">
+            <CdnSvg uri={CDN + 'revamp/recommended-jodii-bg.svg'} width={SW} height={SW} />
+          </View>
+          <Text style={[c.extendedIntroText, { fontFamily: langFonts.semiBold }]}>
+            {t('MATCHES.SEEINGMATCHES')}
+          </Text>
+        </>
+      )}
 
       {/* ── Photo section ──────────────────────────────────────────────────── */}
       {/* Angular: app-photo-new — top border radius 16px */}
@@ -500,7 +525,12 @@ export const MatchCard = memo(function MatchCard({
               (CONFIG.MESSAGE_BTN). Free members get the Pay Now CTA alone. */}
           {showAfterLikeMessageCta(ctaCtx) && !!onMessage && (
             <Pressable style={c.ctaMessage} onPress={onMessage}>
-              <CdnSvg uri={CDN + 'message_red.svg'} width={18} height={18} />
+              {/* 24x24: MESSAGE_BTN (button.config.ts:75) sets no iconSize, so
+                  button-revamp falls back to its default `EIconSize.large` — a
+                  24x24 box — and the icon is a CSS background with no
+                  background-size, so message_red.svg draws at its own intrinsic
+                  24x24. 18 here rendered it visibly smaller than Angular. */}
+              <CdnSvg uri={CDN + 'message_red.svg'} width={24} height={24} />
               <Text style={[c.ctaMessageText, { fontFamily: langFonts.medium }]}>{getMessageBtnText(ctaCtx, t)}</Text>
             </Pressable>
           )}
@@ -755,42 +785,119 @@ function AddPhotoBanner({ data, onPress }: { data: any; onPress: () => void }) {
 }
 
 // ─── Extended Matches End Card ────────────────────────────────────────────────
-// Angular: app-end-card [cardType]="'view-more'" — shown at bottom of list when
-// extendedMatchesCount > 0. Layout: 3 avatar circles + count badge + title + desc.
+// Angular: app-end-card [cardType]="'view-more'" (end-card.component.ts:35-46).
+// NOT a button: a ~3.5s progress bar fills (progress += 0.01 every 35ms), then
+// 1000ms later it emits 'extendedPage' by itself and the extended feed loads.
+// This port had it as a Pressable with a static bar, so the flow stalled until
+// the member happened to tap the card.
 
-const FEMALE_AVATAR = CDN + 'female_avatar_new.svg'
+// Angular end-card.component.ts: 0.01 per 35ms tick, fire 1000ms after it passes 1.
+const EXT_PROGRESS_STEP    = 0.01
+const EXT_PROGRESS_TICK_MS = 35
+const EXT_ADVANCE_DELAY_MS = 1000
 
-function ExtendedMatchesCard({ count, onPress }: { count: number; onPress: () => void }) {
+// Shared "nothing to offer" result, so every skipped branch of the count gate
+// returns the same shape fetchExtendedMatchesCount() does.
+const EMPTY_EXTENDED_COUNT: ExtendedMatchesCountResult = { count: 0, previewPhotos: [] }
+
+function ExtendedMatchesCard({
+  count, previewPhotos, oppGender, onAdvance,
+}: {
+  count:         number
+  previewPhotos: string[]
+  oppGender:     'M' | 'F'
+  onAdvance:     () => void
+}) {
   const { t } = useTranslation()
   const langFonts = useLanguageFonts()
+  const { LinearGradient } = require('expo-linear-gradient')
+  const { height: winH } = useWindowDimensions()
+  const [progress, setProgress] = useState(0)
+
+  // Angular sizes these in vh: `.avatar-images { width: 9vh; height: 9vh }`, and
+  // each next circle starts 6vh along, so they overlap by a third
+  // (end-card.component.scss:6-42). A hardcoded 52px left the row small and
+  // tight next to the Angular screen.
+  const avatarSize = Math.round(winH * 0.09)
+  const overlap    = -Math.round(avatarSize / 3)
+
+  // Angular ngOnInit(): the interval drives the bar, and the first time it passes
+  // 1 it schedules the one-shot advance. `fired` is Angular's own emitHappened
+  // guard — the interval keeps ticking past 1, so without it every later tick
+  // would schedule another advance. Through a ref so the effect can stay
+  // mount-only while still calling the current handler.
+  const onAdvanceRef = useRef(onAdvance)
+  onAdvanceRef.current = onAdvance
+  useEffect(() => {
+    let value = 0
+    let fired = false
+    let advanceTimer: ReturnType<typeof setTimeout> | undefined
+    const tick = setInterval(() => {
+      value += EXT_PROGRESS_STEP
+      setProgress(value)
+      if (value > 1 && !fired) {
+        fired = true
+        advanceTimer = setTimeout(() => onAdvanceRef.current(), EXT_ADVANCE_DELAY_MS)
+      }
+    }, EXT_PROGRESS_TICK_MS)
+    return () => { clearInterval(tick); clearTimeout(advanceTimer) }
+  }, [])
+
+  // Angular showPhotoCard(): `parseInt(matchesCount) > 3` — with 3 or fewer
+  // profiles behind it the card is just the "Please wait" copy and the loader,
+  // no photo slots. And each slot uses a REAL photo only once there are 4+ of
+  // them (end-card.component.html:14's `length >= 4 ? THUMBIMG : avatarImg`),
+  // so a short preview list shows the generic avatar rather than one stray face.
+  const showPhotos = count > 3
+  const useRealPhotos = previewPhotos.length >= 4
+  const slots = showPhotos ? previewPhotos.slice(0, 3) : []
+
+  // Angular: common.getAvatarImg(true, 120) — the OPPOSITE gender silhouette,
+  // not a hardcoded female one.
+  const avatarUri = oppGender === 'M' ? MALE_AVATAR_URI : FEMALE_AVATAR_URI
+  const circle    = { width: avatarSize, height: avatarSize, borderRadius: avatarSize / 2 }
+
   return (
-    <Pressable style={e.card} onPress={onPress}>
-      {/* 3 overlapping avatars + count badge */}
+    // Angular: this end card IS a full slide (`height100 d-flex
+    // ion-align-items-center`) on the plain white page — no rounded panel, no
+    // shadow, no side margins, content centred in the viewport. 56 is the app
+    // footer, so the centre lands on the visible middle rather than behind it.
+    <View style={[e.card, { minHeight: winH - 56 }]}>
       <View style={e.avatarRow}>
-        {[0, 1, 2].map(i => (
-          <View key={i} style={[e.avatarCircle, { marginLeft: i === 0 ? 0 : -12 }]}>
-            <CdnSvg uri={FEMALE_AVATAR} width={52} height={52} />
+        {slots.map((photo, i) => (
+          <View key={i} style={[e.avatarCircle, circle, { marginLeft: i === 0 ? 0 : overlap }]}>
+            {useRealPhotos
+              ? <Image source={{ uri: photo }} style={e.avatarImg} resizeMode="cover" />
+              : <CdnSvg uri={avatarUri} width={avatarSize} height={avatarSize} />}
           </View>
         ))}
-        <View style={[e.countCircle, { marginLeft: -12 }]}>
-          <Text style={[e.countNum, { fontFamily: langFonts.semiBold }]}>+{count}</Text>
+        <View style={[e.countCircle, circle, slots.length > 0 && { marginLeft: overlap }]}>
+          <Text style={[e.countNum, { fontFamily: langFonts.medium }]}>+{count}</Text>
           <Text style={[e.countLabel, { fontFamily: langFonts.regular }]}>{t('MATCHES.MORE')}</Text>
         </View>
       </View>
 
-      {/* Title */}
-      <Text style={[e.title, { fontFamily: langFonts.semiBold }]}>{t('MATCHES.CONTINUE_TITLE')}</Text>
-
-      {/* Description */}
+      {/* Angular passes MATCHES.PLEASEWAIT / MATCHES.VIEWMATCHES here
+          (matches.page.html:202-203) — this card is a wait state, not the
+          "Continue seeing profile" prompt those other two keys describe. */}
+      <Text style={[e.title, { fontFamily: langFonts.semiBold }]}>{t('MATCHES.PLEASEWAIT')}</Text>
       <Text style={[e.desc, { fontFamily: langFonts.regular }]}>
-        {t('MATCHES.CONTINUE_CONT')}
+        {t('MATCHES.VIEWMATCHES')}
       </Text>
 
-      {/* Progress bar — Angular: ion-progress-bar */}
+      {/* Angular: ion-progress-bar — 10px tall, 20px radius, white track and a
+          `linear-gradient(to right, #ffffff 5%, #B30033)` fill
+          (end-card.component.scss:57-63), so it fades in from the left rather
+          than being a flat 4px crimson strip. */}
       <View style={e.progressTrack}>
-        <View style={e.progressFill} />
+        <LinearGradient
+          colors={[Colors.white, Colors.primaryDark]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={[e.progressFill, { width: `${Math.min(progress, 1) * 100}%` }]}
+        />
       </View>
-    </Pressable>
+    </View>
   )
 }
 
@@ -931,7 +1038,6 @@ async function goToEditPreferences(navigation: any) {
 export default function MatchesScreen({ navigation, route }: { navigation: any; route?: any }) {
   const { t, i18n } = useTranslation()
   const isDesktop = useIsDesktopWeb()
-  const langFonts = useLanguageFonts()
   const { isOffline } = useNetwork()
 
   // Android: HomeScreenActivity's ExitPopup — now registered centrally in
@@ -1070,6 +1176,19 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   // ── Extended matches ("Continue seeing profiles" end-card) ─────────────────
   const [loadingExtended, setLoadingExtended] = useState(false)
   const [extendedLoaded,  setExtendedLoaded]  = useState(false)
+  // Angular: extendedMatchesProfile / moreMatchesArray — the count call's own
+  // RESPONSE, shown as the end card's avatar circles.
+  const [extendedPreviews, setExtendedPreviews] = useState<string[]>([])
+  // Angular: profileList[0]['ISEXTENDEDMATCHES'] = "1" (matches.page.ts:1296) —
+  // the ONE profile that carries the "recommended by BharatJodii" intro.
+  const [extendedFirstId, setExtendedFirstId] = useState<string | null>(null)
+  // Angular appends the end card as a LIST ITEM once the preference feed is
+  // spent (matches.page.ts:1356), so cdk-virtual-scroll only instantiates it —
+  // and only then starts its countdown — when the member scrolls that far.
+  // ListFooterComponent has no such gate: it mounts with the list, so without
+  // this the countdown would start at the top of the page and the extended feed
+  // would load itself before the member had seen a single preference match.
+  const [regularExhausted, setRegularExhausted] = useState(false)
 
   // ── Sticky bottom banner (profile-validation / payment-failed retry / force-update) ──
   const [forceUpdateInfo,   setForceUpdateInfo]   = useState<{ minVersion: string } | null>(null)
@@ -1089,7 +1208,11 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   // Angular: app-rating.service.ts hands the popup an actionNo (its SOURCE
   // param, 1-5) identifying which rule opened it — so the trigger object, not a
   // bare boolean, is what drives visibility here.
-  const [ratingTrigger, setRatingTrigger] = useState<RatingTrigger | null>(null)
+  // Angular: the like a member SENDS is an ACTIVE trigger
+  // (communication.service.ts:441 activeRatingPopup('like'), skipped for Daily
+  // Recommendation), and the likes/views they RECEIVED are the passive one
+  // checked once per session on this page. Both live in this hook.
+  const appRating = useAppRating()
 
   // ── BharatJodii rename announcement (one-time) ──────────────────────────────
   // Angular: matches.page.ts's checkBharatJodiiRenameSheet() / BHARATJODII_RENAME
@@ -1221,6 +1344,11 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   const headerAnim   = useRef(new Animated.Value(0)).current
   const titleHRef    = useRef(0)   // height of title row only — amount to slide (Angular offsetHt)
   const headerHRef   = useRef(0)   // full header height — used for FlatList paddingTop
+  // Only so a re-entry reload can put the member back at the top of the fresh
+  // list — a reload that left the old scroll offset in place would drop them
+  // into the middle of profiles they have not seen yet. Null on desktop,
+  // which renders MatchesDesktopLayout instead of this FlatList.
+  const listRef = useRef<FlatList<any> | null>(null)
   const [headerH, setHeaderH] = useState(0)
 
   function handleTitleLayout(h: number) {
@@ -1322,6 +1450,10 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         // extendedmatches/v1 branch from a "Continue seeing profiles" tap before the switch.
         extendedApiStartRef.current = 0
         setExtendedLoaded(false)
+        // The extended flow restarts with it: the end card is offered again only
+        // once this fresh feed is exhausted, and no profile carries the intro yet.
+        setRegularExhausted(false)
+        setExtendedFirstId(null)
         const result = await fetchList(0, 20, { extended: false })
         if (ctrl.cancelled) return
 
@@ -1342,7 +1474,18 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         const [extCount, , promo, bulkLikeResult] = await Promise.all([
           // Angular matches.page.ts:1089-1091 — skip the extended-matches-count
           // check entirely once the free-match paywall is active for this user.
-          checkLimitFlowStatus().then(limited => limited ? 0 : fetchExtendedMatchesCount()),
+          // getExtendedMatchesCount() bails on two more conditions this port was
+          // missing: Filters mode (`if (this.filterService.checkFilterEventType())
+          // { extendeMatchesFlag = false; return }`, matches.page.ts:1704-1710) and
+          // explore mode, which endCardBtnEmit() excludes via `!isExploreMatches`
+          // (:2623). Both list something other than the preference feed, so
+          // "you've seen all your preference matches" is not true of either.
+          (async () => {
+            if (exploreType) return EMPTY_EXTENDED_COUNT
+            const [limited, evType] = await Promise.all([checkLimitFlowStatus(), getFilterEventType()])
+            if (limited || evType === 'filter') return EMPTY_EXTENDED_COUNT
+            return fetchExtendedMatchesCount()
+          })(),
           fetchAndStorePPSetData().then(async (ppSetData) => {
             // Populates CONTACT_DETAIL (Angular: common.ts's getContactDetails(),
             // called on every Matches-page load) BEFORE reading it below — this
@@ -1518,7 +1661,8 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         ])
 
         if (!ctrl.cancelled) {
-          setExtendedCount(extCount)
+          setExtendedCount(extCount.count)
+          setExtendedPreviews(extCount.previewPhotos)
           if (promo) setMenuPromo(promo)
         }
 
@@ -1622,13 +1766,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
       // passiveRatingPopup() itself only evaluates once per app session and
       // honours the cooldown, so re-focusing Matches can't re-ask.
       if (!ctrl.cancelled && !bulkLikeShown && !renameShown) {
-        const trigger = await passiveRatingPopup(comCount)
-        if (!ctrl.cancelled && trigger) {
-          // Angular: openRatingPopup() stamps SHOWAPPRATINGDATE and fires the
-          // source's payment track at present() time, not on dismiss.
-          await markRatingPopupOpened(trigger)
-          setRatingTrigger(trigger)
-        }
+        appRating.onPassiveCounts(comCount)
       }
     }
 
@@ -1701,6 +1839,47 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
       checkOnFocusPopups(ctrl).catch(e => { if (__DEV__) console.error('[Matches] focus popup check error:', e) })
       return () => { ctrl.cancelled = true; clearTimeout(ctrl.notifTimer) }
     }, []),
+  )
+
+  // Angular: leaving Matches for another section and coming back re-enters the
+  // page, so callMatchesApi() runs again. React Navigation keeps this screen
+  // mounted (MainTabs.tsx switches between mounted tabs on purpose), so without
+  // this it kept showing whatever was fetched minutes ago — stale counts, stale
+  // banners, profiles already acted on elsewhere — at the offset it was left at.
+  //
+  // ViewProfile is the deliberate exception. It is a drill-down INTO a card of
+  // this very list and pages through it via profileIds/subscribeVpNeedMoreProfiles,
+  // so coming back from it has to leave the list, the cursor and the scroll
+  // position exactly as they were. Everything else — the other three tabs, Menu,
+  // Search, the liked/viewed lists — reloads.
+  //
+  // Through a ref for the same reason loadMoreRef exists below: loadMatches is
+  // re-created every render and closes over exploreType/routeSearchParams/
+  // quickFilterParams, so a [] useCallback would pin the FIRST render's copy and
+  // reload with filters the member has since changed.
+  const loadMatchesRef = useRef(loadMatches)
+  loadMatchesRef.current = loadMatches
+  const reloadOnFocusRef = useRef(false)
+  useFocusEffect(
+    useCallback(() => {
+      const ctrl = { cancelled: false, notifTimer: undefined as ReturnType<typeof setTimeout> | undefined }
+      if (reloadOnFocusRef.current) {
+        reloadOnFocusRef.current = false
+        setLoading(true)
+        listRef.current?.scrollToOffset({ offset: 0, animated: false })
+        loadMatchesRef.current(ctrl, false).catch(e => { if (__DEV__) console.error('[Matches] re-entry reload error:', e) })
+      }
+      return () => {
+        ctrl.cancelled = true
+        // Where the member went decides whether the NEXT focus reloads. Read off
+        // the parent stack: still on MainTabs means they only switched tabs;
+        // anything else means a screen was pushed over it.
+        const parentState = navigation.getParent()?.getState()
+        const top = parentState?.routes?.[parentState.index]?.name
+        reloadOnFocusRef.current = top !== 'viewProfile'
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [navigation]),
   )
 
   // Chip state is derived from storage, not owned here — Angular reads it back
@@ -1831,7 +2010,12 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     if (isOffline) { showToast(t('GENERAL.NOINTERNET')); return }
     const cursorRef = extendedLoaded ? extendedApiStartRef : apiStartRef
     const bound      = extendedLoaded ? extendedCount : totalCount
-    if (cursorRef.current >= bound) return
+    if (cursorRef.current >= bound) {
+      // onEndReached fired with no page left to fetch: the member is at the end
+      // of the preference feed, which is Angular's cue to show the end card.
+      if (!extendedLoaded) setRegularExhausted(true)
+      return
+    }
     // Angular doInfinite() (matches.page.ts:1458) — a hard stop once the
     // free-match paywall has kicked in, on top of the totalCount comparison
     // above (totalCount itself also gets frozen once this is true — see
@@ -1908,6 +2092,10 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
       } else if (result.type === 'api_success' && result.message) {
         showToast(result.message, () => handleUndoLike(profile), 1500)
       }
+      // Angular: communication.service.ts fires this on every like EXCEPT one
+      // sent from Daily Recommendation. The matches card is not DR, so every
+      // like here counts towards the active threshold.
+      appRating.onLikeSent()
     } catch (e) {
       if (__DEV__) console.error('[Matches] like error:', e)
     }
@@ -2369,6 +2557,10 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     // now-stale cursor from before this reload.
     extendedApiStartRef.current = 0
     setExtendedLoaded(false)
+    // The extended flow restarts with it: the end card is offered again only
+    // once this fresh feed is exhausted, and no profile carries the intro yet.
+    setRegularExhausted(false)
+    setExtendedFirstId(null)
     try {
       const result = await fetchList(0, 20, { extended: false })
       setProfiles(result.items.map(matchProfileAdapter.adapt))
@@ -2396,10 +2588,11 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     handleBulkLikeSent()
   }
 
-  // ── Extended matches ("Continue seeing profiles" end-card) ──────────────────
-  // Angular: endCardBtnEmit() → getExtendedMatches() → appends profiles +
-  // shows the "You are now seeing matches recommended by Jodii" intro banner
-  // on the first extended profile (rendered here via a synthetic bannerSlot).
+  // ── Extended matches (the "Please wait" end card) ───────────────────────────
+  // Angular: the end card's own timer emits 'extendedPage' → endCardBtnEmit()
+  // (matches.page.ts:2621) drops the card and calls getExtendedMatches(), which
+  // appends the extended feed and tags its first profile so that card renders
+  // the "recommended by BharatJodii" intro.
 
   async function handleLoadExtendedMatches() {
     if (loadingExtended || extendedLoaded) return
@@ -2407,9 +2600,22 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     try {
       const result = await fetchExtendedMatches(0, 20)
       if (result.items.length > 0) {
-        const introInsertAt = profiles.length
-        setBannerSlots(existing => [...existing, { slot: 'EXTENDED_INTRO', insertAfter: introInsertAt }])
-        setProfiles(prev => [...prev, ...result.items.map(matchProfileAdapter.adapt)])
+        const adapted = result.items.map(matchProfileAdapter.adapt)
+        // Angular tags the FIRST extended profile with ISEXTENDEDMATCHES="1" and
+        // lets the card itself render the intro (matches-card.component.html:9),
+        // so the heading sits inside that card over its own backdrop. This port
+        // used a synthetic EXTENDED_INTRO banner row instead — a detached line of
+        // centred text with no backdrop, above the card rather than part of it.
+        setExtendedFirstId(adapted[0]?.profileId ?? null)
+        setProfiles(prev => [...prev, ...adapted])
+        // Angular matches.page.ts:1296 — on the FIRST extended page the header
+        // count becomes preference total + extended total (`parseInt(totalCount)
+        // + parseInt(resultData["TOTAL"])`), so the header stops reading as the
+        // now-exhausted preference number. Local state only: Angular persists
+        // MATCHESTOTALCOUNT for matchesPage/searchResult/explorePage but never
+        // for extendedPage (:1584), so recordMatchTotals() is deliberately not
+        // called here — the stored preference total must stay what it was.
+        setTotalCount(prev => prev + (result.totalCount || 0))
         // Own 0-based cursor, separate from apiStartRef (regular matches) — see
         // extendedApiStartRef's declaration. Setting extendedLoaded switches
         // fetchList()/loadMore() over to the extendedmatches/v1 pagination branch.
@@ -2544,6 +2750,10 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     apiStartRef.current = 0
     extendedApiStartRef.current = 0
     setExtendedLoaded(false)
+    // The extended flow restarts with it: the end card is offered again only
+    // once this fresh feed is exhausted, and no profile carries the intro yet.
+    setRegularExhausted(false)
+    setExtendedFirstId(null)
     try {
       const userId = await getItem(StorageKeys.Auth.USER_ID)
       const params = await buildSearchParams(userId ?? '', 0, 20)
@@ -2698,14 +2908,6 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
           />
         )
       }
-      // Synthetic banner (not a real BANNERSLOT) — inserted locally right where
-      // extended-matches profiles begin. Angular: card html ISEXTENDEDMATCHES
-      // flag shows this text on the first extended profile.
-      if (item.bannerSlot === 'EXTENDED_INTRO') {
-        return (
-          <Text style={[s.extendedIntroText, { fontFamily: langFonts.semiBold }]}>{t('MATCHES.SEEINGMATCHES')}</Text>
-        )
-      }
       return null
   }, [
     menuPromo, addPhotoBannerMatches, gamParams, addPhotoPromoActive, addHoroActive,
@@ -2733,6 +2935,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     return (
       <MatchCard
         profile={item}
+        showExtendedIntro={item.profileId === extendedFirstId}
         oppGender={oppGender}
         ownEntryType={ownEntryType}
         femaleFreeEligible={femaleFreeEligible}
@@ -2834,9 +3037,9 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
           onClose={() => setShowNotificationPopup(false)}
         />
         <AppRatingModal
-          visible={!!ratingTrigger}
-          source={ratingTrigger?.source ?? '1'}
-          onClose={() => setRatingTrigger(null)}
+          visible={!!appRating.trigger}
+          source={appRating.trigger?.source ?? '1'}
+          onClose={appRating.close}
         />
         <BottomSheet
           visible={showBharatJodiiRename}
@@ -2982,6 +3185,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           style={{ flex: 1 }}
           data={listData}
           keyExtractor={item => isBanner(item) ? item.uid : item.profileId}
@@ -3012,8 +3216,15 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
           ListFooterComponent={
             loadingMore || loadingExtended
               ? <ActivityIndicator size="small" color={Colors.primary} style={s.footerLoader} />
-              : extendedCount > 0 && !extendedLoaded
-                ? <ExtendedMatchesCard count={extendedCount} onPress={handleLoadExtendedMatches} />
+              : extendedCount > 0 && !extendedLoaded && regularExhausted
+                ? (
+                  <ExtendedMatchesCard
+                    count={extendedCount}
+                    previewPhotos={extendedPreviews}
+                    oppGender={oppGender}
+                    onAdvance={handleLoadExtendedMatches}
+                  />
+                )
                 : null
           }
         />
@@ -3064,9 +3275,9 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         onClose={() => setShowNotificationPopup(false)}
       />
       <AppRatingModal
-        visible={!!ratingTrigger}
-        source={ratingTrigger?.source ?? '1'}
-        onClose={() => setRatingTrigger(null)}
+        visible={!!appRating.trigger}
+        source={appRating.trigger?.source ?? '1'}
+        onClose={appRating.close}
       />
       <BottomSheet
         visible={showBharatJodiiRename}
@@ -3180,15 +3391,7 @@ const s = StyleSheet.create({
   screen:       { flex: 1, backgroundColor: Colors.white },
   loaderBox:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
   footerLoader: { marginVertical: 16 },
-  // Angular: matches-card.component.html — heading2-semibold-18 black-color
-  // fontFamily applied inline (langFonts.semiBold) — see EXTENDED_INTRO's Text usage.
-  extendedIntroText: {
-    fontSize:          FontSize.font18,
-    color:             Colors.black,
-    textAlign:         'center',
-    paddingHorizontal: 16,
-    paddingVertical:   24,
-  },
+
 })
 
 // Angular card styles — matches-card.component.scss
@@ -3199,6 +3402,25 @@ const c = StyleSheet.create({
     paddingTop:        16,
     borderBottomWidth: 8,
     borderBottomColor: Colors.borderSubtle,
+  },
+  // Angular: .recommended-jodii-position (matches-card.component.scss:166) —
+  // absolute, top/left 0, width 100%, height 100vmin, behind the content.
+  extendedIntroBg: {
+    position: 'absolute',
+    top:      0,
+    left:     0,
+    right:    0,
+    height:   SW,
+    overflow: 'hidden',
+  },
+  // Angular: heading2-semibold-18 black-color mb-24 pl-16 pr-16 — left-aligned,
+  // over the backdrop.
+  extendedIntroText: {
+    fontSize:          FontSize.font18,
+    lineHeight:        26,
+    color:             Colors.black,
+    paddingHorizontal: 16,
+    marginBottom:      24,
   },
 
   // Angular: img-holder pl-16 pr-16 with brdr-radius (top-left + top-right radius 16)
@@ -3567,60 +3789,50 @@ const c = StyleSheet.create({
 // Angular: app-end-card [cardType]="'view-more'" styles
 const e = StyleSheet.create({
   card: {
-    backgroundColor:  Colors.white,
-    marginHorizontal: 16,
-    marginVertical:   24,
-    borderRadius:     16,
-    padding:          24,
-    alignItems:       'center',
-    shadowColor:      Colors.shadow,
-    shadowOffset:     { width: 0, height: 2 },
-    shadowOpacity:    0.08,
-    shadowRadius:     8,
-    elevation:        3,
+    backgroundColor:   Colors.white,
+    paddingHorizontal: 24,
+    paddingVertical:   24,
+    alignItems:        'center',
+    justifyContent:    'center',
   },
   // 3 overlapping avatar circles + 1 count badge
   avatarRow: {
     flexDirection: 'row',
     alignItems:    'center',
-    marginBottom:  16,
+    // No bottom margin: the title below carries Angular's own mt-16, and
+    // keeping both put 32 between the circles and "Please wait...".
   },
+  // Angular `.avatar-images`: a 2px white ring on a #e5e5e5 plate. The size
+  // itself is passed in from the component (9vh).
   avatarCircle: {
-    width:        52,
-    height:       52,
-    borderRadius: 26,
-    overflow:     'hidden',
-    borderWidth:  2,
-    borderColor:  Colors.white,
-    backgroundColor: Colors.divider,
-  },
-  avatarImg: { width: '100%', height: '100%' },
-  countCircle: {
-    width:           52,
-    height:          52,
-    borderRadius:    26,
+    overflow:        'hidden',
     borderWidth:     2,
     borderColor:     Colors.white,
-    backgroundColor: Colors.primary,
+    backgroundColor: Colors.extendedCardPlate,
+  },
+  avatarImg: { width: '100%', height: '100%' },
+  // Angular: the count sits on the SAME grey plate as the photos and carries
+  // black text — not a brand-red disc with white text, which is what this port
+  // had (and flagged in a comment as its own deviation).
+  countCircle: {
+    borderWidth:     2,
+    borderColor:     Colors.white,
+    backgroundColor: Colors.extendedCardPlate,
     alignItems:      'center',
     justifyContent:  'center',
   },
-  // FLAGGED/left as-is: Angular's count badge is a flat gray "avatar-images" circle
-  // with body1-medium-14 black-color text (+ body3-regular-12 for "more"), but this
-  // circle is deliberately styled with a brand-red backgroundColor (Colors.primary)
-  // here — an RN-only enhancement, not in Angular — which is why the text is white
-  // rather than black. Not touching fontSize either since it looks tuned to fit
-  // this fixed 52px circle rather than a straight port of 14/12.
-  // fontFamily applied inline (langFonts.semiBold/.regular) — see ExtendedMatchesCard's Text usage.
-  countNum:   { fontSize: FontSize.font13, color: Colors.white, lineHeight: 16 },
-  countLabel: { fontSize: FontSize.font10, color: Colors.white, lineHeight: 13 },
+  // Angular: body1-medium-14 black-color, over body3-regular-12 for "more".
+  // fontFamily applied inline (langFonts.medium/.regular) — see ExtendedMatchesCard's Text usage.
+  countNum:   { fontSize: FontSize.font14, color: Colors.black, lineHeight: 18 },
+  countLabel: { fontSize: FontSize.font12, color: Colors.black, lineHeight: 16 },
   // Angular: end-card.component.html — heading1-semibold-20 color-4c4c4c (was
   // mistakenly ported as 18px; Angular's own class is the 20px size).
   title: {
     fontSize:   FontSize.font20,
     color:      Colors.extendedCardTitle,
     textAlign:  'center',
-    marginBottom: 8,
+    // Angular: mt-16 on the title row, and mt-16 again on the content row.
+    marginTop:  16,
   },
   // Angular: end-card.component.html — body2-regular-14 color-666666
   desc: {
@@ -3628,20 +3840,22 @@ const e = StyleSheet.create({
     color:      Colors.textSecondary,
     textAlign:  'center',
     lineHeight: 22,
-    marginBottom: 20,
+    marginTop:  16,
+    // Angular: the content row is pl-24/pr-24 inside the already-padded grid.
+    paddingHorizontal: 24,
   },
+  // Angular: height 10, border-radius 20, white track (end-card.component.scss:57).
   progressTrack: {
     width:           '100%',
-    height:          4,
-    borderRadius:    2,
-    backgroundColor: Colors.borderSubtle,
+    height:          10,
+    borderRadius:    20,
+    backgroundColor: Colors.white,
     overflow:        'hidden',
+    marginTop:       24,
   },
   progressFill: {
-    width:           '60%',
     height:          '100%',
-    borderRadius:    2,
-    backgroundColor: Colors.primary,
+    borderRadius:    20,
   },
 })
 

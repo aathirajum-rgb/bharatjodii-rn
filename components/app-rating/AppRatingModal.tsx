@@ -14,10 +14,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
+import { SvgXml } from 'react-native-svg'
 import BottomSheet from '../bottom-sheet/BottomSheet'
 import ButtonRevamp from '../button-revamp/ButtonRevamp'
 import SelectableCard from '../radio-checkbox-card/SelectableCard'
-import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
+import { CdnImage } from '../cdn-svg/CdnSvg'
 import CdnLottie from '../CdnLottie'
 import {
   fetchRatingContent, markRatingPopupClosed, redirectToPlayStore, submitRating,
@@ -98,11 +99,18 @@ export default function AppRatingModal({ visible, source = '1', onClose }: AppRa
     if (stars === 0 || submitting) return
     if (stars >= 4) {
       // Angular SubmitRating(): for 4-5 the guard passes, so the rating posts
-      // immediately with no options/suggestions.
+      // immediately with no options/suggestions — no reasons are asked for.
       setSubmitting(true)
       await submitRating({ source, ratingValue: stars })
       setSubmitting(false)
       setSection('PS-Rating')
+      // Angular openRatingPopup()'s dismiss handler runs BOTH of these
+      // together: openRatingThanks(PlayStore_Rating) and
+      // reDirectToPlaystore(true). So Google's in-app review sheet is
+      // requested as the thank-you step appears, over it — the member rates
+      // without leaving the app, and the "Rate Us" button below is the
+      // fallback for when Google's own frequency cap suppresses that sheet.
+      void redirectToPlayStore(true)
       return
     }
     // Angular: for 1-3 SubmitRating() early-returns (nothing to send yet) and
@@ -122,8 +130,11 @@ export default function AppRatingModal({ visible, source = '1', onClose }: AppRa
     thanksTimer.current = setTimeout(close, THANKS_AUTO_DISMISS_MS)
   }
 
+  // Angular: openRatingThanks()'s dismiss handler — `close == 1` on the
+  // PS-Rating step calls reDirectToPlaystore(false), i.e. the store PAGE, not
+  // the in-app sheet (which was already offered when this step opened).
   function handleRateUs() {
-    void redirectToPlayStore()
+    void redirectToPlayStore(false)
     close()
   }
 
@@ -201,8 +212,10 @@ export default function AppRatingModal({ visible, source = '1', onClose }: AppRa
             <View style={s.starRow}>
               {[1, 2, 3, 4, 5].map(n => (
                 <Pressable key={n} onPress={() => setStars(n)} hitSlop={6}>
-                  <CdnSvg
-                    uri={n <= stars ? STAR_IMG.filled : STAR_IMG.empty}
+                  {/* Inline, not CdnSvg: the CDN's unlit star relies on a CSS
+                      blend mode react-native-svg drops — see STAR_IMG. */}
+                  <SvgXml
+                    xml={n <= stars ? STAR_IMG.filled : STAR_IMG.empty}
                     width={32}
                     height={32}
                   />

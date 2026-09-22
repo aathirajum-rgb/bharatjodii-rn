@@ -20,7 +20,7 @@
 // resolvePageId(), the same page_id landing path App Links/custom-scheme
 // links use.
 import Constants, { ExecutionEnvironment } from 'expo-constants'
-import { Platform } from 'react-native'
+import { Linking, Platform } from 'react-native'
 import { getItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { resolvePageId } from './deepLinkService'
@@ -248,6 +248,26 @@ export function dispatchNativeEvent(event: INativeEvent): void {
     case 'page_rendered':
       if (__DEV__) console.log('[page_rendered]', event.page_name)
       break
+
+    // App rating (Angular: app-rating.service.ts reDirectToPlaystore).
+    //
+    // 'GooglePlayStoreReview' asked the native shell for Google's in-app review
+    // sheet, which keeps the member in the app. There is no in-app-review module
+    // in this build (adding one is a native dependency + rebuild), so it falls
+    // back to the store page — the same destination, one step more visible.
+    // Plug the module in HERE and the rating flow needs no other change.
+    case 'GooglePlayStoreReview':
+    case 'playstore_rating': {
+      const url = event.url ?? ''
+      if (!url) {
+        if (__DEV__) console.log('[playstore_rating] no url for', event.event_name)
+        break
+      }
+      Linking.openURL(url).catch(e => {
+        if (__DEV__) console.error('[playstore_rating] open store error:', e)
+      })
+      break
+    }
 
     default:
       if (__DEV__) console.log('[NativeEvent unhandled]', event)

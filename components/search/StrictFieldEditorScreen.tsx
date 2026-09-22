@@ -10,7 +10,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Modal, Pressable, ScrollView, StyleSheet, Text, View,
+  Animated, Modal, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View,
 } from 'react-native'
 import Toggle from '../toggle/Toggle'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -59,6 +59,40 @@ export default function StrictFieldEditorScreen({
 }: StrictFieldEditorScreenProps) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+  // Angular pushes this as a ROUTE (redirectToFilterPage() -> /search/filterpopup/
+  // <FIELD>), so it enters from the right like any forward navigation — which is
+  // also what the right-facing chevron on the row that opens it promises. RN
+  // Modal only knows `slide` = up-from-the-bottom, so the slide is driven here
+  // instead (same Animated + `mounted` pattern SearchablePicker /
+  // MultiSelectPicker already use for their right-side panels), with the Modal
+  // itself on animationType="none".
+  const { width: screenWidth } = useWindowDimensions()
+  const slideAnim = useRef(new Animated.Value(0)).current
+  // Keeps the Modal mounted through the CLOSING animation — the parent drops
+  // this component the moment onClose fires (`{fieldEditorOpen && <...>}`), so
+  // onClose is deferred until the slide-out has finished.
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    if (visible) {
+      setMounted(true)
+      Animated.timing(slideAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start()
+    } else if (mounted) {
+      // `visible` flipped off from outside (not through handleClose) — still
+      // play the exit rather than vanishing on the first frame.
+      Animated.timing(slideAnim, { toValue: 0, duration: 230, useNativeDriver: true })
+        .start(({ finished }) => { if (finished) setMounted(false) })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visible])
+
+  function handleClose() {
+    Animated.timing(slideAnim, { toValue: 0, duration: 230, useNativeDriver: true }).start(({ finished }) => {
+      if (finished) setMounted(false)
+      onClose()
+    })
+  }
+
   const copy = strictFieldCopy(t, fieldKey)
   // Angular: filter-popup.component.ts's showStrictFilter getter —
   //   manageStrictFilter && !excluded(action) && !!content && !isFieldValueAny
@@ -87,10 +121,25 @@ export default function StrictFieldEditorScreen({
   const reduced = baseline != null && !countLoading && matchCount < baseline
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen">
-      <View style={[s.screen, { paddingTop: insets.top }]}>
+    /* `transparent` (and no presentationStyle, which RN refuses to pair with it)
+       so the Filters list stays visible underneath while this page slides across,
+       the way a pushed route looks. statusBarTranslucent + the insets.top padding
+       keeps the header clear of the status bar, matching the pickers this page
+       opens on top of itself. */
+    <Modal visible={mounted} transparent animationType="none" onRequestClose={handleClose} statusBarTranslucent>
+      <Animated.View
+        style={[
+          s.screen,
+          {
+            paddingTop: insets.top,
+            transform: [{
+              translateX: slideAnim.interpolate({ inputRange: [0, 1], outputRange: [screenWidth, 0] }),
+            }],
+          },
+        ]}
+      >
         <View style={s.header}>
-          <Pressable style={s.backBtn} onPress={onClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back">
+          <Pressable style={s.backBtn} onPress={handleClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back">
             <CdnSvg uri={ICON_BACK} width={24} height={24} />
           </Pressable>
           <Text style={s.headerTitle} numberOfLines={1}>{fieldLabel}</Text>
@@ -148,14 +197,14 @@ export default function StrictFieldEditorScreen({
               <Text style={s.matchesCount}>{countLoading ? '…' : matchCount.toLocaleString('en-IN')}</Text>
             )}
           </View>}
-          <Pressable style={s.applyBtn} onPress={onClose}>
+          <Pressable style={s.applyBtn} onPress={handleClose}>
             {/* Angular: `[buttonText]="pageContent['FILTER_APPLY_CTA']"` — a
                 translated string, not an English literal. */}
             <Text style={s.applyText}>{t('FILTER.FILTER_APPLY_CTA', 'Apply')}</Text>
           </Pressable>
           </View>
         </View>
-      </View>
+      </Animated.View>
     </Modal>
   )
 }

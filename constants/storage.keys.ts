@@ -157,6 +157,14 @@ export const StorageKeys = {
     SHOWN_DATE:   'SHOWAPPRATINGDATE',
     VP_COUNT:     'RATINGCOUNTVP',
     LIKE_COUNT:   'RATINGLIKESENT',
+    // Which matri ID the three local values above were counted for. Angular has
+    // no equivalent: it reads/writes them through getLocalStorageUserValue(),
+    // whose name promises per-user scoping but whose body is a plain
+    // localStorage.getItem (common-funtions.ts:883). So its counters and
+    // "last shown" stamp outlive the account that earned them, and the next
+    // member to log in on that device inherits them. This key is what lets
+    // appRatingService detect that and start the new member at zero.
+    OWNER:        'APPRATINGOWNER',
   },
 
 } as const
