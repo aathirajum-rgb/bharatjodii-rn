@@ -109,6 +109,7 @@ import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import NotificationPermissionSheet from '../../components/notification-permission-sheet/NotificationPermissionSheet'
 import SurveyPopup from '../../components/survey-popup/SurveyPopup'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
+import ActivateMembershipBanner from '../../components/matches/ActivateMembershipBanner'
 
 const CDN = CDN_SVG
 
@@ -1321,6 +1322,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   const [addPhotoPromoActive, setAddPhotoPromoActive] = useState(false)
   const [addHoroActive,       setAddHoroActive]       = useState(false)
   const [paidNoPhotoBanner,   setPaidNoPhotoBanner]   = useState<any>(null)   // reg.PHOTOPUBLISHPAID.Matches, or {} for the static ADDPROPERTYS fallback
+  const [idVerifyPromoMatches, setIdVerifyPromoMatches] = useState<any>(null) // reg.PROFILEVERIFYPAID.Matches (BANNERSLOT 1010)
 
   // Hero banner header (ListHeaderComponent) — extends the existing photo-promo
   // banner to Angular's other two variants. 'target' picks the onPress destination.
@@ -1595,6 +1597,26 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
               // (not just set-when-present) so a reload where this account no longer
               // qualifies actually clears a banner a previous load already set.
               setAddPhotoBannerMatches(reg?.PHOTOPUBLISHED?.Matches ?? null)
+
+              // BANNERSLOT 1010 — "get ID verified" promo, reg.PROFILEVERIFYPAID.Matches.
+              // Same ##CSNUM## → VERIFIEDBYCALLNUM placeholder substitution as the
+              // Shortlist variant handleMessage() reads above — getRegistrationArrays()
+              // and getItem() are both async, so (unlike renderBannerItem, a sync render
+              // callback) this must run here, where `reg` was already awaited, and be
+              // cached into state for renderBannerItem to read synchronously.
+              const idVerifyPromo = reg?.PROFILEVERIFYPAID?.Matches
+              if (idVerifyPromo) {
+                let idVerifyCta = String(idVerifyPromo.CTA ?? '')
+                if (idVerifyCta.includes('##CSNUM##')) {
+                  const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
+                  idVerifyCta = idVerifyCta.replace(/##CSNUM##/g, callNum).replace('+91', '')
+                }
+                if (!ctrl.cancelled) {
+                  setIdVerifyPromoMatches({ ...idVerifyPromo, CTA: idVerifyCta, CTABGCOLOR: '#B50033', SVGCOLOR: '#B50033' })
+                }
+              } else if (!ctrl.cancelled) {
+                setIdVerifyPromoMatches(null)
+              }
               // Header hero banner — Angular: matches.page.ts:705-717, checked in this exact
               // if/else-if order (free-photo promo, then non-ID-verify promo, then
               // paid-verified-no-photo promo). Same PhotoPromotionBanner component throughout —
@@ -2848,9 +2870,12 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
       if (item.bannerSlot === '1020' && gamParams) {
         return <GamBanner {...gamParams} />
       }
-      // BANNERSLOT 1010 — "get ID verified" promo (removed live on ID-verify event)
-      if (item.bannerSlot === '1010') {
-        return <IdVerifyBanner onPress={() => navigation.navigate('verifyid')} />
+      // BANNERSLOT 1010 — "get ID verified" promo (removed live on ID-verify event).
+      // idVerifyPromoMatches is precomputed in the load effect above (reg.PROFILEVERIFYPAID.Matches
+      // + ##CSNUM## substitution) since both getRegistrationArrays() and getItem() are async and
+      // this render callback must return synchronously.
+      if (item.bannerSlot === '1010' && idVerifyPromoMatches) {
+        return <ActivateMembershipBanner data={idVerifyPromoMatches} onPress={() => navigation.navigate('verifyid')} />
       }
       // BANNERSLOT 1011 — add-photo generic promo (#26)
       if (item.bannerSlot === '1011' && addPhotoPromoActive) {
@@ -2881,18 +2906,12 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
       // BANNERSLOT 1014 — paid-verified-no-photo promo (dynamic), else legacy
       // ADDPROPERTYS fallback (#26) — Angular reuses this slot for two different concepts.
       if (item.bannerSlot === '1014' && paidNoPhotoBanner) {
-        return paidNoPhotoBanner.dynamic ? (
+        return  (
           <AddPhotoBanner
             data={paidNoPhotoBanner.data}
             onPress={() => addPhoto.openAddPhoto(navigation)}
           />
-        ) : (
-          <SimplePromoBanner
-            title={t('MATCHES.ADDPROPERTYS')}
-            cta={t('MATCHES.ADDPROPERTYS_CTA')}
-            onPress={() => navigation.navigate('onboarding', { pageNo: '28' })}
-          />
-        )
+        ) 
       }
       // BANNERSLOT 1015 — Many Jobs cross-promo (#26). Angular's tap action is a native-bridge
       // call to an internal app code (common.redirectPlayStore('507')), not a known Play
@@ -2911,7 +2930,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
       return null
   }, [
     menuPromo, addPhotoBannerMatches, gamParams, addPhotoPromoActive, addHoroActive,
-    paidNoPhotoBanner, navigation, t,
+    paidNoPhotoBanner, idVerifyPromoMatches, navigation, t,
   ])
 
   // Merged list of profiles + inline banner slots (e.g. BANNERSLOT 1001 = membership
