@@ -330,9 +330,14 @@ export default function ProfilePhoto({
           states. Fallback (no photo / failed load, WhatsApp nudge NOT active)
           is the plain opposite-gender SVG silhouette — native <Image> can't
           decode a remote .svg (see CdnSvg.tsx), so both branches route
-          through CdnSvg/CdnImage instead of the real-photo <Image> below. */}
+          through CdnSvg/CdnImage instead of the real-photo <Image> below.
+
+          CdnImage rather than CdnSvg on the first branch: getBlurPhotoUri()
+          hands back a RASTER on native (its SVG is pattern-based and
+          react-native-svg mis-scales it — see that helper), and CdnImage
+          dispatches on the extension. */}
       {showAddRequest ? (
-        <CdnSvg
+        <CdnImage
           uri={getBlurPhotoUri(oppGenderCode)}
           width="100%"
           height="100%"
@@ -345,7 +350,7 @@ export default function ProfilePhoto({
               borderBottomRightRadius: r.br,
             },
           ]}
-          cover
+          resizeMode="cover"
         />
       ) : showFallback ? (
         <CdnImage

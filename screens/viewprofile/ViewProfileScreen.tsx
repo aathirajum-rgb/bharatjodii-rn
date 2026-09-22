@@ -21,13 +21,15 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CdnSvg, { CdnImage } from '../../components/cdn-svg/CdnSvg'
 import { LANG_LABELS } from '../../components/matches-header/MatchesHeader'
 import {
   WhatsAppIcon, WhatsAppUnlockButton, CallIcon, MessageIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   showLikeCTA, showAfterLikeCTA, disableDontShow, disableViewLater, HtmlText,
   getBlurPhotoUri, getAvatarFallbackUri, NEWLY_JOINED_STAR_URI, ProfileBadge, PhotoSwiper,
-  getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showContactsLeftBanner, showFreeBadge,
+  getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showAfterLikeContentLine,
+  showAfterLikeMessageCta, getMessageBtnText,
+  showContactsLeftBanner, showFreeBadge,
   type AfterLikeCtx,
 } from '../../components/matches/matchesCard.shared'
 import StickyBanner from '../../components/sticky-banner/StickyBanner'
@@ -188,8 +190,25 @@ function biodataThemeOverlapMargin(themeValue: string): number {
 // slidesPerView, not a fixed card width, is what makes ~1 card fill the screen
 // plus a partial peek of the next (a fixed 140px card let 3 fit on wider screens,
 // which is the bug this replaced — confirmed against a real screenshot).
-const SIMILAR_CARD_GAP   = 16
-const SIMILAR_CARD_WIDTH = Math.round(SCREEN_WIDTH / 1.628)
+// Angular: CONFIG.similarprofiles (home.config.ts:49-53) — a Swiper with
+// `slidesPerView: 1.628, spaceBetween: 16`.
+//
+// slidesPerView is NOT "screen width over 1.628". Swiper sizes a slide as
+//
+//   (container - spaceBetween * (slidesPerView - 1)) / slidesPerView
+//
+// and its container here is the list inset by its own left padding, not the
+// whole screen. Dividing the raw width dropped both terms and made every card
+// ~19px too wide on a 324px viewport (199 against the 180 Angular draws), which
+// is what "the card is too long" looks like.
+const SIMILAR_CARD_GAP        = 16
+const SIMILAR_SLIDES_PER_VIEW = 1.628
+// similarListContent.paddingHorizontal — the slide row starts after it.
+const SIMILAR_LIST_PADDING    = 24
+const SIMILAR_CARD_WIDTH = Math.round(
+  ((SCREEN_WIDTH - SIMILAR_LIST_PADDING) - SIMILAR_CARD_GAP * (SIMILAR_SLIDES_PER_VIEW - 1))
+  / SIMILAR_SLIDES_PER_VIEW,
+)
 const SIMILAR_CARD_STRIDE = SIMILAR_CARD_WIDTH + SIMILAR_CARD_GAP
 
 // Angular: none/1/many/"more than 5" text variants for brothers/sisters counts.
@@ -302,7 +321,7 @@ export function SimilarProfileCardItem({
                 <Text style={[s.similarCardName, { fontFamily: langFonts.semiBold }]} numberOfLines={1}>{card.name}</Text>
                 {(card.age || card.education) && (
                   <Text style={[s.similarCardMeta, { fontFamily: langFonts.regular }]} numberOfLines={2}>
-                    {[card.age && `${card.age} Yrs`, card.education].filter(Boolean).join(', ')}
+                    {[card.age, card.education].filter(Boolean).join(', ')}
                   </Text>
                 )}
               </LinearGradient>
@@ -310,7 +329,7 @@ export function SimilarProfileCardItem({
           </>
         ) : (
           <>
-            <CdnSvg uri={getBlurPhotoUri(oppGender)} width="100%" height="100%" />
+            <CdnImage uri={getBlurPhotoUri(oppGender)} width="100%" height="100%" resizeMode="cover" />
             {/* Angular: app-photo-request — .request-photo-now-vp is a transparent,
                 full-bleed, flex-centered wrapper; the actual visible badge is the
                 SMALLER, inset .request-photo-vp nested inside it
@@ -1802,7 +1821,15 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               style={s.afterLikeBandTopLine}
               pointerEvents="none"
             />
-            <Text style={[s.afterLikeText, { fontFamily: langFonts.medium }]}>{getAfterLikeContentText(ctaCtx, t)}</Text>
+            {/* Angular: matches-card.component.html:174-176 gates this line on
+                `showAfterLikeContent(...) && getEnteryType() != 'P'` — a PAID
+                member never sees it, because the contact CTA right below says
+                the same thing. showAfterLikeContentLine() carries that whole
+                condition; without it "Talk to her directly" (MATCHES.TALK_TEXT_1)
+                sat above the button for exactly the members meant to be spared it. */}
+            {showAfterLikeContentLine(ctaCtx) && (
+              <Text style={[s.afterLikeText, { fontFamily: langFonts.medium }]}>{getAfterLikeContentText(ctaCtx, t)}</Text>
+            )}
             <View style={s.ctaSendInterestWrap}>
               {showFreeBadge(ctaCtx) && (
                 <View style={s.freeBadge} pointerEvents="none">
@@ -1814,6 +1841,20 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                 <Text style={[s.ctaSendInterestText, { fontFamily: langFonts.regular }]}>{getAfterLikeCtaLabel(ctaCtx, t)}</Text>
               </Pressable>
             </View>
+            {/* JODII-499 — viewprofile.page.html:1433-1447: a PAID member gets a
+                second "Message him/her" CTA under the primary one
+                (`showAfterLikeContent(...) && getEnteryType() == 'P'`), a free
+                member gets the Pay Now CTA alone. Same CONFIG.MESSAGE_BTN the
+                matches card renders — outlined, brand-red label, message_red.svg
+                — so both surfaces stay identical; this screen was missing it. */}
+            {showAfterLikeMessageCta(ctaCtx) && (
+              <Pressable style={s.ctaMessage} onPress={handleMessage}>
+                <CdnSvg uri={CDN_SVG + 'message_red.svg'} width={24} height={24} />
+                <Text style={[s.ctaMessageText, { fontFamily: langFonts.medium }]}>
+                  {getMessageBtnText(ctaCtx, t)}
+                </Text>
+              </Pressable>
+            )}
             {showContactsLeftBanner(ctaCtx) && (
               <Text style={[s.contactsLeftText, { fontFamily: langFonts.regular }]}>{t('VIEWPROFILE.CONTACT_SEEN_INFO')}</Text>
             )}
@@ -2129,7 +2170,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                     cover
                   />
                 ) : (
-                  <CdnSvg uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} />
+                  <CdnImage uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} resizeMode="cover" />
                 )
               ) : profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0 ? (
                 <PhotoSwiper
@@ -2142,7 +2183,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                 />
               ) : (
                 <View>
-                  <CdnSvg uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} />
+                  <CdnImage uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} resizeMode="cover" />
                   {!sameGender && (
                     <View style={s.photoOverlay}>
                       <View style={s.overlayCard}>
@@ -2839,8 +2880,25 @@ const s = StyleSheet.create({
   photoBottomGradient: {
     position: 'absolute', left: 0, right: 0, bottom: 0, height: 50,
   },
+  // Angular: `.request-photo-vp` — margin 24 each side, padding 8px 16px, 12px
+  // radius, 1px rgba(255,255,255,0.4) border. The margin here is 34, NOT that 24:
+  // measured against the reference screen (badge 258 wide against 296 for the
+  // 24px version, at a scale confirmed by both shots rendering the same 29px-tall
+  // button), 24 comes out visibly wider and the caption wraps a word later than
+  // the design. Angular's own rule also sets `width: 100%` ON TOP of those
+  // margins, which overflows its parent — so what that CSS computes and what the
+  // app ships are not the same box, and this follows the shipped one.
+  //
+  // alignSelf 'stretch' is what makes those margins mean anything: photoOverlay
+  // centres its child, so without it this box is sized by its CONTENT and the
+  // margins never bind — and overlayText's `width: '70%'` then resolves against
+  // an auto-width parent, letting the box grow wider than the margins allow
+  // (measured 295px against the reference's 257 at the same scale). Stretching
+  // pins it to photo width - 48, and the 70% text gets a definite parent to
+  // measure against.
   overlayCard: {
-    backgroundColor: Colors.scrimStrong, marginHorizontal: 24, padding: 16,
+    alignSelf: 'stretch',
+    backgroundColor: Colors.scrimStrong, marginHorizontal: 34, padding: 16,
     borderRadius: 12, borderWidth: 1, borderColor: Colors.overlayBorder,
     alignItems: 'center', gap: 16,
   },
@@ -2869,7 +2927,7 @@ const s = StyleSheet.create({
   // the text's own line-height) can still visually poke past an explicit 28px box.
   verifiedBadgeSize: {
     width: 116, height: 28, minHeight: 0, paddingVertical: 0,
-    justifyContent: 'center', overflow: 'hidden',
+    justifyContent: 'center', 
   },
 
   nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
@@ -2940,14 +2998,29 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
   // fontFamily applied inline (langFonts.regular) — see Text usage.
-  ctaDontShowText: { fontWeight: '400', fontSize: FontSize.font14, color: '#545454' },
+  //
+  // These three labels sit in a `flexDirection:'row'` + `alignItems:'center'`
+  // button beside a 24x24 icon, so what gets centred is the Text's LINE BOX, not
+  // the glyphs inside it. With no explicit lineHeight, RN sizes that box from the
+  // font's own ascent/descent — and on Android adds includeFontPadding space on
+  // top — both asymmetric, so the label sat visibly lower than the icon it was
+  // meant to line up with. MatchesScreen's identical CTA row already carries this
+  // fix (ctaDontShowText/ctaViewLaterText/ctaLikeText there); this one was left
+  // behind, which is the whole difference between the two screens.
+  //
+  // lineHeight 20 is the 14px body line-height used throughout this port
+  // (Angular's .line-height-20), includeFontPadding:false drops Android's extra
+  // metric padding, textAlignVertical centres the glyphs in what remains. The
+  // bare fontWeight goes with it: the family comes from langFonts, and naming a
+  // weight on top of it only invites a synthetic one.
+  ctaDontShowText: { fontSize: FontSize.font14, color: '#545454', lineHeight: 20, includeFontPadding: false, textAlignVertical: 'center' as const },
   ctaViewLater: {
     flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6,
     height: 44, backgroundColor: Colors.white,
     borderWidth: 1, borderColor: '#545454', borderRadius: 8,
   },
   // fontFamily applied inline (langFonts.regular) — see Text usage.
-  ctaViewLaterText: { fontWeight: '400', fontSize: FontSize.font14, color: '#545454' },
+  ctaViewLaterText: { fontSize: FontSize.font14, color: '#545454', lineHeight: 20, includeFontPadding: false, textAlignVertical: 'center' as const },
   // Angular: button-revamp.component.scss:13-21 — `ion-button[disabled]` only
   // overrides background (#e6e6e6) and text (#8A8A8A) via `--background`/
   // `--color`, `opacity: unset !important` (explicitly NOT dimmed) — the
@@ -2960,7 +3033,28 @@ const s = StyleSheet.create({
     backgroundColor: Colors.primaryDark, borderRadius: 8, gap: 6,
   },
   // fontFamily applied inline (langFonts.semiBold) — see Text usage.
-  ctaLikeText: { fontWeight: '600', fontSize: FontSize.font14, color: Colors.white },
+  ctaLikeText: { fontSize: FontSize.font14, color: Colors.white, lineHeight: 20, includeFontPadding: false, textAlignVertical: 'center' as const },
+
+  // JODII-499 message CTA — same box as MatchesScreen's ctaMessage: outlined in
+  // brand red on white, 44 high, and Angular's `ion-icon.large { margin-right:
+  // 3px }` gap between the 24x24 icon and its label.
+  //
+  // No marginTop here, unlike the matches card's copy of this style: Angular's
+  // `mt-12` is already supplied by afterLikeBand's own `gap: 12`, so adding it
+  // again put 24px between the two buttons.
+  ctaMessage: {
+    flexDirection:   'row',
+    height:          44,
+    backgroundColor: Colors.white,
+    borderWidth:     1,
+    borderColor:     Colors.primaryDark,
+    borderRadius:    8,
+    alignItems:      'center',
+    justifyContent:  'center',
+    gap:             3,
+  },
+  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  ctaMessageText: { fontSize: FontSize.font14, color: Colors.primaryDark },
 
   // Feature 6 — same pill styling as ctaLike, standing in for the normal
   // Like/Contact CTA when viewing your own profile.
@@ -3130,8 +3224,16 @@ const s = StyleSheet.create({
   similarCardOverlayBadge: {
     alignSelf: 'stretch', marginHorizontal: 24,
     backgroundColor: 'rgba(0,0,0,0.7)', borderRadius: 12,
+    // Angular: `padding: 8px 16px 8px 16px` (photo-request.component.scss:11).
+    // A later hand-tweak re-declared paddingLeft/Right as 12, which in RN wins
+    // over the shorthand above it — 4px wider content on each side, so the
+    // WhatsApp button stretched and the caption fell from three lines to two.
     paddingHorizontal: 16, paddingVertical: 8, gap: 8,
-    alignItems: 'center',paddingLeft: 12,paddingRight:12,
+    alignItems: 'center',
+    // Angular: `border: 1px solid rgba(255, 255, 255, 0.4)` — missing here, so
+    // the badge had no edge against the blurred photo behind it.
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.4)',
   },
   // Angular: photo-request.component.ts's getFontSize() resolves to
   // EButtonFontSize.semibold12 = 'textcta-medium-12' for this exact context

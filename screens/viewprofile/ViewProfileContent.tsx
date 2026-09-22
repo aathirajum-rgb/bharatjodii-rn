@@ -1371,7 +1371,7 @@ const s = StyleSheet.create({
   // shared default size only here, via its optional `style` prop.
   verifiedBadgeSize: {
     width: 116, height: 28, minHeight: 0, paddingVertical: 0,
-    justifyContent: 'center', overflow: 'hidden',
+    justifyContent: 'center',
   },
 
   nameRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

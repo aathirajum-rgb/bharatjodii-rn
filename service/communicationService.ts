@@ -5,7 +5,7 @@
 
 import { apiCall } from './apiClient'
 import { Endpoints } from './api.endpoints'
-import { getItem, getJson, setJson } from './storageService'
+import { getItem, getJson, setItem, setJson, removeItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { getSessionValue } from './registrationService'
 import { navigate } from '../utils/navigationRef'
@@ -108,6 +108,22 @@ export function shouldSkipPhoneConfirm(
   // This profile has protected their own phone number.
   if (phoneProtected !== '0') return true
   return false
+}
+
+// Angular communication.service.ts:175-179 (and button.component.ts:283-286) —
+// run BEFORE the skip/confirm decision below. The phoneViewed flag on a list row
+// comes from the matches API and still reads '0' for a profile whose number this
+// session already revealed; PHONEVIEWEDID is the one-shot record of that reveal.
+// When it names this profile, Angular promotes phoneViewed to '1' and clears the
+// key, so the confirm sheet is skipped exactly once per reveal — the reason the
+// popup stopped repeating in the old app. Returns true when the caller should
+// treat this row as already-viewed (and update its own list state to match).
+export async function consumePhoneViewedId(phoneViewed: string, matriId: string): Promise<boolean> {
+  if (String(phoneViewed ?? '0') !== '0') return false
+  const viewedId = await getItem('PHONEVIEWEDID')
+  if (!viewedId || viewedId !== String(matriId)) return false
+  await removeItem('PHONEVIEWEDID')
+  return true
 }
 
 // Angular: communication.service.ts's showContactDetails() FIRST check (lines
@@ -236,7 +252,9 @@ async function showCallOrWhatsApp(
 ): Promise<CommActionResult> {
   const [entryType, ekycStatus, femaleFreeData, ppSetRaw, gender, paidFlag] = await Promise.all([
     getSessionValue('ENTRYTYPE'),
-    getItem('PI_EKYCSTATUS'),
+    // See checkPaidBlockerGate() below: the real key is 'EKYCSTATUS'.
+    // 'PI_EKYCSTATUS' is never written, so this always read null.
+    getItem(SK.Verification.EKYC_STATUS),
     getSessionValue('FEMALEFREECONACT'),
     getJson<Record<string, any>>(SK.App.PP_SET_DATA),
     getItem(SK.User.LOGIN_GENDER),
@@ -430,6 +448,15 @@ async function showContactDetails(
     const viewedCount    = String(totalPhNumber - phNumberLeft)
     const remainingCount = String(result.RESPONSE?.PHNUMBERLEFT ?? '')
     const totalCount     = String(totalPhNumber)
+    // Angular communication.service.ts:632-633 — a successful phoneviewed call
+    // marks this profile as viewed in TWO places: the in-memory list row
+    // (PROFILE.PHONEVIEWED = '1', done by the caller) and localStorage
+    // PHONEVIEWEDID, which is what survives the trip out to the dial pad /
+    // WhatsApp and back. This port carried over neither, so the 'would you like
+    // to continue?' confirm sheet re-appeared on every single tap of the same
+    // profile's number. See consumePhoneViewedId() below for the read side.
+    await setItem('PHONEVIEWEDID', partnerId)
+
     const prevDetail = (await getJson<Record<string, any>>('CONTACT_DETAIL')) ?? {}
     await setJson('CONTACT_DETAIL', {
       ...prevDetail,

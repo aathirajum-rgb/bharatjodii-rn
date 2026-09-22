@@ -31,7 +31,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, FlatList, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View,
+  ActivityIndicator, FlatList, Image, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View,
 } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import { useFocusEffect } from '@react-navigation/native'
@@ -45,6 +45,7 @@ import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import CdnSvg, { CdnImage } from '../../components/cdn-svg/CdnSvg'
 import StickyBanner from '../../components/sticky-banner/StickyBanner'
 import PhotoPromoSticky from '../../components/sticky-banner/PhotoPromoSticky'
+import { RIGHT_ARROW_ANIMATION_URI } from '../../components/matches/matchesCard.shared'
 import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
 import ReportProfileModal from '../../components/matches/ReportProfileModal'
 import ThreeDotMenu from '../../components/matches/ThreeDotMenu'
@@ -1012,7 +1013,8 @@ export default function ActivityScreen({ navigation, route }: Props) {
   }
 
   // Angular: <app-list-view-card type="numberviewed"> with bindBasicView() —
-  // photo + name + "City • Age" / "Education • Occupation", no CTAs.
+  // photo + name + "City • Age" / "Education • Occupation", then the card's own
+  // link CTA.
   function renderViewedByMeCard(item: MatchProfile) {
     const line1 = [item.location, item.age].filter(Boolean).join('  •  ')
     const line2 = [item.education, item.occupation].filter(Boolean).join('  •  ')
@@ -1026,6 +1028,21 @@ export default function ActivityScreen({ navigation, route }: Props) {
           <Text style={styles.listCardName} numberOfLines={1}>{item.name}</Text>
           {!!line1 && <Text style={styles.listCardDetail} numberOfLines={1}>{line1}</Text>}
           {!!line2 && <Text style={styles.listCardDetail} numberOfLines={2}>{line2}</Text>}
+          {/* Angular: list-view-card.component.html:28-37 — the card renders a
+              link CTA whenever `linkBtn` is passed, and activity.component.html
+              :232 passes CONFIG.LINK_BTN for this list. Its label falls back to
+              BTN_TXT.listCardVPText = CTATXT.VIEWDETAILS ("View profile"), NOT
+              MATCHES.VIEW_PROFILE_CTA, and LINK_BTN's iconType is
+              forwardAnimation — the same animated arrow the matches card uses.
+              This port dropped the link ("no CTAs"), which is the missing piece.
+
+              No onPress of its own: LINK_BTN's buttonType is `viewprofile` and
+              the whole card already navigates there, so the link is the
+              affordance for the tap target that surrounds it. */}
+          <View style={styles.listCardLink}>
+            <Text style={styles.listCardLinkText}>{t('CTATXT.VIEWDETAILS')}</Text>
+            <Image source={{ uri: RIGHT_ARROW_ANIMATION_URI }} style={styles.listCardLinkArrow} />
+          </View>
         </View>
       </Pressable>
     )
@@ -1433,6 +1450,12 @@ const styles = StyleSheet.create({
   // class (inherits #000000 from the row's own `reallyblack` class) — 12px,
   // not 13px/textMedium, and no line-height rule exists for it either.
   listCardDetail: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.black },
+  // Angular: the link sits in a `mt-4` wrapper and app-button-revamp gives it
+  // `textClassName: 'body3-regular-12 single-line-text'` + textColor `link` — 12px
+  // regular, not the 14px the matches card uses for its own View-profile link.
+  listCardLink: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4 },
+  listCardLinkText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.link },
+  listCardLinkArrow: { width: 20, height: 16 },
 
   // ── Deleted profile placeholder (Angular: .delete-div) ──────────────────────
   // CITATION CORRECTED: an earlier note here claimed ".delete-div, fixed 145px".
