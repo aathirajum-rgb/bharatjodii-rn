@@ -17,7 +17,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
+import CdnSvg from '../components/cdn-svg/CdnSvg';
 import { Colors } from '../constants/colors';
+import { CDN_SVG } from '../constants/cdn';
 import { StorageKeys as SK } from '../constants/storage.keys';
 import { useNetwork } from '../contexts/NetworkContext';
 import { Endpoints } from '../service/api.endpoints';
@@ -80,6 +82,10 @@ function CameraIcon() {
     </Svg>
   );
 }
+
+// Angular `.red-cross-img` / photo-rejected overlay's white cross — same CDN
+// asset, reused here for the dark-themed top bar's close button.
+const ICON_CLOSE = CDN_SVG + 'cross-white-img.svg';
 
 // Guesses a MIME type from the asset's filename extension — expo-media-library's
 // legacy Asset shape has no mimeType/fileSize field of its own (unlike an
@@ -467,14 +473,27 @@ export default function GalleryScreen({ navigation, onDone, maxSelection = DEFAU
 
       {/* ── Top bar ── */}
       <View style={styles.topBar}>
-        {/* Album picker button */}
-        <TouchableOpacity
-          style={styles.albumButton}
-          onPress={() => setShowDropdown(v => !v)}
-        >
-          <Text style={styles.albumButtonText}>{activeAlbum.title}</Text>
-          <Text style={styles.albumChevron}>{showDropdown ? '▲' : '▼'}</Text>
-        </TouchableOpacity>
+        <View style={styles.topBarLeft}>
+          {/* Close — this screen has no other way back once pushed */}
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={() => navigation.goBack()}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+          >
+            <CdnSvg uri={ICON_CLOSE} width={16} height={16} />
+          </TouchableOpacity>
+
+          {/* Album picker button */}
+          <TouchableOpacity
+            style={styles.albumButton}
+            onPress={() => setShowDropdown(v => !v)}
+          >
+            <Text style={styles.albumButtonText}>{activeAlbum.title}</Text>
+            <Text style={styles.albumChevron}>{showDropdown ? '▲' : '▼'}</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Done button */}
         {selected.size > 0 && (
@@ -612,6 +631,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: '#111',
+  },
+  topBarLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  closeButton: {
+    width: 30,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   albumButton: {
     flexDirection: 'row',

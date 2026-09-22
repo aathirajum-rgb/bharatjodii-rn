@@ -18,6 +18,7 @@ import { File, Paths } from 'expo-file-system'
 import { Colors } from '../../constants/colors'
 import { CDN, CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 import LinkCTA from '../../components/link-cta/LinkCTA'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
@@ -178,7 +179,8 @@ export default function MorePaymentOptionsScreen({ navigation, route }: Props) {
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       <View style={s.header}>
         <Pressable onPress={handleBack} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />

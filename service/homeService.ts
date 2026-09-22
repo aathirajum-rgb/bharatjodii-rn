@@ -7,6 +7,7 @@ import i18n from '../i18n'
 import type { SwiperItem } from '../components/swiper-card/SwiperCard'
 import type { ProfileDeactivateInfo } from '../components/auth/ProfileDeactivatedModal'
 import { pickListingPhoto } from '../adapters/profileListing.adapter'
+import { getIosProductIdsParam } from './iapService'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -375,7 +376,9 @@ export async function fetchNotifCount(): Promise<NotifCountResult> {
 export async function fetchMenuPromo(): Promise<any> {
   const id          = await getItem(StorageKeys.Auth.USER_ID)
   const renewalFlag = await getItem('RENEWALENABLEKEY') ?? '0'
-  const params = `ID=${id ?? ''}&RENEWALFLAG=${renewalFlag}&AUTOUPIFLAG=0&PAYAPITYPE=7`
+  // iOS-only — see getIosProductIdsParam() in iapService.ts.
+  const iosProductIds = await getIosProductIdsParam()
+  const params = `ID=${id ?? ''}&RENEWALFLAG=${renewalFlag}&AUTOUPIFLAG=0&PAYAPITYPE=7&IOSPRODUCTIDS=${iosProductIds}`
   try {
     const res = await apiCall(Endpoints.payment.nbMenu, 'POST', params)
     if (String(res['ERRCODE']) === '0' && res['RESPONSE']) {

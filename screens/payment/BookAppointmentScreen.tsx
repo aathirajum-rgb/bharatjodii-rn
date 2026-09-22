@@ -17,6 +17,7 @@ import { CDN, CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import CdnLottie from '../../components/CdnLottie'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import { getPostBookingDestination, submitStoreAppointment } from '../../service/paymentService'
@@ -123,14 +124,16 @@ export default function BookAppointmentScreen({ navigation, route }: Props) {
 
   if (success) {
     return (
-      <View style={[s.screen, s.centered, { paddingTop: insets.top }]}>
+      <View style={[s.screen, s.centered]}>
+        <ScreenTopInset style={s.topInset} />
         <CdnLottie uri={CDN_LOTTIE + 'success-animation-lottie.json'} width={160} height={160} loop={false} />
       </View>
     )
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       <View style={s.header}>
         <Pressable onPress={handleBack} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
@@ -275,6 +278,10 @@ function RadioList({
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.white },
   centered: { alignItems: 'center', justifyContent: 'center' },
+  // Absolute so the strip doesn't add to the flex layout and shift the
+  // lottie off dead-center — `centered`'s own justifyContent:'center' must
+  // keep centering exactly as before.
+  topInset: { position: 'absolute', top: 0, left: 0, right: 0 },
 
   header: {
     height: 56, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16,

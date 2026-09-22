@@ -48,7 +48,7 @@ export default function WhatsAppPaywallModal({
   const titleText = t('MATCHES.WHATSAPP_PAYWALL_TITLE').replace('#HIMHER#', himHer)
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={m.overlay} onPress={onClose}>
         <Pressable style={m.card} onPress={() => {}}>
           <Pressable style={m.closeBtn} onPress={onClose} hitSlop={10}>

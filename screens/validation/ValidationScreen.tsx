@@ -57,6 +57,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { CDN_SVG } from '../../constants/cdn'
 import { FontSize } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -704,7 +705,8 @@ export default function ValidationScreen({ route }: Props) {
 
   if (phase === 'loading') {
     return (
-      <View style={[s.screen, s.center, { paddingTop: insets.top }]}>
+      <View style={[s.screen, s.center]}>
+        <ScreenTopInset style={s.topInsetAbsolute} />
         <ActivityIndicator color={Colors.primaryDark} size="large" />
       </View>
     )
@@ -715,7 +717,8 @@ export default function ValidationScreen({ route }: Props) {
   // heading centred below it.
   if (phase === 'underReview') {
     return (
-      <View style={[s.screen, s.underReview, { paddingTop: insets.top }]}>
+      <View style={[s.screen, s.underReview]}>
+        <ScreenTopInset style={s.topInsetAbsolute} />
         <CdnSvg uri={CDN_UNDER_REVIEW_ICON} width={160} height={160} style={s.underReviewImg} />
         <Text style={[s.underReviewTitle, { fontFamily: langFonts.semiBold }]}>{t('REGISTRATION.PROFILE_REVIEW', 'Your profile is under review')}</Text>
       </View>
@@ -874,7 +877,8 @@ export default function ValidationScreen({ route }: Props) {
   )
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 100 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         {/* isFollowUp renders this SAME icon+title itself, inside the BottomSheet's
             followUpContent below — showing it here too just left a ghost copy of
@@ -998,6 +1002,9 @@ export default function ValidationScreen({ route }: Props) {
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.white },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  // `center`/`underReview` are both centered (and underReview is padded) —
+  // absolute keeps the strip out of that flex layout and full-bleed.
+  topInsetAbsolute: { position: 'absolute', top: 0, left: 0, right: 0 },
 
   content: { paddingHorizontal: 24, paddingTop: 24 },
   // Angular: icon has mb-24, title heading2-semibold-18 with mb-32

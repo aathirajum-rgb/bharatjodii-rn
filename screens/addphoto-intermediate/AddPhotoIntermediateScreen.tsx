@@ -55,6 +55,7 @@ import { getPPSetData } from '../../service/profileService'
 import type { SwiperItem } from '../../components/swiper-card/SwiperCard'
 import { Fonts, FontSize } from '../../src/theme/fonts'
 import { ENavigation } from '../../types/enums/navigation.enum'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 const GIFT_IMG = CDN_IMG + 'png/gift-conrats.png'
 
@@ -277,7 +278,8 @@ export default function AddPhotoIntermediateScreen({ navigation, route }: Props)
       : (guidelines?.items ?? [])
 
     return (
-      <View style={[g.screen, { paddingTop: insets.top }]}>
+      <View style={g.screen}>
+        <ScreenTopInset />
         {/* Angular: `ion-cust-padding-start pr-16 pt-12 pb-0`, right-aligned. */}
         <View style={g.closeRow}>
           <Pressable onPress={close} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
@@ -496,7 +498,8 @@ export default function AddPhotoIntermediateScreen({ navigation, route }: Props)
     .replace('#DAYS#', freeContactDays)
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}>
+    <View style={[s.screen, { paddingTop: 24, paddingBottom: insets.bottom + 24 }]}>
+      <ScreenTopInset style={s.topInsetAbsolute} />
       <Image source={{ uri: GIFT_IMG }} style={s.giftImg} resizeMode="contain" />
       <Text style={s.title}>{t('VERIFY_ID.CONGRATS', 'Congratulations!')}</Text>
       <Text style={s.body}>{body}</Text>
@@ -514,6 +517,9 @@ export default function AddPhotoIntermediateScreen({ navigation, route }: Props)
 
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.white, paddingHorizontal: 24 },
+  // screen carries paddingHorizontal:24 — absolute + left/right:0 escapes that
+  // so the inset strip stays full-bleed instead of inset by the side padding.
+  topInsetAbsolute: { position: 'absolute', top: 0, left: 0, right: 0 },
   giftImg: { width: 160, height: 160, alignSelf: 'center', marginBottom: 24 },
   title: { fontSize: FontSize.font18, fontWeight: '600', color: Colors.black, marginBottom: 12 },
   body: { fontSize: FontSize.font14, color: Colors.textPrimary, lineHeight: 20, marginBottom: 24 },

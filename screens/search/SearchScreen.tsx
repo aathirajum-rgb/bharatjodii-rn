@@ -74,6 +74,7 @@ import MultiSelectPicker, { type MultiSelectOption } from '../../components/mult
 import { ICON } from '../viewprofile/ViewProfileScreen'
 import CheckboxGroup from '../../components/checkbox/CheckboxGroup'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -1131,14 +1132,16 @@ export default function SearchScreen({ navigation }: Props) {
 
   if (loading) {
     return (
-      <View style={[s.screen, s.center, { paddingTop: insets.top }]}>
+      <View style={[s.screen, s.center]}>
+        <ScreenTopInset style={s.topInsetAbsolute} />
         <ActivityIndicator color={Colors.primaryDark} size="large" />
       </View>
     )
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
 
       <View style={s.header}>
         <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
@@ -1577,6 +1580,10 @@ const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.white },
   flex1:  { flex: 1 },
   center: { alignItems: 'center', justifyContent: 'center' },
+  // `center`'s justifyContent:'center' must keep centering the spinner exactly
+  // as before — absolute takes the strip out of the flex layout so it can't
+  // shift it.
+  topInsetAbsolute: { position: 'absolute', top: 0, left: 0, right: 0 },
 
   header: {
     height:            56,

@@ -87,7 +87,7 @@ async function handleErrCode(
 
   if (code === 23) {
     // Both tokens invalid — force logout
-    // await clearSession()
+    await clearSession()
     return null
   }
 

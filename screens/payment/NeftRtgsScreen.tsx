@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 import { getPayAtBankList, type PayAtBankItem } from '../../service/paymentService'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
@@ -45,7 +46,8 @@ export default function NeftRtgsScreen({ navigation }: Props) {
   const bank = banks[selected]
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       <View style={s.header}>
         <Pressable onPress={handleBack} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />

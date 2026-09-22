@@ -13,10 +13,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_LOTTIE } from '../../constants/cdn'
 import CdnLottie from '../../components/CdnLottie'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import PlainRetryFailureSheet from '../../components/payment/PlainRetryFailureSheet'
 import AutoRenewalFailureSheet from '../../components/payment/AutoRenewalFailureSheet'
@@ -65,7 +65,6 @@ function formatCountdown(ms: number): string {
 }
 
 export default function PaymentFailedScreen({ navigation, route }: Props) {
-  const insets = useSafeAreaInsets()
   // route.params is undefined if this screen is ever reached with no
   // navigation state (e.g. a future deep link). status/retryRoute seed
   // useState initializers below, before any effect could redirect away, so
@@ -186,7 +185,8 @@ export default function PaymentFailedScreen({ navigation, route }: Props) {
 
   if (polling) {
     return (
-      <View style={[s.screen, { paddingTop: insets.top }]}>
+      <View style={s.screen}>
+        <ScreenTopInset style={s.topInset} />
         <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} />
         <Text style={s.title}>Confirming your payment…</Text>
         <Text style={s.subtitle}>This usually takes a few seconds. Please don't close the app.</Text>
@@ -243,6 +243,10 @@ const s = StyleSheet.create({
     flex: 1, alignItems: 'center', justifyContent: 'center',
     backgroundColor: Colors.white, padding: 32, gap: 12,
   },
+  // Absolute so the strip doesn't add to the flex layout and shift the
+  // content off dead-center — `screen`'s own justifyContent:'center' must
+  // keep centering exactly as before.
+  topInset: { position: 'absolute', top: 0, left: 0, right: 0 },
   title:    { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font20, color: Colors.black, textAlign: 'center' },
   subtitle: { fontFamily: SemanticFontsEnglish.subheadingEnglishRegular, fontSize: FontSize.font14, color: Colors.textSecondary, textAlign: 'center', lineHeight: 20 },
 

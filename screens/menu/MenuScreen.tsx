@@ -41,6 +41,7 @@ import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import LanguagePillSheet from '../../components/language-pill/LanguagePillSheet'
 import { Fonts, FontSize } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -420,7 +421,8 @@ export default function MenuScreen({ navigation }: Props) {
   // ─── Render ───────────────────────────────────────────────────────────────
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
 
       {/* ── Header back button ── */}
       <Pressable

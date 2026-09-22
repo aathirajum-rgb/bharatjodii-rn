@@ -1,4 +1,5 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import { Colors } from '../constants/colors'
 import ExternalPageScreen from '../screens/external-page/ExternalPageScreen'
 import LanguageSelectionScreen from '../screens/LanguageSelectionScreen'
 import LoginScreen from '../screens/auth/LoginScreen'
@@ -23,7 +24,7 @@ const Stack = createNativeStackNavigator<AuthStackParamList>()
 export default function AuthStack() {
   console.log('[TRACE] AuthStack: MOUNTED')
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.background } }}>
 
       <Stack.Screen name="Splash" options={{ animation: 'none' }}>
         {({ navigation }) => (

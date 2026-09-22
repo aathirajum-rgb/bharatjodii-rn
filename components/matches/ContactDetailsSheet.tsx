@@ -47,7 +47,7 @@ export default function ContactDetailsSheet({
 
   function handleShare() {
     if (!mobile) return
-    Share.share({ message: mobile }).catch(() => {})
+    Share.share({ message: `${name}\n\n${mobile}` }).catch(() => {})
   }
 
   return (

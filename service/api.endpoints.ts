@@ -171,6 +171,10 @@ export const Endpoints = {
     // endpoint exists yet for iOS receipts — that contract is still pending from
     // backend (see verifyAndActivateIosMembership() in the same file).
     iosPackageLogin:     `${payNg}iospayment/iospackagelogin`,
+    // src/nbpayment (JODII-535) — App Store Server API transaction
+    // verification + membership activation. Confirmed real domain from a
+    // live capture: pay (stgoapi), not payNg.
+    iosReceiptValidation: `${pay}payment/iospayrecval/v1`,
   },
 
   notify: {

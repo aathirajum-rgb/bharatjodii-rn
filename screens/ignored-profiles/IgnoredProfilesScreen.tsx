@@ -45,6 +45,7 @@ import Toast, { type ToastRequest } from '../../components/toast/Toast'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import IgnoredProfilesDesktopScreen from './IgnoredProfilesDesktopScreen'
 import { FontSize } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 const DEFAULT_PHOTO_MALE   = CDN_REACT + '/ignore_profile_male.svg'
 const DEFAULT_PHOTO_FEMALE = CDN_REACT + '/ignore_profile_female.svg'
@@ -275,7 +276,8 @@ export default function IgnoredProfilesScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       <View style={s.headerWrap}>
         <View style={s.header}>
           <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">

@@ -71,7 +71,7 @@ export default function PhotoViewerModal({
   if (!photo) return null
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
       <Pressable style={s.scrim} onPress={onClose}>
         <Pressable style={s.card} onPress={() => {}}>
           <Pressable style={s.closeBtn} onPress={onClose} hitSlop={8}>

@@ -25,6 +25,7 @@ import LinkCTA from '../../components/link-cta/LinkCTA'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import HelpCenterDesktopScreen from './HelpCenterDesktopScreen'
 import { FontSize } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -158,7 +159,8 @@ export default function HelpCenterScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
 
       {/* Header */}
       <View style={s.header}>

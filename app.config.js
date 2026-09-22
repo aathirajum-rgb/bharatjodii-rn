@@ -121,7 +121,10 @@ module.exports = ({ config }) => ({
   },
   ios: {
     ...config.ios,
-    bundleIdentifier: f.applicationId,
+    // iOS-only override for flavors whose App Store Connect bundle id
+    // differs from the shared Android applicationId — see flavorConfig.js's
+    // iosBundleId comment (currently just 'jodii', the BharatJodii rebrand).
+    bundleIdentifier: f.iosBundleId || f.applicationId,
     associatedDomains: [
       `applinks:${f.domain}`,
       ...(f.domain2 ? [`applinks:${f.domain2}`] : []),

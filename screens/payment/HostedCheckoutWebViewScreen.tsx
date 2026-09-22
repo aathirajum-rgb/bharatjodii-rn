@@ -16,8 +16,8 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview'
 import type {
   ShouldStartLoadRequest, WebViewErrorEvent, WebViewHttpErrorEvent, WebViewNavigation,
 } from 'react-native-webview/lib/WebViewTypes'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 import { SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { EnvConfig } from '../../constants/env'
 import {
@@ -79,7 +79,6 @@ type Props = {
 }
 
 export default function HostedCheckoutWebViewScreen({ navigation, route }: Props) {
-  const insets = useSafeAreaInsets()
   // route.params is undefined if this screen is ever reached with no
   // navigation state (e.g. a future deep link) — there's no safe fallback
   // package/amount to substitute, so the load effect below bails out to the
@@ -214,14 +213,16 @@ export default function HostedCheckoutWebViewScreen({ navigation, route }: Props
 
   if (!request) {
     return (
-      <View style={[s.screen, s.centered, { paddingTop: insets.top }]}>
+      <View style={[s.screen, s.centered]}>
+        <ScreenTopInset style={s.topInset} />
         <ActivityIndicator color={Colors.primaryDark} size="large" />
       </View>
     )
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       <WebView
         source={{ uri: request.uri, method: 'POST', body: request.body }}
         injectedJavaScriptBeforeContentLoaded={BRIDGE_SCRIPT}
@@ -247,6 +248,10 @@ export default function HostedCheckoutWebViewScreen({ navigation, route }: Props
 const s = StyleSheet.create({
   screen:   { flex: 1, backgroundColor: Colors.white },
   centered: { alignItems: 'center', justifyContent: 'center' },
+  // Absolute so the strip doesn't add to the flex layout and shift the
+  // spinner off dead-center — `centered`'s own justifyContent:'center' must
+  // keep centering exactly as before.
+  topInset: { position: 'absolute', top: 0, left: 0, right: 0 },
   webview:  { flex: 1 },
   loadingOverlay: {
     position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,

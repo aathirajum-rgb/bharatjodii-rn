@@ -25,6 +25,7 @@ import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
 import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
 import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictSheets'
 import { FontSize } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 const ICONS = {
   header:   CDN_SVG + 'updated-images/verify-your-identity-img-updated.svg',
@@ -155,7 +156,8 @@ export default function BlockerScreen({ navigation }: { navigation: any }) {
   }
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 16 }]}>
+    <View style={[styles.screen, { paddingTop: 24, paddingBottom: insets.bottom + 16 }]}>
+      <ScreenTopInset style={styles.topInsetAbsolute} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <CdnSvg uri={ICONS.header} width="100%" height={160} />
 
@@ -281,6 +283,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
     paddingHorizontal: 24,
   },
+  // screen carries paddingHorizontal:24 — absolute + left/right:0 escapes that
+  // so the inset strip stays full-bleed instead of inset by the side padding.
+  topInsetAbsolute: { position: 'absolute', top: 0, left: 0, right: 0 },
   loaderContainer: {
     flex:           1,
     alignItems:     'center',

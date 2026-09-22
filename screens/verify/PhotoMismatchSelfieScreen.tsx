@@ -35,6 +35,7 @@ import { requestCameraPermission } from '../../service/permissionService'
 import { snapshotWebFile } from '../../utils/webFileSnapshot'
 import { pollPhotoValidation } from '../../service/photoValidationService'
 import { FontSize } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 const ICONS = {
   back:    CDN_REACT + '/menu_back_arrow.svg',
@@ -170,7 +171,8 @@ export default function PhotoMismatchSelfieScreen({ navigation, route }: Props) 
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       {step === 'prompt' && (
         <>
           <View style={s.header}>

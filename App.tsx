@@ -16,6 +16,7 @@ import { APP_VERSION } from './constants/appVersion'
 import { StorageKeys } from './constants/storage.keys'
 import { AuthProvider } from './contexts/AuthContext'
 import { NetworkProvider } from './contexts/NetworkContext'
+import { Colors } from './constants/colors'
 import { ErrorBoundary } from './components/error-boundary/ErrorBoundary'
 import { initCrashLogger } from './utils/crashLogger'
 import { useOTAUpdate } from './hooks/useOTAUpdate'
@@ -197,7 +198,7 @@ export default function App() {
     // the tree silently fail to be recognized.
     <ErrorBoundary>
       <GestureHandlerRootView style={{ flex: 1 }}>
-        <SafeAreaProvider>
+        <SafeAreaProvider style={{ backgroundColor: Colors.black }}>
           {/* Set once, centrally — dark icons on the app's white headers by default.
               Screens with a dark/colored top area (e.g. Splash, LanguageSelection)
               mount their own <StatusBar> to override; expo-status-bar restores this

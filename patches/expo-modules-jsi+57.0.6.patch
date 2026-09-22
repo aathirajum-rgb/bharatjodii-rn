@@ -1,0 +1,33 @@
+diff --git a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/RuntimeScheduler.h b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/RuntimeScheduler.h
+index 6115e87..db6bc56 100644
+--- a/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/RuntimeScheduler.h
++++ b/node_modules/expo-modules-jsi/apple/Sources/ExpoModulesJSI-Cxx/include/RuntimeScheduler.h
+@@ -49,8 +49,18 @@ public:
+    Constructs a scheduler bound to a host-provided native RuntimeScheduler.
+    `scheduleTask` dispatches through `fn`, which the host implements against
+    the real react::RuntimeScheduler.
++
++   SWIFT_RETURNS_RETAINED deliberately removed from this constructor (see
++   patches/expo-modules-jsi+*.patch) — Xcode 26.2's Swift/C++ interop importer
++   rejects it here with "cannot be annotated ... because it is not returning
++   a SWIFT_SHARED_REFERENCE type", even though the class below IS registered
++   as one via the trailing SWIFT_SHARED_REFERENCE(...) attribute. Constructors
++   of a SWIFT_SHARED_REFERENCE type are already imported as returning an owned
++   (+1) reference by that registration alone; the explicit annotation is only
++   meaningful (and only accepted by this toolchain) on ordinary member
++   functions whose ownership isn't otherwise inferable.
+    */
+-  SWIFT_RETURNS_RETAINED RuntimeScheduler(void *scheduler, ScheduleFn fn) noexcept
++  RuntimeScheduler(void *scheduler, ScheduleFn fn) noexcept
+       : nativeScheduler(scheduler), scheduleFn(fn) {}
+ 
+   /**
+@@ -58,7 +68,7 @@ public:
+    caller's thread — intended for standalone runtimes (e.g. tests) that have
+    no React scheduler.
+    */
+-  SWIFT_RETURNS_RETAINED RuntimeScheduler() {}
++  RuntimeScheduler() {}
+ 
+   RuntimeScheduler(const RuntimeScheduler &) = delete;
+ 

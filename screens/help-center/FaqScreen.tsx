@@ -29,6 +29,7 @@ import { fetchFaqContent, stripHtml, type FaqType, type FaqContentItem } from '.
 import { setFilterEventType } from '../../service/filterService'
 import { handleBack } from '../../utils/navigationRef'
 import { FontSize } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 const R = CDN_REACT + '/'
 const ICON_BACK  = R + 'menu_back_arrow.svg'
@@ -125,7 +126,8 @@ export default function FaqScreen({ navigation, route }: Props) {
   const title = t(HEADER_KEY[type])
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       <View style={s.header}>
         <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
