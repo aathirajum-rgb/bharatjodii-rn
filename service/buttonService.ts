@@ -56,7 +56,11 @@ export async function checkAddPhotoPromotion(): Promise<boolean> {
   const [isPhotoPromo, photoCount, ekycStatus, entryType, gender, paidFlag] = await Promise.all([
     checkPhotoPromotion(),
     getItem('PHOTOCOUNT'),
-    getItem('PI_EKYCSTATUS'),
+    // Angular reads localStorage 'EKYCSTATUS' (app-swiper.component.ts:109,
+    // button.component's check_Paid_NonVerifyIdUser/check_Paid_Verified_Nophoto).
+    // 'PI_EKYCSTATUS' is written by nothing in this codebase, so it always read
+    // null and every ID-verified member looked unverified here.
+    getItem(SK.Verification.EKYC_STATUS),
     getItem(SK.Auth.ENTRY_TYPE),
     getItem(SK.User.LOGIN_GENDER),
     getItem(SK.Payment.PAY_P_FLAG),

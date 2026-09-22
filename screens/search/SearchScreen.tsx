@@ -49,7 +49,7 @@ import {
   getFilterEventType, resetFilter, buildSearchParams, DEFAULT_FILTER, DEFAULT_PP_CHECKBOX,
   markFilterPPEdited,
   getStrictFilterState, setStrictFilterState, QUICK_FILTER_ICON,
-  getSelectedFilters, isAnyFieldEdited, filterRowKey,
+  getSelectedFilters, isAnyFieldEdited, filterRowKey, isRowUnset,
   ppSelectionFromPPSet, hasStoredFilterSelection,
 } from '../../service/filterService'
 import { getPPSetData } from '../../service/profileService'
@@ -200,6 +200,17 @@ export default function SearchScreen({ navigation }: Props) {
   // Seeded from storage on open (Angular: getSelectedValues() reads
   // SELECTEDFILTERS back) so dots survive leaving and re-entering the screen.
   const [editedRows, setEditedRows] = useState<Record<string, boolean>>({})
+  // Mirror the three pieces of filter state so updateField() can compose several
+  // writes within one tick — two in a row is routine (State then City, religion
+  // then its cascade) — and persist the RESULT immediately. Re-synced from state
+  // on every render, so the paths that set things wholesale (initial load, Reset)
+  // stay authoritative.
+  const selectedRef   = useRef(selected)
+  const ppCheckBoxRef = useRef(ppCheckBox)
+  const editedRowsRef = useRef(editedRows)
+  selectedRef.current   = selected
+  ppCheckBoxRef.current = ppCheckBox
+  editedRowsRef.current = editedRows
   const isRowEdited    = (key: string) => eventType === 'filter' && editedRows[key] === true
   // Angular's Reset guard, `if (!isAnyOneFieldEdited()) return` — the same
   // predicate decides whether the button does anything at all.
@@ -439,18 +450,44 @@ export default function SearchScreen({ navigation }: Props) {
   // member never edited") — which the CASTE/DIVISION resets were quietly
   // undoing by going through the normal path.
   function updateField(key: string, value: any, opts?: { cascade?: boolean }) {
-    setSelected(prev => ({ ...prev, [key]: value }))
+    const next = { ...selectedRef.current, [key]: value }
+    selectedRef.current = next
+    setSelected(next)
+    // A dependent reset the app performed, not an edit the member made — it
+    // changes the value and nothing else. Persisting is left to the edit that
+    // triggered it, which always follows in the same tick.
     if (opts?.cascade) return
+
     // FILTERPP: flag this field's own position as edited (Angular does the
     // same inside each field editor — filter-popup.component.ts:1377). Every
     // edit on both mobile and desktop funnels through here, so this is the one
     // place that needs it.
-    setPpCheckBox(prev => markFilterPPEdited(prev, key))
+    const nextPp = markFilterPPEdited(ppCheckBoxRef.current, key)
+    ppCheckBoxRef.current = nextPp
+    setPpCheckBox(nextPp)
+
     // …and the same for the row flag behind the red dot / chip count. Several
     // selection keys share one ROW (STARTAGE+ENDAGE → AGE, COUNTRY/STATE/CITY
     // → LOCATION), which is exactly what filterRowKey() resolves.
+    //
+    // Raising the flag is only half of it. Angular re-writes it on every edit,
+    // so a field put BACK to its "Any" state stops counting — un-ticking
+    // "Matches who have added photos" has to drop the row again, or the dot and
+    // the Filters-chip count keep reporting an edit the member has undone.
     const row = filterRowKey(key)
-    if (row) setEditedRows(prev => (prev[row] ? prev : { ...prev, [row]: true }))
+    if (!row) return
+    const nextEdited = { ...editedRowsRef.current }
+    if (isRowUnset(row, next)) delete nextEdited[row]
+    else nextEdited[row] = true
+    editedRowsRef.current = nextEdited
+    setEditedRows(nextEdited)
+
+    // Persist NOW, not on the 400ms count debounce this used to ride on. The
+    // Matches chip reads this map back on focus, and un-ticking a box then
+    // going straight back beat the timer — so the count kept the stale 1.
+    saveFilterState(next, nextPp, nextEdited).catch(e => {
+      if (__DEV__) console.error('[Search] persist filter state error:', e)
+    })
   }
 
   async function ensureOptions(key: string, loader: () => Promise<MultiSelectOption[]>) {

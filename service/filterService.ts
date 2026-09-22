@@ -251,6 +251,43 @@ function filterPPIndex(selectionKey: string): number {
 }
 
 
+function sameAsDefault(value: any, fallback: any): boolean {
+  if (Array.isArray(value) || Array.isArray(fallback)) {
+    const a = Array.isArray(value)    ? value    : [value]
+    const b = Array.isArray(fallback) ? fallback : [fallback]
+    return a.length === b.length && a.every((v, i) => String(v ?? '') === String(b[i] ?? ''))
+  }
+  return String(value ?? '') === String(fallback ?? '')
+}
+
+/**
+ * True when every selection key that feeds `row` is back at its unset value —
+ * DEFAULT_FILTER's '0' / ['0'] sentinels, i.e. the row's own "Any" state.
+ *
+ * This is what lets an edit be UNDONE. Angular re-writes the flag on every
+ * edit rather than only raising it: a multi-select that empties back to nothing
+  * gets `this.filterScreenList[filterType]` assigned instead of a flagged entry
+ * (filter.component.ts:860/957), and that default entry carries no
+ * isAnyChanges — so the dot and the chip count go away again.
+ *
+ * Rows can be fed by several keys (COUNTRY+STATE+CITY → LOCATION,
+ * CASTE+SUBCASTE+GOTHRA+DIVISION → CASTE), so all of them have to be unset
+ * before the row counts as untouched: clearing City while State is still set
+ * must leave Location marked.
+ *
+ * Note this compares against the UNSET sentinel, never against the saved
+ * partner preference — a row matching the member's saved PP is still an edit if
+ * they set it by hand this session, which is the distinction that made the
+ * whole-object diff this replaced report untouched rows.
+ */
+export function isRowUnset(row: string, obj: Record<string, any>): boolean {
+  for (const key of Object.keys(DEFAULT_FILTER)) {
+    if (filterRowKey(key) !== row) continue
+    if (!sameAsDefault(obj?.[key], DEFAULT_FILTER[key])) return false
+  }
+  return true
+}
+
 // The red "edited" dot on a filter row, and the count badge on the Filters
 // chip, both come from ONE flag per row: Angular's
 // `searchValueList[field].isAnyChanges`, mirrored into

@@ -10,6 +10,7 @@
 
 import { forwardRef, useCallback, useRef, useState } from 'react'
 import {
+  Platform,
   Pressable, StyleSheet, Text, View,
 } from 'react-native'
 import { Image } from 'expo-image'
@@ -18,18 +19,41 @@ import type { PanGesture } from 'react-native-gesture-handler'
 import { SvgXml } from 'react-native-svg'
 import Svg, { Path } from 'react-native-svg'
 import CdnSvg from '../cdn-svg/CdnSvg'
-import { CDN_SVG } from '../../constants/cdn'
+import { CDN_IMG, CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { decodeEntities } from '../../utils/htmlEntities'
+import { withRupeeFont } from '../../utils/rupeeFont'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 
 // ─── Shared card badge/photo CDN URLs ──────────────────────────────────────────
 // Both MatchCard (mobile) and MatchCardDesktop point at the same CDN assets —
 // kept in one place so the two layouts can't silently drift apart.
 
+// The female placeholder is a PATTERN-based SVG: a #F0F0F0 rect with the photo
+// painted through `<pattern patternContentUnits="objectBoundingBox">` →
+// `<use xlink:href="#image0" transform="matrix(0.00179 0 0 0.00189 …)">`, where
+// #image0 is a 560x528 bitmap the matrix scales down into the 0..1 box.
+//
+// react-native-svg does not apply that pattern transform, so on NATIVE the raw
+// bitmap is drawn at the wrong scale over the grey backdrop — a hard-edged
+// rectangle sitting inside the card, which reads as "the corners are sharp"
+// even though the card itself is rounded. The browser rasterises the same file
+// correctly, which is why only the app shows it.
+//
+// So native takes the CDN's raster of the same artwork and web keeps the
+// vector. Callers must render this through CdnImage, which dispatches on the
+// extension (.svg → CdnSvg, anything else → <Image>).
+const BLUR_PHOTO_RASTER: Partial<Record<'M' | 'F', string>> = {
+  F: CDN_IMG + 'png/profile-photo-blur.png',
+  // No raster for the male placeholder on the CDN yet — it stays on the SVG,
+  // whose own structure differs (one full-bleed pattern rect, no grey backdrop).
+}
+
 export function getBlurPhotoUri(oppGender: 'M' | 'F'): string {
-  return CDN_SVG + (oppGender === 'F' ? 'revamp/profile-photo-blur.svg' : 'profile-blur-male.svg')
+  const svg = CDN_SVG + (oppGender === 'F' ? 'revamp/profile-photo-blur.svg' : 'profile-blur-male.svg')
+  if (Platform.OS === 'web') return svg
+  return BLUR_PHOTO_RASTER[oppGender] ?? svg
 }
 
 export const MALE_AVATAR_URI   = CDN_SVG + 'male_avatar_new.svg'
@@ -106,15 +130,23 @@ export function WhatsAppUnlockButton({ label, onPress }: { label: string; onPres
   )
 }
 
+// Angular: photo-request.component.html renders this as an app-button-revamp
+// with `buttonSize: EButtonSize.mediumSemibold`, which is
+// `setButtonHeight(32px)` + 8px radius (button-revamp.component.scss:108,174) —
+// not the 40 this had. Width was a hardcoded 160; the button is content-sized
+// (icon + gap + label + padding ≈ 110), which is what a pixel measurement of the
+// reference screen works out to once you divide by its scale.
 const waButtonStyles = StyleSheet.create({
   btn: {
-    width:           160,
-    height:          40,
-    borderRadius:    8,
-    flexDirection:   'row',
-    alignItems:      'center',
-    justifyContent:  'center',
-    gap:             4,
+    height:            32,
+    // 6, not 12: the reference button measures 100px wide against 112 at 12px
+    // padding, at the same scale (29px tall in both shots).
+    paddingHorizontal: 6,
+    borderRadius:      8,
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'center',
+    gap:               4,
   },
   text: {
     fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
@@ -214,10 +246,13 @@ export function HtmlText({
   if (segs.length === 0) segs.push({ text: decodeEntities(cleaned.replace(/<[^>]*>/g, '')), segStyle: null })
   return (
     <Text style={style} numberOfLines={numberOfLines}>
+      {/* Angular: `.poppins-family` on any element showing an amount — see
+          withRupeeFont(). Applied here because this renderer carries the server
+          copy that actually contains ₹ (income ranges, discount lines). */}
       {segs.map((seg, i) =>
         seg.segStyle
-          ? <Text key={i} style={seg.segStyle}>{seg.text}</Text>
-          : <Text key={i}>{seg.text}</Text>
+          ? <Text key={i} style={seg.segStyle}>{withRupeeFont(seg.text)}</Text>
+          : <Text key={i}>{withRupeeFont(seg.text)}</Text>
       )}
     </Text>
   )
@@ -450,7 +485,11 @@ export const ProfileBadge = forwardRef<View, {
   const bg = BADGE_BG_PATH[variant]
   const Wrapper = hasInfo && onInfoPress ? Pressable : View
   return (
-    <Wrapper ref={ref as any} style={[badgeStyles.pill, style]} {...(hasInfo && onInfoPress ? { onPress: onInfoPress } : {})}>
+    <Wrapper
+      ref={ref as any}
+      style={[badgeStyles.pill, { minWidth: BADGE_MIN_WIDTH[variant] }, style]}
+      {...(hasInfo && onInfoPress ? { onPress: onInfoPress } : {})}
+    >
       <Svg
         style={StyleSheet.absoluteFill}
         viewBox={bg.viewBox}
@@ -458,7 +497,7 @@ export const ProfileBadge = forwardRef<View, {
       >
         <Path d={bg.d} fill={color} fillOpacity={0.1} />
       </Svg>
-      <CdnSvg uri={BADGE_ICON[variant]} width={28} height={28} style={badgeStyles.icon} />
+      <CdnSvg uri={BADGE_ICON[variant]} width={BADGE_H} height={BADGE_H} style={badgeStyles.icon} />
       <Text style={[badgeStyles.text, { color }]} numberOfLines={1}>{text}</Text>
       {hasInfo && (
         <CdnSvg uri={VERIFIED_INFO_ICON_URI} width={14} height={14} style={badgeStyles.infoIcon} />
@@ -466,6 +505,23 @@ export const ProfileBadge = forwardRef<View, {
     </Wrapper>
   )
 })
+
+// Angular: badge.component.scss — `.verified-member-block` / `.paid-member-block`
+// are `padding: 4px 30px 4px 20px` with the icon absolutely positioned at
+// `left: -10px; top: 0; height: 100%`, so it overhangs the pill and the label
+// starts at the 20px padding — about 8px clear of the icon.
+//
+// BADGE_H is that geometry made explicit: 4 + 14 + 4, where 14 is the line box
+// of the label's own `textcta-medium-12` (12px, no line-height of its own, so
+// the browser's ~1.2). Pinning it lets the icon be exactly "100% of the badge"
+// the way the CSS says, since CdnSvg needs real numbers.
+//
+// What this replaces: icon `left: -1` with a 28px glyph (taller than the pill it
+// sat in), and `left: +8` / `left: 6` nudges on the label and info icon to shove
+// them clear of it. Those offsets don't participate in layout, so the result
+// depended on each screen's own overrides — which is why the badge looked
+// different on Matches and on View Profile.
+const BADGE_H = 28
 
 const badgeStyles = StyleSheet.create({
   pill: {
@@ -475,25 +531,33 @@ const badgeStyles = StyleSheet.create({
     paddingLeft:     20,
     paddingRight:    30,
     paddingVertical: 4,
-    minHeight:       24,
-
+    height:          BADGE_H,
   },
+  // Angular `.paid-tag-position`: left -10, top 0, height 100% of the pill.
   icon: {
     position: 'absolute',
-    left:     -1,
-    top:      0,
+    left:     -12,
+    top:      1,
   },
+  // No `left` offset: the 20px paddingLeft above is what clears the icon, exactly
+  // as in the CSS.
   text: {
     fontFamily: SemanticFontsEnglish.specialCtaEnglishMedium,
     fontSize:   FontSize.font12,
-    left: +8,
+    lineHeight: 18,
+    includeFontPadding: false,
   },
   // Angular: badge.component.html's hasInfo span — class="ml-4" (4px left margin).
   infoIcon: {
     marginLeft: 4,
-    left: 6,
   },
 })
+
+// Angular: `min-width` on the two block classes — 100 for verified, 116 for paid.
+const BADGE_MIN_WIDTH: Record<ProfileBadgeVariant, number> = {
+  paid:     116,
+  verified: 100,
+}
 
 // ─── Photo swiper with dots ────────────────────────────────────────────────────
 // Angular: matches-card.component's Swiper (photosSwiperOpt: dynamicBullets pagination).

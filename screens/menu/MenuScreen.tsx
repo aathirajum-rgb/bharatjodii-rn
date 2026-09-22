@@ -57,6 +57,9 @@ export const ICON = {
   searchId:      R + 'menu_file_info.svg',
   support:       R + 'menu_support.svg',
   dontShow:      R + 'menu_profile_close.svg',
+  // Angular: menu.page.html — profiles-view-later.svg, from the shared svg
+  // folder rather than this port's react/ set (no menu_* variant exists).
+  viewLaterProfiles: CDN_SVG + 'profiles-view-later.svg',
   arrow:         R + 'menu_right_arrow.svg',
   camera:        R + 'menu_camera.svg',
   language:      R + 'setting_language_selection.svg',
@@ -602,6 +605,22 @@ export default function MenuScreen({ navigation }: Props) {
             icon={ICON.wedding}
             title={t('MENU.WEDDING_STORY')}
             onPress={() => navigation.navigate('SuccessStories')}
+            showDivider
+          />
+          {/* Angular: menu.page.html — `[routerLink]="['/activity/viewedbyme']"`
+              with state { activityType: 'viewedbyme', selectedSubTab:
+              'viewinglater' }, i.e. the Activity page's viewed-by-me tab opened on
+              its View-later sub-tab. ActivityScreen already reads both params
+              (routeSubTab), and Activity is a tab, so this goes through MainTabs
+              the same way SearchScreen reaches Matches. Sits above Don't Show,
+              matching the order in the Angular menu. */}
+          <MenuRow
+            icon={ICON.viewLaterProfiles}
+            title={t('GENERAL.VIEWLATER_PROFILES')}
+            onPress={() => navigation.navigate('MainTabs', {
+              screen: 'Activity',
+              params: { activityType: 'viewedbyme', selectedSubTab: 'viewinglater' },
+            })}
             showDivider
           />
           <MenuRow

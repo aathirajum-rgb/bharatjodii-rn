@@ -20,7 +20,8 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native'
-import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import CdnSvg, { CdnImage } from '../../components/cdn-svg/CdnSvg'
+import { withRupeeFont } from '../../utils/rupeeFont'
 import CdnLottie from '../../components/CdnLottie'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { useFooterBadges } from '../../contexts/FooterBadgesContext'
@@ -66,6 +67,7 @@ import {
   fetchContactDetails,
   shouldSkipPhoneConfirm,
   shouldShowPhoneNoLimit,
+  consumePhoneViewedId,
   getContactConfirmContent as getSharedContactConfirmContent,
 } from '../../service/communicationService'
 import { fetchBulkLikeMatches, getPPSetData } from '../../service/profileService'
@@ -287,11 +289,13 @@ export const MatchCard = memo(function MatchCard({
           // Angular: photo-new.component's viewPhotoRequest block, HORO_HIDDEN_LIKE/
           // HORO_HIDDEN_PHOTO text driven by likedStatus (not a separate request flag).
           <Pressable style={c.singlePhotoPressable} onPress={onPress}>
-            <CdnSvg
+            {/* CdnImage: getBlurPhotoUri() hands back a raster on native — see
+                that helper — and CdnImage dispatches on the extension. */}
+            <CdnImage
               uri={getBlurPhotoUri(oppGender)}
               width="100%" height="100%"
               style={StyleSheet.absoluteFill}
-              cover
+              resizeMode="cover"
             />
             <View style={c.photoOverlay}>
               <View style={c.overlayCard}>
@@ -348,11 +352,13 @@ export const MatchCard = memo(function MatchCard({
           // No photo at all: blur placeholder + WhatsApp overlay
           // Angular: getWhatsAppAvatarImg() + request-photo-vp overlay
           <Pressable style={c.singlePhotoPressable} onPress={onPress}>
-            <CdnSvg
+            {/* CdnImage: getBlurPhotoUri() hands back a raster on native — see
+                that helper — and CdnImage dispatches on the extension. */}
+            <CdnImage
               uri={getBlurPhotoUri(oppGender)}
               width="100%" height="100%"
               style={StyleSheet.absoluteFill}
-              cover
+              resizeMode="cover"
             />
             <View style={c.photoOverlay}>
               <View style={c.overlayCard}>
@@ -444,11 +450,15 @@ export const MatchCard = memo(function MatchCard({
       {/* Angular: bindBasicView() — "27 yrs | 5'5" | Brahmin | B.Tech | Engineer | Chennai, TN" —
           solid black segments, "|" separators alone drop to 20% opacity. */}
       <Pressable onPress={onPress}>
-        <Text style={[c.basicView, { fontFamily: langFonts.regular }]} numberOfLines={4}>
+        {/* Angular clamps this block with .text-space (max-height 144px) at
+            .line-height-20, i.e. 7 lines — not 4. Cutting it at 4 dropped the
+            tail of any lengthy basic-view string (long education/occupation/
+            city values, and vernacular text, which runs longer than English). */}
+        <Text style={[c.basicView, { fontFamily: langFonts.regular }]} numberOfLines={7}>
           {buildBasicViewParts(profile, oppGender === 'M').map((part, i) => (
             <Text key={i}>
               {i > 0 && <Text style={c.basicViewSep}> | </Text>}
-              {part}
+              {withRupeeFont(part)}
             </Text>
           ))}
         </Text>
@@ -1500,7 +1510,10 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
               getSessionValue('FEMALEFREECONACT'),
               getSessionValue('HOROSCOPEAVAILABLE'),
               getJson<Record<string, any>>('CONTACT_DETAIL'),
-              getItem('PI_EKYCSTATUS'),
+              // Angular: localStorage 'EKYCSTATUS'. 'PI_EKYCSTATUS' is written
+              // nowhere in this codebase, so BANNERSLOT 1014 / the add-photo gate
+              // treated every ID-verified member as unverified.
+              getItem(StorageKeys.Verification.EKYC_STATUS),
               getItem(StorageKeys.Payment.PAY_P_FLAG),
               getSessionValue(StorageKeys.App.WA_PHOTO_FLAG),
             ])
@@ -2123,10 +2136,27 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     }
   }
 
+  // Angular matches.page.ts re-derives banner positions from the live list on
+  // every render. This port instead stores them as absolute indices
+  // (bannerSlots[].insertAfter = how many profiles precede the banner), so every
+  // removal has to shift the banners that sit after it. Without this the
+  // intermediate nudges drift one slot further down per skipped/view-later
+  // profile and then disappear entirely: buildMergedList() only walks i up to
+  // profs.length, so any slot whose insertAfter has run past the end of the
+  // shrunken array is never emitted at all.
+  function removeProfileAndShiftBanners(profileId: string) {
+    const idx = profiles.findIndex(p => p.profileId === profileId)
+    if (idx === -1) return
+    setProfiles(prev => prev.filter(p => p.profileId !== profileId))
+    setBannerSlots(prev => prev.map(bs =>
+      bs.insertAfter > idx ? { ...bs, insertAfter: bs.insertAfter - 1 } : bs,
+    ))
+  }
+
   async function handleDontShow(profile: MatchProfile) {
     if (addPhotoGateActive) { setShowAddPhotoActionPrompt(true); return }
     // Optimistic UI: remove card immediately (matches Angular removeProfile)
-    setProfiles(prev => prev.filter(p => p.profileId !== profile.profileId))
+    removeProfileAndShiftBanners(profile.profileId)
     setTotalCount(prev => Math.max(0, prev - 1))
     recordMatchRemoval()
     apiStartRef.current = Math.max(0, apiStartRef.current - 1)
@@ -2141,7 +2171,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
 
   async function handleViewLater(profile: MatchProfile) {
     // Optimistic UI: remove card immediately (matches Angular removeProfile)
-    setProfiles(prev => prev.filter(p => p.profileId !== profile.profileId))
+    removeProfileAndShiftBanners(profile.profileId)
     setTotalCount(prev => Math.max(0, prev - 1))
     recordMatchRemoval()
     apiStartRef.current = Math.max(0, apiStartRef.current - 1)
@@ -2171,6 +2201,18 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   // directly (not showPaymentPromo()) so the service still owns the decision —
   // its female-free branches (photo pending / call verification / limit over)
   // must keep winning over the paywall for a free female member who qualifies.
+
+  // Angular communication.service.ts:632 — the in-memory half of the two-part
+  // already-viewed record: the list row itself is flipped to PHONEVIEWED='1' so a
+  // second tap while still on this screen skips the confirm sheet outright.
+  // Returns '1' so callers can use the new value in the same tick.
+  function markPhoneViewed(profileId: string): string {
+    setProfiles(prev => prev.map(p =>
+      p.profileId === profileId ? { ...p, phoneViewed: '1' } : p,
+    ))
+    return '1'
+  }
+
   // Angular communication.service.ts's showContactDetails() FIRST check — a
   // paid user whose mutual-like AND overall phone-view quotas are both
   // exhausted sees the PHONENOLIMIT sheet instead of the confirm popup.
@@ -2182,28 +2224,38 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     return false
   }
 
-  function handleCall(profile: MatchProfile) {
+  async function handleCall(profile: MatchProfile) {
     if (checkPhoneNoLimit(profile)) return
-    const alreadyViewed = ['1', '3'].includes(String(profile.phoneViewed ?? '0'))
+    // Angular communication.service.ts:175-179 — promote a PHONEVIEWEDID match to
+    // phoneViewed==='1' before deciding, so a number revealed earlier in this
+    // session never asks for confirmation a second time.
+    const phoneViewed = (await consumePhoneViewedId(profile.phoneViewed, profile.profileId))
+      ? markPhoneViewed(profile.profileId)
+      : profile.phoneViewed
+    const alreadyViewed = ['1', '3'].includes(String(phoneViewed ?? '0'))
     if (ownEntryType !== 'P' && !alreadyViewed) {
       handleContactConfirmYes({ profile, action: 'call' })
       return
     }
-    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType, profile.phoneProtected)) {
+    if (shouldSkipPhoneConfirm(phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType, profile.phoneProtected)) {
       handleContactConfirmYes({ profile, action: 'call' })
     } else {
       setContactConfirm({ profile, action: 'call' })
     }
   }
 
-  function handleWhatsApp(profile: MatchProfile) {
+  async function handleWhatsApp(profile: MatchProfile) {
     if (checkPhoneNoLimit(profile)) return
-    const alreadyViewed = ['1', '3'].includes(String(profile.phoneViewed ?? '0'))
+    // Same PHONEVIEWEDID promotion as handleCall above.
+    const phoneViewed = (await consumePhoneViewedId(profile.phoneViewed, profile.profileId))
+      ? markPhoneViewed(profile.profileId)
+      : profile.phoneViewed
+    const alreadyViewed = ['1', '3'].includes(String(phoneViewed ?? '0'))
     if (ownEntryType !== 'P' && !alreadyViewed) {
       handleContactConfirmYes({ profile, action: 'whatsapp' })
       return
     }
-    if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType, profile.phoneProtected)) {
+    if (shouldSkipPhoneConfirm(phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType, profile.phoneProtected)) {
       handleContactConfirmYes({ profile, action: 'whatsapp' })
     } else {
       setContactConfirm({ profile, action: 'whatsapp' })
@@ -2416,6 +2468,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
       if (result.type === 'show_contact') {
         // Angular's Contact Details popup shows Name/Mobile/WhatsApp/Call
         // together regardless of which CTA was tapped — not one-or-the-other.
+        markPhoneViewed(profile.profileId)
         setContactDetails({
           name:           profile.name,
           mobile:         result.mobile,
@@ -3602,7 +3655,13 @@ const c = StyleSheet.create({
     lineHeight:       20,
     marginTop:        4,
     paddingHorizontal: 16,
-    minHeight:        40,
+    // Angular applies BOTH .bv-minht (min-height 40) and .text-space
+    // (min-height 45) to this block — 45 is the one that wins in CSS.
+    minHeight:        45,
+    // Angular: .align-content-center — with a min-height taller than a single
+    // line, short content is centred in the box rather than pinned to the top,
+    // which is what kept the name/basic-view/View-profile rows evenly spaced.
+    textAlignVertical: 'center' as const,
   },
   basicViewSep: { color: 'rgba(0,0,0,0.2)' },
 
@@ -3742,7 +3801,10 @@ const c = StyleSheet.create({
     borderRadius:    8,
     alignItems:      'center',
     justifyContent:  'center',
-    gap:             8,
+    // Angular: `ion-icon.large { margin-right: 3px }`
+    // (button-revamp.component.scss:395-398) — the icon sits almost against its
+    // label. 8 was noticeably loose once the icon went to its real 24x24.
+    gap:             3,
   },
   ctaMessageText: {
     fontSize: FontSize.font14,

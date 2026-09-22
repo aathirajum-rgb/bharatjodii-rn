@@ -8,7 +8,7 @@ import { Endpoints } from './api.endpoints'
 import { getItem, setItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
 import { getSession } from './registrationService'
-import { stripAgeUnit, pickListingPhoto } from '../adapters/profileListing.adapter'
+import { pickListingPhoto } from '../adapters/profileListing.adapter'
 
 // JODII-499: Angular's chat.service.ts/messages.component.ts show a dedicated
 // "Invalid MatriID" toast for RESPONSECODE==2 && ERRCODE==3 (checked in three
@@ -271,7 +271,14 @@ function toSimilarCard(p: Record<string, any>): SimilarProfileCard {
   return {
     matriId:          String(p['MATRIID'] ?? p['MATRID'] ?? p['NBID'] ?? ''),
     name:             p['NAME'] ?? '',
-    age:              p['AGE'] ? stripAgeUnit(p['AGE']) : undefined,
+    // view/similarprofile/v1 sends AGE ALREADY worded — "28 years" — and Angular
+    // renders it verbatim (`[innerHtml]="age"`, profile-card.component.html:63).
+    // Stripping the unit here and re-appending "Yrs" at the card turned the
+    // server's own copy into a different string, and one that no longer
+    // translates: "years" comes from the API per language, "Yrs" was hardcoded
+    // English. The listing endpoints that send a bare number keep using
+    // stripAgeUnit — this one never needed it.
+    age:              p['AGE'] ? String(p['AGE']).trim() : undefined,
     education:        p['EDUCATION'] || undefined,
     // pickListingPhoto() covers PHOTO[0].IMAGE/THUMBIMG (same as the matches-listing
     // mappers); PROFILEIMG is this endpoint's own extra fallback on top of that.
