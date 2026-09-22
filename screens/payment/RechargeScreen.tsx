@@ -29,6 +29,7 @@ import { handleBack, resetTo } from '../../utils/navigationRef'
 import { getItem, removeItem } from '../../service/storageService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import CdnLottie from '../../components/CdnLottie'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
@@ -337,7 +338,8 @@ export default function RechargeScreen({ navigation, route }: Props) {
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       <View style={s.header}>
         {/* Angular: the back control sits BEFORE the title (margin-right-auto
             mr-12) — shown when this page was reached from an in-app CTA. */}

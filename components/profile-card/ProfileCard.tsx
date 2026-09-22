@@ -945,7 +945,7 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: Colors.white,
     overflow: 'hidden',
-    marginHorizontal: -8,
+    marginHorizontal: 2,
     shadowColor: Colors.shadow,
     shadowOpacity: 0.16,
     shadowRadius: 4,

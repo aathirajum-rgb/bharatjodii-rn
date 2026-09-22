@@ -685,7 +685,7 @@ export default function AppStack() {
 
   return (
     <Stack.Navigator
-      screenOptions={{ headerShown: false }}
+      screenOptions={{ headerShown: false, contentStyle: { backgroundColor: Colors.background } }}
       initialRouteName={stackInitialRoute}
     >
       <Stack.Screen name="MainTabs" component={MainTabs} />

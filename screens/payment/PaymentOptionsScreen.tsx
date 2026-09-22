@@ -19,6 +19,7 @@ import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { CDN, CDN_REACT, CDN_LOTTIE } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import CdnLottie from '../../components/CdnLottie'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
@@ -153,7 +154,8 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
 
   if (!selectedPackage) {
     return (
-      <View style={[s.screen, { paddingTop: insets.top }]}>
+      <View style={s.screen}>
+        <ScreenTopInset />
         <Header t={t} onBack={handleBack} />
         <View style={s.emptyState}>
           <Text style={s.emptyText}>Select a membership plan to continue.</Text>
@@ -424,7 +426,8 @@ export default function PaymentOptionsScreen({ navigation, route }: Props) {
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       <Header t={t} onBack={handleBack} />
 
       <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 24 }]}>

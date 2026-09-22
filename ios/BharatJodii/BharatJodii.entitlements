@@ -7,6 +7,8 @@
     <key>com.apple.developer.associated-domains</key>
     <array>
       <string>applinks:jodii.app</string>
+      <string>applinks:bharatjodii.com</string>
+      <string>applinks:stgoapi.bharatjodii.com</string>
     </array>
   </dict>
 </plist>

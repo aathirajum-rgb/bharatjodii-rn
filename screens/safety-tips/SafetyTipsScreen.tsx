@@ -22,6 +22,7 @@ import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { handleBack } from '../../utils/navigationRef'
 import { fetchSafetyTipsContent, type SafetyTipsContent } from '../../service/safetyTipsService'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 const BACK_ICON_URI = CDN_SVG + 'arrow-back-activity.svg'
 const TIP_ICON_URI = (n: number) => CDN_SVG + `safety-tips-${n}.svg`
@@ -56,7 +57,8 @@ export default function SafetyTipsScreen() {
   }, [])
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       {/* Angular: ion-toolbar with a bottom border, ion-back-button + title. */}
       <View style={s.header}>
         <Pressable onPress={() => handleBack()} hitSlop={12}>

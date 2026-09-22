@@ -71,6 +71,7 @@ import { EnvConfig } from '../../constants/env'
 import { formatLastActive } from '../../utils/chatTime'
 import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
 import type { ChatMessageItem, ChatMessagesResponse, SendMessageResponse } from '../../types/interfaces/chatMessage.interface'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 // Angular: FIRST_TIME_MSG_LIMIT — 3 messages allowed before the partner
 // responds at all.
@@ -930,7 +931,8 @@ export default function ChatScreen({ navigation, route }: Props) {
       : ''
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
+    <View style={styles.screen}>
+      <ScreenTopInset />
       {/* ── Header ── */}
       <View style={styles.header}>
         <Pressable onPress={() => handleBack()} hitSlop={12} style={styles.backBtn}>

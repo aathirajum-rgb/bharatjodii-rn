@@ -38,6 +38,7 @@ import { fetchStates, fetchHoroCities, generateHoroscope, type HoroCity } from '
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import SelectField from '../../components/input/SelectField'
 import SearchablePicker, { type PickerOption } from '../../components/searchable-picker/SearchablePicker'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { handleBack } from '../../utils/navigationRef'
 import AddHoroscopeDesktopScreen from './AddHoroscopeDesktopScreen'
@@ -225,14 +226,16 @@ export default function AddHoroscopeScreen({ navigation }: Props) {
 
   if (loading) {
     return (
-      <View style={[s.screen, s.center, { paddingTop: insets.top }]}>
+      <View style={[s.screen, s.center]}>
+        <ScreenTopInset style={s.topInset} />
         <ActivityIndicator color={Colors.primaryDark} size="large" />
       </View>
     )
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       <View style={s.header}>
         <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
@@ -364,6 +367,7 @@ export default function AddHoroscopeScreen({ navigation }: Props) {
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.white },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  topInset: { position: 'absolute', top: 0, left: 0, right: 0 },
 
   header: {
     height: 56, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white,

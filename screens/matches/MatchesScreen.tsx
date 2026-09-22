@@ -2952,7 +2952,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
             cta={t('MATCHES.ADDHOROCTA')}
             ctaBg="#2A4FA5"
             gradientColors={['#F3F7FF', '#FFFFFF']}
-            onPress={() => navigation.navigate('onboarding', { pageNo: '22' })}
+            onPress={() => navigation.navigate('onboarding', { pageNo: '29' })}
           />
         )
       }

@@ -60,6 +60,7 @@ import MenuContactsDesktopLayout from './MenuContactsDesktopLayout'
 import AppFooter, { type FooterTab } from '../../components/app-footer/AppFooter'
 import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 const ICONS = {
   back:      CDN_REACT + '/menu_back_arrow.svg',
@@ -354,7 +355,8 @@ export default function MenuContactsScreen({ navigation, route }: { navigation: 
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       {/* Angular: header.component.html:107-120 (the TYPE 'header2' branch) —
           the back button is hidden (BACK_ICON '0') whenever the page was
           reached from the bottom nav, leaving the title flush at the row's

@@ -30,6 +30,7 @@ import DeleteProfileDesktopLayout from './DeleteProfileDesktopLayout'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { handleBack } from '../../utils/navigationRef'
 import { FontSize } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 const SCREEN_H = Dimensions.get('window').height
 
@@ -328,7 +329,8 @@ export default function DeleteProfileScreen({ navigation }: Props) {
 
   return (
     <KeyboardAvoidingView style={s.flex1} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
 
       {/* Header */}
       <View style={s.header}>

@@ -50,6 +50,7 @@ import { Colors } from '../../constants/colors'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { FontSize } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 const FROM_PAGE = 'viewinglater'
 const LIMIT = 20
@@ -299,7 +300,8 @@ export default function ViewLaterScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       <View style={s.header}>
         <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={CDN_REACT + '/menu_back_arrow.svg'} width={24} height={24} />

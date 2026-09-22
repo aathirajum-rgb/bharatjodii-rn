@@ -7,6 +7,8 @@ import i18n from '../i18n'
 import type { SwiperItem } from '../components/swiper-card/SwiperCard'
 import type { ProfileDeactivateInfo } from '../components/auth/ProfileDeactivatedModal'
 import { pickListingPhoto } from '../adapters/profileListing.adapter'
+import { getIosProductIdsParam } from './iapService'
+import { decodeEntities } from '../utils/htmlEntities'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -95,7 +97,12 @@ export function toProfile(p: Record<string, any>): SwiperItem {
     // Angular's home swiper binds [age]="cardContent.AGE" raw — whatever unit the
     // server sends ("28 years") is what shows. Stripping it and re-appending
     // " Yrs" rendered "28 Yrs" where Angular renders "28 years".
-    age:                 p['AGE'] ? String(p['AGE']) : undefined,
+    // The server sends this pre-formatted with the locale's own unit word for
+    // non-English locales, HTML-entity-encoded like every other vernacular field
+    // (see utils/htmlEntities.ts) — Angular decodes it for free via [innerHtml];
+    // RN's plain <Text> doesn't, so without this the raw "&#xbb5;&#xbaf;..."
+    // codes showed up verbatim instead of "வயது".
+    age:                 p['AGE'] ? decodeEntities(String(p['AGE'])) : undefined,
     // Both are carried, because Angular does NOT bind the same one everywhere:
     //
     //   app-swiper.component.html:80   [height]="cardContent.HEIGHT"          (Home carousels)
@@ -106,14 +113,14 @@ export function toProfile(p: Record<string, any>): SwiperItem {
     //
     // Home's SwiperCard reads `height` (raw HEIGHT) straight off this item;
     // everything that goes through MatchProfileAdapter prefers heightCategory.
-    height:              p['HEIGHT'] ?? p['HEIGHTCATEGORY'],
-    heightCategory:      p['HEIGHTCATEGORY'],
-    education:           p['EDUCATION'],
+    height:              decodeEntities(p['HEIGHT'] ?? p['HEIGHTCATEGORY']),
+    heightCategory:      decodeEntities(p['HEIGHTCATEGORY']),
+    education:           decodeEntities(p['EDUCATION']),
     // Angular: bindBasicView() — NRI profiles show "{NRISTATE}, {NRICOUNTRY}" instead of
     // city/state when both are present; otherwise LOCATION first, then CITY+STATE.
-    location:            (p['NRISTATE'] && p['NRICOUNTRY'])
+    location:            decodeEntities((p['NRISTATE'] && p['NRICOUNTRY'])
                             ? `${p['NRISTATE']}, ${p['NRICOUNTRY']}`
-                            : p['LOCATION'] || [p['CITY'], p['STATE']].filter(Boolean).join(', ') || '',
+                            : p['LOCATION'] || [p['CITY'], p['STATE']].filter(Boolean).join(', ') || ''),
     profileImg:          pickListingPhoto(p),
     // Kept alongside profileImg (which prefers the full-size PHOTO[0].IMAGE) because
     // Angular's "see all" preview circles bind THUMBIMG directly, not the big photo.
@@ -147,13 +154,16 @@ export function toProfile(p: Record<string, any>): SwiperItem {
     dontShowStatus:      p['STATUS'],
     viewLaterStatus:     p['VIEWLATER'],
     isNewLabel:          p['ISNEWLABEL']  === '1',
-    labelContent:        p['LABELCONTENT'],
+    labelContent:        decodeEntities(p['LABELCONTENT']),
     // COMTEXTDATE — Angular's activity.component.html binds this straight to
     // matches-card's LabelText for BOTH liked tabs. Missing from this fallback
     // chain was the actual root cause of the "liked you on DATE" strip never
     // showing for Activity-sourced profiles at all (the other 3 field names
     // are never sent by the likedyou/likedbyme endpoints).
-    likedViewedDateText: p['LIKEDVIEWEDDATETEXT'] ?? p['VIEWEDDATETEXT'] ?? p['LIKEDDATETEXT'] ?? p['COMTEXTDATE'],
+    // Same HTML-entity-encoding as AGE/HEIGHT/EDUCATION above for non-English
+    // locales (this is a server-formatted sentence — "X days ago"'s unit word —
+    // not a raw date), so it needs the same decode or it shows the raw codes.
+    likedViewedDateText: decodeEntities(p['LIKEDVIEWEDDATETEXT'] ?? p['VIEWEDDATETEXT'] ?? p['LIKEDDATETEXT'] ?? p['COMTEXTDATE']),
     // Angular: FUNC.IsPaidMember — paid if ENTRYTYPE not 'B'/'F'. MEMBERSHIPTYPE is a
     // confirmed alternate name for the same value (registrationService.ts:768 maps it
     // to ENTRYTYPE the same way) — some listing shapes send that one instead.
@@ -375,7 +385,9 @@ export async function fetchNotifCount(): Promise<NotifCountResult> {
 export async function fetchMenuPromo(): Promise<any> {
   const id          = await getItem(StorageKeys.Auth.USER_ID)
   const renewalFlag = await getItem('RENEWALENABLEKEY') ?? '0'
-  const params = `ID=${id ?? ''}&RENEWALFLAG=${renewalFlag}&AUTOUPIFLAG=0&PAYAPITYPE=7`
+  // iOS-only — see getIosProductIdsParam() in iapService.ts.
+  const iosProductIds = await getIosProductIdsParam()
+  const params = `ID=${id ?? ''}&RENEWALFLAG=${renewalFlag}&AUTOUPIFLAG=0&PAYAPITYPE=7&IOSPRODUCTIDS=${iosProductIds}`
   try {
     const res = await apiCall(Endpoints.payment.nbMenu, 'POST', params)
     if (String(res['ERRCODE']) === '0' && res['RESPONSE']) {
@@ -956,11 +968,14 @@ async function fetchSuccessStoriesUncached(): Promise<SwiperItem[]> {
       profileId:  p['NBID']     ?? p['ID'],
       name:       (groom || bride) ? `${groom ?? ''} & ${bride ?? ''}` : p['NAME'],
       // Angular: profile-card.component.html type==='4' binds [location]="cardContent.DISTRICT".
-      location:   p['DISTRICT'] ?? p['LOCATION'] ?? p['CITY'],
+      // Same HTML-entity-encoding as AGE/HEIGHT/EDUCATION for non-English locales
+      // (district names come from the same server-side vernacular list).
+      location:   decodeEntities(p['DISTRICT'] ?? p['LOCATION'] ?? p['CITY']),
       profileImg: p['THUMBIMG'],
       // Angular binds [date]="cardContent?.TimePosted" directly — no "Posted
-      // on" prefix added client-side (the server string already includes it).
-      date:       p['TimePosted'] ?? p['POSTEDDATE'] ?? p['DATE'] ?? '',
+      // on" prefix added client-side (the server string already includes it,
+      // month/relative-time words entity-encoded the same way for non-English locales).
+      date:       decodeEntities(p['TimePosted'] ?? p['POSTEDDATE'] ?? p['DATE'] ?? ''),
     }
   })
 }

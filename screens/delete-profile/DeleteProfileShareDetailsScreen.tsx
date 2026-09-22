@@ -28,6 +28,7 @@ import DeleteProfileShareDetailsDesktopLayout from './DeleteProfileShareDetailsD
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { handleBack } from '../../utils/navigationRef'
 import { FontSize } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -320,7 +321,8 @@ export default function DeleteProfileShareDetailsScreen({ navigation, route }: P
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
 
       {/* Header */}
       <View style={s.header}>

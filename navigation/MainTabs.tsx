@@ -7,6 +7,7 @@
 // mounts exactly once, as this navigator's custom tabBar, instead of once per
 // screen.
 import { createBottomTabNavigator, type BottomTabBarProps } from '@react-navigation/bottom-tabs'
+import { Colors } from '../constants/colors'
 import HomeScreen from '../screens/home/HomeScreen'
 import MatchesScreen from '../screens/matches/MatchesScreen'
 import ActivityScreen from '../screens/activity/ActivityScreen'
@@ -82,7 +83,7 @@ export default function MainTabs() {
     <FooterBadgesProvider>
       <Tab.Navigator
         initialRouteName="Matches"
-        screenOptions={{ headerShown: false }}
+        screenOptions={{ headerShown: false, sceneStyle: { backgroundColor: Colors.background } }}
         tabBar={props => <MainTabsBar {...props} />}
       >
         <Tab.Screen name="Home" component={HomeScreen} />

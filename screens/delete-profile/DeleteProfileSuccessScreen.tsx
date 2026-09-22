@@ -9,6 +9,7 @@ import { setItem } from '../../service/storageService'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import DeleteProfileSuccessDesktopLayout from './DeleteProfileSuccessDesktopLayout'
 import { FontSize } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 const SUCCESS_GIF = CDN_REACT + '/delete_success.gif'
 
@@ -65,7 +66,8 @@ export default function DeleteProfileSuccessScreen({ route }: Props) {
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[s.screen, { paddingBottom: insets.bottom }]}>
+      <ScreenTopInset style={s.topInset} />
 
       {/* Success GIF */}
       <Animated.View style={[s.iconWrap, { transform: [{ scale: scaleAnim }] }]}>
@@ -94,6 +96,9 @@ const s = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
   },
+  // Absolute so the strip doesn't add to the flex layout and shift the
+  // centered content — screen's justifyContent:'center' must be preserved.
+  topInset: { position: 'absolute', top: 0, left: 0, right: 0 },
   iconWrap: {
     width:          120,
     height:         120,

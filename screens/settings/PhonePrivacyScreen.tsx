@@ -32,6 +32,7 @@ import { handleBack } from '../../utils/navigationRef'
 import { ICON } from '../menu/MenuScreen'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 type Props = { navigation: any }
 
@@ -204,7 +205,8 @@ export default function PhonePrivacyScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+    <View style={[s.screen, { paddingBottom: insets.bottom }]}>
+      <ScreenTopInset />
       <View style={s.header}>
         <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON.back} width={24} height={24} />

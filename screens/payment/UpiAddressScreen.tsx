@@ -19,6 +19,7 @@ import { Fonts, SemanticFontsEnglish, FontSize, remPx } from '../../src/theme/fo
 import { CDN, CDN_REACT } from '../../constants/cdn'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import FloatingLabelInput from '../../components/input/FloatingLabelInput'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
@@ -262,7 +263,8 @@ export default function UpiAddressScreen({ navigation, route }: Props) {
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       {/* Angular: upi-payment.page.html:1-36 — the header is a THREE-ROW
           stack inside ion-toolbar: the back arrow alone on row 1, then the
           title on its own row as .heading1-semibold-20 (20px, not 16), then

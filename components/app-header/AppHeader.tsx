@@ -212,7 +212,8 @@ export default function AppHeader({
       // scrolls back up past a hero banner, or on init when a hero banner is
       // active — for the common case (no hero banner, no scroll yet) the
       // header renders plain white, confirmed against a live screenshot.
-      <SafeAreaView edges={['top']} style={[styles.h1Bg, hasPaidBatch ? styles.h1BgPaid : null, style]}>
+      <SafeAreaView edges={['top']} style={styles.h1SafeArea}>
+      <View style={[styles.h1Bg, hasPaidBatch ? styles.h1BgPaid : null, style]}>
 
         {/* ── Row 1: App bar ── */}
         <View style={styles.h1AppBar}>
@@ -320,6 +321,7 @@ export default function AppHeader({
           </Pressable>
         </View>
 
+      </View>
       </SafeAreaView>
     )
   }
@@ -327,7 +329,8 @@ export default function AppHeader({
   // ── header2: title bar ────────────────────────────────────────────────────
   if (type === 'header2') {
     return (
-      <SafeAreaView edges={['top']} style={[styles.wrapper2, shadowHeader && styles.wrapper2Shadow, style]}>
+      <SafeAreaView edges={['top']} style={[styles.h1SafeArea, shadowHeader && styles.wrapper2Shadow]}>
+      <View style={[styles.wrapper2, shadowHeader && styles.wrapper2ShadowBorder, style]}>
         <View style={[styles.titleRow, titleRowStyle]}>
           {showBackIcon && (
             <Pressable style={[styles.backBtn, { width: HEADER2_GRID_UNIT * backColSize }]} onPress={onBackPress}>
@@ -336,13 +339,15 @@ export default function AppHeader({
           )}
           <Text style={[styles.titleText, titleStyle]} numberOfLines={1}>{title ?? ''}</Text>
         </View>
+      </View>
       </SafeAreaView>
     )
   }
 
   // ── registration / signIn ──────────────────────────────────────────────────
   return (
-    <SafeAreaView edges={['top']} style={[styles.wrapperAuth, style]}>
+    <SafeAreaView edges={['top']} style={styles.h1SafeArea}>
+    <View style={[styles.wrapperAuth, style]}>
       <View style={styles.authRow}>
         {showBackBtn && (
           <Pressable style={styles.backBtn} onPress={onBackPress}>
@@ -364,6 +369,7 @@ export default function AppHeader({
           </Pressable>
         )}
       </View>
+    </View>
     </SafeAreaView>
   )
 }
@@ -371,6 +377,16 @@ export default function AppHeader({
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+
+  // The notch/status-bar inset strip above every header variant — matches
+  // ActivityScreen.tsx's own top SafeAreaView (styles.screen), which is the
+  // only screen with its own top-level SafeAreaView instead of going through
+  // this component. Kept separate from each variant's own background below
+  // (h1Bg/wrapper2/wrapperAuth) so only the inset strip is gray, not the
+  // header bar's real content underneath.
+  h1SafeArea: {
+    backgroundColor: Colors.background,
+  },
 
   // ── header1 — Figma light-blue header ──────────────────────────────────────
   // Measured off the live Angular app (#headerIonGrid computed padding):
@@ -526,13 +542,19 @@ const styles = StyleSheet.create({
   // Angular: video-faq.page.scss's `.header-box-shadow { background:#FFF;
   // box-shadow:0 8px 16px 0 rgba(0,0,0,.08) }` — a page-specific alternative
   // to the generic `.border-bottom-search` hairline, opted into via `shadowHeader`.
+  // Applied to the outer h1SafeArea (not wrapper2 below) — see h1SafeArea's
+  // header comment for why the shadow has to live on the outer container.
   wrapper2Shadow: {
-    borderBottomWidth: 0,
     shadowColor:   '#000000',
     shadowOffset:  { width: 0, height: 8 },
     shadowOpacity: 0.08,
     shadowRadius:  16,
     elevation:     4,
+  },
+  // wrapper2's own bottom border, zeroed out on wrapper2 itself (not the
+  // outer h1SafeArea) when the shadow variant above is active.
+  wrapper2ShadowBorder: {
+    borderBottomWidth: 0,
   },
   titleRow: {
     flexDirection:     'row',

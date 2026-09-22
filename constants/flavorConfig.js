@@ -3,6 +3,16 @@ const FLAVORS = {
     appType: 115,
     appName: 'BharatJodii',
     applicationId: 'jodii.app',
+    // iOS-only override. The real App Store Connect bundle id (confirmed
+    // directly against the account) is com.matrimony.bharatjodii — not the
+    // `applicationId` value above, which iOS was incorrectly sharing with
+    // Android. NOT changing `applicationId` itself: Android package names
+    // are effectively permanent once published, and only the iOS side of
+    // this mismatch has been confirmed/fixed here. Without this override,
+    // iOS built with a bundle id that doesn't match the BUNDLE_ID inside
+    // firebase/GoogleService-Info.jodii.plist, so Firebase refused to treat
+    // that plist as valid and FirebaseApp.configure() crashed on launch.
+    iosBundleId: 'com.matrimony.bharatjodii',
     scheme: 'jodii',
     domain: 'jodii.app',
     // BharatJodii rebrand: old SMS links / OneLink shares already in

@@ -29,6 +29,7 @@ import {
 } from '../../service/biodataService'
 import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 
 const ICON_BACK        = CDN_REACT + '/menu_back_arrow.svg'
@@ -236,7 +237,8 @@ export default function BiodataScreen({ navigation }: Props) {
 
   if (loading) {
     return (
-      <View style={[s.screen, s.centered, { paddingTop: insets.top }]}>
+      <View style={[s.screen, s.centered]}>
+        <ScreenTopInset style={s.topInsetAbsolute} />
         <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} />
       </View>
     )
@@ -244,7 +246,8 @@ export default function BiodataScreen({ navigation }: Props) {
 
   if (!profile) {
     return (
-      <View style={[s.screen, s.centered, { paddingTop: insets.top }]}>
+      <View style={[s.screen, s.centered]}>
+        <ScreenTopInset style={s.topInsetAbsolute} />
         <Text style={s.errorText}>Could not load your biodata.</Text>
         <ButtonRevamp label="Go back" variant="primary" onPress={handleBack} />
       </View>
@@ -280,7 +283,8 @@ export default function BiodataScreen({ navigation }: Props) {
   const photoUrl = approvedPhoto ?? (cachedPhotoUrl || genderAvatarUrl || undefined)
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       <View style={s.header}>
         <Pressable onPress={handleBack} hitSlop={8} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
@@ -656,6 +660,10 @@ function FieldRow({
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.white },
   centered: { alignItems: 'center', justifyContent: 'center', gap: 16, padding: 24 },
+  // `centered` is both justifyContent:'center' and padded — absolute + left/
+  // right:0 keeps the strip full-bleed and out of the flex layout so it
+  // doesn't shift the centered content or get inset by the padding.
+  topInsetAbsolute: { position: 'absolute', top: 0, left: 0, right: 0 },
   // FLAGGED: no fontFamily — falls back to the OS system font (this app
   // registers Poppins as four separate named families, so a missing family is
   // never Poppins). No Angular counterpart either: download-biodata has no

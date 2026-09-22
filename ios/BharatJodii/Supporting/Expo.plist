@@ -20,6 +20,6 @@
     <key>EXUpdatesRuntimeVersion</key>
     <string>1.0.0</string>
     <key>EXUpdatesURL</key>
-    <string>https://stgimg.jodii.app/jodii-ota-server/jodii-ota-server/manifest.php</string>
+    <string>https://stgimg.bharatjodii.com/jodii-ota-server/jodii-ota-server/manifest.php</string>
   </dict>
 </plist>

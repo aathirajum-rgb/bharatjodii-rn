@@ -18,6 +18,12 @@ allprojects {
     google()
     mavenCentral()
     maven { url 'https://www.jitpack.io' }
+    // notifee's own build.gradle adds this via a subproject-triggered
+    // `rootProject.allprojects {}` call, which --configure-on-demand
+    // (always passed by `expo run:android`) can skip for :app, causing
+    // "Could not find app.notifee:core:+". Declare it here at the root
+    // so it's registered regardless of configure-on-demand ordering.
+    maven { url "$rootDir/../node_modules/@notifee/react-native/android/libs" }
   }
 }
 

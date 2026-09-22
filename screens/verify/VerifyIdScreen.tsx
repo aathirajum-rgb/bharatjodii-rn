@@ -40,6 +40,7 @@ import { Endpoints } from '../../service/api.endpoints'
 import { fetchCustomerCare } from '../../service/homeService'
 import { getRegistrationArrays, getRegValue } from '../../service/registrationService'
 import { requestCameraPermission, requestStoragePermission } from '../../service/permissionService'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 // ─── Icons ──────────────────────────────────────────────────────────────────────
 
@@ -392,7 +393,8 @@ export default function VerifyIdScreen({ navigation }: { navigation: any }) {
   const radioOptions: RadioOption[] = idTypes.map(item => ({ key: item.type, value: item.name }))
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       <View style={s.header}>
         <Pressable style={s.backBtn} onPress={handleBack} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICONS.back} width={24} height={24} />

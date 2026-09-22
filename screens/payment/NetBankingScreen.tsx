@@ -22,6 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN, CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
 import { handleBack as handleRootBack } from '../../utils/navigationRef'
@@ -131,7 +132,8 @@ export default function NetBankingScreen({ navigation, route }: Props) {
   const payLabel = t('RECHARGE.PAY').replace('₹#price', amountLabel ?? '')
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       {/* Angular: the back button sits alone in the toolbar row; the page
           heading is a separate row below it, not the header bar's title. */}
       <View style={s.header}>

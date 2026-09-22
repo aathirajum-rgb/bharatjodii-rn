@@ -24,6 +24,7 @@ import { handleBack } from '../../utils/navigationRef'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import SuccessStoriesDesktopScreen from './SuccessStoriesDesktopScreen'
 import { FontSize } from '../../src/theme/fonts'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -285,7 +286,8 @@ export default function SuccessStoriesScreen({ navigation }: Props) {
   }
 
   return (
-    <View style={[c.screen, { paddingTop: insets.top }]}>
+    <View style={c.screen}>
+      <ScreenTopInset />
 
       {/* Header */}
       <View style={c.header}>

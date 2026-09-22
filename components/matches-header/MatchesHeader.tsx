@@ -92,15 +92,24 @@ export default function MatchesHeader({
   const hasMoreFacets   = allFacets.length > 3
 
   return (
-    <Animated.View
-      style={[s.header, s.headerAbsolute, { transform: [{ translateY: headerAnim }] }]}
+    // SafeAreaView (and its top-inset padding + the header's opaque white
+    // background/shadow) stay OUTSIDE the translating Animated.View — this
+    // inset region covers the physical status bar and must stay pinned at
+    // translateY=0 at all times. Previously it was the Animated.View's own
+    // child, so the hide-on-scroll transform carried the inset padding (and
+    // the opaque background covering it) up with the title row, briefly
+    // exposing the pref/chips row underneath the status bar mid-animation —
+    // the header and the device notification bar visually "merging".
+    <SafeAreaView
+      edges={['top']}
+      style={[s.headerSafeArea, s.headerAbsolute]}
       onLayout={e => {
         const h = e.nativeEvent.layout.height
         if (h > 0) onHeaderLayout(h)
       }}
     >
-      {/* SafeAreaView pushes content below status bar — same pattern as Love project */}
-      <SafeAreaView edges={['top']} style={s.safeTop}>
+      <View style={s.header}>
+      <Animated.View style={{ transform: [{ translateY: headerAnim }] }}>
 
         {/* Title row — Figma: top 12, height 24, "Matches (49)" left, icons right */}
         <View
@@ -178,7 +187,7 @@ export default function MatchesHeader({
           </ScrollView>
         )}
 
-      </SafeAreaView>
+      </Animated.View>
 
       <FacetFilterModal
         visible={showFacetModal}
@@ -189,21 +198,36 @@ export default function MatchesHeader({
           onFacetsApply?.(checkedKeys)
         }}
       />
-    </Animated.View>
+      </View>
+    </SafeAreaView>
   )
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
-  // Figma: drop-shadow 0px 8px 8px rgba(0,0,0,0.08)
-  header: {
-    backgroundColor: Colors.white,
+  // The notch/status-bar inset strip — same gray as ActivityScreen.tsx's own
+  // top SafeAreaView / AppHeader.tsx's h1SafeArea. Kept separate from the
+  // opaque white header box below (s.header) so only the inset strip is gray.
+  // The drop-shadow lives here, not on s.header below — Android's `elevation`
+  // draws a shadow around every edge of the shadowed view, not just the
+  // bottom; on s.header (which now sits below the inset padding rather than
+  // flush with the real screen top) that top-edge shadow would bleed visibly
+  // into the gray strip above it. Up here, this view's own top edge is still
+  // flush with the actual screen top (off-screen), so only the bottom shadow
+  // — the intended drop-shadow below the header — ever shows, same as before
+  // this strip was split out.
+  headerSafeArea: {
+    backgroundColor: Colors.background,
     shadowColor:     '#000000',
     shadowOffset:    { width: 0, height: 8 },
     shadowOpacity:   0.08,
     shadowRadius:    8,
     elevation:       4,
+  },
+  // Figma: drop-shadow 0px 8px 8px rgba(0,0,0,0.08)
+  header: {
+    backgroundColor: Colors.white,
   },
   headerAbsolute: {
     position: 'absolute',
@@ -211,9 +235,6 @@ const s = StyleSheet.create({
     left:     0,
     right:    0,
     zIndex:   10,
-  },
-  safeTop: {
-    backgroundColor: 'transparent',
   },
   // Figma: title at top 12, gap below title = 20 before chips (total 56 from content start)
   // paddingTop/paddingBottom (not margin) so onTitleLayout's measured height

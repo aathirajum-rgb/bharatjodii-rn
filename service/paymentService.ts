@@ -15,6 +15,7 @@ import { ENavigation } from '../types/enums/navigation.enum'
 import { decrypt } from './encryptionService'
 import { logAppsFlyer } from './analyticsService'
 import { mapRenewalBenefits, mapMembershipPlan } from '../adapters/payment.adapter'
+import { getIosProductIdsParam } from './iapService'
 
 // ─── Native Razorpay bridge (Android only) ─────────────────────────────────────
 // See android/app/src/main/java/jodii/app/RazorpayBridgeModule.kt +
@@ -622,7 +623,12 @@ export async function getHeroBannerDetails(force = false, bannerType?: number): 
   }
   const userId    = (await getItem(SK.Auth.USER_ID)) ?? ''
   const bannerQs  = bannerType != null ? `&BANNERTYPE=${bannerType}` : ''
-  const result = await apiCall(Endpoints.payment.payBanner, 'POST', `ID=${userId}&TYPE=MYHOME${bannerQs}`)
+  // iOS-only — see getIosProductIdsParam() in iapService.ts.
+  const iosProductIds = await getIosProductIdsParam()
+  const result = await apiCall(
+    Endpoints.payment.payBanner, 'POST',
+    `ID=${userId}&TYPE=MYHOME${bannerQs}&IOSPRODUCTIDS=${iosProductIds}`,
+  )
   if (result?.RESPONSECODE === '1') {
     await setJson(PAYMENT_CACHE_KEYS.HERO_BANNER, result.RESPONSE)
     return result.RESPONSE
@@ -662,14 +668,16 @@ export async function getMenuPromo(forceRefresh = false): Promise<any> {
   // Angular is a local force-refresh flag, never a request field — so the
   // response came back without MENUDISCOUNT and the "₹1200 OFF" chip over the
   // Membership tab never rendered.
-  const [userId, renewalKey, renewalPromo, autoUpiFlag] = await Promise.all([
+  const [userId, renewalKey, renewalPromo, autoUpiFlag, iosProductIds] = await Promise.all([
     getItem(SK.Auth.USER_ID),
     getSessionValue('RENEWALENABLEKEY'),
     getSessionValue('RENEWALPROMOKEY'),
     getAutoUpiFlag(),
+    getIosProductIdsParam(),
   ])
   let params =
-    `ID=${userId ?? ''}&RENEWALFLAG=${renewalKey ?? '0'}&AUTOUPIFLAG=${autoUpiFlag}&PAYAPITYPE=2`
+    `ID=${userId ?? ''}&RENEWALFLAG=${renewalKey ?? '0'}&AUTOUPIFLAG=${autoUpiFlag}&PAYAPITYPE=2` +
+    `&IOSPRODUCTIDS=${iosProductIds}`
   if (['1', '2'].includes(String(renewalPromo ?? ''))) params += `&COMMONKEY=${renewalPromo}`
 
   const result = await apiCall(Endpoints.payment.nbMenu, 'POST', params)
@@ -713,12 +721,13 @@ export interface UpgradePaymentPromo {
 }
 
 export async function fetchUpgradePaymentPromo(profileName = ''): Promise<UpgradePaymentPromo | null> {
-  const [userId, renewalKey, renewalPromo, entryType, autoUpiFlag] = await Promise.all([
+  const [userId, renewalKey, renewalPromo, entryType, autoUpiFlag, iosProductIds] = await Promise.all([
     getItem(SK.Auth.USER_ID),
     getSessionValue('RENEWALENABLEKEY'),
     getSessionValue('RENEWALPROMOKEY'),
     getSessionValue('ENTRYTYPE'),
     getAutoUpiFlag(),
+    getIosProductIdsParam(),
   ])
 
   // PAGETYPE=NEW selects the new bottom-sheet content shape — TITLE +
@@ -729,7 +738,7 @@ export async function fetchUpgradePaymentPromo(profileName = ''): Promise<Upgrad
   // rows with no icons), which is what this screen was rendering.
   let params =
     `ID=${userId ?? ''}&RENEWALFLAG=${renewalKey ?? '0'}&AUTOUPIFLAG=${autoUpiFlag}` +
-    `&name=${encodeURIComponent(profileName)}&PAGETYPE=NEW`
+    `&name=${encodeURIComponent(profileName)}&PAGETYPE=NEW&IOSPRODUCTIDS=${iosProductIds}`
   if (String(entryType ?? '') === 'P') params += '&profileCount=0'
   if (['1', '2'].includes(String(renewalPromo ?? ''))) params += `&COMMONKEY=${renewalPromo}`
 
@@ -761,21 +770,23 @@ export async function fetchUpgradePaymentPromo(profileName = ''): Promise<Upgrad
 // ─── Promotion details ────────────────────────────────────────────────────────
 
 export async function getPromotionDetails(promotionId: string): Promise<any> {
-  const [userId, appVersion, renewalFlag, autoUpiFlag] = await Promise.all([
+  const [userId, appVersion, renewalFlag, autoUpiFlag, iosProductIds] = await Promise.all([
     getItem(SK.Auth.USER_ID),
     getItem('APPVERSION'),
     getSessionValue('RENEWALENABLEKEY'),
     getAutoUpiFlag(),
+    getIosProductIdsParam(),
   ])
   const ipCountryCode = (await getSessionValue('IPCOUNTRYCODE')) ?? 'IN'
   // Angular: payment.service.ts getPromotionDetails() — param is TYPE, not
   // PROMOTIONID (fixed here; the previous name would never have matched the
   // real nbpromotion contract). Defaults confirmed against Angular source:
   // IPCOUNTRYCODE→'IN', PAYAPITYPE→'2', RENEWALFLAG→'0'.
+  // IOSPRODUCTIDS is iOS-only — see getIosProductIdsParam() in iapService.ts.
   const params =
     `ID=${userId ?? ''}&TYPE=${promotionId}&APPVERSION=${appVersion ?? ''}` +
     `&IPCOUNTRYCODE=${ipCountryCode}&AUTOUPIFLAG=${autoUpiFlag}&PAYAPITYPE=2` +
-    `&RENEWALFLAG=${renewalFlag ?? '0'}`
+    `&RENEWALFLAG=${renewalFlag ?? '0'}&IOSPRODUCTIDS=${iosProductIds}`
   const result = await apiCall(Endpoints.payment.nbPromotion, 'POST', params)
   if (result?.RESPONSECODE !== '1') return null
   // Angular: recharge.page.ts:379-383 reads resultData['NUMBER'] and
@@ -983,10 +994,21 @@ export async function invalidateMenuPromoCache(): Promise<void> {
 // flow) via a live device trace. Netbanking, card, and manually-typed UPI
 // VPA are NOT valid here — see getHostedCheckoutRequest() below, which
 // those three route through instead.
+// iOS-only extra fields for nbpaymentcheckout — confirmed via a live capture:
+// IOSPRODUCTID (the Apple SKU), PAYMENTGATEWAY=APPLESTORE, IPADDRESS, CN
+// (country code) and ONLINECHARGE (the raw decimal charge amount, e.g.
+// "3599.00" — no currency symbol) are all present alongside the usual
+// ID/productId/APPTYPE fields that apiCall()/buildCommonParams() already add.
+export interface IosCheckoutDetails {
+  iosProductId: string
+  onlineCharge: string
+}
+
 export async function getCheckoutDetails(
   packageId: string,
   method: string,
   renewOnExpiry = false,
+  iosDetails?: IosCheckoutDetails,
 ): Promise<any> {
   const [userId, userName, appVersion] = await Promise.all([
     getItem(SK.Auth.USER_ID),
@@ -999,6 +1021,15 @@ export async function getCheckoutDetails(
   // Angular: RENEWALFLAG is only ever appended (=1) when the "Renew my
   // membership on expiry" checkbox is checked; never sent as =0.
   if (renewOnExpiry) params += '&RENEWALFLAG=1'
+  if (iosDetails) {
+    const [userIp, ipCountryCode] = await Promise.all([
+      getItem('USERIP'),
+      getSessionValue('IPCOUNTRYCODE'),
+    ])
+    params +=
+      `&IOSPRODUCTID=${iosDetails.iosProductId}&PAYMENTGATEWAY=APPLESTORE` +
+      `&IPADDRESS=${userIp ?? ''}&CN=${ipCountryCode ?? 'IN'}&ONLINECHARGE=${iosDetails.onlineCharge}`
+  }
   const result = await apiCall(Endpoints.payment.checkout, 'POST', params)
   // Confirmed via a real captured response — this endpoint is FLAT, unlike
   // most others: orderId/amount/customerId/MOBILENO/recurring sit as
@@ -1008,7 +1039,15 @@ export async function getCheckoutDetails(
   // the actual root cause of the Razorpay-side payment failures — every
   // field read off "checkout" downstream (orderId, amount, MOBILENO) was
   // silently undefined.
-  if (result?.RESPONSECODE === '1') return result
+  if (result?.RESPONSECODE === '1' || result?.RESPONSECODE === 1) {
+    // The APPTYPE==701 (iOS) branch of nbPaymentCheckout — confirmed against
+    // backend source (nbvpnode's nbPaymentCheckout) — returns the order id
+    // nested/uppercase (RESPONSE.ORDERID) instead of this endpoint's usual
+    // flat/lowercase orderId. Normalize it here so callers (iapService.ts's
+    // useHandlePurchase) don't need to know which shape they got.
+    if (!result.orderId && result.RESPONSE?.ORDERID) result.orderId = result.RESPONSE.ORDERID
+    return result
+  }
   const reason = typeof result?.RESPONSE === 'string'
     ? result.RESPONSE
     : (result?.RESPONSE?.MSG ?? result?.RESPONSE?.ERRMESSAGE ?? result?.RESULT?.ERRMESSAGE)

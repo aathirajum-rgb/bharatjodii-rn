@@ -14,6 +14,7 @@ import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { CDN_REACT } from '../../constants/cdn'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import PaymentRestrictedSheet from '../../components/payment/PaymentRestrictedSheet'
 import { useNetwork } from '../../contexts/NetworkContext'
@@ -88,14 +89,16 @@ export default function RenewalScreen({ navigation, route }: Props) {
 
   if (loading || !banner) {
     return (
-      <View style={[s.screen, s.centered, { paddingTop: insets.top }]}>
+      <View style={[s.screen, s.centered]}>
+        <ScreenTopInset style={s.topInset} />
         <ActivityIndicator color={Colors.primaryDark} size="large" />
       </View>
     )
   }
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
+    <View style={s.screen}>
+      <ScreenTopInset />
       <ScrollView contentContainerStyle={s.content}>
         <Text style={s.title}>{banner.title}</Text>
 
@@ -162,6 +165,10 @@ function Row({ label, value }: { label: string; value: string }) {
 const s = StyleSheet.create({
   screen:   { flex: 1, backgroundColor: Colors.white },
   centered: { alignItems: 'center', justifyContent: 'center' },
+  // Absolute so the strip doesn't add to the flex layout and shift the
+  // spinner off dead-center — `centered`'s own justifyContent:'center' must
+  // keep centering exactly as before.
+  topInset: { position: 'absolute', top: 0, left: 0, right: 0 },
 
   content: { padding: 16 },
   title:   { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font20, color: Colors.black, marginBottom: 16 },

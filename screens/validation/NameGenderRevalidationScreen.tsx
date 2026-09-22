@@ -41,6 +41,7 @@ import { resetTo } from '../../utils/navigationRef'
 import { ENavigation } from '../../types/enums/navigation.enum'
 import ConfirmNameGenderSheet from '../../components/bottom-sheet/ConfirmNameGenderSheet'
 import RegistrationSuccessSheet from '../../components/registration-success-sheet/RegistrationSuccessSheet'
+import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 type Phase = 'loading' | 'edit' | 'success'
 
@@ -156,6 +157,7 @@ export default function NameGenderRevalidationScreen() {
   if (phase === 'loading') {
     return (
       <View style={styles.loading}>
+        <ScreenTopInset style={styles.topInset} />
         <ActivityIndicator size="large" color={Colors.primary} />
       </View>
     )
@@ -171,6 +173,7 @@ export default function NameGenderRevalidationScreen() {
 
   return (
     <View style={styles.screen}>
+      <ScreenTopInset style={styles.topInset} />
       <ConfirmNameGenderSheet
         visible={phase === 'edit'}
         title={fillProfileType('REGISTRATION.CONFIRM_SHEET', 'Please confirm your #PROFILETYPE# details below')}
@@ -191,4 +194,8 @@ export default function NameGenderRevalidationScreen() {
 const styles = StyleSheet.create({
   screen:  { flex: 1, backgroundColor: Colors.white },
   loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.white },
+  // Absolute so the strip doesn't add to the flex layout above and shift the
+  // spinner off dead-center — `loading`'s own justifyContent:'center' must
+  // keep centering exactly as before.
+  topInset: { position: 'absolute', top: 0, left: 0, right: 0 },
 })
