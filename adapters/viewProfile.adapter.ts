@@ -13,10 +13,16 @@ function toLikedStatus(raw: unknown): '0' | '1' | '2' | '3' {
   return (['0', '1', '2', '3'] as const).includes(s as any) ? (s as '0' | '1' | '2' | '3') : '0'
 }
 
-function toPropertyList(raw: unknown): PropertyItem[] {
+// Angular viewprofile.page.html:1194/1209 — the label on each row comes off a
+// DIFFERENT field per list: NPROPERTY items carry LANDVALUE, NVECHILE items carry
+// VEHICLEVALUE. This port read `NAME`/`PROPERTYNAME`, neither of which exists on
+// either payload, so every item mapped to '', got dropped by .filter(Boolean), and
+// both lists came back empty — which hid the whole Property details section and
+// read to testers as "property details are not available for this user".
+function toPropertyList(raw: unknown, valueKey: 'LANDVALUE' | 'VEHICLEVALUE'): PropertyItem[] {
   if (!Array.isArray(raw)) return []
   return raw
-    .map(item => (typeof item === 'string' ? item : item?.NAME ?? item?.PROPERTYNAME ?? ''))
+    .map(item => (typeof item === 'string' ? item : item?.[valueKey] ?? ''))
     .filter(Boolean)
     .map(label => ({ label: String(label) }))
 }
@@ -135,8 +141,8 @@ export class ViewProfileAdapter implements Adapter<ViewProfileModel> {
       // null/undefined) means "no data", so `??` alone let it through as "defined".
       brothers: family['BROTHERS'] || undefined,
       sisters:  family['SISTERS'] || undefined,
-      property: toPropertyList(family['NPROPERTY']),
-      vehicle:  toPropertyList(family['NVECHILE']),
+      property: toPropertyList(family['NPROPERTY'], 'LANDVALUE'),
+      vehicle:  toPropertyList(family['NVECHILE'], 'VEHICLEVALUE'),
 
       showHoroSection:    horo['SHOWHORO'] === '1',
       // Angular: viewprofile.page.html:821 checks `HOROSCOPEAVAILABLE == 'Y'`
