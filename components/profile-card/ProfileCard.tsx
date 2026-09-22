@@ -7,6 +7,7 @@ import {
   View,
 } from 'react-native'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { LinearGradient } from 'expo-linear-gradient'
 import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
@@ -236,6 +237,7 @@ export default function ProfileCard({
   onViewMorePress,
   onWhatsApp,
 }: ProfileCardProps) {
+  const { t } = useTranslation()
 
   const photoH     = PHOTO_HEIGHT[section] ?? SCREEN_W * 0.7
   const photoVar   = SECTION_VARIANT[section] ?? 'default'
@@ -321,8 +323,10 @@ export default function ProfileCard({
             <View style={styles.cardBottomDR}>
               <Pressable style={styles.primaryBtn} onPress={onPress}>
                 {/* Angular: CTATXT.VIEWDETAILS translation key actually reads
-                    "View profile" in English, not "View Details". */}
-                <Text style={styles.primaryBtnText}>View profile</Text>
+                    "View profile" in English, not "View Details". Was a
+                    hardcoded literal here, so it never picked up a language
+                    switch — every other section's CTA text goes through t(). */}
+                <Text style={styles.primaryBtnText}>{t('CTATXT.VIEWDETAILS')}</Text>
               </Pressable>
             </View>
           )}
@@ -441,7 +445,9 @@ export default function ProfileCard({
                 is `mt-6` (6px), see that call site below. Different from
                 the shared linkBtn.marginTop guess, so overridden per case. */}
             <Pressable onPress={onPress} style={[styles.linkBtn, styles.linkBtnMt4, styles.linkBtnRow]}>
-              <Text style={styles.linkBtnText}>View full profile</Text>
+              {/* Angular: ENUMS.EButtonText.viewProfiles → MATCHES.VIEW_PROFILE.
+                  Was a hardcoded literal here, so it never picked up a language switch. */}
+              <Text style={styles.linkBtnText}>{t('MATCHES.VIEW_PROFILE')}</Text>
               {/* Angular's plain <img> has no object-fit (browser default
                   fill/stretch); the GIF's real native frame is a 1200x1200
                   SQUARE, and RN Image's own default (resizeMode:'cover')

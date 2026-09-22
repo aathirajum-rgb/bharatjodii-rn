@@ -160,8 +160,10 @@ const PAYMENT_CACHE_KEYS = {
   // never expire, so any device that cached one would keep the "₹1200 OFF"
   // chip hidden forever — the renamed key retires them.
   MENU_PROMO:              'MENU_PROMO_V2',
+  MENU_PROMO_LANG:         'MENU_PROMO_V2_LANG',
   PAYCONFIG:               'PAYCONFIG',
   HERO_BANNER:             'HERO_BANNER',
+  HERO_BANNER_LANG:        'HERO_BANNER_LANG',
   PAYMENT_FAILED:          'PAYMENT_FAILED',
   PAYMENT_FAILED_EXPIRED:  'PAYMENT_FAILED_EXPIRED',
   PAYMENTFAILTYPE:         'PAYMENTFAILTYPE',
@@ -616,9 +618,17 @@ export async function generatePaymentLink(packageId: string, amount: string | nu
 
 // ─── Hero banner ──────────────────────────────────────────────────────────────
 
+// Cache is scoped to the language it was fetched with (HERO_BANNER_LANG), same
+// as getRegistrationArrays()'s REGISTRATIONARRAYS_LANG — this cache has no TTL
+// (unlike homeService.ts's 45s per-section cache), so without the language
+// check a banner fetched once would keep showing that language's TITLE/BODY/CTA
+// text forever, through every later language switch, until something else
+// happened to pass force=true.
 export async function getHeroBannerDetails(force = false, bannerType?: number): Promise<any> {
+  const lang = (await getItem(SK.Auth.LANG)) ?? 'en'
   if (!force) {
-    const cached = await getJson(PAYMENT_CACHE_KEYS.HERO_BANNER)
+    const cachedLang = await getItem(PAYMENT_CACHE_KEYS.HERO_BANNER_LANG)
+    const cached = cachedLang === lang ? await getJson(PAYMENT_CACHE_KEYS.HERO_BANNER) : null
     if (cached) return cached
   }
   const userId    = (await getItem(SK.Auth.USER_ID)) ?? ''
@@ -631,6 +641,7 @@ export async function getHeroBannerDetails(force = false, bannerType?: number): 
   )
   if (result?.RESPONSECODE === '1') {
     await setJson(PAYMENT_CACHE_KEYS.HERO_BANNER, result.RESPONSE)
+    await setItem(PAYMENT_CACHE_KEYS.HERO_BANNER_LANG, lang)
     return result.RESPONSE
   }
   return null
@@ -656,9 +667,14 @@ async function getAutoUpiFlag(): Promise<string> {
 
 // ─── Menu promo ───────────────────────────────────────────────────────────────
 
+// Same language-scoping as getHeroBannerDetails above — this cache has no TTL,
+// so a stale-language MENUDISCOUNT/badge text would otherwise persist across
+// every later language switch.
 export async function getMenuPromo(forceRefresh = false): Promise<any> {
+  const lang = (await getItem(SK.Auth.LANG)) ?? 'en'
   if (!forceRefresh) {
-    const cached = await getJson(PAYMENT_CACHE_KEYS.MENU_PROMO)
+    const cachedLang = await getItem(PAYMENT_CACHE_KEYS.MENU_PROMO_LANG)
+    const cached = cachedLang === lang ? await getJson(PAYMENT_CACHE_KEYS.MENU_PROMO) : null
     if (cached) return cached
   }
   // Angular: payment.service.ts:631-648 getMenuPromo() — the real nbmenu
@@ -689,6 +705,7 @@ export async function getMenuPromo(forceRefresh = false): Promise<any> {
     // filename and is prefixed to a full CDN URL before being cached.
     if (content.IMAGEPATH) content.IMAGEPATH = CDN_SVG + content.IMAGEPATH
     await setJson(PAYMENT_CACHE_KEYS.MENU_PROMO, content)
+    await setItem(PAYMENT_CACHE_KEYS.MENU_PROMO_LANG, lang)
     return content
   }
   return null

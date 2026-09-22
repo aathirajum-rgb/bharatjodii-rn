@@ -70,12 +70,23 @@ export const EMPTY_LISTING: ListingResult = { items: [], bannerSlots: [], totalC
 // anything longer. Keyed by user id (not cleared on logout) so a cache entry
 // can never resolve for a different account that logs in later in the same
 // app session — a miss just means one extra network round trip, not a leak.
+//
+// Also keyed by the current i18n language: several of these responses (PCS
+// "complete your profile" cards' CONTENT, in particular) carry server-rendered
+// vernacular text, not just IDs the client re-translates locally. HomeScreen's
+// own language-change effect calls loadHome() again right after switching, but
+// without the language in the key that refetch still landed on the SAME cache
+// entry (same name+userId, well under the 45s TTL) and got back the response
+// fetched in the PREVIOUS language — the "complete your profile" prompts stayed
+// in the old language while every client-i18n string on the same screen updated
+// instantly. A miss on language change is one extra request, same as the
+// existing per-focus miss.
 const HOME_CACHE_TTL_MS = 45_000
 const homeCache = new Map<string, { data: unknown; expiresAt: number }>()
 
 async function withTtlCache<T>(name: string, fetcher: () => Promise<T>): Promise<T> {
   const userId = (await getItem(StorageKeys.Auth.USER_ID)) ?? ''
-  const key = `${name}:${userId}`
+  const key = `${name}:${userId}:${i18n.language}`
   const hit = homeCache.get(key)
   if (hit && hit.expiresAt > Date.now()) return hit.data as T
 
