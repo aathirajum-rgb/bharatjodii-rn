@@ -38,7 +38,7 @@ const BHARATJODII_LOGO = require('../../assets/icons/bharatjodii-logo.png')
 export type BottomSheetType =
   | 'payment'
   | 'whatsAppPhotoRequest'
-   'editPack'
+  | 'editPack'
   | 'profileValidation'
   | 'likePromotion'
   | 'getFreePlan'
