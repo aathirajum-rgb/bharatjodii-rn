@@ -15,6 +15,7 @@ import { CDN_SVG } from '../../constants/cdn'
 import { FontSize, Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import ProfilePhoto, { type PhotoVariant, isPhotoRequestActive } from '../profile-photo/ProfilePhoto'
 import { getOppGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // Angular: core/config/button.config.ts's SEE_ALL — textColor: 'linkColor'
 // (--ion-color-link-color: #29339B), not the brand red.
@@ -235,11 +236,12 @@ interface InfoOverlayProps {
 }
 
 function InfoOverlay({ name, detail }: InfoOverlayProps) {
+  const langFonts = useLanguageFonts()
   if (!name && !detail) return null
   return (
     <View style={styles.infoOverlay}>
-      {!!name   && <Text style={styles.overlayName}   numberOfLines={1}>{name}</Text>}
-      {!!detail && <Text style={styles.overlayDetail} numberOfLines={1}>{detail}</Text>}
+      {!!name   && <Text style={[styles.overlayName, { fontFamily: langFonts.semiBold }]}   numberOfLines={1}>{name}</Text>}
+      {!!detail && <Text style={[styles.overlayDetail, { fontFamily: langFonts.regular }]} numberOfLines={1}>{detail}</Text>}
     </View>
   )
 }
@@ -275,6 +277,7 @@ export default function ProfileCard({
   onWhatsApp,
 }: ProfileCardProps) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const photoH     = PHOTO_HEIGHT[section] ?? SCREEN_W * 0.7
   const photoVar   = SECTION_VARIANT[section] ?? 'default'
@@ -363,7 +366,7 @@ export default function ProfileCard({
                     "View profile" in English, not "View Details". Was a
                     hardcoded literal here, so it never picked up a language
                     switch — every other section's CTA text goes through t(). */}
-                <Text style={styles.primaryBtnText}>{t('CTATXT.VIEWDETAILS')}</Text>
+                <Text style={[styles.primaryBtnText, { fontFamily: langFonts.medium }]}>{t('CTATXT.VIEWDETAILS')}</Text>
               </Pressable>
             </View>
           )}
@@ -393,13 +396,13 @@ export default function ProfileCard({
               // black-color's `!important` wins over infoRedColor's plain declaration
               // whenever newTextLable isn't '1', so the default label is black, and only
               // the isNewLabel==='1' branch (ngClass empties out) falls through to the pink.
-              <Text style={[styles.likedLabel, isNewLabel && styles.likedLabelNew]} numberOfLines={2}>{labelText()}</Text>
+              <Text style={[styles.likedLabel, { fontFamily: langFonts.regular }, isNewLabel && styles.likedLabelNew]} numberOfLines={2}>{labelText()}</Text>
             )}
             <Pressable
               style={styles.primaryBtn}
               onPress={canCall ? onPress : onLikePress}
             >
-              <Text style={styles.primaryBtnText}>
+              <Text style={[styles.primaryBtnText, { fontFamily: langFonts.medium }]}>
                 {canCall ? 'Call Now' : 'Like Her'}
               </Text>
             </Pressable>
@@ -469,11 +472,11 @@ export default function ProfileCard({
           </ProfilePhoto>
 
           <View style={styles.cardInfo3}>
-            {!!name         && <Text style={styles.nameText}   numberOfLines={1}>{name}</Text>}
+            {!!name         && <Text style={[styles.nameText, { fontFamily: langFonts.semiBold }]}   numberOfLines={1}>{name}</Text>}
             {/* Angular: .black-color (#000000), not the shared cardInfo's
                 gray detailText — confirmed distinct from variants 4/6/7/8
                 which aren't reviewed yet, so scoped to this case only. */}
-            {!!fullDetail() && <Text style={[styles.detailText, styles.detailText3]} numberOfLines={1}>{fullDetail()}</Text>}
+            {!!fullDetail() && <Text style={[styles.detailText, styles.detailText3, { fontFamily: langFonts.regular }]} numberOfLines={1}>{fullDetail()}</Text>}
             {/* Angular: ENUMS.EButtonText.viewProfiles → 'MATCHES.VIEW_PROFILE'
                 → "View full profile" (locales/en.json:642), not "View Profile"
                 — and a real forward-chevron icon, not an embedded arrow
@@ -484,7 +487,7 @@ export default function ProfileCard({
             <Pressable onPress={onPress} style={[styles.linkBtn, styles.linkBtnMt4, styles.linkBtnRow]}>
               {/* Angular: ENUMS.EButtonText.viewProfiles → MATCHES.VIEW_PROFILE.
                   Was a hardcoded literal here, so it never picked up a language switch. */}
-              <Text style={styles.linkBtnText}>{t('MATCHES.VIEW_PROFILE')}</Text>
+              <Text style={[styles.linkBtnText, { fontFamily: langFonts.regular }]}>{t('MATCHES.VIEW_PROFILE')}</Text>
               {/* Angular's plain <img> has no object-fit (browser default
                   fill/stretch); the GIF's real native frame is a 1200x1200
                   SQUARE, and RN Image's own default (resizeMode:'cover')
@@ -504,9 +507,9 @@ export default function ProfileCard({
         <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]} onPress={onPress}>
           <ProfilePhoto {...photoProps} height={photoH} variant="successStory" />
           <View style={[styles.cardInfo, styles.cardInfo4]}>
-            {!!name     && <Text style={[styles.nameText, styles.nameText4]} numberOfLines={1}>{name}</Text>}
-            {!!location && <Text style={[styles.detailText, styles.detailText4]}>{location}</Text>}
-            {!!date     && <Text style={[styles.dateText, styles.dateText4]}>{date}</Text>}
+            {!!name     && <Text style={[styles.nameText, { fontFamily: langFonts.medium }]} numberOfLines={1}>{name}</Text>}
+            {!!location && <Text style={[styles.detailText, styles.detailText4, { fontFamily: langFonts.regular }]}>{location}</Text>}
+            {!!date     && <Text style={[styles.dateText, styles.dateText4, { fontFamily: langFonts.regular }]}>{date}</Text>}
           </View>
         </Pressable>
       )
@@ -535,7 +538,7 @@ export default function ProfileCard({
                 call site above for the 4px case this shared linkBtn used to
                 guess for both. */}
             <Pressable onPress={onViewMorePress} style={[styles.linkBtn, styles.linkBtnMt6, styles.linkBtnCenter, styles.linkBtnRow]}>
-              <Text style={styles.linkBtnText}>{viewMoreContent}</Text>
+              <Text style={[styles.linkBtnText, { fontFamily: langFonts.regular }]}>{viewMoreContent}</Text>
               <Image source={{ uri: FWD_ANIM_ICON }} style={styles.linkBtnIcon} resizeMode="stretch" />
             </Pressable>
           </LinearGradient>
@@ -550,8 +553,8 @@ export default function ProfileCard({
         <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]} onPress={onPress}>
           <ProfilePhoto {...photoProps} height={photoH} />
           <View style={styles.cardInfo}>
-            {!!name          && <Text style={styles.nameText}   numberOfLines={1}>{name}</Text>}
-            {!!basicDetail() && <Text style={styles.detailText}>{basicDetail()}</Text>}
+            {!!name          && <Text style={[styles.nameText, { fontFamily: langFonts.semiBold }]}   numberOfLines={1}>{name}</Text>}
+            {!!basicDetail() && <Text style={[styles.detailText, { fontFamily: langFonts.regular }]}>{basicDetail()}</Text>}
           </View>
         </Pressable>
       )
@@ -564,8 +567,8 @@ export default function ProfileCard({
         <Pressable style={({ pressed }) => [styles.card, pressed && { opacity: 0.85 }]} onPress={onPress}>
           <ProfilePhoto {...photoProps} height={photoH} variant="default" />
           <View style={styles.cardInfo}>
-            {!!name         && <Text style={styles.nameText}   numberOfLines={1}>{name}</Text>}
-            {!!fullDetail() && <Text style={styles.detailText} numberOfLines={1}>{fullDetail()}</Text>}
+            {!!name         && <Text style={[styles.nameText, { fontFamily: langFonts.semiBold }]}   numberOfLines={1}>{name}</Text>}
+            {!!fullDetail() && <Text style={[styles.detailText, { fontFamily: langFonts.regular }]} numberOfLines={1}>{fullDetail()}</Text>}
           </View>
         </Pressable>
       )
@@ -589,14 +592,14 @@ export default function ProfileCard({
                   height={14}
                   style={styles.eyeIcon}
                 />
-                <Text style={styles.eyeBadgeText} numberOfLines={1}>{labelContent}</Text>
+                <Text style={[styles.eyeBadgeText, { fontFamily: langFonts.regular }]} numberOfLines={1}>{labelContent}</Text>
               </View>
             )}
           </ProfilePhoto>
 
           <View style={styles.cardInfo8}>
-            {!!name         && <Text style={styles.nameText}   numberOfLines={1}>{name}</Text>}
-            {!!fullDetail() && <Text style={[styles.detailText, styles.detailText8]} numberOfLines={1}>{fullDetail()}</Text>}
+            {!!name         && <Text style={[styles.nameText, { fontFamily: langFonts.semiBold }]}   numberOfLines={1}>{name}</Text>}
+            {!!fullDetail() && <Text style={[styles.detailText, styles.detailText8, { fontFamily: langFonts.regular }]} numberOfLines={1}>{fullDetail()}</Text>}
           </View>
 
           {/* Angular: .liked-profile-card — peach-to-white gradient, only the
@@ -610,7 +613,7 @@ export default function ProfileCard({
               end={{ x: 1, y: 0 }}
               style={styles.likedFooter}
             >
-              <Text style={styles.likedFooterText} numberOfLines={1}>{likedViewedDateText}</Text>
+              <Text style={[styles.likedFooterText, { fontFamily: langFonts.regular }]} numberOfLines={1}>{likedViewedDateText}</Text>
             </LinearGradient>
           )}
         </Pressable>
@@ -702,7 +705,7 @@ const styles = StyleSheet.create({
   },
   // Angular: .heading3-semibold-16 { font-size: var(--font16) !important; font-family: var(--english-semibold-poppins) }
   overlayName: {
-    fontFamily: Fonts.poppinsSemiBold,
+  
     fontSize: FontSize.font16,
     color: Colors.white,
     marginBottom: 2,
@@ -712,7 +715,7 @@ const styles = StyleSheet.create({
   // no alpha reduction in the real CSS (.information-block itself has no
   // opacity rule either).
   overlayDetail: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+   
     fontSize: FontSize.font14,
     color: Colors.white,
   },
@@ -767,7 +770,7 @@ const styles = StyleSheet.create({
   // tree does either (global.scss's `body` only sets font-family, not color) — falls
   // through to the UA/Ionic default black, not this app's textPrimary token.
   nameText: {
-    fontFamily: Fonts.poppinsSemiBold,
+   
     fontSize: FontSize.font16,
     color: Colors.black,
     marginBottom: 4,
@@ -779,7 +782,7 @@ const styles = StyleSheet.create({
   // (3/4/8, via detailText3/4/8) already overrides fontSize+color explicitly so this
   // fix only actually changes cases 6 & 7's rendering.
   detailText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+   
     fontSize: FontSize.font14,
     color: Colors.black,
     marginBottom: 2,
@@ -791,7 +794,7 @@ const styles = StyleSheet.create({
   // also unverified for those other variants) only supplies 4 of that, so the
   // remaining 2px is added here rather than on the shared style.
   detailText3: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+   
     fontSize: FontSize.font14,
     color: Colors.black,
     marginTop: 2,
@@ -799,7 +802,7 @@ const styles = StyleSheet.create({
   // Angular: case 4's date div is itself `.color-545454.body3-regular-12` (var(--font12),
   // english-regular-poppins) — this base supplies the family/size, dateText4 the color.
   dateText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+   
     fontSize: FontSize.font12,
     color: Colors.textTertiary,
     marginTop: 6,
@@ -811,7 +814,7 @@ const styles = StyleSheet.create({
   // semibold), the location is `body2-regular-14` + `.black-color` (14/#000, not
   // 13/gray) and the date is `body3-regular-12` + `.color-545454` + `mt-8`.
   cardInfo4:   { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 16 },
-  nameText4:   { fontFamily: Fonts.poppinsMedium },
+  
   detailText4: { fontSize: FontSize.font14, color: Colors.black },
   dateText4:   { color: '#545454', marginTop: 8 },
 
@@ -836,7 +839,7 @@ const styles = StyleSheet.create({
   // span also always carries a static `letter-spacing-normal` class (`!important`),
   // so no letter-spacing belongs here either.
   primaryBtnText: {
-    fontFamily: Fonts.poppinsMedium,
+   
     color: Colors.white,
     fontSize: FontSize.font14,
   },
@@ -873,7 +876,7 @@ const styles = StyleSheet.create({
   // background (transparent) nor buttonSize (link) has a nested span override the way
   // primaryBg does, so it stays 14px Regular, not 13px/600 bold.
   linkBtnText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+ 
     fontSize: FontSize.font14,
     color: SEE_ALL_LINK_COLOR,
     // Centers each line against the others when a longer vernacular label
@@ -894,7 +897,7 @@ const styles = StyleSheet.create({
   // `newTextLable != '1'` branch's `.black-color` (`!important`, wins over the
   // fixed `likedColor` infoRedColor) — see likedLabelNew for the other branch.
   likedLabel: {
-    fontFamily: Fonts.poppinsRegular,
+   
     fontSize: FontSize.font12,
     color: Colors.black,
     textAlign: 'center',
@@ -933,7 +936,7 @@ const styles = StyleSheet.create({
   // `font-10-nav` (var(--font10)) instead, see viewedTextSmall.
   viewedText: {
     flex: 1,
-    fontFamily: Fonts.poppinsRegular,
+   
     fontSize: FontSize.font12,
     color: Colors.white,
   },
@@ -1046,7 +1049,7 @@ const styles = StyleSheet.create({
   // Angular: `.color-de2a68.body3-regular-12` — var(--font12), english-regular-poppins,
   // weight 400 (regular, not the 600 previously guessed here).
   eyeBadgeText: {
-    fontFamily: Fonts.poppinsRegular,
+   
     fontSize: FontSize.font12,
     color: Colors.inputError,
   },
@@ -1075,7 +1078,7 @@ const styles = StyleSheet.create({
   },
   // Angular: `.body3-regular-12.black-color` — var(--font12), english-regular-poppins.
   likedFooterText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+   
     fontSize: FontSize.font12,
     color: Colors.black,
   },

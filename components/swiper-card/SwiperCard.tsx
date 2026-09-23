@@ -17,7 +17,8 @@ import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import ProfileCard, { PHOTO_HEIGHT, type CardSection, type CardVariant } from '../profile-card/ProfileCard'
 import { FEMALE_AVATAR_URL, getOppGenderAvatarUrl } from '../../utils/avatar'
-import { Fonts, FontSize } from '../../src/theme/fonts'
+import { FontSize } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // Angular: core/config/button.config.ts's SEE_ALL — textColor: 'linkColor'
 // (--ion-color-link-color: #29339B), iconType: 'forward-icon-link' — a plain
@@ -242,6 +243,7 @@ export default function SwiperCard({
   onWhatsAppPress,
 }: SwiperCardProps) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   // Card WIDTH comes from the section's own swiper config, not from the photo
   // ratio table (see SLIDES_PER_VIEW above for the arithmetic and why the two
   // are different numbers). PHOTO_HEIGHT stays the fallback for sections with
@@ -321,7 +323,7 @@ export default function SwiperCard({
       {(!!swiperHeader || newCount !== undefined) && (
         <View style={styles.header}>
           {!!swiperHeader && (
-            <Text style={styles.headerTitle} numberOfLines={1}>{swiperHeader}</Text>
+            <Text style={[styles.headerTitle, { fontFamily: langFonts.semiBold }]} numberOfLines={1}>{swiperHeader}</Text>
           )}
           {/* Angular: app-swiper.component.html:29-33 — `isNewtag` (newCount > 0)
               renders a `.new-block` PILL on its own row 6px BELOW the title:
@@ -337,7 +339,7 @@ export default function SwiperCard({
               end={{ x: 1, y: 0.5 }}
               style={styles.newTag}
             >
-              <Text style={styles.newTagText}>
+              <Text style={[styles.newTagText, { fontFamily: langFonts.medium }]}>
                 {t('HOME.NEW_TXT')
                   .replace(/#COUNT#/g, String(newCount))
                   .replace(/#PLURAL#/g, newCount === 1 ? '' : t('PROFILES.PLURALMEMBER'))
@@ -463,7 +465,7 @@ export default function SwiperCard({
           <PaginationDots total={items.length} activeIndex={activeIndex} />
           {linkVisible && !!onSeeAllPress && (
             <Pressable onPress={onSeeAllPress} style={styles.seeAllBtn}>
-              <Text style={styles.seeAllText}>{t('HOME.SEE_ALL_CTA')}</Text>
+              <Text style={[styles.seeAllText, { fontFamily: langFonts.regular }]}>{t('HOME.SEE_ALL_CTA')}</Text>
               {/* Angular: a plain <img style="width:24px;height:20px"> with no
                   object-fit — the browser default (`fill`, non-uniform
                   stretch, no cropping) applies. The GIF's real native frame
@@ -515,7 +517,7 @@ const styles = StyleSheet.create({
   // across all of newlyJoinedSection/dailyRecommendationSection/
   // viewedbymeSection/etc — i.e. pure #000000, not textPrimary (#111111).
   headerTitle: {
-    fontFamily: Fonts.poppinsSemiBold,
+   
     fontSize:   FontSize.font18,
     lineHeight: 24,
     color:      Colors.black,
@@ -531,7 +533,7 @@ const styles = StyleSheet.create({
   // Angular: .textcta-medium-12 (var(--font12), 0.75rem, dynamic — see
   // FontSize's header comment) .white-color
   newTagText: {
-    fontFamily: Fonts.poppinsMedium,
+   
     fontSize:   FontSize.font12,
     lineHeight: 16,
     color:      Colors.white,
@@ -547,7 +549,7 @@ const styles = StyleSheet.create({
   // dynamic), weight 400. A flat 13/600/system-font here matched none of
   // those three.
   seeAllText: {
-    fontFamily: Fonts.poppinsRegular,
+    
     fontSize:   FontSize.font14,
     color:      SEE_ALL_LINK_COLOR,
   },

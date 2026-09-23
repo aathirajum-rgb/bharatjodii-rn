@@ -50,6 +50,7 @@ import { APP_VERSION } from '../../constants/appVersion'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { stripAndDecodeHtml } from '../../utils/htmlEntities'
 import HomeDesktopLayout from './HomeDesktopLayout'
 import HeroBanner, { type HeroBannerContent } from './HeroBanner'
@@ -309,6 +310,7 @@ export interface CompleteProfileSectionProps {
 // is only consumed by the *ngIf="selfVideo" branch (the FAQ-video carousel),
 // a different cardType entirely.
 export const CompleteProfileSection = memo(function CompleteProfileSection({ cards, onCardPress }: CompleteProfileSectionProps) {
+  const langFonts = useLanguageFonts()
   if (cards.length === 0) return null
   return (
     <View style={s.cpList}>
@@ -332,7 +334,7 @@ export const CompleteProfileSection = memo(function CompleteProfileSection({ car
             <View style={s.cpInfo}>
               <Text style={s.cpTitle}>{card.label}</Text>
               <View style={s.cpCtaRow}>
-                <Text style={s.cpCtaText}>{card.ctaLabel}</Text>
+                <Text style={[s.cpCtaText, { fontFamily: langFonts.regular }]}>{card.ctaLabel}</Text>
                 {/* Angular: button-revamp.component.scss's icon rule has NO
                     `background-size` (the `contain` line is commented out) —
                     so the `iconSize`/large-vs-small box (16 or 24) never
@@ -381,6 +383,7 @@ export const LikedProfilesSection = memo(function LikedProfilesSection({
   onSeeAllPress,
 }: LikedProfilesSectionProps) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   // Angular: app-swiper.component.ts's hasLikedYouData()/hasLikedByMeData()
   // OR the count with actual returned items — but this port uses
@@ -404,7 +407,7 @@ export const LikedProfilesSection = memo(function LikedProfilesSection({
       {/* Angular: app-swiper.component.ts's setHeader() — swiperHeader is
           sectionTitle.likedprofile = 'GENERAL.ICON_3' ("Liked profiles"),
           suffixed with (likedYouCount + likedByMeCount) when > 0. */}
-      <Text style={[s.sectionTitle, s.likedSectionTitle]}>
+      <Text style={[s.sectionTitle, s.likedSectionTitle, { fontFamily: langFonts.semiBold }]}>
         {headerWithCount(t('GENERAL.ICON_3'), likedByCount + likedMeCount)}
       </Text>
       {showTabs ? (
@@ -415,7 +418,12 @@ export const LikedProfilesSection = memo(function LikedProfilesSection({
         <View style={s.tabRow}>
           {(gender === 'F' ? (['likedyou', 'likedbyme'] as const) : (['likedbyme', 'likedyou'] as const)).map(tab => (
             <Pressable key={tab} style={[s.tabPill, likedTab === tab && s.tabPillActive]} onPress={() => onTabChange(tab)}>
-              <Text style={[s.tabPillText, likedTab === tab && s.tabPillTextActive]}>
+              <Text style={[
+                s.tabPillText,
+                { fontFamily: langFonts.regular },
+                likedTab === tab && s.tabPillTextActive,
+                likedTab === tab && { fontFamily: langFonts.medium },
+              ]}>
                 {tab === 'likedyou'
                   ? `${t('LIKE_LIST.LIKEDYOU_HOME')} (${likedMeCount})`
                   : `${t('LIKE_LIST.LIKESENT_HOME')} (${likedByCount})`}
@@ -482,14 +490,15 @@ function parseGradientColors(bgColor: string | undefined): [string, string, ...s
 // pre-split line (server-provided "\n" breaks, see fetchExploreCategories())
 // renders as its own row; only the last one also carries the chevron.
 function CategoryLabel({ label }: { label: string }) {
+  const langFonts = useLanguageFonts()
   const lines = label.split('\n')
   return (
     <View style={s.catLabelWrap}>
       {lines.slice(0, -1).map((line, i) => (
-        <Text key={i} style={s.catLabel} numberOfLines={1}>{line}</Text>
+        <Text key={i} style={[s.catLabel, { fontFamily: langFonts.medium }]} numberOfLines={1}>{line}</Text>
       ))}
       <View style={s.catLabelLastLine}>
-        <Text style={s.catLabel} numberOfLines={1}>{lines[lines.length - 1]}</Text>
+        <Text style={[s.catLabel, { fontFamily: langFonts.medium }]} numberOfLines={1}>{lines[lines.length - 1]}</Text>
         <SvgXml xml={CHEVRON_FORWARD_BLUE_XML} width={16} height={16} style={s.catChevron} />
       </View>
     </View>
@@ -513,12 +522,13 @@ export const ExploreCategoriesSection = memo(function ExploreCategoriesSection({
   categories, onCategoryPress, showTitle = true,
 }: ExploreCategoriesSectionProps) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   return (
     <>
       {/* Angular: home.enum.ts's sectionTitle.exploreMatches = 'HOME.EXPLORE_MATCHES_TXT'
           ("Discover matches") — HOME.EXPLORE_MATCHES ("Explore matches based on")
           is a different, unused key. */}
-      {showTitle && <Text style={[s.sectionTitle, s.exploreSectionTitle]}>{t('HOME.EXPLORE_MATCHES_TXT')}</Text>}
+      {showTitle && <Text style={[s.sectionTitle, s.exploreSectionTitle, { fontFamily: langFonts.semiBold }]}>{t('HOME.EXPLORE_MATCHES_TXT')}</Text>}
       <View style={[s.catGrid, { paddingLeft: EXPLORE_ROW_PL + EXPLORE_GRID_GAP, paddingRight: EXPLORE_ROW_PR, gap: EXPLORE_GRID_GAP }]}>
         {categories.map(cat => (
           <Pressable key={cat.id} onPress={() => onCategoryPress(cat)} style={{ width: EXPLORE_TILE_WIDTH }}>
@@ -559,6 +569,7 @@ export const SuccessStoriesSection = memo(function SuccessStoriesSection({
   stories, onCardPress, onSeeAllPress,
 }: { stories: SwiperItem[]; onCardPress: (item: SwiperItem) => void; onSeeAllPress: () => void }) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   const [headLine1, headLine2] = t('HOME.HAPPILY_MARRIED_HEAD').split('<br>').map(p => p.trim())
   const subtitle = t('HOME.HAPPILY_MARRIED_CONTENT').replace(/<br\s*\/?>/gi, '\n')
   return (
@@ -571,9 +582,9 @@ export const SuccessStoriesSection = memo(function SuccessStoriesSection({
         <View>
           <CdnLottie uri={`${CDN}revamp/animation/success-heart-animation.json`} width={80} height={80} />
           <View style={s.storyHeader}>
-            <Text style={s.storyTitle}>{headLine1}</Text>
-            <Text style={s.storyTitle}>{headLine2}</Text>
-            <Text style={s.storySubtitle}>{subtitle}</Text>
+            <Text style={[s.storyTitle, { fontFamily: langFonts.semiBold }]}>{headLine1}</Text>
+            <Text style={[s.storyTitle, { fontFamily: langFonts.semiBold }]}>{headLine2}</Text>
+            <Text style={[s.storySubtitle, { fontFamily: langFonts.regular }]}>{subtitle}</Text>
           </View>
         </View>
         <CdnSvg uri={`${CDN}success-story-hand.svg`} width={HAND_SIZE} height={HAND_SIZE} style={s.storyHandImage} />
@@ -610,9 +621,10 @@ export const SelfHelpVideosSection = memo(function SelfHelpVideosSection({
   videos, cardWidth, cardHeight, onVideoPress, onSeeAllPress,
 }: { videos: HelpVideo[]; cardWidth: number; cardHeight: number; onVideoPress: (item: HelpVideo) => void; onSeeAllPress: () => void }) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   return (
     <>
-      <Text style={[s.sectionTitle, s.selfVideoSectionTitle]}>{t('HOME.SELF_VIDEO_HEADER')}</Text>
+      <Text style={[s.sectionTitle, s.selfVideoSectionTitle, { fontFamily: langFonts.semiBold }]}>{t('HOME.SELF_VIDEO_HEADER')}</Text>
       <FlatList
         data={videos}
         keyExtractor={i => i.id}
@@ -631,7 +643,7 @@ export const SelfHelpVideosSection = memo(function SelfHelpVideosSection({
             </View>
             {!!item.title && (
               <View style={s.videoCaptionScrim}>
-                <Text style={s.videoTitle} numberOfLines={2}>{item.title}</Text>
+                <Text style={[s.videoTitle, { fontFamily: langFonts.regular }]} numberOfLines={2}>{item.title}</Text>
               </View>
             )}
           </Pressable>
@@ -645,7 +657,7 @@ export const SelfHelpVideosSection = memo(function SelfHelpVideosSection({
           the header "See all" links elsewhere on Home). */}
       <View style={s.selfHelpSeeAllRow}>
         <Pressable style={s.selfHelpSeeAllBtn} onPress={onSeeAllPress}>
-          <Text style={s.selfHelpSeeAllText}>{t('HOME.SEE_ALL_CTA')}</Text>
+          <Text style={[s.selfHelpSeeAllText, { fontFamily: langFonts.medium }]}>{t('HOME.SEE_ALL_CTA')}</Text>
           <SvgXml xml={CHEVRON_FORWARD_BLUE_XML} width={16} height={16} />
         </Pressable>
       </View>
@@ -673,6 +685,7 @@ export const HelpSection = memo(function HelpSection({
   onCallPress, phone,
 }: { onCallPress: () => void; phone: string }) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   // Angular: getHelbBannerData() strips a leading '+91' from the customer-care
   // number BEFORE substituting it into the CTA (cutomerCareNO.slice(3)) — the
   // dialled number keeps the prefix, only the label drops it.
@@ -692,10 +705,10 @@ export const HelpSection = memo(function HelpSection({
       style={s.helpWrap}
     >
       <View style={s.helpTextCol}>
-        <Text style={s.helpTitle}>{t('FAQ_DETAILS.BANNER.TITLE')}</Text>
-        <Text style={s.helpSub}>{t('FAQ_DETAILS.BANNER.BODY')}</Text>
+        <Text style={[s.helpTitle, { fontFamily: langFonts.medium }]}>{t('FAQ_DETAILS.BANNER.TITLE')}</Text>
+        <Text style={[s.helpSub, { fontFamily: langFonts.regular }]}>{t('FAQ_DETAILS.BANNER.BODY')}</Text>
         <Pressable style={s.helpCta} onPress={onCallPress}>
-          <Text style={s.helpCtaText}>{t('FAQ_DETAILS.BANNER.CTA').replace('#CALL#', ctaPhone).trim()}</Text>
+          <Text style={[s.helpCtaText, { fontFamily: langFonts.medium }]}>{t('FAQ_DETAILS.BANNER.CTA').replace('#CALL#', ctaPhone).trim()}</Text>
           <SvgXml xml={CHEVRON_FORWARD_BLUE_XML} width={18} height={18} style={s.helpCtaChevron} />
         </Pressable>
       </View>
@@ -947,6 +960,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   const isDesktop = useIsDesktopWeb()
   const insets = useSafeAreaInsets()
   const { t, i18n } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   // ── WhatsApp "no photo" CTA (All Matches / New Matches / etc. cards) ──────
   // Angular: matches-card.component's handleWhatsApp() — same confirm →
@@ -2009,7 +2023,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
               {/* Angular: complete-profile.component.html's header text is
                   .color-1f1e1b, not the generic textPrimary black every other
                   section header here uses. */}
-              <Text style={[s.sectionTitle, s.cpSectionTitle]}>{t('HOME.COMPLETE_PROFILE_HEADER')}</Text>
+              <Text style={[s.sectionTitle, s.cpSectionTitle, { fontFamily: langFonts.semiBold }]}>{t('HOME.COMPLETE_PROFILE_HEADER')}</Text>
               <CompleteProfileSection cards={completeCards} onCardPress={handleCompleteProfileCard} />
             </View>
           </>
@@ -2312,7 +2326,7 @@ const s = StyleSheet.create({
   // Angular: app-swiper.component.html's heading gets no [headerColor] input for
   // the liked-profiles swiper (explore.component.html only passes blockbgColor),
   // so it inherits the framework default black (#000000), not textPrimary.
-  sectionTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, color: Colors.black, paddingHorizontal: 16, marginBottom: 12 },
+  sectionTitle: { fontSize: FontSize.font18, color: Colors.black, paddingHorizontal: 16, marginBottom: 12 },
   // Angular: complete-profile.component.html's outer grid is pl-24 pr-0
   // (not the generic 16px every other section header uses), header color is
   // the specific .color-1f1e1b (not textPrimary) — no line-height-24 class on
@@ -2353,14 +2367,14 @@ const s = StyleSheet.create({
   // Angular: `body1-medium-14 black-color` — font-size var(--font14) (0.875rem,
   // scales with device width — see FontSize's header comment); family/color
   // already matched.
-  cpTitle:   { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontSize: FontSize.font14, color: Colors.black },
+  cpTitle:   { fontSize: FontSize.font14, color: Colors.black },
   cpCtaRow:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
   // Angular: this CTA is <app-button-revamp buttonSize="link">, whose
   // ctaFontSize defaults to EButtonFontSize.regular14 = body2-regular-14 —
   // font-size var(--font14) (0.875rem, dynamic — see FontSize's header
   // comment), not a flat 14. `ion-button.link span` also sets
   // `line-height: 20px !important` explicitly.
-  cpCtaText: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font14, color: '#29339B', lineHeight: 20 },
+  cpCtaText: { fontSize: FontSize.font14, color: '#29339B', lineHeight: 20 },
 
   // Liked profiles tabs
   // Angular: app-swiper.component.scss's `ion-segment` for this section —
@@ -2402,12 +2416,12 @@ const s = StyleSheet.create({
   // an earlier note here: app-swiper.component.scss:1073 sets
   // `ion-segment-button ion-label { line-height: 1.4 }`, and 1.4 x 12 = 16.8
   // ≈ 17. The active pill's 20 is the same rule at 14 (1.4 x 14 = 19.6).
-  tabPillText:        { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, lineHeight: 17, color: '#000000', textAlign: 'center' },
+  tabPillText:        {  fontSize: FontSize.font12, lineHeight: 17, color: '#000000', textAlign: 'center' },
   // global.scss's .body1-medium-14 is --english-medium-poppins @ var(--font14)
   // (0.875rem, dynamic), i.e. Poppins-Medium — SemanticFontsEnglish has no
   // body-medium slot, so take the family straight from Fonts (same mapping
   // SemanticFonts.en.medium uses).
-  tabPillTextActive:  { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, lineHeight: 20, color: '#8B4800' },
+  tabPillTextActive:  { fontSize: FontSize.font14, lineHeight: 20, color: '#8B4800' },
   // Angular: this section's header ion-row is `pt-32 pr-24 pl-24` with pb-8
   // (every other section gets pb-24), and its ion-col adds mt-24 — so the title
   // sits 24px lower and 24px in from the edge, with only 8px under it before the
@@ -2421,7 +2435,7 @@ const s = StyleSheet.create({
   // instead of the tab row when only one of likedYou/likedByMe has data.
   // No color class on this label either, so it's the same inherited black
   // (not textPrimary) as likedSectionTitle above.
-  onlyOneLikedText:   { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, lineHeight: 24, color: Colors.black, paddingHorizontal: 24, paddingTop: 8, marginBottom: 32 },
+  onlyOneLikedText:   { fontSize: FontSize.font14, lineHeight: 24, color: Colors.black, paddingHorizontal: 24, paddingTop: 8, marginBottom: 32 },
 
   // Explore categories
   // Angular: .discover-new-bg — 12px radius, 1px #E6E6E6 border, compact
@@ -2449,7 +2463,7 @@ const s = StyleSheet.create({
   // Angular: `textcta-medium-12 black-color`, label wrapped in a
   // `line-height-16` span — font-size var(--font12) (0.75rem, dynamic — see
   // FontSize's header comment), pure black (not textPrimary).
-  catLabel:         { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font12, color: Colors.black, lineHeight: 16 },
+  catLabel:         { fontSize: FontSize.font12, color: Colors.black, lineHeight: 16 },
   // Fills the tile's remaining width (catLabel itself no longer does, now
   // that it's a per-line, content-sized Text — see CategoryLabel's header
   // comment above for why).
@@ -2492,12 +2506,12 @@ const s = StyleSheet.create({
   // Angular: this headline is ALSO app-swiper's own header template
   // (successStory's swiperHeader branch) — same `heading2-semibold-18
   // line-height-24`, so the same dynamic font-size applies.
-  storyTitle:     { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, lineHeight: 24, color: Colors.black },
+  storyTitle:     { fontSize: FontSize.font18, lineHeight: 24, color: Colors.black },
   // Angular: .body2-regular-14.black-color.line-height-20
   // Angular: `line-height-20 body2-regular-14 black-color mt-8` — font-size
   // var(--font14) (0.875rem, dynamic — see FontSize's header comment);
   // line-height-20 is a flat 20px (not rem-based), already matched.
-  storySubtitle:  { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, marginTop: 8, lineHeight: 20 },
+  storySubtitle:  { fontSize: FontSize.font14, color: Colors.black, marginTop: 8, lineHeight: 20 },
 
   // Self-help videos
   videoCard:     { borderRadius: 10, overflow: 'hidden', position: 'relative', backgroundColor: Colors.white },
@@ -2507,7 +2521,7 @@ const s = StyleSheet.create({
   // Angular: `body3-regular-12 white-color overflow-auto line-height-16` —
   // font-size var(--font12) (0.75rem, dynamic — see FontSize's header comment);
   // line-height-16 is a flat 16px (not rem-based), already matched.
-  videoTitle:    { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.white, lineHeight: 16 },
+  videoTitle:    { fontSize: FontSize.font12, color: Colors.white, lineHeight: 16 },
   // Angular: the "See all" row is `ion-col size="12" class="d-flex
   // ion-justify-content-end"` — right-aligned, no extra top margin of its own
   // beyond the FlatList's existing bottom padding.
@@ -2515,7 +2529,7 @@ const s = StyleSheet.create({
   selfHelpSeeAllBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   // Angular: `textcta-medium-12 color-29339B` — font-size var(--font12)
   // (0.75rem, dynamic — see FontSize's header comment), Poppins-Medium.
-  selfHelpSeeAllText: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font12, color: '#29339B' },
+  selfHelpSeeAllText: { fontSize: FontSize.font12, color: '#29339B' },
 
   // Help section
   // Angular: FAQ_DETAILS.BANNER — title/body/link-CTA on a gradient card with
@@ -2539,7 +2553,7 @@ const s = StyleSheet.create({
   // width — see FontSize's header comment), not a flat 16px. TITLECOLOR is
   // bound via [ngStyle] but absent from the FAQ_DETAILS.BANNER translation
   // object, so it resolves to inherited black, not textPrimary.
-  helpTitle:     { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font16, color: Colors.black },
+  helpTitle:     { fontSize: FontSize.font16, color: Colors.black },
   // Angular: `body2-regular-14` + `mt-8`; CONTANTCOLOR is likewise absent from
   // the translation object, so this is default dark at 14 — not 13 gray.
   // Angular: home-banner.component.html's helpBanner BODY is `body2-regular-14
@@ -2547,12 +2561,12 @@ const s = StyleSheet.create({
   // FontSize's header comment). No line-height class on this one (unlike
   // storySubtitle's identically-sized text, which has line-height-20) — drop
   // the explicit lineHeight so it falls back to the font's natural metric.
-  helpSub:       { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, marginTop: 8 },
+  helpSub:       { fontSize: FontSize.font14, color: Colors.black, marginTop: 8 },
   // Angular: the CTA row is `mt-4`; its label is `textcta-medium-12`
   // (var(--font12), 0.75rem, dynamic — see FontSize's header comment —
   // Poppins-Medium) in .color-29339B, with the chevron at ml-4.
   helpCta:       { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  helpCtaText:   { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font12, color: '#29339B' },
+  helpCtaText:   { fontSize: FontSize.font12, color: '#29339B' },
   // Angular's ion-icon here has no explicit size class, so it's Ionic's own
   // default (1.5rem ≈ 24px) — a real chevron-forward-outline icon now
   // (CHEVRON_FORWARD_BLUE_XML), not this SemiBold '›' character standing in

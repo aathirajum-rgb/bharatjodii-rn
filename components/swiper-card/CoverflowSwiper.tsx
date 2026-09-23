@@ -18,7 +18,8 @@ import { CDN_SVG } from '../../constants/cdn'
 import CdnLottie from '../CdnLottie'
 import ProfileCard, { PHOTO_HEIGHT } from '../profile-card/ProfileCard'
 import { PaginationDots, type SwiperItem } from './SwiperCard'
-import { Fonts, FontSize } from '../../src/theme/fonts'
+import { FontSize } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 const SEE_ALL_LINK_COLOR = '#29339B'
 const CDN_ANIM = `${CDN_SVG}revamp/animation/`
@@ -55,6 +56,7 @@ export default function CoverflowSwiper({
   swiperHeader, items, moreItems, onCardPress, onLikePress, onSeeAllPress, onWhatsAppPress,
 }: CoverflowSwiperProps) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   const scrollX = useRef(new Animated.Value(0)).current
   const [activeIndex, setActiveIndex] = useState(0)
 
@@ -109,7 +111,7 @@ export default function CoverflowSwiper({
       <View style={styles.headerWrap}>
         <CdnLottie uri={`${CDN_ANIM}today-matches-animation.json`} width={180} height={180} style={styles.headerAnimLeft} />
         <CdnLottie uri={`${CDN_ANIM}today-matches-animation.json`} width={180} height={180} style={styles.headerAnimRight} />
-        {!!swiperHeader && <Text style={styles.header}>{swiperHeader}</Text>}
+        {!!swiperHeader && <Text style={[styles.header, { fontFamily: langFonts.semiBold }]}>{swiperHeader}</Text>}
       </View>
 
       <Animated.ScrollView
@@ -163,7 +165,7 @@ export default function CoverflowSwiper({
           <PaginationDots total={slideCount} activeIndex={activeIndex} maxVisible={2} />
           {showSeeAll && (
             <Pressable onPress={onSeeAllPress} style={styles.seeAllBtn}>
-              <Text style={styles.seeAllText}>{t('HOME.SEE_ALL_CTA')}</Text>
+              <Text style={[styles.seeAllText, { fontFamily: langFonts.regular }]}>{t('HOME.SEE_ALL_CTA')}</Text>
               {/* Angular: a plain <img style="width:24px;height:20px"> with no
                   object-fit — the browser default (`fill`, non-uniform
                   stretch, no cropping) applies. The GIF's real native frame
@@ -198,7 +200,7 @@ const styles = StyleSheet.create({
   // missed this component's own stylesheet). Pure black, not textPrimary
   // (#111111) — same fix already applied to SwiperCard.tsx's equivalent header.
   header: {
-    fontFamily:  Fonts.poppinsSemiBold,
+    
     fontSize:    FontSize.font18,
     lineHeight:  24,
     color:       Colors.black,
@@ -227,7 +229,7 @@ const styles = StyleSheet.create({
   // body2-regular-14) applies — Poppins-Regular @ var(--font14) (0.875rem,
   // dynamic), weight 400 — same shared CTA already matched in SwiperCard.tsx.
   // A flat 13/600 here matched none of those three.
-  seeAllText: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font14, color: SEE_ALL_LINK_COLOR },
+  seeAllText: { fontSize: FontSize.font14, color: SEE_ALL_LINK_COLOR },
   // Angular: the animated <img> is styled inline `width: 24px; height: 20px`
   // — not square, same asset/size as SwiperCard.tsx's own "See all" link.
   seeAllIcon: { width: 24, height: 20 },
