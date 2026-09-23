@@ -789,8 +789,16 @@ const swiperStyles = StyleSheet.create({
     width:           24,
     backgroundColor: Colors.white,
   },
+  // Solid white, same as the active bullet. This port had it at
+  // `rgba(255,255,255,0.5)`, and because the dynamicBullets scale also shrinks
+  // non-active dots to 0.7/0.45/0.3, a half-transparent dot over a photo read as
+  // grey rather than white. Angular's own value is `#FFFFFFDD` (~87% alpha,
+  // global.scss:4911-4916), but that still tints towards grey on a mid-grey photo,
+  // so this is pinned fully opaque on request. Active vs inactive stays legible
+  // through SIZE alone — a 24px pill against 8px circles — which is how Angular
+  // separates them too (a 20x5 pill against small round bullets).
   dotInactive: {
-    backgroundColor: 'rgba(255,255,255,0.5)',
+    backgroundColor: Colors.white,
   },
   arrowBtn: {
     position:        'absolute',

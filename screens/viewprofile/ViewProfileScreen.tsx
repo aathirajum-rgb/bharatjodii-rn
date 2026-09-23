@@ -2026,7 +2026,9 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           + a 3-dot report/don't-show menu. */}
       <View style={[s.headerBar, { paddingTop: insets.top + 8 }]}>
         <Pressable style={s.headerBackBtn} onPress={() => handleBack()} hitSlop={8}>
-          <CdnSvg uri={BACK_ICON_URI} width={24} height={48} />
+          {/* 24x24, not 24x48 — arrow-back-activity.svg has a square 21x21 viewBox,
+              and a 48-tall child inside this 42-tall box overflowed it. */}
+          <CdnSvg uri={BACK_ICON_URI} width={24} height={24} />
         </Pressable>
 
         {scrolled && (
@@ -3107,8 +3109,17 @@ const s = StyleSheet.create({
   // Angular: heading1-semibold-20 line-height-16 black-color, mt-24 mb-4 (every
   // section header in viewprofile.page.html uses this identical class combo).
   // fontFamily applied inline (langFonts.semiBold) — see Text usage.
+  //
+  // The lineHeight deliberately does NOT follow Angular's 16 — a 20px heading in
+  // a 16px line box. In CSS that is harmless: the glyph simply
+  // overflows its line box and still paints in full. React Native does NOT
+  // behave that way — on Android a lineHeight below the font's natural height
+  // CLIPS the glyph, which cut the descenders off every section heading
+  // ("Horoscope details", "Life style details", "Family details" all lost the
+  // bottom of their p/y). Copying the CSS number across was the mistake; 26
+  // (1.3x) is the smallest leading that clears Poppins' descender at font20.
   sectionHeader: {
-    fontWeight: '600', fontSize: FontSize.font20, lineHeight: 16, color: Colors.black,
+    fontWeight: '600', fontSize: FontSize.font20, lineHeight: 26, color: Colors.black,
     marginTop: 24, marginBottom: 4,
   },
   // Angular: icon column (ion-col size="1") + text column (size="11", pl-12) —
@@ -3278,7 +3289,11 @@ const s = StyleSheet.create({
     backgroundColor: Colors.surface,
     borderBottomWidth: 1, borderBottomColor: Colors.divider,
     flexDirection: 'row', alignItems: 'center', gap: 10,
-    paddingHorizontal: 16, paddingBottom: 10,
+    // Angular viewprofile.page.html:3 — the header row is `pl-2 pr-16`, i.e. 2px
+    // on the left, not 16. A symmetric 16 pushed the back arrow 14px inboard of
+    // where the old app puts it, so it no longer lined up with the name beside it
+    // (or with the back arrow on every other screen).
+    paddingLeft: 2, paddingRight: 16, paddingBottom: 10,
     // The 3-dot's dropdown is absolutely positioned at top:34 — i.e. it hangs
     // BELOW this bar, over the ScrollView that follows it as a sibling. Later
     // siblings paint on top by default, and photoWrap inside that ScrollView
@@ -3311,7 +3326,14 @@ const s = StyleSheet.create({
   // Angular: `.vp-profile-name` (global.scss:22281-22285) — font16, Poppins-Medium,
   // `--gray-color1` (#1f1e1b) — not SemiBold/pure-black, and NOT font18.
   // fontFamily applied inline (langFonts.medium) — see Text usage.
-  headerName: { flex: 1, fontWeight: '500', fontSize: FontSize.font16, color: '#1f1e1b' },
+  // lineHeight 30 is Angular's own `.one-lines-vp-header` (global.scss:9975-9983).
+  // includeFontPadding:false matters on Android: the default extra font padding is
+  // asymmetric, so the name sat a couple of px below the vertically-centred back
+  // arrow beside it even though the row is `alignItems:'center'`.
+  headerName: {
+    flex: 1, fontWeight: '500', fontSize: FontSize.font16, color: '#1f1e1b',
+    lineHeight: 30, includeFontPadding: false, textAlignVertical: 'center' as const,
+  },
   headerIconBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
   // Angular: .width-height-18 (viewprofile.page.scss:22-25) — box sized exactly
   // to the 18x18 icon, not a bigger 28x28 hit-target box (hitSlop covers touch
