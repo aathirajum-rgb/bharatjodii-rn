@@ -185,11 +185,13 @@ export function toProfile(p: Record<string, any>): SwiperItem {
     // via live debugging — some listing shapes send that instead of either of the
     // other two.
     isIdVerified:        p['IDVERIFY'] == '1' || p['IDVERIFYSTATUS'] == '1' || p['IDVERIFIED'] == '1',
-    occupation:          p['OCCUPATION'],
+    // Same HTML-entity encoding as name/age/height/etc. above — occupation and
+    // caste are free-text fields that can carry a vernacular-script value.
+    occupation:          decodeEntities(p['OCCUPATION']),
     // Some listing shapes send MONTHLYINCOME instead of INCOME for the same value
     // (registrationService.ts's own profile mapper already falls back the same way).
     income:              p['INCOME'] ?? p['MONTHLYINCOME'],
-    caste:               p['CASTE'],
+    caste:               decodeEntities(p['CASTE']),
   }
 }
 
