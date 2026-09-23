@@ -537,8 +537,8 @@ export default function ProfileCard({
             {/* Angular: type='5's wrapper is `mt-6` (6px) — see type='3's
                 call site above for the 4px case this shared linkBtn used to
                 guess for both. */}
-            <Pressable onPress={onViewMorePress} style={[styles.linkBtn, styles.linkBtnMt6, styles.linkBtnCenter, styles.linkBtnRow]}>
-              <Text style={[styles.linkBtnText, { fontFamily: langFonts.regular }]}>{viewMoreContent}</Text>
+            <Pressable onPress={onViewMorePress} style={[styles.linkBtn, styles.linkBtnMt6, styles.linkBtnCenter, styles.linkBtnRow, styles.linkBtnRowCenter]}>
+              <Text style={[styles.linkBtnText, styles.linkBtnTextCenter, { fontFamily: langFonts.regular }]}>{viewMoreContent}</Text>
               <Image source={{ uri: FWD_ANIM_ICON }} style={styles.linkBtnIcon} resizeMode="stretch" />
             </Pressable>
           </LinearGradient>
@@ -857,18 +857,26 @@ const styles = StyleSheet.create({
   linkBtnCenter: {
     alignSelf: 'center',
   },
-  // justifyContent:'center' matters once the CTA label wraps to 2 lines — a
-  // vernacular translation (e.g. Tamil "அனைத்தையும் காணுங்கள்") runs longer
-  // than English "See All" and wraps inside this card's narrow width. Without
-  // it, Yoga sizes the row to the full available width once its Text child
-  // needs 2 lines rather than shrink-wrapping to content, so the outer
-  // linkBtnCenter's alignSelf:'center' had nothing narrower to center — text
-  // and the chevron both sat flush left instead of centered as a block.
   linkBtnRow: {
-    flexDirection:  'row',
-    alignItems:     'center',
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           4,
+  },
+  // Case 5 ("See All") only — NOT shared onto linkBtnRow/linkBtnText below,
+  // which case 3 ("View full profile") also uses. justifyContent:'center'
+  // matters once the CTA label wraps to 2 lines: a vernacular translation
+  // (e.g. Tamil "அனைத்தையும் காணுங்கள்") runs longer than English "See All"
+  // and wraps inside this card's narrow width, and without it Yoga sizes the
+  // row to the full available width once its Text child needs 2 lines rather
+  // than shrink-wrapping to content, leaving text+chevron flush left instead
+  // of centered as a block. Case 3's own wrapper stretches to the card's full
+  // width by design (Angular: profile-card.component.html:130 has no
+  // ion-justify-content-center, left-aligned is correct there) and relies on
+  // this row's PLAIN default (flex-start) to stay flush left — putting
+  // justifyContent:'center' on the shared linkBtnRow instead of here pushed
+  // "View full profile" into the center of its card.
+  linkBtnRowCenter: {
     justifyContent: 'center',
-    gap:            4,
   },
   // Angular: both call sites (type='3' "View full profile", type='5' "See All") use
   // app-button-revamp with the default ctaFontSize (EButtonFontSize.regular14 →
@@ -876,16 +884,18 @@ const styles = StyleSheet.create({
   // background (transparent) nor buttonSize (link) has a nested span override the way
   // primaryBg does, so it stays 14px Regular, not 13px/600 bold.
   linkBtnText: {
- 
+    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize: FontSize.font14,
     color: SEE_ALL_LINK_COLOR,
-    // Centers each line against the others when a longer vernacular label
-    // wraps to 2 lines — RN's Text defaults to left-aligning wrapped lines.
-    textAlign: 'center',
-    // Lets the label actually wrap within the row's available width instead
-    // of overflowing past the card edge, which is what forced it into a
-    // single line — measurable width is required for React Native's
-    // Text wrapping to kick in inside a flexDirection:'row' parent.
+  },
+  // Case 5 only — see linkBtnRowCenter above for why this isn't merged into
+  // the shared linkBtnText. Centers each line against the others when a
+  // longer vernacular label wraps to 2 lines (RN's Text defaults to
+  // left-aligning wrapped lines), and flexShrink lets it actually wrap
+  // within the row's available width instead of overflowing past the card
+  // edge, which is what forced it into a single line.
+  linkBtnTextCenter: {
+    textAlign:  'center',
     flexShrink: 1,
   },
   // Angular: the animated <img> is styled inline `width: 24px; height: 20px`

@@ -104,7 +104,10 @@ export function toProfile(p: Record<string, any>): SwiperItem {
   return {
     // Angular: profile.MATRIID is the primary ID in matches API response
     profileId:           p['MATRIID']  ?? p['NBID']  ?? p['ID'],
-    name:                p['NAME'],
+    // Same HTML-entity encoding as every other vernacular field below (see
+    // utils/htmlEntities.ts) — was the one field here left un-decoded, so a
+    // non-English profile name rendered as raw "&#xc03;&#xc38;..." codes.
+    name:                decodeEntities(p['NAME']),
     // Angular's home swiper binds [age]="cardContent.AGE" raw — whatever unit the
     // server sends ("28 years") is what shows. Stripping it and re-appending
     // " Yrs" rendered "28 Yrs" where Angular renders "28 years".
