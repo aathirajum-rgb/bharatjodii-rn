@@ -21,6 +21,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_REACT, CDN_REVAMP } from '../../constants/cdn'
 import { StorageKeys } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
+import { stripAndDecodeHtml } from '../../utils/htmlEntities'
 import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
 import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { apiCall } from '../../service/apiClient'
@@ -62,7 +63,7 @@ function StoryCard({ story }: { story: Story }) {
       />
       <View style={s.cardInfo}>
         {!!name && <Text style={s.cardName} numberOfLines={1}>{name}</Text>}
-        {!!story.DISTRICT && <Text style={s.cardLocation} numberOfLines={1}>{story.DISTRICT}</Text>}
+        {!!story.DISTRICT && <Text style={s.cardLocation} numberOfLines={1}>{stripAndDecodeHtml(story.DISTRICT)}</Text>}
         {!!story.TimePosted && <Text style={s.cardDate} numberOfLines={1}>{story.TimePosted}</Text>}
       </View>
     </View>
@@ -110,7 +111,9 @@ export default function SuccessStoriesDesktopScreen({ navigation }: Props) {
 
         if (!contentSetRef.current) {
           contentSetRef.current = true
-          if (data['CONTENT1']) setHeroSub(data['CONTENT1'])
+          // See SuccessStoriesScreen.tsx's fetch — CONTENT1 arrives as HTML
+          // numeric character references for vernacular languages.
+          if (data['CONTENT1']) setHeroSub(stripAndDecodeHtml(data['CONTENT1']))
         }
 
         startRef.current += PAGE_LIMIT

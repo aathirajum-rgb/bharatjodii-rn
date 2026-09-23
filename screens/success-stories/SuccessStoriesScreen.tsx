@@ -18,6 +18,7 @@ import { CDN_REACT, CDN_REVAMP } from '../../constants/cdn'
 import { StorageKeys } from '../../constants/storage.keys'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { getItem } from '../../service/storageService'
+import { stripAndDecodeHtml } from '../../utils/htmlEntities'
 import { apiCall } from '../../service/apiClient'
 import { Endpoints } from '../../service/api.endpoints'
 import { handleBack } from '../../utils/navigationRef'
@@ -76,7 +77,7 @@ function formatDate(raw: string): string {
 function StoryCard({ story, onPress }: StoryCardProps) {
   const name     = [story.GroomName, story.BrideName].filter(Boolean).join(' & ')
   const date     = story.TimePosted ? formatDate(story.TimePosted) : ''
-  const location = [story.DISTRICT, date].filter(Boolean).join(',  ')
+  const location = [stripAndDecodeHtml(story.DISTRICT), stripAndDecodeHtml(date)].filter(Boolean).join(',  ')
 
   return (
     <Pressable style={c.card} onPress={onPress} accessibilityRole="button">
@@ -240,8 +241,12 @@ export default function SuccessStoriesScreen({ navigation }: Props) {
 
         if (!contentSetRef.current) {
           contentSetRef.current = true
-          if (data['CONTENT'])  setHeroTitle(data['CONTENT'])
-          if (data['CONTENT1']) setHeroSub(data['CONTENT1'])
+          // CONTENT/CONTENT1 arrive as HTML numeric character references for
+          // vernacular languages (see utils/htmlEntities.ts) — Angular decodes
+          // these for free via [innerHTML]; RN's <Text> has no HTML parser, so
+          // without this they render as literal "&#x0B8E;&#x0BA9;..." text.
+          if (data['CONTENT'])  setHeroTitle(stripAndDecodeHtml(data['CONTENT']))
+          if (data['CONTENT1']) setHeroSub(stripAndDecodeHtml(data['CONTENT1']))
         }
 
         startRef.current += PAGE_LIMIT

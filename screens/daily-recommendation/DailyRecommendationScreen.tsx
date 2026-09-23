@@ -37,7 +37,7 @@ import { toProfile, fetchAndStorePPSetData, fetchMatches } from '../../service/h
 import { communicationBtnOnClick, type CommActionResult } from '../../service/communicationService'
 import { checkAddPhotoPromotion } from '../../service/buttonService'
 import { markProfileViewed } from '../../service/viewProfileService'
-import { stripAndDecodeHtmlInline } from '../../utils/htmlEntities'
+import { stripAndDecodeHtml } from '../../utils/htmlEntities'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
 import { paymentTrack } from '../../service/paymentService'
 import { handleFooterTabPress } from '../../utils/footerTabPress'
@@ -200,7 +200,7 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
 
   // ─── Header ───────────────────────────────────────────────────────────────
   // Angular: getHeaderText() — "Daily recommendations (i/total)"
-  const headerText = `${stripAndDecodeHtmlInline(t('DAILYRECOMMENDATIONS.DAILY_RECOMMENDATIONS'))} (${currentIndex}/${totalCount})`
+  const headerText = `${stripAndDecodeHtml(t('DAILYRECOMMENDATIONS.DAILY_RECOMMENDATIONS'))} (${currentIndex}/${totalCount})`
 
   // ─── navigatteToPaywall() equivalent — used by the close icon and by the
   // end-card's login-with-no-fallback-profile branch ──────────────────────────
@@ -212,15 +212,19 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
       // Angular: navigatteToPaywall()'s else branch does
       // router.navigate(['/' + frm_page]) — a raw lowercase route path,
       // matched fine against Angular's own lowercase routing table. React
-      // Navigation's registered screen name is capitalized ('Matches'), so
-      // passing the literal 'matches' (the only real value drService.ts's
-      // loadDrProfiles() ever sends besides 'login') straight to resetTo()
-      // silently no-oped — nothing registered under that exact lowercase
-      // name. This is why the close (X) icon appeared to do nothing.
-      const target = ['dailyrecommendations', 'registration', 'matches'].includes(frmPage)
-        ? ENavigation.MATCHES
-        : frmPage
-      resetTo(target)
+      // Navigation's registered screen names don't all follow that same
+      // lowercase convention (see ENavigation's own comment on MATCHES) —
+      // 'matches' silently no-oped for exactly that reason (this is why the
+      // close (X) icon appeared to do nothing), and 'home' (HomeScreen.tsx's
+      // Daily Recommendation "See all" passes frm_page: 'home') hits the same
+      // gap: the registered screen name is capitalized 'Home', not 'home'.
+      const FRM_PAGE_TARGET: Record<string, ENavigation> = {
+        dailyrecommendations: ENavigation.MATCHES,
+        registration:         ENavigation.MATCHES,
+        matches:              ENavigation.MATCHES,
+        home:                 ENavigation.HOME,
+      }
+      resetTo(FRM_PAGE_TARGET[frmPage] ?? frmPage)
     }
   }, [frmPage])
 
