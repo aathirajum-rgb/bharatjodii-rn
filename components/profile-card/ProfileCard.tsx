@@ -163,6 +163,43 @@ function SeeAllAvatar({ uri, fallbackUri }: { uri: string; fallbackUri?: string 
   )
 }
 
+const AVATAR_SIZE = 56
+
+// The middle "See All" avatar overlaps the seam between the other two —
+// originally centered via `left: '50%'` + a fixed negative marginLeft on an
+// absolutely-positioned child. That works on iOS/web, but Yoga on Android
+// resolves a percentage `left` on an absolute child of a shrink-wrapped flex
+// row (avatarRow has no explicit width — it sizes to its two in-flow avatars)
+// inconsistently, throwing the middle circle visibly off-center on Android
+// only. Measuring the row's actual pixel width via onLayout and computing an
+// explicit pixel `left` sidesteps the percentage entirely, so every platform
+// places it identically.
+function AvatarRow({
+  avatarSlots, avatarImg,
+}: { avatarSlots: string[]; avatarImg?: string | undefined }) {
+  const [rowWidth, setRowWidth] = useState<number | null>(null)
+
+  return (
+    <View
+      style={styles.avatarRow}
+      onLayout={e => setRowWidth(e.nativeEvent.layout.width)}
+    >
+      {avatarSlots.map((uri, i) => (
+        <View
+          key={i}
+          style={[
+            styles.avatarWrap,
+            i === 1 && rowWidth != null && [styles.avatarWrapAbsolute, { left: (rowWidth - AVATAR_SIZE) / 2 }],
+            i === 1 && rowWidth == null && styles.avatarWrapHidden,
+          ]}
+        >
+          <SeeAllAvatar uri={uri} fallbackUri={avatarImg} />
+        </View>
+      ))}
+    </View>
+  )
+}
+
 // ─── Section → PhotoVariant map ──────────────────────────────────────────────
 
 const SECTION_VARIANT: Record<CardSection, PhotoVariant> = {
@@ -493,13 +530,7 @@ export default function ProfileCard({
       return (
         <Pressable style={({ pressed }) => [styles.card, styles.seeAllCardOuter, pressed && { opacity: 0.85 }]} onPress={onViewMorePress}>
           <LinearGradient colors={SEE_ALL_GRADIENT[section] ?? SEE_ALL_GRADIENT_DEFAULT} style={styles.seeAllCard}>
-            <View style={styles.avatarRow}>
-              {avatarSlots.map((uri, i) => (
-                <View key={i} style={[styles.avatarWrap, i === 1 && styles.avatarWrapAbsolute]}>
-                  <SeeAllAvatar uri={uri} fallbackUri={avatarImg} />
-                </View>
-              ))}
-            </View>
+            <AvatarRow avatarSlots={avatarSlots} avatarImg={avatarImg} />
             {/* Angular: type='5's wrapper is `mt-6` (6px) — see type='3's
                 call site above for the 4px case this shared linkBtn used to
                 guess for both. */}
@@ -823,10 +854,18 @@ const styles = StyleSheet.create({
   linkBtnCenter: {
     alignSelf: 'center',
   },
+  // justifyContent:'center' matters once the CTA label wraps to 2 lines — a
+  // vernacular translation (e.g. Tamil "அனைத்தையும் காணுங்கள்") runs longer
+  // than English "See All" and wraps inside this card's narrow width. Without
+  // it, Yoga sizes the row to the full available width once its Text child
+  // needs 2 lines rather than shrink-wrapping to content, so the outer
+  // linkBtnCenter's alignSelf:'center' had nothing narrower to center — text
+  // and the chevron both sat flush left instead of centered as a block.
   linkBtnRow: {
-    flexDirection: 'row',
-    alignItems:    'center',
-    gap:           4,
+    flexDirection:  'row',
+    alignItems:     'center',
+    justifyContent: 'center',
+    gap:            4,
   },
   // Angular: both call sites (type='3' "View full profile", type='5' "See All") use
   // app-button-revamp with the default ctaFontSize (EButtonFontSize.regular14 →
@@ -837,6 +876,14 @@ const styles = StyleSheet.create({
     fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
     fontSize: FontSize.font14,
     color: SEE_ALL_LINK_COLOR,
+    // Centers each line against the others when a longer vernacular label
+    // wraps to 2 lines — RN's Text defaults to left-aligning wrapped lines.
+    textAlign: 'center',
+    // Lets the label actually wrap within the row's available width instead
+    // of overflowing past the card edge, which is what forced it into a
+    // single line — measurable width is required for React Native's
+    // Text wrapping to kick in inside a flexDirection:'row' parent.
+    flexShrink: 1,
   },
   // Angular: the animated <img> is styled inline `width: 24px; height: 20px`
   // — not square, same asset/size as SwiperCard.tsx's own "See all" link.
@@ -960,12 +1007,17 @@ const styles = StyleSheet.create({
   },
   // RN's `position: absolute` (unlike web CSS) anchors to the parent's
   // origin rather than the element's own static flow position, so the
-  // horizontal centering has to be done explicitly.
+  // horizontal centering has to be done explicitly. `left` is computed to an
+  // exact pixel value from the measured row width in AvatarRow above instead
+  // of a percentage — see the comment on AvatarRow for why.
   avatarWrapAbsolute: {
     position: 'absolute',
-    left: '50%',
-    marginLeft: -28,   // half of avatarWrap's width, to center it
     zIndex: 1,
+  },
+  // Middle avatar stays invisible for the one frame before avatarRow's width
+  // is measured, instead of flashing at an unpositioned (left: 0) spot.
+  avatarWrapHidden: {
+    opacity: 0,
   },
   avatarImg: {
     width: '100%',
