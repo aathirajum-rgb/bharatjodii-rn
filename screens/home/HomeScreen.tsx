@@ -824,7 +824,7 @@ const TodayMatchesSection = memo(function TodayMatchesSection({
   return (
     <>
       <View style={s.divider} />
-      <View style={s.section}>
+      <View style={s.drSection}>
         {/* Angular: home.config.ts's drmatches is the only swiper config with
             coverflowEffect — a centered, tilted-neighbor carousel. */}
         <CoverflowSwiper
@@ -2292,6 +2292,13 @@ const s = StyleSheet.create({
   // ion-row supplies the `pt-32` — so 32 above and 12 below, not the generic
   // section's 20/4. The background SVG fills this whole padded box.
   likedSection: { paddingTop: 32, paddingBottom: 12 },
+  // Daily Recommendation (app-swiper.component.html's `swipperType ===
+  // dailyRecommendation` branch) goes through this exact same generic
+  // <app-swiper> `pt-0 pb-12` grid / `pt-32` row as likedSection above — it
+  // was left on the generic section's 20/4 instead of getting the same 32/12
+  // override, so its bottom gap to the next section (Newly Joined) sat
+  // noticeably tighter than every other swiper section's.
+  drSection: { paddingTop: 40, paddingBottom: 24 },
   // Angular: .explore-border-top { border-top: 3px solid #EBEBEB } — a thin
   // top-border line between sections, not a filled band.
   divider: { borderTopWidth: 3, borderTopColor: '#EBEBEB' },
