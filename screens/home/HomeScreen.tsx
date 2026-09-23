@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import { useFooterBadges } from '../../contexts/FooterBadgesContext'
 import {
@@ -30,7 +30,7 @@ import CoverflowSwiper from '../../components/swiper-card/CoverflowSwiper'
 import Loader from '../../components/loader/Loader'
 import StickyBanner from '../../components/sticky-banner/StickyBanner'
 import PhotoPromoSticky from '../../components/sticky-banner/PhotoPromoSticky'
-import BottomSheet from '../../components/bottom-sheet/BottomSheet'
+import BottomSheet, { whatsAppPhotoRequestSheet } from '../../components/bottom-sheet/BottomSheet'
 import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
 import WhatsAppPaywallModal from '../../components/matches/WhatsAppPaywallModal'
 import { useContactGating, type ContactGating } from '../../hooks/useContactGating'
@@ -76,7 +76,7 @@ import {
   fetchExploreCategories, fetchHomeSession, fetchAndStorePPSetData, fetchHomeAllMatches,
   fetchViewedYou, fetchDailyRec, fetchNewlyJoined, fetchViewedByMe,
   fetchLikedByMe, fetchLikedYou, fetchSuccessStories, fetchFaqVideos,
-  fetchCustomerCare, fetchNotifCount, refreshSession,
+  fetchCustomerCare, fetchNotifCount, deriveExploreCount, refreshSession,
   mapCompleteProfileCards, fetchProfileValidationBanner, type ProfileValidationBanner,
   type ExploreCategory, type HelpVideo, type CompleteProfileCard, type ComCountEntry,
 } from '../../service/homeService'
@@ -986,6 +986,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
     idVerified?: boolean | undefined
   } | null>(null)
   const [whatsappPaywallItem, setWhatsappPaywallItem] = useState<SwiperItem | null>(null)
+  // The WhatsApp photo-request paywall sheet (BottomSheet 'whatsAppPhotoRequest').
+  const [waPhotoRequest, setWaPhotoRequest] = useState<{ item: SwiperItem; fromPage: string } | null>(null)
 
   const [likedTab, setLikedTab] = useState<LikedTab>('likedbyme')
   const [categories, setCategories] = useState<ExploreCategory[]>([])
@@ -1005,9 +1007,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   // The persistent tab bar (MainTabs.tsx) renders AppFooter now, not this
   // screen — publish these into the shared context instead of local state.
   const {
-    setUpgradeTag, setShowMembershipDot,
-    isMembershipDotDismissedForSession, dismissMembershipDotForSession,
-    setLikesCount,
+    setUpgradeTag, dismissMembershipDotForSession,
+    setLikesCount, setExploreCount,
   } = useFooterBadges()
 
   // ── Hero banner / assist banner (mutually exclusive top slot) ─────────────
@@ -1386,11 +1387,12 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       let tag = String(menuPromo?.['MENUDISCOUNT'] ?? '')
       if (['0', '0 OFF', '₹0 OFF'].includes(tag) || entryTypeVal === 'P') tag = ''
       setUpgradeTag(tag)
-      // Angular: footer.component.html:52's showRedDot && membershipExpiry &&
-      // ENTRYTYPE==='F' && upgradeTag!=='' — showRedDot itself defaults true
-      // and only ever flips false for the rest of the session once the user
-      // has tapped the membership tab (FooterBadgesContext's dismiss flag).
-      setShowMembershipDot(!isMembershipDotDismissedForSession() && membershipExpiry && entryTypeVal === 'F' && !!tag)
+      // The red dot itself is no longer computed here. Angular's footer owns it
+      // (it loads ppSetData/getMenuPromo for itself), and having only Home set it
+      // meant it never appeared for a session that started on Matches — so that
+      // derivation now lives in FooterBadgesContext. `membershipExpiry` is still
+      // read above for the tag's own conditions.
+      void membershipExpiry
 
       // ── Force-update sticky — Angular populates updatePopupContent.APPFORCEUPDATE
       // independently of checkProfileStatus() below (explore.component.ts:553),
@@ -1470,6 +1472,11 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       const notifResult = await fetchNotifCount()
       if (ctrl.cancelled) return
       setComCount(notifResult.comCount)
+      // Footer Home bubble — Angular recomputes it inside getNotificationCount(),
+      // so every screen that refreshes the counts refreshes the badge too.
+      deriveExploreCount(notifResult.comCount)
+        .then(n => { if (!ctrl.cancelled) setExploreCount(n) })
+        .catch(() => {})
 
       const viewedYouResult = await fetchViewedYou()
       if (ctrl.cancelled) return
@@ -1803,13 +1810,45 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           idVerified: item.isIdVerified,
         })
       } else if (result.type === 'payment_promo') {
-        setWhatsappPaywallItem(item)
+        // Angular communication.service.ts's whatsappNudge branch: a free
+        // member on a card showing the WhatsApp photo-request overlay (no
+        // photo, or a hidden one — showReqPhotoElement, see homeGating.ts)
+        // gets the whatsAppPhotoRequestPayment sheet, not the generic promo.
+        if (item.showReqPhotoElement) setWaPhotoRequest({ item, fromPage })
+        else setWhatsappPaywallItem(item)
       } else if (result.type === 'error') {
         Alert.alert('', result.message)
       } else {
         await phoneInfo.handleResult(result)
       }
     } catch { /* silent — matches this app's established convention */ }
+  }
+
+  // Hidden photo → the partner's blurred THUMBIMG + "has hidden" copy;
+  // no photo → the placeholder (see whatsAppPhotoRequestSheet()).
+  const waPhotoSheet = useMemo(() => whatsAppPhotoRequestSheet(
+    t,
+    gating.oppGender,
+    !!waPhotoRequest?.item.isPhotoAvailable,
+    waPhotoRequest?.item.thumbImg ?? waPhotoRequest?.item.profileImg,
+  ), [waPhotoRequest, gating.oppGender, t])
+  const waPhotoRequestData = waPhotoRequest ? waPhotoSheet.data : undefined
+  const waPhotoTracking    = waPhotoSheet.tracking
+
+  // Angular showWhatsAppPhotoRequestPaymentPopup(): the open beacon fires as
+  // the sheet is created.
+  useEffect(() => {
+    if (waPhotoRequest) paymentTrack(waPhotoTracking.open).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waPhotoRequest])
+
+  // Angular onDidDismiss 'upgradeNow': pay beacon, then
+  // redirectToIntermediatePage(this.router.url, '', '7', true).
+  function handleWaPhotoRequestPayNow() {
+    const fromPage = waPhotoRequest?.fromPage ?? 'home'
+    setWaPhotoRequest(null)
+    paymentTrack(waPhotoTracking.pay).catch(() => {})
+    redirectToIntermediatePage(fromPage, '', '7').catch(() => {})
   }
 
   function handleContactDetailsClose() { setContactDetails(null) }
@@ -2278,6 +2317,15 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         oppGender={gating.oppGender}
         onClose={() => setWhatsappPaywallItem(null)}
         onPayNow={() => { setWhatsappPaywallItem(null); navigation.navigate('recharge') }}
+      />
+      <BottomSheet
+        visible={!!waPhotoRequest}
+        type="whatsAppPhotoRequest"
+        data={waPhotoRequestData}
+        // Angular opens this modal with backdropDismiss:false.
+        dismissOnBackdrop={false}
+        onClose={() => setWaPhotoRequest(null)}
+        onPrimaryPress={handleWaPhotoRequestPayNow}
       />
       <BottomSheet
         visible={!!phoneInfo.sheet}

@@ -100,6 +100,28 @@ export const StorageKeys = {
     FAQ_MATCHES_TOUCHPOINT: 'FAQMATCHESTOUCHPOINT',
   },
 
+  // Bottom-nav notification badges. Angular keeps the counts on its `Nbcommon`
+  // singleton and the "already seen this tab" flags in localStorage under these
+  // exact names (footer.component.ts:152/160/186, common.ts:827/858).
+  Notify: {
+    // Written when the Home tab is tapped. Angular never READS it — the Home
+    // badge is driven purely by the count — but the key is kept so the two
+    // apps clear the same storage on logout.
+    EXPLORE_CLICK: 'EXPLORENOTIFYCLICK',
+    // Written when the Activity tab is tapped, and genuinely read back: it is
+    // what suppresses the Activity badge (common.ts:827/858).
+    ACTIVITY_CLICK: 'NOTIFICATIONCLICK',
+    // Written when Messages is opened. Angular never reads this one either —
+    // the live gate is an in-memory flag that resets each launch.
+    CHAT_CLICK: 'CHATNOTIFYCLICK',
+    // How many "viewed you" profiles have been opened since the count was
+    // issued; subtracted from the Home badge. Angular: common.ts:136.
+    REDUCED_COUNT: 'REDUCEDNOTIFYCOUNT',
+    // Partner IDs already counted into REDUCED_COUNT, so re-opening the same
+    // profile doesn't decrement twice (viewprofile.page.ts:766-777).
+    VIEWED_IDS: 'VIEWEDID',
+  },
+
   App: {
     DYNAMIC: 'DYNAMIC',
     PP_SET_DATA: 'PPSETDATA',

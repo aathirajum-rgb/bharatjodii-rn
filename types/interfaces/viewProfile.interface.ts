@@ -11,6 +11,10 @@ export interface PropertyItem {
 
 export interface ViewProfileModel extends MatchProfile {
   gender:          'M' | 'F'
+  // COMMINFO.NEW — "this member viewed you and you haven't opened them yet".
+  // Only consumed by the footer's Home badge accounting (Angular:
+  // viewprofile.page.ts:768), not rendered anywhere.
+  isNewViewer?:    boolean
   maritalStatus?:  string
   noOfChildren?:   string
   motherTongue?:     string

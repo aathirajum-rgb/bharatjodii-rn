@@ -436,6 +436,25 @@ export async function saveFilterState(
   ])
 }
 
+// The Filter / Edit Preference screen persists every edit as it happens (the
+// live count reads it back), so leaving WITHOUT "Show N matches" used to keep
+// those edits: Matches' Filters-chip count and the screen's red dots both read
+// SELECTEDFILTERS, though no search ever ran with them. The screen snapshots
+// these keys on open and restores them unless the member applied.
+// K.TOTAL rides along because Reset (resetFilter) purges it too.
+const FILTER_SESSION_KEYS = [K.SELECTED, K.PPCHECK, K.FILTERS, K.TOTAL]
+
+export type FilterSessionSnapshot = Record<string, string | null>
+
+export async function snapshotFilterSession(): Promise<FilterSessionSnapshot> {
+  const values = await Promise.all(FILTER_SESSION_KEYS.map(k => getItem(k)))
+  return Object.fromEntries(FILTER_SESSION_KEYS.map((k, i) => [k, values[i]]))
+}
+
+export async function restoreFilterSession(snap: FilterSessionSnapshot): Promise<void> {
+  await Promise.all(Object.entries(snap).map(([k, v]) => (v == null ? removeItem(k) : setItem(k, v))))
+}
+
 // ─── Matches counts ───────────────────────────────────────────────────────────
 // Angular keeps TWO counts, and the difference is the whole point of the
 // "#COUNT# profiles based on your preferences." line (matches.page.ts:2900's

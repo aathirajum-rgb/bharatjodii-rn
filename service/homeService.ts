@@ -393,6 +393,40 @@ export async function fetchNotifCount(): Promise<NotifCountResult> {
   return { newCount: 0, comCount: [] }
 }
 
+// ─── Footer "Home" badge count ────────────────────────────────────────────────
+// Angular: common.ts:830-839 — the Home bubble counts NEW "viewed you" profiles,
+// minus however many of them the member has already opened (reducedNotifyCount,
+// bumped in viewprofile.page.ts:771). Tapping Home does NOT clear this badge in
+// Angular, so this subtraction is the only thing that ever brings it down before
+// the server's own count changes.
+export async function deriveExploreCount(comCount: Array<{ comtype?: string; newcount?: string }>): Promise<number> {
+  const viewedYou = Number(comCount.find(c => c.comtype === 'viewedyou')?.newcount ?? 0)
+  const reducedRaw = await getItem(StorageKeys.Notify.REDUCED_COUNT)
+  const reduced = Number(reducedRaw ?? 0)
+  // Angular guards the subtraction with Math.max(0, reduced) but not the result,
+  // so a stale REDUCEDNOTIFYCOUNT can go negative there; clamped here instead
+  // since a negative would read as "no badge" either way.
+  return Math.max(0, viewedYou - Math.max(0, Number.isFinite(reduced) ? reduced : 0))
+}
+
+// Angular: viewprofile.page.ts:766-777 — opening a profile that is still flagged
+// NEW, reached from the "viewed you" list, permanently discounts it from the Home
+// badge. VIEWEDID dedupes, so re-opening the same profile can't decrement twice.
+export async function recordViewedYouOpened(partnerId: string): Promise<void> {
+  if (!partnerId) return
+  const raw = await getItem(StorageKeys.Notify.VIEWED_IDS)
+  let seen: string[] = []
+  try { seen = raw ? JSON.parse(raw) : [] } catch { seen = [] }
+  if (!Array.isArray(seen)) seen = []
+  if (seen.includes(partnerId)) return
+  seen.push(partnerId)
+  const reduced = Number((await getItem(StorageKeys.Notify.REDUCED_COUNT)) ?? 0)
+  await Promise.all([
+    setItem(StorageKeys.Notify.VIEWED_IDS, JSON.stringify(seen)),
+    setItem(StorageKeys.Notify.REDUCED_COUNT, String((Number.isFinite(reduced) ? reduced : 0) + 1)),
+  ])
+}
+
 // ─── Menu promo (MATCHESSLOT membership banner) ───────────────────────────────
 // Angular: paymentService.getMenuPromo(0) → payment/nbmenu/v1
 // Returns MATCHESSLOT (festival/membership offer), MANYJOBSPROMO, ASSISTEDPROMO, etc.

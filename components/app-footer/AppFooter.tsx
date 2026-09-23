@@ -109,11 +109,14 @@ const TAB_ORDER: FooterTab[] = [0, 1, 2, 4, 3]
 
 // ─── Sub-component ────────────────────────────────────────────────────────────
 
+// Angular caps every footer count at "9+", not "99+" — common.ts:848/886
+// (`count > 9 ? '9+' : count`) for Activity and :835/873/899 for Home. The
+// badge is a small circle sized for two glyphs; three digits overflowed it.
 function CountBadge({ count }: { count: number }) {
   return (
     <View style={styles.countBadge}>
       <Text style={styles.countText} numberOfLines={1}>
-        {count > 99 ? '99+' : String(count)}
+        {count > 9 ? '9+' : String(count)}
       </Text>
     </View>
   )

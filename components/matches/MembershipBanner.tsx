@@ -55,7 +55,7 @@ export default function MembershipBanner({ data, onPress }: { data: any; onPress
         <Image source={{ uri: data.BGIMG }} style={mb.bgImg} resizeMode="cover" />
       )}
 
-      <View style={[mb.content,{minHeight:"387px"}]}>
+      <View style={mb.content}>
         {/* TITLEIMG is an SVG logo/icon — CdnSvg (not plain Image) so it decodes on native */}
         {!!data.TITLEIMG && (
           <CdnSvg uri={data.TITLEIMG} width={140} height={28} style={mb.titleImg} />
@@ -74,7 +74,7 @@ export default function MembershipBanner({ data, onPress }: { data: any; onPress
 
         {/* Festival subtitle */}
         {!!data.FESTIVALSUBTITLE && (
-          <HtmlText html={data.FESTIVALSUBTITLE} style={[mb.subtitle, { color: textColor, fontFamily: langFonts.semiBold }]} />
+          <HtmlText html={data.FESTIVALSUBTITLE} style={[mb.subtitle, { color: textColor, fontFamily: langFonts.medium }]} classFonts={langFonts} />
         )}
 
         {/* Subtitle — "Get up to <span>₹200 OFF</span> on paid membership!" — Angular gives
@@ -83,15 +83,16 @@ export default function MembershipBanner({ data, onPress }: { data: any; onPress
         {!!data.SUBTITLE && (
           <HtmlText
             html={data.SUBTITLE}
-            style={[mb.subtitle, { color: textColor, fontFamily: langFonts.semiBold }]}
-            spanStyle={mb.subtitleAmount}
+            style={[mb.subtitle, { color: textColor, fontFamily: langFonts.medium }]}
+            spanStyle={{ ...mb.subtitleAmount, fontFamily: langFonts.semiBold }}
+            classFonts={langFonts}
           />
         )}
 
         {/* Validity / timer pill — ribbon shape: rounded left corners only, no right border
             (Angular: border-t/border-b/border-l but no border-r, rounded-tl/rounded-bl only) */}
         {!!valid && (
-          <Text style={[mb.valid, { backgroundColor: validBg, borderColor: validBorder, color: isWhite ? Colors.white : Colors.black, fontFamily: langFonts.semiBold }]}>
+          <Text style={[mb.valid, { backgroundColor: validBg, borderColor: validBorder, color: isWhite ? Colors.white : Colors.black, fontFamily: langFonts.regular }]}>
             {valid}
           </Text>
         )}
@@ -118,7 +119,7 @@ export default function MembershipBanner({ data, onPress }: { data: any; onPress
           style={[mb.ctaBtn, { backgroundColor: resolveCtaBg(data.CTABGCOLOR) }]}
           onPress={onPress}
         >
-          <Text style={[mb.ctaText, { color: resolveCtaTextColor(data.CTACOLOR), fontFamily: langFonts.semiBold }]}>{cta}</Text>
+          <Text style={[mb.ctaText, { color: resolveCtaTextColor(data.CTACOLOR), fontFamily: langFonts.regular }]}>{cta}</Text>
         </Pressable>
       </View>
     </Pressable>
@@ -127,12 +128,8 @@ export default function MembershipBanner({ data, onPress }: { data: any; onPress
 
 const mb = StyleSheet.create({
   // Angular: matches-breather-block — background: url(BGIMG) covers the WHOLE card.
-  // No minHeight: Angular's own min-height:387px assumes content is vertically
-  // centered inside it (d-flex align-center-item), which isn't reproduced here —
-  // without that centering, a fixed minHeight just leaves dead space below the CTA
-  // button whenever this card's content (varies per campaign) is shorter than the
-  // floor. Sizing purely to content removes that gap; bgImg (cover, often mostly
-  // transparent art) adapts to whatever height results.
+  // Angular: min-height:387px with the content vertically centred — the floor
+  // and the centring live together on mb.content below.
   card: {
     backgroundColor:   Colors.membershipCardBg,
     borderBottomWidth: 8,
@@ -155,7 +152,10 @@ const mb = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop:        38,
     paddingBottom:     24,
-    justifyContent: "center"
+    // A NUMBER: the '387px' string this used to be is web-only CSS — native
+    // Yoga doesn't parse units, so the card sized differently per platform.
+    minHeight:         387,
+    justifyContent:    'center',
   },
   titleImg: {
     width:        140,
@@ -174,11 +174,13 @@ const mb = StyleSheet.create({
   // (Angular: breather.component.html:38 FESTIVALSUBTITLE — body1-medium-14 line-height-20)
   subtitle: {
    
-    fontSize:      FontSize.font14,
+    // Matched to the Angular render: "Get up to" / "on paid membership!" sit
+    // visibly larger than the 14px benefit rows. lineHeight leaves room for
+    // the 22px amount span sharing the line.
+    fontSize:      FontSize.font16,
     color:         Colors.textDark,
     marginTop:     8,
-    lineHeight:    20,
-    letterSpacing: 0.28,
+    lineHeight:    28,
   },
   // The "₹200 OFF" span specifically — Angular: breather.component.ts's transform() confirms
   // the server-sent SUBTITLE span itself carries class heading1-semibold-22 (22px
@@ -206,14 +208,15 @@ const mb = StyleSheet.create({
   },
   // Angular: breather.component.scss .benefits { margin-top: 16px } (English);
   // gap-[12px] between individual rows matches Figma + Angular's .benefitItem margin-top
+  // Row pitch matched to the Angular render (~34px centre to centre).
   benefitsList: {
-    marginTop: 16,
-    gap:       12,
+    marginTop: 20,
+    gap:       14,
   },
   // Figma: gap-[8px] between tick and text
   benefitRow: {
     flexDirection: 'row',
-    alignItems:    'flex-start',
+    alignItems:    'center',
     gap:           8,
     width:        '77%',
   },
@@ -235,10 +238,11 @@ const mb = StyleSheet.create({
   // — 100% of its OWN column, which is ion-col size="7.2" (7.2/12 = 60% of the row).
   // The Figma mockup's compact/content-sized look doesn't match the real Angular CSS —
   // this follows the actual implementation, not the mockup.
+  // Angular render: 32px below the last benefit, 60% wide (ion-col 7.2/12).
   ctaBtn: {
-    marginTop:         16,
+    marginTop:         32,
     height:            40,
-    width:             '65%',
+    width:             '60%',
     borderRadius:      8,
     paddingHorizontal: 16,
     alignItems:        'center',

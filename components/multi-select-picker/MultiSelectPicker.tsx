@@ -79,15 +79,32 @@ export default function MultiSelectPicker({
   // parent flips `visible` off without going through handleClose.
   const [mounted,  setMounted]  = useState(false)
 
+  // The entrance must not start until the Modal below is actually on screen.
+  // `visible` flipping only schedules the `mounted` render, and Android then
+  // takes several more frames to present the native modal window — so a timing
+  // started here ran down behind a window nobody could see yet, and the panel
+  // appeared late and already part-way through its slide. Park the values and
+  // let the Modal's own onShow drive it.
+  function runEnterAnimation() {
+    Animated.parallel([
+      Animated.timing(slideAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
+      Animated.timing(scrimAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+    ]).start()
+  }
+
   useEffect(() => {
     if (visible) {
       setSearch('')
       setSelected(selectedKeys)
-      setMounted(true)
-      Animated.parallel([
-        Animated.timing(slideAnim, { toValue: 1, duration: 280, useNativeDriver: true }),
-        Animated.timing(scrimAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-      ]).start()
+      if (mounted) {
+        // Reopened before the exit finished, so the Modal never unmounted and
+        // no onShow is coming — drive the entrance from here instead.
+        runEnterAnimation()
+      } else {
+        slideAnim.setValue(0)
+        scrimAnim.setValue(0)
+        setMounted(true)
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible])
@@ -222,6 +239,7 @@ export default function MultiSelectPicker({
       transparent
       visible={mounted}
       animationType="none"
+      onShow={runEnterAnimation}
       onRequestClose={handleClose}
       statusBarTranslucent
     >

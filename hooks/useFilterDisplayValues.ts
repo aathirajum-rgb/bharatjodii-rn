@@ -84,7 +84,7 @@ export function useFilterDisplayValues(): [FilterDisplayResult | null, () => voi
       heightOpts, starOpts, doshamOpts,
     ] = await Promise.all([
       isAny(selected.RELIGION) ? empty : fetchReligionOptions(),
-      isAny(casteKeys) ? empty : fetchSearchCasteOptions(religion),
+      isAny(casteKeys) ? empty : fetchSearchCasteOptions(religion, casteKeys),
       isAny(selected.OCCUPATION) ? empty : fetchOccupationOptions(),
       isAny(selected.MONTHLYINCOME) ? empty : fetchMonthlyIncomeOptions(),
       isAny(selected.EDUCATION) ? empty : fetchQualificationOptions(),

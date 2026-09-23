@@ -73,10 +73,27 @@ export default function StrictFieldEditorScreen({
   // onClose is deferred until the slide-out has finished.
   const [mounted, setMounted] = useState(false)
 
+  // Starting the entrance the moment `visible` flips is too early: the Modal
+  // below is gated on `mounted`, which has not rendered yet, and Android then
+  // spends several more frames actually presenting the native modal window.
+  // The 280ms timing was burning down behind a window nobody could see, so the
+  // panel showed up late and already part-way (or fully) slid in, which reads
+  // as a lag rather than a transition. Park it off-screen instead and let the
+  // Modal's own onShow start it, which fires when the window is really up.
+  function runEnterAnimation() {
+    Animated.timing(slideAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start()
+  }
+
   useEffect(() => {
     if (visible) {
-      setMounted(true)
-      Animated.timing(slideAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start()
+      if (mounted) {
+        // Reopened before the previous exit finished — the Modal never went
+        // away, so no onShow is coming and the entrance has to start here.
+        runEnterAnimation()
+      } else {
+        slideAnim.setValue(0)
+        setMounted(true)
+      }
     } else if (mounted) {
       // `visible` flipped off from outside (not through handleClose) — still
       // play the exit rather than vanishing on the first frame.
@@ -126,7 +143,7 @@ export default function StrictFieldEditorScreen({
        the way a pushed route looks. statusBarTranslucent + the insets.top padding
        keeps the header clear of the status bar, matching the pickers this page
        opens on top of itself. */
-    <Modal visible={mounted} transparent animationType="none" onRequestClose={handleClose} statusBarTranslucent>
+    <Modal visible={mounted} transparent animationType="none" onShow={runEnterAnimation} onRequestClose={handleClose} statusBarTranslucent>
       <Animated.View
         style={[
           s.screen,

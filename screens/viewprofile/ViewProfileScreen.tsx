@@ -5,7 +5,7 @@
 // photo gestures, prev/next profile swipe + cache, Daily-Recommendation mode,
 // horoscope request/upload, similar-profiles carousel, report-profile popover,
 // self-preview/edit-profile mode, and GAM ads (no RN equivalent, dropped for good).
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator, Dimensions, FlatList, Linking, Platform, Alert,
@@ -44,7 +44,7 @@ import Toast, { type ToastRequest } from '../../components/toast/Toast'
 import AppRatingModal from '../../components/app-rating/AppRatingModal'
 import { useAppRating } from '../../hooks/useAppRating'
 import Popover, { type PopoverAnchor } from '../../components/popover/Popover'
-import BottomSheet from '../../components/bottom-sheet/BottomSheet'
+import BottomSheet, { whatsAppPhotoRequestSheet } from '../../components/bottom-sheet/BottomSheet'
 import ViewProfileDesktopLayout from './ViewProfileDesktopLayout'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
@@ -59,11 +59,11 @@ import {
 import { viewProfileAdapter } from '../../adapters/viewProfile.adapter'
 import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import {
-  getHeroBannerDetails, fetchUpgradePaymentPromo, redirectToIntermediatePage,
+  getHeroBannerDetails, fetchUpgradePaymentPromo, redirectToIntermediatePage, paymentTrack,
   type UpgradePaymentPromo,
 } from '../../service/paymentService'
 import { handleBack } from '../../utils/navigationRef'
-import { fetchMenuPromo } from '../../service/homeService'
+import { fetchMenuPromo, recordViewedYouOpened } from '../../service/homeService'
 import { getItem, getJson } from '../../service/storageService'
 import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
 import { ENavigation } from '../../types/enums/navigation.enum'
@@ -505,7 +505,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // 'show_contact' with no confirmation step, and silently dropped every other
   // phoneviewed branch (protected number, view limits, ID-verify gate,
   // female-free flow) instead of surfacing anything for them. ──
-  const [contactConfirm, setContactConfirm] = useState<'call' | 'whatsapp' | null>(null)
+  // 'whatsappNudge' = the photo overlay's WhatsApp button (Angular's action of
+  // that name), as opposed to the name row's plain 'whatsapp' icon.
+  const [contactConfirm, setContactConfirm] = useState<'call' | 'whatsapp' | 'whatsappNudge' | null>(null)
+  // The WhatsApp photo-request paywall sheet (BottomSheet 'whatsAppPhotoRequest').
+  const [waPhotoRequestOpen, setWaPhotoRequestOpen] = useState(false)
   // Angular: viewprofile.page.ts's presentPopover() — tapping the Verified badge's
   // info icon (or anywhere on the badge, same as Angular) shows this small tooltip,
   // anchored right under the tapped badge (Angular: popoverController.create({event})).
@@ -793,6 +797,14 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         const adapted = viewProfileAdapter.adapt(raw)
         setProfile(adapted)
         setEnlargedPhotos(null)
+        // Angular viewprofile.page.ts:766-777 — opening a still-NEW profile
+        // from the "viewed you" list discounts it from the footer's Home
+        // bubble. This is the ONLY thing that brings that badge down before
+        // the server's own count moves (tapping Home deliberately does not
+        // clear it), so without this the badge would stick permanently.
+        if (fromPage === 'viewedyou' && adapted.isNewViewer) {
+          recordViewedYouOpened(matriId).catch(() => {})
+        }
         // Angular: viewprofile.page.ts:2033-2039 — a profile that actually
         // rendered counts as one "profile seen", unless it is the member
         // looking at their own card or a same-gender one
@@ -1220,19 +1232,50 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     }
   }
 
-  function handleWhatsApp() {
+  // Both are passed straight to onPress, so neither takes an argument (RN
+  // would hand it the press event) — the action is fixed per entry point.
+  function handleWhatsApp()      { startWhatsApp('whatsapp') }
+  function handleWhatsAppNudge() { startWhatsApp('whatsappNudge') }
+
+  function startWhatsApp(action: 'whatsapp' | 'whatsappNudge') {
     if (!profile) return
     if (checkPhoneNoLimit()) return
     const alreadyViewed = ['1', '3'].includes(String(profile.phoneViewed ?? '0'))
     if (ownEntryType !== 'P' && !alreadyViewed) {
-      handleContactConfirmYes('whatsapp')
+      handleContactConfirmYes(action)
       return
     }
     if (shouldSkipPhoneConfirm(profile.phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType, profile.phoneProtected)) {
-      handleContactConfirmYes('whatsapp')
+      handleContactConfirmYes(action)
     } else {
-      setContactConfirm('whatsapp')
+      setContactConfirm(action)
     }
+  }
+
+  // Hidden photo → the partner's blurred photo + "has hidden" copy; no photo →
+  // the placeholder (see whatsAppPhotoRequestSheet()).
+  // profile.gender, not `oppGender`: that const is only declared below the
+  // screen's loading early-return.
+  const waPhotoSheet = useMemo(() => whatsAppPhotoRequestSheet(
+    t,
+    profile?.gender === 'M' ? 'M' : 'F',
+    !!profile?.isPhotoAvailable,
+    profile?.profileImg ?? profile?.photos?.[0],
+  ), [profile, t])
+
+  // Angular showWhatsAppPhotoRequestPaymentPopup(): the open beacon fires as
+  // the sheet is created.
+  useEffect(() => {
+    if (waPhotoRequestOpen) paymentTrack(waPhotoSheet.tracking.open).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waPhotoRequestOpen])
+
+  // Angular onDidDismiss 'upgradeNow': pay beacon, then
+  // redirectToIntermediatePage(this.router.url, '', '7', true).
+  function handleWaPhotoRequestPayNow() {
+    setWaPhotoRequestOpen(false)
+    paymentTrack(waPhotoSheet.tracking.pay).catch(() => {})
+    redirectToIntermediatePage(fromPage, '', '7').catch(() => {})
   }
 
   // Angular: viewprofile.page.html:493-498 — msgImgCta, same clickingOnBtn(...,
@@ -1294,7 +1337,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     return getSharedContactConfirmContent(t, profile.gender, contactQuota)
   }
 
-  async function handleContactConfirmYes(override?: 'call' | 'whatsapp') {
+  async function handleContactConfirmYes(override?: 'call' | 'whatsapp' | 'whatsappNudge') {
     const action = override ?? contactConfirm
     if (!profile || !action) return
     setContactConfirm(null)
@@ -1320,7 +1363,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           }))
         }
       } else if (result.type === 'payment_promo') {
-        await showPaymentPromo(action === 'whatsapp')
+        // Angular communication.service.ts's whatsappNudge branch: a free
+        // member tapping the photo overlay's WhatsApp gets the
+        // whatsAppPhotoRequestPayment sheet instead of the generic promo.
+        if (action === 'whatsappNudge') setWaPhotoRequestOpen(true)
+        else await showPaymentPromo(action === 'whatsapp')
       } else if (result.type === 'phone_protected') {
         setPhoneInfoSheet({ kind: 'phone_protected' })
       } else if (result.type === 'under_validation') {
@@ -2192,7 +2239,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                         <Text style={[s.overlayText, { fontFamily: langFonts.medium }]}>
                           {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
                         </Text>
-                        <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={handleWhatsApp} />
+                        <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={handleWhatsAppNudge} />
                       </View>
                     </View>
                   )}
@@ -2675,6 +2722,18 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           countdownDeadlineMs={activeSticky.deadlineMs}
         />
       )}
+
+      {/* Angular: bottomsheet.component's `whatsAppPhotoRequestPayment` —
+          the photo overlay's WhatsApp tap by a free member. */}
+      <BottomSheet
+        visible={waPhotoRequestOpen}
+        type="whatsAppPhotoRequest"
+        data={waPhotoRequestOpen ? waPhotoSheet.data : undefined}
+        // Angular opens this modal with backdropDismiss:false.
+        dismissOnBackdrop={false}
+        onClose={() => setWaPhotoRequestOpen(false)}
+        onPrimaryPress={handleWaPhotoRequestPayNow}
+      />
 
       {/* Angular: bottom-sheet.component's `action == 'paymentPromo'` block —
           the same real upgrade sheet Angular shows for Call/WhatsApp/Message. */}

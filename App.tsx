@@ -25,6 +25,7 @@ import RootNavigation from './navigation/RootNavigation'
 import { setupNotificationHandlers } from './service/notificationService'
 import { initAnalytics } from './service/analyticsService'
 import { getItem, setItem } from './service/storageService'
+import { resetFilter } from './service/filterService'
 import { loadFonts } from './src/config/fonts'
 import { usePendingPurchase } from './service/iapService'
 
@@ -118,6 +119,13 @@ async function initializeAppConfig(): Promise<string> {
   if (!(await getItem('DEVICEDETAIL'))) {
     await setItem('DEVICEDETAIL', await buildDeviceDetail(deviceId))
   }
+
+  // A filter is a per-session choice: a cold launch starts back on the
+  // member's saved partner preference, so Matches and the Filter screen don't
+  // silently reopen on the last session's filter. 'pp' also drops the
+  // FILTEREVENTTYPE flag Matches reads to decide whether a filter is active.
+  // Never let a storage failure block launch.
+  await resetFilter('pp').catch(() => {})
 
   await Promise.all([
     setItem(StorageKeys.Auth.APP_TYPE, appType),
