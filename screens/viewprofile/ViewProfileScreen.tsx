@@ -1267,7 +1267,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     }
   }
 
-  function startWhatsApp(action: 'whatsapp' | 'whatsappNudge') {
+  async function startWhatsApp(action: 'whatsapp' | 'whatsappNudge') {
     if (!profile) return
     // Same verify-first order as handleCall above.
     if (await checkPaidBlockerGate()) {
