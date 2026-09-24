@@ -58,7 +58,7 @@ import {
   type SimilarProfileCard, type StarMatchResult, type BiodataTheme,
 } from '../../service/viewProfileService'
 import { viewProfileAdapter } from '../../adapters/viewProfile.adapter'
-import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, checkPaidBlockerGate, buildVerifyIdSheet, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
+import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, checkPaidBlockerGate, buildVerifyIdSheet, getContactConfirmContent as getSharedContactConfirmContent, requestAddPhoto } from '../../service/communicationService'
 import {
   getHeroBannerDetails, fetchUpgradePaymentPromo, redirectToIntermediatePage, paymentTrack,
   type UpgradePaymentPromo,
@@ -1267,7 +1267,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     }
   }
 
-  function startWhatsApp(action: 'whatsapp' | 'whatsappNudge') {
+  async function startWhatsApp(action: 'whatsapp' | 'whatsappNudge') {
     if (!profile) return
     // Same verify-first order as handleCall above.
     if (await checkPaidBlockerGate()) {
@@ -2257,19 +2257,12 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                   blur={profile.isPhotoProtect}
                 />
               ) : (
-                <View>
-                  <BlurPhotoPlaceholder oppGender={oppGender} width="100%" height={PHOTO_HEIGHT} resizeMode="cover" />
-                  {!sameGender && (
-                    <View style={s.photoOverlay}>
-                      <View style={s.overlayCard}>
-                        <Text style={[s.overlayText, { fontFamily: langFonts.medium }]}>
-                          {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
-                        </Text>
-                        <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={handleWhatsAppNudge} />
-                      </View>
-                    </View>
-                  )}
-                </View>
+                // No photo at all — plain placeholder. The CTA overlay for this
+                // case is the single block right below (NOT duplicated inline
+                // here) so it can carry the full photoAddRequest/waPhotoFlag
+                // state machine (request-sent / WhatsApp-flag / plain-request
+                // sub-states) instead of an always-on WhatsApp button.
+                <BlurPhotoPlaceholder oppGender={oppGender} width="100%" height={PHOTO_HEIGHT} resizeMode="cover" />
               )}
               {/* ── "Request to add photo" overlay — Angular: components/photo/
                   photo.component.html's 'ProfileView' switch case, "request to
