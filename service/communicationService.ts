@@ -667,6 +667,18 @@ async function callHttpAction(
   return { type: 'error', message: msg ? String(msg) : 'Action failed' }
 }
 
+// ─── Request partner to add a photo (ViewProfile — PHOTOAVAILABLE=='N') ────────
+// Angular: components/photo/photo.component.ts's photoRequestBtnClickOn() —
+// a standalone `requestphoto` call (never routed through clickingOnBtn/
+// communication.service.ts like the other actions above), so it isn't folded
+// into communicationBtnOnClick(). Angular's own params carry no ENTRYTYPE.
+
+export async function requestAddPhoto(partnerId: string): Promise<boolean> {
+  const params = await getCommParams(partnerId)
+  const res = await apiCall(Endpoints.communication.requestPhoto, 'POST', params)
+  return res?.RESPONSECODE === '1' && String(res?.ERRCODE ?? '') === '0'
+}
+
 // ─── Unblock (Ignored Profiles → "Blocked profiles" tab) ───────────────────────
 
 export async function unblockProfile(partnerId: string): Promise<boolean> {

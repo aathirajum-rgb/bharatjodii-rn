@@ -294,17 +294,28 @@ export const MatchCard = memo(function MatchCard({
           // Photo exists but is protected/hidden — distinct from "no photo at all".
           // Angular: photo-new.component's viewPhotoRequest block, HORO_HIDDEN_LIKE/
           // HORO_HIDDEN_PHOTO text driven by likedStatus (not a separate request flag).
-          <Pressable style={c.singlePhotoPressable} onPress={onPress}>
-            {/* CdnImage: getBlurPhotoUri() hands back a raster on native — see
-                that helper — and CdnImage dispatches on the extension. */}
-            <CdnImage
-              uri={getBlurPhotoUri(oppGender)}
-              width="100%" height="100%"
-              style={StyleSheet.absoluteFill}
-              resizeMode="cover"
+          // photo-new.component.ts's `profileImage` is a plain @Input set by the
+          // parent, and photo-new.component.html only ever applies `.blur-photo`
+          // (filter: blur(4px)) to it — the REAL photo, same as
+          // viewprofile.page.html:171-186. This used getBlurPhotoUri()'s generic
+          // gender-silhouette placeholder instead, same gap ViewProfileScreen.tsx
+          // had (now fixed there too).
+          <View style={c.singlePhotoPressable}>
+            <PhotoSwiper
+              images={singlePhoto ? profile.photos.slice(0, 1) : profile.photos}
+              width={SW - 32}
+              height={photoH}
+              oppGender={oppGender}
+              onPress={onPress}
+              blur
             />
             <View style={c.photoOverlay}>
               <View style={c.overlayCard}>
+                {/* Angular: photo-new.component.html:4-6 — the padlock badge
+                    shows whenever isPhotoProtect, unconditionally on which CTA
+                    (WhatsApp-link or Shortlist/Like) renders below it. Was
+                    missing entirely here, same gap ProfilePhoto.tsx had. */}
+                <CdnSvg uri={CDN + 'revamp/hidden-lock.svg'} width={28} height={28} />
                 {whatsAppViewHiddenPhoto ? (
                   /* Angular: getHiddenPhotoContent() → getHiddenPhotoRequestText().
                      Unlike the shortlist variant below, this one is NOT gated on
@@ -331,8 +342,22 @@ export const MatchCard = memo(function MatchCard({
                   /* Angular routes this through the SAME handler as the no-photo
                      WhatsApp overlay below (communication.service.ts:202-254's
                      whatsAppPhotoRequestBtnClickOn) — there is no separate
-                     "request sent" state for the hidden-photo variant. */
-                  <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={onWhatsAppNudge ?? onWhatsApp} />
+                     "request sent" state for the hidden-photo variant. The CTA
+                     ITSELF is a different design though, per photo-request.
+                     component.html:34-46 — a plain green underlined text link
+                     with a trailing chevron (buttonType link, background
+                     transparent), not the solid WhatsApp-branded button the
+                     no-photo-at-all case below uses. Same fix already applied
+                     to ProfilePhoto.tsx's equivalent overlay. */
+                  <Pressable
+                    style={c.whatsappLinkBtn}
+                    onPress={onWhatsAppNudge ?? onWhatsApp}
+                  >
+                    <Text style={[c.whatsappLinkText, { fontFamily: langFonts.regular }]}>
+                      {t('GENERAL.WHATSAPP')}
+                    </Text>
+                    <CdnSvg uri={CDN + 'revamp/forward-icon-green.svg'} width={7} height={10} />
+                  </Pressable>
                 )}
                 {!whatsAppViewHiddenPhoto && !hiddenPhotoPending && (
                   <Pressable onPress={onLike}>
@@ -353,7 +378,7 @@ export const MatchCard = memo(function MatchCard({
                 )}
               </View>
             </View>
-          </Pressable>
+          </View>
         ) : (
           // No photo at all: blur placeholder + WhatsApp overlay
           // Angular: getWhatsAppAvatarImg() + request-photo-vp overlay
@@ -3657,8 +3682,22 @@ const c = StyleSheet.create({
   },
   // fontFamily applied inline (langFonts.medium) — see MatchCard's Text usage.
   waBtnText: {
-    fontSize:   FontSize.font13,
+    fontSize:   FontSize.font12,
     color:      Colors.white,
+  },
+  // Angular: photo-request.component.html's "view hidden photo" CTA — link
+  // style, not the solid waBtn/waBtnText the no-photo-at-all case above uses.
+  whatsappLinkBtn: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           4,
+    marginTop:     8,
+  },
+  // fontFamily applied inline (langFonts.regular) — see MatchCard's Text usage.
+  whatsappLinkText: {
+    fontSize:           FontSize.font14,
+    color:              Colors.whatsappGreen,
+    textDecorationLine: 'underline',
   },
 
   // Angular: ion-row isProfileBadge d-flex pl-24 mt-16 — BELOW the photo

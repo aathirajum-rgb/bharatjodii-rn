@@ -443,6 +443,14 @@ export const LikedProfilesSection = memo(function LikedProfilesSection({
         </Text>
       )}
       <SwiperCard
+        // Remounts the whole card list (FlatList scroll position included)
+        // whenever the tab flips — this section reuses ONE SwiperCard
+        // instance for both tabs, only swapping `items` below, so without a
+        // key tied to the tab, switching tabs kept the previous tab's scroll
+        // offset: e.g. scrolled to card 3 of "Liked by me", switching to
+        // "Liked you" showed ITS card 3 first instead of starting over from
+        // the first card.
+        key={likedTab}
         cardVariant={8}
         cardSection="likedprofile"
         // Angular: setLikedProfileLists() — likedProfileContents is capped at

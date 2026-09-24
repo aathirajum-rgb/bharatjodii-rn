@@ -14,6 +14,7 @@ import {
   Pressable, StyleSheet, Text, View,
 } from 'react-native'
 import { Image } from 'expo-image'
+import { BlurView } from 'expo-blur'
 import Carousel, { type ICarouselInstance } from 'react-native-reanimated-carousel'
 import type { PanGesture } from 'react-native-gesture-handler'
 import { SvgXml } from 'react-native-svg'
@@ -629,6 +630,11 @@ export interface PhotoSwiperProps {
   // Desktop-only, opt-in — mobile stays swipe-only (matches Angular). Gives desktop a
   // click-based alternative to dragging, alongside it, not instead of it.
   showArrows?:  boolean | undefined
+  // Angular: viewprofile.page.html:171-186 — a protected-but-available photo
+  // still renders the REAL swiper over the actual photo(s) (`userPhotos`),
+  // each slide just gets `.blur-photo` (filter: blur(4px)) — not a single
+  // generic gender-silhouette placeholder swapped in for the whole gallery.
+  blur?:        boolean | undefined
 }
 
 // Instagram-style gesture disambiguation: a real Swiper.js (and Instagram's own
@@ -648,7 +654,7 @@ function configureSwiperPanGesture(pan: PanGesture): void {
   pan.activeOffsetX([-10, 10]).failOffsetY([-10, 10])
 }
 
-export function PhotoSwiper({ images, width, height, oppGender, onPress, showArrows }: PhotoSwiperProps) {
+export function PhotoSwiper({ images, width, height, oppGender, onPress, showArrows, blur }: PhotoSwiperProps) {
   const [activeIndex, setActiveIndex] = useState(0)
   const carouselRef = useRef<ICarouselInstance>(null)
   // Per-slide load-failure tracking — one bad URL in a multi-photo gallery
@@ -705,15 +711,23 @@ export function PhotoSwiper({ images, width, height, oppGender, onPress, showArr
               // own contentFit="cover" below — same box, same fill behavior.
               <CdnSvg uri={getAvatarFallbackUri(oppGender)} width={width} height={height} style={swiperStyles.image} cover />
             ) : (
-              <Image
-                source={{ uri: item }}
-                style={swiperStyles.image}
-                contentFit="cover"
-                cachePolicy="memory-disk"
-                recyclingKey={item}
-                transition={150}
-                onError={() => setFailedIndices(prev => ({ ...prev, [index]: true }))}
-              />
+              <>
+                <Image
+                  source={{ uri: item }}
+                  style={swiperStyles.image}
+                  contentFit="cover"
+                  cachePolicy="memory-disk"
+                  recyclingKey={item}
+                  transition={150}
+                  onError={() => setFailedIndices(prev => ({ ...prev, [index]: true }))}
+                />
+                {/* Angular's .blur-photo is a CSS filter on the real <img> —
+                    expo-image has no blur prop, so this is the same BlurView
+                    overlay ProfilePhoto.tsx's own showBlur case already uses. */}
+                {blur && (
+                  <BlurView intensity={60} tint="dark" style={StyleSheet.absoluteFill} />
+                )}
+              </>
             )}
           </Pressable>
         )}

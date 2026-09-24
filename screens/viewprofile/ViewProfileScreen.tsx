@@ -24,12 +24,13 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg, { CdnImage } from '../../components/cdn-svg/CdnSvg'
 import { LANG_LABELS } from '../../components/matches-header/MatchesHeader'
 import {
-  WhatsAppIcon, WhatsAppUnlockButton, CallIcon, MessageIcon, CloseIcon, ViewLaterIcon, LikeIcon,
+  WhatsAppIcon, CallIcon, MessageIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   showLikeCTA, showAfterLikeCTA, disableDontShow, disableViewLater, HtmlText,
   getBlurPhotoUri, getAvatarFallbackUri, NEWLY_JOINED_STAR_URI, ProfileBadge, PhotoSwiper,
   getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showAfterLikeContentLine,
   showAfterLikeMessageCta, getMessageBtnText,
   showContactsLeftBanner, showFreeBadge,
+  WhatsAppUnlockButton,
   type AfterLikeCtx,
 } from '../../components/matches/matchesCard.shared'
 import StickyBanner from '../../components/sticky-banner/StickyBanner'
@@ -57,7 +58,7 @@ import {
   type SimilarProfileCard, type StarMatchResult, type BiodataTheme,
 } from '../../service/viewProfileService'
 import { viewProfileAdapter } from '../../adapters/viewProfile.adapter'
-import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
+import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, getContactConfirmContent as getSharedContactConfirmContent, requestAddPhoto } from '../../service/communicationService'
 import {
   getHeroBannerDetails, fetchUpgradePaymentPromo, redirectToIntermediatePage, paymentTrack,
   type UpgradePaymentPromo,
@@ -480,6 +481,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   const [ownEntryType, setOwnEntryType] = useState('')
   const [femaleFreeEligible, setFemaleFreeEligible] = useState(false)
   const [indNumbersLeft, setIndNumbersLeft] = useState('0')
+  // Angular: FUNC.whatsAppPhotoFlag() — session WAPHOTOFLAG, '0' when absent.
+  // Drives the protected-photo overlay below (WhatsApp CTA vs plain Like),
+  // same as MatchesScreen.tsx's MatchCard (matches.page.html:173's
+  // getWhatsAppViewHiddenPhotoRequest(profile)).
+  const [waPhotoFlag, setWaPhotoFlag] = useState('0')
   // Angular: paymentPromoPopUp() → bottom-sheet.component's `paymentPromo` block —
   // the real upgrade sheet shown for Call/WhatsApp/Message when the viewer is free.
   const [paymentPromo, setPaymentPromo] = useState<UpgradePaymentPromo | null>(null)
@@ -753,7 +759,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
       // the confirm sheet's quota footer (contactQuota) has real numbers
       // instead of whatever was last cached (or nothing, on a fresh session).
       await fetchContactDetails().catch(() => {})
-      const [lg, entryType, femaleFreeRaw, contactDetail, horoAvail, userId, religionKey] = await Promise.all([
+      const [lg, entryType, femaleFreeRaw, contactDetail, horoAvail, userId, religionKey, waFlag] = await Promise.all([
         getItem(StorageKeys.User.LOGIN_GENDER),
         getSessionValue('ENTRYTYPE'),
         getSessionValue('FEMALEFREECONACT'),
@@ -761,12 +767,15 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         getSessionValue('HOROSCOPEAVAILABLE'),
         getItem(StorageKeys.Auth.USER_ID),
         getSessionValue('RELIGIONKEY'),
+        getSessionValue(StorageKeys.App.WA_PHOTO_FLAG),
       ])
       if (cancelled) return
       setOwnUserId(userId ?? '')
       const gender = lg === 'M' ? 'M' : 'F'
       setLoginGender(gender)
       setOwnEntryType(entryType ?? '')
+      // Angular: whatsAppPhotoFlag() defaults to '0' when the key is absent.
+      setWaPhotoFlag(String(waFlag ?? '0'))
       const femaleFree: any = femaleFreeRaw
       setFemaleFreeEligible(String(femaleFree?.FLAG) === '1' && gender === 'F' && String(femaleFree?.Left ?? '0') !== '0')
       setIndNumbersLeft(String(contactDetail?.IndNumbersLeft ?? '0'))
@@ -1236,6 +1245,20 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // would hand it the press event) — the action is fixed per entry point.
   function handleWhatsApp()      { startWhatsApp('whatsapp') }
   function handleWhatsAppNudge() { startWhatsApp('whatsappNudge') }
+
+  // Angular: photo.component.ts's photoRequestBtnClickOn() — only flips to the
+  // "Request sent" state (PHOTOADDREQUEST='1') on a confirmed API success, not
+  // optimistically (unlike handleLike above), since this fires a one-way
+  // notification to the partner rather than a reversible like/dislike.
+  async function handleRequestPhotoNow() {
+    if (!profile) return
+    try {
+      const ok = await requestAddPhoto(profile.profileId)
+      if (ok) setProfile(prev => prev && { ...prev, photoAddRequest: '1' })
+    } catch (e) {
+      if (__DEV__) console.error('[ViewProfile] request-photo error:', e)
+    }
+  }
 
   function startWhatsApp(action: 'whatsapp' | 'whatsappNudge') {
     if (!profile) return
@@ -2221,7 +2244,15 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                 ) : (
                   <CdnImage uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} resizeMode="cover" />
                 )
-              ) : profile.isPhotoAvailable && !profile.isPhotoProtect && profile.photos.length > 0 ? (
+              ) : profile.isPhotoAvailable && profile.photos.length > 0 ? (
+                // Angular: viewprofile.page.html:171-186 — PHOTOAVAILABLE=='Y'
+                // renders the REAL swiper over the actual photo(s) regardless
+                // of PHOTOPROTECTED; a protected photo just gets `.blur-photo`
+                // (filter: blur(4px)) applied to it, same asset, not a generic
+                // gender-silhouette placeholder swapped in for the whole
+                // gallery. This previously fell through to the no-photo-at-all
+                // placeholder branch below whenever isPhotoProtect was true,
+                // losing the real photo (and multi-photo swipe) entirely.
                 <PhotoSwiper
                   key={profile.profileId}
                   images={profile.photos}
@@ -2229,22 +2260,122 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                   height={PHOTO_HEIGHT}
                   oppGender={oppGender}
                   onPress={i => { setPhotoViewerIndex(i); setPhotoViewerOpen(true) }}
+                  blur={profile.isPhotoProtect}
                 />
               ) : (
-                <View>
-                  <CdnImage uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} resizeMode="cover" />
-                  {!sameGender && (
-                    <View style={s.photoOverlay}>
-                      <View style={s.overlayCard}>
-                        <Text style={[s.overlayText, { fontFamily: langFonts.medium }]}>
-                          {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
-                        </Text>
-                        <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={handleWhatsAppNudge} />
-                      </View>
-                    </View>
-                  )}
-                </View>
+                // No photo at all (Angular: PHOTOAVAILABLE == 'N') — a plain
+                // gender-silhouette placeholder. viewprofile.page.html's own
+                // inline markup for this case has no CTA of its own — the
+                // "request to add photo" overlay below lives in a SEPARATE
+                // component, <app-photo data="vpPhotoView"> at viewprofile.
+                // page.html:298, easy to miss since it's not nested inside the
+                // photo swiper markup at all.
+                <CdnImage uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} resizeMode="cover" />
               )}
+              {/* ── "Request to add photo" overlay — Angular: components/photo/
+                  photo.component.html's 'ProfileView' switch case, "request to
+                  add photo section" (lines 95-131), same <app-photo data=
+                  "vpPhotoView"> component as the protected-photo overlay below.
+                  Three sub-states (FUNC.showWhatsAppPhotoRequest()):
+                  - PHOTOADDREQUEST=='1' (request already sent): green tick +
+                    waiting text, no CTA.
+                  - not sent yet, WhatsApp flag on: bigger text + solid
+                    WhatsApp CTA (same WhatsAppUnlockButton MatchesScreen.tsx's
+                    MatchCard uses for its own simpler version of this case).
+                  - not sent yet, WhatsApp flag off: smaller text + an
+                    outlined/ghost "Request now" button that calls the
+                    `requestphoto` API directly (photoRequestBtnClickOn()) —
+                    not routed through communicationBtnOnClick like every other
+                    action on this screen, since Angular's own version isn't
+                    either. */}
+              {!ownProfile && !profile.isPhotoAvailable && !sameGender && (() => {
+                const requestSent = profile.photoAddRequest === '1'
+                const whatsAppAddPhotoRequest = waPhotoFlag === '1'
+                return (
+                  <View style={s.photoOverlay}>
+                    <View style={s.overlayCard}>
+                      {requestSent ? (
+                        <View style={s.requestSentRow}>
+                          <CdnSvg uri={CDN_SVG + 'green-tick-membership.svg'} width={16} height={16} />
+                          <Text style={[s.overlayText, { fontFamily: langFonts.regular }]}>
+                            {t('VIEWPROFILE.VP_PHOTO_REQ_SEND').replace(/##HIS_HER##/g, t(`PRONOUN.${oppGender}.hisher`))}
+                          </Text>
+                        </View>
+                      ) : (
+                        <>
+                          <Text style={[s.overlayText, whatsAppAddPhotoRequest && s.overlayTextLarge, { fontFamily: langFonts.regular }]}>
+                            {whatsAppAddPhotoRequest
+                              ? t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))
+                              : t('VIEWPROFILE.VP_PHOTO_REQ')
+                                .replace(/##HE_SHE##/g, t(`PRONOUN.${oppGender}.heshe`))
+                                .replace(/##HIS_HER##/g, t(`PRONOUN.${oppGender}.hisher`))}
+                          </Text>
+                          {whatsAppAddPhotoRequest ? (
+                            <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={handleWhatsAppNudge} />
+                          ) : (
+                            <Pressable style={s.requestNowBtn} onPress={handleRequestPhotoNow}>
+                              <Text style={[s.requestNowBtnText, { fontFamily: langFonts.medium }]}>
+                                {t('VIEWPROFILE.VP_PHOTO_REQ_CTA')}
+                              </Text>
+                            </Pressable>
+                          )}
+                        </>
+                      )}
+                    </View>
+                  </View>
+                )
+              })()}
+              {/* ── Protected-photo overlay — Angular: components/photo/photo.
+                  component.html's 'ProfileView' switch case, "Photo protect
+                  section" (lines 133-189), rendered via <app-photo data=
+                  "vpPhotoView"> at viewprofile.page.html:298 — a SEPARATE
+                  component overlaid on the swiper, not part of its own inline
+                  markup (which has no overlay of its own, hence this being
+                  missed on an first pass). Two sub-states:
+                  - already liked (likedStatus 1/3) and no WhatsApp flag: lock
+                    + waiting text, no CTA at all.
+                  - not yet liked (0/2), OR the WhatsApp flag is on regardless
+                    of liked status: lock + text + a CTA — "Shortlist" (Angular:
+                    .primary-cta-jodii) normally, or the WhatsApp link style
+                    (green underline + chevron) when the flag's on. Same
+                    whatsAppViewHiddenPhoto/hiddenPhotoPending split already
+                    used in MatchesScreen.tsx's MatchCard for this exact case. */}
+              {!ownProfile && profile.isPhotoProtect && !sameGender && (() => {
+                const hiddenPhotoPending = profile.likedStatus === '1' || profile.likedStatus === '3'
+                const whatsAppViewHiddenPhoto = waPhotoFlag === '1'
+                return (
+                  <View style={s.photoOverlay}>
+                    <View style={s.overlayCard}>
+                      <CdnSvg uri={CDN_SVG + 'revamp/hidden-lock.svg'} width={28} height={28} />
+                      {whatsAppViewHiddenPhoto ? (
+                        <Text style={[s.overlayText, { fontFamily: langFonts.regular }]}>
+                          {t('GENERAL.REQUEST_HIDDEN_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
+                        </Text>
+                      ) : (
+                        <Text style={[s.overlayText, { fontFamily: langFonts.regular }]}>
+                          {t(hiddenPhotoPending ? 'VIEWPROFILE.HORO_HIDDEN_PHOTO' : 'VIEWPROFILE.HORO_HIDDEN_LIKE')
+                            .replace(/##HE_SHE##/g, t(`PRONOUN.${oppGender}.heshe`))
+                            .replace(/##HIS_HER##/g, t(`PRONOUN.${oppGender}.hisher`))
+                            .replace(/##he_she##/g, t(`PRONOUN.${oppGender}.heshe`).toLowerCase())}
+                        </Text>
+                      )}
+                      {whatsAppViewHiddenPhoto ? (
+                        <Pressable style={s.whatsappLinkBtn} onPress={handleWhatsAppNudge}>
+                          <Text style={[s.whatsappLinkText, { fontFamily: langFonts.regular }]}>{t('GENERAL.WHATSAPP')}</Text>
+                          <CdnSvg uri={CDN_SVG + 'revamp/forward-icon-green.svg'} width={7} height={10} />
+                        </Pressable>
+                      ) : !hiddenPhotoPending ? (
+                        <Pressable style={s.likeHerBtn} onPress={handleLike}>
+                          {/* Angular: photo.component.ts's btnLike is GENERAL.SHORTLIST
+                              ("Shortlist") — the template's own literal "Like Her" fallback
+                              text is never what actually renders. */}
+                          <Text style={[s.likeHerBtnText, { fontFamily: langFonts.medium }]}>{t('GENERAL.SHORTLIST')}</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  </View>
+                )
+              })()}
             {/* Angular: global.scss:4918-4928 `.top-slider-header-div .swiper-pagination`
                 — only a 50px-tall gradient strip pinned to the BOTTOM of the photo
                 (behind the pagination dots), not a full top+bottom overlay. The
@@ -2932,41 +3063,66 @@ const s = StyleSheet.create({
   coachMarkDismiss: {
     fontWeight: '600', fontSize: FontSize.font14, color: Colors.primaryDark,
   },
-  photoOverlay: {
-    ...StyleSheet.absoluteFill,
-    alignItems: 'center', justifyContent: 'center',
-  },
   // Angular: global.scss:4918-4928 — 50px-tall gradient strip pinned to the
   // bottom of the photo, behind the swiper pagination dots.
   photoBottomGradient: {
     position: 'absolute', left: 0, right: 0, bottom: 0, height: 50,
   },
-  // Angular: `.request-photo-vp` — margin 24 each side, padding 8px 16px, 12px
-  // radius, 1px rgba(255,255,255,0.4) border. The margin here is 34, NOT that 24:
-  // measured against the reference screen (badge 258 wide against 296 for the
-  // 24px version, at a scale confirmed by both shots rendering the same 29px-tall
-  // button), 24 comes out visibly wider and the caption wraps a word later than
-  // the design. Angular's own rule also sets `width: 100%` ON TOP of those
-  // margins, which overflows its parent — so what that CSS computes and what the
-  // app ships are not the same box, and this follows the shipped one.
-  //
-  // alignSelf 'stretch' is what makes those margins mean anything: photoOverlay
-  // centres its child, so without it this box is sized by its CONTENT and the
-  // margins never bind — and overlayText's `width: '70%'` then resolves against
-  // an auto-width parent, letting the box grow wider than the margins allow
-  // (measured 295px against the reference's 257 at the same scale). Stretching
-  // pins it to photo width - 48, and the 70% text gets a definite parent to
-  // measure against.
+
+  // ── Protected-photo overlay (components/photo/photo.component.html's
+  // "Photo protect section") ──────────────────────────────────────────────
+  photoOverlay: {
+    ...StyleSheet.absoluteFill,
+    alignItems: 'center', justifyContent: 'center',
+  },
   overlayCard: {
     alignSelf: 'stretch',
-    backgroundColor: Colors.scrimStrong, marginHorizontal: 34, padding: 16,
+    backgroundColor: Colors.scrimStrong, marginHorizontal: 24, padding: 16,
     borderRadius: 12, borderWidth: 1, borderColor: Colors.overlayBorder,
-    alignItems: 'center', gap: 16,
+    alignItems: 'center', gap: 12,
   },
-  // fontFamily applied inline (langFonts.medium) — see Text usage.
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
   overlayText: {
-    fontWeight: '500', fontSize: FontSize.font13, color: Colors.white,
-    textAlign: 'center', lineHeight: 17, width: '70%', alignSelf: 'center',
+    fontSize: FontSize.font13, color: Colors.white,
+    textAlign: 'center', lineHeight: 18,
+  },
+  // Angular: photo.component.ts's getFontSize() bumps this specific text to
+  // 'heading4-medium-16' (font16) only when showWhatsAppPhotoRequest() is true
+  // — the non-WhatsApp "Request now" copy stays at the smaller textcta-medium-12
+  // (overlayText's own font13 default is close enough to that already).
+  overlayTextLarge: { fontSize: FontSize.font16 },
+  requestSentRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  // Angular: `fill="clear"` ion-button — transparent background, thin white
+  // border, white text — not a solid fill (that's reserved for the WhatsApp
+  // CTA in this same overlay).
+  requestNowBtn: {
+    borderWidth: 1, borderColor: Colors.white, borderRadius: 24,
+    paddingVertical: 8, paddingHorizontal: 20,
+  },
+  requestNowBtnText: {
+    fontSize: FontSize.font14, color: Colors.white,
+  },
+  // Angular: photo-request.component.html's "view hidden photo" CTA — link
+  // style (buttonType link, background transparent), not a solid button.
+  whatsappLinkBtn: {
+    flexDirection: 'row', alignItems: 'center', gap: 4,
+  },
+  // fontFamily applied inline (langFonts.regular) — see Text usage.
+  whatsappLinkText: {
+    fontSize: FontSize.font14, color: Colors.whatsappGreen,
+    textDecorationLine: 'underline',
+  },
+  // Angular: .primary-cta-jodii — Colors.primaryDark background, white text,
+  // rounded pill. NOT the WhatsApp-green gradient MatchesScreen.tsx's own
+  // "Shortlist"-equivalent CTA uses in its own hidden-photo overlay — that's
+  // a different Angular component (matches-card.component) with its own
+  // distinct button color for the same conceptual action.
+  likeHerBtn: {
+    backgroundColor: Colors.primaryDark, borderRadius: 24,
+    paddingVertical: 8, paddingHorizontal: 20,
+  },
+  likeHerBtnText: {
+    fontSize: FontSize.font14, color: Colors.white,
   },
 
   // Angular: .details-section { background:#fff } — plain white, flush against the

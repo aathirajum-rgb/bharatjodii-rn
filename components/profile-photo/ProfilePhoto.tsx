@@ -20,6 +20,7 @@ import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { getItem } from '../../service/storageService'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { StorageKeys } from '../../constants/storage.keys'
 import { getOppGenderAvatarUrl, FEMALE_AVATAR_URL } from '../../utils/avatar'
 
@@ -94,6 +95,8 @@ const ICONS = {
   shortlistOn:    CDN_SVG + 'shortlist/shortlisted-white-updated.svg',
   closeWhite:     CDN + 'close-white.svg',
   camera:         CDN + 'camera-upload.svg',    // upload CTA icon
+  hiddenLock:     CDN + 'hidden-lock.svg',       // protected-photo overlay padlock badge
+  forwardGreen:   CDN + 'forward-icon-green.svg', // "view hidden photo" link CTA chevron
 }
 
 // ─── Border radius per variant (mirrors Angular CSS) ─────────────────────────
@@ -122,6 +125,7 @@ const RADIUS: Record<PhotoVariant, { tl: number; tr: number; bl: number; br: num
 
 function NewlyJoinedBadge() {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)
 
   return (
@@ -135,7 +139,7 @@ function NewlyJoinedBadge() {
       <CdnSvg uri={ICONS.newlyJoinedStar} width={16} height={16} />
       {/* Angular: MATCHES.NEW_BADGE — "Newly Joined", not the "New" this
           previously hardcoded. */}
-      <Text style={styles.newlyJoinedText}>{t('MATCHES.NEW_BADGE')}</Text>
+      <Text style={[styles.newlyJoinedText, { fontFamily: langFonts.medium }]}>{t('MATCHES.NEW_BADGE')}</Text>
     </View>
   )
 }
@@ -184,6 +188,7 @@ export default function ProfilePhoto({
   onPhotoUpload,
 }: ProfilePhotoProps) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   const [imgError, setImgError] = useState(false)
   const [uploading, setUploading] = useState(false)
   // Angular: getAvatarImage(profile) → getAvatarImg(getOppGenderType()) — a
@@ -493,7 +498,7 @@ export default function ProfilePhoto({
         // blurred photo behind and the dark floating card itself.
         <View style={styles.whatsappOverlayWrap}>
           <View style={styles.whatsappOverlayCard}>
-            <Text style={styles.whatsappOverlayText}>
+            <Text style={[styles.whatsappOverlayText, { fontFamily: langFonts.regular }]}>
               {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGenderCode}.hisher`))}
             </Text>
             <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={() => onWhatsApp?.()} />
@@ -505,14 +510,27 @@ export default function ProfilePhoto({
           routes through the SAME WhatsApp click handler as the no-photo case
           above (whatsAppPhotoRequestBtnClickOn(), communication.service.ts:
           202-254) — there's no separate persisted "request sent" state for
-          this variant, unlike the add-photo case's ADDPHOTOREQUEST flag. ── */}
+          this variant, unlike the add-photo case's ADDPHOTOREQUEST flag.
+          BUT the visual is genuinely different from that case, per Angular's
+          photo-request.component.html: a padlock badge above the text
+          (isPhotoProtect, lines 4-6), and the CTA itself is a plain green
+          underlined text link with a small trailing chevron (buttonType:
+          link, background: transparent, iconType: forwardIconGreen,
+          textClassName: text-decoration-underline — lines 34-46), NOT the
+          solid WhatsApp-branded button the add-photo case uses. Reusing
+          WhatsAppUnlockButton here rendered a big solid green button where
+          Angular shows a small text link. ── */}
       {showViewRequest && (
         <View style={styles.whatsappOverlayWrap}>
           <View style={styles.whatsappOverlayCard}>
-            <Text style={styles.whatsappOverlayText}>
+            <CdnSvg uri={ICONS.hiddenLock} width={28} height={28} />
+            <Text style={[styles.whatsappOverlayText, { fontFamily: langFonts.regular }]}>
               {t('GENERAL.REQUEST_HIDDEN_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGenderCode}.hisher`))}
             </Text>
-            <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={() => onWhatsApp?.()} />
+            <Pressable style={styles.whatsappLinkBtn} onPress={() => onWhatsApp?.()}>
+              <Text style={[styles.whatsappLinkText, { fontFamily: langFonts.regular }]}>{t('GENERAL.WHATSAPP')}</Text>
+              <CdnSvg uri={ICONS.forwardGreen} width={7} height={10} />
+            </Pressable>
           </View>
         </View>
       )}
@@ -679,6 +697,21 @@ const styles = StyleSheet.create({
     color:      Colors.white,
     textAlign:  'center',
     lineHeight: 18,
+  },
+  // Angular: photo-request.component.html's "view hidden photo" CTA —
+  // buttonType link, background transparent, iconPosition end (chevron
+  // trails the text, not the WhatsApp-icon-leads layout WhatsAppUnlockButton
+  // uses for the add-photo case).
+  whatsappLinkBtn: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    gap:           4,
+  },
+  whatsappLinkText: {
+    fontFamily:        SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize:          FontSize.font14,
+    color:             Colors.whatsappGreen,
+    textDecorationLine: 'underline',
   },
 
   // ── Own-photo upload overlay ────────────────────────────────────────────────

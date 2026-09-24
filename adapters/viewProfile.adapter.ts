@@ -108,6 +108,9 @@ export class ViewProfileAdapter implements Adapter<ViewProfileModel> {
       isPhotoAvailable: photo['PHOTOAVAILABLE'] === 'Y',
       isPhotoProtect:   photo['PHOTOPROTECTED'] === 'Y',
       likedStatus:      toLikedStatus(comm['LIKED']),
+      photoAddRequest:  (['0', '1', '2'] as const).includes(String(comm['PHOTOADDREQUEST'] ?? '0') as any)
+        ? (String(comm['PHOTOADDREQUEST'] ?? '0') as '0' | '1' | '2')
+        : '0',
       isNewlyJoined:    personal['NEWUSER'] === '1',
       isNewLabel:       false,
       labelContent:     '',

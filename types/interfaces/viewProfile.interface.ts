@@ -58,6 +58,11 @@ export interface ViewProfileModel extends MatchProfile {
 
   likedMsg?: string   // COMMINFO.LIKEDMSG — "Liked by you on ..." row text, when present
 
+  // COMMINFO.PHOTOADDREQUEST — "0"/"2" not yet requested, "1" request already
+  // sent (Angular: photo.component.html:97/123's request-photo-now-vp block).
+  // Only meaningful when isPhotoAvailable is false.
+  photoAddRequest: '0' | '1' | '2'
+
   // Angular: viewprofile.page.ts's presentPopover() — the Verified badge's info-tap
   // popover shows PERSONALINFO.IDDET.BODY, API-supplied text (e.g. "Verified via
   // Call"), not a translation key. Only ever shown to a female viewer on a
