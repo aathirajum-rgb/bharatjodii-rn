@@ -7,7 +7,6 @@ import { useFocusEffect } from '@react-navigation/native'
 import { useTranslation } from 'react-i18next'
 import {
   ActivityIndicator,
-  Animated,
   Dimensions,
   FlatList,
   Image,
@@ -20,7 +19,10 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native'
-import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import Animated, {
+  Easing, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming,
+} from 'react-native-reanimated'
+import CdnSvg, { CdnImage } from '../../components/cdn-svg/CdnSvg'
 import { withRupeeFont } from '../../utils/rupeeFont'
 import CdnLottie from '../../components/CdnLottie'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
@@ -1396,12 +1398,10 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     onError: () => showToast('Upload failed. Please try again.'),
   })
 
-  // ── Header hide-on-scroll ────────────────────────────────────────────────────
-  // Angular: offsetHt = this.header?.el?.offsetHeight where #header = the TITLE ion-row only.
-  // The entire ion-header translates by offsetHt (title row height), so the title disappears
-  // above the screen and the pref+chips section slides up to become the new sticky top bar.
-  const headerAnim   = useRef(new Animated.Value(0)).current
-  const titleHRef    = useRef(0)   // height of title row only — amount to slide (Angular offsetHt)
+  // ── Header height ────────────────────────────────────────────────────────────
+  // MatchesHeader is absolutely positioned over the FlatList (its own SafeAreaView
+  // handles the status-bar inset), so the list needs its measured height reserved
+  // as top padding or the first row would render underneath it.
   const headerHRef   = useRef(0)   // full header height — used for FlatList paddingTop
   // Only so a re-entry reload can put the member back at the top of the fresh
   // list — a reload that left the old scroll offset in place would drop them
@@ -1410,10 +1410,6 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   const listRef = useRef<FlatList<any> | null>(null)
   const [headerH, setHeaderH] = useState(0)
 
-  function handleTitleLayout(h: number) {
-    if (h > 0) titleHRef.current = h
-  }
-
   function handleHeaderLayout(h: number) {
     if (h > 0 && h !== headerHRef.current) {
       headerHRef.current = h
@@ -1421,39 +1417,91 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     }
   }
 
-  // Header hide-on-scroll — Angular: onScroll() (matches.page.ts:3087-3118). Hides the
-  // title row (slides up by titleHRef, same amount the pref+chips row becomes the new
-  // sticky top bar) once scrolled past 100px while still scrolling down, and brings it
-  // back on any meaningful upward scroll or once back near the top. The FlatList wrapper
-  // below shares this exact same Animated.Value so its content slides up in lockstep,
-  // closing the gap the tucked-away title leaves — mirrors Angular's .content.hidden
-  // translateY(-var(--header-offset)) counterpart to .header.hidden.
-  const lastScrollYRef    = useRef(0)
-  const headerHiddenRef   = useRef(false)
+  // ── Hide-on-scroll title row ─────────────────────────────────────────────────
+  // The "Matches (N) [English]" row hides while ppRow/chips/facets below it
+  // ride up to take its place (MatchesHeader translates its whole content
+  // block by this same value, not just the title). The list is translated by
+  // the identical amount so its first visible row always lines up flush
+  // against the header's new, visually shorter bottom edge — no gap opens up
+  // between them at any point during the animation. Driven entirely on the UI
+  // thread (worklet + shared values, no setState) so scrolling never triggers
+  // a JS render. titleRowH is measured by MatchesHeader itself (its layout
+  // height never changes — only its paint position does — so this has no
+  // effect on headerH/list paddingTop above).
+  const titleTranslateY = useSharedValue(0)
+  const titleRowH        = useSharedValue(0)
+  const isHeaderHidden    = useSharedValue(false)
+  // Accumulated scroll delta since the last direction reversal — this is the
+  // dead-zone: small back-and-forth movements (momentum bounce, a shaky
+  // finger) never reach HIDE_THRESHOLD, so they can't flip the header state.
+  const scrollAccum       = useSharedValue(0)
+  const lastScrollY       = useSharedValue(0)
+  const HIDE_THRESHOLD    = 12
+  // Android in particular can settle a fling with the last reported offset a
+  // few px shy of a true 0 (rounding in the deceleration curve, not a bounce),
+  // so a strict `y <= 0` check can miss "at the top" entirely and leave the
+  // header stuck in whatever state the last real scroll event left it in.
+  const TOP_EPSILON       = 4
 
-  function handleScroll(e: any) {
-    const current = e.nativeEvent.contentOffset.y
-    const delta = current - lastScrollYRef.current
-    // Angular: ignores sub-10px jitter so the header doesn't flicker on tiny scroll ticks.
-    if (Math.abs(delta) < 10) return
-    lastScrollYRef.current = current
+  const handleListScroll = useAnimatedScrollHandler({
+    onScroll: e => {
+      const y = e.contentOffset.y
 
-    const shouldHide = current > 100 && delta > 0
-    const shouldShow = delta < -15 || current < 50
+      // At/near the top (covers Android's fling-settle rounding, its clamp to
+      // 0, and iOS's elastic negative overscroll) — always force the header
+      // shown and drop any accumulated progress so a bounce at the top can't
+      // carry into a hide.
+      if (y <= TOP_EPSILON) {
+        scrollAccum.value = 0
+        lastScrollY.value = y
+        if (isHeaderHidden.value) {
+          isHeaderHidden.value = false
+          titleTranslateY.value = withTiming(0, { duration: 220, easing: Easing.out(Easing.cubic) })
+        }
+        return
+      }
 
-    let nextHidden = headerHiddenRef.current
-    if (shouldHide) nextHidden = true
-    else if (shouldShow) nextHidden = false
+      const dy = y - lastScrollY.value
+      lastScrollY.value = y
 
-    if (nextHidden !== headerHiddenRef.current) {
-      headerHiddenRef.current = nextHidden
-      Animated.timing(headerAnim, {
-        toValue:        nextHidden ? -titleHRef.current : 0,
-        duration:       300,
-        useNativeDriver: true,
-      }).start()
-    }
-  }
+      // A reversal (sign flip) discards whatever had built up in the other
+      // direction — a scroll-down-then-slightly-up doesn't get a head start
+      // toward showing the header from residual downward accumulation.
+      if ((dy > 0 && scrollAccum.value < 0) || (dy < 0 && scrollAccum.value > 0)) {
+        scrollAccum.value = 0
+      }
+      scrollAccum.value += dy
+
+      if (scrollAccum.value > HIDE_THRESHOLD && !isHeaderHidden.value) {
+        isHeaderHidden.value = true
+        titleTranslateY.value = withTiming(-titleRowH.value, { duration: 220, easing: Easing.out(Easing.cubic) })
+        scrollAccum.value = 0
+      } else if (scrollAccum.value < -HIDE_THRESHOLD && isHeaderHidden.value) {
+        isHeaderHidden.value = false
+        titleTranslateY.value = withTiming(0, { duration: 220, easing: Easing.out(Easing.cubic) })
+        scrollAccum.value = 0
+      }
+    },
+    // Safety net for the same "settled a few px shy of 0" case: if a fling's
+    // deceleration ends without ever dispatching an onScroll at/near the top
+    // (event under-sampling), this still catches the final rest position and
+    // corrects the header state instead of leaving it stuck hidden.
+    onMomentumEnd: e => {
+      if (e.contentOffset.y <= TOP_EPSILON && isHeaderHidden.value) {
+        isHeaderHidden.value = false
+        scrollAccum.value = 0
+        titleTranslateY.value = withTiming(0, { duration: 220, easing: Easing.out(Easing.cubic) })
+      }
+    },
+  })
+
+  // The list rides up in lockstep with the header's collapse (see comment on
+  // titleTranslateY above) — same shared value, same frame, so there's never a
+  // moment where the header has visually shrunk but the list hasn't caught up
+  // (or vice versa).
+  const listAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: titleTranslateY.value }],
+  }))
 
   // apiStart tracks the cursor for pagination (how many profiles we've fetched from API)
   const apiStartRef = useRef(0)
@@ -3313,7 +3361,6 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
       {/* ── Header ─────────────────────────────────────────────────────────── */}
       {/* Separated component — SafeAreaView edges={["top"]} handles status bar internally */}
       <MatchesHeader
-        headerAnim={headerAnim}
         loading={loading}
         totalCount={totalCount}
         langCode={i18n.language}
@@ -3324,12 +3371,13 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         preferenceCount={preferenceCount}
         onEditPreferences={() => goToEditPreferences(navigation)}
         onHeaderLayout={handleHeaderLayout}
-        onTitleLayout={handleTitleLayout}
         facets={facets}
         onFacetToggle={toggleFacet}
         onFacetsApply={applyFacetSelection}
         titleOverride={exploreLabel}
         isExploreMode={!!exploreType}
+        titleTranslateY={titleTranslateY}
+        titleRowHeight={titleRowH}
       />
 
       {/* ── Profile list / loader ──────────────────────────────────────────── */}
@@ -3343,15 +3391,16 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
           <NoMatchesCard onPress={() => goToEditPreferences(navigation)} />
         </View>
       ) : (
-        <FlatList
+        <Animated.FlatList
           ref={listRef}
-          style={{ flex: 1 }}
+          style={[{ flex: 1 }, listAnimStyle]}
           data={listData}
           keyExtractor={item => isBanner(item) ? item.uid : item.profileId}
           renderItem={renderItem}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingTop: headerH, paddingBottom: 8 }}
-          onScroll={handleScroll}
+          // Hide-on-scroll title row — UI-thread worklet, see handleListScroll above.
+          onScroll={handleListScroll}
           scrollEventThrottle={16}
           // Angular: doInfinite() on scroll end — load next 20 when within 50% of end
           onEndReached={loadMore}
