@@ -624,11 +624,30 @@ export async function generatePaymentLink(packageId: string, amount: string | nu
 // check a banner fetched once would keep showing that language's TITLE/BODY/CTA
 // text forever, through every later language switch, until something else
 // happened to pass force=true.
+//
+// The cache key is also scoped to `bannerType` — this endpoint's response
+// shape genuinely differs per type (BANNERTYPE=1's payment-failed fields vs
+// the default call's BANNERBG/BRIDEBGCOLOR/TITLE/BODY), so a bare/type-less
+// call and a `bannerType=1` call are NOT interchangeable data. Before this,
+// both shared ONE cache slot: MatchesScreen.tsx/ViewProfileScreen.tsx's own
+// getHeroBannerDetails(true, 1) calls (force=true, so they always fetch AND
+// always overwrite the shared slot) would silently poison it with the
+// payment-failed response — so the NEXT plain getHeroBannerDetails(false) on
+// Home (force=false, reads the cache) came back with that wrong-type response
+// instead of making its own request, and its BANNERBG/BRIDEBGCOLOR read as
+// undefined even though the server's real default-banner response carried a
+// perfectly good color. Simply visiting Matches or ViewProfile before Home
+// was enough to trigger this — no payment-failed state needed on Home itself.
+function heroBannerCacheKey(bannerType?: number): string {
+  return `${PAYMENT_CACHE_KEYS.HERO_BANNER}:${bannerType ?? 'default'}`
+}
+
 export async function getHeroBannerDetails(force = false, bannerType?: number): Promise<any> {
   const lang = (await getItem(SK.Auth.LANG)) ?? 'en'
+  const cacheKey = heroBannerCacheKey(bannerType)
   if (!force) {
     const cachedLang = await getItem(PAYMENT_CACHE_KEYS.HERO_BANNER_LANG)
-    const cached = cachedLang === lang ? await getJson(PAYMENT_CACHE_KEYS.HERO_BANNER) : null
+    const cached = cachedLang === lang ? await getJson(cacheKey) : null
     if (cached) return cached
   }
   const userId    = (await getItem(SK.Auth.USER_ID)) ?? ''
@@ -640,7 +659,7 @@ export async function getHeroBannerDetails(force = false, bannerType?: number): 
     `ID=${userId}&TYPE=MYHOME${bannerQs}&IOSPRODUCTIDS=${iosProductIds}`,
   )
   if (result?.RESPONSECODE === '1') {
-    await setJson(PAYMENT_CACHE_KEYS.HERO_BANNER, result.RESPONSE)
+    await setJson(cacheKey, result.RESPONSE)
     await setItem(PAYMENT_CACHE_KEYS.HERO_BANNER_LANG, lang)
     return result.RESPONSE
   }

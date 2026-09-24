@@ -99,12 +99,22 @@ export interface HeroBannerContent {
   // Angular: the addPhotoPromotion/nonIdVerifyPromotion/addPhotoPromotionPaid
   // grid's "free-trial-bg" CSS class — a FIXED gradient (#FFDDDD → white), not
   // server-driven like bgColor above. Takes precedence over bgColor when set.
-  gradient?:           [string, string] | undefined
+  // Also used for the 'old'/'bride' variants when BANNERBG/BRIDEBGCOLOR itself
+  // comes back as a `linear-gradient(...)` CSS string (Angular binds that field
+  // straight into a raw CSS `background`, so the CMS can send either a plain
+  // color or a full gradient there) — see utils/cssGradient.ts's
+  // parseCssBackground(), not just the two fixed literals above.
+  gradient?:           string[] | undefined
   // Color-stop positions (0-1) for `gradient` above, e.g. Figma's
   // "linear-gradient(180deg, #D9E7FF 12.59%, #FFF 137.6%)" → [0.1259, 1]
   // (137.6% clamped to 1 — LinearGradient's locations can't exceed the box).
-  // Omit for an even 0/1 spread.
-  gradientLocations?:  [number, number] | undefined
+  // Omit for an even spread across all stops.
+  gradientLocations?:  number[] | undefined
+  // Direction for `gradient` above — defaults to top-to-bottom (matching the
+  // two fixed-literal gradients' own implicit direction) when the CMS's
+  // BANNERBG/BRIDEBGCOLOR carries no angle/keyword of its own.
+  gradientStart?:      { x: number; y: number } | undefined
+  gradientEnd?:        { x: number; y: number } | undefined
   // Angular: the photo-promo grid's text is black-color on its light pink
   // gradient, unlike every other variant's white-on-dark text. Defaults to
   // white (this component's original, still-correct default for every other
@@ -130,7 +140,13 @@ export interface HeroBannerContent {
 // plain <Text> doesn't interpret HTML, so without this it showed the raw
 // "<del>...</del>" tag text instead of striking through the old price.
 const DEL_TAG_RE = /<del>([\s\S]*?)<\/del>/gi
-function renderRichText(text: string, key: string): ReactNode {
+// Angular: global.scss:26651 `.del del { color: #717175 !important; }` — TITLE's
+// own wrapping div is the only one of the five rich-text fields carrying the
+// "del" class (home-banner.component.html:23), so a struck-through <del> segment
+// inside TITLE specifically gets this muted gray, overriding TITLECOLOR/
+// textColor for just that segment — BODY/TITLE1/TITLE2/VALID have no such
+// wrapper and so keep inheriting their own line's color, undimmed.
+function renderRichText(text: string, key: string, strikeColor?: string): ReactNode {
   if (!text.includes('<del')) return text
   const nodes: ReactNode[] = []
   let lastIndex = 0
@@ -139,7 +155,11 @@ function renderRichText(text: string, key: string): ReactNode {
   DEL_TAG_RE.lastIndex = 0
   while ((match = DEL_TAG_RE.exec(text))) {
     if (match.index > lastIndex) nodes.push(text.slice(lastIndex, match.index))
-    nodes.push(<Text key={`${key}-${i++}`} style={s.strike}>{match[1]}</Text>)
+    nodes.push(
+      <Text key={`${key}-${i++}`} style={[s.strike, strikeColor ? { color: strikeColor } : null]}>
+        {match[1]}
+      </Text>,
+    )
     lastIndex = match.index + match[0].length
   }
   if (lastIndex < text.length) nodes.push(text.slice(lastIndex))
@@ -162,6 +182,13 @@ export default function HeroBanner({ content, onPress, onDismiss }: HeroBannerPr
     content.bannerStyle === 'bride'      ? [s.titleBride, i18n.language === 'en' ? s.titleBrideEn : s.titleBrideOther] :
     content.bannerStyle === 'photoPromo' ? s.titlePhotoPromo :
     s.title
+  // Angular: home-banner.component.html:23's TITLE div (bannerStyle 'old'/
+  // 'bride' only — this exact div, shared by both) carries a plain `class=
+  // "del"`, which global.scss:26651's `.del del { color: #717175 !important; }`
+  // targets. The 'photoPromo'/'paymentFailed' TITLE markup (lines 204/135/177)
+  // has no such wrapper, so a <del> there (if it ever occurs) keeps inheriting
+  // its own line's ordinary color instead.
+  const titleDelColor = content.bannerStyle === 'old' || content.bannerStyle === 'bride' ? '#717175' : undefined
   const bodyStyle =
     content.bannerStyle === 'bride'         ? s.bodyBride :
     content.bannerStyle === 'photoPromo'    ? s.bodyPhotoPromo :
@@ -209,8 +236,8 @@ export default function HeroBanner({ content, onPress, onDismiss }: HeroBannerPr
   const gradientProps = content.gradient
     ? {
         colors: content.gradient,
-        start: { x: 0, y: 0 },
-        end: { x: 0, y: 1 },
+        start: content.gradientStart ?? { x: 0, y: 0 },
+        end: content.gradientEnd ?? { x: 0, y: 1 },
         ...(content.gradientLocations ? { locations: content.gradientLocations } : {}),
       }
     : {}
@@ -241,7 +268,7 @@ export default function HeroBanner({ content, onPress, onDismiss }: HeroBannerPr
           />
         )}
         <View style={s.textCol}>
-          {!!content.title && <Text style={[titleStyle, (content.titleColor ?? content.textColor) ? { color: content.titleColor ?? content.textColor } : null]}>{renderRichText(content.title, 'title')}</Text>}
+          {!!content.title && <Text style={[titleStyle, (content.titleColor ?? content.textColor) ? { color: content.titleColor ?? content.textColor } : null]}>{renderRichText(content.title, 'title', titleDelColor)}</Text>}
           {!!content.title1 && <Text style={[s.title1, (content.title1Color ?? content.textColor) ? { color: content.title1Color ?? content.textColor } : null]}>{renderRichText(content.title1, 'title1')}</Text>}
           {!!content.title2 && <Text style={[s.title2, (content.title2Color ?? content.textColor) ? { color: content.title2Color ?? content.textColor } : null]}>{renderRichText(content.title2, 'title2')}</Text>}
           {!!body && <Text style={[bodyStyle, (content.bodyColor ?? content.textColor) ? { color: content.bodyColor ?? content.textColor, opacity: 1 } : null]}>{renderRichText(body, 'body')}</Text>}
@@ -403,21 +430,31 @@ const s = StyleSheet.create({
   // `title` above) — was Poppins-Regular, wrong weight. CONTENTCOLOR is
   // server-driven via [attr.style] — RN default color left alone. Used when
   // bannerStyle==='old'.
+  // Angular: this div's color is driven entirely by [attr.style]="'color: ' +
+  // CONTENTCOLOR + ' !important;'" — when the API sends no CONTENTCOLOR at
+  // all, that becomes invalid CSS ("color:  !important;"), which the browser
+  // discards outright, so the div falls back to its ordinary inherited color
+  // (black, off the page's own default) rather than any white the OLD banner's
+  // typically-dark background might suggest. RN has no such "invalid style is
+  // dropped" behavior, so this default has to be set explicitly to match.
   body: {
     fontFamily: Fonts.poppinsMedium,
     fontSize:   FontSize.font12,
-    color:      Colors.white,
+    color:      Colors.black,
     opacity:    0.9,
   },
   // Angular: the !isOldBanner ("bride") BODY class — `heading2-semibold-18
   // mt-8 line-height-20` — font-size var(--font18) (1.125rem, dynamic — see
   // FontSize's header comment), Poppins-SemiBold, flat 20px line-height (not
   // rem-based).
+  // Same "invalid CONTENTCOLOR style is silently dropped, falls back to black"
+  // reasoning as `body` above — this is the !isOldBanner ("bride") variant's
+  // own BODY div, same [attr.style] binding, just a different typography class.
   bodyBride: {
     fontFamily: Fonts.poppinsSemiBold,
     fontSize:   FontSize.font18,
     lineHeight: 20,
-    color:      Colors.white,
+    color:      Colors.black,
     marginTop:  8,
   },
   // Angular: the addPhotoPromotion/nonIdVerifyPromotion/addPhotoPromotionPaid

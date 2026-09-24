@@ -54,6 +54,7 @@ import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { stripAndDecodeHtml } from '../../utils/htmlEntities'
 import HomeDesktopLayout from './HomeDesktopLayout'
 import HeroBanner, { type HeroBannerContent } from './HeroBanner'
+import { parseCssBackground } from '../../utils/cssGradient'
 import AssistBanner, { type AssistBannerContent } from './AssistBanner'
 import ForceUpdateCard from './ForceUpdateCard'
 import {
@@ -86,6 +87,20 @@ import { subscribeDrProfileRemoved } from '../../service/eventBus'
 
 const CDN = CDN_SVG
 const FWD_ICON = `${CDN}revamp/forward-icon-link.svg`
+
+// Figma spec for the default-variant hero banner's own fallback background,
+// used only when the server sends no resolvable BANNERBG/BRIDEBGCOLOR at all:
+// linear-gradient(180deg, #D9E7FF 12.59%, #FFF 137.6%) — note the 2nd stop
+// sits PAST the visible box (>100%), so the real bottom edge never reaches
+// solid white. Resampled once via the same parser/resampler the live API path
+// uses (utils/cssGradient.ts), rather than a hand-computed literal, so this
+// spec string stays the only source of truth and can't drift out of sync with
+// what it's supposed to produce.
+const DEFAULT_HERO_GRADIENT = (
+  parseCssBackground('linear-gradient(180deg, #D9E7FF 12.59%, #FFF 137.6%)') as {
+    gradient: { colors: string[]; locations?: number[] | undefined; start: { x: number; y: number }; end: { x: number; y: number } }
+  }
+).gradient
 
 // Angular: both the Help section's CTA and the video-faq-popup's close button
 // use Ionic's bundled Ionicons (node_modules/ionicons/dist/svg/*.svg), not a
@@ -1317,15 +1332,23 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
         // Angular's [attr.style] binds these fields as raw CSS, so the CMS
         // can send plain hex, 'transparent' (e.g. a borderless/textual CTA),
         // or rgb(a)/hsl(a) — RN's `style` prop accepts all of those directly.
-        // Excluded: CSS gradient syntax, which a plain View's backgroundColor
-        // can't render (that case already has its own dedicated `gradient`
-        // field on HeroBannerContent, populated separately where it applies).
         const hex = (v: any): string | undefined =>
           typeof v === 'string' && /^(#|rgb|hsl|transparent$)/i.test(v.trim()) && !/gradient/i.test(v)
             ? v.trim()
             : undefined
         const ownTimerDeadline = isOldBanner && details?.['TIMER'] ? Date.parse(details['TIMER']) : NaN
-        const bgColor = hex(isOldBanner ? details?.['BANNERBG'] : details?.['BRIDEBGCOLOR'])
+        // Angular's [attr.style]="'background: ' + heroBannerData?.BANNERBG"
+        // binds this field straight into a raw CSS `background` — the CMS can
+        // (and does) send either a plain color OR a full `linear-gradient(...)`
+        // string here, not just solid colors. `hex()` above only covers the
+        // solid case; a gradient string used to be silently dropped entirely
+        // (matched neither `hex()` nor the untouched fallback-gradient branch),
+        // which left the banner showing HeroBanner's hardcoded navy default
+        // instead of the campaign color the API actually sent.
+        const parsedBg = parseCssBackground(isOldBanner ? details?.['BANNERBG'] : details?.['BRIDEBGCOLOR'])
+        const bgColor      = parsedBg && 'solid' in parsedBg ? parsedBg.solid : undefined
+        const apiGradient  = parsedBg && 'gradient' in parsedBg ? parsedBg.gradient : undefined
+        const hasOwnBg     = !!parsedBg
         setHeroBannerContent({
           bannerStyle: isOldBanner ? 'old' : 'bride',
           title:      details?.['TITLE'] || 'Upgrade your membership',
@@ -1336,10 +1359,13 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           ctaLabel:   details?.['CTA']   || 'Upgrade now',
           imageUrl:   isOldBanner ? details?.['BANNERIMG'] : details?.['BRIDEIMG'],
           bgColor,
-          // Figma default for this banner when the server sends no resolvable
-          // BANNERBG/BRIDEBGCOLOR: linear-gradient(180deg, #D9E7FF 12.59%, #FFF 137.6%).
-          gradient:          bgColor ? undefined : ['#D9E7FF', '#FFFFFF'],
-          gradientLocations: bgColor ? undefined : [0.1259, 1],
+          // DEFAULT_HERO_GRADIENT (see its own comment above) — a server-sent
+          // gradient (apiGradient) takes precedence over this fallback, same
+          // as a server-sent solid bgColor already did.
+          gradient:          apiGradient ? apiGradient.colors    : (hasOwnBg ? undefined : DEFAULT_HERO_GRADIENT.colors),
+          gradientLocations: apiGradient ? apiGradient.locations : (hasOwnBg ? undefined : DEFAULT_HERO_GRADIENT.locations),
+          gradientStart:     apiGradient?.start ?? (hasOwnBg ? undefined : DEFAULT_HERO_GRADIENT.start),
+          gradientEnd:       apiGradient?.end   ?? (hasOwnBg ? undefined : DEFAULT_HERO_GRADIENT.end),
           // Angular: home-banner.component.html's old-banner block colors
           // TITLE/BODY/TITLE1/TITLE2 from these 4 independent server fields
           // (TITLE2 genuinely reuses CTABGCOLOR as its own text color in the
@@ -1350,8 +1376,8 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           // default) when the server sends neither a color nor a background —
           // otherwise title/body text stays white-on-white against the
           // gradient fallback above.
-          titleColor:  hex(details?.['TITLECOLOR']) ?? (bgColor ? undefined : Colors.link),
-          bodyColor:   hex(details?.['CONTENTCOLOR']) ?? (bgColor ? undefined : Colors.link),
+          titleColor:  hex(details?.['TITLECOLOR']) ?? (hasOwnBg ? undefined : Colors.link),
+          bodyColor:   hex(details?.['CONTENTCOLOR']) ?? (hasOwnBg ? undefined : Colors.link),
           title1Color: isOldBanner ? hex(details?.['NOTECOLOR']) : undefined,
           title2Color: isOldBanner ? hex(details?.['CTABGCOLOR']) : undefined,
           ctaBgColor:     hex(details?.['CTABGCOLOR']),
