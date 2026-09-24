@@ -10,9 +10,7 @@
 // migrated here, to avoid touching an already-large, working screen.
 import { useCallback, useMemo, useState } from 'react'
 import type { BottomSheetData } from '../components/bottom-sheet/BottomSheet'
-import { getItem } from '../service/storageService'
-import { getRegistrationArrays } from '../service/registrationService'
-import type { CommActionResult } from '../service/communicationService'
+import { buildVerifyIdSheet, type CommActionResult } from '../service/communicationService'
 
 export type PhoneInfoSheet =
   | { kind: 'phone_protected' }
@@ -21,7 +19,7 @@ export type PhoneInfoSheet =
   | { kind: 'fup_limit'; header: string; body: string; cta: string; cta1: string }
   | { kind: 'profile_validation'; title: string; content: string; cta: string; image?: string | undefined }
   | { kind: 'phone_number_left' }
-  | { kind: 'verify_id'; title: string; content: string; ctaLabel: string }
+  | { kind: 'verify_id'; title: string; content: string; ctaLabel: string; image?: string | undefined; ctaIcon?: string | undefined; pinkWash?: boolean | undefined }
   | { kind: 'female_free_photo_add' }
   | { kind: 'female_free_photo_pending' }
   | { kind: 'female_free_photo_fail' }
@@ -68,19 +66,8 @@ export function usePhoneInfoSheet() {
         // verified-but-no-photo case (result.photoUpload). The ##CSNUM##
         // support-number placeholder only ever appears in CTA, not CONTENT
         // (communication.service.ts:640-642).
-        const arrays = await getRegistrationArrays()
-        const cfg = (result.photoUpload ? arrays?.PHOTOPUBLISHPAID?.Shortlist : arrays?.PROFILEVERIFYPAID?.Shortlist) ?? {}
-        let cta = String(cfg.CTA ?? 'OK')
-        if (cta.includes('##CSNUM##')) {
-          const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
-          cta = cta.replace(/##CSNUM##/g, callNum).replace('+91', '')
-        }
-        setSheet({
-          kind: 'verify_id',
-          title: String(cfg.TITLE ?? (result.photoUpload ? 'Add your photo to continue' : 'Verify your profile')),
-          content: String(cfg.CONTENT ?? (result.photoUpload ? 'Please add your photo to view phone numbers.' : 'Please complete ID verification to view phone numbers.')),
-          ctaLabel: cta,
-        })
+        const verifySheet = await buildVerifyIdSheet(!!result.photoUpload)
+        setSheet({ kind: 'verify_id', ...verifySheet })
         return true
       }
       case 'female_free': {
@@ -125,7 +112,7 @@ export function usePhoneInfoSheet() {
           ctaLabel: t('GENERAL.OK_CTA', 'OK'),
         }
       case 'verify_id':
-        return { title: sheet.title, content: sheet.content, ctaLabel: sheet.ctaLabel }
+        return { title: sheet.title, content: sheet.content, ctaLabel: sheet.ctaLabel, image: sheet.image, ctaIcon: sheet.ctaIcon, pinkWash: sheet.pinkWash }
       case 'female_free_photo_pending':
         return {
           title: 'Your photo is under validation!',

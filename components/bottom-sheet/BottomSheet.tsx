@@ -93,6 +93,13 @@ export interface BottomSheetData {
   // 'whatsAppPhotoRequest': `image` is the partner's raster THUMBIMG, shown
   // blurred (a hidden photo) rather than the placeholder SVG.
   imageBlur?: boolean | undefined
+  // Angular componentData.CTAIMG — leading icon on the primary CTA, as a
+  // ButtonRevamp ICON_URLS key (e.g. 'call-img-white' = revamp/call-icon-white.svg,
+  // what navigateToVerify() passes for the verify-profile sheet).
+  ctaIcon?: string | undefined
+  // Angular componentData.BGCOLOR — soft pink wash fading to white at the top
+  // of the sheet instead of plain white (the verify-profile sheet).
+  pinkWash?: boolean | undefined
 }
 
 // 'whatsAppPhotoRequest' componentData — Angular builds the same object in
@@ -458,6 +465,17 @@ export default function BottomSheet({
         </>
       ) : children ? children : (
         <>
+          {/* Absolutely positioned, so it spans the sheet's padding too and sits
+              behind everything rendered after it. */}
+          {data?.pinkWash && (
+            <LinearGradient
+              colors={['#FFEDF2', '#FFFFFF']}
+              locations={[0, 0.5]}
+              style={[StyleSheet.absoluteFill, styles.pinkWash]}
+              pointerEvents="none"
+            />
+          )}
+
           {/* Top image — CdnSvg so CDN-hosted SVG icons (e.g. the "add your photo"
               alert icon) render correctly on native, not just web. Angular sets no
               explicit size on this image (it's the source asset's natural size) —
@@ -538,6 +556,7 @@ export default function BottomSheet({
               label={data!.ctaLabel!}
               variant="primary"
               fullWidth
+              icon={data?.ctaIcon}
               style={[styles.primaryBtn, { backgroundColor: Colors.primaryDark }]}
               onPress={() => onPrimaryPress?.()}
             />
@@ -646,6 +665,10 @@ const styles = StyleSheet.create({
   sheetPaymentPromo: {
     paddingHorizontal: 8,
     paddingTop:        8,
+  },
+  // Matches both the mobile sheet's top corners and the desktop card's 16px radius.
+  pinkWash: {
+    borderRadius: 16,
   },
   sheet: {
     position:             'absolute',

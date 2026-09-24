@@ -361,7 +361,7 @@ export default function MessagerListScreen({ navigation }: Props) {
   }
 
   function emptyButtonText(): string {
-    return showPaywall ? t('GENERAL.BECOME_PAID') : t('STAR_RATING.GOTOMATCHES')
+    return showPaywall ? t('GENERAL.BECOME_PAID') : t('GENERAL.ACTIVITY_CTA')
   }
 
   function handleEmptyAction() {

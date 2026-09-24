@@ -15,7 +15,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import * as ImagePicker from 'expo-image-picker'
 import { useTranslation } from 'react-i18next'
 import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
-import { WhatsAppUnlockButton, getBlurPhotoUri } from '../matches/matchesCard.shared'
+import { WhatsAppUnlockButton, BlurPhotoPlaceholder } from '../matches/matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
 import { SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
@@ -337,13 +337,12 @@ export default function ProfilePhoto({
           decode a remote .svg (see CdnSvg.tsx), so both branches route
           through CdnSvg/CdnImage instead of the real-photo <Image> below.
 
-          CdnImage rather than CdnSvg on the first branch: getBlurPhotoUri()
-          hands back a RASTER on native (its SVG is pattern-based and
-          react-native-svg mis-scales it — see that helper), and CdnImage
-          dispatches on the extension. */}
+          BlurPhotoPlaceholder on the first branch: react-native-svg mis-scales
+          the pattern-based SVG, so native rebuilds its card-stack artwork +
+          bottom fade from a bundled bitmap — see that component. */}
       {showAddRequest ? (
-        <CdnImage
-          uri={getBlurPhotoUri(oppGenderCode)}
+        <BlurPhotoPlaceholder
+          oppGender={oppGenderCode}
           width="100%"
           height="100%"
           style={[

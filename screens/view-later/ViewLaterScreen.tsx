@@ -35,7 +35,7 @@ import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
 import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictSheets'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { fetchViewLaterProfiles } from '../../service/viewLaterService'
-import { communicationBtnOnClick, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
+import { communicationBtnOnClick, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, checkPaidBlockerGate, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import { handleBack } from '../../utils/navigationRef'
 import { getItem } from '../../service/storageService'
@@ -138,7 +138,14 @@ export default function ViewLaterScreen({ navigation }: Props) {
   // no confirm step first — the confirm popup only lives inside showContactDetails(),
   // reached once entryType=='P', the number was already viewed, or the female-free
   // promo applies. See ActivityScreen.tsx's confirmThenContact for the same fix.
-  function confirmThenContact(profile: MatchProfile, action: 'call' | 'whatsapp') {
+  async function confirmThenContact(profile: MatchProfile, action: 'call' | 'whatsapp') {
+    // Angular communication.service.ts:181-186 — the paid verify-id / add-photo
+    // gates run BEFORE showContactDetails() (PHONENOLIMIT + confirm), so an
+    // unverified paid male gets the verify-profile sheet straight away.
+    if (await checkPaidBlockerGate()) {
+      handleContactConfirmYes({ profile, action })
+      return
+    }
     // Angular communication.service.ts's showContactDetails() FIRST check — a
     // paid user whose mutual-like AND overall phone-view quotas are both
     // exhausted sees the PHONENOLIMIT sheet instead of the confirm popup.

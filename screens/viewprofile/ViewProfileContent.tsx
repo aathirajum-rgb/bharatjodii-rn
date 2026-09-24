@@ -68,7 +68,7 @@ export type PhoneInfoSheet =
   | { kind: 'fup_limit'; header: string; body: string; cta: string; cta1: string }
   | { kind: 'profile_validation'; title: string; content: string; cta: string; image?: string | undefined }
   | { kind: 'phone_number_left' }
-  | { kind: 'verify_id'; title: string; content: string; ctaLabel: string }
+  | { kind: 'verify_id'; title: string; content: string; ctaLabel: string; image?: string | undefined; ctaIcon?: string | undefined; pinkWash?: boolean | undefined }
   | { kind: 'female_free_photo_add' }
   | { kind: 'female_free_photo_pending' }
   | { kind: 'female_free_photo_fail' }
@@ -393,6 +393,7 @@ export default function ViewProfileContent(props: ViewProfileContentProps) {
     image?: string | undefined; title?: string | undefined; content?: string | undefined
     ctaLabel?: string | undefined; linkCtaLabel?: string | undefined; orCtaText?: string | undefined
     secondaryCtaLabel?: string | undefined; showSecondaryCta?: boolean | undefined; sideBySideCtas?: boolean | undefined
+    ctaIcon?: string | undefined; pinkWash?: boolean | undefined
   } {
     if (!phoneInfoSheet) return {}
     const gender = profile?.gender ?? 'F'
@@ -439,6 +440,9 @@ export default function ViewProfileContent(props: ViewProfileContentProps) {
           title:    phoneInfoSheet.title,
           content:  phoneInfoSheet.content,
           ctaLabel: phoneInfoSheet.ctaLabel,
+          image:    phoneInfoSheet.image,
+          ctaIcon:  phoneInfoSheet.ctaIcon,
+          pinkWash: phoneInfoSheet.pinkWash,
         }
       case 'female_free_photo_pending':
         return {

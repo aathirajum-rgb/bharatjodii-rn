@@ -35,7 +35,7 @@ import {
 } from '../../service/drService'
 import { toProfile, fetchAndStorePPSetData, fetchMatches, invalidateDailyRecCache, filterListingRows } from '../../service/homeService'
 import { emitDrProfileRemoved } from '../../service/eventBus'
-import { communicationBtnOnClick, type CommActionResult } from '../../service/communicationService'
+import { communicationBtnOnClick, buildVerifyIdSheet, type CommActionResult } from '../../service/communicationService'
 import { checkAddPhotoPromotion } from '../../service/buttonService'
 import { markProfileViewed } from '../../service/viewProfileService'
 import { stripAndDecodeHtml } from '../../utils/htmlEntities'
@@ -400,19 +400,8 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
         // photoUpload=true (verified male, no photo yet) reads a DIFFERENT
         // registration-array config than the plain not-yet-verified case —
         // see communicationService.ts's CommActionResult 'verify_id' doc.
-        const arrays = await getRegistrationArrays()
-        const cfg = (result.photoUpload ? arrays?.PHOTOPUBLISHPAID?.Shortlist : arrays?.PROFILEVERIFYPAID?.Shortlist) ?? {}
-        let cta = String(cfg.CTA ?? 'OK')
-        if (cta.includes('##CSNUM##')) {
-          const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
-          cta = cta.replace(/##CSNUM##/g, callNum).replace('+91', '')
-        }
-        setMessageInfoSheet({
-          title:     String(cfg.TITLE ?? (result.photoUpload ? 'Add your photo to continue' : 'Verify your profile')),
-          content:   String(cfg.CONTENT ?? (result.photoUpload ? 'Please add your photo to view phone numbers.' : 'Please complete ID verification to view phone numbers.')),
-          ctaLabel:  cta,
-          showClose: true,
-        })
+        const verifySheet = await buildVerifyIdSheet(!!result.photoUpload)
+        setMessageInfoSheet({ ...verifySheet, showClose: true })
       } else if (result.type === 'error') {
         setMessageInfoSheet({ content: result.message, ctaLabel: t('GENERAL.OK_CTA', 'OK'), showClose: true })
       }

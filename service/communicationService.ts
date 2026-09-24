@@ -7,7 +7,8 @@ import { apiCall } from './apiClient'
 import { Endpoints } from './api.endpoints'
 import { getItem, getJson, setItem, setJson, removeItem } from './storageService'
 import { StorageKeys as SK } from '../constants/storage.keys'
-import { getSessionValue } from './registrationService'
+import { getSessionValue, getRegistrationArrays } from './registrationService'
+import { CDN_SVG } from '../constants/cdn'
 import { navigate } from '../utils/navigationRef'
 import { ENavigation } from '../types/enums/navigation.enum'
 import { resolveFemaleFreeAction, getFemaleContactStatus } from './femaleFreeService'
@@ -261,7 +262,8 @@ async function showCallOrWhatsApp(
     getItem(SK.Payment.PAY_P_FLAG),
   ])
 
-  const photoStatus: string = (ppSetRaw as any)?.PI_PHOTOSTATUS ?? 'N'
+  // Angular getPPsetValue(): absent → '' (not 'N'), so check_Paid_Verified_Nophoto() stays false.
+  const photoStatus: string = String((ppSetRaw as any)?.PI_PHOTOSTATUS || '')
 
   // Female free 3-contact promo
   if (entryType !== 'P' && femaleFreeData) {
@@ -276,7 +278,7 @@ async function showCallOrWhatsApp(
     // limit flow. useContactGating.ts's femaleFreeEligible reads `.FLAG`
     // correctly (only the card-display value) — this is the click-dispatch fix.
     if (String((femaleFreeData as any)?.FLAG) === '1') {
-      const femaleFreeAction = await resolveFemaleFreeAction(photoStatus, ekycStatus ?? '0')
+      const femaleFreeAction = await resolveFemaleFreeAction(photoStatus || 'N', ekycStatus ?? '0')
       if (femaleFreeAction) {
         return { type: 'female_free', action: femaleFreeAction, profile: oppProfile }
       }
@@ -548,6 +550,40 @@ export async function fetchContactDetails(force = false): Promise<void> {
 // every getChatCount() call, not just once at entry) share one derivation.
 export type PaidBlockerGate = 'non_verify_id' | 'verified_no_photo' | null
 
+// Content for the sheet a `verify_id` result opens — Angular button.component.ts
+// / communication.service.ts navigateToVerify(): componentData is the
+// registration-array Shortlist config (PHOTOPUBLISHPAID for the photoUpload
+// case, PROFILEVERIFYPAID otherwise) with ##CSNUM## in CTA swapped for
+// VERIFIEDBYCALLNUM, plus CTAIMG = call-icon-white.svg for the verify-id case
+// only. The verify-id Shortlist config carries no usable IMG, so the badge is
+// the dedicated activate-paid-membership-popup.svg.
+export interface VerifyIdSheetContent {
+  title:    string
+  content:  string
+  ctaLabel: string
+  image?:   string | undefined
+  ctaIcon?: string | undefined
+  pinkWash: boolean
+}
+
+export async function buildVerifyIdSheet(photoUpload: boolean): Promise<VerifyIdSheetContent> {
+  const arrays = await getRegistrationArrays()
+  const cfg = (photoUpload ? arrays?.PHOTOPUBLISHPAID?.Shortlist : arrays?.PROFILEVERIFYPAID?.Shortlist) ?? {}
+  let cta = String(cfg.CTA ?? 'OK')
+  if (cta.includes('##CSNUM##')) {
+    const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
+    cta = cta.replace(/##CSNUM##/g, callNum).replace('+91', '')
+  }
+  return {
+    title:    String(cfg.TITLE ?? (photoUpload ? 'Add your photo to continue' : 'Verify your profile')),
+    content:  String(cfg.CONTENT ?? (photoUpload ? 'Please add your photo to view phone numbers.' : 'Please complete ID verification to view phone numbers.')),
+    ctaLabel: cta,
+    image:    photoUpload ? (cfg.IMG || undefined) : CDN_SVG + 'activate-paid-membership-popup.svg',
+    ctaIcon:  photoUpload ? undefined : 'call-img-white',
+    pinkWash: true,
+  }
+}
+
 export async function checkPaidBlockerGate(): Promise<PaidBlockerGate> {
   const [entryType, ekycStatus, gender, paidFlag, ppSetRaw] = await Promise.all([
     getSessionValue('ENTRYTYPE'),
@@ -557,7 +593,8 @@ export async function checkPaidBlockerGate(): Promise<PaidBlockerGate> {
     getJson<Record<string, any>>(SK.App.PP_SET_DATA),
   ])
 
-  const photoStatus: string = (ppSetRaw as any)?.PI_PHOTOSTATUS ?? 'N'
+  // Angular getPPsetValue(): absent → '' (not 'N'), so check_Paid_Verified_Nophoto() stays false.
+  const photoStatus: string = String((ppSetRaw as any)?.PI_PHOTOSTATUS || '')
   const isPaidMale = entryType === 'P' && gender === 'M' && paidFlag === '1'
 
   if (isPaidMale && ekycStatus !== '1') return 'non_verify_id'

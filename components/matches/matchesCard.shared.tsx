@@ -8,7 +8,7 @@
 // Call/WhatsApp = SvgUri (always calls the server, no caching), the rest = SvgXml
 // (bundled strings).
 
-import { forwardRef, useCallback, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
 import {
   Platform,
   Pressable, StyleSheet, Text, View,
@@ -19,8 +19,9 @@ import Carousel, { type ICarouselInstance } from 'react-native-reanimated-carous
 import type { PanGesture } from 'react-native-gesture-handler'
 import { SvgXml } from 'react-native-svg'
 import Svg, { Path } from 'react-native-svg'
-import CdnSvg from '../cdn-svg/CdnSvg'
-import { CDN_IMG, CDN_SVG } from '../../constants/cdn'
+import { LinearGradient } from 'expo-linear-gradient'
+import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
+import { CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { decodeEntities } from '../../utils/htmlEntities'
@@ -31,30 +32,89 @@ import type { MatchProfile } from '../../types/interfaces/matches.interface'
 // Both MatchCard (mobile) and MatchCardDesktop point at the same CDN assets —
 // kept in one place so the two layouts can't silently drift apart.
 
-// The female placeholder is a PATTERN-based SVG: a #F0F0F0 rect with the photo
-// painted through `<pattern patternContentUnits="objectBoundingBox">` →
-// `<use xlink:href="#image0" transform="matrix(0.00179 0 0 0.00189 …)">`, where
-// #image0 is a 560x528 bitmap the matrix scales down into the 0..1 box.
-//
-// react-native-svg does not apply that pattern transform, so on NATIVE the raw
-// bitmap is drawn at the wrong scale over the grey backdrop — a hard-edged
-// rectangle sitting inside the card, which reads as "the corners are sharp"
-// even though the card itself is rounded. The browser rasterises the same file
-// correctly, which is why only the app shows it.
-//
-// So native takes the CDN's raster of the same artwork and web keeps the
-// vector. Callers must render this through CdnImage, which dispatches on the
-// extension (.svg → CdnSvg, anything else → <Image>).
-const BLUR_PHOTO_RASTER: Partial<Record<'M' | 'F', string>> = {
-  F: CDN_IMG + 'png/profile-photo-blur.png',
-  // No raster for the male placeholder on the CDN yet — it stays on the SVG,
-  // whose own structure differs (one full-bleed pattern rect, no grey backdrop).
+// The web female placeholder (revamp/profile-photo-blur.svg) paints its
+// 560x528 card-stack bitmap through a `matrix(…)` pattern transform that
+// react-native-svg does not apply, so on NATIVE it drew at the wrong scale.
+// Native instead uses revamp/profile-blur.svg — the SAME bitmap, but through a
+// plain `scale()` transform. That file has no grey backdrop or bottom fade, and
+// react-native-svg draws its bitmap pixelated, so BlurPhotoPlaceholder below
+// renders the embedded PNG itself and adds the fade back.
+export function getBlurPhotoUri(oppGender: 'M' | 'F'): string {
+  if (oppGender === 'M') return CDN_SVG + 'profile-blur-male.svg'
+  return CDN_SVG + (Platform.OS === 'web' ? 'revamp/profile-photo-blur.svg' : 'revamp/profile-blur.svg')
 }
 
-export function getBlurPhotoUri(oppGender: 'M' | 'F'): string {
-  const svg = CDN_SVG + (oppGender === 'F' ? 'revamp/profile-photo-blur.svg' : 'profile-blur-male.svg')
-  if (Platform.OS === 'web') return svg
-  return BLUR_PHOTO_RASTER[oppGender] ?? svg
+// Drop-in for `<CdnImage uri={getBlurPhotoUri(g)} …/>`. Web and the male
+// placeholder render the CDN asset as-is; native female layers the bottom
+// transparent→black fade that the web SVG (viewBox 0 0 110 110) draws as
+//   <rect y=56.34 h=53.66 fill=linear(64.0→95.3)/>
+// over revamp/profile-blur.svg. The fade's stops relative to its own rect are
+// (64.0-56.34)/53.66 ≈ 0.143 and (95.3-56.34)/53.66 ≈ 0.726 — the same
+// 14.29%/72.62% Angular's .bottom-blur uses.
+//
+// The artwork itself is NOT drawn through react-native-svg: it rasterises the
+// pattern at the SVG's own 60x58 size and upscales that without smoothing, so
+// the card-stack's rounded corners came out as jagged stair-steps. Instead the
+// SVG is fetched once, its embedded base64 PNG (560x528) pulled out, and handed
+// to expo-image, which scales it with proper filtering. CdnSvg is only the
+// fallback while that loads or if the extraction fails.
+const blurArtCache = new Map<string, Promise<string | null>>()
+function loadEmbeddedPng(svgUri: string): Promise<string | null> {
+  let p = blurArtCache.get(svgUri)
+  if (!p) {
+    p = fetch(svgUri)
+      .then(r => (r.ok ? r.text() : ''))
+      .then(txt => txt.match(/data:image\/(?:png|jpe?g|webp);base64,[A-Za-z0-9+/=\s]+/)?.[0].replace(/\s/g, '') ?? null)
+      .catch(() => null)
+    p.then(v => { if (!v) blurArtCache.delete(svgUri) })
+    blurArtCache.set(svgUri, p)
+  }
+  return p
+}
+
+function useEmbeddedPng(svgUri: string, enabled: boolean): string | null | undefined {
+  // undefined = still loading, null = failed (use the SVG fallback)
+  const [png, setPng] = useState<string | null | undefined>(undefined)
+  useEffect(() => {
+    if (!enabled) return
+    let alive = true
+    loadEmbeddedPng(svgUri).then(v => { if (alive) setPng(v) })
+    return () => { alive = false }
+  }, [svgUri, enabled])
+  return png
+}
+
+export function BlurPhotoPlaceholder({
+  oppGender, width = '100%', height = '100%', style, resizeMode = 'cover',
+}: {
+  oppGender: 'M' | 'F'
+  width?: number | `${number}%` | undefined
+  height?: number | `${number}%` | undefined
+  style?: any
+  resizeMode?: 'contain' | 'cover' | 'stretch' | undefined
+}) {
+  const nativeFemale = Platform.OS !== 'web' && oppGender === 'F'
+  const png = useEmbeddedPng(getBlurPhotoUri(oppGender), nativeFemale)
+  if (!nativeFemale) {
+    return <CdnImage uri={getBlurPhotoUri(oppGender)} width={width} height={height} style={style} resizeMode={resizeMode} />
+  }
+  return (
+    <View style={[{ width, height, backgroundColor: '#F0F0F0', overflow: 'hidden' }, style]}>
+      {png ? (
+        // The SVG stretches its bitmap across the whole viewBox (non-uniform
+        // scale(1/560, 1/528)), so `fill` reproduces it exactly.
+        <Image source={{ uri: png }} style={StyleSheet.absoluteFill} contentFit="fill" />
+      ) : png === null ? (
+        <CdnSvg uri={getBlurPhotoUri('F')} width="100%" height="100%" cover={resizeMode === 'cover'} />
+      ) : null}
+      <LinearGradient
+        colors={['rgba(0,0,0,0)', '#000000']}
+        locations={[0.143, 0.726]}
+        style={{ position: 'absolute', left: 0, right: 0, bottom: 0, top: `${(56.34 / 110) * 100}%` }}
+        pointerEvents="none"
+      />
+    </View>
+  )
 }
 
 export const MALE_AVATAR_URI   = CDN_SVG + 'male_avatar_new.svg'

@@ -21,12 +21,12 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
-import CdnSvg, { CdnImage } from '../../components/cdn-svg/CdnSvg'
+import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { LANG_LABELS } from '../../components/matches-header/MatchesHeader'
 import {
   WhatsAppIcon, CallIcon, MessageIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   showLikeCTA, showAfterLikeCTA, disableDontShow, disableViewLater, HtmlText,
-  getBlurPhotoUri, getAvatarFallbackUri, NEWLY_JOINED_STAR_URI, ProfileBadge, PhotoSwiper,
+  BlurPhotoPlaceholder, getAvatarFallbackUri, NEWLY_JOINED_STAR_URI, ProfileBadge, PhotoSwiper,
   getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showAfterLikeContentLine,
   showAfterLikeMessageCta, getMessageBtnText,
   showContactsLeftBanner, showFreeBadge,
@@ -58,7 +58,7 @@ import {
   type SimilarProfileCard, type StarMatchResult, type BiodataTheme,
 } from '../../service/viewProfileService'
 import { viewProfileAdapter } from '../../adapters/viewProfile.adapter'
-import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, getContactConfirmContent as getSharedContactConfirmContent, requestAddPhoto } from '../../service/communicationService'
+import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, checkPaidBlockerGate, buildVerifyIdSheet, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import {
   getHeroBannerDetails, fetchUpgradePaymentPromo, redirectToIntermediatePage, paymentTrack,
   type UpgradePaymentPromo,
@@ -66,7 +66,7 @@ import {
 import { handleBack } from '../../utils/navigationRef'
 import { fetchMenuPromo, recordViewedYouOpened } from '../../service/homeService'
 import { getItem, getJson } from '../../service/storageService'
-import { getSessionValue, getRegistrationArrays } from '../../service/registrationService'
+import { getSessionValue } from '../../service/registrationService'
 import { ENavigation } from '../../types/enums/navigation.enum'
 import { emitVpNeedMoreProfiles, subscribeVpProfileListUpdated } from '../../service/eventBus'
 import { shouldShowCoachMark, markCoachMarkShown } from '../../service/coachMarkService'
@@ -330,7 +330,7 @@ export function SimilarProfileCardItem({
           </>
         ) : (
           <>
-            <CdnImage uri={getBlurPhotoUri(oppGender)} width="100%" height="100%" resizeMode="cover" />
+            <BlurPhotoPlaceholder oppGender={oppGender} width="100%" height="100%" resizeMode="cover" />
             {/* Angular: app-photo-request — .request-photo-now-vp is a transparent,
                 full-bleed, flex-centered wrapper; the actual visible badge is the
                 SMALLER, inset .request-photo-vp nested inside it
@@ -573,7 +573,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     | { kind: 'fup_limit'; header: string; body: string; cta: string; cta1: string }
     | { kind: 'profile_validation'; title: string; content: string; cta: string; image?: string | undefined }
     | { kind: 'phone_number_left' }
-    | { kind: 'verify_id'; title: string; content: string; ctaLabel: string }
+    | { kind: 'verify_id'; title: string; content: string; ctaLabel: string; image?: string | undefined; ctaIcon?: string | undefined; pinkWash?: boolean | undefined }
     | { kind: 'female_free_photo_add' }
     | { kind: 'female_free_photo_pending' }
     | { kind: 'female_free_photo_fail' }
@@ -1223,8 +1223,15 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     return false
   }
 
-  function handleCall() {
+  async function handleCall() {
     if (!profile) return
+    // Angular communication.service.ts:181-186 — the paid verify-id / add-photo
+    // gates run BEFORE showContactDetails() (PHONENOLIMIT + confirm), so an
+    // unverified paid male gets the verify-profile sheet straight away.
+    if (await checkPaidBlockerGate()) {
+      handleContactConfirmYes('call')
+      return
+    }
     if (checkPhoneNoLimit()) return
     // Angular: a free member who's never viewed this profile's number goes
     // straight to paymentPromoPopUp(), no confirm step first — see
@@ -1262,6 +1269,11 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
 
   function startWhatsApp(action: 'whatsapp' | 'whatsappNudge') {
     if (!profile) return
+    // Same verify-first order as handleCall above.
+    if (await checkPaidBlockerGate()) {
+      handleContactConfirmYes(action)
+      return
+    }
     if (checkPhoneNoLimit()) return
     const alreadyViewed = ['1', '3'].includes(String(profile.phoneViewed ?? '0'))
     if (ownEntryType !== 'P' && !alreadyViewed) {
@@ -1316,19 +1328,8 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         // photoUpload=true (verified male, no photo yet) reads a DIFFERENT
         // registration-array config than the plain not-yet-verified case —
         // see communicationService.ts's CommActionResult 'verify_id' doc.
-        const arrays = await getRegistrationArrays()
-        const cfg = (result.photoUpload ? arrays?.PHOTOPUBLISHPAID?.Shortlist : arrays?.PROFILEVERIFYPAID?.Shortlist) ?? {}
-        let cta = String(cfg.CTA ?? 'OK')
-        if (cta.includes('##CSNUM##')) {
-          const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
-          cta = cta.replace(/##CSNUM##/g, callNum).replace('+91', '')
-        }
-        setPhoneInfoSheet({
-          kind:     'verify_id',
-          title:    String(cfg.TITLE ?? (result.photoUpload ? 'Add your photo to continue' : 'Verify your profile')),
-          content:  String(cfg.CONTENT ?? (result.photoUpload ? 'Please add your photo to view phone numbers.' : 'Please complete ID verification to view phone numbers.')),
-          ctaLabel: cta,
-        })
+        const verifySheet = await buildVerifyIdSheet(!!result.photoUpload)
+        setPhoneInfoSheet({ kind: 'verify_id', ...verifySheet })
       } else if (result.type === 'female_free') {
         const kindByAction: Record<string, PhoneInfoSheet['kind'] | undefined> = {
           'femaleFree-PhotoAdd':     'female_free_photo_add',
@@ -1411,19 +1412,8 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
         // verified-but-no-photo case (result.photoUpload — check_Paid_Verified_
         // Nophoto() in Angular). The support-number placeholder `##CSNUM##`
         // only ever appears in CTA.
-        const arrays = await getRegistrationArrays()
-        const cfg = (result.photoUpload ? arrays?.PHOTOPUBLISHPAID?.Shortlist : arrays?.PROFILEVERIFYPAID?.Shortlist) ?? {}
-        let cta = String(cfg.CTA ?? 'OK')
-        if (cta.includes('##CSNUM##')) {
-          const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
-          cta = cta.replace(/##CSNUM##/g, callNum).replace('+91', '')
-        }
-        setPhoneInfoSheet({
-          kind:     'verify_id',
-          title:    String(cfg.TITLE ?? (result.photoUpload ? 'Add your photo to continue' : 'Verify your profile')),
-          content:  String(cfg.CONTENT ?? (result.photoUpload ? 'Please add your photo to view phone numbers.' : 'Please complete ID verification to view phone numbers.')),
-          ctaLabel: cta,
-        })
+        const verifySheet = await buildVerifyIdSheet(!!result.photoUpload)
+        setPhoneInfoSheet({ kind: 'verify_id', ...verifySheet })
       } else if (result.type === 'female_free') {
         const kindByAction: Record<string, PhoneInfoSheet['kind'] | undefined> = {
           'femaleFree-PhotoAdd':     'female_free_photo_add',
@@ -1470,6 +1460,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
     image?: string | undefined; title?: string | undefined; content?: string | undefined
     ctaLabel?: string | undefined; linkCtaLabel?: string | undefined; orCtaText?: string | undefined
     secondaryCtaLabel?: string | undefined; showSecondaryCta?: boolean | undefined; sideBySideCtas?: boolean | undefined
+    ctaIcon?: string | undefined; pinkWash?: boolean | undefined
   } {
     if (!phoneInfoSheet) return {}
     const gender = profile?.gender ?? 'F'
@@ -1516,6 +1507,9 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
           title:    phoneInfoSheet.title,
           content:  phoneInfoSheet.content,
           ctaLabel: phoneInfoSheet.ctaLabel,
+          image:    phoneInfoSheet.image,
+          ctaIcon:  phoneInfoSheet.ctaIcon,
+          pinkWash: phoneInfoSheet.pinkWash,
         }
       case 'female_free_photo_pending':
         return {
@@ -2242,7 +2236,7 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                     cover
                   />
                 ) : (
-                  <CdnImage uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} resizeMode="cover" />
+                  <BlurPhotoPlaceholder oppGender={oppGender} width="100%" height={PHOTO_HEIGHT} resizeMode="cover" />
                 )
               ) : profile.isPhotoAvailable && profile.photos.length > 0 ? (
                 // Angular: viewprofile.page.html:171-186 — PHOTOAVAILABLE=='Y'
@@ -2263,14 +2257,19 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
                   blur={profile.isPhotoProtect}
                 />
               ) : (
-                // No photo at all (Angular: PHOTOAVAILABLE == 'N') — a plain
-                // gender-silhouette placeholder. viewprofile.page.html's own
-                // inline markup for this case has no CTA of its own — the
-                // "request to add photo" overlay below lives in a SEPARATE
-                // component, <app-photo data="vpPhotoView"> at viewprofile.
-                // page.html:298, easy to miss since it's not nested inside the
-                // photo swiper markup at all.
-                <CdnImage uri={getBlurPhotoUri(oppGender)} width="100%" height={PHOTO_HEIGHT} resizeMode="cover" />
+                <View>
+                  <BlurPhotoPlaceholder oppGender={oppGender} width="100%" height={PHOTO_HEIGHT} resizeMode="cover" />
+                  {!sameGender && (
+                    <View style={s.photoOverlay}>
+                      <View style={s.overlayCard}>
+                        <Text style={[s.overlayText, { fontFamily: langFonts.medium }]}>
+                          {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
+                        </Text>
+                        <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={handleWhatsAppNudge} />
+                      </View>
+                    </View>
+                  )}
+                </View>
               )}
               {/* ── "Request to add photo" overlay — Angular: components/photo/
                   photo.component.html's 'ProfileView' switch case, "request to

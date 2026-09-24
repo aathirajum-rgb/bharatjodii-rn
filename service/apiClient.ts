@@ -386,6 +386,9 @@ export async function clearSession(): Promise<void> {
       // on the same device, until something happens to force a fresh fetch.
       StorageKeys.App.PP_SET_DATA,
       StorageKeys.Payment.PAYMENT_WALL,
+      // Written by storeWebURLData() at login; the next user on this device
+      // must not inherit it (it drives the paid verify-profile gate).
+      StorageKeys.Payment.PAY_P_FLAG,
       'PHOTOCOUNT',
       'PHOTOAVAILABLE',
       'PI_VALIDATION',

@@ -60,7 +60,7 @@ import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
 import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictSheets'
 import { matchProfileAdapter } from '../../adapters/matches.adapter'
 import { fetchActivityListingPage } from '../../service/activityService'
-import { communicationBtnOnClick, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, fetchContactDetails, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
+import { communicationBtnOnClick, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, fetchContactDetails, checkPaidBlockerGate, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import {
   openMembershipTab, fetchUpgradePaymentPromo, redirectToIntermediatePage,
@@ -577,7 +577,14 @@ export default function ActivityScreen({ navigation, route }: Props) {
   // condition is met (already viewed this profile before, or mutual-like+paid+
   // quota-left) — not unconditionally. Rendered via the same generic
   // BottomSheet(type="viewPhoneConfirm") MatchesScreen.tsx uses.
-  function confirmThenContact(profile: MatchProfile, action: 'call' | 'whatsapp') {
+  async function confirmThenContact(profile: MatchProfile, action: 'call' | 'whatsapp') {
+    // Angular communication.service.ts:181-186 — the paid verify-id / add-photo
+    // gates run BEFORE showContactDetails() (PHONENOLIMIT + confirm), so an
+    // unverified paid male gets the verify-profile sheet straight away.
+    if (await checkPaidBlockerGate()) {
+      handleContactConfirmYes({ profile, action })
+      return
+    }
     // Angular communication.service.ts's showCallAndWhatsAppPromo(): the
     // "view phone number?" CONFIRM popup lives inside showContactDetails(),
     // which is only reached when the number can actually be revealed —

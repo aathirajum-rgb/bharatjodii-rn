@@ -1684,6 +1684,18 @@ export async function storeWebURLData(data: Record<string, any>): Promise<void> 
   if (data.RATINGDATE !== undefined)  ops.push(setItem(SK.Rating.RATING_DATE,  String(data.RATINGDATE)))
   if (data.TIMECREATED !== undefined) ops.push(setItem(SK.User.TIME_CREATED,   String(data.TIMECREATED)))
 
+  // Angular: shared/config.ts's localvalueArr stores EKYCSTATUS and PAYPFLAG
+  // as flat localStorage keys from this same payload, and every reader here
+  // (checkPaidBlockerGate(), showCallOrWhatsApp(), MatchesScreen's banner
+  // gates) reads them flat via getItem() — but neither was ever written, so
+  // PAYPFLAG was always null. check_Paid_NonVerifyIdUser() requires
+  // PAYPFLAG=='1', so the verify-profile gate could never fire and an
+  // unverified paid male saw the real phone number on Call/WhatsApp. EKYCSTATUS
+  // is written too so a member verified outside the app isn't treated as
+  // unverified once that gate can actually fire.
+  if (data.EKYCSTATUS !== undefined) ops.push(setItem(SK.Verification.EKYC_STATUS, String(data.EKYCSTATUS)))
+  if (data.PAYPFLAG   !== undefined) ops.push(setItem(SK.Payment.PAY_P_FLAG,       String(data.PAYPFLAG)))
+
   // All session/profile data → single USER_SESSION object
   const session: Record<string, any> = await getSession()
 

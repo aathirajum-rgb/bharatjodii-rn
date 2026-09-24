@@ -20,7 +20,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native'
-import CdnSvg, { CdnImage } from '../../components/cdn-svg/CdnSvg'
+import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { withRupeeFont } from '../../utils/rupeeFont'
 import CdnLottie from '../../components/CdnLottie'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
@@ -29,7 +29,7 @@ import MatchesHeader from '../../components/matches-header/MatchesHeader'
 import {
   WhatsAppIcon, WhatsAppUnlockButton, CallIcon, MessageIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   buildBasicViewParts, showLikeCTA, showAfterLikeCTA,
-  getBlurPhotoUri, NEWLY_JOINED_STAR_URI, RIGHT_ARROW_ANIMATION_URI, ProfileBadge,
+  BlurPhotoPlaceholder, NEWLY_JOINED_STAR_URI, RIGHT_ARROW_ANIMATION_URI, ProfileBadge,
   MALE_AVATAR_URI, FEMALE_AVATAR_URI,
   PhotoSwiper,
   getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showContactsLeftBanner, showFreeBadge,
@@ -69,6 +69,8 @@ import {
   shouldSkipPhoneConfirm,
   shouldShowPhoneNoLimit,
   consumePhoneViewedId,
+  checkPaidBlockerGate,
+  buildVerifyIdSheet,
   getContactConfirmContent as getSharedContactConfirmContent,
 } from '../../service/communicationService'
 import { fetchBulkLikeMatches, getPPSetData } from '../../service/profileService'
@@ -326,8 +328,12 @@ export const MatchCard = memo(function MatchCard({
                      already renders for this case; Angular reaches for
                      getGenderPrefix_Him_Her ('him'/'her') rather than the
                      his/her used here, which differs only for a male profile. */
+                  // Product decision: same copy as ViewProfile's overlay for this
+                  // profile ("Contact and Get #HER_HIS# Photos on WhatsApp") rather
+                  // than Angular's shorter REQUEST_HIDDEN_PHOTO_WHATSAPP, so the
+                  // Matches card and View Profile read identically.
                   <Text style={[c.overlayText, { fontFamily: langFonts.regular }]}>
-                    {t('GENERAL.REQUEST_HIDDEN_PHOTO_WHATSAPP')
+                    {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP')
                       .replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
                   </Text>
                 ) : (
@@ -383,10 +389,10 @@ export const MatchCard = memo(function MatchCard({
           // No photo at all: blur placeholder + WhatsApp overlay
           // Angular: getWhatsAppAvatarImg() + request-photo-vp overlay
           <Pressable style={c.singlePhotoPressable} onPress={onPress}>
-            {/* CdnImage: getBlurPhotoUri() hands back a raster on native — see
-                that helper — and CdnImage dispatches on the extension. */}
-            <CdnImage
-              uri={getBlurPhotoUri(oppGender)}
+            {/* BlurPhotoPlaceholder: the card-stack blur artwork (side-cards +
+                bottom fade) the web SVG draws — see that component. */}
+            <BlurPhotoPlaceholder
+              oppGender={oppGender}
               width="100%" height="100%"
               style={StyleSheet.absoluteFill}
               resizeMode="cover"
@@ -1348,7 +1354,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     // not eKYC-verified. Content is server-driven (REGISTRATIONARRAYS.
     // PROFILEVERIFYPAID.Shortlist), read at the point this is set (see
     // handleContactConfirmYes) rather than passed through CommActionResult.
-    | { kind: 'verify_id'; title: string; content: string; ctaLabel: string }
+    | { kind: 'verify_id'; title: string; content: string; ctaLabel: string; image?: string | undefined; ctaIcon?: string | undefined; pinkWash?: boolean | undefined }
     // Angular communication.service.ts's femaleFreeContactFunc() — 4 reachable
     // outcomes for a female free-3-contact user (the 5th, femaleFree-PhotoAdded,
     // is only produced with isRedirect=true, not on this tap-to-call path).
@@ -1558,7 +1564,14 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
               getItem(StorageKeys.Payment.PAY_P_FLAG),
               getSessionValue(StorageKeys.App.WA_PHOTO_FLAG),
             ])
-            const photoStatus = ppSetData?.PI_PHOTOSTATUS ?? 'N'
+            // Angular: getPPsetValue('PI_PHOTOSTATUS') returns `ppSetData?.[key] || ''`
+            // (common-funtions.ts:947-950) — an absent/empty status is '', NOT 'N'.
+            // Defaulting to 'N' made check_Paid_Verified_Nophoto() below pass for a
+            // paid verified male whose PPSET omitted the field, showing the
+            // PHOTOPUBLISHPAID hero banner / BANNERSLOT 1014 / add-photo gate where
+            // Angular shows none. BANNERSLOT 1011's `!['P','Y'].includes()` reads
+            // '' and 'N' identically, so it is unaffected.
+            const photoStatus = String(ppSetData?.PI_PHOTOSTATUS || '')
 
             if (!ctrl.cancelled) {
               setOwnEntryType(entryType ?? '')
@@ -2271,6 +2284,15 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   }
 
   async function handleCall(profile: MatchProfile) {
+    // Angular communication.service.ts:181-186 — check_Paid_NonVerifyIdUser()
+    // / check_Paid_Verified_Nophoto() run BEFORE showContactDetails() (the
+    // PHONENOLIMIT + "view number?" confirm), so an unverified paid male goes
+    // straight to the verify-profile sheet, never a contact prompt. The service
+    // returns verify_id for exactly these gates.
+    if (await checkPaidBlockerGate()) {
+      handleContactConfirmYes({ profile, action: 'call' })
+      return
+    }
     if (checkPhoneNoLimit(profile)) return
     // Angular communication.service.ts:175-179 — promote a PHONEVIEWEDID match to
     // phoneViewed==='1' before deciding, so a number revealed earlier in this
@@ -2293,8 +2315,13 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   // `nudge` = the photo overlay's WhatsApp button (Angular's 'whatsappNudge'),
   // not the action row's icon — same gating, different free-member sheet.
   async function handleWhatsApp(profile: MatchProfile, nudge = false) {
-    if (checkPhoneNoLimit(profile)) return
     const action: ContactAction = nudge ? 'whatsappNudge' : 'whatsapp'
+    // Same verify-first order as handleCall above.
+    if (await checkPaidBlockerGate()) {
+      handleContactConfirmYes({ profile, action })
+      return
+    }
+    if (checkPhoneNoLimit(profile)) return
     // Same PHONEVIEWEDID promotion as handleCall above.
     const phoneViewed = (await consumePhoneViewedId(profile.phoneViewed, profile.profileId))
       ? markPhoneViewed(profile.profileId)
@@ -2348,19 +2375,8 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         // photoUpload=true (verified male, no photo yet) reads a DIFFERENT
         // registration-array config than the plain not-yet-verified case —
         // see communicationService.ts's CommActionResult 'verify_id' doc.
-        const arrays = await getRegistrationArrays()
-        const cfg = (result.photoUpload ? arrays?.PHOTOPUBLISHPAID?.Shortlist : arrays?.PROFILEVERIFYPAID?.Shortlist) ?? {}
-        let cta = String(cfg.CTA ?? 'OK')
-        if (cta.includes('##CSNUM##')) {
-          const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
-          cta = cta.replace(/##CSNUM##/g, callNum).replace('+91', '')
-        }
-        setPhoneInfoSheet({
-          kind:    'verify_id',
-          title:   String(cfg.TITLE ?? (result.photoUpload ? 'Add your photo to continue' : 'Verify your profile')),
-          content: String(cfg.CONTENT ?? (result.photoUpload ? 'Please add your photo to view phone numbers.' : 'Please complete ID verification to view phone numbers.')),
-          ctaLabel: cta,
-        })
+        const verifySheet = await buildVerifyIdSheet(!!result.photoUpload)
+        setPhoneInfoSheet({ kind: 'verify_id', ...verifySheet })
       } else if (result.type === 'female_free') {
         const kindByAction: Record<string, PhoneInfoSheet['kind'] | undefined> = {
           'femaleFree-PhotoAdd':     'female_free_photo_add',
@@ -2404,6 +2420,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     image?: string | undefined; title?: string | undefined; content?: string | undefined
     ctaLabel?: string | undefined; linkCtaLabel?: string | undefined; orCtaText?: string | undefined
     secondaryCtaLabel?: string | undefined; showSecondaryCta?: boolean | undefined; sideBySideCtas?: boolean | undefined
+    ctaIcon?: string | undefined; pinkWash?: boolean | undefined
   } {
     if (!phoneInfoSheet) return {}
     switch (phoneInfoSheet.kind) {
@@ -2457,6 +2474,9 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
           title:    phoneInfoSheet.title,
           content:  phoneInfoSheet.content,
           ctaLabel: phoneInfoSheet.ctaLabel,
+          image:    phoneInfoSheet.image,
+          ctaIcon:  phoneInfoSheet.ctaIcon,
+          pinkWash: phoneInfoSheet.pinkWash,
         }
       // Angular botton-sheet.config.ts's UNDERVALIDSHEET/ADDPHOTOTEXT/
       // VERIFIEDBTMSHEET/PHONENOLIMIT — English text confirmed via source, not
@@ -2598,19 +2618,8 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         // (An earlier version of this code wrongly applied a replace to
         // CONTENT instead of CTA, using a nonexistent cfg.CSNUM field instead
         // of the real VERIFIEDBYCALLNUM session value.)
-        const arrays = await getRegistrationArrays()
-        const cfg = (result.photoUpload ? arrays?.PHOTOPUBLISHPAID?.Shortlist : arrays?.PROFILEVERIFYPAID?.Shortlist) ?? {}
-        let cta = String(cfg.CTA ?? 'OK')
-        if (cta.includes('##CSNUM##')) {
-          const callNum = (await getItem('VERIFIEDBYCALLNUM')) ?? ''
-          cta = cta.replace(/##CSNUM##/g, callNum).replace('+91', '')
-        }
-        setPhoneInfoSheet({
-          kind:    'verify_id',
-          title:   String(cfg.TITLE ?? (result.photoUpload ? 'Add your photo to continue' : 'Verify your profile')),
-          content: String(cfg.CONTENT ?? (result.photoUpload ? 'Please add your photo to view phone numbers.' : 'Please complete ID verification to view phone numbers.')),
-          ctaLabel: cta,
-        })
+        const verifySheet = await buildVerifyIdSheet(!!result.photoUpload)
+        setPhoneInfoSheet({ kind: 'verify_id', ...verifySheet })
       } else if (result.type === 'female_free') {
         const kindByAction: Record<string, PhoneInfoSheet['kind'] | undefined> = {
           'femaleFree-PhotoAdd':     'female_free_photo_add',

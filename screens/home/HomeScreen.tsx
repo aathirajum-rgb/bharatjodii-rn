@@ -39,7 +39,7 @@ import { useAddPhotoPicker } from '../../hooks/useAddPhotoPicker'
 import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
 import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictSheets'
 import { openMembershipTab, paymentTrack, getHeroBannerDetails, getMenuPromo, redirectToIntermediatePage } from '../../service/paymentService'
-import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
+import { communicationBtnOnClick, fetchContactDetails, shouldSkipPhoneConfirm, shouldShowPhoneNoLimit, checkPaidBlockerGate, getContactConfirmContent as getSharedContactConfirmContent } from '../../service/communicationService'
 import { redirectToViewProfile } from '../../service/buttonService'
 import { getItem, setItem, removeItem, getJson } from '../../service/storageService'
 import { getRegistrationArrays, getSessionValue } from '../../service/registrationService'
@@ -1785,8 +1785,15 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
   // Angular: matches-card.component's WhatsApp photo-request overlay (see
   // ProfilePhoto.tsx) — fromPage varies per section, matching goToProfile's
   // own per-section fromPage argument below.
-  function confirmThenWhatsApp(item: SwiperItem, fromPage: string) {
+  async function confirmThenWhatsApp(item: SwiperItem, fromPage: string) {
     if (!item.profileId) return
+    // Angular communication.service.ts:181-186 — the paid verify-id / add-photo
+    // gates run BEFORE showContactDetails() (PHONENOLIMIT + confirm), so an
+    // unverified paid male gets the verify-profile sheet straight away.
+    if (await checkPaidBlockerGate()) {
+      handleContactConfirmYes({ item, action: 'whatsappNudge', fromPage })
+      return
+    }
     // Angular communication.service.ts's showContactDetails() FIRST check — a
     // paid user whose mutual-like AND overall phone-view quotas are both
     // exhausted sees the PHONENOLIMIT sheet instead of the confirm popup.
