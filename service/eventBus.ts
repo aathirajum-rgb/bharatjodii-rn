@@ -54,3 +54,27 @@ export function subscribeVpProfileListUpdated(callback: (ids: string[]) => void)
   const subscription = DeviceEventEmitter.addListener(VP_LIST_UPDATED_EVENT, callback)
   return () => subscription.remove()
 }
+
+// ─── Daily Recommendation swipe → Home's own Daily Recommendation section ────
+// HomeScreen.tsx renders its own copy of today's Daily Recommendation cards
+// (todayMatches), fetched separately from the full-screen swipe stack in
+// DailyRecommendationScreen.tsx, and stays mounted underneath it (stack
+// navigator). Invalidating Home's fetch cache alone only fixes this on the
+// NEXT successful refetch — Home's existing React state doesn't clear until
+// then, and HomeScreen.tsx's loadHome() only calls setTodayMatches when the
+// fresh result is non-empty, so a slow/failed refetch could leave the
+// just-swiped card showing indefinitely. Emitting the id the instant it's
+// swiped lets Home filter its own list immediately, with no dependency on
+// cache timing or a second network round trip.
+
+const DR_PROFILE_REMOVED_EVENT = 'jodii:drProfileRemoved'
+
+/** DailyRecommendationScreen -> Home: this profile was just swiped away. */
+export function emitDrProfileRemoved(profileId: string): void {
+  DeviceEventEmitter.emit(DR_PROFILE_REMOVED_EVENT, profileId)
+}
+
+export function subscribeDrProfileRemoved(callback: (profileId: string) => void): () => void {
+  const subscription = DeviceEventEmitter.addListener(DR_PROFILE_REMOVED_EVENT, callback)
+  return () => subscription.remove()
+}

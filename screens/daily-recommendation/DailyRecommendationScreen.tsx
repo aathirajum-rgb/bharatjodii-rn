@@ -33,7 +33,8 @@ import type { MatchProfile } from '../../types/interfaces/matches.interface'
 import {
   callingDailyRecommendationAPI, handleAfterDr, updateDrProfiles,
 } from '../../service/drService'
-import { toProfile, fetchAndStorePPSetData, fetchMatches } from '../../service/homeService'
+import { toProfile, fetchAndStorePPSetData, fetchMatches, invalidateDailyRecCache, filterListingRows } from '../../service/homeService'
+import { emitDrProfileRemoved } from '../../service/eventBus'
 import { communicationBtnOnClick, type CommActionResult } from '../../service/communicationService'
 import { checkAddPhotoPromotion } from '../../service/buttonService'
 import { markProfileViewed } from '../../service/viewProfileService'
@@ -330,7 +331,13 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
       const raw = await callingDailyRecommendationAPI(userId ?? '')
       if (cancelled) return
 
-      const adapted: DrProfile[] = raw.map(r => matchProfileAdapter.adapt(toProfile(r)))
+      // filterListingRows drops the same STATUS-997/999/1000 loader/end-of-
+      // list sentinels and BANNERSLOT rows homeService.ts's own mapping does
+      // for Home's copy of this same list (see homeService.ts's comment on
+      // fetchDailyRec) — this raw array was being mapped straight into cards
+      // unfiltered, so any such row here would have produced a broken,
+      // untappable card instead of just being skipped.
+      const adapted: DrProfile[] = filterListingRows(raw).map(r => matchProfileAdapter.adapt(toProfile(r)))
       setProfiles(adapted)
 
       const cachedCount = (await getJson<any[]>('DR_COUNT'))?.length ?? 0
@@ -426,6 +433,20 @@ export default function DailyRecommendationScreen({ navigation, route }: { navig
     // (`cached?.length`) still saw the FULL, un-trimmed list on the next app
     // open the same day and re-served every profile, already-swiped or not.
     updateDrProfiles(shifted.profileId).catch(() => {})
+    // Home's own Daily Recommendation section (HomeScreen.tsx's todayMatches)
+    // reads through a separate 45s in-memory cache (homeService.ts's
+    // withTtlCache) that updateDrProfiles above never touches — without this,
+    // a card swiped away here kept showing on Home for up to 45s after
+    // navigating back.
+    invalidateDailyRecCache().catch(() => {})
+    // Belt-and-suspenders: Home stays mounted underneath this screen, so its
+    // own React state doesn't wait for the cache invalidation above to take
+    // effect on some later refetch — tell it directly, immediately, so the
+    // card disappears from Home's list the instant it's swiped here, not
+    // "eventually, if the next fetch happens to succeed and come back
+    // non-empty" (see eventBus.ts's own comment on this event for why that
+    // guard made the cache fix alone unreliable).
+    emitDrProfileRemoved(shifted.profileId)
     // `shifted` is always the current top card at every call site — drop it.
     // willEmpty is read from the ref (still the pre-shift value here) rather
     // than inside the setProfiles updater — updaters must stay pure, and

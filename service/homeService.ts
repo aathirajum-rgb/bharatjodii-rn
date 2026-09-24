@@ -95,6 +95,20 @@ async function withTtlCache<T>(name: string, fetcher: () => Promise<T>): Promise
   return data
 }
 
+// Drops a cached listing so the next fetchX() call is a real network hit
+// instead of serving this TTL's stale snapshot. Needed when a profile is
+// removed from a list by an action taken on a DIFFERENT screen than the one
+// that owns this cache — e.g. swiping a card away on the full-screen Daily
+// Recommendation flow (DailyRecommendationScreen.tsx) updates that screen's
+// own AsyncStorage-backed list (drService.ts's updateDrProfiles) but has no
+// way to reach into Home's in-memory cache otherwise, so Home kept showing
+// the just-swiped profile in its own Daily Recommendation section for up to
+// HOME_CACHE_TTL_MS after returning to it.
+export async function invalidateDailyRecCache(): Promise<void> {
+  const userId = (await getItem(StorageKeys.Auth.USER_ID)) ?? ''
+  homeCache.delete(`fetchDailyRec:${userId}:${i18n.language}`)
+}
+
 // ─── Profile mapper ───────────────────────────────────────────────────────────
 
 // Exported so DailyRecommendationScreen can run drService's raw (uncached-envelope)
@@ -198,18 +212,14 @@ export function toProfile(p: Record<string, any>): SwiperItem {
   }
 }
 
-// Exported so other listing screens (e.g. ActivityScreen's liked-profile tabs)
-// can parse their own RESPONSE/TOTAL envelope through the same SwiperItem
-// mapping instead of hand-rolling a second raw->UI adapter.
-export function toListingResult(res: Record<string, any>): ListingResult {
-  // Angular matches API: profiles in res['RESPONSE'] (array), count in res['TOTAL']
-  // Other listing APIs may use res['LIST'] / res['TOTALCOUNT'] — keep fallbacks
-  const raw = res['RESPONSE'] ?? res['LIST'] ?? res['LISTDATA'] ?? []
-  const all = Array.isArray(raw) ? raw : []
-
-  const items: SwiperItem[] = []
-  const bannerSlots: Array<{ slot: string; insertAfter: number }> = []
-
+// Exported so any screen mapping a raw listing array itself (rather than
+// through mapListingItems/toListingResult below) — e.g.
+// DailyRecommendationScreen.tsx, which runs each row through its own
+// matchProfileAdapter afterward instead of toProfile() — filters out the
+// same non-profile rows first, instead of quietly mapping them into a
+// broken card (see the STATUS comment below for what "broken" looks like).
+export function filterListingRows(all: any[]): any[] {
+  const rows: any[] = []
   for (const p of all) {
     // STATUS 997/999/1000 = loader / end-of-list / hidden placeholders. Confirmed live
     // (JODII debug) that the server sends this as a JSON NUMBER (999), not a string —
@@ -219,6 +229,25 @@ export function toListingResult(res: Record<string, any>): ListingResult {
     // everywhere in matches.page.ts, which is why this never surfaced there.
     const status = String(p['STATUS'] ?? '')
     if (status === '997' || status === '999' || status === '1000') continue
+    if (p['BANNERSLOT']) continue // banner rows are handled separately by mapListingItems below
+    rows.push(p)
+  }
+  return rows
+}
+
+// Shared by toListingResult below and fetchDailyRecUncached (which has no
+// RESPONSE/TOTAL envelope to unwrap — drService.ts's callingDailyRecommendationAPI
+// returns the bare profile array straight out of its own cache). Doesn't
+// build on filterListingRows above — it needs each banner row's POSITION
+// before dropping it, which that function already discards.
+function mapListingItems(all: any[]): { items: SwiperItem[]; bannerSlots: Array<{ slot: string; insertAfter: number }> } {
+  const items: SwiperItem[] = []
+  const bannerSlots: Array<{ slot: string; insertAfter: number }> = []
+
+  for (const p of all) {
+    // See filterListingRows above for what these STATUS sentinels are.
+    const status = String(p['STATUS'] ?? '')
+    if (status === '997' || status === '999' || status === '1000') continue
     if (p['BANNERSLOT']) {
       // Track banner position as "after N profile items"
       bannerSlots.push({ slot: String(p['BANNERSLOT']), insertAfter: items.length })
@@ -226,6 +255,20 @@ export function toListingResult(res: Record<string, any>): ListingResult {
     }
     items.push(toProfile(p))
   }
+
+  return { items, bannerSlots }
+}
+
+// Exported so other listing screens (e.g. ActivityScreen's liked-profile tabs)
+// can parse their own RESPONSE/TOTAL envelope through the same SwiperItem
+// mapping instead of hand-rolling a second raw->UI adapter.
+export function toListingResult(res: Record<string, any>): ListingResult {
+  // Angular matches API: profiles in res['RESPONSE'] (array), count in res['TOTAL']
+  // Other listing APIs may use res['LIST'] / res['TOTALCOUNT'] — keep fallbacks
+  const raw = res['RESPONSE'] ?? res['LIST'] ?? res['LISTDATA'] ?? []
+  const all = Array.isArray(raw) ? raw : []
+
+  const { items, bannerSlots } = mapListingItems(all)
 
   const rawFacets = res['FACETRESPONSE']
   const facets: ExploreFacet[] | undefined = Array.isArray(rawFacets)
@@ -781,19 +824,38 @@ async function fetchViewedYouUncached(): Promise<ListingResult> {
 }
 
 // ─── Today's / Daily recommendations ─────────────────────────────────────────
-// Angular: ID,START=0,LIMIT=15,LIKED=1,VIEWED=1,REPORTED=1,BLOCKED=1,REMOVED=1,
-// SKIPED=1,MYHOME=1 — same shape fetchDailyRecommendations() below already uses;
-// this wrapper just returns the ListingResult (with totalCount) shape Home needs.
-
+// Angular: explore.component.ts's Home carousel and daily-recommendation.
+// component.ts's own full-screen swipe stack both call the SAME shared
+// dr.service.ts#callingDailyRecommendationAPI() — one cache (localStorage
+// DR_DATE/DR_PROFILES, a calendar day at a time, trimmed locally on every
+// swipe), so the two surfaces can never show different lists. This used to
+// be its own independent network fetch straight off the listing endpoint —
+// same query shape, but a SEPARATE 45s cache with no knowledge of the swipe
+// stack's own AsyncStorage trims, so a card swiped away on the full-screen
+// stack (screens/daily-recommendation/DailyRecommendationScreen.tsx) could
+// still show here for up to 45s (or longer, since a stale snapshot from
+// before the trim could keep winning the TTL race). Routing through
+// drService.ts's shared cache instead makes this the same list, by
+// construction, matching Angular. The outer withTtlCache wrapper stays —
+// it's now just a short-lived in-memory read of that same shared cache
+// (still invalidated explicitly on trim, see invalidateDailyRecCache below),
+// avoiding an AsyncStorage read on every single Home focus.
 export function fetchDailyRec(): Promise<ListingResult> {
   return withTtlCache('fetchDailyRec', fetchDailyRecUncached)
 }
 
 async function fetchDailyRecUncached(): Promise<ListingResult> {
-  const userId = await getItem(StorageKeys.Auth.USER_ID)
-  const params = `ID=${userId ?? ''}&START=0&LIMIT=15&LIKED=1&VIEWED=1&REPORTED=1&BLOCKED=1&REMOVED=1&SKIPED=1&MYHOME=1`
-  const res = await apiCall(Endpoints.listing.dailyRecommendations, 'POST', params)
-  return toListingResult(res)
+  const userId = (await getItem(StorageKeys.Auth.USER_ID)) ?? ''
+  // Deferred require — drService.ts imports fetchMatches from this file, so a
+  // top-level import here would be circular. Both sides only ever call the
+  // other's export from inside a function body, never at module-init time,
+  // so this is safe; a deferred require just makes the cycle explicit.
+  const { callingDailyRecommendationAPI } = require('./drService') as typeof import('./drService')
+  const profiles = await callingDailyRecommendationAPI(userId)
+  // Angular: explore.component.ts's setDRProfiles() — drTotalCount is
+  // resultData.length (this call's own result), not a separate server total.
+  const { items, bannerSlots } = mapListingItems(profiles)
+  return { items, bannerSlots, totalCount: items.length, newCount: 0 }
 }
 
 // ─── Newly joined ─────────────────────────────────────────────────────────────

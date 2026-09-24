@@ -80,6 +80,7 @@ import {
   mapCompleteProfileCards, fetchProfileValidationBanner, type ProfileValidationBanner,
   type ExploreCategory, type HelpVideo, type CompleteProfileCard, type ComCountEntry,
 } from '../../service/homeService'
+import { subscribeDrProfileRemoved } from '../../service/eventBus'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -1548,6 +1549,19 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
       return () => { ctrl.cancelled = true }
     }, [loadHome])
   )
+
+  // DailyRecommendationScreen.tsx (the full-screen swipe stack, a separate
+  // fetch from this section's own todayMatches) tells Home the instant a
+  // card is swiped away there, so it disappears from THIS list right away
+  // instead of waiting on the next loadHome() refetch — see eventBus.ts's
+  // own comment on emitDrProfileRemoved for why the refetch alone wasn't
+  // reliable enough (Home stays mounted underneath, and loadHome() only
+  // applies a fresh result when it comes back non-empty).
+  useEffect(() => {
+    return subscribeDrProfileRemoved(profileId => {
+      setTodayMatches(prev => prev.filter(p => p.profileId !== profileId))
+    })
+  }, [])
 
   // Angular: registration.service.ts's navigateToMatches() — clears REGISTERURL
   // once the user has genuinely reached Home, the one place every onboarding
