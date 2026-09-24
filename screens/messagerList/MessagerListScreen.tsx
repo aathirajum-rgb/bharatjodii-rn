@@ -20,6 +20,7 @@ import AllMessagesEmptyState from '../../components/messages/AllMessagesEmptySta
 import ConversationRow from '../../components/messages/ConversationRow'
 import MessagerListDesktopLayout from './MessagerListDesktopLayout'
 import { useNetwork } from '../../contexts/NetworkContext'
+import { useFooterBadges } from '../../contexts/FooterBadgesContext'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { adaptChatListRecord, dedupeChatList } from '../../adapters/chatList.adapter'
 import { redirectToViewProfile } from '../../service/buttonService'
@@ -101,6 +102,18 @@ export default function MessagerListScreen({ navigation }: Props) {
   // tabs' ViewedActivitytList) — it just reflects whatever the socket last
   // reported, every time.
   const [conversationsUnread, setConversationsUnread] = useState(0)
+  // Angular: common.chatCount, read by the footer's Messages badge
+  // (footer.component.html:35). Same socket NEWCHATCNT this screen already
+  // shows on its own "All Messages" section tab — the footer had no source for
+  // it at all before, so that badge could never appear.
+  const { setChatCount: setFooterChatCount, markMessagesSeen } = useFooterBadges()
+  useEffect(() => { setFooterChatCount(conversationsUnread) }, [conversationsUnread, setFooterChatCount])
+  // Angular sets chatNotifyClick in THREE places — the footer tap
+  // (footer.component.ts:183), and ngOnInit/ngAfterViewChecked on the route
+  // itself (:87, :106-118) — so arriving here by any other path (a chat
+  // notification, an in-app link) clears the badge just the same. The tab tap
+  // is handled in MainTabs; this covers every other way in.
+  useFocusEffect(useCallback(() => { markMessagesSeen() }, [markMessagesSeen]))
   const [viewedTabs, setViewedTabs] = useState<Record<string, boolean>>({})
   const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
 

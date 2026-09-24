@@ -46,6 +46,7 @@ import {
 import RadioGroup from '../../components/radio/RadioGroup'
 import {
   getSelectedObject, saveFilterState,
+  snapshotFilterSession, restoreFilterSession, type FilterSessionSnapshot,
   getFilterEventType, resetFilter, buildSearchParams, DEFAULT_FILTER, DEFAULT_PP_CHECKBOX,
   markFilterPPEdited,
   getStrictFilterState, setStrictFilterState, QUICK_FILTER_ICON,
@@ -291,6 +292,38 @@ export default function SearchScreen({ navigation }: Props) {
   const countAbortRef = useRef<AbortController | null>(null)
   const countGenRef    = useRef(0)
 
+  // ── Discard unapplied edits on leave ──────────────────────────────────────
+  // Every edit is persisted immediately (the live count and the red dots read
+  // it back), so backing out without "Show N matches" left the Matches
+  // Filters-chip count and this screen's red dots describing a filter that
+  // never ran. Snapshot the stored session on open — this effect sits above
+  // the load effect so the reads go out before anything here can write — and
+  // put it back on any exit (header back, hardware back, swipe) that didn't
+  // apply. Restored BEFORE the pop completes, so Matches' focus re-read sees
+  // the old values rather than racing the write.
+  const sessionSnapRef = useRef<Promise<FilterSessionSnapshot> | null>(null)
+  const appliedRef     = useRef(false)
+  const leavingRef     = useRef(false)
+
+  useEffect(() => {
+    sessionSnapRef.current = snapshotFilterSession()
+    return navigation.addListener('beforeRemove', (e: any) => {
+      const snap = sessionSnapRef.current
+      if (appliedRef.current || !snap) return
+      e.preventDefault()
+      sessionSnapRef.current = null
+      // The live-count debounce also saves the session — a timer firing after
+      // the restore would write the discarded edits straight back.
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+      countAbortRef.current?.abort()
+      leavingRef.current = true
+      snap
+        .then(restoreFilterSession)
+        .catch(() => {})
+        .finally(() => navigation.dispatch(e.data.action))
+    })
+  }, [navigation])
+
   // ── Load ──────────────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -366,12 +399,17 @@ export default function SearchScreen({ navigation }: Props) {
       // preference said "Hindu, 25-30" saw "Any religion, 18-50" instead.
       const baseline = ppSelectionFromPPSet(ppSet as Record<string, any> | null)
       setPpBaseline(baseline)
-      setSelected(hasStored ? obj : baseline)
-      // The dots belong to the stored filter session. No session stored means
+      // Edit Preference ALWAYS opens on the saved preference: the stored
+      // session may be a temporary filter, and a filter must never show up
+      // as (or get saved into) the member's partner preference. Only Filters
+      // mode resumes the stored session.
+      const resumeSession = hasStored && evType === 'filter'
+      setSelected(resumeSession ? obj : baseline)
+      // The dots belong to the stored filter session. No session resumed means
       // the screen is opening on the saved preference, where nothing has been
       // edited yet — Angular's setsearchValueList() clears every isAnyChanges
       // on exactly that path.
-      setEditedRows(hasStored ? storedEdited : {})
+      setEditedRows(resumeSession ? storedEdited : {})
       // FILTERPP reports the fields edited in THIS visit, so the flags start
       // clean on every open — a stale '1' left by an earlier visit would
       // otherwise ride along and break "only the edited field is 1". Both
@@ -406,6 +444,7 @@ export default function SearchScreen({ navigation }: Props) {
     if (loading || !matriId) return
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(async () => {
+      if (leavingRef.current) return
       countAbortRef.current?.abort()
       const controller = new AbortController()
       countAbortRef.current = controller
@@ -492,9 +531,10 @@ export default function SearchScreen({ navigation }: Props) {
   }
 
   async function ensureOptions(key: string, loader: () => Promise<MultiSelectOption[]>) {
-    if (labelCache[key]) return labelCache[key]
+    const slot = optionsKey(key)
+    if (labelCache[slot]) return labelCache[slot]
     const opts = await loader()
-    setLabelCache(prev => ({ ...prev, [key]: opts }))
+    setLabelCache(prev => ({ ...prev, [slot]: opts }))
     return opts
   }
 
@@ -537,7 +577,7 @@ export default function SearchScreen({ navigation }: Props) {
   }
 
   function labelsFor(key: string, keys: string[]): string {
-    return resolveFilterLabel(labelCache[key] ?? [], keys, anyLabelFor(key))
+    return resolveFilterLabel(labelCache[optionsKey(key)] ?? [], keys, anyLabelFor(key))
   }
 
   // ── Radio-first fields: Dosham & Monthly income ──────────────────────────
@@ -625,6 +665,20 @@ export default function SearchScreen({ navigation }: Props) {
   const religionKey   = (selected.RELIGION ?? []).filter((k: string) => k && k !== '0').join('~')
   const isChristian   = religionKey === '2'
   const religionIsAny = religionKey === ''
+  const casteSelection: string[] = (isChristian ? selected.DIVISION : selected.CASTE) ?? []
+
+  // Every other field's option list is a constant, so caching it under the
+  // field name is enough. CASTE/DIVISION are not: the list is whatever
+  // `type=caste&religion=<key>` answers, so the SAME field name means a
+  // different list for Hindu, Christian and Muslim. Keyed by field name alone,
+  // the first religion's list won and every later religion re-served it —
+  // Muslim (and any non-Christian religion) showed the Hindu castes, because
+  // they all resolve to the single 'CASTE' slot. Qualifying the slot with the
+  // religion makes a stale hit impossible instead of relying on some other code
+  // path remembering to invalidate it.
+  function optionsKey(field: string): string {
+    return field === 'CASTE' || field === 'DIVISION' ? `${field}:${religionKey}` : field
+  }
 
   // Angular keeps filterDataList.CASTE populated by re-fetching on every
   // religion change; this is the same fetch, kept only as "did it return
@@ -640,13 +694,13 @@ export default function SearchScreen({ navigation }: Props) {
     let cancelled = false
     ;(async () => {
       try {
-        const opts = await fetchSearchCasteOptions(religionKey)
+        const opts = await fetchSearchCasteOptions(religionKey, casteSelection)
         if (cancelled) return
         setCasteListAvailable(opts.length > 0)
         // The row's own value resolves against this same list — cache it here
         // rather than making the prefetch above fetch it a second time.
         if (opts.length > 0) {
-          setLabelCache(prev => ({ ...prev, [isChristian ? 'DIVISION' : 'CASTE']: opts }))
+          setLabelCache(prev => ({ ...prev, [optionsKey(isChristian ? 'DIVISION' : 'CASTE')]: opts }))
         }
       } catch {
         if (!cancelled) setCasteListAvailable(false)
@@ -655,6 +709,9 @@ export default function SearchScreen({ navigation }: Props) {
     return () => { cancelled = true }
     // The member's own mother tongue is read inside the fetch and never
     // changes here, so the partner-preference MOTHERTONGUE is no longer a dep.
+    // casteSelection is read, not a dep: it only labels picks saved before
+    // this religion was chosen, and refetching on every tick would be waste.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [religionKey, isChristian, religionIsAny])
 
   const showCasteRow = !religionIsAny && casteListAvailable
@@ -845,7 +902,7 @@ export default function SearchScreen({ navigation }: Props) {
   // comes back is what the one "Caste" panel is meant to show.
   async function openCaste() {
     const key  = isChristian ? 'DIVISION' : 'CASTE'
-    const opts = await ensureOptions(key, () => fetchSearchCasteOptions(religionKey))
+    const opts = await ensureOptions(key, () => fetchSearchCasteOptions(religionKey, casteSelection))
     if (opts.length === 0) return
     setMultiEditor(key as FieldKey)
   }
@@ -1089,6 +1146,14 @@ export default function SearchScreen({ navigation }: Props) {
 
     await saveFilterState(selected, ppCheckBox, editedRows)
     const params = await buildSearchParams(matriId, 0, 20, { strictFilterApply })
+    // An Edit Preference apply (SETPP all '1') makes this selection the saved
+    // preference, so Filters should now open ON it with nothing marked edited
+    // — no red dots, Filters-chip count 0. The selection and FILTERPP flags
+    // stay stored: Matches rebuilds pages 2+ from them.
+    if (eventType !== 'filter') await saveFilterState(selected, ppCheckBox, {})
+    // Applied — navigating to Matches pops this screen, and the leave guard
+    // above must keep these edits instead of restoring the snapshot.
+    appliedRef.current = true
     navigation.navigate('MainTabs', { screen: 'Matches', params: { searchParams: params } })
   }
 
@@ -1448,7 +1513,7 @@ export default function SearchScreen({ navigation }: Props) {
             : (multiEditor as string) === 'DIVISION' ? t('FILTER.SEARCH_DIVISION')
             : multiEditor === 'MOTHERTONGUE' ? t('FILTER.SEARCH_MOTHERTONGUE')
             : undefined}
-          options={sortFilterOptions(multiEditor, labelCache[multiEditor] ?? [], selectionFor(multiEditor))}
+          options={sortFilterOptions(multiEditor, labelCache[optionsKey(multiEditor)] ?? [], selectionFor(multiEditor))}
           selectedKeys={selectionFor(multiEditor) ?? ['0']}
           anyLabel={NO_ANY_ROW_PANELS.has(multiEditor) ? undefined : anyLabelFor(multiEditor)}
           onApply={keys => {
@@ -1470,7 +1535,12 @@ export default function SearchScreen({ navigation }: Props) {
               // must not light up as edited rows of their own.
               updateField('CASTE', ['0'], { cascade: true })
               updateField('DIVISION', ['0'], { cascade: true })
-              setLabelCache(prev => { const n = { ...prev }; delete n.CASTE; delete n.DIVISION; return n })
+              // No cache eviction needed any more: caste options live under a
+              // religion-qualified slot (see optionsKey), so the new religion
+              // simply misses and fetches its own list. The old code deleted the
+              // bare 'CASTE'/'DIVISION' slots, which only worked when the
+              // religion was changed through THIS panel — any other route to a
+              // religion change left the previous religion's list in place.
             }
           }}
           onClose={() => setMultiEditor(null)}

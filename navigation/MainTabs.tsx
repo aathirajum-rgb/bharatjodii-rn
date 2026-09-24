@@ -43,7 +43,12 @@ const TAB_FOR_ROUTE: Record<string, FooterTab> = {
 }
 
 function MainTabsBar({ state, navigation }: BottomTabBarProps) {
-  const { likesCount, upgradeTag, showMembershipDot, footerVisible, dismissMembershipDotForSession } = useFooterBadges()
+  const {
+    exploreCount, likesCount, chatCount,
+    showExploreBadge, showActivityBadge, showMessagesBadge,
+    markExploreSeen, markActivitySeen, markMessagesSeen,
+    upgradeTag, showMembershipDot, footerVisible, dismissMembershipDotForSession,
+  } = useFooterBadges()
   const activeTab = TAB_FOR_ROUTE[state.routeNames[state.index]] ?? 0
 
   // ActivityScreen hides the footer while showing its "viewed you"/"viewed by
@@ -60,6 +65,14 @@ function MainTabsBar({ state, navigation }: BottomTabBarProps) {
       openMembershipTab()
       return
     }
+    // Angular footer.component.ts's menuselectTab() marks the tab seen BEFORE
+    // navigating (:152 Home, :160 Activity, :183-186 Messages), so the badge
+    // clears on the tap itself rather than waiting for the destination screen
+    // to mount and report back.
+    if (tab === 0) markExploreSeen()
+    if (tab === 2) markActivitySeen()
+    if (tab === 4) markMessagesSeen()
+
     const route = ROUTE_FOR_TAB[tab]
     if (route) navigation.navigate(route)
   }
@@ -67,7 +80,12 @@ function MainTabsBar({ state, navigation }: BottomTabBarProps) {
   return (
     <AppFooter
       activeTab={activeTab}
-      likesCount={likesCount}
+      // Each count is handed over only when its own Angular rule says the
+      // badge should be visible — the rules themselves live in
+      // FooterBadgesContext, so AppFooter stays a dumb renderer.
+      exploreCount={showExploreBadge  ? exploreCount : undefined}
+      likesCount={showActivityBadge   ? likesCount   : undefined}
+      chatCount={showMessagesBadge    ? chatCount    : undefined}
       upgradeTag={upgradeTag}
       showMembershipDot={showMembershipDot}
       onTabPress={handleTabPress}

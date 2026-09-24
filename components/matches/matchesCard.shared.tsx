@@ -23,7 +23,7 @@ import { CDN_IMG, CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { decodeEntities } from '../../utils/htmlEntities'
-import { withRupeeFont } from '../../utils/rupeeFont'
+import { withRupeeFont, withRupeeSymbolFont } from '../../utils/rupeeFont'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 
 // ─── Shared card badge/photo CDN URLs ──────────────────────────────────────────
@@ -203,11 +203,43 @@ const HTML_SPAN_CLASS_STYLES: Record<string, Record<string, any>> = {
 // span its own CSS class rather than an inline style) — a known class or an
 // inline color/font-size on the span itself, when present, overrides spanStyle
 // for that property.
+//
+// classFonts: opt-in for Angular's typography utility classes on spans —
+// `<weight>-<size>` names such as heading1-semibold-22 / body1-medium-16 /
+// body2-regular-14, plus primary-color / black-color / white-color. Without it
+// a span only gets spanStyle, so every span in a promo line ("Get up to" AND
+// "₹2800 OFF") rendered at the amount's size. Takes the language's font set,
+// since the class names a weight, not a face.
+type HtmlClassFonts = { regular: string; medium: string; semiBold: string; bold: string }
+
+function angularClassStyle(cls: string, fonts: HtmlClassFonts): Record<string, any> | null {
+  const typo = cls.match(/(regular|medium|semibold|bold)-(\d{2})$/i)
+  if (typo) {
+    const w = typo[1].toLowerCase()
+    return {
+      fontFamily: w === 'regular' ? fonts.regular : w === 'medium' ? fonts.medium : w === 'bold' ? fonts.bold : fonts.semiBold,
+      fontSize:   Number(typo[2]),
+    }
+  }
+  if (cls === 'primary-color' || cls === 'primaryColor') return { color: Colors.primaryDark }
+  if (cls === 'black-color') return { color: Colors.black }
+  if (cls === 'white-color') return { color: Colors.white }
+  return null
+}
+
 export function HtmlText({
-  html, style, spanStyle, numberOfLines,
-}: { html: string; style?: any; spanStyle?: any; numberOfLines?: number | undefined }) {
+  html, style, spanStyle, numberOfLines, classFonts,
+}: {
+  html: string; style?: any; spanStyle?: any; numberOfLines?: number | undefined
+  classFonts?: HtmlClassFonts
+}) {
   if (!html) return null
-  const cleaned = html.replace(/<br\s*\/?>/gi, '\n')
+  // HTML collapses the whitespace around a <br>; RN renders it, so
+  // "<br> on paid membership!" started its line one space in.
+  const cleaned = html.replace(/[ \t]*<br\s*\/?>[ \t]*/gi, '\n')
+  // Banner mode wraps only the ₹ glyph, so the digits keep the line's weight
+  // (only Roboto-Regular is loaded — "₹2800" rendered thin beside a bold "OFF").
+  const rupee = classFonts ? withRupeeSymbolFont : withRupeeFont
   const segs: Array<{ text: string; segStyle: Record<string, any> | null }> = []
   const spanRe = /<span([^>]*)>([\s\S]*?)<\/span>/gi
   let last = 0
@@ -228,6 +260,7 @@ export function HtmlText({
     const segStyle: Record<string, any> = { ...spanStyle }
     for (const cls of classM.split(/\s+/)) {
       if (HTML_SPAN_CLASS_STYLES[cls]) Object.assign(segStyle, HTML_SPAN_CLASS_STYLES[cls])
+      else if (classFonts) Object.assign(segStyle, angularClassStyle(cls, classFonts) ?? {})
       // Angular's `.color-XXXXXX` utility classes (e.g. `color-B50033` on the
       // BharatJodii rename sheet's title) are generated per-hex-value rather
       // than being a fixed named class, so they can't live in the lookup
@@ -251,8 +284,8 @@ export function HtmlText({
           copy that actually contains ₹ (income ranges, discount lines). */}
       {segs.map((seg, i) =>
         seg.segStyle
-          ? <Text key={i} style={seg.segStyle}>{withRupeeFont(seg.text)}</Text>
-          : <Text key={i}>{withRupeeFont(seg.text)}</Text>
+          ? <Text key={i} style={seg.segStyle}>{rupee(seg.text)}</Text>
+          : <Text key={i}>{rupee(seg.text)}</Text>
       )}
     </Text>
   )

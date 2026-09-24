@@ -1064,20 +1064,19 @@ export async function fetchPhysicalStatusOptions(): Promise<Array<{ key: string;
 // the single panel titled "Caste".
 //
 // Angular sends an extra `page=search` on this call (search.component.ts:907 and
-// filter-popup.component.ts:892, both exactly
-// `type=caste&page=search&mothertongue=<mt>&religion=<value>`). It was dropped
-// here on the reasoning that a religion-scoped list is what a filter wants.
+// filter-popup.component.ts:892). That flag makes the endpoint IGNORE
+// `religion` and answer with the master list of every caste and division
+// across all religions — so picking Hindu listed Muslim castes and Christian
+// divisions too, and a Christian member's "Division" opened onto Hindu castes.
+// The panel's options are therefore the religion-scoped list: Hindu → Hindu
+// castes, Christian → divisions, Muslim → Muslim castes.
 //
-// That reasoning cost two real bugs, both visible at once on the Caste panel:
-//
-//   1. The list came back SHORT — scoped to one religion + the member's own
-//      mother tongue, instead of the broader `page=search` list.
-//   2. Any already-selected key that wasn't in that narrower list had no label
-//      to resolve to, so the field rendered the RAW KEY: "24 Manai Telugu
-//      Chettiar,771,772,Chettiar".
-//
-// The flag is sent again. `religion` is still passed per Angular, which passes
-// it too.
+// The broad `page=search` list is still fetched, but ONLY to recover the
+// labels of already-saved picks the scoped list doesn't contain (it is scoped
+// to the member's own mother tongue too). Without that, those picks rendered
+// as RAW KEYS ("24 Manai Telugu Chettiar,771,772,Chettiar"). Only the missing
+// picks are appended — the rest of the master list never reaches the panel —
+// so the member can still see and untick them.
 //
 // Deliberately NOT fetchCasteOptions(): that one short-circuits on the
 // REGISTRATIONARRAYS.CASTE blob, the list for the member's OWN religion
@@ -1086,6 +1085,7 @@ export async function fetchPhysicalStatusOptions(): Promise<Array<{ key: string;
 // likewise refetches on every religion change rather than caching.
 export async function fetchSearchCasteOptions(
   religion: string,
+  selectedKeys: string[] = [],
 ): Promise<Array<{ key: string; label: string }>> {
   // Accepts one key or Angular's '~'-joined selection; '0' is "Any", which has
   // no caste list of its own.
@@ -1120,11 +1120,26 @@ export async function fetchSearchCasteOptions(
     return []
   }
 
-  const lists = await Promise.all(religionKeys.map(async key => {
-    const paramStr = `type=caste&page=search&religion=${key}&mothertongue=${mothertongue}&LANG=${lang}`
+  const fetchList = async (key: string, page = '') => {
+    const paramStr = `type=caste${page}&religion=${key}&mothertongue=${mothertongue}&LANG=${lang}`
     const res      = await apiCall(Endpoints.registration.initialFetch, 'POST', paramStr)
     return toList(res?.RESPONSE?.CASTE ?? res?.CASTE)
-  }))
+  }
+
+  const lists = await Promise.all(religionKeys.map(key => fetchList(key)))
+
+  // Saved picks the scoped list can't label — resolved from the broad list.
+  const scopedKeys = new Set(lists.flat().map(o => o.key))
+  const missing    = new Set(selectedKeys.map(String)
+    .filter(k => k && !NON_SELECTABLE_OPTION_KEYS.has(k) && !scopedKeys.has(k)))
+  if (missing.size > 0) {
+    try {
+      const broad = await fetchList(religionKeys[0], '&page=search')
+      lists.push(broad.filter(o => missing.has(o.key)))
+    } catch {
+      // Labels only — the scoped list is still the right panel.
+    }
+  }
 
   // Merge in selection order, first occurrence wins — the religions overlap on
   // shared codes, and a duplicate key would render as two identical rows the

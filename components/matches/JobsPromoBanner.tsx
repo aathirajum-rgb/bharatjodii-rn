@@ -70,6 +70,10 @@ export default function JobsPromoBanner({ data, onPress }: { data: any; onPress:
 const jp = StyleSheet.create({
   card: {
     overflow: 'hidden',
+    // Same 8px #E6E6E6 divider as the profile cards (c.card) around it, so the
+    // banner reads as its own slide instead of running into the next card.
+    borderBottomWidth: 8,
+    borderBottomColor: Colors.borderSubtle,
   },
   bgImg: {
     position: 'absolute',

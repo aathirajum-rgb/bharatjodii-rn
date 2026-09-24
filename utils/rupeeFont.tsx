@@ -59,3 +59,19 @@ export function withRupeeFont(text: string): ReactNode {
   if (last < text.length) out.push(<Fragment key={`t${last}`}>{text.slice(last)}</Fragment>)
   return out
 }
+
+/**
+ * Like withRupeeFont, but only the ₹ glyph itself switches face — the digits
+ * keep the parent's font. For emphasised amounts (a promo's "₹2800 OFF"):
+ * only Roboto-Regular is loaded, so wrapping the digits too rendered them
+ * regular weight beside semibold text, where Angular's browser faux-bolds.
+ */
+export function withRupeeSymbolFont(text: string): ReactNode {
+  if (!text || !text.includes('₹')) return text
+  return text.split('₹').flatMap((part, i) => i === 0
+    ? [<Fragment key="t0">{part}</Fragment>]
+    : [
+        <Text key={`r${i}`} style={{ fontFamily: RupeeSymbolFont }}>₹</Text>,
+        <Fragment key={`t${i}`}>{part}</Fragment>,
+      ])
+}

@@ -52,6 +52,10 @@ export default function ActivateMembershipBanner({ data, onPress }: { data: any;
 const am = StyleSheet.create({
   card: {
     borderRadius: 0,
+    // Same 8px #E6E6E6 divider as the profile cards (c.card) around it, so the
+    // banner reads as its own slide instead of running into the next card.
+    borderBottomWidth: 8,
+    borderBottomColor: Colors.borderSubtle,
   },
   // Angular: "add-photo-height" — no cited px value for this class, so this
   // sizes the illustration by content (contain) rather than guessing a crop.
@@ -62,6 +66,9 @@ const am = StyleSheet.create({
     width:      160,
     height:     120,
     marginTop:  16,
+    // The row's pl-24 — without it the image sat flush on the screen edge
+    // while the title/body/CTA below started 24px in.
+    marginLeft: 24,
     alignSelf:  'flex-start',
   },
   content: {

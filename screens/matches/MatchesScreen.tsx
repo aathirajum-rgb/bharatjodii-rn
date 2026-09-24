@@ -60,6 +60,7 @@ import {
   fetchAndStorePPSetData,
   fetchMenuPromo,
   fetchNotifCount,
+  deriveExploreCount,
   checkLimitFlowStatus,
 } from '../../service/homeService'
 import {
@@ -81,7 +82,7 @@ import {
 import { fetchQuickFilterChips } from '../../service/registrationService'
 import { FILTER_CHIP, type ChipConfig } from '../../components/matches-header/FilterChipsRow'
 import {
-  getHeroBannerDetails, openMembershipTab, fetchUpgradePaymentPromo, redirectToIntermediatePage,
+  getHeroBannerDetails, openMembershipTab, fetchUpgradePaymentPromo, redirectToIntermediatePage, paymentTrack,
   type UpgradePaymentPromo,
 } from '../../service/paymentService'
 import { useAppRating } from '../../hooks/useAppRating'
@@ -107,7 +108,7 @@ import BulkLikeDesktopModal from '../../components/bulk-like/BulkLikeDesktopModa
 import ContactDetailsSheet from '../../components/matches/ContactDetailsSheet'
 import StickyBanner from '../../components/sticky-banner/StickyBanner'
 import AppRatingModal from '../../components/app-rating/AppRatingModal'
-import BottomSheet from '../../components/bottom-sheet/BottomSheet'
+import BottomSheet, { whatsAppPhotoRequestSheet } from '../../components/bottom-sheet/BottomSheet'
 import NotificationPermissionSheet from '../../components/notification-permission-sheet/NotificationPermissionSheet'
 import SurveyPopup from '../../components/survey-popup/SurveyPopup'
 import Toast, { type ToastRequest } from '../../components/toast/Toast'
@@ -149,7 +150,7 @@ function buildMergedList(
 // a card only re-renders when its own props actually change.
 export const MatchCard = memo(function MatchCard({
   profile, oppGender, ownEntryType, femaleFreeEligible, indNumbersLeft,
-  onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp, onMessage,
+  onPress, onLike, onDontShow, onViewLater, onCall, onWhatsApp, onWhatsAppNudge, onMessage,
   showLikedBadge, singlePhoto, hideVerifiedBadge, photoHeight, waPhotoFlag = '0',
   showExtendedIntro,
 }: {
@@ -164,6 +165,11 @@ export const MatchCard = memo(function MatchCard({
   onViewLater:() => void
   onCall:     () => void
   onWhatsApp: () => void
+  // The photo overlay's WhatsApp button — Angular's 'whatsappNudge' action,
+  // distinct from the action row's plain 'whatsapp' (a free member gets the
+  // WhatsApp photo-request sheet, not the generic promo). Falls back to
+  // onWhatsApp for the screens that reuse this card without wiring it.
+  onWhatsAppNudge?: (() => void) | undefined
   // Optional — only the Matches list wires this up so far; Activity/ViewLater/
   // DailyRecommendation (which also reuse this card) are untouched by this fix.
   onMessage?: () => void
@@ -326,7 +332,7 @@ export const MatchCard = memo(function MatchCard({
                      WhatsApp overlay below (communication.service.ts:202-254's
                      whatsAppPhotoRequestBtnClickOn) — there is no separate
                      "request sent" state for the hidden-photo variant. */
-                  <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={onWhatsApp} />
+                  <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={onWhatsAppNudge ?? onWhatsApp} />
                 )}
                 {!whatsAppViewHiddenPhoto && !hiddenPhotoPending && (
                   <Pressable onPress={onLike}>
@@ -365,7 +371,7 @@ export const MatchCard = memo(function MatchCard({
                 <Text style={c.overlayText}>
                   {t('GENERAL.REQUEST_ADD_PHOTO_WHATSAPP').replace('#HER_HIS#', t(`PRONOUN.${oppGender}.hisher`))}
                 </Text>
-                <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={onWhatsApp} />
+                <WhatsAppUnlockButton label={t('GENERAL.WHATSAPP')} onPress={onWhatsAppNudge ?? onWhatsApp} />
               </View>
             </View>
           </Pressable>
@@ -642,6 +648,10 @@ const pcs = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop:         24,
     paddingBottom:      24,
+    // Same 8px #E6E6E6 divider as the profile cards (c.card) around it, so the
+    // banner reads as its own slide instead of running into the next card.
+    borderBottomWidth: 8,
+    borderBottomColor: Colors.borderSubtle,
   },
   // Angular: breather.component.html's PCS block — heading2-semibold-18 black-color
   // fontFamily applied inline (langFonts.semiBold) — see PcsBanner's Text usage.
@@ -810,6 +820,10 @@ const EXT_ADVANCE_DELAY_MS = 1000
 // Shared "nothing to offer" result, so every skipped branch of the count gate
 // returns the same shape fetchExtendedMatchesCount() does.
 const EMPTY_EXTENDED_COUNT: ExtendedMatchesCountResult = { count: 0, previewPhotos: [] }
+
+// Contact CTAs routed through communicationBtnOnClick(). 'whatsappNudge' is the
+// photo overlay's WhatsApp button (see MatchCard's onWhatsAppNudge).
+type ContactAction = 'call' | 'whatsapp' | 'whatsappNudge'
 
 function ExtendedMatchesCard({
   count, previewPhotos, oppGender, onAdvance,
@@ -1260,7 +1274,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   const [likesCount, setLikesCount] = useState(0)
   // The persistent tab bar (MainTabs.tsx) renders AppFooter now, not this
   // screen — publish into the shared context instead of a local prop.
-  const { setLikesCount: setFooterLikesCount } = useFooterBadges()
+  const { setLikesCount: setFooterLikesCount, setExploreCount: setFooterExploreCount } = useFooterBadges()
   useEffect(() => { setFooterLikesCount(likesCount) }, [likesCount, setFooterLikesCount])
 
   // Angular: paymentPromoPopUp() → bottom-sheet.component's `paymentPromo` block —
@@ -1274,7 +1288,9 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   // ── Contact-reveal flow (Angular button.component.ts's two-step confirm →
   // phoneviewed API → Contact Details sheet) — previously this port skipped
   // straight to dialing on 'show_contact', no confirmation or details sheet. ──
-  const [contactConfirm, setContactConfirm] = useState<{ profile: MatchProfile; action: 'call' | 'whatsapp' } | null>(null)
+  const [contactConfirm, setContactConfirm] = useState<{ profile: MatchProfile; action: ContactAction } | null>(null)
+  // The WhatsApp photo-request paywall sheet (BottomSheet 'whatsAppPhotoRequest').
+  const [waPhotoRequest, setWaPhotoRequest] = useState<MatchProfile | null>(null)
   const [contactDetails, setContactDetails] = useState<{
     name: string; mobile?: string | undefined; dialNumber?: string | undefined; whatsappNumber?: string | undefined
     showCounter?: boolean | undefined; viewedCount?: string | undefined; totalCount?: string | undefined
@@ -1793,6 +1809,11 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
       if (!ctrl.cancelled) {
         const likedYou = comCount.find(c => c.comtype === 'likedyou')
         setLikesCount(Number(likedYou?.newcount ?? 0))
+        // Same COMCOUNT payload also carries the footer's Home bubble
+        // ("viewed you"), which Angular derives on every getNotificationCount().
+        deriveExploreCount(comCount)
+          .then(n => { if (!ctrl.cancelled) setFooterExploreCount(n) })
+          .catch(() => {})
       }
 
       // "Rate our app" popup (#9) — Angular: passiveRatingPopup(). Skipped when the
@@ -2244,22 +2265,49 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     }
   }
 
-  async function handleWhatsApp(profile: MatchProfile) {
+  // `nudge` = the photo overlay's WhatsApp button (Angular's 'whatsappNudge'),
+  // not the action row's icon — same gating, different free-member sheet.
+  async function handleWhatsApp(profile: MatchProfile, nudge = false) {
     if (checkPhoneNoLimit(profile)) return
+    const action: ContactAction = nudge ? 'whatsappNudge' : 'whatsapp'
     // Same PHONEVIEWEDID promotion as handleCall above.
     const phoneViewed = (await consumePhoneViewedId(profile.phoneViewed, profile.profileId))
       ? markPhoneViewed(profile.profileId)
       : profile.phoneViewed
     const alreadyViewed = ['1', '3'].includes(String(phoneViewed ?? '0'))
     if (ownEntryType !== 'P' && !alreadyViewed) {
-      handleContactConfirmYes({ profile, action: 'whatsapp' })
+      handleContactConfirmYes({ profile, action })
       return
     }
     if (shouldSkipPhoneConfirm(phoneViewed, profile.likedStatus, indNumbersLeft, ownEntryType, profile.phoneProtected)) {
-      handleContactConfirmYes({ profile, action: 'whatsapp' })
+      handleContactConfirmYes({ profile, action })
     } else {
-      setContactConfirm({ profile, action: 'whatsapp' })
+      setContactConfirm({ profile, action })
     }
+  }
+
+  // Hidden photo → the partner's blurred photo + "has hidden" copy; no photo →
+  // the placeholder (see whatsAppPhotoRequestSheet()).
+  const waPhotoSheet = useMemo(() => whatsAppPhotoRequestSheet(
+    t,
+    oppGender,
+    !!waPhotoRequest?.isPhotoAvailable,
+    waPhotoRequest?.profileImg ?? waPhotoRequest?.photos?.[0],
+  ), [waPhotoRequest, oppGender, t])
+
+  // Angular showWhatsAppPhotoRequestPaymentPopup(): the open beacon fires as
+  // the sheet is created.
+  useEffect(() => {
+    if (waPhotoRequest) paymentTrack(waPhotoSheet.tracking.open).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [waPhotoRequest])
+
+  // Angular onDidDismiss 'upgradeNow': pay beacon, then
+  // redirectToIntermediatePage(this.router.url, '', '7', true).
+  function handleWaPhotoRequestPayNow() {
+    setWaPhotoRequest(null)
+    paymentTrack(waPhotoSheet.tracking.pay).catch(() => {})
+    redirectToIntermediatePage('matches', '', '7').catch(() => {})
   }
 
   // Angular: matches-card.component.html's message icon → clickingOnBtn(..., 'jodimessages', ...)
@@ -2458,7 +2506,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   // function immediately instead — same underlying action either way, this
   // just lets handleCall/handleWhatsApp invoke it without first round-
   // tripping through contactConfirm state.
-  async function handleContactConfirmYes(override?: { profile: MatchProfile; action: 'call' | 'whatsapp' }) {
+  async function handleContactConfirmYes(override?: { profile: MatchProfile; action: ContactAction }) {
     const pending = override ?? contactConfirm
     if (!pending) return
     const { profile, action } = pending
@@ -2493,7 +2541,11 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
           }))
         }
       } else if (result.type === 'payment_promo') {
-        await showPaymentPromo(profile, action === 'whatsapp')
+        // Angular communication.service.ts's whatsappNudge branch: a free
+        // member tapping the photo overlay's WhatsApp gets the
+        // whatsAppPhotoRequestPayment sheet instead of the generic promo.
+        if (action === 'whatsappNudge') setWaPhotoRequest(profile)
+        else await showPaymentPromo(profile, action === 'whatsapp')
       } else if (result.type === 'phone_protected') {
         setPhoneInfoSheet({ kind: 'phone_protected' })
       } else if (result.type === 'under_validation') {
@@ -3018,6 +3070,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         onViewLater={() => handleViewLater(item)}
         onCall={() => handleCall(item)}
         onWhatsApp={() => handleWhatsApp(item)}
+        onWhatsAppNudge={() => handleWhatsApp(item, true)}
         onMessage={() => handleMessage(item)}
         waPhotoFlag={waPhotoFlag}
       />
@@ -3328,6 +3381,15 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         onClose={handleBulkLikeClose}
         onSent={handleBulkLikeSent}
         onSentNeedsPhoto={handleBulkLikeNeedsPhoto}
+      />
+      <BottomSheet
+        visible={!!waPhotoRequest}
+        type="whatsAppPhotoRequest"
+        data={waPhotoRequest ? waPhotoSheet.data : undefined}
+        // Angular opens this modal with backdropDismiss:false.
+        dismissOnBackdrop={false}
+        onClose={() => setWaPhotoRequest(null)}
+        onPrimaryPress={handleWaPhotoRequestPayNow}
       />
       <BottomSheet
         visible={showPhotoBulkLikePrompt}

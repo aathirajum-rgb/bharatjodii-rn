@@ -90,6 +90,40 @@ export interface BottomSheetData {
   showSecondaryCta?: boolean | undefined  // whether to show the secondary button
   sideBySideCtas?: boolean | undefined    // primary + secondary side by side (e.g. Cancel | Block)
   showClose?: boolean | undefined         // show ✕ close button (default: true)
+  // 'whatsAppPhotoRequest': `image` is the partner's raster THUMBIMG, shown
+  // blurred (a hidden photo) rather than the placeholder SVG.
+  imageBlur?: boolean | undefined
+}
+
+// 'whatsAppPhotoRequest' componentData — Angular builds the same object in
+// button.component.ts and communication.service.ts's whatsappNudge branch:
+// the no-photo variant ('whatsAppAddPhotoRequest', beacons 102/103, blurred
+// placeholder SVG) or, for a hidden photo, 'whatsAppViewHiddenPhotoRequest'
+// (beacons 106/107, the partner's THUMBIMG blurred, the "has hidden" copy).
+// Shared so every screen that opens this sheet renders identical copy.
+export function whatsAppPhotoRequestSheet(
+  t: (key: string) => string,
+  oppGender: 'M' | 'F',
+  hiddenPhoto: boolean,
+  thumbImg?: string | undefined,
+): { data: BottomSheetData; tracking: { open: string; pay: string } } {
+  // getGenderPrefix_He_She / _His_Her / _Him_Her
+  const heShe  = t(`PRONOUN.${oppGender}.heshe`)
+  const hisHer = t(oppGender === 'M' ? 'GENERAL.HIS' : 'GENERAL.HER')
+  const himHer = t(oppGender === 'M' ? 'GENERAL.HIM' : 'GENERAL.HER1')
+  const blurThumb = hiddenPhoto && !!thumbImg
+  return {
+    data: {
+      image:     blurThumb ? thumbImg : CDN + 'revamp/profile-blur.svg',
+      imageBlur: blurThumb,
+      title:     t(hiddenPhoto ? 'GENERAL.REQUEST_HIDDEN_PHOTO_POUPUP' : 'GENERAL.WHATSAPP_NUDGE_POPUP_TXT')
+        .replace(/#SHE_HE#|#HE_SHE#/g, heShe)
+        .replace(/#HER_HIS#/g, hisHer),
+      content:   t('GENERAL.WHATSAPP_NUDGE_POPUP_TXT1').replace(/#HER_HIM#/g, himHer),
+      ctaLabel:  t('GENERAL.PAY_NOW'),
+    },
+    tracking: hiddenPhoto ? { open: '106', pay: '107' } : { open: '102', pay: '103' },
+  }
 }
 
 // NOTE on the callbacks below: they are all declared `() => void` and MUST be
@@ -239,6 +273,13 @@ export default function BottomSheet({
   // right-arrow icon (no secondary/link CTA, no benefits list).
   const isBharatJodiiRename = type === 'bharatJodiiRename'
 
+  // Angular bottomsheet.component.html:140-166 (action 'whatsAppPhotoRequestPayment')
+  // — a left-aligned row of [partner image 60x58] → forward arrow → WhatsApp
+  // icon, then TITLE (mt-24 mb-8), CONTENT (heading2-semibold-18) and a
+  // full-width standard CTA (mt-24). `image` is the blurred placeholder SVG for
+  // a no-photo profile, or the partner's THUMBIMG (with imageBlur) when hidden.
+  const isWhatsAppPhotoRequest = type === 'whatsAppPhotoRequest'
+
   // Close button — Angular: mobile's `.bottomsheet-cross` is a bare
   // bottomsheet-cross.svg image floating ABOVE the sheet (top:-40px, left:45%)
   // with NO circular background behind it — bottomsheet.component.html/scss
@@ -364,6 +405,35 @@ export default function BottomSheet({
                 onPress={() => onPrimaryPress?.()}
               />
             </View>
+          )}
+        </>
+      ) : isWhatsAppPhotoRequest ? (
+        <>
+          <View style={styles.waRequestIconRow}>
+            {/* .profile-image-revamp-blur — 60x58, filter: blur(4px). A raster
+                THUMBIMG takes Image (blurRadius); the placeholder is an SVG. */}
+            {data?.imageBlur ? (
+              <Image source={{ uri: data.image }} style={styles.waRequestAvatar} blurRadius={4} />
+            ) : (
+              !!data?.image && <CdnSvg uri={data.image} width={60} height={58} />
+            )}
+            {/* pl-16 pr-16 height-20 (24px) */}
+            <View style={styles.waRequestForward}>
+              <CdnSvg uri={CDN + 'revamp/forward-popup.svg'} width={24} height={24} />
+            </View>
+            <CdnSvg uri={CDN + 'revamp/whatsapp-popup-secondary.svg'} width={40} height={40} />
+          </View>
+          {!!data?.title   && <Text style={styles.waRequestTitle}>{data.title}</Text>}
+          {!!data?.content && <Text style={styles.waRequestContent}>{data.content}</Text>}
+          {hasPrimary && (
+            <ButtonRevamp
+              label={data!.ctaLabel!}
+              variant="primary"
+              size="standard"
+              fullWidth
+              style={styles.waRequestCta}
+              onPress={() => onPrimaryPress?.()}
+            />
           )}
         </>
       ) : isBharatJodiiRename ? (
@@ -893,5 +963,42 @@ const styles = StyleSheet.create({
     height:       48,
     marginTop:    24,
     marginBottom: 8,
+  },
+
+  // ── whatsAppPhotoRequest (bottomsheet.component.html:140-166) ──
+  // Angular: d-flex align-center-item
+  waRequestIconRow: {
+    flexDirection: 'row',
+    alignItems:    'center',
+  },
+  // Angular: .profile-image-revamp-blur — 60x58
+  waRequestAvatar: {
+    width:  60,
+    height: 58,
+  },
+  // Angular: pl-16 pr-16
+  waRequestForward: {
+    paddingHorizontal: 16,
+  },
+  // Angular: mb-8 mt-24, default body text
+  waRequestTitle: {
+    fontFamily:   SemanticFontsEnglish.bodyEnglishRegular,
+    fontSize:     FontSize.font16,
+    lineHeight:   24,
+    color:        Colors.black,
+    marginTop:    24,
+    marginBottom: 8,
+  },
+  // Angular: heading2-semibold-18 black-color
+  waRequestContent: {
+    fontFamily: Fonts.poppinsSemiBold,
+    fontSize:   FontSize.font18,
+    lineHeight: 28,
+    color:      Colors.black,
+  },
+  // Angular: mt-24 wrapper around the full-width standard button
+  waRequestCta: {
+    marginTop:    24,
+    marginBottom: 24,
   },
 })
