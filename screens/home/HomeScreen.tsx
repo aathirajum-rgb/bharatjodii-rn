@@ -54,7 +54,7 @@ import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { stripAndDecodeHtml } from '../../utils/htmlEntities'
 import HomeDesktopLayout from './HomeDesktopLayout'
 import HeroBanner, { type HeroBannerContent } from './HeroBanner'
-import { parseCssBackground } from '../../utils/cssGradient'
+import { parseCssBackground, extractCssColor } from '../../utils/cssGradient'
 import AssistBanner, { type AssistBannerContent } from './AssistBanner'
 import ForceUpdateCard from './ForceUpdateCard'
 import {
@@ -1388,8 +1388,27 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
           ownTimerDeadlineMs: !Number.isNaN(ownTimerDeadline) ? ownTimerDeadline : undefined,
           // Angular: the CONTENT+TIMER line's own container (not the CTA) —
           // border/background from these 2 server fields, previously unread.
-          ownTimerBg:          isOldBanner ? hex(details?.['TIMERBG']) : undefined,
-          ownTimerBorderColor: isOldBanner ? hex(details?.['TIMERBORDER']) : undefined,
+          // TIMERBG is bound to a raw CSS `background` (same as BANNERBG
+          // above) — commonly a linear-gradient, not a plain color, so `hex()`
+          // (solid-only) silently dropped it; parseCssBackground() handles both.
+          // TIMERBORDER is a full `border` shorthand ("1px solid #CFDBF0"),
+          // not a bare color either — extractCssColor() pulls just the color
+          // out of it for RN's borderColor (see its own comment: the
+          // accompanying TIMERBORDERIMAGE fade isn't reproducible in RN).
+          ownTimerBg:          isOldBanner ? parseCssBackground(details?.['TIMERBG']) : undefined,
+          ownTimerBorderColor: isOldBanner ? extractCssColor(details?.['TIMERBORDER']) : undefined,
+          // TIMERBORDERIMAGE — the same left-to-right fade as TIMERBORDER's
+          // own color, applied as a border-image in Angular (see HeroBanner's
+          // ownTimerBorderRing comment for the RN approximation). Its raw
+          // value carries border-image-slice/width/outset/repeat parameters
+          // AFTER the gradient's closing paren ("...) 45% 1 / 1 / 0 stretch"),
+          // which parseCssBackground() now tolerates (extracts just the
+          // gradient rather than requiring the whole string to be one).
+          ownTimerBorderGradient: (() => {
+            if (!isOldBanner) return undefined
+            const parsed = parseCssBackground(details?.['TIMERBORDERIMAGE'])
+            return parsed && 'gradient' in parsed ? parsed.gradient : undefined
+          })(),
         })
       } else {
         setHeroBannerContent(null)

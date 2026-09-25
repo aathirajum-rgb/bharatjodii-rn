@@ -11,6 +11,8 @@ import { LinearGradient } from 'expo-linear-gradient'
 import { Colors } from '../../constants/colors'
 import { CdnImage } from '../../components/cdn-svg/CdnSvg'
 import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { type ParsedCssBackground } from '../../utils/cssGradient'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // Angular: home-banner.component.scss's .jodii-membership-banner-block —
 // min-height: 42vmin !important — the OLD banner's outer row, not a fixed px
@@ -93,9 +95,26 @@ export interface HeroBannerContent {
   // Angular: the CONTENT+TIMER countdown line's container has
   // {border: TIMERBORDER, background: TIMERBG} (both server fields) — its
   // text itself is the "black-color" utility class (#000, hardcoded, NOT
-  // server-driven) regardless of what's behind it.
-  ownTimerBg?:         string | undefined
+  // server-driven) regardless of what's behind it. TIMERBG is bound to the raw
+  // CSS `background` (same as BANNERBG/BRIDEBGCOLOR above), so it's commonly a
+  // `linear-gradient(...)` string, not a plain color — parsed the same way via
+  // utils/cssGradient.ts's parseCssBackground(), whose result this stores
+  // directly rather than re-flattening it to a single color.
+  ownTimerBg?:         { solid: string } | { gradient: ParsedCssBackground } | undefined
+  // TIMERBORDER is the raw CSS `border` shorthand ("1px solid #CFDBF0"), so
+  // this is only the COLOR extracted out of it (utils/cssGradient.ts's
+  // extractCssColor()) — RN's borderColor/borderWidth are separate props.
+  // Used only as a same-color fallback border when `ownTimerBorderGradient`
+  // below isn't present.
   ownTimerBorderColor?: string | undefined
+  // Angular additionally applies a TIMERBORDERIMAGE — a border-image built
+  // from the SAME left-to-right gradient as its border-color, fading to
+  // transparent partway along — on top of the plain border above. RN's View
+  // has no border-image primitive, so this is approximated with the standard
+  // "gradient ring" trick instead: an outer LinearGradient sized to the box,
+  // padded by the border width, with the real background/content sitting in
+  // an inner View on top — see HeroBanner's ownTimerBox render.
+  ownTimerBorderGradient?: ParsedCssBackground | undefined
   // Angular: the addPhotoPromotion/nonIdVerifyPromotion/addPhotoPromotionPaid
   // grid's "free-trial-bg" CSS class — a FIXED gradient (#FFDDDD → white), not
   // server-driven like bgColor above. Takes precedence over bgColor when set.
@@ -174,14 +193,25 @@ export interface HeroBannerProps {
 
 export default function HeroBanner({ content, onPress, onDismiss }: HeroBannerProps) {
   const { i18n } = useTranslation()
+  // Same pattern HomeScreen.tsx uses everywhere: a static StyleSheet fontFamily
+  // (Poppins) covers the English look, and this hook's per-language family is
+  // applied inline on top at each Text below — the static Poppins alone would
+  // render vernacular scripts (Tamil/Telugu/etc.) as tofu boxes.
+  const langFonts = useLanguageFonts()
   // Angular: the bride-banner TITLE class is `berkshire` (BerkshireSwash,
   // a decorative script font) for English specifically, `regular-16`
   // (Poppins-Regular) for every other language — the OTHER 3 bannerStyle
-  // variants have no such per-language split.
+  // variants have no such per-language split. The decorative English case is
+  // deliberately NOT run through langFonts below (Berkshire Swash is the
+  // intended English-only look, not a stand-in for "regular" weight); only
+  // titleBrideOther's plain Poppins-Regular needs the per-language swap.
   const titleStyle =
     content.bannerStyle === 'bride'      ? [s.titleBride, i18n.language === 'en' ? s.titleBrideEn : s.titleBrideOther] :
     content.bannerStyle === 'photoPromo' ? s.titlePhotoPromo :
     s.title
+  const titleFontFamily = content.bannerStyle === 'bride'
+    ? (i18n.language === 'en' ? undefined : langFonts.regular)
+    : langFonts.semiBold // 'old' and 'photoPromo' are both semiBold in their static styles
   // Angular: home-banner.component.html:23's TITLE div (bannerStyle 'old'/
   // 'bride' only — this exact div, shared by both) carries a plain `class=
   // "del"`, which global.scss:26651's `.del del { color: #717175 !important; }`
@@ -194,6 +224,10 @@ export default function HeroBanner({ content, onPress, onDismiss }: HeroBannerPr
     content.bannerStyle === 'photoPromo'    ? s.bodyPhotoPromo :
     content.bannerStyle === 'paymentFailed' ? s.bodyPaymentFailed :
     s.body
+  const bodyFontFamily =
+    content.bannerStyle === 'bride' ? langFonts.semiBold :
+    content.bannerStyle === 'old'   ? langFonts.medium :
+    langFonts.regular // 'photoPromo' and 'paymentFailed' are both regular in their static styles
 
   const [remaining, setRemaining] = useState(() =>
     content.countdownDeadlineMs != null ? formatRemaining(content.countdownDeadlineMs) : ''
@@ -268,28 +302,87 @@ export default function HeroBanner({ content, onPress, onDismiss }: HeroBannerPr
           />
         )}
         <View style={s.textCol}>
-          {!!content.title && <Text style={[titleStyle, (content.titleColor ?? content.textColor) ? { color: content.titleColor ?? content.textColor } : null]}>{renderRichText(content.title, 'title', titleDelColor)}</Text>}
-          {!!content.title1 && <Text style={[s.title1, (content.title1Color ?? content.textColor) ? { color: content.title1Color ?? content.textColor } : null]}>{renderRichText(content.title1, 'title1')}</Text>}
-          {!!content.title2 && <Text style={[s.title2, (content.title2Color ?? content.textColor) ? { color: content.title2Color ?? content.textColor } : null]}>{renderRichText(content.title2, 'title2')}</Text>}
-          {!!body && <Text style={[bodyStyle, (content.bodyColor ?? content.textColor) ? { color: content.bodyColor ?? content.textColor, opacity: 1 } : null]}>{renderRichText(body, 'body')}</Text>}
-          {!!ownTimerLabel && (
-            <View
-              style={[
-                s.ownTimerBox,
-                content.ownTimerBg ? { backgroundColor: content.ownTimerBg } : null,
-                content.ownTimerBorderColor ? { borderWidth: 1, borderColor: content.ownTimerBorderColor } : null,
-              ]}
-            >
-              {isTmMl ? (
-                <Text style={s.ownTimerLabel}>{ownTimerLabel}</Text>
-              ) : (
-                <Text style={s.ownTimerLabel}>
-                  {ownTimerLabel}{' '}
-                  <Text style={s.ownTimer}>{ownRemaining}</Text>
-                </Text>
-              )}
-            </View>
+          {!!content.title && (
+            <Text style={[titleStyle, titleFontFamily ? { fontFamily: titleFontFamily } : null, (content.titleColor ?? content.textColor) ? { color: content.titleColor ?? content.textColor } : null]}>
+              {renderRichText(content.title, 'title', titleDelColor)}
+            </Text>
           )}
+          {!!content.title1 && (
+            <Text style={[s.title1, { fontFamily: langFonts.medium }, (content.title1Color ?? content.textColor) ? { color: content.title1Color ?? content.textColor } : null]}>
+              {renderRichText(content.title1, 'title1')}
+            </Text>
+          )}
+          {!!content.title2 && (
+            <Text style={[s.title2, { fontFamily: langFonts.semiBold }, (content.title2Color ?? content.textColor) ? { color: content.title2Color ?? content.textColor } : null]}>
+              {renderRichText(content.title2, 'title2')}
+            </Text>
+          )}
+          {!!body && (
+            <Text style={[bodyStyle, { fontFamily: bodyFontFamily }, (content.bodyColor ?? content.textColor) ? { color: content.bodyColor ?? content.textColor, opacity: 1 } : null]}>
+              {renderRichText(body, 'body')}
+            </Text>
+          )}
+          {!!ownTimerLabel && (() => {
+            const bg = content.ownTimerBg
+            const isBgGradient = !!bg && 'gradient' in bg
+            const InnerWrap: any = isBgGradient ? LinearGradient : View
+            const innerWrapProps = isBgGradient
+              ? {
+                  colors: (bg as { gradient: ParsedCssBackground }).gradient.colors,
+                  start: (bg as { gradient: ParsedCssBackground }).gradient.start,
+                  end:   (bg as { gradient: ParsedCssBackground }).gradient.end,
+                  ...((bg as { gradient: ParsedCssBackground }).gradient.locations
+                    ? { locations: (bg as { gradient: ParsedCssBackground }).gradient.locations }
+                    : {}),
+                }
+              : {}
+            const borderGrad = content.ownTimerBorderGradient
+
+            const inner = (
+              <InnerWrap
+                {...innerWrapProps}
+                style={[
+                  s.ownTimerBox,
+                  borderGrad ? s.ownTimerBoxInnerWithRing : null,
+                  bg && 'solid' in bg ? { backgroundColor: bg.solid } : null,
+                  // A flat borderColor is only used when there's no gradient
+                  // ring below — the ring itself (1px LinearGradient padding)
+                  // takes over as the visible border once it's present.
+                  !borderGrad && content.ownTimerBorderColor ? { borderWidth: 1, borderColor: content.ownTimerBorderColor } : null,
+                ]}
+              >
+                {isTmMl ? (
+                  <Text style={[s.ownTimerLabel, { fontFamily: langFonts.regular }]}>{ownTimerLabel}</Text>
+                ) : (
+                  <Text style={[s.ownTimerLabel, { fontFamily: langFonts.regular }]}>
+                    {ownTimerLabel}{' '}
+                    <Text style={[s.ownTimer, { fontFamily: langFonts.medium }]}>{ownRemaining}</Text>
+                  </Text>
+                )}
+              </InnerWrap>
+            )
+
+            if (!borderGrad) return inner
+
+            // Angular's TIMERBORDERIMAGE fades this box's border from solid to
+            // transparent left-to-right (border-image has no RN equivalent) —
+            // approximated with the standard "gradient ring" trick: an outer
+            // LinearGradient sized to the box, padded by the border's own 1px,
+            // with the real box (background + content) sitting on top in
+            // `inner`, covering all but that 1px ring around the edge.
+            const BorderRing: any = LinearGradient
+            return (
+              <BorderRing
+                colors={borderGrad.colors}
+                start={borderGrad.start}
+                end={borderGrad.end}
+                {...(borderGrad.locations ? { locations: borderGrad.locations } : {})}
+                style={s.ownTimerBorderRing}
+              >
+                {inner}
+              </BorderRing>
+            )
+          })()}
           <View
             style={[
               s.cta,
@@ -297,10 +390,10 @@ export default function HeroBanner({ content, onPress, onDismiss }: HeroBannerPr
               content.ctaBorderColor ? { borderWidth: 1, borderColor: content.ctaBorderColor } : null,
             ]}
           >
-            <Text style={[s.ctaText, content.ctaColor ? { color: content.ctaColor } : null]}>{content.ctaLabel}</Text>
+            <Text style={[s.ctaText, { fontFamily: langFonts.medium }, content.ctaColor ? { color: content.ctaColor } : null]}>{content.ctaLabel}</Text>
             {!!content.arrowIconUrl && <CdnImage uri={content.arrowIconUrl} width={14} height={14} style={s.ctaArrow} />}
           </View>
-          {!!content.validText && <Text style={s.validText}>{renderRichText(content.validText, 'valid')}</Text>}
+          {!!content.validText && <Text style={[s.validText, { fontFamily: langFonts.regular }]}>{renderRichText(content.validText, 'valid')}</Text>}
         </View>
       </Pressable>
     </Wrap>
@@ -367,7 +460,7 @@ const s = StyleSheet.create({
   // left alone. Used when bannerStyle==='old' (and 'paymentFailed', whose
   // title is always '' so this never actually renders for it).
   title: {
-    fontFamily: Fonts.poppinsSemiBold,
+   
     fontSize:   FontSize.font18,
     color:      Colors.white,
     paddingRight: 20,
@@ -391,7 +484,7 @@ const s = StyleSheet.create({
   // this grid at all (unlike 'old'/'bride') — color is always black-color,
   // already supplied by this variant's own call site via `textColor`.
   titlePhotoPromo: {
-    fontFamily:   Fonts.poppinsSemiBold,
+  
     fontSize:     FontSize.font16,
     color:        Colors.white,
     paddingRight: 20,
@@ -407,7 +500,7 @@ const s = StyleSheet.create({
   // (Poppins-Medium). NOTECOLOR is server-driven via [ngStyle] — RN default
   // color left alone.
   title1: {
-    fontFamily: SemanticFontsEnglish.headingEnglishMedium,
+   
     fontSize:   FontSize.font16,
     color:      Colors.white,
   },
@@ -419,7 +512,7 @@ const s = StyleSheet.create({
   // (yes, TITLE2 really does reuse the CTA background color as its own text
   // color) — RN default color left alone.
   title2: {
-    fontFamily: Fonts.poppinsSemiBold,
+    
     fontSize:   FontSize.font22,
     color:      Colors.white,
   },
@@ -438,7 +531,7 @@ const s = StyleSheet.create({
   // typically-dark background might suggest. RN has no such "invalid style is
   // dropped" behavior, so this default has to be set explicitly to match.
   body: {
-    fontFamily: Fonts.poppinsMedium,
+    
     fontSize:   FontSize.font12,
     color:      Colors.black,
     opacity:    0.9,
@@ -451,7 +544,7 @@ const s = StyleSheet.create({
   // reasoning as `body` above — this is the !isOldBanner ("bride") variant's
   // own BODY div, same [attr.style] binding, just a different typography class.
   bodyBride: {
-    fontFamily: Fonts.poppinsSemiBold,
+   
     fontSize:   FontSize.font18,
     lineHeight: 20,
     color:      Colors.black,
@@ -463,7 +556,7 @@ const s = StyleSheet.create({
   // above). No CONTENTCOLOR binding on this grid — color is always
   // black-color, already supplied via this variant's own `textColor`.
   bodyPhotoPromo: {
-    fontFamily: Fonts.poppinsRegular,
+   
     fontSize:   FontSize.font12,
     color:      Colors.white,
     marginTop:  8,
@@ -475,7 +568,7 @@ const s = StyleSheet.create({
   // Regular, flat 20px line-height, no top margin (unlike the other 3
   // variants, none of which have their own mt-8 in this specific branch).
   bodyPaymentFailed: {
-    fontFamily: Fonts.poppinsRegular,
+    
     fontSize:   FontSize.font12,
     lineHeight: 20,
     color:      Colors.white,
@@ -492,6 +585,22 @@ const s = StyleSheet.create({
     paddingVertical:   4,
     marginTop:         2,
   },
+  // Applied on top of `ownTimerBox` only when a gradient border ring wraps it
+  // (see ownTimerBorderRing below) — the ring itself now owns marginTop and a
+  // slightly larger borderRadius, so the inner box's own copies would double up.
+  ownTimerBoxInnerWithRing: {
+    marginTop:    0,
+    borderRadius: 3,
+  },
+  // The gradient-border-ring wrapper — `padding` here IS the border's width
+  // (1px, matching content.ownTimerBorderColor's own borderWidth above), so
+  // only a 1px ring of this LinearGradient shows around ownTimerBox's edges.
+  ownTimerBorderRing: {
+    alignSelf:    'flex-start',
+    borderRadius: 4,
+    padding:      1,
+    marginTop:    2,
+  },
   // Angular: this line's CONTENT-text span — `body3-regular-12` — font-size
   // var(--font12) (0.75rem, scales with device width — see FontSize's header
   // comment), Poppins-Regular. Used for the whole line on tm/ml (CONTENT with
@@ -499,7 +608,7 @@ const s = StyleSheet.create({
   // portion only on every other language, where `ownTimer` below nests inside
   // for just the digits.
   ownTimerLabel: {
-    fontFamily: Fonts.poppinsRegular,
+   
     fontSize:   FontSize.font12,
     color:      '#000000',
   },
@@ -507,7 +616,7 @@ const s = StyleSheet.create({
   // same font-size var(--font12), but Poppins-MEDIUM, not Regular like the
   // label it's nested inside.
   ownTimer: {
-    fontFamily: Fonts.poppinsMedium,
+    
     fontSize:   FontSize.font12,
     color:      '#000000',
   },
@@ -530,7 +639,7 @@ const s = StyleSheet.create({
   // wrong weight. CTATEXTCOLOR is server-driven via [attr.style] — RN default
   // color left alone.
   ctaText: {
-    fontFamily: Fonts.poppinsMedium,
+  
     fontSize:   FontSize.font12,
     color:      '#29339B',
   },
@@ -541,7 +650,7 @@ const s = StyleSheet.create({
   // FontSize's header comment); family already matched (Poppins-Regular).
   // C2COLOR is server-driven via [attr.style] — RN default color left alone.
   validText: {
-    fontFamily: SemanticFontsEnglish.bodyEnglishRegular,
+   
     fontSize:   FontSize.font12,
     color:      Colors.white,
     opacity:    0.85,

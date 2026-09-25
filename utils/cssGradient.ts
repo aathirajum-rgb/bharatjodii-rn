@@ -122,6 +122,28 @@ export function resampleGradientStops(colors: string[], locations: number[]): { 
   return { colors: outColors, locations: outLocations }
 }
 
+// Finds `linear-gradient(...)` anywhere in a string and returns just its
+// argument list, matching parens by depth rather than greedy/lazy regex —
+// needed because CSS's `border-image` shorthand packs EXTRA slice/width/
+// outset/repeat values after the gradient's own closing paren (e.g.
+// "linear-gradient(to right, rgb(207, 219, 240) 67%, transparent 68%) 45% 1 /
+// 1 / 0 stretch"), which a `^linear-gradient\((.*)\)$`-anchored match can't
+// tolerate (the trailing text breaks the end anchor).
+function extractLinearGradientArgs(v: string): string | undefined {
+  const start = v.search(/linear-gradient\(/i)
+  if (start === -1) return undefined
+  const openIdx = v.indexOf('(', start)
+  let depth = 0
+  for (let i = openIdx; i < v.length; i++) {
+    if (v[i] === '(') depth++
+    else if (v[i] === ')') {
+      depth--
+      if (depth === 0) return v.slice(openIdx + 1, i)
+    }
+  }
+  return undefined
+}
+
 // Returns undefined for anything unparseable (radial-gradient, url(...) images,
 // empty/missing values) so callers can fall back to their own default rather
 // than rendering a broken gradient.
@@ -130,9 +152,9 @@ export function parseCssBackground(raw: unknown): { solid: string } | { gradient
   const v = raw.trim()
   if (!v) return undefined
 
-  const gradMatch = v.match(/^linear-gradient\((.*)\)$/is)
-  if (gradMatch) {
-    const parts = splitTopLevel(gradMatch[1]!)
+  const gradArgs = extractLinearGradientArgs(v)
+  if (gradArgs !== undefined) {
+    const parts = splitTopLevel(gradArgs)
     let angleDeg = 180 // CSS default direction when the angle/keyword is omitted: "to bottom".
     let stopParts = parts
     const first = (parts[0] ?? '').toLowerCase()
@@ -162,9 +184,29 @@ export function parseCssBackground(raw: unknown): { solid: string } | { gradient
     if (everyStopHasLocation && locations.some(l => l < 0 || l > 1)) {
       ({ colors, locations } = resampleGradientStops(colors, locations))
     }
+    // Normalize the bare `transparent` keyword to its exact CSS-spec value
+    // (rgba(0,0,0,0)) rather than passing the keyword through as-is — some
+    // native color-processing paths handle a literal "transparent" string
+    // less reliably than an explicit rgba() with alpha 0, and TIMERBG's own
+    // "linear-gradient(to right, rgb(226, 236, 248), transparent)" depends on
+    // this specific stop actually reaching zero alpha to fade out correctly.
+    colors = colors.map(c => (/^transparent$/i.test(c.trim()) ? 'rgba(0,0,0,0)' : c))
     return { gradient: { colors, locations: everyStopHasLocation ? locations : undefined, ...angleToPoints(angleDeg) } }
   }
 
   if (SOLID_COLOR_RE.test(v)) return { solid: v }
   return undefined
+}
+
+// Pulls the color token out of a full CSS `border` shorthand — Angular binds
+// TIMERBORDER straight into the raw `border` property ([ngStyle]="{'border':
+// heroBannerData?.TIMERBORDER}"), e.g. "1px solid rgb(207, 219, 240)", not a
+// bare color the way most other server-driven fields are — RN's `borderColor`
+// needs just the color, so this extracts the one color-shaped token out of the
+// shorthand rather than requiring callers to split "width style color" (which
+// breaks on rgb()/rgba()'s own internal commas).
+export function extractCssColor(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined
+  const m = raw.match(/#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)|\btransparent\b/i)
+  return m ? m[0] : undefined
 }
