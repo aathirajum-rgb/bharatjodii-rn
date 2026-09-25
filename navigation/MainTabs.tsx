@@ -20,7 +20,7 @@ export type MainTabsParamList = {
   Home:    undefined
   // Same shape as the old flat AppStackParamList['Matches'] — Home's "Explore
   // matches based on" category tiles and Search both pass these through.
-  Matches: { exploreType?: string; exploreLabel?: string; searchParams?: string } | undefined
+  Matches: { exploreType?: string; exploreLabel?: string; exploreQSearch?: string; searchParams?: string } | undefined
   // Same shape as the old flat AppStackParamList['Activity'].
   Activity: { activityType?: 'likedyou' | 'likesent' | 'viewedyou' | 'viewedbyme'; selectedSubTab?: 'viewedbyme' | 'viewinglater' } | undefined
   MessagerList: undefined

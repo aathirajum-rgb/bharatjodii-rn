@@ -155,7 +155,7 @@ export function parseCssBackground(raw: unknown): { solid: string } | { gradient
   const gradArgs = extractLinearGradientArgs(v)
   if (gradArgs !== undefined) {
     const parts = splitTopLevel(gradArgs)
-    let angleDeg = 180 // CSS default direction when the angle/keyword is omitted: "to bottom".
+    let angleDeg = 540 // CSS default direction when the angle/keyword is omitted: "to bottom".
     let stopParts = parts
     const first = (parts[0] ?? '').toLowerCase()
     const degMatch = first.match(/^(-?[\d.]+)deg$/)

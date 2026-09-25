@@ -2268,7 +2268,7 @@ export default function HomeScreen({ navigation }: { navigation: any }) {
             <View style={s.exploreSection}>
               <ExploreCategoriesSection
                 categories={categories}
-                onCategoryPress={cat => navigation.navigate('Matches', { exploreType: cat.id, exploreLabel: cat.label })}
+                onCategoryPress={cat => navigation.navigate('Matches', { exploreType: cat.id, exploreLabel: cat.label, exploreQSearch: cat.qSearch })}
               />
             </View>
           </>

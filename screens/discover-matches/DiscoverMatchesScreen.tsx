@@ -108,7 +108,7 @@ export default function DiscoverMatchesScreen({ navigation }: Props) {
               so rendering it here too would show the title twice. */}
           <ExploreCategoriesSection
             categories={categories}
-            onCategoryPress={cat => navigation.navigate('MainTabs', { screen: 'Matches', params: { exploreType: cat.id, exploreLabel: cat.label } })}
+            onCategoryPress={cat => navigation.navigate('MainTabs', { screen: 'Matches', params: { exploreType: cat.id, exploreLabel: cat.label, exploreQSearch: cat.qSearch } })}
             showTitle={false}
           />
         </ScrollView>
