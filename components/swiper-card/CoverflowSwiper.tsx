@@ -122,8 +122,15 @@ export default function CoverflowSwiper({
         // The vertical padding is what lets the card's shadow render: a
         // ScrollView clips content to its frame, and with the track exactly as
         // tall as a card the shadow (Angular: box-shadow 0 0 7px) was cut off
-        // flush along the top and bottom edges.
-        contentContainerStyle={{ paddingHorizontal: SIDE_INSET, paddingVertical: 8 }}
+        // flush along the top and bottom edges. CARD_HEIGHT is an exact sum
+        // (padding + photo + button, see its own comment) with no slack for
+        // the shadow to bleed into, and Android's `elevation` shadow doesn't
+        // follow the shadowRadius/shadowOffset math that sized the original
+        // 8px (those are iOS/web-only — elevation has its own, usually wider,
+        // OS-drawn spread) — 8px cut the card's bottom border off on Android.
+        // 16 matches the headroom SwiperCard.tsx's listContent already needed
+        // for the identical clipping problem on every other Home section.
+        contentContainerStyle={{ paddingHorizontal: SIDE_INSET, paddingVertical: 16 }}
         onScroll={handleScroll}
         scrollEventThrottle={16}
       >
@@ -221,7 +228,11 @@ const styles = StyleSheet.create({
     alignItems:        'center',
     justifyContent:    'space-between',
     paddingHorizontal: 24,
-    marginTop:         16,
+    // 8, not 16 — the ScrollView's own paddingVertical grew from 8 to 16 (see
+    // its comment) to stop clipping the card's bottom shadow/border on
+    // Android; this keeps the total card→row gap at the original 24px
+    // (16 scroll padding + 8 here) instead of widening it to 32.
+    marginTop:         8,
   },
   seeAllBtn:  { flexDirection: 'row', alignItems: 'center', gap: 4 },
   // Angular: button.config.ts's SEE_ALL sets no ctaFontSize, so

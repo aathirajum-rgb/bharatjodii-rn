@@ -12,6 +12,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native'
 import Constants from 'expo-constants'
@@ -48,7 +49,7 @@ import { StorageKeys } from '../../constants/storage.keys'
 import { CDN_LOTTIE, CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import { APP_VERSION } from '../../constants/appVersion'
 import { Colors } from '../../constants/colors'
-import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
+import { FontSize } from '../../src/theme/fonts'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { stripAndDecodeHtml } from '../../utils/htmlEntities'
@@ -189,19 +190,47 @@ const { width: SW } = Dimensions.get('window')
 // ~22px/~18px on a typical phone width, and the asymmetry itself was visible.
 const EXPLORE_ROW_PL    = 4
 const EXPLORE_ROW_PR    = 24
-const EXPLORE_GRID_UNIT = (SW - EXPLORE_ROW_PL - EXPLORE_ROW_PR) / 12
-export const EXPLORE_TILE_WIDTH = EXPLORE_GRID_UNIT * 5.4
-const EXPLORE_GRID_GAP  = EXPLORE_GRID_UNIT * 0.6
-// Angular: .discover-new-bg { height: 20vmin } — a FIXED height (20vmin ≈ 20vw
-// in portrait), so every tile is the same size and a two-line label centers
-// inside it. A min-height instead let one-line tiles collapse shorter and
-// two-line tiles grow taller than their neighbours.
-const EXPLORE_TILE_HEIGHT = SW * 0.20
-// Angular: the icon sits in an `ion-col size="2"` of the card's own 12-col grid,
-// and the label column that follows adds `pl-5`. A flat 32+8 box pushed the
-// label ~12px further right than Angular does, costing it that much width on an
-// already-narrow two-line tile.
-const EXPLORE_ICON_COL = (EXPLORE_TILE_WIDTH - 12) * 2 / 12
+
+// These all derive from the window width, so — unlike SW above, a one-time
+// snapshot that's fine for values only ever read once at import — they can't
+// be plain module constants: a device whose width differs from whatever SW
+// happened to be at first JS load (or a rotation/split-screen resize) would
+// bake in the WRONG tile width forever, and since 5.4/12 of a wrong-but-still
+// plausible width can still be under 50%, the bug doesn't always look like
+// "wrong size" so much as "only 1 column fits" — each tile silently claiming
+// more of the row than Angular's real 5.4-of-12 columns intended. Computed
+// fresh from useWindowDimensions() in ExploreCategoriesSection on every
+// render instead, so it always matches the ACTUAL current width.
+function exploreGridMetrics(windowWidth: number) {
+  // Angular: explore.component.html / discover-matches.component.html both wrap
+  // the category grid in <ion-row class="... pl-4 pr-24">, with each
+  // <ion-col size="5.4" offset="0.6"> in Ionic's 12-column grid — every tile
+  // (including the first) is preceded by a 0.6-unit gap, and nothing follows
+  // the last tile beyond the row's own 24px right padding. RN has no per-column
+  // "offset" primitive, so this reproduces the same asymmetric result with
+  // plain padding + a shared gap: an enlarged left padding (4px + one gap unit)
+  // and a flat 24px right padding. A previous pass approximated this
+  // symmetrically (24px both sides, 16px gap) "since the difference is
+  // imperceptible" — it wasn't; the real left margin/gap only come out to
+  // ~22px/~18px on a typical phone width, and the asymmetry itself was visible.
+  const gridUnit  = (windowWidth - EXPLORE_ROW_PL - EXPLORE_ROW_PR) / 12
+  const tileWidth = gridUnit * 5.4
+  const gridGap   = gridUnit * 0.6
+  return {
+    tileWidth,
+    gridGap,
+    // Angular: .discover-new-bg { height: 20vmin } — a FIXED height (20vmin ≈
+    // 20vw in portrait), so every tile is the same size and a two-line label
+    // centers inside it. A min-height instead let one-line tiles collapse
+    // shorter and two-line tiles grow taller than their neighbours.
+    tileHeight: windowWidth * 0.20,
+    // Angular: the icon sits in an `ion-col size="2"` of the card's own 12-col
+    // grid, and the label column that follows adds `pl-5`. A flat 32+8 box
+    // pushed the label ~12px further right than Angular does, costing it that
+    // much width on an already-narrow two-line tile.
+    iconCol: (tileWidth - 12) * 2 / 12,
+  }
+}
 // Angular: .success-story-image img { width: 35vw; height: 35vw }
 const HAND_SIZE = SW * 0.35
 // Angular: complete-profile.component.html's `cardType==='completeprofile'`
@@ -547,15 +576,19 @@ export const ExploreCategoriesSection = memo(function ExploreCategoriesSection({
 }: ExploreCategoriesSectionProps) {
   const { t } = useTranslation()
   const langFonts = useLanguageFonts()
+  // Live window width, not the frozen module-level SW — see exploreGridMetrics()'s
+  // own comment for why a stale width silently collapses this grid to 1 column.
+  const { width: windowWidth } = useWindowDimensions()
+  const { tileWidth, gridGap, tileHeight, iconCol } = exploreGridMetrics(windowWidth)
   return (
     <>
       {/* Angular: home.enum.ts's sectionTitle.exploreMatches = 'HOME.EXPLORE_MATCHES_TXT'
           ("Discover matches") — HOME.EXPLORE_MATCHES ("Explore matches based on")
           is a different, unused key. */}
       {showTitle && <Text style={[s.sectionTitle, s.exploreSectionTitle, { fontFamily: langFonts.semiBold }]}>{t('HOME.EXPLORE_MATCHES_TXT')}</Text>}
-      <View style={[s.catGrid, { paddingLeft: EXPLORE_ROW_PL + EXPLORE_GRID_GAP, paddingRight: EXPLORE_ROW_PR, gap: EXPLORE_GRID_GAP }]}>
+      <View style={[s.catGrid, { paddingLeft: EXPLORE_ROW_PL + gridGap, paddingRight: EXPLORE_ROW_PR, gap: gridGap }]}>
         {categories.map(cat => (
-          <Pressable key={cat.id} onPress={() => onCategoryPress(cat)} style={{ width: EXPLORE_TILE_WIDTH }}>
+          <Pressable key={cat.id} onPress={() => onCategoryPress(cat)} style={{ width: tileWidth }}>
             {/* Angular: backgroundStyle() — server's BGCOLOUR per category,
                 else this exact default diagonal gradient at 113deg. Converted
                 via the standard CSS-angle-to-corner-points formula (same one
@@ -565,9 +598,9 @@ export const ExploreCategoriesSection = memo(function ExploreCategoriesSection({
               colors={parseGradientColors(cat.bgColor)}
               start={{ x: 0.04, y: 0.30 }}
               end={{ x: 0.96, y: 0.70 }}
-              style={s.catTile}
+              style={[s.catTile, { height: tileHeight }]}
             >
-              <View style={s.catIconWrap}>
+              <View style={[s.catIconWrap, { width: iconCol }]}>
                 {!!cat.imageUrl && <CdnImage uri={cat.imageUrl} width={28} height={28} />}
               </View>
               {/* Angular: the chevron is INLINE right after the label text —
@@ -2564,9 +2597,10 @@ const s = StyleSheet.create({
   // icon+text row (not a big image tile), default background a light diagonal
   // gradient (applied via LinearGradient at the call site, not here).
   // Angular: ion-row's pl-4/pr-24 + ion-col's size="5.4" offset="0.6" — see
-  // tileWidth's own call-site comment for the exact math this approximates.
-  // paddingLeft/paddingRight/gap are computed per-render from screen width —
-  // see EXPLORE_TILE_WIDTH's header comment — and merged in at the call site.
+  // exploreGridMetrics()'s own comment for the exact math this approximates.
+  // paddingLeft/paddingRight/gap/height/iconCol all come from that function,
+  // computed per-render from the LIVE window width (useWindowDimensions(),
+  // not a frozen SW snapshot) — merged in at the call site, not set here.
   // Angular: the title ion-row is `pl-24 pr-24 mt-32 mb-16` and the grid ion-row
   // is `mt-16 pb-24 pr-24 pl-4`. So: 32 below the divider, then (16 collapsed
   // between the two rows + 16 from each card's own `mt-16`) = 32 between the
@@ -2579,9 +2613,9 @@ const s = StyleSheet.create({
   catGrid:      { flexDirection: 'row', flexWrap: 'wrap' },
   // Angular: .discover-new-bg { padding: 8px 4px 8px 8px } — tighter on the
   // right, where the chevron sits, not a flat 8px on every side.
-  catTile:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#E6E6E6', paddingTop: 8, paddingRight: 4, paddingBottom: 8, paddingLeft: 8, height: EXPLORE_TILE_HEIGHT },
+  catTile:      { flexDirection: 'row', alignItems: 'center', borderRadius: 12, borderWidth: 1, borderColor: '#E6E6E6', paddingTop: 8, paddingRight: 4, paddingBottom: 8, paddingLeft: 8 },
   // marginRight is Angular's `pl-5` on the label column, not a rounded 8.
-  catIconWrap:  { width: EXPLORE_ICON_COL, marginRight: 5, alignItems: 'center', justifyContent: 'center' },
+  catIconWrap:  { marginRight: 5, alignItems: 'center', justifyContent: 'center' },
   // Angular: `textcta-medium-12 black-color`, label wrapped in a
   // `line-height-16` span — font-size var(--font12) (0.75rem, dynamic — see
   // FontSize's header comment), pure black (not textPrimary).

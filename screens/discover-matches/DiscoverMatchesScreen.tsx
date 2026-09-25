@@ -98,7 +98,7 @@ export default function DiscoverMatchesScreen({ navigation }: Props) {
           {/* Angular: same ion-row pl-4/pr-24 + ion-col size="5.4" offset="0.6"
               grid as Home's own explore-matches section — ExploreCategoriesSection
               now applies that exact left/right padding + gap itself (see
-              EXPLORE_TILE_WIDTH's header comment in HomeScreen.tsx), so this
+              exploreGridMetrics()'s own comment in HomeScreen.tsx), so this
               screen's own content padding must stay vertical-only or the two
               would stack and double the margin. showTitle=false because this
               screen's own header above already renders "Discover matches" once
