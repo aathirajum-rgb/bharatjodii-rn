@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Animated,
+  Easing,
   Dimensions,
   FlatList,
   Keyboard,
@@ -289,6 +290,29 @@ export default function DOBScreen({ navigation }: Props) {
   const yearRef  = useRef<View>(null)
   const pickerListRef = useRef<FlatList<{ key: string; label: string }>>(null)
 
+  // Year auto-scroll glide. FlatList's own `animated: true` is a short native
+  // fling (reads as a jump); driving the offset from an Animated.Value gives
+  // a slow, eased scroll — same technique as BulkLikeModal's showcase scroll.
+  // useNativeDriver must be false: scroll offset isn't a native-animatable prop.
+  const yearScrollAnim  = useRef(new Animated.Value(0)).current
+  const yearScrollRun   = useRef<Animated.CompositeAnimation | null>(null)
+  const yearScrollTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    const id = yearScrollAnim.addListener(({ value }) => {
+      pickerListRef.current?.scrollToOffset({ offset: value, animated: false })
+    })
+    return () => yearScrollAnim.removeListener(id)
+  }, [yearScrollAnim])
+
+  function stopYearScroll() {
+    if (yearScrollTimer.current) { clearTimeout(yearScrollTimer.current); yearScrollTimer.current = null }
+    yearScrollRun.current?.stop()
+    yearScrollRun.current = null
+  }
+
+  useEffect(() => stopYearScroll, [])
+
   // Arrow rotation per field — 0 = pointing down (closed), 1 = pointing up (open).
   // Same down-arrow.svg icon is reused for both states (Angular swaps the source
   // image instead; rotating one icon animates the flip rather than popping between them).
@@ -498,23 +522,28 @@ export default function DOBScreen({ navigation }: Props) {
       // instead of opening pre-scrolled.
       if (field === 'year' && !selYear) {
         const years = getOptions('year')
-        setTimeout(() => {
-          // scrollToOffset (not scrollToIndex) — with ~53 rows, jumping via
-          // index instead of a raw pixel offset relies on the FlatList's
-          // virtualization having already measured/rendered that far ahead,
-          // which it hasn't 700ms after just mounting. That mismatch is what
-          // left the list scrolled to the right place but with blank/invisible
-          // rows — an offset-based scroll has no such dependency.
-          pickerListRef.current?.scrollToOffset({
-            offset:   (years.length - 1) * ITEM_H,
-            animated: true,
+        // Offset-based (not scrollToIndex) — see initialNumToRender on the
+        // FlatList: every row is mounted up front, so no blank rows mid-glide.
+        const maxOffset = Math.max(0, years.length * ITEM_H - listHeight)
+        stopYearScroll()
+        yearScrollTimer.current = setTimeout(() => {
+          yearScrollTimer.current = null
+          yearScrollAnim.setValue(0)
+          const run = Animated.timing(yearScrollAnim, {
+            toValue:         maxOffset,
+            duration:        1500,
+            easing:          Easing.inOut(Easing.cubic),
+            useNativeDriver: false,
           })
+          yearScrollRun.current = run
+          run.start(() => { yearScrollRun.current = null })
         }, 700)
       }
     })
   }
 
   function closePicker() {
+    stopYearScroll()
     if (pickerField) rotateArrow(pickerField, false)
     setPickerField(null)
   }
@@ -750,6 +779,9 @@ export default function DOBScreen({ navigation }: Props) {
             showsVerticalScrollIndicator
             getItemLayout={(_, index) => ({ length: ITEM_H, offset: ITEM_H * index, index })}
             initialScrollIndex={initialScrollIdx}
+            // Any touch on the list hands scrolling back to the user.
+            onTouchStart={stopYearScroll}
+            onScrollBeginDrag={stopYearScroll}
             // Year has ~53 rows — the most of the three fields — and is the
             // only one that gets auto-scrolled to its far end after opening
             // (see openPicker's setTimeout above). Virtualization only renders
@@ -808,9 +840,12 @@ export default function DOBScreen({ navigation }: Props) {
         </TouchableWithoutFeedback>
 
         <AnimatedKeyboardAvoidingView
+          // No paddingBottom here: behavior="padding" writes its OWN
+          // paddingBottom (keyboard height, 0 when closed) over the style's,
+          // which left the Next CTA flush against — and half under — the
+          // keyboard / gesture bar. The bottom gap lives on ageConfirmBtn.
           style={[
             styles.ageSheet,
-            { paddingBottom: insets.bottom + 20 },
             { transform: [{ translateY: ageSlideAnim }] },
           ]}
           // 'height' shrinks the container's own height by the keyboard height —
@@ -859,7 +894,7 @@ export default function DOBScreen({ navigation }: Props) {
 
           {!!ageError && <Text style={styles.ageError}>{ageError}</Text>}
 
-          <View style={styles.ageConfirmBtn}>
+          <View style={[styles.ageConfirmBtn, { marginBottom: insets.bottom + 20 }]}>
             <ButtonRevamp
               label={t('REGISTRATION.NEXTCTA', 'Next')}
               variant="primary"

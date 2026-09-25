@@ -1,7 +1,7 @@
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import type { NavigatorScreenParams } from '@react-navigation/native'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Animated, KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
+import { Animated, BackHandler, KeyboardAvoidingView, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native'
 import ReAnimated, { SlideInRight, SlideOutRight } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useTranslation } from 'react-i18next'
@@ -420,6 +420,23 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
 
   const canGoBack = hasHistory || mappedBack !== null
 
+  // Angular registration-revamp's `showLoader`: only these steps turn it on —
+  // 2 (Name, AI name validation), 3 (Gender, AI name/gender validation) and
+  // 14 (Caste, the registration insert API) — all with the red #B50033
+  // spinner. 35 (Occupation detail) also did in Angular, but its AI check now
+  // runs in the background after the user moves on, so there's nothing to
+  // wait for. Every other step saves without any CTA loader, so `nextLoading`
+  // from those is only used to swallow repeat taps, never shown.
+  const showLoader = !!footerState.nextLoading && CTA_LOADER_PAGES.has(pageNo)
+
+  // Angular's `.screen-loading-block` (a transparent fixed overlay) also
+  // blocks back navigation while the loader is up — Android back included.
+  useEffect(() => {
+    if (!showLoader) return
+    const sub = BackHandler.addEventListener('hardwareBackPress', () => true)
+    return () => sub.remove()
+  }, [showLoader])
+
   const handleBack = useCallback(() => {
     // hasHistory routes through the same centralized handleBack() the
     // Android back button and every other custom back icon call, so this
@@ -549,8 +566,10 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
               size="standard"
               fullWidth
               disabled={footerState.nextDisabled}
-              loading={footerState.nextLoading}
-              onPress={() => handlers.current.onNext()}
+              loading={showLoader}
+              loaderStyle="inline"
+              spinnerColor={Colors.primaryDark}
+              onPress={() => { if (!footerState.nextLoading) handlers.current.onNext() }}
             />
           )}
 
@@ -581,6 +600,11 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
           )}
         </View>
 
+        {/* Angular: `<div class="screen-loading-block" *ngIf="showLoader">` —
+            swallows every tap (header back, language pill, fields, CTA) while
+            the step's API call is in flight. */}
+        {showLoader && <View style={shell.loadingBlock} pointerEvents="auto" />}
+
       </KeyboardAvoidingView>
     </OnboardingCtx.Provider>
   )
@@ -588,7 +612,20 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
 
 // ─── Shell styles ─────────────────────────────────────────────────────────────
 
+const CTA_LOADER_PAGES = new Set(['2', '3', '14'])
+
 const shell = StyleSheet.create({
+  // Angular .screen-loading-block — transparent, full-screen, above everything.
+  loadingBlock: {
+    position:        'absolute',
+    top:             0,
+    right:           0,
+    bottom:          0,
+    left:            0,
+    zIndex:          1000,
+    elevation:       1000,
+    backgroundColor: 'transparent',
+  },
   screen: {
     flex:            1,
     backgroundColor: Colors.surface,

@@ -145,10 +145,12 @@ const styles = StyleSheet.create({
     borderColor:     Colors.chipBorderActive,
     backgroundColor: Colors.radioCheckedBg,
   },
-  // Angular ion-label: margin 0 16 0 0, overflow visible
+  // Angular ion-label: margin 0 16 0 0, overflow visible. Angular's
+  // line-height-16 relies on that overflow:visible; RN Text clips to its line
+  // box, so 16 cut off Poppins' descenders (the "g" in "Daughter").
   pillLabel: {
     fontSize:    FontSize.font14,
-    lineHeight:  16,
+    lineHeight:  20,
     color:       Colors.textPrimary,
     marginRight: 8,
     flexShrink:  1,

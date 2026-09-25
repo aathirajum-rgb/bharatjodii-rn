@@ -200,7 +200,7 @@ export default function GenderScreen({ navigation }: Props) {
         {/* Page illustration — Figma: 48×48 gender icon at top-left */}
         <Image
           source={{ uri: CDN_PAGE_ICON }}
-          style={os.pageIcon}
+          style={[os.pageIcon, styles.pageIconOffset]}
           contentFit="contain"
         />
 
@@ -275,6 +275,12 @@ export default function GenderScreen({ navigation }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  // On mobile the gender illustration sat right up against the header's back
+  // arrow — pushed down to leave clear space between the two.
+  pageIconOffset: {
+    marginTop: 16,
+  },
+
   loader: {
     marginTop: 48,
   },

@@ -156,10 +156,15 @@ const styles = StyleSheet.create({
   },
 
   // Outer wrapper constrains size + pins to left — LottieView ignores alignSelf on some platforms
+  // success-new.json centres its artwork on a 1080×1080 canvas — the largest
+  // circle is ~558px wide, so ~24% of the box is transparent on each side (~30px
+  // at 124px). Pulled left by that much so the visible circle, not the empty
+  // canvas, lines up with the title text on the left.
   lottieWrapper: {
     width:        124,
     height:       125,
     alignSelf:    'flex-start',
+    marginLeft:   -30,
     marginBottom: 16,
     overflow:     'hidden',
   },

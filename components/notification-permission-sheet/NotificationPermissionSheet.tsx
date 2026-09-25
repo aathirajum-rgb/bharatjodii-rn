@@ -169,24 +169,31 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
+  // The bell lottie has transparent padding on its left, which pushed the
+  // visible bell ~6px right of the title/body text edge — pulled back so
+  // all three share the same left edge.
   iconWrapper: {
+    marginLeft:   -6,
     marginBottom: 24,
   },
 
+  // 26 was tighter than Poppins' own line box at 22px (clipped descenders,
+  // cramped against the body).
   title: {
     fontSize:   FontSize.font22,
     fontWeight: '600',
     color:      '#1f1e1b',
-    lineHeight: 26,
+    lineHeight: 32,
     textAlign:  'left',
   },
+  // 18 on 14px Poppins ran the three body lines into each other.
   body: {
     fontSize:     FontSize.font14,
     fontWeight:   '400',
     color:        '#1f1e1b',
-    lineHeight:   18,
+    lineHeight:   22,
     textAlign:    'left',
-    marginTop:    8,
+    marginTop:    12,
     marginBottom: 24,
   },
 
@@ -197,7 +204,7 @@ const styles = StyleSheet.create({
     justifyContent:  'center',
     backgroundColor: '#B50033',
     borderRadius:    8,
-    height:          44,
+    height:          48,
   },
   ctaLabel: {
     fontSize:  FontSize.font14,

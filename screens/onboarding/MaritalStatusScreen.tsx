@@ -311,7 +311,7 @@ const styles = StyleSheet.create({
     fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      Colors.black,
-    lineHeight: 16,
+    lineHeight: 20,
   },
   // Angular's option-label class is static (see the render-side comment
   // above) — it never bolds on selection, so this has no overrides.

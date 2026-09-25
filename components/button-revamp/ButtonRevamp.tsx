@@ -29,6 +29,12 @@ export interface ButtonRevampProps {
   fullWidth?:    boolean     | undefined
   disabled?:     boolean     | undefined
   loading?:      boolean     | undefined
+  // 'replace' (default): the spinner takes the label's place.
+  // 'inline': Angular button-revamp's own [showLoader] look — button goes to
+  // its disabled grey, the label stays, and an <ion-spinner> sits after it.
+  loaderStyle?:  'replace' | 'inline' | undefined
+  // Angular [spinnerColor] — only used by loaderStyle 'inline'.
+  spinnerColor?: string      | undefined
   onPress?:      (() => void) | undefined
   style?:        StyleProp<ViewStyle> | undefined
 }
@@ -164,9 +170,15 @@ export default function ButtonRevamp({
   fullWidth    = false,
   disabled     = false,
   loading      = false,
+  loaderStyle  = 'replace',
+  spinnerColor = Colors.white,
   onPress,
   style,
 }: ButtonRevampProps) {
+  const inlineLoading = loading && loaderStyle === 'inline'
+  // Angular binds [isDisabled]="... || showLoader", so an inline-loading
+  // button renders in its disabled colours too.
+  const looksDisabled = disabled || inlineLoading
   const vt = VARIANT_TOKENS[variant]
   const st = SIZE_TOKENS[size]
   const iconSpec = icon ? ICON_URLS[icon] : undefined
@@ -188,18 +200,18 @@ export default function ButtonRevamp({
           height:            isLink ? undefined : st.height,
           paddingHorizontal: isLink ? 0 : st.paddingH,
           borderRadius:      st.radius,
-          backgroundColor:   disabled ? Colors.border : vt.bg,
+          backgroundColor:   looksDisabled ? Colors.border : vt.bg,
           borderWidth:       vt.borderWidth,
           borderColor:       vt.borderColor,
         },
         fullWidth && styles.fullWidth,
-        pressed && !disabled && styles.pressed,
+        pressed && !looksDisabled && styles.pressed,
         style,
       ]}
       accessibilityRole="button"
-      accessibilityState={{ disabled }}
+      accessibilityState={{ disabled: looksDisabled, busy: loading }}
     >
-      {loading ? (
+      {loading && !inlineLoading ? (
         // Spinner color matches text area so it's always visible
         <ActivityIndicator
           size="small"
@@ -219,7 +231,7 @@ export default function ButtonRevamp({
                 fontSize:   st.fontSize,
                 fontWeight: st.fontWeight,
                 fontFamily: st.fontWeight === '600' ? langFonts.semiBold : st.fontWeight === '500' ? langFonts.medium : langFonts.regular,
-                color:      disabled ? Colors.textTertiary : vt.textColor,
+                color:      looksDisabled ? Colors.textTertiary : vt.textColor,
               },
             ]}
           >
@@ -228,6 +240,10 @@ export default function ButtonRevamp({
 
           {iconPosition === 'end' && !!iconSpec && (
             <CdnSvg uri={iconSpec.url} width={iconSpec.width} height={iconSpec.height} style={styles.icon} />
+          )}
+
+          {inlineLoading && (
+            <ActivityIndicator size="small" color={spinnerColor} style={styles.inlineSpinner} />
           )}
         </>
       )}
@@ -261,5 +277,8 @@ const styles = StyleSheet.create({
   label: {
     flexShrink: 1,
     textAlign:  'center',
+  },
+  inlineSpinner: {
+    marginLeft: 8,
   },
 })

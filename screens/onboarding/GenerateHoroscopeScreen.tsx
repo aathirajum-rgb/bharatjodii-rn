@@ -240,7 +240,7 @@ export default function GenerateHoroscopeScreen({ navigation }: Props) {
     <View style={os.flex1}>
       <ScrollView
         style={os.flex1}
-        contentContainerStyle={os.scrollContent}
+        contentContainerStyle={[os.scrollContent, styles.centeredContent]}
         showsVerticalScrollIndicator={false}
       >
         <Image
@@ -286,6 +286,14 @@ export default function GenerateHoroscopeScreen({ navigation }: Props) {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
+  // Illustration + title + subtitle sit vertically centred in the space
+  // between the header and the footer CTAs, instead of hugging the top.
+  // flexGrow (not a fixed height) so the ScrollView still scrolls on short
+  // screens / large fonts — same approach as AddPhotoScreen.
+  centeredContent: {
+    flexGrow:       1,
+    justifyContent: 'center',
+  },
   illustration: {
     width:        ILLUSTRATION_SIZE,
     height:       ILLUSTRATION_SIZE,
