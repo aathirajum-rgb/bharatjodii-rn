@@ -42,7 +42,7 @@ import {
   WELCOME_PROMOTION_TYPE,
   type MembershipPlan, type MembershipPlansData, type SelectedPackage,
 } from '../../service/paymentService'
-import { useHandlePurchase } from '../../service/iapService'
+import { useHandlePurchase, attachIosProductIds } from '../../service/iapService'
 
 // Angular: recharge.page.html:92 — paymentPageType '1' (this port's variant)
 // renders the title FIRST and a close ✕ on the RIGHT (close-light-black.svg),
@@ -166,7 +166,7 @@ export default function RechargeScreen({ navigation, route }: Props) {
       // is the page-view analytics beacon. None of these three block or feed
       // the plan list itself (matches Angular's own fire-and-forget usage),
       // so they run alongside getMembershipPlans() rather than before it.
-      const [result] = await Promise.all([
+      const [plansResult] = await Promise.all([
         // Welcome page → nbpromotion payload carries TYPE=7; every other entry
         // point keeps the stored S&FPROMOTION default.
         getMembershipPlans(isWelcomePaywall ? WELCOME_PROMOTION_TYPE : undefined),
@@ -174,6 +174,10 @@ export default function RechargeScreen({ navigation, route }: Props) {
         checkAvailOffer(),
         paymentTrack('0'),
       ])
+      // No-op on Android/web — attaches each plan's Apple SKU (see
+      // service/iapService.ts's attachIosProductIds()) so the iOS purchase
+      // branch below can actually find plan.iosProductId.
+      const result = plansResult ? await attachIosProductIds(plansResult) : plansResult
       setData(result)
       if (result) setSelected(result.defaultProductId)
       // Angular: promotions.component.ts — COUPONFLAG '1'/'3' auto-applies
@@ -288,11 +292,12 @@ export default function RechargeScreen({ navigation, route }: Props) {
     setShowAllPlans(false)
 
     if (Platform.OS === 'ios') {
-      // plan.iosProductId isn't populated by getMembershipPlans() yet — no
-      // backend field for it exists (see the comment on MembershipPlan in
-      // service/paymentService.ts). Fails loudly instead of guessing an Apple
-      // product ID, since guessing wrong here means charging for the wrong
-      // package.
+      // loadData() attaches this via iapService.ts's attachIosProductIds()
+      // right after getMembershipPlans() resolves (see the comment on
+      // MembershipPlan in service/paymentService.ts) — unset here means this
+      // plan's productid has no match in the App Store catalog. Fails loudly
+      // instead of guessing an Apple product ID, since guessing wrong here
+      // means charging for the wrong package.
       if (!plan.iosProductId) {
         Alert.alert('Error', 'This plan is not yet available for purchase on iOS.')
         return

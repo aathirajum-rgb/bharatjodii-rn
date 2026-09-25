@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useTranslation } from 'react-i18next'
+import Animated, { useAnimatedStyle, type SharedValue } from 'react-native-reanimated'
 import { SafeAreaView } from 'react-native-safe-area-context'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import FilterChipsRow, { type ChipConfig } from './FilterChipsRow'
@@ -23,7 +24,6 @@ export { LANG_LABELS }
 // ─── Props ─────────────────────────────────────────────────────────────────────
 
 export interface MatchesHeaderProps {
-  headerAnim:      Animated.Value
   loading:         boolean
   totalCount:      number
   langCode:        string
@@ -43,7 +43,6 @@ export interface MatchesHeaderProps {
   preferenceCount?: number
   onEditPreferences?: () => void
   onHeaderLayout:  (height: number) => void
-  onTitleLayout:   (height: number) => void
   // Explore-by-category mode (#5/#6) — facet refinement chips returned inline by
   // the explore listing response. Angular: matches.page.html:94-114 facetResponce row.
   facets?:         ExploreFacet[]
@@ -58,12 +57,18 @@ export interface MatchesHeaderProps {
   // row AND the quick-filter chip row on `!isExploreMatches` — neither applies once
   // you're inside a category (only the facet refinement chips make sense there).
   isExploreMode?:  boolean
+  // Hide-on-scroll title row (MatchesScreen owns the scroll worklet — see its
+  // handleListScroll — this component only paints the transform and reports
+  // its own measured height back). titleRowHeight is a SharedValue rather than
+  // a plain number so the worklet reads the current measured value without a
+  // JS round-trip.
+  titleTranslateY?: SharedValue<number>
+  titleRowHeight?:  SharedValue<number>
 }
 
 // ─── MatchesHeader ─────────────────────────────────────────────────────────────
 
 export default function MatchesHeader({
-  headerAnim,
   loading,
   totalCount,
   langCode,
@@ -74,16 +79,26 @@ export default function MatchesHeader({
   preferenceCount = 0,
   onEditPreferences,
   onHeaderLayout,
-  onTitleLayout,
   facets,
   onFacetToggle,
   onFacetsApply,
   titleOverride,
   isExploreMode = false,
+  titleTranslateY,
+  titleRowHeight,
 }: MatchesHeaderProps) {
   const { t } = useTranslation()
   const langFonts = useLanguageFonts()
   const [showFacetModal, setShowFacetModal] = useState(false)
+
+  // Slides the WHOLE header block (title+ppRow+chips+facets) up together, not
+  // just the title — ppRow/chips ride up into the title's vacated spot instead
+  // of leaving it behind as a blank gap. transform: [] (identity, no-op) when
+  // the parent doesn't wire up the scroll-hide props, so this still works
+  // standalone/unanimated.
+  const headerAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: titleTranslateY?.value ?? 0 }],
+  }))
 
   // Angular: matches.page.ts facetChipLimit = 3 — always slice(0, 3) inline,
   // plus a "View more" chip when there are more than that (matches.page.html:94-114).
@@ -92,14 +107,6 @@ export default function MatchesHeader({
   const hasMoreFacets   = allFacets.length > 3
 
   return (
-    // SafeAreaView (and its top-inset padding + the header's opaque white
-    // background/shadow) stay OUTSIDE the translating Animated.View — this
-    // inset region covers the physical status bar and must stay pinned at
-    // translateY=0 at all times. Previously it was the Animated.View's own
-    // child, so the hide-on-scroll transform carried the inset padding (and
-    // the opaque background covering it) up with the title row, briefly
-    // exposing the pref/chips row underneath the status bar mid-animation —
-    // the header and the device notification bar visually "merging".
     <SafeAreaView
       edges={['top']}
       style={[s.headerSafeArea, s.headerAbsolute]}
@@ -108,15 +115,23 @@ export default function MatchesHeader({
         if (h > 0) onHeaderLayout(h)
       }}
     >
-      <View style={s.header}>
-      <Animated.View style={{ transform: [{ translateY: headerAnim }] }}>
+      {/* Clips the header block below to this box — the box itself is sized by
+          the block's own (unanimated) layout height, so it never changes; only
+          the Animated.View's paint position (translateY) moves, and
+          overflow:hidden crops whatever slides above y=0 (the title row). */}
+      <View style={s.headerClip}>
+      <Animated.View style={[s.header, headerAnimStyle]}>
 
-        {/* Title row — Figma: top 12, height 24, "Matches (49)" left, icons right */}
+        {/* Title row — Figma: top 12, height 24, "Matches (49)" left, icons right.
+            Hide-on-scroll: this row is the first child of the block above, so
+            it's the first thing to slide above the clip box's top edge and
+            disappear — ppRow/chips/facets below it ride up to take its place
+            rather than a blank gap being left behind. */}
         <View
           style={s.titleRow}
           onLayout={e => {
             const h = e.nativeEvent.layout.height
-            if (h > 0) onTitleLayout(h)
+            if (h > 0 && titleRowHeight) titleRowHeight.value = h
           }}
         >
           {/* Angular matches.page.ts's setPageTitle() — "Matches (#COUNT)" (SEARCH.MATCHES_FOUND),
@@ -188,7 +203,11 @@ export default function MatchesHeader({
         )}
 
       </Animated.View>
+      </View>
 
+      {/* Modal — renders to its own native overlay regardless of where it sits
+          in this tree, so it doesn't need to be (and shouldn't be) inside the
+          clipped/translating block above. */}
       <FacetFilterModal
         visible={showFacetModal}
         facets={allFacets}
@@ -198,7 +217,6 @@ export default function MatchesHeader({
           onFacetsApply?.(checkedKeys)
         }}
       />
-      </View>
     </SafeAreaView>
   )
 }
@@ -242,6 +260,11 @@ const s = StyleSheet.create({
   // so with margin here the scroll-hide animation only slid the header up by the
   // bare 24px content height, leaving the 12+8 margin as a visible sliver after
   // "hiding" instead of the row fully tucking away.
+  // Clips the header block's Animated.View to this box — see the comment
+  // above its usage in the JSX.
+  headerClip: {
+    overflow: 'hidden',
+  },
   titleRow: {
     flexDirection:  'row',
     alignItems:     'center',

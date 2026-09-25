@@ -29,7 +29,7 @@ import { getSessionValue } from './registrationService'
 import { navigate } from '../utils/navigationRef'
 import { ENavigation } from '../types/enums/navigation.enum'
 import { logAppsFlyer } from './analyticsService'
-import { getCheckoutDetails, handlePaymentSuccess, recordPaymentFailure, type SelectedPackage } from './paymentService'
+import { getCheckoutDetails, handlePaymentSuccess, recordPaymentFailure, type SelectedPackage, type MembershipPlansData } from './paymentService'
 
 const isIos = () => Platform.OS === 'ios'
 
@@ -92,6 +92,27 @@ export async function getIosProductIdsParam(): Promise<string> {
   const map: Record<string, [string, string]> = {}
   for (const p of state.products) map[p.id] = [p.id, p.price]
   return JSON.stringify(map)
+}
+
+// ─── Membership-plan ↔ Apple SKU join ───────────────────────────────────────
+// getMembershipPlans() (paymentService.ts) and fetchIosPackages() above come
+// from two separate, unrelated backend endpoints that share no field name —
+// plans key off `productid`, the iOS catalog off `PACKKEY` (same id space,
+// per IosPackageCatalogEntry's comment above, confirmed against the backend
+// source). Nothing previously joined the two, so MembershipPlan.iosProductId
+// was always unset and RechargeScreen's iOS branch always hit its "not yet
+// available for purchase on iOS" guard. Call this once after
+// getMembershipPlans() resolves (see RechargeScreen.tsx's loadData()).
+export async function attachIosProductIds(data: MembershipPlansData): Promise<MembershipPlansData> {
+  if (!isIos()) return data
+  const catalog = await fetchIosPackages()
+  if (catalog.length === 0) return data
+  const byPackKey = new Map(catalog.map(entry => [entry.PACKKEY, entry.PACKAGEID]))
+  const attach = (plan: MembershipPlansData['plans'][number]) => {
+    const iosProductId = byPackKey.get(plan.productid)
+    return iosProductId ? { ...plan, iosProductId } : plan
+  }
+  return { ...data, plans: data.plans.map(attach), allPlans: data.allPlans.map(attach) }
 }
 
 // ─── Product context (StoreKit products) ────────────────────────────────────
@@ -194,6 +215,25 @@ interface LastPurchaseAttempt {
   selectedPackage: SelectedPackage
 }
 
+// StoreKit 2 delivers a transaction through BOTH product.purchase()'s direct
+// return value AND the Transaction.updates stream that usePendingPurchase()
+// listens to (Inapppurchase.swift's updatesTask observes it for the app's
+// whole lifetime, starting before any purchase is ever made) — Apple's own
+// docs/sample code confirm this isn't restricted to out-of-band transactions.
+// Without this guard, every normal purchase gets independently verified,
+// finished, and reported to AppsFlyer/navigated to PAYMENT_SUCCESS twice: once
+// by handlePurchase() below, once by usePendingPurchase()'s event listener
+// reacting to the same transaction a moment later.
+//
+// Keyed on orderId, not transactionId — Inapppurchase.swift's
+// handle(updatedTransaction:) reads its orderId from the same UserDefaults
+// key purchaseProduct() writes right before calling StoreKit, so the
+// "pendingPurchase" event can in principle reach JS before
+// Inapppurchase.purchaseProduct()'s own promise resolves with a
+// transactionId. Reserving the orderId here, before that native call even
+// starts, closes that window; the transaction id isn't known yet at that point.
+const inFlightOrderIds = new Set<string>()
+
 export function useHandlePurchase() {
   const [purchasing, setPurchasing] = useState(false)
   const lastAttempt = useRef<LastPurchaseAttempt | null>(null)
@@ -215,18 +255,23 @@ export function useHandlePurchase() {
       const orderId = String(checkout?.orderId ?? '')
       if (!orderId) throw new Error('Could not generate an order ID for this purchase.')
 
-      const result = await Inapppurchase.purchaseProduct(iosProductId, orderId)
-      const transactionId = String(result?.transactionId ?? '')
-      const verified = transactionId ? await verifyAndActivateIosMembership(transactionId, orderId) : false
+      inFlightOrderIds.add(orderId)
+      try {
+        const result = await Inapppurchase.purchaseProduct(iosProductId, orderId)
+        const transactionId = String(result?.transactionId ?? '')
+        const verified = transactionId ? await verifyAndActivateIosMembership(transactionId, orderId) : false
 
-      if (verified) {
-        // Only finish the StoreKit transaction once the backend has actually
-        // activated membership — see this file's header comment.
-        await Inapppurchase.finishTransaction(transactionId)
-        logAppsFlyer('af_purchase', [{ key: 'af_order_id', value: orderId }])
-        await handlePaymentSuccess()
-      } else {
-        await failPurchase(selectedPackage, 'pending')
+        if (verified) {
+          // Only finish the StoreKit transaction once the backend has actually
+          // activated membership — see this file's header comment.
+          await Inapppurchase.finishTransaction(transactionId)
+          logAppsFlyer('af_purchase', [{ key: 'af_order_id', value: orderId }])
+          await handlePaymentSuccess()
+        } else {
+          await failPurchase(selectedPackage, 'pending')
+        }
+      } finally {
+        inFlightOrderIds.delete(orderId)
       }
     } catch (err: any) {
       // SKError.paymentCancelled surfaces here as a rejected promise — treat
@@ -271,6 +316,11 @@ export function usePendingPurchase() {
 
     const emitter = new NativeEventEmitter(IAPEventEmitter)
     const sub = emitter.addListener('pendingPurchase', async ({ transactionId, orderId }: { transactionId: string; productId: string; orderId: string }) => {
+      // Same order is already being verified/finished by useHandlePurchase()'s
+      // direct purchase() await — see inFlightOrderIds' definition above.
+      // Skip it here; that path owns it and will finish it once its own
+      // backend call resolves.
+      if (inFlightOrderIds.has(orderId)) return
       try {
         const verified = await verifyAndActivateIosMembership(transactionId, orderId)
         if (verified) {

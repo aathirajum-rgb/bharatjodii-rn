@@ -8,7 +8,7 @@
 // (BGIMG/CTABGCOLOR/OFFERTAG); only the LAYOUT below (sizes/weights/gaps/radii) is fixed
 // across campaigns and is what this component hardcodes.
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native'
-import CdnSvg from '../cdn-svg/CdnSvg'
+import CdnSvg, { CdnSvgBackground } from '../cdn-svg/CdnSvg'
 import { HtmlText } from './matchesCard.shared'
 import { Colors } from '../../constants/colors'
 import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
@@ -50,9 +50,18 @@ export default function MembershipBanner({ data, onPress }: { data: any; onPress
   const langFonts = useLanguageFonts()
   return (
     <Pressable style={mb.card} onPress={onPress}>
-      {/* Full-bleed campaign background art (Angular: background: url(BGIMG) on the whole card) */}
+      {/* Full-bleed campaign background art (Angular: .matches-breather-block —
+          background: url(BGIMG); background-position: bottom; background-size: cover).
+          BGIMG is commonly an SVG (e.g. paid_membership.svg) — plain RN <Image> can't
+          decode a remote SVG on native (it rendered fine on web/PWA, where RN's <Image>
+          becomes a real <img>, but silently failed to load on Android/iOS), so SVGs
+          route through CdnSvgBackground instead, same as every other CDN SVG here. */}
       {!!data.BGIMG && (
-        <Image source={{ uri: data.BGIMG }} style={mb.bgImg} resizeMode="cover" />
+        /\.svg(\?|#|$)/i.test(data.BGIMG) ? (
+          <CdnSvgBackground uri={data.BGIMG} anchor="bottom" style={mb.bgImg} />
+        ) : (
+          <Image source={{ uri: data.BGIMG }} style={mb.bgImg} resizeMode="cover" />
+        )
       )}
 
       <View style={mb.content}>

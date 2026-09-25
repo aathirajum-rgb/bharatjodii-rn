@@ -22,9 +22,10 @@
 // rects — falls back to SVG's default black fill, rendering as a solid
 // black box. SvgCssUri pulls in css-tree/css-select to actually resolve
 // those rules, matching what a browser's <img> does on web.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Image, Platform, StyleSheet, View, type LayoutChangeEvent } from 'react-native'
-import { SvgCssUri } from 'react-native-svg/css'
+import { fetchText } from 'react-native-svg'
+import { SvgCss, SvgCssUri } from 'react-native-svg/css'
 
 type Props = {
   uri:    string
@@ -77,6 +78,85 @@ export function CdnImage({
   return <Image source={{ uri }} style={[{ width, height }, style]} resizeMode={resizeMode} onError={onError} />
 }
 
+// Figma exports a raster image used as a shape fill (e.g. a photo dropped
+// into a rect) as a <pattern patternContentUnits="objectBoundingBox"> whose
+// content is a <use> wrapping an <image>, with a transform="scale(...)" on
+// the <use> that converts the image's own pixel-sized width/height down into
+// the pattern's required 0..1 coordinate space (e.g. .../nbpromotion/
+// payment-male.svg — the "Become a paid member" banner's photo). Browsers
+// (web <img>) and a spec-compliant rasterizer both render this correctly,
+// but react-native-svg's pattern engine does not honor that <use> transform
+// on native — the embedded photo comes out tiled and wildly overscaled
+// instead of a single clean crop. There's no known react-native-svg fix/
+// version bump for this, so instead of feeding the whole SVG through
+// SvgCss(Uri), CdnSvgBackground below fetches the raw XML itself, strips out
+// just the pattern-filled shape (the vector background/gradient around it —
+// which reliably renders fine — is untouched), and re-draws the extracted
+// photo as a plain <Image> positioned/sized using the exact same cover-scale
+// math as the background SVG, so it lines up pixel-for-pixel.
+type PatternPhoto = { href: string; x: number; y: number; width: number; height: number }
+
+function extractViewBox(xml: string): [number, number, number, number] | null {
+  const raw = xml.match(/<svg\b[^>]*\bviewBox="([-\d.\s]+)"/)?.[1]
+  if (!raw) return null
+  const parts = raw.trim().split(/\s+/).map(Number)
+  return parts.length === 4 && parts.every((n) => !Number.isNaN(n)) ? (parts as [number, number, number, number]) : null
+}
+
+function extractPatternPhotos(xml: string): { xml: string; photos: PatternPhoto[] } {
+  const photos: PatternPhoto[] = []
+  let patched = xml
+  const patternRe = /<pattern\b[^>]*\bid="([^"]+)"[^>]*>([\s\S]*?)<\/pattern>/g
+  let m: RegExpExecArray | null
+  while ((m = patternRe.exec(xml))) {
+    const [, patternId, inner] = m
+    // The pattern's content is normally a <use xlink:href="#imageId"/> pointing
+    // at an <image> defined separately in <defs> (Figma's export shape), not
+    // an <image> inlined inside the pattern itself — fall back to an inline
+    // <image> in case some asset does embed it directly.
+    const useRefId = inner.match(/<use\b[^>]*\b(?:xlink:href|href)="#([^"]+)"/)?.[1]
+    const href = useRefId
+      ? xml.match(new RegExp(`<image\\b[^>]*\\bid="${useRefId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[^>]*\\b(?:xlink:href|href)="([^"]+)"`))?.[1]
+      : inner.match(/<image\b[^>]*\b(?:xlink:href|href)="([^"]+)"/)?.[1]
+    if (!href) continue
+    const escapedId = patternId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const rectTag = patched.match(new RegExp(`<(?:rect|path|circle|ellipse)\\b[^>]*\\bfill="url\\(#${escapedId}\\)"[^>]*\\/?>`))?.[0]
+    if (!rectTag) continue
+    const x = Number(rectTag.match(/\bx="(-?[\d.]+)"/)?.[1] ?? 0)
+    const y = Number(rectTag.match(/\by="(-?[\d.]+)"/)?.[1] ?? 0)
+    const width = Number(rectTag.match(/\bwidth="(-?[\d.]+)"/)?.[1] ?? 0)
+    const height = Number(rectTag.match(/\bheight="(-?[\d.]+)"/)?.[1] ?? 0)
+    if (!width || !height) continue
+    photos.push({ href, x, y, width, height })
+    patched = patched.replace(rectTag, '')
+  }
+  return { xml: patched, photos }
+}
+
+// Fetches + patches the SVG once per uri (native only — web never renders
+// this XML directly, see the Platform.OS==='web' branch below), so the
+// pattern-photo workaround above only costs an extra text fetch on native.
+function usePatchedSvg(uri: string) {
+  const [state, setState] = useState<{ xml: string | null; photos: PatternPhoto[]; viewBox: [number, number, number, number] | null }>({
+    xml: null, photos: [], viewBox: null,
+  })
+  useEffect(() => {
+    if (Platform.OS === 'web') return
+    let cancelled = false
+    fetchText(uri)
+      .then((text) => {
+        if (cancelled || !text) return
+        const { xml, photos } = extractPatternPhotos(text)
+        setState({ xml, photos, viewBox: extractViewBox(text) })
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [uri])
+  return state
+}
+
 // For an SVG used the way CSS `background-image` would (Angular: e.g.
 // .liked-profile-bg { background:url(...); background-size:cover }) — an
 // ImageBackground-style wrapper, but SVG-aware. Native SvgCssUri needs an
@@ -92,9 +172,10 @@ export function CdnSvgBackground({
   // `background-position`. 'center' matches Angular's explicit `center center`
   // (e.g. .paid-member-block); 'top-left' matches the CSS DEFAULT (0% 0%) that
   // a rule with no background-position gets — .liked-profile-bg is one of those,
-  // and centering it cropped the artwork's top off. The web branch below always
-  // renders top-left (backgroundPosition unset), so this only steers native.
-  anchor?: 'center' | 'top-left'
+  // and centering it cropped the artwork's top off. 'bottom' matches Angular's
+  // `background-position: bottom` (.matches-breather-block, the membership/
+  // festival banner) — horizontally centered, anchored to the bottom edge.
+  anchor?: 'center' | 'top-left' | 'bottom'
   // Overrides the source SVG's own viewBox before the cover/slice scaling
   // below runs — e.g. "0 6 110 104" treats only that sub-rectangle as the
   // source, cropping out a dead strip baked into one specific CDN asset
@@ -104,11 +185,38 @@ export function CdnSvgBackground({
   viewBox?: string
 }) {
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)
+  const patched = usePatchedSvg(uri)
 
   function handleLayout(e: LayoutChangeEvent) {
     const { width, height } = e.nativeEvent.layout
     setSize({ width, height })
   }
+
+  // Same "minX minY w h" the viewBox prop/SVG's own viewBox uses — the
+  // coordinate space extractPatternPhotos' x/y/width/height are measured in.
+  const effectiveViewBox = viewBox
+    ? (viewBox.trim().split(/\s+/).map(Number) as [number, number, number, number])
+    : patched.viewBox
+  // Cover-scale math mirroring the "slice" preserveAspectRatio below, so an
+  // extracted photo lines up exactly with where the background SVG would
+  // have drawn it. anchor governs the crop origin exactly like the
+  // preserveAspectRatio prefix and CSS backgroundPosition do elsewhere here.
+  const photoOverlays =
+    size && effectiveViewBox
+      ? (() => {
+          const [minX, minY, vbW, vbH] = effectiveViewBox
+          const scale = Math.max(size.width / vbW, size.height / vbH)
+          const shiftX = anchor === 'top-left' ? 0 : (size.width - vbW * scale) / 2
+          const shiftY = anchor === 'center' ? (size.height - vbH * scale) / 2 : anchor === 'bottom' ? size.height - vbH * scale : 0
+          return patched.photos.map((p) => ({
+            ...p,
+            left:   shiftX + (p.x - minX) * scale,
+            top:    shiftY + (p.y - minY) * scale,
+            width:  p.width * scale,
+            height: p.height * scale,
+          }))
+        })()
+      : []
 
   return (
     // overflow: 'hidden' clips whatever the "slice"/"cover" scaling below
@@ -143,24 +251,44 @@ export function CdnSvgBackground({
               backgroundImage: `url("${uri}${viewBox ? `#svgView(viewBox(${viewBox.trim().split(/\s+/).join(',')}))` : ''}")`,
               backgroundSize:     'cover',
               backgroundRepeat:   'no-repeat',
-              backgroundPosition: anchor === 'center' ? 'center' : '0% 0%',
+              backgroundPosition: anchor === 'center' ? 'center' : anchor === 'bottom' ? '50% 100%' : '0% 0%',
             } as any]} />
           // "xMidYMid slice" is the SVG spec's own equivalent of CSS
           // background-size:cover (scale to fill, crop overflow, centered) —
           // react-native-svg's default ("meet") is closer to contain/
           // letterbox, and would leave gaps instead of covering.
-          : (
-            <SvgCssUri
-              uri={uri}
-              width={size.width}
-              height={size.height}
-              {...(viewBox ? { viewBox } : {})}
-              // "slice" is the SVG spec's background-size:cover; the xMin/xMid
-              // prefix is its background-position — xMinYMin pins the top-left
-              // corner (CSS's 0% 0% default), xMidYMid centers.
-              preserveAspectRatio={anchor === 'center' ? 'xMidYMid slice' : 'xMinYMin slice'}
-              style={StyleSheet.absoluteFill}
-            />
+          : !!patched.xml && (
+            <>
+              <SvgCss
+                xml={patched.xml}
+                width={size.width}
+                height={size.height}
+                {...(viewBox ? { viewBox } : {})}
+                // "slice" is the SVG spec's background-size:cover; the xMin/xMid/
+                // yMin/yMax prefix is its background-position — xMinYMin pins the
+                // top-left corner (CSS's 0% 0% default), xMidYMid centers, xMidYMax
+                // pins the bottom edge (CSS background-position: bottom).
+                preserveAspectRatio={
+                  anchor === 'center' ? 'xMidYMid slice' : anchor === 'bottom' ? 'xMidYMax slice' : 'xMinYMin slice'
+                }
+                style={StyleSheet.absoluteFill}
+              />
+              {/* Any photo(s) extractPatternPhotos pulled out of a <pattern>
+                  fill — react-native-svg can't draw these itself (see the
+                  comment above usePatchedSvg), so they're redrawn here as
+                  plain <Image>s, positioned with the same cover-scale math
+                  the SVG above was just drawn with. resizeMode="stretch"
+                  matches the source's own preserveAspectRatio="none" on its
+                  <image> (the design stretches to exactly fill its rect). */}
+              {photoOverlays.map((p, i) => (
+                <Image
+                  key={i}
+                  source={{ uri: p.href }}
+                  resizeMode="stretch"
+                  style={{ position: 'absolute', left: p.left, top: p.top, width: p.width, height: p.height }}
+                />
+              ))}
+            </>
           )
       )}
       {children}

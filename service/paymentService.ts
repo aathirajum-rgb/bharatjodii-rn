@@ -106,10 +106,12 @@ export interface SelectedPackage {
   // getMembershipPlans() below rather than re-deriving it per screen.
   isEmi?:            boolean | undefined
   // App Store product identifier for this plan (e.g. "com.matrimony.jodii_3INR")
-  // — see service/iapService.ts. No backend field for this exists yet
-  // (getMembershipPlans() never sets it); RechargeScreen's iOS branch checks
-  // for its presence and shows an error instead of guessing a SKU, since a
-  // wrong guess here means charging the wrong Apple product.
+  // — copied straight from the matching MembershipPlan.iosProductId by
+  // RechargeScreen's proceedWithPlan(). Its iOS branch still checks for
+  // presence and shows an error instead of guessing a SKU (a wrong guess here
+  // means charging the wrong Apple product) — only relevant now if a plan's
+  // productid has no match in the App Store catalog (see
+  // iapService.ts's attachIosProductIds()).
   iosProductId?:     string | undefined
 }
 
@@ -865,10 +867,14 @@ export interface MembershipPlan {
   // getMembershipPlans() below rather than re-deriving it per screen.
   isEmi?:         boolean | undefined
   // App Store product identifier for this plan (e.g. "com.matrimony.jodii_3INR")
-  // — see service/iapService.ts. No backend field for this exists yet
-  // (getMembershipPlans() never sets it); RechargeScreen's iOS branch checks
-  // for its presence and shows an error instead of guessing a SKU, since a
-  // wrong guess here means charging the wrong Apple product.
+  // — no backend field for this exists (getMembershipPlans() below never sets
+  // it directly); joined in client-side by iapService.ts's
+  // attachIosProductIds(), matching this plan's productid against the
+  // separate iospackagelogin catalog's PACKKEY (see RechargeScreen.tsx's
+  // loadData(), which calls it right after getMembershipPlans() resolves).
+  // Left unset when no catalog entry matches — RechargeScreen's iOS branch
+  // checks for its presence and shows an error instead of guessing a SKU,
+  // since a wrong guess here means charging the wrong Apple product.
   iosProductId?:  string | undefined
 }
 
