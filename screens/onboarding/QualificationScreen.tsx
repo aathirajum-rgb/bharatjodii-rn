@@ -213,6 +213,6 @@ const styles = StyleSheet.create({
     fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      Colors.black,
-    lineHeight: 16,
+    lineHeight: 20,
   },
 })

@@ -23,6 +23,7 @@ import Animated, {
   Easing, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming,
 } from 'react-native-reanimated'
 import CdnSvg, { CdnImage } from '../../components/cdn-svg/CdnSvg'
+import { NewlyJoinedBadge } from '../../components/profile-photo/ProfilePhoto'
 import { withRupeeFont } from '../../utils/rupeeFont'
 import CdnLottie from '../../components/CdnLottie'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
@@ -31,7 +32,7 @@ import MatchesHeader from '../../components/matches-header/MatchesHeader'
 import {
   WhatsAppIcon, WhatsAppUnlockButton, CallIcon, MessageIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   buildBasicViewParts, showLikeCTA, showAfterLikeCTA,
-  BlurPhotoPlaceholder, NEWLY_JOINED_STAR_URI, RIGHT_ARROW_ANIMATION_URI, ProfileBadge,
+  BlurPhotoPlaceholder, RIGHT_ARROW_ANIMATION_URI, ProfileBadge,
   MALE_AVATAR_URI, FEMALE_AVATAR_URI,
   PhotoSwiper,
   getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showContactsLeftBanner, showFreeBadge,
@@ -411,11 +412,11 @@ export const MatchCard = memo(function MatchCard({
           </Pressable>
         )}
 
-        {/* Angular: .newly-joined posabsolute — star SVG + "New" text, top-left of photo */}
+        {/* Angular: .newly-joined posabsolute — the same "Newly Joined" badge
+            (newly-joined.svg bg + star + MATCHES.NEW_BADGE) ProfilePhoto shows. */}
         {profile.isNewlyJoined && (
-          <View style={c.newBadge} pointerEvents="none">
-            <CdnSvg uri={NEWLY_JOINED_STAR_URI} width={14} height={14} />
-            <Text style={[c.newBadgeText, { fontFamily: langFonts.medium }]}>{t('MATCHES.NEW')}</Text>
+          <View style={StyleSheet.absoluteFill} pointerEvents="none">
+            <NewlyJoinedBadge />
           </View>
         )}
       </View>
@@ -3672,26 +3673,6 @@ const c = StyleSheet.create({
   noPhoto:     { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12 },
   noPhotoIcon: { width: 56, height: 56, opacity: 0.35 },
   noPhotoText: { fontSize: FontSize.font14, color: Colors.textMuted },
-
-  // Angular: .newly-joined posabsolute — uses newly-joined.svg as bg, top-left of photo
-  newBadge: {
-    position:      'absolute',
-    top:           0,
-    left:          0,
-    flexDirection: 'row',
-    alignItems:    'center',
-    backgroundColor: Colors.primaryDark,
-    paddingVertical:   4,
-    paddingLeft:       12,
-    paddingRight:      20,
-    borderBottomRightRadius: 12,
-    gap: 4,
-  },
-  // fontFamily applied inline (langFonts.medium) — see MatchCard's Text usage.
-  newBadgeText: {
-    fontSize:   FontSize.font12,
-    color:      Colors.white,
-  },
 
   // Angular: isActivityLabel row — viewed-icon + LabelText below liked strip
   activityRow: {

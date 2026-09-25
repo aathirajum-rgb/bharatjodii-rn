@@ -190,14 +190,14 @@ export default function OTPScreen({ navigation, route }: Props) {
   function handleChange(text: string, index: number) {
     const digits = text.replace(/\D/g, '')
 
-    // Paste support: a real paste/autofill delivers multiple digits in one
-    // event on a box that was still empty — matches Angular onPaste(). A
-    // normal single keystroke landing on an already-filled box (each box now
-    // holds at most 1 digit) never produces more than 1 digit here, so this
-    // branch no longer misfires on that case (previously: typing a second
-    // digit into a filled box combined old+new into a 2-char string, which
-    // this branch treated as a paste and redistributed across every box).
-    if (digits.length > 1 && !otpValues[index]) {
+    // Paste support: a paste/autofill delivers multiple digits in one event —
+    // spread them across the boxes from the first one (Angular onPaste()).
+    // Works on any box, filled or not. The one multi-digit event that is NOT
+    // a paste: a keystroke into an already-filled box (cursor after its
+    // digit, not selected) arrives as old digit + new one — that's typing.
+    const current = otpValues[index]
+    const typedOverFilled = !!current && digits.length === 2 && digits.startsWith(current)
+    if (digits.length > 1 && !typedOverFilled) {
       const next = Array(OTP_LENGTH).fill('')
       for (let i = 0; i < digits.length && i < OTP_LENGTH; i++) next[i] = digits[i]
       setOtpValues(next)
@@ -406,7 +406,11 @@ export default function OTPScreen({ navigation, route }: Props) {
                 // SMS Retriever hook above: both funnel into handleChange's existing
                 // multi-digit paste branch, so no separate handling is needed.
                 autoComplete="one-time-code"
-                maxLength={1}         // 1 digit per box; multi-digit paste is handled in handleChange
+                // NOT 1: the native maxLength truncates a pasted "1234" to "1"
+                // before onChangeText ever sees it, so the paste branch in
+                // handleChange never ran. Each box still only ever displays
+                // one digit — `value` is otpValues[i], a single character.
+                maxLength={OTP_LENGTH}
                 returnKeyType={i === OTP_LENGTH - 1 ? 'done' : 'next'}
                 onSubmitEditing={i === OTP_LENGTH - 1 ? () => handleVerify() : undefined}
                 selectTextOnFocus
@@ -539,19 +543,19 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // ── 4 OTP boxes (Figma: 48×48px, gap 24px, centred) ──────────────────────
+  // ── 4 OTP boxes (design reference: ~42×42px, ~20px gap) ──────────────────
   otpRow: {
     flexDirection: 'row',
-    gap:           16,
+    gap:           20,
     marginBottom:  8,
   },
   otpBox: {
-    width:              56,
-    height:             56,
+    width:              42,
+    height:             42,
     borderWidth:        1,
     borderRadius:       8,
     fontFamily:         Fonts.poppinsRegular,
-    fontSize:           FontSize.font22,
+    fontSize:           FontSize.font16,
     fontWeight:         '400',
     color:              Colors.textPrimary,
     backgroundColor:    Colors.surface,

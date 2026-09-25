@@ -1286,7 +1286,7 @@ export default function SearchScreen({ navigation }: Props) {
           </View>
         )} */}
 
-        {/* Strict Filter entry point (Figma node 1364:1711) — Partner-
+        {/* Strict Filter entry point (Figma node 1364:1711) — Partner-`
             Preference mode only (same gate as the sub-header above). */}
         {eventType !== 'filter' && (
           <View style={s.strictBanner}>

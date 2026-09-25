@@ -123,7 +123,7 @@ const RADIUS: Record<PhotoVariant, { tl: number; tr: number; bl: number; br: num
 // text-only on the first frame, measures itself via onLayout, then adds the
 // real background SVG behind the content at that exact size.
 
-function NewlyJoinedBadge() {
+export function NewlyJoinedBadge() {
   const { t } = useTranslation()
   const langFonts = useLanguageFonts()
   const [size, setSize] = useState<{ width: number; height: number } | null>(null)

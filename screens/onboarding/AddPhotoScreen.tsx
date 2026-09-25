@@ -17,6 +17,7 @@ import { FontSize } from '../../src/theme/fonts'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { getRegValue, fetchAddPhotoIntermediateContent } from '../../service/registrationService'
 import { CDN_SVG } from '../../constants/cdn'
+import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { os } from './onboardingStyles'
 import { getFewMoreDetailsNextPage } from './fewMoreDetailsFlow'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
@@ -41,6 +42,21 @@ import VerificationSuccessSheet from '../../components/bottom-sheet/Verification
 
 const CDN_MALE_PLACEHOLDER   = CDN_SVG + 'add-photo.svg'
 const CDN_FEMALE_PLACEHOLDER = CDN_SVG + 'add-photo.svg'
+// Same grey chevron the onboarding footer's "I'll do this later" link uses.
+const CDN_LATER_CHEVRON      = CDN_SVG + 'revamp/forward-icon-grey.svg'
+
+// Server copy (registrationArrays INTERMEDIATE) arrives with `<br>` tags and
+// stray spaces around them — rendered raw, the leading space on the second
+// line pushed "to continue" off-centre and indented wrapped bullet lines.
+function cleanServerText(s: string): string {
+  return s
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .split('\n')
+    .map(line => line.trim())
+    .filter(Boolean)
+    .join('\n')
+}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -121,11 +137,11 @@ export default function AddPhotoScreen({ navigation }: Props) {
   // as CasteScreen/HomeTownLocationScreen's useLanguageReload usage.
   function loadContent() {
     return fetchAddPhotoIntermediateContent().then(content => {
-      if (content.header)    setTitle(content.header)
-      if (content.subheader) setSubheader(content.subheader)
-      if (content.content1)  setContent1(content.content1)
-      if (content.content2)  setContent2(content.content2)
-      if (content.cta)       setAddPhotoCta(content.cta)
+      if (content.header)    setTitle(cleanServerText(content.header))
+      if (content.subheader) setSubheader(cleanServerText(content.subheader))
+      if (content.content1)  setContent1(cleanServerText(content.content1))
+      if (content.content2)  setContent2(cleanServerText(content.content2))
+      if (content.cta)       setAddPhotoCta(cleanServerText(content.cta))
     })
   }
 
@@ -405,7 +421,7 @@ export default function AddPhotoScreen({ navigation }: Props) {
           <Text style={[styles.laterText, { fontFamily: langFonts.regular }]}>
             {t('REGISTRATION.IWILLDOTHISLATER', "I'll do this later")}
           </Text>
-          <Text style={styles.laterChevron}>›</Text>
+          <CdnSvg uri={CDN_LATER_CHEVRON} width={16} height={16} />
         </Pressable>
       </ScrollView>
 
@@ -640,17 +656,5 @@ const styles = StyleSheet.create({
   laterText: {
     fontSize:   FontSize.font14,
     color:      Colors.textDark,
-  },
-  // Angular renders a real `<ion-icon name="chevron-forward-outline"
-  // class="ion-no-margin color-333333 mt-2">` here (not wrapped in
-  // app-button-revamp, so none of its iconSize/ctaFontSize defaults apply) —
-  // no explicit font-size utility class sets its size, only its color, so
-  // there's no verified Angular px value to port for this glyph's size;
-  // left as-is. mt-2 (margin-top: 2px) IS ported directly below.
-  laterChevron: {
-    fontSize:   FontSize.font18,
-    color:      Colors.textDark,
-    lineHeight: 22,
-    marginTop:  2,
   },
 })

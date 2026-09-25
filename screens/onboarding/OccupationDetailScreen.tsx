@@ -7,7 +7,9 @@
 // same letters-only validation applies, ICONTYPE occupation.svg,
 // ISINPUTEVENT true, SHOWSKIPBTN true with SKIPBTNTXT IWILLDOTHISLATER.
 // Saved live via updprofileinfo (OCCDETAILS); that response's OCCDETAILSVALID
-// flag can reject the text, in which case Angular keeps the user on the page.
+// flag can reject the text. Angular kept the user on the page for that; here
+// the check runs in the background after Next (validateJobDetailInBackground)
+// — the user always moves on, and a rejected value is simply emptied.
 
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -37,6 +39,23 @@ import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const CDN_PAGE_ICON = CDN_REG + 'occupation.svg'
+
+// AI job-detail validation, run AFTER the user has already moved on (module
+// scope, not tied to this screen's lifecycle — it must finish even though the
+// screen unmounts on advance). The same updprofileinfo call both saves and
+// validates: OCCDETAILSVALID '1' keeps the value (it then shows in Edit
+// Profile's Job details); anything else empties it both locally and on the
+// server, so a rejected entry never lingers on the profile.
+async function validateJobDetailInBackground(value: string): Promise<void> {
+  try {
+    const { valid } = await updateFewMoreDetail('OCCDETAILS', value)
+    if (valid) return
+    await setRegValue('JOBDETAIL', '')
+    await updateFewMoreDetail('OCCDETAILS', '')
+  } catch {
+    // Network failure — nothing was confirmed either way; leave it as saved.
+  }
+}
 
 // Removes the browser's default black focus outline on web — TextInput renders
 // as <input> there, and the outline would sit on top of our custom borderColor.
@@ -136,22 +155,18 @@ export default function OccupationDetailScreen({ navigation }: Props) {
     setSubmitting(true)
     try {
       if (trimmed) {
-        // Angular: OCCDETAILSVALID === '1' accepts; anything else keeps the user
-        // on the page so they can correct the text.
-        const { valid } = await updateFewMoreDetail('OCCDETAILS', trimmed)
-        if (!valid) {
-          setError(t('REG.ALPHABETONLY', 'Please enter valid characters'))
-          return
-        }
+        // Saved locally right away so the box still shows it if the user
+        // comes back before the AI check answers; the check itself runs in
+        // the background and never holds the user on this page.
         await setRegValue('JOBDETAIL', trimmed)
+        validateJobDetailInBackground(trimmed)
       }
-      await advance()
     } catch {
       // Optional field — a save failure must never trap the user mid-onboarding.
-      await advance()
     } finally {
       setSubmitting(false)
     }
+    await advance()
   }
 
   // Angular: SHOWSKIPBTN — skipping leaves JOBDETAIL untouched and moves on.
