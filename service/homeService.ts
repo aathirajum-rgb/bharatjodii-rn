@@ -802,6 +802,39 @@ export async function fetchExplore(filterType: string, start = 0, limit = 20, qS
   return toListingResult(res)
 }
 
+// Angular: the "Newly Joined" landing page (exploreType 'bynewlyjoined',
+// RN's 'NEYLYJOINED') runs on the plain matches/v1 endpoint with NEWMATCHES=1
+// and VIEWED=1 for its entire lifetime — initial load, pagination, AND facet
+// refinement (matches.page.ts's pillFilter() `exploreType == 'bynewlyjoined'`
+// branch at 2078-2087) — never explore/v1 with FILTERTYPE the way every other
+// Discover category (fetchExplore above) works. Missing NEWMATCHES=1 (and
+// hitting the wrong endpoint entirely) is what silently fell back to generic
+// results for this one category.
+export async function fetchNewlyJoinedMatches(qSearch: string, start = 0, limit = 20): Promise<ListingResult> {
+  const [session, userId] = await Promise.all([
+    getSession(),
+    getItem(StorageKeys.Auth.USER_ID),
+  ])
+  const loginCount = session['LOGINCOUNT'] ?? '0'
+  const parts = [
+    `ID=${userId ?? ''}`,
+    `START=${start}`,
+    `LIMIT=${limit}`,
+    'LIKED=1',
+    'VIEWED=1',
+    'REPORTED=1',
+    'BLOCKED=1',
+    'REMOVED=1',
+    'SKIPED=1',
+    'BANNERFLAG=1',
+    `LOGINCOUNT=${loginCount}`,
+    'NEWMATCHES=1',
+  ]
+  if (qSearch) parts.push(`QSEARCH=${qSearch}`)
+  const res = await apiCall(Endpoints.listing.matches, 'POST', parts.join('&'))
+  return toListingResult(res)
+}
+
 // ─── Nearby matches ─────────────────────────────────────────────────────────────
 // Angular: webview.page.ts's callingListAPI("nearbymatches") — its own dedicated
 // endpoint (listing/nearbymatches/v1), not the generic explore/v1 FILTERTYPE

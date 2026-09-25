@@ -959,9 +959,16 @@ const NewlyJoinedSection = memo(function NewlyJoinedSection({
           // then router.navigate(['/matches/bynewlyjoined']) — matches.page.ts's
           // urlExploreObj maps route name 'bynewlyjoined' to FILTERTYPE
           // 'NEYLYJOINED' (backend typo, preserved) before it reaches the API.
+          // No exploreLabel here — unlike a real Discover-category tile (which
+          // sets this.discoverData from the navigation state's exploreData),
+          // this "bynewlyjoined" flow only sets qSearchValue (matches.page.ts:
+          // 321-323); setPageTitle()'s custom-label branch is gated on
+          // `isExploreMatches && discoverData`, so with discoverData unset it
+          // falls through to the plain generic "N Matches" title, not a
+          // "Newly joined (N)" label — matched here by leaving titleOverride
+          // (exploreLabel) undefined so MatchesHeader's own fallback applies.
           onSeeAllPress={() => navigation.navigate('Matches', {
             exploreType: 'NEYLYJOINED',
-            exploreLabel: t('HOME.NEWLY_JOINED_HEADER'),
           })}
           onWhatsAppPress={onWhatsAppPress}
         />

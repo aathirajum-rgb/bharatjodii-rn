@@ -122,7 +122,7 @@ export default function HelpCenterScreen({ navigation }: Props) {
   //    Activity screen, despite the CTA's name; that's Angular's actual behavior.)
   //  - "Verify ID" has no RN destination yet (large standalone feature, out of
   //    scope here) — stays a "Coming soon" stub.
-  function handleQuickLink(cta: string, title: string) {
+  function handleQuickLink(cta: string) {
     if (cta === 'Add Photo') {
       navigation.navigate('onboarding', { pageNo: '21', standalone: true })
     } else if (cta === 'Membership Plan') {
@@ -131,7 +131,12 @@ export default function HelpCenterScreen({ navigation }: Props) {
       setFilterEventType('pp')
       navigation.navigate('Search')
     } else if (cta === 'Newly Joined') {
-      navigation.navigate('MainTabs', { screen: 'Matches', params: { exploreType: 'NEYLYJOINED', exploreLabel: title } })
+      // Angular: help-center.component.ts:99 navigates with no `state` at all
+      // (a plain router.navigate, unlike a real Discover-category tile's
+      // reDirectFromExplore()) — matches.page.ts's discoverData never gets set,
+      // so setPageTitle() falls through to the generic "N Matches" title, not
+      // a custom label. No exploreLabel here to match.
+      navigation.navigate('MainTabs', { screen: 'Matches', params: { exploreType: 'NEYLYJOINED' } })
     } else if (cta === 'Activity') {
       navigation.navigate('Faq', { type: 'CONTACTMATCHES', itemId: 9 })
     } else {
@@ -194,7 +199,7 @@ export default function HelpCenterScreen({ navigation }: Props) {
                 <Row
                   key={`${item.TITLE}_${i}`}
                   title={item.TITLE}
-                  onPress={() => handleQuickLink(item.CTA, item.TITLE)}
+                  onPress={() => handleQuickLink(item.CTA)}
                   showDivider={i < quickLinks.length - 1}
                 />
               ))}

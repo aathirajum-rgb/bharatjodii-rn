@@ -232,7 +232,7 @@ export default function MatchesHeader({
                 onPress={() => f.count !== 0 && onFacetToggle?.(f.key)}
                 disabled={f.count === 0}
               >
-                <Text style={[s.facetChipText, { fontFamily: langFonts.regular }, f.checked && s.facetChipTextSelected]}>{f.value}</Text>
+                <Text style={[s.facetChipText, { fontFamily: langFonts.regular }]}>{f.value}</Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -314,16 +314,19 @@ const s = StyleSheet.create({
   // titleRow's space-between still puts just two things — this group and
   // titleActions — at opposite ends, instead of the back button splitting
   // away to its own far-left slot once it's a 3rd flex child.
-  // flexGrow (not just flexShrink) matters once titleActions is hidden in
-  // explore mode (the language pill — see its own comment): without it this
-  // View stayed sized to its own content instead of claiming the width
-  // titleActions vacated, so the now-longer "label (count)" title wrapped to
-  // 2 lines with empty space sitting unused to its right.
+  // flex:1 (not flexGrow alone) matters once titleActions is hidden in
+  // explore mode (the language pill — see its own comment): plain
+  // `flexGrow:1` keeps the default flexBasis:'auto', so Yoga's first layout
+  // pass still measures/wraps the Text child against its own intrinsic
+  // (un-grown) content width before applying the grow — visually identical
+  // to titleLeft never having grown at all. `flex:1` forces flexBasis:0, so
+  // the full row width is allocated BEFORE the Text inside is laid out/
+  // wrapped, which is what actually lets "label (count)" fit on one line
+  // once titleActions vacates the row.
   titleLeft: {
     flexDirection: 'row',
     alignItems:    'center',
-    flexGrow:      1,
-    flexShrink:    1,
+    flex:          1,
   },
   // Angular: the back-button column sits directly against the grid's own
   // pl-24 (dropped to a plain 0 via !isExploreMatches's pl-24 toggle) — no
@@ -393,13 +396,13 @@ const s = StyleSheet.create({
   },
   facetChipDisabled: { opacity: 0.4 },
   // Angular: matches.page.html body3-regular-12 color-4c4c4c — fontFamily
-  // applied inline (langFonts.regular).
+  // applied inline (langFonts.regular). Stays this same color whether the
+  // chip is checked or not — Angular's `.filter-selected` only restyles the
+  // chip's background/border, never the text — a pink override here (now
+  // removed) made a selected chip's text nearly unreadable against its own
+  // pink-tinted background.
   facetChipText: {
     fontSize:   FontSize.font12,
     color:      Colors.extendedCardTitle,
   },
-  // No Angular equivalent selected-text color exists (.filter-selected only
-  // restyles the chip's background/border) — kept as a pre-existing RN-only
-  // enhancement rather than removed; flagging here per the typography audit.
-  facetChipTextSelected: { color: Colors.primary },
 })

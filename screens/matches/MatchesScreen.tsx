@@ -55,6 +55,7 @@ import { EEndCardText } from '../../types/enums/common.enum'
 import {
   fetchMatches,
   fetchExplore,
+  fetchNewlyJoinedMatches,
   fetchSearchResults,
   type ExploreFacet,
   fetchExtendedMatchesCount, type ExtendedMatchesCountResult,
@@ -1149,6 +1150,11 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
       const nextPageParams = await buildSearchParams(userId ?? '', start, limit)
       return fetchSearchResults(nextPageParams)
     }
+    // Angular: the "Newly Joined" landing (exploreType 'bynewlyjoined'/'NEYLYJOINED')
+    // hits the plain matches/v1 endpoint with NEWMATCHES=1, not explore/v1 with
+    // FILTERTYPE like every other Discover category — see fetchNewlyJoinedMatches()'s
+    // own comment. Applies from the very first page, not just after a facet tap.
+    if (exploreType === 'NEYLYJOINED') return fetchNewlyJoinedMatches(qSearch, start, limit)
     return exploreType
       ? fetchExplore(exploreType, start, limit, qSearch)
       : fetchMatches(start, limit)
@@ -2997,7 +3003,12 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
     setLoading(true)
     apiStartRef.current = 0
     try {
-      const result = await fetchExplore(exploreType, 0, 20, nextQSearch)
+      // Angular: pillFilter() special-cases exploreType === 'bynewlyjoined' to
+      // the matches/v1+NEWMATCHES=1 endpoint instead of explore/v1+FILTERTYPE
+      // — see fetchNewlyJoinedMatches()'s own comment.
+      const result = exploreType === 'NEYLYJOINED'
+        ? await fetchNewlyJoinedMatches(nextQSearch, 0, 20)
+        : await fetchExplore(exploreType, 0, 20, nextQSearch)
       setProfiles(result.items.map(matchProfileAdapter.adapt))
       setBannerSlots(result.bannerSlots)
       setTotalCount(result.totalCount)

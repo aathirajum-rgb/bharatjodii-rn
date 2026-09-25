@@ -83,7 +83,7 @@ export default function HelpCenterDesktopScreen({ navigation }: Props) {
 
   // Mirrors HelpCenterScreen.tsx's handleQuickLink() exactly — see that file's
   // header comment for the full Angular PageNavigation() trace this is ported from.
-  function handleQuickLink(cta: string, title: string) {
+  function handleQuickLink(cta: string) {
     if (cta === 'Add Photo') {
       navigation.navigate('onboarding', { pageNo: '21', standalone: true })
     } else if (cta === 'Membership Plan') {
@@ -92,7 +92,8 @@ export default function HelpCenterDesktopScreen({ navigation }: Props) {
       setFilterEventType('pp')
       navigation.navigate('Search')
     } else if (cta === 'Newly Joined') {
-      navigation.navigate('MainTabs', { screen: 'Matches', params: { exploreType: 'NEYLYJOINED', exploreLabel: title } })
+      
+      navigation.navigate('MainTabs', { screen: 'Matches', params: { exploreType: 'NEYLYJOINED' } })
     } else if (cta === 'Activity') {
       navigation.navigate('Faq', { type: 'CONTACTMATCHES', itemId: 9 })
     } else {
@@ -131,7 +132,7 @@ export default function HelpCenterDesktopScreen({ navigation }: Props) {
                 <Row
                   key={`${item.TITLE}_${i}`}
                   title={item.TITLE}
-                  onPress={() => handleQuickLink(item.CTA, item.TITLE)}
+                  onPress={() => handleQuickLink(item.CTA)}
                   showDivider={i < quickLinks.length - 1}
                 />
               ))}
