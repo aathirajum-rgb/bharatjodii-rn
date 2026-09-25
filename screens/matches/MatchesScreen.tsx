@@ -1113,7 +1113,12 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
   // Angular: search.component.ts applyFilter() → router.navigate(['matches'], {state:{SEARCH_URL}})
   const routeSearchParams = route?.params?.searchParams as string | undefined
   const [facets,  setFacets]  = useState<ExploreFacet[]>([])
-  const [qSearch, setQSearch] = useState('')
+  // Angular: reDirectFromExplore() seeds qSearchValue from the tapped explore
+  // tile's own KEY on the very first fetch (e.g. "5-star and above" carries
+  // KEY:'5') — this isn't only a later facet-chip refinement (applyFacetKeys
+  // below). Without seeding it here, the initial list showed every match for
+  // the tile's FILTERTYPE instead of the specific one the tile promised.
+  const [qSearch, setQSearch] = useState((route?.params?.exploreQSearch as string | undefined) ?? '')
 
   // `extended` overrides the extendedLoaded STATE read below — needed by callers
   // that just called setExtendedLoaded(false) in the same tick (a plain state
@@ -3376,6 +3381,7 @@ export default function MatchesScreen({ navigation, route }: { navigation: any; 
         onFacetToggle={toggleFacet}
         onFacetsApply={applyFacetSelection}
         titleOverride={exploreLabel}
+        hideExploreCount={exploreType === 'MHOROSCOPELIST'}
         isExploreMode={!!exploreType}
         titleTranslateY={titleTranslateY}
         titleRowHeight={titleRowH}

@@ -8,12 +8,14 @@ import FilterChipsRow, { type ChipConfig } from './FilterChipsRow'
 import FacetFilterModal from './FacetFilterModal'
 import LanguagePill, { LANG_LABELS } from '../language-pill/LanguagePill'
 import { Colors } from '../../constants/colors'
-import { CDN_SVG } from '../../constants/cdn'
+import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
 import type { ExploreFacet } from '../../service/homeService'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { FontSize } from '../../src/theme/fonts'
+import { handleBack } from '../../utils/navigationRef'
 
 const CDN = CDN_SVG
+const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
 // Re-exported so existing imports (ViewProfileScreen.tsx, ViewProfileDesktopLayout.tsx,
 // MatchesDesktopNav.tsx, StarMatchingDesktopLayout.tsx) keep working unchanged —
@@ -51,8 +53,14 @@ export interface MatchesHeaderProps {
   // joined by '~' (matches.page.ts:1952-1988), not one-at-a-time like onFacetToggle.
   onFacetsApply?:  (checkedKeys: string[]) => void
   // Explore-by-category mode — Angular shows the category's own label instead of
-  // "N Matches" as the page title (matches.page.ts pageTitle).
+  // "N Matches" as the page title (matches.page.ts pageTitle), PLUS the live
+  // result count appended in parens once it's known — setPageTitle() does
+  // `title = (discoverData.TITLE1||TITLE) + ' (' + count + ')'`, not the bare
+  // label alone.
   titleOverride?:  string | undefined
+  // Angular: setPageTitle()'s one exception — exploreTypeUrl === 'MHOROSCOPELIST'
+  // is the only category whose title never gets the "(count)" suffix.
+  hideExploreCount?: boolean
   // Angular: matches.page.html gates BOTH the "#COUNT# profiles..."/Edit-preferences
   // row AND the quick-filter chip row on `!isExploreMatches` — neither applies once
   // you're inside a category (only the facet refinement chips make sense there).
@@ -83,6 +91,7 @@ export default function MatchesHeader({
   onFacetToggle,
   onFacetsApply,
   titleOverride,
+  hideExploreCount = false,
   isExploreMode = false,
   titleTranslateY,
   titleRowHeight,
@@ -134,15 +143,42 @@ export default function MatchesHeader({
             if (h > 0 && titleRowHeight) titleRowHeight.value = h
           }}
         >
-          {/* Angular matches.page.ts's setPageTitle() — "Matches (#COUNT)" (SEARCH.MATCHES_FOUND),
-              not a count-first "323 Matches". */}
-          <Text style={[s.title, { fontFamily: langFonts.semiBold }]}>
-            {loading ? (titleOverride ?? t('GENERAL.ICON_1')) : (titleOverride ?? t('SEARCH.MATCHES_FOUND').replace('#COUNT', String(totalCount)))}
-          </Text>
-
-          <View style={s.titleActions}>
-            <LanguagePill langCode={langCode} />
+          <View style={s.titleLeft}>
+            {/* Angular: matches.page.html:6-7 — `*ngIf="isExploreMatches"` puts a
+                real back button (defaultHref redirectUrl||'/home') in its own
+                1.5/12 column ahead of the title, which otherwise has no way back
+                to Home since this screen is normally a bottom-nav tab, not a
+                pushed page. */}
+            {isExploreMode && (
+              <Pressable onPress={() => handleBack()} hitSlop={8} style={s.backBtn}>
+                <CdnSvg uri={ICON_BACK} width={24} height={24} />
+              </Pressable>
+            )}
+            {/* Angular matches.page.ts's setPageTitle() — "Matches (#COUNT)" (SEARCH.MATCHES_FOUND)
+                normally, not a count-first "323 Matches"; in explore mode it's
+                `(discoverData.TITLE1||TITLE) + ' (' + count + ')'` instead — the
+                category label ALSO gets the live count appended once it's known,
+                not shown bare (MHOROSCOPELIST is the one exception, per
+                hideExploreCount above). */}
+            <Text style={[s.title, { fontFamily: langFonts.semiBold }]}>
+              {loading
+                ? (titleOverride ?? t('GENERAL.ICON_1'))
+                : titleOverride
+                  ? (hideExploreCount ? titleOverride : `${titleOverride} (${totalCount})`)
+                  : t('SEARCH.MATCHES_FOUND').replace('#COUNT', String(totalCount))}
+            </Text>
           </View>
+
+          {/* Angular: matches.page.html:19-36 — the real (live, non-commented)
+              language dropdown sits inside the same `*ngIf="!isExploreMatches"`
+              block as the back-button/search column above — hidden entirely
+              once you're inside a category, not just the profile-count/chip
+              rows below it. */}
+          {!isExploreMode && (
+            <View style={s.titleActions}>
+              <LanguagePill langCode={langCode} />
+            </View>
+          )}
         </View>
 
         {/* Angular: matches.page.html — "#COUNT# profiles based on your preferences." on
@@ -273,6 +309,27 @@ const s = StyleSheet.create({
     paddingRight:   16,
     paddingTop:     12,
     paddingBottom:  8,
+  },
+  // Groups the (explore-mode-only) back button with the title so the outer
+  // titleRow's space-between still puts just two things — this group and
+  // titleActions — at opposite ends, instead of the back button splitting
+  // away to its own far-left slot once it's a 3rd flex child.
+  // flexGrow (not just flexShrink) matters once titleActions is hidden in
+  // explore mode (the language pill — see its own comment): without it this
+  // View stayed sized to its own content instead of claiming the width
+  // titleActions vacated, so the now-longer "label (count)" title wrapped to
+  // 2 lines with empty space sitting unused to its right.
+  titleLeft: {
+    flexDirection: 'row',
+    alignItems:    'center',
+    flexGrow:      1,
+    flexShrink:    1,
+  },
+  // Angular: the back-button column sits directly against the grid's own
+  // pl-24 (dropped to a plain 0 via !isExploreMatches's pl-24 toggle) — no
+  // extra inset of its own, just the icon's natural touch target.
+  backBtn: {
+    marginRight: 8,
   },
   // Angular: matches.page.html — "#COUNT# profiles based on your preferences." then
   // "Edit preferences" always on its own line below (column, not a wrapping row).

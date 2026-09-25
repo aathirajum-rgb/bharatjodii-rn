@@ -30,6 +30,12 @@ export interface ExploreCategory {
   // "linear-gradient(113deg, #DCF0FF 1.75%, #FFF 26.84%), #FFF". Falls back
   // to that same default gradient when the server omits it.
   bgColor?: string | undefined
+  // Angular: filter.service.ts's reDirectFromExplore() sends this tile's own
+  // KEY as qSearchValue on the VERY FIRST matches fetch, not just as a later
+  // facet-chip refinement — e.g. "5-star and above" carries KEY:'5', and
+  // without it the destination list shows every FILTERTYPE match instead of
+  // the specific one this tile promised.
+  qSearch: string
 }
 
 export interface HelpVideo {
@@ -1018,6 +1024,10 @@ export async function fetchExploreCategories(discoverKey?: unknown): Promise<Exp
       count:    Number(item['COUNT'] ?? 0),
       imageUrl: String(item['ICON'] ?? ''),
       bgColor:  item['BGCOLOUR'] ?? undefined,
+      // Angular: reDirectFromExplore() reads exploreData.KEY as qSearchValue —
+      // confirmed against filter.service.spec.ts's own fixtures (e.g.
+      // { FILTER: 'STAR', KEY: '5' }, { FILTER: 'EDUCATION', KEY: 'engineering' }).
+      qSearch:  String(item['KEY'] ?? ''),
     }))
 }
 
