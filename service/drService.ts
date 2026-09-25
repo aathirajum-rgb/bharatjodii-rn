@@ -306,11 +306,32 @@ export async function handleAfterDr(pageId: string | number): Promise<void> {
       resetTo(ENavigation.ADD_PHOTO_INTERMEDIATE, { page: 'ADDPHOTOPUBLISH' })
       break
 
+    // Angular: case "7" (CallVerify) → verify-id?frm_page=notify. The backend
+    // keeps sending this landing page_id on every app open until the profile
+    // is verified. verify-id.page.ts shows the <app-id-verify> intermediate when
+    // isNewIdVerifyFlow (EKYCSTATUS=='0' && LOGINGENDER=='M'), bounces an
+    // already-verified user (EKYCSTATUS=='1') to Matches, and otherwise shows
+    // its classic govt-ID flow.
+    case '7': {
+      const [ekycStatus, gender] = await Promise.all([
+        getItem(SK.Verification.EKYC_STATUS),
+        getItem(SK.User.LOGIN_GENDER),
+      ])
+      const ekyc = ekycStatus || '0'
+      if (ekyc === '0' && gender === 'M') {
+        resetTo(ENavigation.ID_VERIFY_INTERMEDIATE)
+      } else if (ekyc !== '1') {
+        resetTo(ENavigation.VERIFY_ID)
+      } else {
+        resetTo(ENavigation.MATCHES)
+      }
+      break
+    }
+
     // Angular's default re-enters loadDrProfiles(nbId, 'dailyrecommendations',
     // 'matches') — but handleAfterDr is only reached when DR came back empty,
     // so that re-entry resolves to the same plain Matches landing. Kept as the
     // direct landing rather than a redundant second DR fetch.
-    case '7':
     default:
       resetTo(ENavigation.MATCHES)
   }

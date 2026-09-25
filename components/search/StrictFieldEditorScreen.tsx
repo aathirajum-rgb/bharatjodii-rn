@@ -22,6 +22,7 @@ import {
 } from '../../constants/strictFilter.config'
 import type { FieldKey } from '../../screens/search/SearchScreen'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
@@ -58,6 +59,7 @@ export default function StrictFieldEditorScreen({
   strictEnabled, onToggleStrict, isAny, strictAllowed, matchCount, countLoading, children,
 }: StrictFieldEditorScreenProps) {
   const insets = useSafeAreaInsets()
+  const langFonts = useLanguageFonts()
   const { t } = useTranslation()
   // Angular pushes this as a ROUTE (redirectToFilterPage() -> /search/filterpopup/
   // <FIELD>), so it enters from the right like any forward navigation — which is
@@ -159,11 +161,11 @@ export default function StrictFieldEditorScreen({
           <Pressable style={s.backBtn} onPress={handleClose} hitSlop={10} accessibilityRole="button" accessibilityLabel="Back">
             <CdnSvg uri={ICON_BACK} width={24} height={24} />
           </Pressable>
-          <Text style={s.headerTitle} numberOfLines={1}>{fieldLabel}</Text>
+          <Text style={[s.headerTitle, { fontFamily: langFonts.medium }]} numberOfLines={1}>{fieldLabel}</Text>
         </View>
 
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-          <Text style={s.title}>{subtitle}</Text>
+          <Text style={[s.title, { fontFamily: langFonts.medium }]}>{subtitle}</Text>
 
           <View style={s.fieldsWrap}>{children}</View>
 
@@ -171,8 +173,8 @@ export default function StrictFieldEditorScreen({
             <>
               <View style={s.strictBanner}>
                 <View style={s.strictTextCol}>
-                  <Text style={s.strictTitle}>{copy.label}</Text>
-                  <Text style={s.strictDesc}>{copy.description}</Text>
+                  <Text style={[s.strictTitle, { fontFamily: langFonts.medium }]}>{copy.label}</Text>
+                  <Text style={[s.strictDesc, { fontFamily: langFonts.regular }]}>{copy.description}</Text>
                 </View>
                 <Toggle
                   value={strictEnabled}
@@ -184,7 +186,7 @@ export default function StrictFieldEditorScreen({
                   and only once the count has actually dropped
                   (`<div *ngIf="isMatchesReduced">`). The "Turn on strict …"
                   RANGE prompt is a separate element in the FOOTER — see below. */}
-              {reduced && <Text style={[s.promptText, s.warningText]}>{copy.note}</Text>}
+              {reduced && <Text style={[s.promptText, s.warningText, { fontFamily: langFonts.regular }]}>{copy.note}</Text>}
             </>
           )}
         </ScrollView>
@@ -195,7 +197,7 @@ export default function StrictFieldEditorScreen({
               the count/Apply row, and only while the toggle is still OFF. It
               used to render up in the scroll body directly under the banner. */}
           {showStrict && !strictEnabled && (
-            <Text style={s.footerPrompt}>{strictPromptText(t, fieldKey, fieldValue)}</Text>
+            <Text style={[s.footerPrompt, { fontFamily: langFonts.regular }]}>{strictPromptText(t, fieldKey, fieldValue)}</Text>
           )}
 
           <View style={s.footerRow}>
@@ -203,21 +205,21 @@ export default function StrictFieldEditorScreen({
               and Apply widens from `width-60` to `width100` without it — so a
               Filters-mode field page is just a full-width Apply. */}
           {showStrict && <View style={s.matchesCol}>
-            <Text style={s.matchesLabel}>{reduced ? 'Matches reduced' : 'Matches'}</Text>
+            <Text style={[s.matchesLabel, { fontFamily: langFonts.regular }]}>{reduced ? 'Matches reduced' : 'Matches'}</Text>
             {reduced ? (
               <View style={s.reducedRow}>
-                <Text style={s.reducedOld}>{baseline!.toLocaleString('en-IN')}</Text>
-                <Text style={s.reducedTo}>to</Text>
-                <Text style={s.reducedNew}>{matchCount.toLocaleString('en-IN')}</Text>
+                <Text style={[s.reducedOld, { fontFamily: langFonts.regular }]}>{baseline!.toLocaleString('en-IN')}</Text>
+                <Text style={[s.reducedTo, { fontFamily: langFonts.regular }]}>to</Text>
+                <Text style={[s.reducedNew, { fontFamily: langFonts.semiBold }]}>{matchCount.toLocaleString('en-IN')}</Text>
               </View>
             ) : (
-              <Text style={s.matchesCount}>{countLoading ? '…' : matchCount.toLocaleString('en-IN')}</Text>
+              <Text style={[s.matchesCount, { fontFamily: langFonts.semiBold }]}>{countLoading ? '…' : matchCount.toLocaleString('en-IN')}</Text>
             )}
           </View>}
           <Pressable style={s.applyBtn} onPress={handleClose}>
             {/* Angular: `[buttonText]="pageContent['FILTER_APPLY_CTA']"` — a
                 translated string, not an English literal. */}
-            <Text style={s.applyText}>{t('FILTER.FILTER_APPLY_CTA', 'Apply')}</Text>
+            <Text style={[s.applyText, { fontFamily: langFonts.regular }]}>{t('FILTER.FILTER_APPLY_CTA', 'Apply')}</Text>
           </Pressable>
           </View>
         </View>
@@ -311,6 +313,7 @@ const s = StyleSheet.create({
 export function CompactFieldRow({
   label, value, onPress, disabled,
 }: { label: string; value: string; onPress: () => void; disabled?: boolean }) {
+  const langFonts = useLanguageFonts()
   return (
     <Pressable
       style={[cs.box, disabled && cs.boxDisabled]}
@@ -320,9 +323,9 @@ export function CompactFieldRow({
       disabled={disabled}
     >
       <View style={cs.labelWrap} pointerEvents="none">
-        <Text style={cs.label}>{label}</Text>
+        <Text style={[cs.label, { fontFamily: langFonts.regular }]}>{label}</Text>
       </View>
-      <Text style={cs.value} numberOfLines={1}>{value}</Text>
+      <Text style={[cs.value, { fontFamily: langFonts.regular }]} numberOfLines={1}>{value}</Text>
       <CdnSvg uri={CDN_REACT + '/menu_right_arrow.svg'} width={16} height={16} />
     </Pressable>
   )

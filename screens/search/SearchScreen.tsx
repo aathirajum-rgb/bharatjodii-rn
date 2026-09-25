@@ -75,6 +75,7 @@ import MultiSelectPicker, { type MultiSelectOption } from '../../components/mult
 import { ICON } from '../viewprofile/ViewProfileScreen'
 import CheckboxGroup from '../../components/checkbox/CheckboxGroup'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
@@ -166,6 +167,7 @@ function useModalMounted(visible: boolean, exitMs = 300): boolean {
 
 export default function SearchScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
+  const langFonts = useLanguageFonts()
   const { t } = useTranslation()
   const isDesktop = useIsDesktopWeb()
 
@@ -1249,7 +1251,7 @@ export default function SearchScreen({ navigation }: Props) {
         <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
           <CdnSvg uri={ICON_BACK} width={24} height={24} />
         </Pressable>
-        <Text style={s.headerTitle}>
+        <Text style={[s.headerTitle, { fontFamily: langFonts.medium }]}>
           {eventType === 'filter' ? t('FILTER.FILTER_HEADER') : t('FILTER.PP_HEADER')}
         </Text>
         {/* Angular: search.component.html gates Reset on
@@ -1270,7 +1272,7 @@ export default function SearchScreen({ navigation }: Props) {
             accessibilityRole="button"
             accessibilityState={{ disabled: !anyFieldEdited || resetting }}
           >
-            <Text style={[s.resetText, !anyFieldEdited && s.resetTextDisabled]}>
+            <Text style={[s.resetText, !anyFieldEdited && s.resetTextDisabled, { fontFamily: langFonts.regular }]}>
               {t('FILTER.RESET_HEADER')}
             </Text>
           </Pressable>
@@ -1280,7 +1282,7 @@ export default function SearchScreen({ navigation }: Props) {
       <ScrollView style={s.flex1} contentContainerStyle={s.scrollContent} showsVerticalScrollIndicator={false}>
         {/* {eventType !== 'filter' && (
           <View style={s.subHeader}>
-            <Text style={s.subHeaderText}>{t('FILTER.FILTER_SUB_HEADER')}</Text>
+            <Text style={[s.subHeaderText, { fontFamily: langFonts.regular }]}>{t('FILTER.FILTER_SUB_HEADER')}</Text>
           </View>
         )} */}
 
@@ -1288,10 +1290,10 @@ export default function SearchScreen({ navigation }: Props) {
             Preference mode only (same gate as the sub-header above). */}
         {eventType !== 'filter' && (
           <View style={s.strictBanner}>
-            <Text style={s.strictBannerTitle}>{t(STRICT_FILTERS_TITLE)}</Text>
-            <Text style={s.strictBannerDesc}>{t(STRICT_FILTERS_NOTE)}</Text>
+            <Text style={[s.strictBannerTitle, { fontFamily: langFonts.semiBold }]}>{t(STRICT_FILTERS_TITLE)}</Text>
+            <Text style={[s.strictBannerDesc, { fontFamily: langFonts.regular }]}>{t(STRICT_FILTERS_NOTE)}</Text>
             <Pressable style={s.manageStrictBtn} onPress={() => setManageStrictOpen(true)} accessibilityRole="button">
-              <Text style={s.manageStrictBtnText}>{t(MANAGE_FILTER_CTA)}</Text>
+              <Text style={[s.manageStrictBtnText, { fontFamily: langFonts.regular }]}>{t(MANAGE_FILTER_CTA)}</Text>
             </Pressable>
           </View>
         )}
@@ -1318,11 +1320,11 @@ export default function SearchScreen({ navigation }: Props) {
                 <CdnSvg uri={FIELD_ICON[row.key]} width={24} height={24} style={s.rowIcon} />
                 <View style={s.rowText}>
                   <View style={s.rowLabelLine}>
-                    <Text style={s.rowLabel}>{row.label}</Text>
+                    <Text style={[s.rowLabel, { fontFamily: langFonts.regular }]}>{row.label}</Text>
                     {/* Angular: `<span class="ml-8"><div class="red-dot"></div></span>` */}
                     {edited && <View style={s.editedDot} accessibilityElementsHidden importantForAccessibility="no" />}
                   </View>
-                  <Text style={s.rowValue} numberOfLines={1}>
+                  <Text style={[s.rowValue, { fontFamily: langFonts.medium }]} numberOfLines={1}>
                     {(rowValue as any)[row.key]}
                   </Text>
                 </View>
@@ -1371,7 +1373,7 @@ export default function SearchScreen({ navigation }: Props) {
           {countLoading ? (
             <ActivityIndicator color={Colors.white} />
           ) : (
-            <Text style={s.applyText}>
+            <Text style={[s.applyText, { fontFamily: langFonts.regular }]}>
               {(matchCount === 1 ? t('FILTER.FILTER_SHOW_MATCH_CTA') : t('FILTER.FILTER_SHOW_MATCHES_CTA'))
                 .replace('#MATCHESCOUNT#', String(matchCount))}
             </Text>

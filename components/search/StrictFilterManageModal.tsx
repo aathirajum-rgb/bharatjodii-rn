@@ -17,6 +17,7 @@ import {
 } from '../../constants/strictFilter.config'
 import type { FieldKey } from '../../screens/search/SearchScreen'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // Close icon: revamp-img/close-icon-gray.svg — what Angular's own
 // manageStrictFilter header uses (search.component.html:9,
@@ -56,6 +57,7 @@ export default function StrictFilterManageModal({
   matchCount, countLoading, onShowMatches,
 }: StrictFilterManageModalProps) {
   const insets = useSafeAreaInsets()
+  const langFonts = useLanguageFonts()
   const { t } = useTranslation()
 
   return (
@@ -71,8 +73,8 @@ export default function StrictFilterManageModal({
         </View>
 
         <ScrollView contentContainerStyle={s.content} showsVerticalScrollIndicator={false}>
-          <Text style={s.title}>{t(STRICT_FILTERS_TITLE)}</Text>
-          <Text style={s.subtitle}>{t(STRICT_FILTERS_NOTE)}</Text>
+          <Text style={[s.title, { fontFamily: langFonts.semiBold }]}>{t(STRICT_FILTERS_TITLE)}</Text>
+          <Text style={[s.subtitle, { fontFamily: langFonts.regular }]}>{t(STRICT_FILTERS_NOTE)}</Text>
 
           <View style={s.list}>
             {VISIBLE_FIELDS.map((key, i) => {
@@ -90,8 +92,8 @@ export default function StrictFilterManageModal({
                   <View style={s.rowLeft}>
                     <CdnSvg uri={fieldIcon[key]} width={24} height={24} />
                     <View style={s.rowText}>
-                      <Text style={s.rowLabel}>{fieldLabel[key]}</Text>
-                      <Text style={s.rowValue} numberOfLines={1}>{fieldValue[key]}</Text>
+                      <Text style={[s.rowLabel, { fontFamily: langFonts.regular }]}>{fieldLabel[key]}</Text>
+                      <Text style={[s.rowValue, { fontFamily: langFonts.medium }]} numberOfLines={1}>{fieldValue[key]}</Text>
                     </View>
                   </View>
                   <View style={s.rowRight}>
@@ -118,9 +120,9 @@ export default function StrictFilterManageModal({
         </ScrollView>
 
         <View style={[s.footer, { paddingBottom: insets.bottom + 16 }]}>
-          <Text style={s.footerNote}>{t(FILTER_CTA_NOTE)}</Text>
+          <Text style={[s.footerNote, { fontFamily: langFonts.regular }]}>{t(FILTER_CTA_NOTE)}</Text>
           <Pressable style={s.showMatchesBtn} onPress={onShowMatches} disabled={countLoading}>
-            <Text style={s.showMatchesText}>
+            <Text style={[s.showMatchesText, { fontFamily: langFonts.regular }]}>
               {countLoading ? '…' : `Show ${matchCount.toLocaleString('en-IN')} matches`}
             </Text>
           </Pressable>
