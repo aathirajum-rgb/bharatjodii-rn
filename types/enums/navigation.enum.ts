@@ -59,6 +59,8 @@ export enum ENavigation {
   EDIT_FORM              = 'editform',
   CHAT_WINDOW            = 'chat-window',
   VERIFY_ID              = 'verify-id',
+  // Angular: verify-id?frm_page=notify's <app-id-verify> intermediate (landing page_id 7)
+  ID_VERIFY_INTERMEDIATE = 'id-verify-intermediate',
   HOROSCOPE              = 'horoscope',
   RECHARGE               = 'recharge',
   RENEWAL                = 'renewal',

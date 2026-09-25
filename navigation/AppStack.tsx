@@ -94,6 +94,7 @@ import DailyRecommendationScreen   from '../screens/daily-recommendation/DailyRe
 import ViewProfileScreen           from '../screens/viewprofile/ViewProfileScreen'
 import BlockerScreen               from '../screens/verify/BlockerScreen'
 import VerifyIdScreen               from '../screens/verify/VerifyIdScreen'
+import IdVerifyIntermediateScreen   from '../screens/verify/IdVerifyIntermediateScreen'
 import SelfieVerificationScreen     from '../screens/verify/SelfieVerificationScreen'
 import PhotoMismatchSelfieScreen    from '../screens/verify/PhotoMismatchSelfieScreen'
 import MenuContactsScreen           from '../screens/menu-contacts/MenuContactsScreen'
@@ -275,6 +276,9 @@ export type AppStackParamList = {
   // Angular: pages/verify-id — STUB (see screens/verify/VerifyIdScreen.tsx),
   // real govt-ID verification flow not ported yet.
   'verify-id': undefined
+  // Angular: components/id-verify (verify-id?frm_page=notify) — "verify your
+  // profile to activate paid membership" landing, see drService.ts case '7'.
+  'id-verify-intermediate': undefined
   // Angular: pages/selfie-verification (see screens/verify/SelfieVerificationScreen.tsx)
   // — reached from BlockerScreen.tsx's selfie row.
   'selfie-verification': undefined
@@ -707,6 +711,11 @@ export default function AppStack() {
         options={{ gestureEnabled: false }}
       />
       <Stack.Screen name="verify-id" component={VerifyIdScreen} />
+      <Stack.Screen
+        name="id-verify-intermediate"
+        component={IdVerifyIntermediateScreen}
+        options={{ gestureEnabled: false }}
+      />
       <Stack.Screen name="selfie-verification" component={SelfieVerificationScreen} />
       <Stack.Screen name="photo-mismatch-selfie" component={PhotoMismatchSelfieScreen} />
       <Stack.Screen name="my-membership" component={MenuContactsScreen} />
