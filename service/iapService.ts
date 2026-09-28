@@ -63,16 +63,17 @@ export interface IosPackageCatalogEntry {
 }
 
 // ─── Package catalog (backend) ──────────────────────────────────────────────
-// GET .../iospayment/iospackagelogin/{userId} — the App Store product IDs
+// GET .../iospackagelogin/v1?ID={userId}&CN=... — the App Store product IDs
 // this account is allowed to buy. This decides *which* SKUs to ask StoreKit
-// about; it is not itself a StoreKit call and carries no price.
+// about; it is not itself a StoreKit call and carries no price. userId rides
+// as the ID query param, not a path segment — see Endpoints.payment.iosPackageLogin.
 export async function fetchIosPackages(): Promise<IosPackageCatalogEntry[]> {
   const userId = await getItem(SK.Auth.USER_ID)
   if (!userId) return []
 
   const cn = (await getSessionValue('IPCOUNTRYCODE')) ?? 'IN'
   const params = `CN=${cn}&ID=${userId}`
-  const result = await apiCall(`${Endpoints.payment.iosPackageLogin}/${userId}`, 'GET', params)
+  const result = await apiCall(Endpoints.payment.iosPackageLogin, 'GET', params)
   return Array.isArray(result?.RESPONSE?.PRODUCTIDS) ? result.RESPONSE.PRODUCTIDS : []
 }
 
@@ -108,8 +109,11 @@ export async function attachIosProductIds(data: MembershipPlansData): Promise<Me
   const catalog = await fetchIosPackages()
   if (catalog.length === 0) return data
   const byPackKey = new Map(catalog.map(entry => [entry.PACKKEY, entry.PACKAGEID]))
+  // TEMP diagnostic — remove once the join-mismatch report is root-caused.
+  console.log('[iapService] catalog PACKKEYs:', catalog.map(e => ({ value: e.PACKKEY, type: typeof e.PACKKEY })))
   const attach = (plan: MembershipPlansData['plans'][number]) => {
     const iosProductId = byPackKey.get(plan.productid)
+    console.log('[iapService] plan lookup:', { productid: plan.productid, type: typeof plan.productid, matched: !!iosProductId })
     return iosProductId ? { ...plan, iosProductId } : plan
   }
   return { ...data, plans: data.plans.map(attach), allPlans: data.allPlans.map(attach) }

@@ -61,7 +61,17 @@ export function NetworkProvider({ children }: { children: React.ReactNode }) {
     setState(toState(s))
   }
 
-  const isOffline = state.isReady && (!state.isConnected || state.isInternetReachable === false)
+  // Was also gated on `isInternetReachable === false` (meant to catch a wifi
+  // captive portal with no real connectivity) until 2026-09-25, when a real
+  // device on working wifi (plans/API calls succeeding) reproducibly got
+  // isConnected=true, isInternetReachable=false — a false positive that
+  // silently blocked Pay on RechargeScreen (and identically guarded actions
+  // on 8 other screens: the other payment screens, MatchesScreen, both
+  // gallery uploaders). isInternetReachable's background reachability probe
+  // is too unreliable on real networks to gate real actions on; a genuine
+  // connectivity failure still surfaces via each action's own API error
+  // handling, so this no longer doubles as a second, flakier gate.
+  const isOffline = state.isReady && !state.isConnected
 
   return (
     <NetworkContext.Provider value={{ ...state, isOffline, refresh }}>

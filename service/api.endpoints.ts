@@ -165,12 +165,13 @@ export const Endpoints = {
     upiAutoPay:          `${payNg}payment/nbupiautopay`,
     upiPayLink:          `${api}payment/nbupipaylink/v1`,
     autopayRefund:       `${api}payment/autopayrefund/v1`,
-    // iOS StoreKit package catalog — GET .../iospackagelogin/{userId}. Returns
-    // { CountryCode, CurrencyCode, ProductArray: [{ ProductId, Price, LocalPrice }] }.
-    // See service/iapService.ts fetchIosPackages(). No verify/activate-membership
-    // endpoint exists yet for iOS receipts — that contract is still pending from
-    // backend (see verifyAndActivateIosMembership() in the same file).
-    iosPackageLogin:     `${payNg}iospayment/iospackagelogin`,
+    // iOS StoreKit package catalog — GET .../iospackagelogin/v1?ID={userId}&CN=...
+    // Returns { RESPONSE: { PRODUCTIDS: [{PACKKEY, PACKAGEID}] } }, no price
+    // (see service/iapService.ts fetchIosPackages()). Confirmed real domain
+    // 2026-09-25 via live capture: pay (stgoapi), not payNg — payNg's
+    // iospayment/iospackagelogin/{userId} path returns stale/duplicate
+    // PACKAGEIDs from an old backend instance, not the real per-tier ones.
+    iosPackageLogin:     `${pay}payment/iospackagelogin/v1`,
     // src/nbpayment (JODII-535) — App Store Server API transaction
     // verification + membership activation. Confirmed real domain from a
     // live capture: pay (stgoapi), not payNg.
