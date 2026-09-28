@@ -15,7 +15,7 @@ import { Colors } from '../../constants/colors'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
 import type { ContactGating } from '../../hooks/useContactGating'
 import type { LikedTab } from './ActivityScreen'
-import { Fonts, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { CDN_SVG } from '../../constants/cdn'
 
@@ -65,6 +65,7 @@ export default function ActivityDesktopLayout({
   onGetPaidMembership, onLanguagePress, onTabPress, children,
 }: ActivityDesktopLayoutProps) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   function renderItem({ item }: { item: MatchProfile }) {
     return (
@@ -112,7 +113,7 @@ export default function ActivityDesktopLayout({
           narrow content column instead — confirmed via a live screenshot
           comparison against this Figma frame. */}
       <View style={ds.headerWrap}>
-        <Text style={ds.title}>{t('GENERAL.ICON_3')}</Text>
+        <Text style={[ds.title, { fontFamily: langFonts.semiBold }]}>{t('GENERAL.ICON_3')}</Text>
 
         <View style={ds.tabRow}>
           {(['likedyou', 'likesent'] as LikedTab[]).map(tab => {
@@ -124,10 +125,10 @@ export default function ActivityDesktopLayout({
                 style={[ds.chip, isActive && ds.chipActive]}
                 onPress={() => onSwitchTab(tab)}
               >
-                <Text style={ds.chipLabel}>{tabLabel(tab)}</Text>
+                <Text style={[ds.chipLabel, { fontFamily: langFonts.regular }]}>{tabLabel(tab)}</Text>
                 {unread > 0 && (
                   <View style={ds.unreadBadge}>
-                    <Text style={ds.unreadBadgeText}>{unread}</Text>
+                    <Text style={[ds.unreadBadgeText, { fontFamily: langFonts.semiBold }]}>{unread}</Text>
                   </View>
                 )}
               </Pressable>
@@ -138,11 +139,11 @@ export default function ActivityDesktopLayout({
         {!isPaid && current.total > 0 && (
           <View style={ds.banner}>
             <View>
-              <Text style={ds.bannerTitle}>{bannerTitle}</Text>
-              <Text style={ds.bannerSub}>{t('VERIFY_ID_DOC.BECOMEPAIDMEMBER')}</Text>
+              <Text style={[ds.bannerTitle, { fontFamily: langFonts.semiBold }]}>{bannerTitle}</Text>
+              <Text style={[ds.bannerSub, { fontFamily: langFonts.regular }]}>{t('VERIFY_ID_DOC.BECOMEPAIDMEMBER')}</Text>
             </View>
             <Pressable style={ds.bannerBtn} onPress={onGetPaidMembership}>
-              <Text style={ds.bannerBtnLabel}>{t('GENERAL.BECOME_PAID')}</Text>
+              <Text style={[ds.bannerBtnLabel, { fontFamily: langFonts.medium }]}>{t('GENERAL.BECOME_PAID')}</Text>
             </Pressable>
           </View>
         )}
@@ -165,10 +166,10 @@ export default function ActivityDesktopLayout({
           ListEmptyComponent={current.loaded ? (
             <View style={ds.emptyBox}>
               <CdnSvg uri={CDN_SVG + 'liked_profiles_empty.svg'} width={140} height={140} />
-              <Text style={ds.emptyTitle}>
+              <Text style={[ds.emptyTitle, { fontFamily: langFonts.semiBold }]}>
                 {t(activeTab === 'likesent' ? 'LIKE_LIST.NOPROFILE_CONT' : 'LIKE_LIST.NOPROFILE_CONT_1')}
               </Text>
-              <Text style={ds.emptyDesc}>
+              <Text style={[ds.emptyDesc, { fontFamily: langFonts.regular }]}>
                 {t(activeTab === 'likesent' ? 'LIKE_LIST.NOPROFILE_CONT_SUB' : 'LIKE_LIST.NOPROFILE_CONT_1_SUB')}
               </Text>
             </View>
@@ -193,7 +194,7 @@ const ds = StyleSheet.create({
   // outer bounding box — see the comment above the FlatList for why.
   list: { flex: 1, width: '100%' },
   // Figma: heading2-semibold-20, tracking 0.6px (this used 24px/no tracking).
-  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: 20, letterSpacing: 0.6, color: Colors.textDark },
+  title: { fontSize: 20, letterSpacing: 0.6, color: Colors.textDark },
 
   tabRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
   chip: {
@@ -202,24 +203,24 @@ const ds = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)', borderWidth: 1, borderColor: Colors.inputBorder,
   },
   chipActive: { backgroundColor: Colors.chipSurfaceSelected, borderColor: Colors.chipBorderActive },
-  chipLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textDark },
+  chipLabel: { fontSize: 14, color: Colors.textDark },
   unreadBadge: {
     minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
     backgroundColor: Colors.primary, alignItems: 'center', justifyContent: 'center',
   },
-  unreadBadgeText: { fontFamily: Fonts.poppinsSemiBold, fontSize: 11, color: Colors.white },
+  unreadBadgeText: { fontSize: 12, color: Colors.white },
 
   banner: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     backgroundColor: 'rgba(181, 0, 51, 0.05)', borderRadius: 8, padding: 16, marginTop: 16,
   },
-  bannerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 16, color: Colors.textPrimary },
-  bannerSub: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textMedium, marginTop: 4 },
+  bannerTitle: { fontSize: 16, color: Colors.textPrimary },
+  bannerSub: { fontSize: 14, color: Colors.textMedium, marginTop: 4 },
   bannerBtn: {
     borderWidth: 1.5, borderColor: Colors.primary, borderRadius: 6,
     paddingHorizontal: 16, paddingVertical: 10,
   },
-  bannerBtnLabel: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontSize: 14, color: Colors.primary },
+  bannerBtnLabel: { fontSize: 14, color: Colors.primary },
 
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   listContent: {
@@ -234,6 +235,6 @@ const ds = StyleSheet.create({
 
   footerLoader: { marginVertical: 16 },
   emptyBox: { alignItems: 'center', justifyContent: 'center', paddingTop: 80, gap: 6 },
-  emptyTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: 18, color: Colors.textDark, textAlign: 'center' },
-  emptyDesc: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: 14, color: Colors.textDark, textAlign: 'center' },
+  emptyTitle: { fontSize: 18, color: Colors.textDark, textAlign: 'center' },
+  emptyDesc: { fontSize: 14, color: Colors.textDark, textAlign: 'center' },
 })

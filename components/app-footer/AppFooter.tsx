@@ -8,7 +8,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { getMenuPromo } from '../../service/paymentService'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
-import { Fonts, FontSize, RupeeSymbolFont, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { FontSize, RupeeSymbolFont } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── TEMP local preview of the re-exported Messages icon pair ─────────────────
 // The corrected message-matches(.svg/_active.svg) files (same artwork/padding
@@ -113,9 +114,10 @@ const TAB_ORDER: FooterTab[] = [0, 1, 2, 4, 3]
 // (`count > 9 ? '9+' : count`) for Activity and :835/873/899 for Home. The
 // badge is a small circle sized for two glyphs; three digits overflowed it.
 function CountBadge({ count }: { count: number }) {
+  const langFonts = useLanguageFonts()
   return (
     <View style={styles.countBadge}>
-      <Text style={styles.countText} numberOfLines={1}>
+      <Text style={[styles.countText, { fontFamily: langFonts.regular }]} numberOfLines={1}>
         {count > 9 ? '9+' : String(count)}
       </Text>
     </View>
@@ -137,6 +139,7 @@ export default function AppFooter({
 }: AppFooterProps) {
   const insets = useSafeAreaInsets()
   const { t, i18n } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   // Angular: footer.component.ts:97-100 — the FOOTER ITSELF loads the discount
   // chip (paymentService.getMenuPromo(0) → MENUDISCOUNT), which is why it shows
@@ -246,11 +249,14 @@ export default function AppFooter({
               <Text
                 style={[
                   styles.tabLabel,
+                  { fontFamily: langFonts.regular },
                   // Angular: every label is `pt-4` except Message, which is `pt-2`.
                   tab === 4 && styles.tabLabelMessage,
                   isActive && styles.tabLabelActive,
                 ]}
-                numberOfLines={3}
+                numberOfLines={label.includes('\n') ? 2 : 1}
+                adjustsFontSizeToFit={!label.includes('\n')}
+                minimumFontScale={0.8}
               >
                 {label}
               </Text>
@@ -315,7 +321,6 @@ const styles = StyleSheet.create({
   // swaps color to var(--pink) = #B50033 — it does NOT change weight/family,
   // so the active label stays Poppins-Regular too.
   tabLabel: {
-    fontFamily: SemanticFontsEnglish.bottomnavEnglishRegular,
     fontSize:   FontSize.font10,
     color:      '#1F1E1B',
     marginTop:  4,
@@ -347,7 +352,6 @@ const styles = StyleSheet.create({
   // (0.5rem, scales with device width) + font-family var(--english-regular-
   // poppins) = Poppins-Regular; no semibold class is applied to these badges.
   countText: {
-    fontFamily: Fonts.poppinsRegular,
     color:      Colors.white,
     fontSize:   FontSize.font8,
     lineHeight: 12,
