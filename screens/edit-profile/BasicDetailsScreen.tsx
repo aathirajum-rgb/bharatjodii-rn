@@ -34,7 +34,7 @@ import { Colors } from '../../constants/colors'
 import { Fonts, FontSize } from '../../src/theme/fonts'
 import { CDN_REACT } from '../../constants/cdn'
 import { fetchEditProfileInfo, submitFieldChanges, type FieldChange } from '../../service/editProfileService'
-import { fetchMotherTongueOptions, fetchStates, fetchCities, fetchHomeTownDomain } from '../../service/registrationService'
+import { fetchMotherTongueOptions, fetchStates, fetchCities, fetchHomeTownDomain, storeUserName } from '../../service/registrationService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import SelectField from '../../components/input/SelectField'
 import FloatingLabelInput, { validateName } from '../../components/input/FloatingLabelInput'
@@ -211,6 +211,7 @@ export default function BasicDetailsScreen({ navigation: _navigation }: Props) {
     }
 
     const result = await submitFieldChanges(changes)
+    if (result.succeeded.includes('NAME')) await storeUserName(name)
     setSubmitting(false)
 
     if (result.failed.length > 0) {

@@ -45,6 +45,8 @@ const SELECT_ICON_SIZE = Math.round(Dimensions.get('window').width * 0.0525)
 // not a plain "›" text glyph — same traced SVG + 24x24/black convention as
 // LocationScreen.tsx / MotherTongueScreen.tsx use for the identical icon.
 const CHEVRON_FORWARD_XML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><path fill="none" stroke="#000000" stroke-linecap="round" stroke-linejoin="round" stroke-width="48" d="M184 112l144 144-144 144"/></svg>`
+// Same chevron, greyed for the read-only Date of birth field.
+const CHEVRON_FORWARD_MUTED_XML = CHEVRON_FORWARD_XML.replace('#000000', Colors.textPlaceholder)
 
 // Fallback only, same as DOBScreen.tsx — used until fetchMonthOptions() resolves.
 const MONTH_FALLBACK = [
@@ -100,6 +102,10 @@ export default function HoroscopeBirthDetailsScreen({ navigation }: Props) {
   const [months,   setMonths]   = useState(MONTH_FALLBACK)
   const [apiYears, setApiYears] = useState<Option[] | null>(null)
   const [apiDates, setApiDates] = useState<Option[] | null>(null)
+  // True when page 5 saved a full DOB (not just an age — DOBScreen's age path
+  // blanks DATE/MONTH/YEAR). DOB is then shown as a read-only field with
+  // GENERATEHOROSCOPESUBTITLE under it instead of the editable triplet.
+  const [dobLocked, setDobLocked] = useState(false)
 
   const [pickerField, setPickerField] = useState<DateField | null>(null)
   const dateRef  = useRef<View>(null)
@@ -125,6 +131,7 @@ export default function HoroscopeBirthDetailsScreen({ navigation }: Props) {
       if (rv.DATE)  setSelDate(String(Number(rv.DATE)))
       if (rv.MONTH) setSelMonth(String(Number(rv.MONTH)))
       if (rv.YEAR)  setSelYear(rv.YEAR)
+      setDobLocked(!!(rv.DATE && rv.MONTH && rv.YEAR))
     })
   }, [])
 
@@ -327,6 +334,11 @@ export default function HoroscopeBirthDetailsScreen({ navigation }: Props) {
   const monthPlaceholder = t('REGISTRATION.MONTH', 'Month')
   const yearPlaceholder  = t('REGISTRATION.YEAR',  'Year')
   const selMonthLabel    = months.find(m => m.key === selMonth)?.label ?? ''
+  const dobDisplay       = [selDate.padStart(2, '0'), selMonthLabel, selYear].join(' ')
+  const dobProvidedText  = t('REGISTRATION.GENERATEHOROSCOPESUBTITLE', 'You have already provided your #PROFILETYPE# date of birth')
+    .replace('#PROFILETYPE#', translatedProfileType)
+    .replace('  ', ' ')
+    .trim()
 
   const pickerOptions = pickerField ? getDateOptions(pickerField) : []
   const currentPickerVal = pickerField ? getCurrentDateVal(pickerField) : ''
@@ -371,9 +383,23 @@ export default function HoroscopeBirthDetailsScreen({ navigation }: Props) {
               langFonts={langFonts}
             />
 
-            {/* Date / Month / Year — same dropdown-trigger fields as DOBScreen.tsx
-                (page 5), pre-filled from the already-saved DOB and still editable
-                (Angular: isCheckValidValue()/showDobList() on currentPageType == '30'). */}
+            {dobLocked ? (
+              <View style={styles.lockedDob}>
+                <FloatField
+                  label={t('VERIFY_ID.PASSPORT_DOB', 'Date of birth')}
+                  value={dobDisplay}
+                  placeholder=""
+                  onPress={() => {}}
+                  hasValue
+                  disabled
+                  muted
+                  langFonts={langFonts}
+                />
+                <Text style={[styles.lockedDobText, { fontFamily: langFonts.regular }]}>{dobProvidedText}</Text>
+              </View>
+            ) : (
+            /* Date / Month / Year — same dropdown-trigger fields as DOBScreen.tsx
+               (page 5), shown when page 5 only captured an age. */
             <View style={styles.dateRow}>
               {(
                 [
@@ -408,6 +434,7 @@ export default function HoroscopeBirthDetailsScreen({ navigation }: Props) {
                 )
               })}
             </View>
+            )}
           </View>
         )}
       </ScrollView>
@@ -471,20 +498,22 @@ type FloatFieldProps = {
   hasValue: boolean
   disabled?: boolean
   loading?: boolean
+  // Greyed read-only look (light border, grey text/label/chevron).
+  muted?: boolean
   langFonts: ReturnType<typeof useLanguageFonts>
 }
 
-function FloatField({ label, value, placeholder, onPress, hasValue, disabled, loading, langFonts }: FloatFieldProps) {
+function FloatField({ label, value, placeholder, onPress, hasValue, disabled, loading, muted, langFonts }: FloatFieldProps) {
   return (
     <View style={floatStyles.wrapper}>
       <Pressable
-        style={floatStyles.field}
+        style={[floatStyles.field, muted && floatStyles.fieldMuted]}
         onPress={disabled ? undefined : onPress}
         accessibilityRole="button"
         accessibilityLabel={label}
       >
         <Text
-          style={[floatStyles.value, !hasValue && floatStyles.placeholder, { fontFamily: hasValue ? langFonts.medium : langFonts.regular }]}
+          style={[floatStyles.value, !hasValue && floatStyles.placeholder, muted && floatStyles.textMuted, { fontFamily: hasValue && !muted ? langFonts.medium : langFonts.regular }]}
           numberOfLines={1}
         >
           {hasValue ? value : placeholder}
@@ -492,13 +521,13 @@ function FloatField({ label, value, placeholder, onPress, hasValue, disabled, lo
         {loading ? (
           <ActivityIndicator size={16} color={Colors.textSecondary} style={{ marginRight: 4 }} />
         ) : (
-          <SvgXml xml={CHEVRON_FORWARD_XML} width={24} height={24} />
+          <SvgXml xml={muted ? CHEVRON_FORWARD_MUTED_XML : CHEVRON_FORWARD_XML} width={24} height={24} />
         )}
       </Pressable>
 
       {hasValue && (
         <View style={floatStyles.labelWrap}>
-          <Text style={[floatStyles.labelText, { fontFamily: langFonts.regular }]}>{label}</Text>
+          <Text style={[floatStyles.labelText, muted && floatStyles.textMuted, { fontFamily: langFonts.regular }]}>{label}</Text>
         </View>
       )}
     </View>
@@ -511,6 +540,13 @@ const styles = StyleSheet.create({
   loader: { marginTop: 48 },
   // 32px between every field, including title-to-first-field
   fieldsContainer: { gap: 32 },
+
+  // Read-only DOB field + "You have already provided…" line under it.
+  lockedDob: { gap: 8 },
+  lockedDobText: {
+    fontSize: FontSize.font12,
+    color:    Colors.black,
+  },
 
   // ── Date/Month/Year row — same layout as DOBScreen.tsx's fieldsRow/field ──
   dateRow: {
@@ -610,6 +646,13 @@ const floatStyles = StyleSheet.create({
   },
   placeholder: {
     fontWeight: '400',
+  },
+  fieldMuted: {
+    borderColor: Colors.border,
+  },
+  textMuted: {
+    fontWeight: '400',
+    color:      Colors.textPlaceholder,
   },
   labelWrap: {
     position:          'absolute',

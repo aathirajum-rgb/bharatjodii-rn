@@ -682,6 +682,7 @@ const shell = StyleSheet.create({
     alignItems:      'center',
     justifyContent:  'center',
     paddingVertical: 12,
+    marginTop:       8,
   },
   // Angular: the skip CTA's app-button-revamp also has no [ctaFontSize] override
   // (default .body2-regular-14 → font14/Regular/400); textColor is

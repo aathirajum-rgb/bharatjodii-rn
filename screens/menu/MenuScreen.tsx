@@ -18,7 +18,6 @@ import { Image } from 'expo-image'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
 import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
-import { PRIVACY_POLICY_URL, TERMS_CONDITIONS_URL } from '../../constants/webLinks'
 import { EnvConfig } from '../../constants/env'
 import { StorageKeys } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
@@ -39,7 +38,6 @@ import WebPhotoInput from '../../components/add-photo/WebPhotoInput'
 import AddPhotoVerdictSheets from '../../components/add-photo/AddPhotoVerdictSheets'
 import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
-import LanguagePillSheet from '../../components/language-pill/LanguagePillSheet'
 import { Fonts, FontSize } from '../../src/theme/fonts'
 import ScreenTopInset from '../../components/screen/ScreenTopInset'
 
@@ -70,6 +68,8 @@ export const ICON = {
   privacy:       R + 'settings_privacy_ploicy.svg',
   terms:         R + 'settings_terms_condition.svg',
   logout:        R + 'settings_logout.svg',
+  // Menu's Settings row (opens SettingsScreen.tsx).
+  settings:      CDN_SVG + 'photo-privacy.svg',
   logoutSheet:   R + 'bottomsheet_logout.svg',
   // Expired-membership banner glyph. Hyphenated, unlike the underscore names
   // above — that's how it is on the server (react/expired-alert.svg, 44x44).
@@ -238,13 +238,6 @@ export default function MenuScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
 
-  // Angular: Menu's own languageChange() opens LanguageSelectionComponent as a
-  // real modal overlay (ModalController), not a page push — React Navigation's
-  // presentation:'modal' (still used by the LanguageSelection route for
-  // onboarding) is a full-screen page with a different transition, not a true
-  // popup. This local sheet replaces the navigate() call below for Menu only.
-  const [showLanguageSheet, setShowLanguageSheet] = useState(false)
-
   const [userName,      setUserName]      = useState('')
   const [userId,        setUserId]        = useState('')
   const [photoUrl,      setPhotoUrl]      = useState('')
@@ -256,10 +249,6 @@ export default function MenuScreen({ navigation }: Props) {
   const [photoFailed,     setPhotoFailed]     = useState(false)
   const [entryType,     setEntryType]     = useState('')
   const [isVerified,    setIsVerified]    = useState(false)
-  // Angular: menu.page.html:233 — *ngIf="LOGINGENDER !== 'M'" gates the Phone
-  // Privacy row (SettingsScreen.tsx's desktop-only sibling already tracks this
-  // same flag under the name `isFemale`).
-  const [isFemale,      setIsFemale]      = useState(false)
   const [membershipExp, setMembershipExp] = useState('')
   const [appVersion,    setAppVersion]    = useState('')
   const [logoutSheetVisible, setLogoutSheetVisible] = useState(false)
@@ -296,14 +285,12 @@ export default function MenuScreen({ navigation }: Props) {
       // MAX_PHOTOS cap counts photos the member already has — passing 0 would
       // let them add a full set on top of an existing one.
       getItem('PHOTOCOUNT'),
-      getItem(StorageKeys.User.LOGIN_GENDER),
-    ]).then(([session, id, photo, ver, ekyc, photoCnt, gender]) => {
+    ]).then(([session, id, photo, ver, ekyc, photoCnt]) => {
       if (cancelled) return
       setUserName(String(session['NAME'] ?? ''))
       setUserId(id ?? '')
       setPhotoUrl(photo ?? '')
       setPhotoCount(Number(photoCnt ?? 0) || 0)
-      setIsFemale(gender !== 'M')
       // A newly arrived photo clears any earlier load failure, otherwise the
       // placeholder would stick for the life of the mount.
       setPhotoFailed(false)
@@ -602,6 +589,9 @@ export default function MenuScreen({ navigation }: Props) {
         </View>
 
         {/* ── Card 4: Main menu ── */}
+        {/* New menu alignment: Settings (Change language / Phone privacy /
+            Privacy policy / Terms) moved into SettingsScreen.tsx; Delete
+            Profile and Logout stay here, below Contact Customer support. */}
         <View style={s.card}>
           <MenuRow
             icon={ICON.wedding}
@@ -632,46 +622,21 @@ export default function MenuScreen({ navigation }: Props) {
             showDivider
           />
           <MenuRow
-            icon={ICON.support}
-            title={t('GENERAL.NEED_HELP')}
-            onPress={() => navigation.navigate('HelpCenter')}
-          />
-        </View>
-
-        {/* ── Card 5: Settings (merged from the old SettingsScreen) ── */}
-        <View style={s.card}>
-          <MenuRow
-            icon={ICON.language}
-            title={t('MENU.TTTLE_6')}
-            onPress={() => setShowLanguageSheet(true)}
+            icon={ICON.settings}
+            title={t('MENU.SETTINGS')}
+            onPress={() => navigation.navigate('Settings')}
             showDivider
           />
-          {isFemale && (
-            <MenuRow
-              icon={ICON.phonePrivacy}
-              title={t('MENU.PHONE_PRIVACY')}
-              onPress={() => navigation.navigate('PhonePrivacy')}
-              showDivider
-            />
-          )}
+          <MenuRow
+            icon={ICON.support}
+            title={t('MENU.CUSTOMER_SUPPORT')}
+            onPress={() => navigation.navigate('HelpCenter')}
+            showDivider
+          />
           <MenuRow
             icon={ICON.deleteAccount}
             title={t('ACCOUNT.DEL_PRO')}
             onPress={() => navigation.navigate('DeleteProfile')}
-            showDivider
-          />
-          <MenuRow
-            icon={ICON.privacy}
-            iconSize={18}
-            title={t('ACCOUNT.PRIVACY_POLICY')}
-            onPress={() => navigation.navigate('ExternalPage', { url: PRIVACY_POLICY_URL, title: t('ACCOUNT.PRIVACY_POLICY') })}
-            showDivider
-          />
-          <MenuRow
-            icon={ICON.terms}
-            iconSize={18}
-            title={t('REGISTRATION.TERMSANDCONDITIONS')}
-            onPress={() => navigation.navigate('ExternalPage', { url: TERMS_CONDITIONS_URL, title: t('REGISTRATION.TERMSANDCONDITIONS') })}
             showDivider
           />
           <MenuRow
@@ -692,12 +657,6 @@ export default function MenuScreen({ navigation }: Props) {
         visible={logoutSheetVisible}
         onYes={handleConfirmLogout}
         onNo={() => setLogoutSheetVisible(false)}
-      />
-
-      <LanguagePillSheet
-        visible={showLanguageSheet}
-        onClose={() => setShowLanguageSheet(false)}
-        allLanguages
       />
 
       {/* Native photo picker — embedded, not a navigate(), so finishing an

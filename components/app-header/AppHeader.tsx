@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Dimensions, Pressable, StyleSheet, Text, View, type StyleProp, type TextStyle, type ViewStyle } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { SvgXml } from 'react-native-svg'
 import CdnSvg, { CdnImage } from '../cdn-svg/CdnSvg'
 import Badge from '../badge/Badge'
@@ -169,6 +169,7 @@ export default function AppHeader({
 }: AppHeaderProps) {
   const { t, i18n } = useTranslation()
   const langFonts = useLanguageFonts()
+  const insets = useSafeAreaInsets()
 
   // Resolve language label for the registration/signIn pill only — header1
   // (home/dashboard) now renders <LanguagePill>, which computes its own
@@ -345,8 +346,12 @@ export default function AppHeader({
   }
 
   // ── registration / signIn ──────────────────────────────────────────────────
+  // Top inset from useSafeAreaInsets() rather than the native SafeAreaView:
+  // inside OnboardingRouter's KeyboardAvoidingView the native view mounted
+  // with 0 top padding (header under the status bar, back button hidden, page
+  // shifted up) until focusing an input forced a relayout.
   return (
-    <SafeAreaView edges={['top']} style={styles.h1SafeArea}>
+    <View style={[styles.h1SafeArea, { paddingTop: insets.top }]}>
     <View style={[styles.wrapperAuth, style]}>
       <View style={styles.authRow}>
         {showBackBtn && (
@@ -371,7 +376,7 @@ export default function AppHeader({
         )}
       </View>
     </View>
-    </SafeAreaView>
+    </View>
   )
 }
 

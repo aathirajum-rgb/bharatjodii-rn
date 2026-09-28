@@ -39,7 +39,7 @@ import { Image } from 'expo-image'
 import * as ImagePicker from 'expo-image-picker'
 import { Colors } from '../../constants/colors'
 import { Fonts, FontSize } from '../../src/theme/fonts'
-import { CDN_REACT, CDN_REVAMP, CDN_SVG } from '../../constants/cdn'
+import { CDN_REACT, CDN_SVG } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem, setItem } from '../../service/storageService'
 import { Endpoints } from '../../service/api.endpoints'
@@ -63,9 +63,10 @@ import {
   fetchStarOptions, fetchMonthlyIncomeOptions, fetchPropertyOptions,
   fetchStates, fetchCities, fetchHeightCategoryOptions,
   fetchMaritalStatusOptions, fetchPhysicalStatusOptions, fetchProfileCreatedByOptions,
-  fetchFamilyOptions, isHomeTownMotherTongue,
+  fetchFamilyOptions, isHomeTownMotherTongue, storeUserName,
 } from '../../service/registrationService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
+import Svg, { Rect } from 'react-native-svg'
 import PhotoPrivacySheet from '../../components/photo-privacy/PhotoPrivacySheet'
 import FieldRestrictedSheet from '../../components/edit-profile/FieldRestrictedSheet'
 import ScreenTopInset from '../../components/screen/ScreenTopInset'
@@ -83,14 +84,28 @@ const ICON_ARROW = CDN_REACT + '/menu_right_arrow.svg'
 const ICON_GUIDELINES = CDN_SVG + 'guidelins.svg'
 const GUIDELINES_ICON = 16
 
-// "Add photos" CTA — Angular: edit-profile.page.html:170-177. Its `.like-icon`
-// class is unreachable here: the only `.like-icon` rules in the project are
-// scoped inside `.button-banner` (global.scss:5052) and inside two
-// style-encapsulated components (button/, modalpopup/), none of which apply to
-// edit-profile.page.html. So the "+" also renders at its intrinsic size —
-// app-photos-edit-profile-img.svg is 18x18, a white stroke-only glyph.
-const ICON_ADD_PHOTO = CDN_SVG + 'app-photos-edit-profile-img.svg'
-const ADD_PHOTO_ICON = 18
+// Red "+" circle on the photo grid's Add Photo / Add More tile.
+const ICON_ADD_CIRCLE = CDN_REACT + '/add_circle.svg'
+const ADD_CIRCLE_ICON = 24
+
+// Add Photo / Add More tile border. Drawn as an SVG rect because RN's
+// borderStyle 'dashed' gives no control over dash length — its short native
+// dashes read as a faint dotted line. Dash 8 / gap 6, 1.5 wide.
+const ADD_DASH = '8 6'
+const ADD_DASH_WIDTH = 1.5
+
+function DashedBorder({ width, height, radius }: { width: number; height: number; radius: number }) {
+  const inset = ADD_DASH_WIDTH / 2
+  return (
+    <Svg width={width} height={height} style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Rect
+        x={inset} y={inset} width={width - ADD_DASH_WIDTH} height={height - ADD_DASH_WIDTH}
+        rx={radius} ry={radius}
+        fill="none" stroke={Colors.inputBorder} strokeWidth={ADD_DASH_WIDTH} strokeDasharray={ADD_DASH}
+      />
+    </Svg>
+  )
+}
 
 // Missing-field warning triangle, shown at the right edge of any row whose
 // value isn't set yet (Figma) — it replaces the grey chevron rather than
@@ -134,22 +149,14 @@ const MISSING_CHEVRON = 16
 // separate change (the data is already parsed as `profile.vehicles`).
 const ROW_ICON = 24
 const R_ICON = {
-  // Jodii ID and Profile created by deliberately reuse two icons that already
-  // appear elsewhere in this same list (mother tongue / name). That is the
-  // requested mapping, not an oversight — it does mean edit_mothertongue.svg
-  // and edit_name.svg each render twice in the Basic details section.
-  jodiiId:        CDN_REACT + '/edit_mothertongue.svg',
+  jodiiId:        CDN_REACT + '/edit_id.svg',
   createdBy:      CDN_REACT + '/edit_name.svg',
   // Angular svg/ tree, not react/. 19x19 intrinsic, stroke #545454 — scaled up
   // to the 24 ROW_ICON box like every other row icon.
   maritalStatus:  CDN_SVG + 'viewprofile/marital-status-icon.svg',
   // 24x24 intrinsic, fill #858585 — already exactly ROW_ICON size.
   physicalStatus: CDN_SVG + 'physical-status.svg',
-  // revamp-img/ tree, not svg/. 20x21 intrinsic, stroke #333 — reads clearly on
-  // the white row background and fits the 24 ROW_ICON box like the others.
-  // Replaces svg/revamp/call-icon-white.svg, which was `stroke="white"` and so
-  // rendered invisible against these rows.
-  mobileNo:       CDN_REVAMP + 'call.svg',
+  mobileNo:       CDN_REACT + '/edit_phone.svg',
 
   name:           CDN_REACT + '/edit_name.svg',
   age:            CDN_REACT + '/edit_age.svg',
@@ -176,9 +183,11 @@ const R_ICON = {
   properties:     CDN_REACT + '/edit_property_owned.svg',
 } as const
 
-// Photo mosaic (Figma node 2192-9135) — 1 large tile (spans 2x2 of the small-
-// tile grid) + 5 small tiles: two stacked to its right, three in a row below.
-// Matches Angular's 6-slot photo grid exactly (slot 0 = main/profile photo).
+// Photo mosaic — 1 large tile (spans 2x2 of the small-tile grid) with two
+// small tiles stacked to its right, then rows of 3 small tiles below for every
+// further photo (slot 0 = main/profile photo). The "Add More" tile takes the
+// slot right after the last photo and disappears once MAX_PHOTOS is reached;
+// with no photos at all the grid is replaced by one large "Add Photo" box.
 // The grid is RESPONSIVE: tile size is derived from the viewport, not fixed.
 // The design's 98px tile only fills the row on a 360pt-wide frame — hardcoding
 // it overflowed the 24pt content inset on a 320pt phone (312 of grid into 272
@@ -195,7 +204,6 @@ const MOSAIC_GAP = 9
 // ~430), so every real handset still fills edge to edge and only genuine
 // tablets clamp — where the grid then sits left-aligned with the rows.
 const MOSAIC_TILE_MAX = 130
-const PHOTO_GRID_SLOTS = 6
 
 // Horizontal content inset. Shared with scrollContent's paddingHorizontal so
 // the two can't drift — the mosaic width is computed from it.
@@ -220,11 +228,18 @@ function mosaicMetrics(viewportWidth: number): MosaicMetrics {
 
 function photoSlotPosition(i: number, m: MosaicMetrics): { left: number; top: number } {
   if (i === 0) return { left: 0, top: 0 }
-  if (i === 1) return { left: m.third,  top: 0 }
-  if (i === 2) return { left: m.third,  top: m.second }
-  if (i === 3) return { left: 0,        top: m.third }
-  if (i === 4) return { left: m.second, top: m.third }
-  return { left: m.third, top: m.third }
+  if (i === 1) return { left: m.third, top: 0 }
+  if (i === 2) return { left: m.third, top: m.second }
+  const row = Math.floor((i - 3) / 3)
+  const col = (i - 3) % 3
+  return { left: col * m.second, top: m.third + row * m.second }
+}
+
+// Height of a mosaic holding `count` slots (photos + the Add More tile).
+function mosaicHeight(count: number, m: MosaicMetrics): number {
+  if (count <= 3) return m.main
+  const rows = Math.ceil((count - 3) / 3)
+  return m.third + rows * m.second - MOSAIC_GAP
 }
 
 type Props = { navigation: any; route?: any }
@@ -489,6 +504,8 @@ export default function EditProfileScreen({ navigation, route }: Props) {
     if (__DEV__) console.log('[EditProfile] managePhotos() returned:', JSON.stringify(photoData))
 
     if (!info) { setLoading(false); return }
+    // Angular getUserDetails(): keep the stored NAME in sync with the server.
+    if (info.name) storeUserName(info.name)
 
     const gender = info.gender ?? (await getItem(SK.User.LOGIN_GENDER)) ?? '1'
 
@@ -705,7 +722,10 @@ export default function EditProfileScreen({ navigation, route }: Props) {
 
         {/* ── Photo ── */}
         <View style={s.photoHeaderRow}>
-          <Text style={s.sectionTitle}>{t('EDITPROFILE.PHOTOS')}</Text>
+          <View style={s.photoTitleRow}>
+            <Text style={[s.sectionTitle, s.photoTitleText]}>{t('EDITPROFILE.PHOTOS')}</Text>
+            {photos.length === 0 && <CdnSvg uri={ICON_MISS_WARN} width={MISS_WARN_W} height={MISS_WARN_H} />}
+          </View>
           <Pressable
             style={s.photoPrivacyBtn}
             onPress={() => (photos.length > 0 ? setPhotoPrivacyVisible(true) : openGalleryPicker())}
@@ -716,48 +736,74 @@ export default function EditProfileScreen({ navigation, route }: Props) {
           </Pressable>
         </View>
 
-        {/* Figma node 2192-9135: a fixed 1-large + 5-small mosaic (matches
-            Angular's 6-slot photo grid), not a horizontal scroll of equal
-            tiles. Main tile spans 2x2 of the small-tile grid; every empty
-            slot (not just the last one) is its own add-photo trigger. */}
-        <View style={[s.photoGrid, { width: mosaic.size, height: mosaic.size }]}>
-          {Array.from({ length: PHOTO_GRID_SLOTS }, (_, i) => {
-            const photo = photos[i]
-            const pos = photoSlotPosition(i, mosaic)
-            const size = i === 0 ? mosaic.main : mosaic.tile
-            if (photo && !failedPhotos.has(i)) {
-              return (
-                <Pressable key={i} style={[s.photoTile, i === 0 && s.photoTileMain, pos, { width: size, height: size }]} onPress={() => setViewerIndex(i)}>
-                  <Image
-                    source={{ uri: photo.PHOTOURL || photo.PHOTOTHUMB }}
-                    style={s.photoTileImg}
-                    contentFit="cover"
-                    onError={(e) => {
-                      if (__DEV__) console.warn(`[EditProfile] photo[${i}] failed to load:`, photo.PHOTOURL || photo.PHOTOTHUMB, e.error)
-                      setFailedPhotos(prev => new Set(prev).add(i))
-                    }}
-                  />
-                  {i === 0 && (
-                    <View style={s.mainPhotoBadge}>
-                      <Text style={s.mainPhotoBadgeText}>{t('EDITPROFILE.PROFILE_PHOTO')}</Text>
-                    </View>
+        {photos.length === 0 ? (
+          <Pressable
+            style={[s.photoAddSlot, s.photoAddEmpty, { width: mosaic.size, height: mosaic.size }]}
+            onPress={openGalleryPicker}
+            disabled={photoUploading}
+            accessibilityRole="button"
+          >
+            <DashedBorder width={mosaic.size} height={mosaic.size} radius={16} />
+            {photoUploading ? <ActivityIndicator color={Colors.textTertiary} size="small" /> : (
+              <>
+                <CdnSvg uri={ICON_ADD_CIRCLE} width={ADD_CIRCLE_ICON} height={ADD_CIRCLE_ICON} />
+                <Text style={s.photoAddText}>{t('GENERAL.ADD_PHOTO_TXT')}</Text>
+              </>
+            )}
+          </Pressable>
+        ) : (() => {
+          const showAddTile = photos.length < MAX_PHOTOS
+          const slotCount = photos.length + (showAddTile ? 1 : 0)
+          return (
+            <View style={[s.photoGrid, { width: mosaic.size, height: mosaicHeight(slotCount, mosaic) }]}>
+              {photos.map((photo, i) => {
+                const pos = photoSlotPosition(i, mosaic)
+                const size = i === 0 ? mosaic.main : mosaic.tile
+                const failed = failedPhotos.has(i)
+                return (
+                  <Pressable key={i} style={[s.photoTile, i === 0 && s.photoTileMain, pos, { width: size, height: size }]} onPress={() => setViewerIndex(i)}>
+                    {failed ? (
+                      // Image failed to load — same gender-avatar placeholder
+                      // Angular falls back to (common.ts's getAvatarImg(false)).
+                      !!genderAvatarUrl && <CdnSvg uri={genderAvatarUrl} width={size} height={size} />
+                    ) : (
+                      <Image
+                        source={{ uri: photo.PHOTOURL || photo.PHOTOTHUMB }}
+                        style={s.photoTileImg}
+                        contentFit="cover"
+                        onError={(e) => {
+                          if (__DEV__) console.warn(`[EditProfile] photo[${i}] failed to load:`, photo.PHOTOURL || photo.PHOTOTHUMB, e.error)
+                          setFailedPhotos(prev => new Set(prev).add(i))
+                        }}
+                      />
+                    )}
+                    {i === 0 && (
+                      <View style={s.mainPhotoBadge}>
+                        <Text style={s.mainPhotoBadgeText}>{t('EDITPROFILE.PROFILE_PHOTO')}</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                )
+              })}
+              {showAddTile && (
+                <Pressable
+                  style={[s.photoAddSlot, photoSlotPosition(photos.length, mosaic), { width: mosaic.tile, height: mosaic.tile }]}
+                  onPress={openGalleryPicker}
+                  disabled={photoUploading}
+                  accessibilityRole="button"
+                >
+                  <DashedBorder width={mosaic.tile} height={mosaic.tile} radius={8} />
+                  {photoUploading ? <ActivityIndicator color={Colors.textTertiary} size="small" /> : (
+                    <>
+                      <CdnSvg uri={ICON_ADD_CIRCLE} width={ADD_CIRCLE_ICON} height={ADD_CIRCLE_ICON} />
+                      <Text style={s.photoAddText}>{t('EDITPROFILE.ADD_MORE', 'Add More')}</Text>
+                    </>
                   )}
                 </Pressable>
-              )
-            }
-            // Empty slot (or a photo whose image failed to load) — same
-            // gender-avatar placeholder Angular falls back to (common.ts's
-            // getAvatarImg(false)), not a generic "+" icon.
-            return (
-              <Pressable key={i} style={[s.photoAddSlot, pos, { width: size, height: size }]} onPress={openGalleryPicker} disabled={photoUploading}>
-                {photoUploading
-                  ? <ActivityIndicator color={Colors.textTertiary} size="small" />
-                  : !!genderAvatarUrl && <CdnSvg uri={genderAvatarUrl} width={size} height={size} />
-                }
-              </Pressable>
-            )
-          })}
-        </View>
+              )}
+            </View>
+          )
+        })()}
 
         {/* ── View photo guidelines ──
             Angular: edit-profile.page.html:160-167 — a `mt-16` row sitting
@@ -767,34 +813,13 @@ export default function EditProfileScreen({ navigation, route }: Props) {
           <Text style={s.guidelinesText}>{t('GENERAL.VIEW_GUIDELINE')}</Text>
         </Pressable>
 
-        {/* ── Add photos ──
-            Angular: edit-profile.page.html:170-177 — `*ngIf="photoCount <
-            photoMaxLimit"`, so the CTA disappears once the album is full
-            rather than going disabled. Same photo-add entry point as an empty
-            mosaic slot (Angular's callNative('photo_add') for both). */}
-        {photos.length < MAX_PHOTOS && (
-          <Pressable
-            style={({ pressed }) => [s.addPhotoBtn, pressed && s.addPhotoBtnPressed]}
-            onPress={openGalleryPicker}
-            disabled={photoUploading}
-            accessibilityRole="button"
-          >
-            {photoUploading ? (
-              <ActivityIndicator color={Colors.white} />
-            ) : (
-              <>
-                <CdnSvg uri={ICON_ADD_PHOTO} width={ADD_PHOTO_ICON} height={ADD_PHOTO_ICON} />
-                <Text style={s.addPhotoBtnText}>{t('EDITPROFILE.ADDPHOTO_CTA')}</Text>
-              </>
-            )}
-          </Pressable>
-        )}
-
         {/* ── Basic details ── */}
         <Section title={t('EDITPROFILE.BASIC_DETAILS')}>
+          {/* New alignment: ID, Profile created for, Name, Mobile number first. */}
           <FieldRow label={t('EDITPROFILE.JODIIID')} value={ownId} onPress={() => {}} hideArrow icon={R_ICON.jodiiId} showDivider />
           <FieldRow label={t('EDITPROFILE.CREATEDFOR')} value={createdByLabel} onPress={() => {}} hideArrow icon={R_ICON.createdBy} showDivider />
           <FieldRow label={t('EDITPROFILE.NAME')} value={profile.name} onPress={restrictedNav(profile.nameEditable, 'EditProfileBasic')} icon={R_ICON.name} showDivider />
+          <FieldRow label={t('EDITPROFILE.MOBILENO')} value={profile.mobileNo} onPress={() => {}} hideArrow icon={R_ICON.mobileNo} showDivider />
           <FieldRow label={t('EDITPROFILE.AGE')} value={profile.age ? `${profile.age} years old` : undefined} onPress={restrictedNav(profile.ageEditable, 'EditProfileAgeHeight')} icon={R_ICON.age} showDivider />
           <FieldRow label={t('EDITPROFILE.HEIGHT')} value={heightLabel} onPress={() => navigation.navigate('EditProfileAgeHeight')} icon={R_ICON.height} showDivider />
           <FieldRow
@@ -820,11 +845,10 @@ export default function EditProfileScreen({ navigation, route }: Props) {
             showDivider
           />
           <FieldRow label={t('EDITPROFILE.MOTHERTONGUE')} value={labelFor(labels.motherTongue ?? [], profile.motherTongue)} onPress={restrictedNav(profile.motherTongueEditable, 'EditProfileBasic')} icon={R_ICON.motherTongue} showDivider />
-          <FieldRow label={t('EDITPROFILE.CURRENT_LOCATION')} value={cityLabel} onPress={() => navigation.navigate('EditProfileBasic')} icon={R_ICON.location} showDivider />
+          <FieldRow label={t('EDITPROFILE.CURRENT_LOCATION')} value={cityLabel} onPress={() => navigation.navigate('EditProfileBasic')} icon={R_ICON.location} showDivider={homeTownVisible} />
           {homeTownVisible && (
-            <FieldRow label={t('EDITPROFILE.NATIVE_PLACE')} value={homeCityLabel} onPress={() => navigation.navigate('EditProfileBasic')} icon={R_ICON.hometown} showDivider />
+            <FieldRow label={t('BIO_DATA.HOME_TOWN')} value={homeCityLabel} onPress={() => navigation.navigate('EditProfileBasic')} icon={R_ICON.hometown} />
           )}
-          <FieldRow label={t('EDITPROFILE.MOBILENO')} value={profile.mobileNo} onPress={() => {}} hideArrow icon={R_ICON.mobileNo} />
         </Section>
 
         {/* ── Professional details ── */}
@@ -1027,9 +1051,16 @@ const s = StyleSheet.create({
   },
 
   photoAddSlot: {
-    position: 'absolute', borderRadius: 8, borderWidth: 1, borderStyle: 'dashed', borderColor: Colors.borderSubtle,
-    backgroundColor: 'rgba(230,230,230,0.3)', alignItems: 'center', justifyContent: 'center',
+    // Border drawn by <DashedBorder> (SVG) for controllable dash length.
+    position: 'absolute', borderRadius: 8,
+    backgroundColor: 'rgba(230,230,230,0.3)', alignItems: 'center', justifyContent: 'center', gap: 8,
   },
+  // No-photo state: one big box in normal flow instead of an absolute tile.
+  photoAddEmpty: { position: 'relative', marginTop: 24, borderRadius: 16 },
+  photoAddText: { fontSize: FontSize.font14, fontFamily: Fonts.poppinsMedium, color: Colors.primaryDark },
+  photoTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  // Title's own marginBottom would push it off-centre from the warning icon.
+  photoTitleText: { marginBottom: 0 },
 
   // Unused — nothing renders this. Kept and tokenised rather than deleted; its
   // Angular counterpart (edit-profile.page.html:157 `textcta-medium-12

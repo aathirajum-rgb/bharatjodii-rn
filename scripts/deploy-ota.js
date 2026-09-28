@@ -29,7 +29,10 @@ const envPath = require('path').join(__dirname, '..', '.env.ota');
 if (require('fs').existsSync(envPath)) {
   require('fs').readFileSync(envPath, 'utf-8').split('\n').forEach(line => {
     const [key, ...rest] = line.split('=');
-    if (key && rest.length) process.env[key.trim()] = rest.join('=').trim();
+    // Don't override vars already set by the npm script (cross-env) — .env.ota's
+    // CHANNEL_SUFFIX=production would otherwise send `ota:preview` to production.
+    // Same guard as app.config.js's .env.ota loader.
+    if (key && rest.length && !process.env[key.trim()]) process.env[key.trim()] = rest.join('=').trim();
   });
 }
 const crypto = require('crypto');

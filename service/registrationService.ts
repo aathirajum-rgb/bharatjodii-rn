@@ -85,6 +85,16 @@ export async function setSessionValue(key: string, value: any): Promise<void> {
   await setItem(SESSION_STORE_KEY, JSON.stringify(sd))
 }
 
+// Angular: registration.page.ts's editform save (`if (editType == "1")
+// localStorage.setItem("NAME", ...)`) and edit-profile.page.ts's
+// getUserDetails() both refresh the stored NAME. Here the member's name lives
+// in two places — SK.User.NAME (most screens) and the session's NAME (Menu,
+// Home) — so both are written, or an edited name keeps showing the old one.
+export async function storeUserName(name: string): Promise<void> {
+  if (!name) return
+  await Promise.all([setItem(SK.User.NAME, name), setSessionValue('NAME', name)])
+}
+
 export async function setSessionValues(updates: Record<string, any>): Promise<void> {
   const sd = await getSession()
   Object.assign(sd, updates)

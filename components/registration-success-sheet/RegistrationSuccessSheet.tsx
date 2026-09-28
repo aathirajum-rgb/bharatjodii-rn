@@ -119,7 +119,7 @@ export default function RegistrationSuccessSheet({ visible, onContinue }: Props)
           <Text style={[styles.ctaLabel, { fontFamily: langFonts.semiBold }]}>
             {t('REGISTRATION.CONTINUE', 'Continue')}
           </Text>
-          <CdnSvg uri={CTA_ARROW_ICON_URL} width={16} height={16} style={styles.ctaArrow} />
+          <CdnSvg uri={CTA_ARROW_ICON_URL} width={20} height={20} style={styles.ctaArrow} />
         </Pressable>
       </Animated.View>
     </Modal>

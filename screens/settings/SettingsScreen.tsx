@@ -4,9 +4,8 @@
 // Angular's own Settings page doesn't show) directly into its own "Card 5" —
 // there's no dedicated mobile Settings screen to branch off of the way most
 // other screens in this app do. This is a fresh, single screen supporting
-// both platforms: a full-screen list on mobile (for the sake of having a
-// working 'Settings' route at all — nothing currently navigates here on
-// mobile) and the DesktopPageShell-wrapped card Figma's desktop design
+// both platforms: a full-screen list on mobile (reached from MenuScreen's
+// Settings row) and the DesktopPageShell-wrapped card Figma's desktop design
 // (UaPAN9aG6MfZf6CRpwXf1L, node 647:13325 / 659-23124) actually asks for,
 // reached via HomeSidebar's "Settings" row.
 //
@@ -30,7 +29,9 @@ import { getItem } from '../../service/storageService'
 import { handleFooterTabPress } from '../../utils/footerTabPress'
 import { handleBack } from '../../utils/navigationRef'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
-import { ICON, LogoutSheet, performLogout } from '../menu/MenuScreen'
+import { ICON, performLogout } from '../menu/MenuScreen'
+import LanguagePillSheet from '../../components/language-pill/LanguagePillSheet'
+import { PRIVACY_POLICY_URL, TERMS_CONDITIONS_URL } from '../../constants/webLinks'
 import { restoreIosPurchases } from '../../service/iapService'
 import type { FooterTab } from '../../components/app-footer/AppFooter'
 import ScreenTopInset from '../../components/screen/ScreenTopInset'
@@ -45,6 +46,7 @@ export default function SettingsScreen({ navigation }: Props) {
   const [userName, setUserName] = useState('')
   const [isFemale, setIsFemale] = useState(false)
   const [logoutSheetVisible, setLogoutSheetVisible] = useState(false)
+  const [showLanguageSheet, setShowLanguageSheet] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -78,15 +80,30 @@ export default function SettingsScreen({ navigation }: Props) {
     }
   }
 
+  // Mobile reaches this screen from MenuScreen.tsx's Settings row, which keeps
+  // Delete Profile / Logout itself — so here mobile shows only language, phone
+  // privacy, privacy policy and terms. Desktop's sidebar has no Logout row
+  // (see HomeSidebar.tsx), so desktop keeps Delete Profile / Logout below.
   const rows = [
     {
       key: 'language', icon: ICON.language, title: t('MENU.TTTLE_6'),
-      onPress: () => navigation.navigate('LanguageSelection'),
+      // Mobile: same popup sheet the menu used before this row moved here.
+      onPress: () => isDesktop ? navigation.navigate('LanguageSelection') : setShowLanguageSheet(true),
     },
     ...(isFemale ? [{
       key: 'phonePrivacy', icon: CDN_SVG + 'phone-privacy-settings.svg', title: t('MENU.PHONE_PRIVACY'),
       onPress: () => navigation.navigate('PhonePrivacy'),
     }] : []),
+    ...(!isDesktop ? [
+      {
+        key: 'privacyPolicy', icon: ICON.privacy, iconSize: 18, title: t('ACCOUNT.PRIVACY_POLICY'),
+        onPress: () => navigation.navigate('ExternalPage', { url: PRIVACY_POLICY_URL, title: t('ACCOUNT.PRIVACY_POLICY') }),
+      },
+      {
+        key: 'terms', icon: ICON.terms, iconSize: 18, title: t('REGISTRATION.TERMSANDCONDITIONS'),
+        onPress: () => navigation.navigate('ExternalPage', { url: TERMS_CONDITIONS_URL, title: t('REGISTRATION.TERMSANDCONDITIONS') }),
+      },
+    ] : []),
     // No dedicated "restore purchases" icon exists in ICON yet (see
     // MenuScreen.tsx) — reusing `support` as a neutral placeholder pending a
     // real asset from design.
@@ -94,15 +111,17 @@ export default function SettingsScreen({ navigation }: Props) {
       key: 'restorePurchases', icon: ICON.support, title: t('ACCOUNT.RESTORE_PURCHASES'),
       onPress: handleRestorePurchases,
     }] : []),
-    {
-      key: 'deleteProfile', icon: ICON.deleteAccount, title: t('ACCOUNT.DEL_PRO'),
-      onPress: () => navigation.navigate('DeleteProfile'),
-    },
-    {
-      key: 'logout', icon: ICON.logout, title: t('ACCOUNT.LOGOUT'),
-      onPress: handleLogout,
-    },
-  ]
+    ...(isDesktop ? [
+      {
+        key: 'deleteProfile', icon: ICON.deleteAccount, title: t('ACCOUNT.DEL_PRO'),
+        onPress: () => navigation.navigate('DeleteProfile'),
+      },
+      {
+        key: 'logout', icon: ICON.logout, title: t('ACCOUNT.LOGOUT'),
+        onPress: handleLogout,
+      },
+    ] : []),
+  ] as { key: string; icon: string; iconSize?: number; title: string; onPress: () => void }[]
 
   const rowList = (
     <>
@@ -110,7 +129,7 @@ export default function SettingsScreen({ navigation }: Props) {
         <View key={row.key}>
           <Pressable style={({ pressed }) => [s.row, pressed && s.rowPressed]} onPress={row.onPress} accessibilityRole="button">
             <View style={s.rowIconWrap}>
-              <CdnSvg uri={row.icon} width={24} height={24} />
+              <CdnSvg uri={row.icon} width={row.iconSize ?? 24} height={row.iconSize ?? 24} />
             </View>
             <Text style={s.rowTitle}>{row.title}</Text>
             <CdnSvg uri={ICON.arrow} width={16} height={16} />
@@ -147,7 +166,7 @@ export default function SettingsScreen({ navigation }: Props) {
       <View style={s.mobileCard}>
         {rowList}
       </View>
-      <LogoutSheet visible={logoutSheetVisible} onYes={handleConfirmLogout} onNo={() => setLogoutSheetVisible(false)} />
+      <LanguagePillSheet visible={showLanguageSheet} onClose={() => setShowLanguageSheet(false)} allLanguages />
     </View>
   )
 }
