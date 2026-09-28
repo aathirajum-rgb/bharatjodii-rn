@@ -4,7 +4,6 @@ import {
   Animated,
   Easing,
   Dimensions,
-  FlatList,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -216,7 +215,13 @@ export default function DOBScreen({ navigation }: Props) {
   // when the user previously entered their age via the "enter age" sheet
   // (handleAgeSubmit) instead of the DOB dropdowns, so the age badge re-populates
   // instead of staying blank when navigating back to this screen.
-  const [directAge, setDirectAge] = useState<number | null>(null)
+  // Angular: showAgePage() / isValidAgeValue() — once an age is entered via the
+  // sheet (or restored from storage), the page becomes the "Enter your age"
+  // page: an editable inline Age input replaces the DOB dropdowns.
+  const [ageMode, setAgeMode] = useState(false)
+  const [pageAge, setPageAge] = useState('')
+  const [pageAgeFocused, setPageAgeFocused] = useState(false)
+  const directAge = ageMode && pageAge ? Number(pageAge) : null
 
   const [months, setMonths] = useState(MONTH_FALLBACK)
   // API-sourced DATE/YEARS lists — null until fetched, so getOptions() can
@@ -288,9 +293,9 @@ export default function DOBScreen({ navigation }: Props) {
   const dateRef  = useRef<View>(null)
   const monthRef = useRef<View>(null)
   const yearRef  = useRef<View>(null)
-  const pickerListRef = useRef<FlatList<{ key: string; label: string }>>(null)
+  const pickerListRef = useRef<ScrollView>(null)
 
-  // Year auto-scroll glide. FlatList's own `animated: true` is a short native
+  // Year auto-scroll glide. ScrollView's own `animated: true` is a short native
   // fling (reads as a jump); driving the offset from an Animated.Value gives
   // a slow, eased scroll — same technique as BulkLikeModal's showcase scroll.
   // useNativeDriver must be false: scroll offset isn't a native-animatable prop.
@@ -300,7 +305,7 @@ export default function DOBScreen({ navigation }: Props) {
 
   useEffect(() => {
     const id = yearScrollAnim.addListener(({ value }) => {
-      pickerListRef.current?.scrollToOffset({ offset: value, animated: false })
+      pickerListRef.current?.scrollTo({ y: value, animated: false })
     })
     return () => yearScrollAnim.removeListener(id)
   }, [yearScrollAnim])
@@ -341,9 +346,9 @@ export default function DOBScreen({ navigation }: Props) {
         }
       } else if (age) {
         // No DOB stored, but an age was entered directly via the "enter age"
-        // sheet (handleAgeSubmit) — restore it so the age badge shows instead
-        // of a blank state.
-        setDirectAge(Number(age))
+        // sheet (handleAgeSubmit) — reopen as the "Enter your age" page.
+        setAgeMode(true)
+        setPageAge(age)
       }
       if (g) setGender(g)
     })
@@ -395,7 +400,7 @@ export default function DOBScreen({ navigation }: Props) {
 
   const possessiveKey = possessive?.toUpperCase()
   const translatedProfileType = possessiveKey ? t(`REGISTRATION.${possessiveKey}`) : ''
-  const title = t('REGISTRATION.DATEOFBIRTH', 'Select your #PROFILETYPE# date of birth')
+  const dobTitle = t('REGISTRATION.DATEOFBIRTH', 'Select your #PROFILETYPE# date of birth')
     .replace('#PROFILETYPE#', translatedProfileType)
     .replace('  ', ' ')
     .trim()
@@ -428,10 +433,8 @@ export default function DOBScreen({ navigation }: Props) {
 
   const selMonthLabel    = months.find(m => m.key === selMonth)?.label ?? ''
   const isAllSelected    = !!(selDate && selMonth && selYear)
-  // Falls back to a directly-entered age (see directAge/Init effect above) when
-  // the DOB dropdowns aren't filled, so the badge/OR-block below still reflect
-  // an age entered via the "enter age" sheet on a previous visit.
-  const hasAgeInfo       = isAllSelected || directAge !== null
+  // In age mode (see ageMode above) the age comes from the inline Age input
+  // instead of the DOB dropdowns.
   const calculatedAge    = isAllSelected ? calculateAge(selYear, selMonth, selDate) : directAge
 
   // Angular: registration-revamp.component.ts's setMinMaxAge() —
@@ -441,6 +444,16 @@ export default function DOBScreen({ navigation }: Props) {
   const minAge = gender === '0' ? 18 : 21
   const maxAge = 70
   const isDobAgeValid = isAllSelected && calculatedAge !== null && calculatedAge >= minAge && calculatedAge <= maxAge
+  // Angular: isAgeValid() — gates both Next and the age badge in age mode.
+  const isDirectAgeValid = directAge !== null && directAge >= minAge && directAge <= maxAge
+  const canGoNext = ageMode ? isDirectAgeValid : isDobAgeValid
+  // Angular: ENTERAGETITLE replaces the DOB title in age mode.
+  const title = ageMode ? ageSheetTitleText : dobTitle
+  const pageAgeBorderColor = pageAgeFocused
+    ? Colors.inputFocus
+    : pageAge.length === 0
+      ? Colors.inputError
+      : Colors.inputBorder
 
   // Angular: updateAgeContent() — createdBy === '1' (Myself) uses
   // AGESTATEMENTMYSELF, everyone else uses AGESTATEMENT with #PROFILETYPE#
@@ -522,8 +535,8 @@ export default function DOBScreen({ navigation }: Props) {
       // instead of opening pre-scrolled.
       if (field === 'year' && !selYear) {
         const years = getOptions('year')
-        // Offset-based (not scrollToIndex) — see initialNumToRender on the
-        // FlatList: every row is mounted up front, so no blank rows mid-glide.
+        // Offset-based — the dropdown is a plain ScrollView with every row
+        // mounted up front, so there are no blank rows mid-glide.
         const maxOffset = Math.max(0, years.length * ITEM_H - listHeight)
         stopYearScroll()
         yearScrollTimer.current = setTimeout(() => {
@@ -578,11 +591,19 @@ export default function DOBScreen({ navigation }: Props) {
   // ── Submit (DOB path) ─────────────────────────────────────────────────────
 
   async function handleNext() {
-    if (!isDobAgeValid || submitting) return
+    if (!canGoNext || submitting) return
     setSubmitting(true)
     try {
+      if (ageMode) {
+        // The inline Age input is editable, so re-store whatever it holds now.
+        await setRegValue('AGE', pageAge)
+        navigation.push('onboarding', { pageNo: '43' })
+        callPartialRegistrationAPI()
+        return
+      }
       const dob = `${selYear}-${selMonth.padStart(2, '0')}-${selDate.padStart(2, '0')}`
-      await setRegValues({ DATEOFBIRTH: dob, MONTH: selMonth, DATE: selDate, YEAR: selYear })
+      // Angular's sendPartialRegistrationData() blanks AGE once a full DOB is set.
+      await setRegValues({ DATEOFBIRTH: dob, MONTH: selMonth, DATE: selDate, YEAR: selYear, AGE: '' })
       navigation.push('onboarding', { pageNo: '43' })
       callPartialRegistrationAPI()
     } catch {
@@ -601,20 +622,37 @@ export default function DOBScreen({ navigation }: Props) {
       setAgeError(`Please enter a valid age (${minAge}–${maxAge})`)
       return
     }
-    closeAgeSheet()
+    // Unmount the sheet's Modal NOW rather than after its exit animation. On
+    // Android a Modal is its own window above the whole app — left mounted
+    // through the animation while push() below shows the next step, it sat
+    // invisibly over Height and swallowed the first tap there.
+    Keyboard.dismiss()
+    setShowAgeSheet(false)
+    setAgeModalMounted(false)
     setSubmitting(true)
     try {
-      await setRegValue('AGE', age)
+      // TEMP DEBUG (age-path partialreg) — remove once diagnosed.
+      if (__DEV__) console.log('[DOB] age submit', age)
+      // Drop any half-picked DOB so it isn't sent alongside the age.
+      await setRegValues({ AGE: age, DATEOFBIRTH: '', YEAR: '', MONTH: '', DATE: '' })
+      if (__DEV__) console.log('[DOB] stored AGE =', await getRegValue('AGE'))
+      // push() keeps this screen mounted underneath, so Back returns to this
+      // same instance — the Init effect won't re-run, so switch to age mode
+      // here or the page would still show the DOB dropdowns on return.
+      setSelDate(''); setSelMonth(''); setSelYear('')
+      setAgeMode(true)
+      setPageAge(age)
       navigation.push('onboarding', { pageNo: '43' })
       callPartialRegistrationAPI()
-    } catch {
+    } catch (e) {
+      if (__DEV__) console.log('[DOB] age submit failed', e)
       // Allow retry
     } finally {
       setSubmitting(false)
     }
   }
 
-  useOnboardingFooter({ nextDisabled: !isDobAgeValid, nextLoading: submitting, onNext: handleNext }, [isDobAgeValid, submitting])
+  useOnboardingFooter({ nextDisabled: !canGoNext, nextLoading: submitting, onNext: handleNext }, [canGoNext, submitting])
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -664,7 +702,33 @@ export default function DOBScreen({ navigation }: Props) {
         {/* Title */}
         <Text style={[os.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
 
+        {/* Age mode — Angular's inline #ageInput (ion-input + floating "Age"
+            label) replaces the DOB dropdowns once an age has been entered. */}
+        {ageMode && (
+          <View style={styles.pageAgeOuter}>
+            <TextInput
+              style={[styles.ageInputBox, { borderColor: pageAgeBorderColor }, webOutlineReset]}
+              keyboardType="number-pad"
+              value={pageAge}
+              onChangeText={v => setPageAge(v.replace(/\D/g, ''))}
+              onFocus={() => setPageAgeFocused(true)}
+              onBlur={() => setPageAgeFocused(false)}
+              placeholder={enterAgeLinkText}
+              placeholderTextColor={Colors.textTertiary}
+              cursorColor={Colors.textPrimary}
+              selectionColor={Colors.textPrimary}
+              maxLength={2}
+              returnKeyType="done"
+              onSubmitEditing={handleNext}
+            />
+            <View style={styles.ageLabelWrap} pointerEvents="none">
+              <Text style={[styles.ageLabelText, { fontFamily: langFonts.regular }]}>{ageLabelText}</Text>
+            </View>
+          </View>
+        )}
+
         {/* Three dropdown trigger fields */}
+        {!ageMode && (
         <View style={styles.fieldsRow}>
           {(
             [
@@ -713,6 +777,7 @@ export default function DOBScreen({ navigation }: Props) {
             )
           })}
         </View>
+        )}
 
         {/* Age badge — "Your son is 28 years old" (Angular .height-block).
             Figma has TWO gradients: a border-image (a pink→white hairline that fades
@@ -723,7 +788,9 @@ export default function DOBScreen({ navigation }: Props) {
             the fill. Both gradients are near-transparent by design, so the fill layer
             sits on an opaque white base — without it the badge has no background at
             all and reads as a dark rectangle against the page. */}
-        {hasAgeInfo && calculatedAge !== null && calculatedAge > 0 && (
+        {/* Angular: shown for (isDobValidValues() || isAgeValid()) — in age mode
+            only while the typed age is within the min/max range. */}
+        {(ageMode ? isDirectAgeValid : isAllSelected && calculatedAge !== null && calculatedAge > 0) && (
           <AgeBadge>
             <Text style={[styles.ageBadgeText, { fontFamily: langFonts.regular }]}>{ageStatementBefore}
               <Text style={[styles.ageBadgeYears, { fontFamily: langFonts.semiBold }]}>{ageStatementYears}</Text>
@@ -732,9 +799,9 @@ export default function DOBScreen({ navigation }: Props) {
           </AgeBadge>
         )}
 
-        {/* OR divider + "Please enter age" — hidden once all 3 date fields are filled,
-            or once an age has been restored from a previous direct-entry visit */}
-        {!hasAgeInfo && (
+        {/* OR divider + "Please enter age" — hidden once all 3 date fields are
+            filled, or in age mode */}
+        {!isAllSelected && !ageMode && (
           <>
             <View style={styles.orRow}>
               <Image source={{ uri: CDN_OR_LEFT }} style={styles.orLine} contentFit="contain" />
@@ -771,29 +838,26 @@ export default function DOBScreen({ navigation }: Props) {
         {/* Dropdown list — below the field normally, or above it when flipped
             (dropdownPos.openUp) because there wasn't room underneath. */}
         <View style={[styles.dropdown, dropdownPos.openUp && styles.dropdownUp, dropStyle]}>
-          <FlatList
+          {/* Plain ScrollView, not FlatList: at most ~53 rows (Year), so there's
+              nothing to virtualize — and FlatList's per-scroll-event windowing
+              recomputation competed with the frame-by-frame Year auto-scroll
+              glide below, which is what made it stutter instead of gliding.
+              Every row is mounted up front, so the glide never hits blank rows. */}
+          <ScrollView
             ref={pickerListRef}
-            data={pickerOptions}
-            keyExtractor={item => item.key}
             style={{ maxHeight: listH }}
+            contentOffset={{ x: 0, y: initialScrollIdx * ITEM_H }}
             showsVerticalScrollIndicator
-            getItemLayout={(_, index) => ({ length: ITEM_H, offset: ITEM_H * index, index })}
-            initialScrollIndex={initialScrollIdx}
+            scrollEventThrottle={16}
             // Any touch on the list hands scrolling back to the user.
             onTouchStart={stopYearScroll}
             onScrollBeginDrag={stopYearScroll}
-            // Year has ~53 rows — the most of the three fields — and is the
-            // only one that gets auto-scrolled to its far end after opening
-            // (see openPicker's setTimeout above). Virtualization only renders
-            // rows near the initial scroll position, so that later jump could
-            // land on rows that were never mounted, showing as blank. Rendering
-            // the full list upfront (cheap at this size) removes that gap.
-            initialNumToRender={pickerOptions.length}
-            removeClippedSubviews={false}
-            renderItem={({ item }) => {
+          >
+            {pickerOptions.map(item => {
               const isSel = item.key === currentVal
               return (
                 <Pressable
+                  key={item.key}
                   style={[styles.dropdownItem, isSel && styles.dropdownItemSel]}
                   onPress={() => pickerField && handlePickerSelect(pickerField, item.key)}
                 >
@@ -802,8 +866,8 @@ export default function DOBScreen({ navigation }: Props) {
                   </Text>
                 </Pressable>
               )
-            }}
-          />
+            })}
+          </ScrollView>
         </View>
       </Modal>
 
@@ -1155,6 +1219,11 @@ const styles = StyleSheet.create({
     position:  'relative',
     marginTop: 8,
   },
+  // Inline age-mode input — same row position as fieldsRow it replaces.
+  pageAgeOuter: {
+    position:  'relative',
+    marginTop: 8,
+  },
   // Angular: ion-input class="body1-medium-14" (no black-color here, unlike
   // the other input fields, so the color is left at its existing value)
   ageInputBox: {
@@ -1163,6 +1232,12 @@ const styles = StyleSheet.create({
     borderColor:       Colors.inputBorder,
     borderRadius:      8,
     paddingHorizontal: 12,
+    // Android's default TextInput vertical padding + Poppins' font padding
+    // pushed the value above the box's centre — same paddingVertical:0 as
+    // NameScreen.tsx's input, plus explicit centring.
+    paddingVertical:    0,
+    textAlignVertical:  'center',
+    includeFontPadding: false,
     fontFamily:        Fonts.poppinsMedium,
     fontSize:          FontSize.font14,
     fontWeight:        '500',

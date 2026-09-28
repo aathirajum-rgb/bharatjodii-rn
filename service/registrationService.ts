@@ -2249,7 +2249,10 @@ async function _doPartialReg(): Promise<void> {
     `APPVERSION=${appVersion}`,
   ].join('&')
 
-  await apiCall(Endpoints.registration.partial, 'POST', paramStr)
+  // TEMP DEBUG (age-path partialreg) — remove once diagnosed.
+  if (__DEV__) console.log('[partialreg] sending Age=%s Year=%s Month=%s Date=%s', rv.AGE, rv.YEAR, rv.MONTH, rv.DATE)
+  const res = await apiCall(Endpoints.registration.partial, 'POST', paramStr)
+  if (__DEV__) console.log('[partialreg] response', JSON.stringify(res))
 }
 
 export async function callIntermediatePageUpdateApi(pageId: string): Promise<void> {

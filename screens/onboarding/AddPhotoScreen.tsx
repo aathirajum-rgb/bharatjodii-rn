@@ -349,7 +349,8 @@ export default function AddPhotoScreen({ navigation }: Props) {
         style={os.flex1}
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingBottom: Math.max(insets.bottom, 24) },
+          // Bottom safe-area inset now lives on the pinned laterFooter below.
+          { paddingBottom: 24 },
         ]}
         showsVerticalScrollIndicator={false}
         contentInsetAdjustmentBehavior="never"
@@ -408,11 +409,12 @@ export default function AddPhotoScreen({ navigation }: Props) {
             </Text>
           </Pressable>
         </View>
+      </ScrollView>
 
-        {/* "I'll do this later" — Angular: #skip_cta div sits inside the same
-            scrollable wrapper right after the card ("mt-32 ... d-flex
-            justify-content-center"), not pinned as a fixed footer. Skips
-            immediately, no confirmation dialog, for the onboarding entry point. */}
+      {/* "I'll do this later" — pinned as a footer below the scroll area
+          (product request; Angular keeps it in-flow after the card). Skips
+          immediately, no confirmation dialog, for the onboarding entry point. */}
+      <View style={[styles.laterFooter, { paddingBottom: Math.max(insets.bottom, 24) }]}>
         <Pressable
           style={styles.laterRow}
           onPress={handleSkip}
@@ -423,7 +425,7 @@ export default function AddPhotoScreen({ navigation }: Props) {
           </Text>
           <CdnSvg uri={CDN_LATER_CHEVRON} width={16} height={16} />
         </Pressable>
-      </ScrollView>
+      </View>
 
       {/* Gallery access explainer — Angular's STORAGE_SETTINGS bottom sheet,
           shown before requesting permission (2nd tap / type '6'). */}
@@ -521,9 +523,11 @@ const styles = StyleSheet.create({
   // "d-flex justify-content-center mt-32 mb-20" — both margins now ported
   // directly from that one div (was mb-20 only, with mt-32 approximated via
   // scrollContent's generic padding above).
+  // marginTop raised from Angular's mt-32 to sit the photo a little lower
+  // (product request).
   photoAreaWrapper: {
     alignItems:    'center',
-    marginTop:     32,
+    marginTop:     56,
     marginBottom:  20,
   },
   photoArea: {
@@ -642,13 +646,14 @@ const styles = StyleSheet.create({
     color:      Colors.white,
   },
 
+  laterFooter: {
+    paddingTop:      12,
+    backgroundColor: Colors.surface,
+  },
   laterRow: {
-    // Angular: "mt-32 pl-24 pr-24 d-flex justify-content-center" — in-flow
-    // below the card, not a fixed footer bar.
     flexDirection:     'row',
     alignItems:        'center',
     justifyContent:    'center',
-    marginTop:         32,
     paddingHorizontal: 24,
     gap:               4,
   },
@@ -656,5 +661,8 @@ const styles = StyleSheet.create({
   laterText: {
     fontSize:   FontSize.font14,
     color:      Colors.textDark,
+    // Same fix as AppStack.tsx's skipText — centres the › icon on the glyphs.
+    includeFontPadding: false,
+    textAlignVertical:  'center',
   },
 })

@@ -350,7 +350,7 @@ export default function AppHeader({
     <View style={[styles.wrapperAuth, style]}>
       <View style={styles.authRow}>
         {showBackBtn && (
-          <Pressable style={styles.backBtn} onPress={onBackPress}>
+          <Pressable style={[styles.backBtn, type === 'registration' && styles.backBtnRegistration]} onPress={onBackPress}>
             {closeIcon
               ? <CdnSvg uri={ICONS.close} width={24} height={24} />
               : <SvgXml xml={CHEVRON_BACK_XML} width={24} height={24} />}
@@ -364,8 +364,9 @@ export default function AppHeader({
             <CdnSvg uri={ICONS.lang} width={24} height={24} />
             <Text style={[styles.langText, { fontFamily: langFonts.medium }]}>{resolvedLangLabel}</Text>
             {/* Angular: bare `<ion-icon name="chevron-down-outline">`, no size
-                class at all here — Ionic's own default (1.5rem ≈ 24px), not 16. */}
-            <SvgXml xml={CHEVRON_DOWN_XML} width={24} height={24} />
+                class — ionicons sizes itself to 1em of the inherited 16px font,
+                so 16×16 (24 rendered noticeably larger than the live app). */}
+            <SvgXml xml={CHEVRON_DOWN_XML} width={16} height={16} style={styles.langChevron} />
           </Pressable>
         )}
       </View>
@@ -581,6 +582,11 @@ const styles = StyleSheet.create({
   flex1: { flex: 1 },
 
   // ── registration / signIn ─────────────────────────────────────────────────
+  // Registration only: nudges the back chevron in from the screen edge (it sat
+  // 8px in — centered in the 40px backBtn — now 16px). signIn is unchanged.
+  backBtnRegistration: {
+    marginLeft: 8,
+  },
   wrapperAuth: {
     backgroundColor: Colors.white,
   },
@@ -608,6 +614,10 @@ const styles = StyleSheet.create({
   // Angular: `textcta-medium-12 black-color` — font-size var(--font12)
   // (0.75rem, dynamic — see FontSize's header comment), Poppins-Medium
   // (family already matched); color pure black (#000), not textPrimary (#111).
+  // Centered on the pill's row regardless of the label's line box.
+  langChevron: {
+    alignSelf: 'center',
+  },
   langText: {
     fontFamily: SemanticFontsEnglish.buttonEnglishMedium,
     fontSize:   FontSize.font12,

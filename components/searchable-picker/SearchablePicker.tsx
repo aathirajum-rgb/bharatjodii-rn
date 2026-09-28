@@ -122,7 +122,15 @@ export default function SearchablePicker({
 
   function handleSelect(opt: PickerOption) {
     onSelect(opt)
-    handleClose()
+    // Close instantly on a pick (not via handleClose()'s exit animation): on
+    // Android the Modal is its own window and, while mounted for that
+    // animation, swallowed the next tap — usually the screen's Next CTA.
+    slideAnim.stopAnimation()
+    scrimAnim.stopAnimation()
+    slideAnim.setValue(0)
+    scrimAnim.setValue(0)
+    setMounted(false)
+    onClose()
   }
 
   // Builds the flat row list FlatList renders. Grouped mode: a 'header' row

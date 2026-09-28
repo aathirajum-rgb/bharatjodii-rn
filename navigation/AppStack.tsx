@@ -8,13 +8,14 @@ import { useTranslation } from 'react-i18next'
 import AppHeader from '../components/app-header/AppHeader'
 import ButtonRevamp from '../components/button-revamp/ButtonRevamp'
 import CdnSvg from '../components/cdn-svg/CdnSvg'
+import Toast, { type ToastRequest } from '../components/toast/Toast'
 import { Colors } from '../constants/colors'
 import { FontSize } from '../src/theme/fonts'
 import { CDN_SVG } from '../constants/cdn'
 import { StorageKeys } from '../constants/storage.keys'
 import { OnboardingCtx, FooterState, FooterHandlers } from '../contexts/OnboardingContext'
 import { getItem, setItem } from '../service/storageService'
-import { getOnboardingBackPage } from '../screens/onboarding/onboardingBackFlow'
+import { getOnboardingBackPage, hasOnboardingBackPage } from '../screens/onboarding/onboardingBackFlow'
 import { handleBack as centralizedHandleBack } from '../utils/navigationRef'
 import { useAuth } from '../contexts/AuthContext'
 import { useIsDesktopWeb } from '../hooks/useIsDesktopWeb'
@@ -351,6 +352,30 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
   const [customerCare, setCustomerCare] = useState('')
   const handlers = useRef<FooterHandlers>({ onNext: () => {} })
 
+  // A step that shows a toast and then push()es the next step can't render it
+  // itself — the pushed screen covers it. It passes { toast } in the next
+  // step's params instead, shown here on the step the user actually sees
+  // (e.g. page 31's "Horoscope Generated Successfully!" on page 32). Cleared
+  // after showing so Back/re-render doesn't replay it.
+  const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
+  const pendingToast: string | undefined = route.params?.toast
+  useEffect(() => {
+    if (!pendingToast) return
+    setToastRequest({ message: pendingToast, key: Date.now() })
+    navigation.setParams({ toast: undefined })
+  }, [pendingToast, navigation])
+  // Reset the handler ref DURING render when the page changes — each screen
+  // registers its own handlers via useOnboardingFooter while it renders, which
+  // happens right after this. A useEffect reset here ran AFTER the child had
+  // registered (parent effects run after child renders), silently replacing
+  // the real onNext with a no-op until the screen happened to re-render — the
+  // "CTA only works on the second tap" bug.
+  const handlersPageNo = useRef(pageNo)
+  if (handlersPageNo.current !== pageNo) {
+    handlersPageNo.current = pageNo
+    handlers.current = { onNext: () => {} }
+  }
+
   // Angular: LINK_BTN's forward-animation-link — a looping nudge-forward
   // bounce on the link CTA's arrow icon (e.g. page 29's "Upload horoscope").
   const linkArrowAnim = useRef(new Animated.Value(0)).current
@@ -369,12 +394,6 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
   useEffect(() => {
     getItem(StorageKeys.App.CUSTOMER_CARE).then(cc => { if (cc) setCustomerCare(cc) })
   }, [])
-
-  // Reset only the handler ref when the page changes — each screen sets its
-  // own visual footer state via useOnboardingFooter on mount.
-  useEffect(() => {
-    handlers.current = { onNext: () => {} }
-  }, [pageNo])
 
   // Angular: dozens of screens scattered across registration.page.ts/
   // registration-revamp.component.ts/form-fields.component.ts each call
@@ -407,18 +426,14 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
   // must NOT fall back to the wizard's back map, which would walk them into
   // onboarding steps they never came from.
   const standalone = !!route.params?.standalone
-  const [mappedBack, setMappedBack] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (hasHistory || standalone) { setMappedBack(null); return }
-    let cancelled = false
-    getOnboardingBackPage(pageNo).then(target => {
-      if (!cancelled) setMappedBack(target)
-    })
-    return () => { cancelled = true }
-  }, [pageNo, hasHistory, standalone])
-
-  const canGoBack = hasHistory || mappedBack !== null
+  // Angular: showBackBtn = !['20'].includes(currentPageType) — shown on every
+  // step except Add Photo, decided synchronously. Previously this waited on an
+  // async map lookup, so on a step with no history beneath it the button was
+  // missing until (or unless) that lookup resolved. Standalone entries into 20
+  // keep it, since they exit back to their caller rather than into the wizard.
+  const hideBack = pageNo === '20' && !standalone
+  const canGoBack = !hideBack && (hasHistory || (!standalone && hasOnboardingBackPage(pageNo)))
 
   // Angular registration-revamp's `showLoader`: only these steps turn it on —
   // 2 (Name, AI name validation), 3 (Gender, AI name/gender validation) and
@@ -446,8 +461,10 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
     // push, so repeated back presses walk the map backwards instead of
     // growing a forward-looking stack. Params are spread through — a bare
     // { pageNo } would drop standalone/pendingUri/existingCount.
-    if (mappedBack) navigation.replace('onboarding', { ...route.params, pageNo: mappedBack })
-  }, [hasHistory, mappedBack, navigation, route.params])
+    getOnboardingBackPage(pageNo).then(target => {
+      if (target) navigation.replace('onboarding', { ...route.params, pageNo: target })
+    })
+  }, [hasHistory, pageNo, navigation, route.params])
 
   // ── Content router ────────────────────────────────────────────────────────
 
@@ -582,7 +599,7 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
               <Text style={[shell.skipText, { fontFamily: langFonts.medium }]}>
                 {footerState.skipLabel ?? t('REG.DO_LATER', "I'll do this later")}
               </Text>
-              <CdnSvg uri={CDN_FORWARD_ICON_GREY} width={10} height={10} style={shell.skipIcon} />
+              <CdnSvg uri={CDN_FORWARD_ICON_GREY} width={16} height={16} style={shell.skipIcon} />
             </Pressable>
           )}
 
@@ -604,6 +621,8 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
             swallows every tap (header back, language pill, fields, CTA) while
             the step's API call is in flight. */}
         {showLoader && <View style={shell.loadingBlock} pointerEvents="auto" />}
+
+        <Toast request={toastRequest} />
 
       </KeyboardAvoidingView>
     </OnboardingCtx.Provider>
@@ -672,6 +691,11 @@ const shell = StyleSheet.create({
     fontSize:   FontSize.font14,
     fontWeight: '400',
     color:      Colors.textDark,
+    // Android pads Poppins' text box with extra ascent/descent space, so the
+    // box's centre (what alignItems:'center' lines the › icon up with) sat
+    // off the visible glyphs — dropping that padding centres the icon on them.
+    includeFontPadding: false,
+    textAlignVertical:  'center',
   },
   skipIcon: {
     marginLeft: 4,

@@ -26,7 +26,8 @@ import { FontSize } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const CDN_PAGE_ICON = CDN_REG + 'property.svg'
+// Was 'property.svg', which doesn't exist on the CDN (404) — left a blank gap.
+const CDN_PAGE_ICON = CDN_REG + 'property-details.svg'
 
 const FALLBACK_OPTIONS = [
   { key: '1', label: 'Own house' },

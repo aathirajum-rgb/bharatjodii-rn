@@ -33,9 +33,9 @@ import { os } from './onboardingStyles'
 // icons every other onboarding screen uses) — registration-revamp.component.html's
 // horoscope-img-center block: assets/images/png/registration-new/horoscope-revamp.png.
 const CDN_ILLUSTRATION = CDN_IMG + 'png/registration-new/horoscope-revamp.png'
-// Angular's .horoscope-image class: min-width/min-height: 77.77vmin — nearly
-// fills the viewport's shorter dimension, not a small fixed icon.
-const ILLUSTRATION_SIZE = Math.round(Dimensions.get('window').width * 0.7777)
+// Design spec: 345×345. Capped to the content width (screen minus
+// os.scrollContent's 24px side padding) so it never overflows narrow phones.
+const ILLUSTRATION_SIZE = Math.min(345, Math.round(Dimensions.get('window').width - 48))
 
 type Props = {
   navigation: any

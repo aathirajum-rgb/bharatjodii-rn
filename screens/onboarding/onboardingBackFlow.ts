@@ -74,6 +74,13 @@ const CREATED_BY_SKIPS_NAME = ['4', '5', '8', '9']
 // when the member selected "Not working".
 const NOT_WORKING_OCCUPATION = '8'
 
+// Sync check for back-button VISIBILITY. Every conditional override in
+// getOnboardingBackPage() below is on a page that already has a static entry,
+// except 20, whose target is resolved conditionally but always exists.
+export function hasOnboardingBackPage(pageNo: string): boolean {
+  return pageNo === '20' || pageNo in LANDING_BACK_PAGE
+}
+
 // Angular: handlePageTypeBackNavigation() — conditional overrides applied on
 // top of the static map above. The NRI (page 10 -> 41) and hometown-domain
 // (page 10 -> 44/46) branches are deliberately NOT ported: both key off

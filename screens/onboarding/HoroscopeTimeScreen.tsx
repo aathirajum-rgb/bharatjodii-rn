@@ -17,7 +17,6 @@ import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
-import Toast, { type ToastRequest } from '../../components/toast/Toast'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 // Angular pageType 31 — birth-time picker (registration-revamp.component.html):
@@ -38,7 +37,7 @@ import Toast, { type ToastRequest } from '../../components/toast/Toast'
 // ICONTYPE and shows one; this one deliberately doesn't.
 
 const ROW_H      = 40           // Angular: inactive .picker-item height
-const ACTIVE_H   = 54           // Angular: .picker-item-active height
+const ACTIVE_H   = 46           // Selected-value box (was Angular's 54 — reduced per design reference)
 // Angular's wheel: ion-picker-internal is 280px tall but pulled up by
 // margin-top:-70px inside the 294px .datetime-wrapper — so only ~210px
 // (≈5 rows) actually shows below the "Hrs"/"Min" labels, with the boxed
@@ -243,12 +242,6 @@ export default function HoroscopeTimeScreen({ navigation }: Props) {
   const [selMinute,  setSelMinute]  = useState('00')
   const [selMeridian, setSelMeridian] = useState<'AM' | 'PM'>('AM')
   const [submitting, setSubmitting] = useState(false)
-  const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
-
-  function showToast(message: string) {
-    setToastRequest({ message, key: Date.now() })
-  }
-
   useEffect(() => {
     getRegValues().then(rv => {
       if (rv.CREATEDBY) setCreatedBy(rv.CREATEDBY)
@@ -298,16 +291,18 @@ export default function HoroscopeTimeScreen({ navigation }: Props) {
         cityKey:  rv.HOROCITY  ?? '',
       })
       if (ok) {
-        // Angular generateHoroscope(): success toast (REG.HOROSUCCESS) before
-        // navigating on to the next step.
-        showToast(t('REG.HOROSUCCESS', 'Horoscope Generated Successfully!'))
+        // Angular generateHoroscope(): success toast (REG.HOROSUCCESS) on
+        // navigating to the next step. Passed as a param so the onboarding
+        // shell shows it on page 32 — a toast rendered here would be hidden
+        // under the pushed screen (see OnboardingRouter's pendingToast).
+        const toast = t('REG.HOROSUCCESS', 'Horoscope Generated Successfully!')
         // Angular: landingNextPage[31] = "/onboarding/32" (Dosham) — this port's
         // pageNo '32' is DoshamScreen, matching that target exactly. (Angular's
         // own Star/Raasi step is a DIFFERENT page — 26 — earlier in its flow,
         // well before the horoscope sub-flow even starts; it isn't page 31's
         // next step in Angular at all, despite this port's pageNo '33' being
         // named StarRaasiScreen.)
-        navigation.push('onboarding', { pageNo: '32' })
+        navigation.push('onboarding', { pageNo: '32', toast })
       }
     } catch {
       // Allow retry
@@ -365,7 +360,6 @@ export default function HoroscopeTimeScreen({ navigation }: Props) {
 
       {/* Sticky footer handled globally via useOnboardingFooter */}
 
-      <Toast request={toastRequest} />
     </View>
   )
 }
@@ -376,7 +370,9 @@ const styles = StyleSheet.create({
   wheelWrap: {
     alignSelf: 'flex-start',   // left-aligned, not centered on the screen
     width:     '100%',
-    maxWidth:  300,
+    // 3 columns × ~56 + 2 colons × COLON_W — keeps the boxes grouped tightly
+    // (as in the design reference) instead of spread across 300px.
+    maxWidth:  216,
   },
 
   columnLabels: {
@@ -448,7 +444,7 @@ const styles = StyleSheet.create({
   },
   wheelTextSel: {
     fontFamily: Fonts.poppinsRegular,
-    fontSize:   FontSize.font20,
+    fontSize:   FontSize.font18,   // was font20 — sized down with the smaller box
     fontWeight: '500',
     color:      Colors.black,
   },
@@ -468,7 +464,7 @@ const styles = StyleSheet.create({
     position:        'absolute',
     alignSelf:       'center',
     top:             0,   // the box sits at the very top of the clip window
-    width:           ACTIVE_H,   // Angular's .picker-item-active: 54x54 square,
+    width:           ACTIVE_H,   // square box (see ACTIVE_H),
     height:          ACTIVE_H,   // not a bar spanning the column's full width
     backgroundColor: Colors.divider,   // Angular: #F0F0F0
     borderRadius:    8,

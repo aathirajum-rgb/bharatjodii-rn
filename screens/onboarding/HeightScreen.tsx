@@ -196,7 +196,15 @@ export default function HeightScreen({ navigation }: Props) {
   function selectExactHeight(option: Option) {
     setSelectedHeight(option)
     setSelectedCategory(null)
-    closePanel()
+    // Close instantly on a pick instead of through closePanel()'s exit
+    // animation: on Android the Modal is its own window, and while it stayed
+    // mounted for that animation it swallowed the tap the user makes next —
+    // almost always the Next CTA — so Next only worked on the second tap.
+    slideAnim.stopAnimation()
+    scrimAnim.stopAnimation()
+    slideAnim.setValue(0)
+    scrimAnim.setValue(0)
+    setPanelMounted(false)
   }
 
   // ─── Derived ──────────────────────────────────────────────────────────────
