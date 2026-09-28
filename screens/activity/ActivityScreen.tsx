@@ -80,7 +80,8 @@ import { CDN_SVG } from '../../constants/cdn'
 import { Colors } from '../../constants/colors'
 import i18n from '../../i18n'
 import type { MatchProfile } from '../../types/interfaces/matches.interface'
-import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { FontSize } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -157,6 +158,7 @@ export default function ActivityScreen({ navigation, route }: Props) {
   const { t } = useTranslation()
   const isDesktop = useIsDesktopWeb()
   const gating = useContactGating()
+  const langFonts = useLanguageFonts()
 
   // Angular: the constructor reads router state ({activityType, selectedSubTab})
   // and ngOnInit reads the :module route param — both land in selectedType.
@@ -1012,8 +1014,8 @@ export default function ActivityScreen({ navigation, route }: Props) {
           width={84} height={84} style={styles.deletedImg} resizeMode="cover"
         />
         <View style={styles.deletedTextCol}>
-          <Text style={styles.deletedName} numberOfLines={1}>{item.name}</Text>
-          <Text style={styles.deletedNote}>{t('LIKE_LIST.DELETED_PROFILE_TXT')}</Text>
+          <Text style={[styles.deletedName, { fontFamily: langFonts.medium }]} numberOfLines={1}>{item.name}</Text>
+          <Text style={[styles.deletedNote, { fontFamily: langFonts.regular }]}>{t('LIKE_LIST.DELETED_PROFILE_TXT')}</Text>
         </View>
       </Pressable>
     )
@@ -1032,9 +1034,9 @@ export default function ActivityScreen({ navigation, route }: Props) {
           width={88} height={88} style={styles.listCardImg} resizeMode="cover"
         />
         <View style={styles.listCardTextCol}>
-          <Text style={styles.listCardName} numberOfLines={1}>{item.name}</Text>
-          {!!line1 && <Text style={styles.listCardDetail} numberOfLines={1}>{line1}</Text>}
-          {!!line2 && <Text style={styles.listCardDetail} numberOfLines={2}>{line2}</Text>}
+          <Text style={[styles.listCardName, { fontFamily: langFonts.semiBold }]} numberOfLines={1}>{item.name}</Text>
+          {!!line1 && <Text style={[styles.listCardDetail, { fontFamily: langFonts.regular }]} numberOfLines={1}>{line1}</Text>}
+          {!!line2 && <Text style={[styles.listCardDetail, { fontFamily: langFonts.regular }]} numberOfLines={2}>{line2}</Text>}
           {/* Angular: list-view-card.component.html:28-37 — the card renders a
               link CTA whenever `linkBtn` is passed, and activity.component.html
               :232 passes CONFIG.LINK_BTN for this list. Its label falls back to
@@ -1047,7 +1049,7 @@ export default function ActivityScreen({ navigation, route }: Props) {
               the whole card already navigates there, so the link is the
               affordance for the tap target that surrounds it. */}
           <View style={styles.listCardLink}>
-            <Text style={styles.listCardLinkText}>{t('CTATXT.VIEWDETAILS')}</Text>
+            <Text style={[styles.listCardLinkText, { fontFamily: langFonts.regular }]}>{t('CTATXT.VIEWDETAILS')}</Text>
             <Image source={{ uri: RIGHT_ARROW_ANIMATION_URI }} style={styles.listCardLinkArrow} />
           </View>
         </View>
@@ -1108,10 +1110,10 @@ export default function ActivityScreen({ navigation, route }: Props) {
     if (isViewedList || !isFreeEntry || !topBanner.title || current.profiles.length === 0) return null
     return (
       <View style={styles.banner}>
-        <Text style={styles.bannerTitle}>{bannerTitle()}</Text>
-        {!!topBanner.subtitle && <Text style={styles.bannerSub}>{stripHtml(topBanner.subtitle)}</Text>}
+        <Text style={[styles.bannerTitle, { fontFamily: langFonts.semiBold }]}>{bannerTitle()}</Text>
+        {!!topBanner.subtitle && <Text style={[styles.bannerSub, { fontFamily: langFonts.regular }]}>{stripHtml(topBanner.subtitle)}</Text>}
         <Pressable style={styles.bannerBtn} onPress={goToPayment}>
-          <Text style={styles.bannerBtnLabel}>{stripHtml(topBanner.cta) || t('GENERAL.BECOME_PAID')}</Text>
+          <Text style={[styles.bannerBtnLabel, { fontFamily: langFonts.regular }]}>{stripHtml(topBanner.cta) || t('GENERAL.BECOME_PAID')}</Text>
         </Pressable>
       </View>
     )
@@ -1150,10 +1152,10 @@ export default function ActivityScreen({ navigation, route }: Props) {
     return (
       <View style={styles.emptyState}>
         <CdnSvg uri={icon} width={160} height={160} />
-        <Text style={styles.emptyTitle}>{stripHtml(title)}</Text>
-        {!!subtitle && <Text style={styles.emptySubtitle}>{stripHtml(subtitle)}</Text>}
+        <Text style={[styles.emptyTitle, { fontFamily: langFonts.semiBold }]}>{stripHtml(title)}</Text>
+        {!!subtitle && <Text style={[styles.emptySubtitle, { fontFamily: langFonts.regular }]}>{stripHtml(subtitle)}</Text>}
         <Pressable style={styles.emptyCta} onPress={goToMatches}>
-          <Text style={styles.emptyCtaLabel}>{t('GENERAL.ACTIVITY_CTA')}</Text>
+          <Text style={[styles.emptyCtaLabel, { fontFamily: langFonts.regular }]}>{t('GENERAL.ACTIVITY_CTA')}</Text>
         </Pressable>
       </View>
     )
@@ -1171,11 +1173,11 @@ export default function ActivityScreen({ navigation, route }: Props) {
           <Pressable onPress={() => handleBack()} hitSlop={10} style={styles.backBtn}>
             <CdnSvg uri={`${CDN_SVG}arrow-back-activity.svg`} width={24} height={24} />
           </Pressable>
-          <Text style={styles.headerTitle} numberOfLines={1}>{viewedHeaderTitle()}</Text>
+          <Text style={[styles.headerTitle, { fontFamily: langFonts.semiBold }]} numberOfLines={1}>{viewedHeaderTitle()}</Text>
         </View>
       ) : (
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>{t('GENERAL.ICON_3')}</Text>
+          <Text style={[styles.headerTitle, { fontFamily: langFonts.semiBold }]}>{t('GENERAL.ICON_3')}</Text>
           {/* Angular: *ngIf="FUNC.showLanguageList('activity')" — LANGLIST.activity is true. */}
           <LanguagePill langCode={i18n.language} />
         </View>
@@ -1189,14 +1191,14 @@ export default function ActivityScreen({ navigation, route }: Props) {
           {!!photoPromoBanner?.['BANNERIMG'] && (
             <CdnImage uri={String(photoPromoBanner['BANNERIMG'])} width={220} height={180} />
           )}
-          <Text style={styles.photoPromoTitle}>
+          <Text style={[styles.photoPromoTitle, { fontFamily: langFonts.semiBold }]}>
             {stripHtml(String(photoPromoBanner?.['TITLE'] ?? t('GENERAL.ADD_PHOTO', 'Add your photo')))}
           </Text>
           {!!photoPromoBanner?.['BODY'] && (
-            <Text style={styles.photoPromoBody}>{stripHtml(String(photoPromoBanner['BODY']))}</Text>
+            <Text style={[styles.photoPromoBody, { fontFamily: langFonts.regular }]}>{stripHtml(String(photoPromoBanner['BODY']))}</Text>
           )}
           <Pressable style={styles.photoPromoCta} onPress={() => addPhoto.openAddPhoto(navigation)}>
-            <Text style={styles.photoPromoCtaLabel}>
+            <Text style={[styles.photoPromoCtaLabel, { fontFamily: langFonts.regular }]}>
               {stripHtml(String(photoPromoBanner?.['CTA'] ?? t('LIKE_LIST.PHOTO_REQ_CTA')))}
             </Text>
           </Pressable>
@@ -1216,10 +1218,10 @@ export default function ActivityScreen({ navigation, route }: Props) {
                       style={[styles.chip, isActive && styles.chipActive]}
                       onPress={() => switchTab(tab)}
                     >
-                      <Text style={[styles.chipLabel, isActive && styles.chipLabelActive]}>{tabLabel(tab)}</Text>
+                      <Text style={[styles.chipLabel, isActive && styles.chipLabelActive, { fontFamily: langFonts.regular }]}>{tabLabel(tab)}</Text>
                       {unread > 0 && (
                         <View style={styles.unreadBadge}>
-                          <Text style={styles.unreadBadgeText}>{unread}</Text>
+                          <Text style={[styles.unreadBadgeText, { fontFamily: langFonts.regular }]}>{unread}</Text>
                         </View>
                       )}
                     </Pressable>
@@ -1240,7 +1242,7 @@ export default function ActivityScreen({ navigation, route }: Props) {
                       style={[styles.chip, isActive && styles.chipActive]}
                       onPress={() => switchSubTab(sub)}
                     >
-                      <Text style={[styles.chipLabel, isActive && styles.chipLabelActive]}>{subTabLabel(sub)}</Text>
+                      <Text style={[styles.chipLabel, isActive && styles.chipLabelActive, { fontFamily: langFonts.regular }]}>{subTabLabel(sub)}</Text>
                     </Pressable>
                   )
                 })}
@@ -1403,7 +1405,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: Colors.divider,
   },
   backBtn: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center' },
-  headerTitle: { flex: 1, fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font18, color: Colors.textDark },
+  headerTitle: { flex: 1, fontSize: FontSize.font18, color: Colors.textDark },
 
   // ── Tab bar — Figma: unselected border #b0b0b0, selected bg/border chip tokens ──
   tabBarWrap: { backgroundColor: Colors.surface },
@@ -1419,8 +1421,8 @@ const styles = StyleSheet.create({
   // Angular: chip.component.html:3 — `color-1f1e1b body2-regular-14`, the SAME
   // class regardless of selected state (only the chip container's own
   // border/background change, not the label color).
-  chipLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.chipLabelText },
-  chipLabelActive: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.chipLabelText },
+  chipLabel: { fontSize: FontSize.font14, color: Colors.chipLabelText },
+  chipLabelActive: { fontSize: FontSize.font14, color: Colors.chipLabelText },
   // Angular: app-chip's countShow badge — small red circle, white count text.
   unreadBadge: {
     minWidth: 18, height: 18, borderRadius: 9, paddingHorizontal: 4,
@@ -1428,7 +1430,7 @@ const styles = StyleSheet.create({
   },
   // Angular: chip.component.html:10 — `font-12-all white-color` (global.scss:2276)
   // — Poppins-Regular 12px, not semibold 11px.
-  unreadBadgeText: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font12, color: Colors.white },
+  unreadBadgeText: { fontSize: FontSize.font12, color: Colors.white },
 
   // ── Card + 3-dot menu overlay ──────────────────────────────────────────────────
   cardWrap: { position: 'relative' },
@@ -1452,16 +1454,16 @@ const styles = StyleSheet.create({
   // Angular: list-view-card.component.html:14 — without `showCheckbox` (this
   // screen's usage), the name span is `black-color font-14-semibold` — 14px
   // Poppins-Semibold, #000000, not 16px `textDark`.
-  listCardName: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font14, color: Colors.black },
+  listCardName: { fontSize: FontSize.font14, color: Colors.black },
   // Angular: list-view-card.component.html:26 — `body3-regular-12`, no color
   // class (inherits #000000 from the row's own `reallyblack` class) — 12px,
   // not 13px/textMedium, and no line-height rule exists for it either.
-  listCardDetail: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.black },
+  listCardDetail: { fontSize: FontSize.font12, color: Colors.black },
   // Angular: the link sits in a `mt-4` wrapper and app-button-revamp gives it
   // `textClassName: 'body3-regular-12 single-line-text'` + textColor `link` — 12px
   // regular, not the 14px the matches card uses for its own View-profile link.
   listCardLink: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 4 },
-  listCardLinkText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: Colors.link },
+  listCardLinkText: { fontSize: FontSize.font12, color: Colors.link },
   listCardLinkArrow: { width: 20, height: 16 },
 
   // ── Deleted profile placeholder (Angular: .delete-div) ──────────────────────
@@ -1486,11 +1488,11 @@ const styles = StyleSheet.create({
   deletedTextCol: { flex: 1, gap: 6 },
   // Angular: activity.component.html:249's `heading4-medium-16 pl-12` — no
   // color class, inherits #000000 — not `textDark`.
-  deletedName: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font16, color: Colors.black },
+  deletedName: { fontSize: FontSize.font16, color: Colors.black },
   // Angular: `.detail-matches` (activity.component.scss:539) — Poppins-Regular
   // 14px (not 13), `var(--gray)` = #666666 (= Colors.textSecondary, not
   // textMedium), line-height 18px.
-  deletedNote: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.textSecondary, lineHeight: 18 },
+  deletedNote: { fontSize: FontSize.font14, color: Colors.textSecondary, lineHeight: 18 },
 
   // ── Unpaid upsell banner ────────────────────────────────────────────────────
   // Angular: `.shortlisted-header` (activity.component.scss:774-778) —
@@ -1500,9 +1502,9 @@ const styles = StyleSheet.create({
   banner: { backgroundColor: 'rgba(181, 0, 51, 0.05)', padding: 16, gap: 6 },
   // Angular: `.shortlisted-header` block (activity.component.html:158-177) —
   // title `heading3-semibold-16 black-color` (#000000, not textPrimary).
-  bannerTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: Colors.black, lineHeight: 22 },
+  bannerTitle: { fontSize: FontSize.font16, color: Colors.black, lineHeight: 22 },
   // Angular: `body2-regular-14 black-color line-height-20` — #000000, not textMedium.
-  bannerSub: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, lineHeight: 20, marginBottom: 8 },
+  bannerSub: { fontSize: FontSize.font14, color: Colors.black, lineHeight: 20, marginBottom: 8 },
   // Angular: buttonSize `mediumsemibold`, border `primaryBorder` ->
   // --ion-color-primary (#B50033 = primaryDark, not the brighter primary red).
   bannerBtn: {
@@ -1512,27 +1514,27 @@ const styles = StyleSheet.create({
   // Angular: no ctaFontSize override -> default body2-regular-14 (Poppins-
   // Regular 14px), but `.mediumsemibold span{font-weight:500}` wins over that
   // class's own 400. textColor 'primaryColor' -> --ion-color-primary (primaryDark).
-  bannerBtnLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, fontWeight: '500', color: Colors.primaryDark },
+  bannerBtnLabel: { fontSize: FontSize.font14, fontWeight: '500', color: Colors.primaryDark },
 
   // ── Add-photo promotion (Angular: app-add-photo, fromPage="activity", default
   // promotype='1') ─────────────────────────────────────────────────────────────
   photoPromoWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32, gap: 12 },
   // Angular: add-photo.component.html:26 — `heading1-semibold-20 black-color
   // line-height-32` — 20px (not 18), #000000, line-height 32.
-  photoPromoTitle: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font20, color: Colors.black, textAlign: 'center', lineHeight: 32 },
+  photoPromoTitle: { fontSize: FontSize.font20, color: Colors.black, textAlign: 'center', lineHeight: 32 },
   // Angular: promotype='1' renders the SUBHEADER line — `body2-regular-14
   // black-color`, no line-height class — #000000, not textMedium. (Angular
   // also renders two `heading4-medium-16 black-color` bullet points below this
   // that photoPromoBanner's TITLE/BODY/CTA shape has no data for — not fixed
   // here, flagging as a real content-model gap.)
-  photoPromoBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, textAlign: 'center' },
+  photoPromoBody: { fontSize: FontSize.font14, color: Colors.black, textAlign: 'center' },
   photoPromoCta: {
     marginTop: 8, backgroundColor: Colors.primaryDark, borderRadius: 8,
     paddingHorizontal: 24, paddingVertical: 12,
   },
   // Angular: no buttonSize/ctaFontSize override -> default body2-regular-14 —
   // Poppins-Regular 14px (not Medium 15), white.
-  photoPromoCtaLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.white },
+  photoPromoCtaLabel: { fontSize: FontSize.font14, color: Colors.white },
 
   // ── List ──────────────────────────────────────────────────────────────────────
   listContent: { flexGrow: 1, paddingBottom: 16 },
@@ -1544,9 +1546,9 @@ const styles = StyleSheet.create({
   },
   // Angular: activity.component.html:99+ empty block — `heading3-semibold-16
   // black-color` (#000000, not textPrimary).
-  emptyTitle: { marginTop: 8, fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: Colors.black, textAlign: 'center' },
+  emptyTitle: { marginTop: 8, fontSize: FontSize.font16, color: Colors.black, textAlign: 'center' },
   // Angular: `body2-regular-14 black-color` (#000000, not textSecondary).
-  emptySubtitle: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black, textAlign: 'center', lineHeight: 20 },
+  emptySubtitle: { fontSize: FontSize.font14, color: Colors.black, textAlign: 'center', lineHeight: 20 },
   // Angular: SECONDARY_BTN (button.config.ts:50) — border `primaryBorder` ->
   // --ion-color-primary (#B50033 = primaryDark), NOT a red/primary label —
   // textColor is literally `black`.
@@ -1556,5 +1558,5 @@ const styles = StyleSheet.create({
   },
   // Angular: no buttonSize/ctaFontSize override -> default body2-regular-14 —
   // Poppins-Regular 14px (not Medium 15), textColor black (not primary red).
-  emptyCtaLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
+  emptyCtaLabel: { fontSize: FontSize.font14, color: Colors.black },
 })

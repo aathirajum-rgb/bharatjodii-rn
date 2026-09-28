@@ -23,10 +23,11 @@ import Animated, {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import { LANG_LABELS } from '../../components/matches-header/MatchesHeader'
+import { NewlyJoinedBadge } from '../../components/profile-photo/ProfilePhoto'
 import {
   WhatsAppIcon, CallIcon, MessageIcon, CloseIcon, ViewLaterIcon, LikeIcon,
   showLikeCTA, showAfterLikeCTA, disableDontShow, disableViewLater, HtmlText,
-  BlurPhotoPlaceholder, getAvatarFallbackUri, NEWLY_JOINED_STAR_URI, ProfileBadge, PhotoSwiper,
+  BlurPhotoPlaceholder, getAvatarFallbackUri, ProfileBadge, PhotoSwiper,
   getAfterLikeCtaLabel, getAfterLikeCtaIcon, getAfterLikeContentText, showAfterLikeContentLine,
   showAfterLikeMessageCta, getMessageBtnText,
   showContactsLeftBanner, showFreeBadge,
@@ -2379,12 +2380,12 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
               style={s.photoBottomGradient}
               pointerEvents="none"
             />
-            {profile.isNewlyJoined && !ownProfile && (
-              <View style={s.newBadge} pointerEvents="none">
-                <CdnSvg uri={NEWLY_JOINED_STAR_URI} width={14} height={14} />
-                <Text style={[s.newBadgeText, { fontFamily: langFonts.medium }]}>{t('MATCHES.NEW')}</Text>
-              </View>
-            )}
+            {/* Angular: viewprofile.page.html:165 — the SAME <app-badge> +
+                MATCHES.NEW_BADGE ("Newly Joined") + newly-joined.svg ribbon
+                background as the Matches card, not a separate "New" badge.
+                Reuses ProfilePhoto.tsx's own NewlyJoinedBadge instead of a
+                second, drifting implementation. */}
+            {profile.isNewlyJoined && !ownProfile && <NewlyJoinedBadge />}
           
             </View>
           </GestureDetector>
@@ -2990,15 +2991,6 @@ const s = StyleSheet.create({
   // Flat, full-bleed square — Angular has no border-radius on this photo (unlike
   // the rounded Matches-card photo), confirmed against viewprofile.page.scss.
   photoBox: { width: SCREEN_WIDTH, height: PHOTO_HEIGHT, backgroundColor: Colors.divider },
-  newBadge: {
-    position: 'absolute', top: 0, left: 0,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    backgroundColor: Colors.primaryDark, height: 24,
-    paddingLeft: 8, paddingRight: 12, borderBottomRightRadius: 10, gap: 4,
-  },
-  // Angular: badge.component.html — .textcta-medium-12 (font12, Poppins-Medium,
-  // weight 500) — NOT Regular/400. fontFamily applied inline (langFonts.medium).
-  newBadgeText: { fontWeight: '500', fontSize: FontSize.font12, color: Colors.white },
   // Feature 2 prev/next-profile chevrons — same dark-circle/white-chevron style
   // as PhotoSwiper's own desktop arrow fallback (matchesCard.shared.tsx). Angular:
   // viewprofile.page.scss:512,523 `top: calc(100vw + 32px)` — just below the square
