@@ -38,7 +38,7 @@ import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { stripAndDecodeHtml as stripHtml } from '../../utils/htmlEntities'
-import { Fonts, FontSize } from '../../src/theme/fonts'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -707,7 +707,7 @@ export default function DOBScreen({ navigation }: Props) {
         {ageMode && (
           <View style={styles.pageAgeOuter}>
             <TextInput
-              style={[styles.ageInputBox, { borderColor: pageAgeBorderColor }, webOutlineReset]}
+              style={[styles.ageInputBox, { borderColor: pageAgeBorderColor, fontFamily: langFonts.medium }, webOutlineReset]}
               keyboardType="number-pad"
               value={pageAge}
               onChangeText={v => setPageAge(v.replace(/\D/g, ''))}
@@ -847,6 +847,11 @@ export default function DOBScreen({ navigation }: Props) {
             ref={pickerListRef}
             style={{ maxHeight: listH }}
             contentOffset={{ x: 0, y: initialScrollIdx * ITEM_H }}
+            // contentOffset is iOS-only — Android/web opened at the top, leaving the
+            // selected year (e.g. 1994) out of view / cut off. Scroll there explicitly.
+            onLayout={() => {
+              if (selectedIdx >= 0) pickerListRef.current?.scrollTo({ y: initialScrollIdx * ITEM_H, animated: false })
+            }}
             showsVerticalScrollIndicator
             scrollEventThrottle={16}
             // Any touch on the list hands scrolling back to the user.
@@ -939,7 +944,7 @@ export default function DOBScreen({ navigation }: Props) {
           <View style={styles.ageInputOuter}>
             <TextInput
               ref={ageInputRef}
-              style={[styles.ageInputBox, { borderColor: ageInputBorderColor }, webOutlineReset]}
+              style={[styles.ageInputBox, { borderColor: ageInputBorderColor, fontFamily: langFonts.medium }, webOutlineReset]}
               keyboardType="number-pad"
               value={ageInput}
               onChangeText={v => { setAgeInput(v.replace(/\D/g, '')); setAgeError('') }}
@@ -956,7 +961,7 @@ export default function DOBScreen({ navigation }: Props) {
             </View>
           </View>
 
-          {!!ageError && <Text style={styles.ageError}>{ageError}</Text>}
+          {!!ageError && <Text style={[styles.ageError, { fontFamily: langFonts.regular }]}>{ageError}</Text>}
 
           <View style={[styles.ageConfirmBtn, { marginBottom: insets.bottom + 20 }]}>
             <ButtonRevamp
@@ -1013,9 +1018,12 @@ const styles = StyleSheet.create({
     zIndex:            10,
   },
   // Angular: floating-dob body3-regular-12 black-color
+  // No fontWeight next to the inline langFonts family: on Android a weight on a
+  // custom family can fall back to the system font, which is what made the three
+  // fields render at slightly different heights (misaligned).
   fieldLabelText: {
     fontSize:   FontSize.font12,
-    fontWeight: '400',
+    lineHeight: 16,
     color:      Colors.black,
   },
 
@@ -1027,19 +1035,25 @@ const styles = StyleSheet.create({
   },
   // Angular: ion-label class="ion-no-margin black-color body1-medium-14" —
   // same class for both a filled value and the untranslated placeholder.
+  // Explicit lineHeight + no font padding: Poppins' tall line box was clipping
+  // the value (e.g. "1994" showed partially) inside the 48px field.
   fieldText: {
     flex:       1,
+    minWidth:   0,
     fontSize:   FontSize.font14,
-    fontWeight: '500',
+    lineHeight: 20,
     color:      Colors.black,
+    includeFontPadding: false,
+    textAlignVertical:  'center',
   },
   fieldPlaceholder: {
-    fontWeight: '500',
     color:      Colors.black,
   },
   chevronIcon: {
     width:  16,
     height: 16,
+    flexShrink: 0,
+    marginLeft: 4,
   },
   // ── Age badge ────────────────────────────────────────────────────────────────
 
@@ -1177,8 +1191,9 @@ const styles = StyleSheet.create({
   // inherits that ambient #333333 (Colors.textDark), not Colors.textPrimary.
   dropdownItemText: {
     fontSize:   FontSize.font14,
-    fontWeight: '400',
+    lineHeight: 20,
     color:      Colors.textDark,
+    includeFontPadding: false,
   },
   // Angular's '.selection' class (applied to the matching ion-item) only
   // changes --background — it doesn't bold or recolor the row's text.
@@ -1238,7 +1253,6 @@ const styles = StyleSheet.create({
     paddingVertical:    0,
     textAlignVertical:  'center',
     includeFontPadding: false,
-    fontFamily:        Fonts.poppinsMedium,
     fontSize:          FontSize.font14,
     fontWeight:        '500',
     color:             Colors.textPrimary,
@@ -1259,7 +1273,6 @@ const styles = StyleSheet.create({
   // Closest Angular analog (name-violation text): body3-regular-12
   // color-de2a68 — no line-height class set.
   ageError: {
-    fontFamily: Fonts.poppinsRegular,
     marginTop:  8,
     fontSize:   FontSize.font12,
     color:      Colors.inputError,

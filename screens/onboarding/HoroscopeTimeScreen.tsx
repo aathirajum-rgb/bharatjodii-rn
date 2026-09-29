@@ -11,7 +11,7 @@ import {
 } from 'react-native'
 import { LinearGradient } from 'expo-linear-gradient'
 import { Colors } from '../../constants/colors'
-import { Fonts, FontSize } from '../../src/theme/fonts'
+import { FontSize } from '../../src/theme/fonts'
 import { generateHoroscope, getRegValues } from '../../service/registrationService'
 import { PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
@@ -62,7 +62,7 @@ const MERIDIANS = ['AM', 'PM']
 
 type Props = {
   navigation: any
-  route: { params?: { pageNo?: string } }
+  route: { params?: { pageNo?: string; fromEditProfile?: boolean } }
 }
 
 // ─── Wheel column ─────────────────────────────────────────────────────────────
@@ -86,6 +86,7 @@ function WheelColumn({
   selected: string
   onChange: (value: string) => void
 }) {
+  const langFonts = useLanguageFonts()
   const listRef = useRef<ScrollView>(null)
   const padCount = (VISIBLE - 1) / 2
   const selectedIndex = Math.max(0, data.indexOf(selected))
@@ -211,7 +212,7 @@ function WheelColumn({
                 Platform.OS === 'web' ? ({ scrollSnapAlign: 'center' } as any) : null,
               ]}
             >
-              <Text style={[styles.wheelText, isLive && styles.wheelTextSel]}>{value}</Text>
+              <Text style={[styles.wheelText, isLive && styles.wheelTextSel, { fontFamily: langFonts.regular }]}>{value}</Text>
             </View>
           )
         })}
@@ -230,7 +231,8 @@ function WheelColumn({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function HoroscopeTimeScreen({ navigation }: Props) {
+export default function HoroscopeTimeScreen({ navigation, route }: Props) {
+  const fromEditProfile = !!route?.params?.fromEditProfile
   const { t } = useTranslation()
   const langFonts = useLanguageFonts()
 
@@ -278,9 +280,15 @@ export default function HoroscopeTimeScreen({ navigation }: Props) {
   async function handleNext() {
     if (submitting) return
     setSubmitting(true)
+    // Angular generateHoroscope() fires generatehoro/updatehoroinfo and moves
+    // on to the next step straight away, whatever the API returns. This port
+    // used to navigate ONLY on RESPONSECODE == 1 and swallow everything else,
+    // so a rejected/failed call left Next looking dead ("doesn't respond").
+    // Now: always move on; the success toast only when the API confirms.
+    let ok = false
     try {
       const rv = await getRegValues()
-      const ok = await generateHoroscope({
+      ok = await generateHoroscope({
         date:     rv.DATE  ?? '',
         month:    rv.MONTH ?? '',
         year:     rv.YEAR  ?? '',
@@ -290,25 +298,25 @@ export default function HoroscopeTimeScreen({ navigation }: Props) {
         stateId:  rv.HOROSTATE ?? '',
         cityKey:  rv.HOROCITY  ?? '',
       })
-      if (ok) {
-        // Angular generateHoroscope(): success toast (REG.HOROSUCCESS) on
-        // navigating to the next step. Passed as a param so the onboarding
-        // shell shows it on page 32 — a toast rendered here would be hidden
-        // under the pushed screen (see OnboardingRouter's pendingToast).
-        const toast = t('REG.HOROSUCCESS', 'Horoscope Generated Successfully!')
-        // Angular: landingNextPage[31] = "/onboarding/32" (Dosham) — this port's
-        // pageNo '32' is DoshamScreen, matching that target exactly. (Angular's
-        // own Star/Raasi step is a DIFFERENT page — 26 — earlier in its flow,
-        // well before the horoscope sub-flow even starts; it isn't page 31's
-        // next step in Angular at all, despite this port's pageNo '33' being
-        // named StarRaasiScreen.)
-        navigation.push('onboarding', { pageNo: '32', toast })
-      }
-    } catch {
-      // Allow retry
+    } catch (e) {
+      if (__DEV__) console.warn('[HoroscopeTime] generateHoroscope failed:', e)
     } finally {
       setSubmitting(false)
     }
+    // Angular generateHoroscope(): success toast (REG.HOROSUCCESS) on
+    // navigating to the next step. Passed as a param so the onboarding
+    // shell shows it on page 32 — a toast rendered here would be hidden
+    // under the pushed screen (see OnboardingRouter's pendingToast).
+    const toast = ok ? t('REG.HOROSUCCESS', 'Horoscope Generated Successfully!') : undefined
+    // Angular: landingNextPage[31] = "/onboarding/32" (Dosham) — this port's
+    // pageNo '32' is DoshamScreen, matching that target exactly. (Angular's
+    // own Star/Raasi step is a DIFFERENT page — 26 — earlier in its flow,
+    // well before the horoscope sub-flow even starts; it isn't page 31's
+    // next step in Angular at all, despite this port's pageNo '33' being
+    // named StarRaasiScreen.)
+    // From Edit Profile: back there (it reloads and shows the horoscope as added).
+    if (fromEditProfile) { navigation.popTo('EditProfile'); return }
+    navigation.push('onboarding', { pageNo: '32', ...(toast ? { toast } : {}) })
   }
 
   // "I'll do this later" removed on this screen per product direction — Angular's
@@ -343,16 +351,16 @@ export default function HoroscopeTimeScreen({ navigation }: Props) {
             <View style={styles.colonSpacer} />
             <Text style={[styles.columnLabel, { fontFamily: langFonts.medium }]}>{t('REGISTRATION.MINS', 'Min')}</Text>
             <View style={styles.colonSpacer} />
-            <Text style={styles.columnLabel} />
+            <Text style={[styles.columnLabel, { fontFamily: langFonts.medium }]} />
           </View>
 
           <View style={styles.wheelBody}>
             <WheelColumn data={HOURS}     selected={selHour}     onChange={setSelHour} />
-            <Text style={styles.colon}>:</Text>
+            <Text style={[styles.colon, { fontFamily: langFonts.regular }]}>:</Text>
             <WheelColumn data={MINUTES}   selected={selMinute}   onChange={setSelMinute} />
             {/* Second colon between Minute and AM/PM — same treatment as the
                 Hour/Minute colon, per product direction. */}
-            <Text style={styles.colon}>:</Text>
+            <Text style={[styles.colon, { fontFamily: langFonts.regular }]}>:</Text>
             <WheelColumn data={MERIDIANS} selected={selMeridian} onChange={v => setSelMeridian(v as 'AM' | 'PM')} />
           </View>
         </View>
@@ -435,15 +443,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   wheelText: {
-    // Poppins Regular always — these are numerals/AM-PM, not translated text,
-    // so they don't switch to the per-language NotoSans family the way the
-    // title/labels do via useLanguageFonts().
-    fontFamily: Fonts.poppinsRegular,
+    // Regular family from useLanguageFonts(), applied inline (Poppins for
+    // English, the per-language NotoSans family otherwise).
     fontSize:   FontSize.font14,
     color:      '#808080',   // Angular: .picker-item color, exact match
   },
   wheelTextSel: {
-    fontFamily: Fonts.poppinsRegular,
     fontSize:   FontSize.font18,   // was font20 — sized down with the smaller box
     fontWeight: '500',
     color:      Colors.black,
@@ -453,7 +458,6 @@ const styles = StyleSheet.create({
     width:      COLON_W,
     height:     ACTIVE_H,       // matches the box's height so its own line-height
     lineHeight: ACTIVE_H,       // centers vertically within that same top-aligned
-    fontFamily: Fonts.poppinsRegular,
     fontSize:   FontSize.font24,             // space, now that wheelBody uses flex-start
     fontWeight: '700',
     color:      Colors.black,

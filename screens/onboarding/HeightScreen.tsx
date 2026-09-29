@@ -32,7 +32,7 @@ import { os } from './onboardingStyles'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
-import { Fonts, FontSize } from '../../src/theme/fonts'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -317,8 +317,9 @@ export default function HeightScreen({ navigation }: Props) {
                     is declared AFTER body2-regular-14/body1-medium-14 in global.scss, so at
                     equal specificity (both !important) it wins the font-family cascade; that
                     class maps to var(--english-poppins), which _variable.scss defines as
-                    Roboto-Regular (originally meant for the Rupee symbol), not Poppins. */}
-                <Text style={[styles.exactFieldText, { fontFamily: Fonts.robotoRegular }]} numberOfLines={1}>
+                    Roboto-Regular (originally meant for the Rupee symbol), not Poppins.
+                    RN uses langFonts.regular instead so the text follows the app language's script. */}
+                <Text style={[styles.exactFieldText, { fontFamily: langFonts.regular }]} numberOfLines={1}>
                   {selectedHeight
                     ? selectedHeight.label
                     : linkText}
@@ -432,7 +433,7 @@ export default function HeightScreen({ navigation }: Props) {
 
             {heightGroups.length === 0 ? (
               <View style={styles.panelEmpty}>
-                <Text style={styles.panelEmptyText}>{noHeightsText}</Text>
+                <Text style={[styles.panelEmptyText, { fontFamily: langFonts.regular }]}>{noHeightsText}</Text>
               </View>
             ) : (
               <SectionList
@@ -594,8 +595,8 @@ const styles = StyleSheet.create({
   },
   // Angular: black-color body2-regular-14 poppins-family, static weight —
   // never bolds on selection (registration-revamp.component.html:51-52) —
-  // fontFamily is Fonts.robotoRegular (see the poppins-family cascade note
-  // at the Text element above), not langFonts
+  // fontFamily is langFonts.regular, applied inline (see the poppins-family
+  // cascade note at the Text element above)
   exactFieldText: {
     flex:       1,
     fontSize:   FontSize.font14,

@@ -1,62 +1,40 @@
-// New screen — Angular's Age/Height rows (editform/5, /6, /43) each need
-// bespoke UI (a 3-dropdown DOB picker + "enter age directly" fallback for
-// Age; a category-radio-or-exact-height side panel for Height) far more
-// involved than the plain SelectField+SearchablePicker rows the other group
-// screens use. BasicDetailsScreen.tsx's own header comment already deferred
-// these two fields for exactly this reason. This screen re-implements (not
-// imports) the same interaction patterns already proven in
-// screens/onboarding/DOBScreen.tsx and screens/onboarding/HeightScreen.tsx,
-// wired to editProfileService instead of registration AsyncStorage.
+// Age / Height editors for the mobile Edit Profile screen (EditAgeHeightSheets
+// below) plus the shared date/height helpers they use. The old full-page
+// Age/Height screen that used to live here was removed — Edit Profile opens
+// these sheets straight from its Age and Height rows (and via the EditProfile
+// route's openField: 'age' | 'height' deep link).
 //
-// Age save shape (FLAGGED, not confirmed against a live capture): whichever
-// entry path is used (full DOB or "enter age directly"), the computed age
-// number is sent under FieldKey 'AGE' (TYPE 3) — Angular's edit-profile
-// TYPE-code map has no separate code for DATEOFBIRTH. Height is saved under
-// whichever of HEIGHT/HEIGHTCATEGORY the user picked (both share TYPE 4,
-// mutually exclusive) — never both in the same submit.
+// Age save shape: a full DOB sends DOB (TYPE 20, "Y~M~D") + AGE (TYPE 3), the
+// same pair Angular's form-fields goToNext() fires; a typed age sends AGE only.
+// Height is saved under whichever of HEIGHT / HEIGHTCATEGORY applies (both
+// TYPE 4, mutually exclusive).
 
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  ActivityIndicator, Alert, Animated, Easing, FlatList, Keyboard, KeyboardAvoidingView, Modal, Platform,
-  Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, TouchableOpacity,
-  TouchableWithoutFeedback, View,
+  ActivityIndicator, Alert, Animated, Easing, Keyboard, Modal, Platform,
+  Pressable, ScrollView, SectionList, StyleSheet, Text, TextInput, View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Colors } from '../../constants/colors'
-import { Fonts, FontSize } from '../../src/theme/fonts'
-import { CDN_REACT, CDN_REVAMP } from '../../constants/cdn'
+import { FontSize } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
+import { CDN_REVAMP } from '../../constants/cdn'
 import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem } from '../../service/storageService'
-import { fetchEditProfileInfo, submitFieldChanges, type EditProfileInfo, type FieldChange } from '../../service/editProfileService'
+import { submitFieldChanges, type EditProfileInfo, type FieldChange } from '../../service/editProfileService'
 import {
   fetchHeightCategoryOptions, fetchExactHeightGrouped, type HeightGroup,
 } from '../../service/registrationService'
 import { PICKER_PANEL_WIDTH, PROFILE_POSSESSIVE } from '../../constants/registration.constants'
 import { Image } from 'expo-image'
-import CdnSvg from '../../components/cdn-svg/CdnSvg'
-import SelectField from '../../components/input/SelectField'
-import FieldRestrictedSheet from '../../components/edit-profile/FieldRestrictedSheet'
-import ScreenTopInset from '../../components/screen/ScreenTopInset'
 import BottomSheet from '../../components/bottom-sheet/BottomSheet'
-import { handleBack } from '../../utils/navigationRef'
 
-const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 const ITEM_H = 40
-const MAX_LIST_ITEMS = 7
 
 type Option   = { key: string; label: string }
 type Category = { key: string; label: string; subtitle: string }
-type Props    = { navigation: any }
 type DateFieldKey = 'date' | 'month' | 'year'
-type DropdownPos  = { top: number; left: number; width: number; fieldBottom: number }
-
-const FALLBACK_CATEGORIES: Category[] = [
-  { key: '101', label: 'Below average', subtitle: "Shorter than 5'3 ft" },
-  { key: '102', label: 'Average',       subtitle: "5'4 - 5'6 ft"        },
-  { key: '103', label: 'Above average', subtitle: "5'7 - 5'11 ft"       },
-  { key: '104', label: 'Tall',          subtitle: "Greater than 6 ft"    },
-]
 
 const MONTHS = [
   { key: '1',  label: 'January'   }, { key: '2',  label: 'February'  },
@@ -106,582 +84,6 @@ function parseHtmlLabel(raw: string): { label: string; subtitle: string } {
 const YEARS = buildYears()
 // Age sheet's Year dropdown lists oldest → newest (reverse of YEARS).
 const YEARS_ASC = [...YEARS].reverse()
-
-export default function EditProfileAgeHeightScreen({ navigation: _navigation }: Props) {
-  const insets = useSafeAreaInsets()
-  const { t } = useTranslation()
-
-  const [loading, setLoading]       = useState(true)
-  const [submitting, setSubmitting] = useState(false)
-
-  // ── Age ──
-  const [ageEditable, setAgeEditable] = useState(true)
-  const [restrictedVisible, setRestrictedVisible] = useState(false)
-  const [selDate, setSelDate]   = useState('')
-  const [selMonth, setSelMonth] = useState('')
-  const [selYear, setSelYear]   = useState('')
-  const [directAge, setDirectAge] = useState('')
-  const [datePickerField, setDatePickerField] = useState<DateFieldKey | null>(null)
-  const [dropdownPos, setDropdownPos] = useState<DropdownPos>({ top: 0, left: 0, width: 94, fieldBottom: 0 })
-  const [showAgeSheet, setShowAgeSheet] = useState(false)
-  const [ageInput, setAgeInput] = useState('')
-  const [ageError, setAgeError] = useState('')
-
-  const dateRef  = useRef<View>(null)
-  const monthRef = useRef<View>(null)
-  const yearRef  = useRef<View>(null)
-
-  // ── Height ──
-  const [categories, setCategories]     = useState<Category[]>([])
-  const [heightGroups, setHeightGroups] = useState<HeightGroup[]>([])
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [selectedHeight, setSelectedHeight]     = useState<Option | null>(null)
-  const [heightPanelVisible, setHeightPanelVisible] = useState(false)
-  const slideAnim = useRef(new Animated.Value(0)).current
-
-  const [original, setOriginal] = useState<{
-    age?: string | undefined; height?: string | undefined; heightCategory?: string | undefined
-  }>({})
-
-  useEffect(() => {
-    (async () => {
-      setLoading(true)
-      const info = await fetchEditProfileInfo()
-      if (!info) { setLoading(false); return }
-
-      setAgeEditable(info.ageEditable)
-      setOriginal({ age: info.age, height: info.height, heightCategory: info.heightCategory })
-
-      if (info.dateOfBirth) {
-        const p = info.dateOfBirth.split('-')
-        if (p.length === 3 && p[0]?.length === 4) {
-          setSelYear(p[0]); setSelMonth(String(Number(p[1]))); setSelDate(String(Number(p[2])))
-        }
-      }
-      if (!info.dateOfBirth && info.age) setDirectAge(info.age)
-
-      const gender = info.gender ?? (await getItem(SK.User.LOGIN_GENDER)) ?? '1'
-      const [rawCats, groups] = await Promise.all([
-        fetchHeightCategoryOptions(gender),
-        fetchExactHeightGrouped(gender),
-      ])
-      const cats: Category[] = rawCats.length
-        ? rawCats.map(opt => { const { label, subtitle } = parseHtmlLabel(opt.label); return { key: opt.key, label, subtitle } })
-        : FALLBACK_CATEGORIES
-      setCategories(cats)
-      setHeightGroups(groups)
-
-      if (info.height) {
-        const found = groups.flatMap(g => g.data).find(h => h.key === info.height)
-        if (found) setSelectedHeight(found)
-      } else if (info.heightCategory) {
-        setSelectedCategory(info.heightCategory)
-      }
-
-      setLoading(false)
-    })()
-  }, [])
-
-  // ── Age: DOB dropdown ──
-
-  function getDateOptions(field: DateFieldKey) {
-    if (field === 'month') return MONTHS
-    if (field === 'year')  return YEARS
-    return getDaysInMonth(selMonth, selYear)
-  }
-  function getDateCurrentVal(field: DateFieldKey) {
-    if (field === 'date')  return selDate
-    if (field === 'month') return selMonth
-    return selYear
-  }
-  function dateRefFor(field: DateFieldKey) {
-    if (field === 'date')  return dateRef
-    if (field === 'month') return monthRef
-    return yearRef
-  }
-  function openDatePicker(field: DateFieldKey) {
-    const ref = dateRefFor(field)
-    ref.current?.measureInWindow((x, y, w, h) => {
-      const dropW = field === 'month' ? Math.max(w, 130) : w
-      setDropdownPos({ top: y, left: x, width: dropW, fieldBottom: y + h })
-      setDatePickerField(field)
-    })
-  }
-  function handleDatePickerSelect(field: DateFieldKey, key: string) {
-    if (field === 'date') {
-      setSelDate(key)
-    } else if (field === 'month') {
-      setSelMonth(key)
-      if (selDate) {
-        const days = getDaysInMonth(key, selYear)
-        if (Number(selDate) > days.length) setSelDate('')
-      }
-    } else {
-      setSelYear(key)
-      if (selDate && selMonth === '2') {
-        const days = getDaysInMonth(selMonth, key)
-        if (Number(selDate) > days.length) setSelDate('')
-      }
-    }
-    setDatePickerField(null)
-    setDirectAge('')
-  }
-
-  function handleAgeSubmit() {
-    const age = ageInput.trim()
-    const ageNum = Number(age)
-    if (!age || ageNum < 18 || ageNum > 70) {
-      setAgeError('Please enter a valid age (18–70)')
-      return
-    }
-    setDirectAge(age)
-    setSelDate(''); setSelMonth(''); setSelYear('')
-    setShowAgeSheet(false)
-  }
-
-  const isDobComplete = !!(selDate && selMonth && selYear)
-  const calculatedAge = isDobComplete ? calculateAge(selYear, selMonth, selDate) : null
-
-  // ── Height ──
-
-  function openHeightPanel() {
-    setHeightPanelVisible(true)
-    Animated.timing(slideAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start()
-  }
-  function closeHeightPanel() {
-    Animated.timing(slideAnim, { toValue: 0, duration: 230, useNativeDriver: true }).start(() => setHeightPanelVisible(false))
-  }
-  function selectCategory(key: string) {
-    setSelectedCategory(key)
-    setSelectedHeight(null)
-  }
-  function selectExactHeight(option: Option) {
-    setSelectedHeight(option)
-    setSelectedCategory(null)
-    closeHeightPanel()
-  }
-
-  const panelTranslateX = slideAnim.interpolate({ inputRange: [0, 1], outputRange: [PICKER_PANEL_WIDTH, 0] })
-
-  // ── Submit ──
-
-  async function handleSubmit() {
-    if (submitting) return
-    setSubmitting(true)
-
-    const changes: FieldChange[] = []
-
-    // Angular (form-fields.component.ts's goToNext()) never gates these calls
-    // on "did the value change from the prefill" — EXISTINGVALUE is sent for
-    // backend audit only, the update call itself always fires. Matching that
-    // here matters specifically for Age: this screen is reached via the
-    // server's own "Age still incomplete" signal (page_id 47), so if the
-    // prefilled value happens to equal what the user re-confirms, skipping
-    // the call would leave the backend's flag never cleared and re-land the
-    // user right back on this screen on the next login.
-    if (ageEditable) {
-      if (isDobComplete) {
-        // Angular fires BOTH calls for a completed DOB entry: TYPE=20 (DOB,
-        // tilde-joined YEAR~MONTH~DATE) then TYPE=3 (AGE, computed). Sending
-        // only AGE (as this screen used to) can leave the backend's
-        // DOB-specific completeness check unsatisfied.
-        changes.push({ field: 'DOB', value: `${selYear}~${selMonth}~${selDate}`, existingValue: original.age })
-        changes.push({ field: 'AGE', value: String(calculatedAge), existingValue: original.age })
-      } else if (directAge) {
-        changes.push({ field: 'AGE', value: directAge, existingValue: original.age })
-      }
-    }
-
-    if (selectedHeight) {
-      changes.push({ field: 'HEIGHT', value: selectedHeight.key, existingValue: original.height || original.heightCategory })
-    } else if (selectedCategory) {
-      changes.push({ field: 'HEIGHTCATEGORY', value: selectedCategory, existingValue: original.heightCategory || original.height })
-    }
-
-    if (changes.length === 0) {
-      setSubmitting(false)
-      handleBack()
-      return
-    }
-
-    const result = await submitFieldChanges(changes)
-    setSubmitting(false)
-
-    if (result.failed.length > 0) {
-      Alert.alert(
-        'Some changes could not be saved',
-        `${result.succeeded.length} saved, ${result.failed.length} failed: ${result.failed.join(', ')}`,
-      )
-      return
-    }
-    handleBack()
-  }
-
-  if (loading) {
-    return (
-      <View style={[s.screen, s.center]}>
-        <ScreenTopInset style={s.topInset} />
-        <ActivityIndicator color={Colors.primaryDark} size="large" />
-      </View>
-    )
-  }
-
-  const datePickerOptions = datePickerField ? getDateOptions(datePickerField) : []
-  const datePickerCurrentVal = datePickerField ? getDateCurrentVal(datePickerField) : ''
-  const dateListH = Math.min(datePickerOptions.length, MAX_LIST_ITEMS) * ITEM_H
-  const dateDropStyle = {
-    position: 'absolute' as const,
-    top: dropdownPos.fieldBottom, left: dropdownPos.left, width: dropdownPos.width,
-  }
-
-  return (
-    <View style={s.screen}>
-      <ScreenTopInset />
-      <View style={s.header}>
-        <Pressable style={s.backBtn} onPress={() => handleBack()} accessibilityRole="button" accessibilityLabel="Back">
-          <CdnSvg uri={ICON_BACK} width={24} height={24} />
-        </Pressable>
-        <Text style={s.headerTitle} numberOfLines={1}>{t('EDITPROFILE.EDIT_PROFILE')}</Text>
-      </View>
-
-      <ScrollView contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 16 }]} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-        <Text style={s.heading}>{t('EDITPROFILE.BASIC_DETAILS')}</Text>
-
-        {/* ── Age ── */}
-        <Text style={s.fieldGroupLabel}>{t('EDITPROFILE.AGE')}</Text>
-        {!ageEditable ? (
-          <SelectField
-            label={t('EDITPROFILE.AGE')}
-            value={original.age ? `${original.age} years old` : undefined}
-            locked
-            // Angular: showDisableToast('age') -> restrictPopup(), i.e. the
-            // lowerpopup 'editFieldRestrict' popup with the generic
-            // RESTRICT_FIELD/RESTRICT_SUPPORT copy — its per-field AGEDISABLE
-            // toast is commented out there, same as NAMEDISABLE.
-            onPress={() => setRestrictedVisible(true)}
-          />
-        ) : (
-          <>
-            <View style={h.fieldsRow}>
-              {(
-                [
-                  { field: 'date' as DateFieldKey, ref: dateRef, val: selDate, display: selDate ? selDate.padStart(2, '0') : '', placeholder: 'Date' },
-                  { field: 'month' as DateFieldKey, ref: monthRef, val: selMonth, display: MONTHS.find(m => m.key === selMonth)?.label ?? '', placeholder: 'Month' },
-                  { field: 'year' as DateFieldKey, ref: yearRef, val: selYear, display: selYear, placeholder: 'Year' },
-                ] as const
-              ).map(({ field, ref, val, display, placeholder }) => {
-                const isOpen = datePickerField === field
-                return (
-                  <View key={field} ref={ref as any} style={[h.dateField, isOpen && h.dateFieldOpen]}>
-                    {!!val && (
-                      <View style={h.dateFieldLabel} pointerEvents="none">
-                        <Text style={h.dateFieldLabelText}>{placeholder}</Text>
-                      </View>
-                    )}
-                    <Pressable style={h.dateFieldPressable} onPress={() => openDatePicker(field)} accessibilityRole="button" accessibilityLabel={`Select ${placeholder}`}>
-                      <Text style={[h.dateFieldText, !val && h.dateFieldPlaceholder]} numberOfLines={1}>{val ? display : placeholder}</Text>
-                      <Text style={h.chevron}>{isOpen ? '▴' : '▾'}</Text>
-                    </Pressable>
-                  </View>
-                )
-              })}
-            </View>
-
-            {isDobComplete && calculatedAge !== null && calculatedAge > 0 && (
-              <View style={h.ageBadge}>
-                <Text style={h.ageBadgeText}>You are <Text style={h.ageBadgeYears}>{calculatedAge} years</Text> old</Text>
-              </View>
-            )}
-
-            {!isDobComplete && (
-              <>
-                {!!directAge && (
-                  <Text style={h.currentAgeText}>Current age on file: {directAge} years</Text>
-                )}
-                <View style={h.orRow}>
-                  <View style={h.orLine} />
-                  <Text style={h.orText}>OR</Text>
-                  <View style={h.orLine} />
-                </View>
-                <Pressable style={h.enterAgeRow} onPress={() => { setAgeInput(directAge); setAgeError(''); setShowAgeSheet(true) }}>
-                  <Text style={h.enterAgeLink}>{directAge ? 'Update age' : 'Please enter age'}</Text>
-                  <Text style={h.enterAgeCaret}> ›</Text>
-                </Pressable>
-              </>
-            )}
-          </>
-        )}
-
-        {/* ── Height ── */}
-        <Text style={[s.fieldGroupLabel, s.fieldGroupLabelSpaced]}>{t('EDITPROFILE.HEIGHT')}</Text>
-        {categories.map((cat, idx) => {
-          const isSelected = selectedCategory === cat.key
-          const isLast = idx === categories.length - 1
-          return (
-            <Pressable
-              key={cat.key}
-              style={[h.row, !isLast && h.rowBorder, isSelected && h.rowSelected]}
-              onPress={() => selectCategory(cat.key)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: isSelected }}
-            >
-              <View style={h.rowLabels}>
-                <Text style={[h.rowLabel, isSelected && h.rowLabelSelected]}>{cat.label}</Text>
-                {!!cat.subtitle && <Text style={[h.rowSubtitle, isSelected && h.rowSubtitleSelected]}>{cat.subtitle}</Text>}
-              </View>
-              <View style={[h.radio, isSelected && h.radioSelected]}>
-                {isSelected && <Text style={h.radioTick}>✓</Text>}
-              </View>
-            </Pressable>
-          )
-        })}
-
-        <View style={h.orRow}>
-          <View style={h.orLine} />
-          <Text style={h.orText}>OR</Text>
-          <View style={h.orLine} />
-        </View>
-
-        <Pressable style={[h.exactField, !!selectedHeight && h.exactFieldActive]} onPress={openHeightPanel} accessibilityRole="button">
-          <Text style={[h.exactFieldText, !!selectedHeight && h.exactFieldTextActive]} numberOfLines={1}>
-            {selectedHeight ? selectedHeight.label : 'Select exact height'}
-          </Text>
-          <Text style={h.exactFieldArrow}>›</Text>
-        </Pressable>
-
-        <Pressable style={s.submitBtn} onPress={handleSubmit} disabled={submitting}>
-          {submitting ? <ActivityIndicator color={Colors.white} /> : <Text style={s.submitBtnText}>{t('GENERAL.SUBMIT')}</Text>}
-        </Pressable>
-      </ScrollView>
-
-      {/* ── Date dropdown ── */}
-      <Modal visible={datePickerField !== null} transparent animationType="none" onRequestClose={() => setDatePickerField(null)}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={() => setDatePickerField(null)} />
-        <View style={[h.dropdown, dateDropStyle]}>
-          <FlatList
-            data={datePickerOptions}
-            keyExtractor={item => item.key}
-            style={{ maxHeight: dateListH }}
-            showsVerticalScrollIndicator
-            getItemLayout={(_, index) => ({ length: ITEM_H, offset: ITEM_H * index, index })}
-            initialScrollIndex={Math.max(0, datePickerOptions.findIndex(o => o.key === datePickerCurrentVal) - 2)}
-            renderItem={({ item }) => {
-              const isSel = item.key === datePickerCurrentVal
-              return (
-                <Pressable style={[h.dropdownItem, isSel && h.dropdownItemSel]} onPress={() => datePickerField && handleDatePickerSelect(datePickerField, item.key)}>
-                  <Text style={[h.dropdownItemText, isSel && h.dropdownItemTextSel]}>{item.label}</Text>
-                </Pressable>
-              )
-            }}
-          />
-        </View>
-      </Modal>
-
-      {/* ── Enter-age bottom sheet ── */}
-      <Modal visible={showAgeSheet} transparent animationType="slide" onRequestClose={() => setShowAgeSheet(false)}>
-        <TouchableWithoutFeedback onPress={() => setShowAgeSheet(false)}>
-          <View style={h.overlay} />
-        </TouchableWithoutFeedback>
-        <KeyboardAvoidingView style={[h.ageSheet, { paddingBottom: insets.bottom + 20 }]} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-          <View style={h.dragHandle} />
-          <Text style={h.ageSheetTitle}>Enter age</Text>
-          <View style={h.ageInputOuter}>
-            <TextInput
-              style={h.ageInputBox}
-              keyboardType="number-pad"
-              value={ageInput}
-              onChangeText={v => { setAgeInput(v.replace(/\D/g, '')); setAgeError('') }}
-              maxLength={2}
-              returnKeyType="done"
-              autoFocus
-              onSubmitEditing={handleAgeSubmit}
-            />
-            <View style={h.ageLabelWrap} pointerEvents="none">
-              <Text style={h.ageLabelText}>Age</Text>
-            </View>
-          </View>
-          {!!ageError && <Text style={h.ageError}>{ageError}</Text>}
-          <Pressable style={[s.submitBtn, h.ageConfirmBtn, !ageInput && s.submitBtnDisabled]} onPress={handleAgeSubmit} disabled={!ageInput}>
-            <Text style={s.submitBtnText}>Confirm</Text>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* ── Exact height side panel ── */}
-      <Modal transparent visible={heightPanelVisible} animationType="none" onRequestClose={closeHeightPanel} statusBarTranslucent>
-        <View style={h.panelContainer}>
-          <Pressable style={h.backdrop} onPress={closeHeightPanel} />
-          {/* statusBarTranslucent draws this Modal behind the status bar/notch —
-              without an explicit top inset here, the panel's close icon/header
-              sat under it. Same fix as SearchablePicker.tsx/HeightScreen.tsx. */}
-          <Animated.View style={[h.panel, { paddingTop: insets.top, paddingBottom: Platform.OS === 'ios' ? insets.bottom : 16, transform: [{ translateX: panelTranslateX }] }]}>
-            <View style={h.panelHeader}>
-              <Text style={h.panelTitle}>Select height</Text>
-              <TouchableOpacity onPress={closeHeightPanel} hitSlop={8}>
-                <Text style={h.panelCloseTxt}>✕</Text>
-              </TouchableOpacity>
-            </View>
-            {heightGroups.length === 0 ? (
-              <View style={h.panelEmpty}><Text style={h.panelEmptyText}>No heights available</Text></View>
-            ) : (
-              <SectionList
-                sections={heightGroups}
-                keyExtractor={(item: Option) => item.key}
-                showsVerticalScrollIndicator={false}
-                stickySectionHeadersEnabled={false}
-                renderSectionHeader={({ section }) => (
-                  <View style={h.sectionHeader}><Text style={h.sectionHeaderText}>{section.title}</Text></View>
-                )}
-                renderItem={({ item }: { item: Option }) => {
-                  const isSelected = selectedHeight?.key === item.key
-                  return (
-                    <Pressable style={[h.heightItem, isSelected && h.heightItemSelected]} onPress={() => selectExactHeight(item)}>
-                      <Text style={[h.heightItemText, isSelected && h.heightItemTextSelected]}>{item.label}</Text>
-                      {isSelected && <View style={[h.radio, h.radioSelected]}><Text style={h.radioTick}>✓</Text></View>}
-                    </Pressable>
-                  )
-                }}
-              />
-            )}
-          </Animated.View>
-        </View>
-      </Modal>
-      <FieldRestrictedSheet visible={restrictedVisible} onClose={() => setRestrictedVisible(false)} />
-    </View>
-  )
-}
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
-const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: Colors.white },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  topInset: { position: 'absolute', top: 0, left: 0, right: 0 },
-
-  header: {
-    height: 56, flexDirection: 'row', alignItems: 'center', backgroundColor: Colors.white,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4,
-  },
-  backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
-  // App-wide screen-header convention (16/Medium/#333333), not Angular's own
-  // edit-profile header (`heading1-semibold-20 black-color`).
-  headerTitle: {
-    flex: 1, fontSize: FontSize.font16, fontFamily: Fonts.poppinsMedium,
-    color: '#333333', marginLeft: 6, marginRight: 16,
-  },
-
-  content: { paddingHorizontal: 24, paddingTop: 32 },
-  // Same section heading as the hub's section titles — Angular:
-  // `heading-03-bold-20 color-333333` = var(--font20) + Poppins-Bold + #333333.
-  heading: { fontSize: FontSize.font20, fontFamily: Fonts.poppinsBold, color: Colors.textDark, marginBottom: 24 },
-  fieldGroupLabel: { fontSize: FontSize.font14, fontWeight: '600', color: Colors.textSecondary, marginBottom: 12 },
-  fieldGroupLabelSpaced: { marginTop: 28 },
-
-  submitBtn: {
-    height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
-    alignItems: 'center', justifyContent: 'center', marginTop: 24,
-  },
-  submitBtnDisabled: { opacity: 0.5 },
-  // Angular primary CTA copy: `primary-cta-jodii body1-medium-14 white-color`
-  // = var(--font14) + --english-medium-poppins (Poppins-Medium) + #ffffff.
-  submitBtnText: { color: Colors.white, fontSize: FontSize.font14, fontFamily: Fonts.poppinsMedium },
-})
-
-const h = StyleSheet.create({
-  // Date row
-  fieldsRow: { flexDirection: 'row', gap: 15, marginTop: 8, marginBottom: 12 },
-  dateField: {
-    flex: 1, height: 48, borderWidth: 1, borderColor: Colors.inputBorder, borderRadius: 8,
-    backgroundColor: Colors.surface, overflow: 'visible', justifyContent: 'center',
-  },
-  dateFieldOpen: { borderBottomLeftRadius: 0, borderBottomRightRadius: 0, borderBottomColor: Colors.surface },
-  dateFieldLabel: { position: 'absolute', top: -8, left: 12, backgroundColor: Colors.surface, paddingHorizontal: 4, zIndex: 10 },
-  dateFieldLabelText: { fontSize: FontSize.font12, fontWeight: '400', color: Colors.textSecondary },
-  dateFieldPressable: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 10, height: 48 },
-  dateFieldText: { flex: 1, fontSize: FontSize.font14, fontWeight: '500', color: Colors.textPrimary },
-  dateFieldPlaceholder: { fontWeight: '500', color: Colors.textPrimary },
-  chevron: { fontSize: FontSize.font14, color: Colors.textSecondary, lineHeight: 20 },
-
-  ageBadge: {
-    marginBottom: 12, paddingHorizontal: 8, paddingVertical: 4, borderWidth: 1,
-    borderColor: 'rgba(181,0,51,0.1)', borderRadius: 8, alignSelf: 'flex-start', backgroundColor: 'rgba(181,0,51,0.03)',
-  },
-  ageBadgeText: { fontSize: FontSize.font14, fontWeight: '400', color: Colors.textPrimary },
-  ageBadgeYears: { fontWeight: '600' },
-  currentAgeText: { fontSize: FontSize.font13, color: Colors.textSecondary, marginBottom: 8 },
-
-  orRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4, marginBottom: 16, gap: 8 },
-  orLine: { flex: 1, height: 1, backgroundColor: '#e0e0e0' },
-  orText: { fontSize: FontSize.font14, color: 'rgba(0,0,0,0.5)' },
-
-  enterAgeRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
-  enterAgeLink: { fontSize: FontSize.font14, fontWeight: '400', color: Colors.link, textDecorationLine: 'underline', lineHeight: 20 },
-  enterAgeCaret: { fontSize: FontSize.font16, fontWeight: '600', color: Colors.link, lineHeight: 20 },
-
-  // Height rows
-  row: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 10 },
-  rowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle },
-  rowSelected: { backgroundColor: Colors.selectionBg },
-  rowLabels: { flex: 1 },
-  rowLabel: { fontSize: FontSize.font14, fontWeight: '400', color: Colors.textPrimary },
-  rowLabelSelected: { fontWeight: '500' },
-  rowSubtitle: { fontSize: FontSize.font14, fontWeight: '400', color: 'rgba(0,0,0,0.6)', marginTop: 2 },
-  rowSubtitleSelected: { fontWeight: '500' },
-
-  radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: '#545454', alignItems: 'center', justifyContent: 'center' },
-  radioSelected: { borderColor: Colors.primaryDark, backgroundColor: Colors.primaryDark },
-  radioTick: { color: Colors.surface, fontSize: FontSize.font10, fontWeight: '700', lineHeight: 12 },
-
-  exactField: {
-    flexDirection: 'row', alignItems: 'center', height: 48, borderWidth: 1, borderColor: Colors.inputBorder,
-    borderRadius: 8, paddingLeft: 16, paddingRight: 12, backgroundColor: Colors.surface,
-  },
-  exactFieldActive: {},
-  exactFieldText: { flex: 1, fontSize: FontSize.font14, fontWeight: '400', color: Colors.textPrimary },
-  exactFieldTextActive: { fontWeight: '500' },
-  exactFieldArrow: { fontSize: FontSize.font22, color: Colors.textPrimary, lineHeight: 26 },
-
-  // Dropdown (date picker)
-  dropdown: {
-    backgroundColor: Colors.surface, borderWidth: 1, borderTopWidth: 0, borderColor: Colors.inputBorder,
-    borderBottomLeftRadius: 8, borderBottomRightRadius: 8,
-    ...Platform.select({
-      ios: { shadowColor: Colors.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 6 },
-      android: { elevation: 6 },
-    }),
-  },
-  dropdownItem: { height: ITEM_H, justifyContent: 'center', paddingHorizontal: 10 },
-  dropdownItemSel: { backgroundColor: 'rgba(181,0,51,0.05)' },
-  dropdownItemText: { fontSize: FontSize.font14, fontWeight: '400', color: Colors.textPrimary },
-  dropdownItemTextSel: { fontWeight: '600', color: Colors.primaryDark },
-
-  overlay: { flex: 1, backgroundColor: Colors.scrimMedium },
-
-  ageSheet: { backgroundColor: Colors.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingHorizontal: 24, paddingTop: 20 },
-  dragHandle: { width: 40, height: 4, borderRadius: 2, backgroundColor: Colors.borderSoft, alignSelf: 'center', marginBottom: 12 },
-  ageSheetTitle: { fontSize: FontSize.font20, fontWeight: '600', color: Colors.textPrimary, marginBottom: 28, marginTop: 8 },
-  ageInputOuter: { position: 'relative', marginTop: 8 },
-  ageInputBox: { height: 48, borderWidth: 1, borderColor: Colors.inputBorder, borderRadius: 8, paddingHorizontal: 12, fontSize: FontSize.font14, fontWeight: '500', color: Colors.textPrimary },
-  ageLabelWrap: { position: 'absolute', top: -8, left: 12, backgroundColor: Colors.surface, paddingHorizontal: 4 },
-  ageLabelText: { fontSize: FontSize.font12, fontWeight: '400', color: Colors.textSecondary },
-  ageError: { marginTop: 8, fontSize: FontSize.font12, color: Colors.inputError, lineHeight: 16 },
-  ageConfirmBtn: { marginTop: 28, marginBottom: 0 },
-
-  panelContainer: { flex: 1, flexDirection: 'row', justifyContent: 'flex-end' },
-  backdrop: { flex: 1, backgroundColor: Colors.scrimMedium },
-  panel: { width: PICKER_PANEL_WIDTH, backgroundColor: Colors.surface, elevation: 8, shadowColor: Colors.shadow, shadowOpacity: 0.2, shadowOffset: { width: -2, height: 0 }, shadowRadius: 8 },
-  panelHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle },
-  panelTitle: { flex: 1, fontSize: FontSize.font16, fontWeight: '600', color: Colors.textPrimary },
-  panelCloseTxt: { fontSize: FontSize.font16, color: Colors.textPrimary, padding: 4 },
-  panelEmpty: { padding: 32, alignItems: 'center' },
-  panelEmptyText: { fontSize: FontSize.font14, color: Colors.scrimLight },
-  sectionHeader: { paddingHorizontal: 20, paddingVertical: 8, backgroundColor: Colors.surfaceAlt, borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle },
-  sectionHeaderText: { fontSize: FontSize.font12, fontWeight: '600', color: 'rgba(0,0,0,0.5)', textTransform: 'uppercase', letterSpacing: 0.6 },
-  heightItem: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, height: 52, borderBottomWidth: 1, borderBottomColor: Colors.surfaceDim },
-  heightItemSelected: { backgroundColor: Colors.selectionBg },
-  heightItemText: { flex: 1, fontSize: FontSize.font14, fontWeight: '400', color: Colors.textPrimary },
-  heightItemTextSelected: { fontWeight: '500', color: Colors.primaryDark },
-})
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Age / Height bottom sheets for the mobile Edit Profile hub (new design) —
@@ -745,6 +147,7 @@ export function heightCategoryCode(info: EditProfileInfo): string | null {
 function DateDropList({ options, selected, onPick }: {
   options: Option[]; selected: string; onPick: (key: string) => void
 }) {
+  const langFonts = useLanguageFonts()
   const ref = useRef<ScrollView>(null)
   const selIndex = Math.max(0, options.findIndex(o => o.key === selected))
   return (
@@ -761,7 +164,7 @@ function DateDropList({ options, selected, onPick }: {
           const sel = o.key === selected
           return (
             <Pressable key={o.key} style={[sh.dropItem, sel && sh.dropItemSel]} onPress={() => onPick(o.key)}>
-              <Text style={[sh.dropItemText, sel && sh.dropItemTextSel]}>{o.label}</Text>
+              <Text style={[sh.dropItemText, { fontFamily: sel ? langFonts.medium : langFonts.regular }]}>{o.label}</Text>
             </Pressable>
           )
         })}
@@ -779,6 +182,7 @@ export function EditAgeHeightSheets({
   onSaved: () => void
 }) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   const insets = useSafeAreaInsets()
 
   // "son's" / "daughter's" … for a relative-created profile, "your" for self.
@@ -807,12 +211,16 @@ export function EditAgeHeightSheets({
   const [heightLoading, setHeightLoading] = useState(false)
   const slideAnim = useRef(new Animated.Value(0)).current
 
-  // iOS: lift the sheet above the keyboard for the age input (Android resizes the window itself).
+  // Lift the sheet above the keyboard for the age input. BottomSheet's Modal is
+  // statusBarTranslucent, so on Android the window does NOT resize for the
+  // keyboard either — without this the sheet sat hidden under the number pad.
   const [kbHeight, setKbHeight] = useState(0)
   useEffect(() => {
-    if (Platform.OS !== 'ios') return
-    const show = Keyboard.addListener('keyboardWillShow', e => setKbHeight(e.endCoordinates.height))
-    const hide = Keyboard.addListener('keyboardWillHide', () => setKbHeight(0))
+    if (Platform.OS === 'web') return
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow'
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide'
+    const show = Keyboard.addListener(showEvt, e => setKbHeight(e.endCoordinates.height))
+    const hide = Keyboard.addListener(hideEvt, () => setKbHeight(0))
     return () => { show.remove(); hide.remove() }
   }, [])
 
@@ -918,7 +326,7 @@ export function EditAgeHeightSheets({
 
   const saveBtn = (onPress: () => void, disabled: boolean) => (
     <Pressable style={[sh.saveBtn, disabled && sh.saveBtnDisabled]} onPress={onPress} disabled={disabled || saving} accessibilityRole="button">
-      {saving ? <ActivityIndicator color={Colors.white} /> : <Text style={sh.saveBtnText}>{t('GENERAL.SAVE_CHANGES', 'Save changes')}</Text>}
+      {saving ? <ActivityIndicator color={Colors.white} /> : <Text style={[sh.saveBtnText, { fontFamily: langFonts.medium }]}>{t('GENERAL.SAVE_CHANGES', 'Save changes')}</Text>}
     </Pressable>
   )
 
@@ -933,7 +341,7 @@ export function EditAgeHeightSheets({
           <Pressable style={sh.panelTapArea} onPress={closePanel} />
           <Animated.View style={[sh.panel, { paddingTop: insets.top, paddingBottom: insets.bottom, transform: [{ translateX }] }]}>
             <View style={sh.panelHeader}>
-              <Text style={sh.panelTitle}>{`Select ${who} height`}</Text>
+              <Text style={[sh.panelTitle, { fontFamily: langFonts.medium }]}>{`Select ${who} height`}</Text>
               <Pressable onPress={closePanel} hitSlop={8} accessibilityRole="button" accessibilityLabel="Close">
                 <Text style={sh.panelClose}>✕</Text>
               </Pressable>
@@ -947,13 +355,13 @@ export function EditAgeHeightSheets({
                 stickySectionHeadersEnabled={false}
                 showsVerticalScrollIndicator={false}
                 renderSectionHeader={({ section }) => (
-                  <View style={sh.sectionHeader}><Text style={sh.sectionHeaderText}>{section.title}</Text></View>
+                  <View style={sh.sectionHeader}><Text style={[sh.sectionHeaderText, { fontFamily: langFonts.medium }]}>{section.title}</Text></View>
                 )}
                 renderItem={({ item }: { item: Option }) => {
                   const sel = item.key === profile?.height
                   return (
                     <Pressable style={[sh.heightItem, sel && sh.heightItemSel]} onPress={() => saveExactHeight(item)} disabled={saving}>
-                      <Text style={[sh.heightItemText, sel && sh.heightItemTextSel]}>{item.label}</Text>
+                      <Text style={[sh.heightItemText, sel && sh.heightItemTextSel, { fontFamily: sel ? langFonts.medium : langFonts.regular }]}>{item.label}</Text>
                     </Pressable>
                   )
                 }}
@@ -972,7 +380,7 @@ export function EditAgeHeightSheets({
       <BottomSheet visible={ageMode} onClose={onClose} style={kbHeight ? { bottom: kbHeight } : undefined}>
         {dob ? (
           <>
-            <Text style={sh.title}>{`Select ${who} age`}</Text>
+            <Text style={[sh.title, { fontFamily: langFonts.semiBold }]}>{`Select ${who} age`}</Text>
             <View style={sh.dateRow}>
               {([
                 { f: 'date' as const,  label: 'Date',  display: selDate ? selDate.padStart(2, '0') : '' },
@@ -985,14 +393,14 @@ export function EditAgeHeightSheets({
                 return (
                   <View key={f} style={[sh.dateCol, f === 'month' && sh.dateColWide, open && sh.dateColOpen]}>
                     <Pressable style={[sh.dateField, open && sh.dateFieldOpen]} onPress={() => setOpenField(open ? null : f)} accessibilityRole="button" accessibilityLabel={`Select ${label}`}>
-                      <Text style={[sh.dateFieldText, !display && sh.placeholder]} numberOfLines={1}>{display || label}</Text>
+                      <Text style={[sh.dateFieldText, !display && sh.placeholder, { fontFamily: langFonts.medium }]} numberOfLines={1}>{display || label}</Text>
                       <Image
                         source={{ uri: ICON_ARROW_DOWN }}
                         style={[sh.chevronIcon, open && sh.chevronIconOpen]}
                         contentFit="contain"
                       />
                     </Pressable>
-                    {!!display && <View style={sh.floatLabel} pointerEvents="none"><Text style={sh.floatLabelText}>{label}</Text></View>}
+                    {!!display && <View style={sh.floatLabel} pointerEvents="none"><Text style={[sh.floatLabelText, { fontFamily: langFonts.regular }]}>{label}</Text></View>}
                     {open && (
                       <DateDropList options={opts} selected={cur} onPick={key => pick(f, key)} />
                     )}
@@ -1000,16 +408,14 @@ export function EditAgeHeightSheets({
                 )
               })}
             </View>
-            {/* Reserve room for an open dropdown so it stays inside the sheet. */}
-            {openField && <View style={{ height: DROPDOWN_ROWS * ITEM_H }} />}
             {saveBtn(saveDob, !dobComplete)}
           </>
         ) : (
           <>
-            <Text style={sh.title}>{`Enter ${who} age`}</Text>
+            <Text style={[sh.title, { fontFamily: langFonts.semiBold }]}>{`Enter ${who} age`}</Text>
             <View style={sh.inputWrap}>
               <TextInput
-                style={[sh.input, !!ageError && sh.inputErr, webOutlineReset]}
+                style={[sh.input, !!ageError && sh.inputErr, webOutlineReset, { fontFamily: langFonts.medium }]}
                 autoComplete="off"
                 value={ageInput}
                 onChangeText={v => { setAgeInput(v.replace(/\D/g, '')); setAgeError('') }}
@@ -1019,9 +425,9 @@ export function EditAgeHeightSheets({
                 returnKeyType="done"
                 onSubmitEditing={saveManualAge}
               />
-              <View style={sh.floatLabel} pointerEvents="none"><Text style={sh.floatLabelText}>{t('EDITPROFILE.AGE', 'Age')}</Text></View>
+              <View style={sh.floatLabel} pointerEvents="none"><Text style={[sh.floatLabelText, { fontFamily: langFonts.regular }]}>{t('EDITPROFILE.AGE', 'Age')}</Text></View>
             </View>
-            {!!ageError && <Text style={sh.error}>{ageError}</Text>}
+            {!!ageError && <Text style={[sh.error, { fontFamily: langFonts.regular }]}>{ageError}</Text>}
             {saveBtn(saveManualAge, !ageInput)}
           </>
         )}
@@ -1029,7 +435,7 @@ export function EditAgeHeightSheets({
 
       {/* ── Height category ── */}
       <BottomSheet visible={heightMode && !exact} onClose={onClose}>
-        <Text style={sh.title}>{`Select ${who} height`}</Text>
+        <Text style={[sh.title, { fontFamily: langFonts.semiBold }]}>{`Select ${who} height`}</Text>
         {heightLoading ? (
           <ActivityIndicator style={sh.catLoader} color={Colors.primaryDark} />
         ) : categories.map((c, i) => {
@@ -1043,8 +449,8 @@ export function EditAgeHeightSheets({
               accessibilityState={{ selected: sel }}
             >
               <View style={sh.catLabels}>
-                <Text style={sh.catLabel}>{c.label}</Text>
-                {!!c.subtitle && <Text style={sh.catSub}>{c.subtitle}</Text>}
+                <Text style={[sh.catLabel, { fontFamily: langFonts.medium }]}>{c.label}</Text>
+                {!!c.subtitle && <Text style={[sh.catSub, { fontFamily: langFonts.regular }]}>{c.subtitle}</Text>}
               </View>
               <View style={[sh.radio, sel && sh.radioSel]}>{sel && <Text style={sh.radioTick}>✓</Text>}</View>
             </Pressable>
@@ -1057,30 +463,32 @@ export function EditAgeHeightSheets({
 }
 
 const sh = StyleSheet.create({
-  title: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: Colors.black, marginBottom: 24 },
+  title: { fontSize: FontSize.font16, color: Colors.black, marginBottom: 24 },
 
   saveBtn: {
     height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center', marginTop: 24,
   },
   saveBtnDisabled: { opacity: 0.5 },
-  saveBtnText: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, color: Colors.white },
+  saveBtnText: { fontSize: FontSize.font14, color: Colors.white },
 
   // Floating-label outlined field (Age input + date fields)
   floatLabel: { position: 'absolute', top: -8, left: 10, backgroundColor: Colors.white, paddingHorizontal: 4 },
-  floatLabelText: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font12, color: Colors.textSecondary },
+  floatLabelText: { fontSize: FontSize.font12, color: Colors.textSecondary },
 
   inputWrap: { position: 'relative' },
   input: {
     height: 48, borderWidth: 1, borderColor: Colors.inputBorder, borderRadius: 8, paddingHorizontal: 12,
-    fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, color: Colors.textPrimary,
+    fontSize: FontSize.font14, color: Colors.textPrimary,
     backgroundColor: Colors.white,
   },
   inputErr: { borderColor: Colors.inputError },
-  error: { marginTop: 8, fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font12, color: Colors.inputError },
+  error: { marginTop: 8, fontSize: FontSize.font12, color: Colors.inputError },
 
   // DOB
-  dateRow: { flexDirection: 'row', gap: 12, zIndex: 10 },
+  // alignItems flex-start: the open column grows by its list height while the
+  // other two fields keep their 48px height.
+  dateRow: { flexDirection: 'row', gap: 12, alignItems: 'flex-start' },
   dateCol: { flex: 1, position: 'relative' },
   dateColWide: { flex: 1.3 },
   dateColOpen: { zIndex: 20 },
@@ -1091,27 +499,30 @@ const sh = StyleSheet.create({
   // Open: field + list read as ONE box with the same 1px grey border all round —
   // the field drops its bottom edge/corners and the list carries on below it.
   dateFieldOpen: { borderBottomWidth: 0, borderBottomLeftRadius: 0, borderBottomRightRadius: 0 },
-  dateFieldText: { flex: 1, fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, color: Colors.textPrimary },
+  dateFieldText: { flex: 1, fontSize: FontSize.font14, color: Colors.textPrimary },
   placeholder: { color: Colors.textSecondary },
   chevronIcon: { width: 16, height: 16, marginLeft: 4 },
   chevronIconOpen: { transform: [{ rotate: '180deg' }] },
+  // In normal flow under its field (NOT position:absolute). An absolutely
+  // positioned list hung outside its 48px column, and touches outside a
+  // parent's bounds never reach the child on Android/iOS — so the list
+  // couldn't be scrolled or tapped.
   dropdown: {
-    position: 'absolute', top: 48, left: 0, right: 0, backgroundColor: Colors.white,
+    backgroundColor: Colors.white,
     borderWidth: 1, borderTopWidth: 0, borderColor: Colors.inputBorder,
     borderBottomLeftRadius: 8, borderBottomRightRadius: 8, overflow: 'hidden',
   },
   dropItem: { height: ITEM_H, justifyContent: 'center', paddingHorizontal: 10 },
   dropItemSel: { backgroundColor: Colors.selectionBg },
-  dropItemText: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font14, color: Colors.textPrimary },
-  dropItemTextSel: { fontFamily: Fonts.poppinsMedium },
+  dropItemText: { fontSize: FontSize.font14, color: Colors.textPrimary },
 
   // Height category radio rows
   catLoader: { marginVertical: 24 },
   catRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, gap: 8 },
   catRowBorder: { borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle },
   catLabels: { flex: 1 },
-  catLabel: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, color: Colors.textPrimary },
-  catSub: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font12, color: Colors.textSecondary, marginTop: 2 },
+  catLabel: { fontSize: FontSize.font14, color: Colors.textPrimary },
+  catSub: { fontSize: FontSize.font12, color: Colors.textSecondary, marginTop: 2 },
   radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1, borderColor: '#545454', alignItems: 'center', justifyContent: 'center' },
   radioSel: { borderColor: Colors.primaryDark, backgroundColor: Colors.primaryDark },
   radioTick: { color: Colors.white, fontSize: FontSize.font10, fontWeight: '700', lineHeight: 12 },
@@ -1123,14 +534,14 @@ const sh = StyleSheet.create({
   panelTapArea: { flex: 1 },
   panel: { width: PICKER_PANEL_WIDTH, backgroundColor: Colors.white, elevation: 8 },
   panelHeader: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, paddingVertical: 16 },
-  panelTitle: { flex: 1, fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, color: Colors.textPrimary },
+  panelTitle: { flex: 1, fontSize: FontSize.font14, color: Colors.textPrimary },
   panelClose: { fontSize: FontSize.font16, color: Colors.textPrimary, padding: 4 },
   panelLoader: { marginTop: 32 },
   panelSaving: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.6)' },
   sectionHeader: { paddingHorizontal: 20, paddingVertical: 10, backgroundColor: Colors.surfaceDim },
-  sectionHeaderText: { fontFamily: Fonts.poppinsMedium, fontSize: FontSize.font14, color: Colors.textPrimary },
+  sectionHeaderText: { fontSize: FontSize.font14, color: Colors.textPrimary },
   heightItem: { paddingHorizontal: 20, height: 44, justifyContent: 'center', borderBottomWidth: 1, borderBottomColor: Colors.borderSubtle },
   heightItemSel: { backgroundColor: Colors.selectionBg },
-  heightItemText: { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font13, color: Colors.textPrimary },
-  heightItemTextSel: { fontFamily: Fonts.poppinsMedium, color: Colors.primaryDark },
+  heightItemText: { fontSize: FontSize.font13, color: Colors.textPrimary },
+  heightItemTextSel: { color: Colors.primaryDark },
 })

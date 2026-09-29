@@ -57,6 +57,7 @@ import { Colors } from '../../constants/colors'
 import { Fonts, SemanticFontsEnglish, FontSize } from '../../src/theme/fonts'
 import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
 import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interface'
+import type { EditOpenField } from '../edit-profile/EditProfileScreen'
 
 // Same shape ViewProfileScreen.tsx declares for its phoneInfoSheet slot — the
 // other 6 phoneviewed scenarios plus the female-free variants, all mutually
@@ -483,17 +484,17 @@ export default function ViewProfileContent(props: ViewProfileContentProps) {
   // Angular: download-biodata.component.ts redirectToMissingPage() — a single
   // top-of-screen "some details are missing" banner that redirects to whichever
   // field is missing, in this priority order.
-  function getFirstMissingScreen(p: ViewProfileModel): string | null {
-    if (!p.income)      return 'EditProfileProfessional'
-    if (!p.eatingHabits) return 'EditProfileLifestyle'
-    if (!p.drinking)     return 'EditProfileLifestyle'
-    if (!p.smoking)      return 'EditProfileLifestyle'
-    if (!p.raasi)        return 'EditProfileReligious'
-    if (!p.dosham?.length) return 'EditProfileReligious'
-    if (!p.star)         return 'EditProfileReligious'
-    if (!p.brothers)     return 'EditProfileFamily'
-    if (!p.sisters)      return 'EditProfileFamily'
-    if (!p.property.length && !p.vehicle.length) return 'EditProfileProperty'
+  function getFirstMissingScreen(p: ViewProfileModel): EditOpenField | null {
+    if (!p.income)      return 'income'
+    if (!p.eatingHabits) return 'eating'
+    if (!p.drinking)     return 'drinking'
+    if (!p.smoking)      return 'smoking'
+    if (!p.raasi)        return 'raasi'
+    if (!p.dosham?.length) return 'dosham'
+    if (!p.star)         return 'star'
+    if (!p.brothers)     return 'brothers'
+    if (!p.sisters)      return 'sisters'
+    if (!p.property.length && !p.vehicle.length) return 'properties'
     return null
   }
 

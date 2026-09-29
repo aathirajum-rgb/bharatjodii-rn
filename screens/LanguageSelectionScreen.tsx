@@ -173,8 +173,9 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
       {presentedAsModal && (
         <AppHeader
           type="registration"
-          showBackBtn={navigation?.canGoBack() ?? false}
-          onBackPress={() => handleBack()}
+          // No back arrow while switching the app language — the member
+          // leaves this screen by picking a language (Next).
+          showBackBtn={false}
         />
       )}
 
@@ -238,7 +239,7 @@ export default function LanguageSelectionScreen({ onSelect, navigation, presente
       <View
         style={[
           styles.footer,
-          { paddingBottom: insets.bottom + 20 },
+          { paddingBottom: insets.bottom + 24 },
         ]}
       >
         {/* Angular: language-selection.component.html's button uses

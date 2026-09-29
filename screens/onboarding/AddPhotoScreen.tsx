@@ -414,7 +414,7 @@ export default function AddPhotoScreen({ navigation }: Props) {
       {/* "I'll do this later" — pinned as a footer below the scroll area
           (product request; Angular keeps it in-flow after the card). Skips
           immediately, no confirmation dialog, for the onboarding entry point. */}
-      <View style={[styles.laterFooter, { paddingBottom: Math.max(insets.bottom, 24) }]}>
+      <View style={[styles.laterFooter, { paddingBottom: insets.bottom + 24 }]}>
         <Pressable
           style={styles.laterRow}
           onPress={handleSkip}
@@ -660,6 +660,7 @@ const styles = StyleSheet.create({
   // Angular: #skip_cta's span is `.body2-regular-14 color-333333`.
   laterText: {
     fontSize:   FontSize.font14,
+    lineHeight: 16,   // = the 16px › icon, so both share one vertical centre
     color:      Colors.textDark,
     // Same fix as AppStack.tsx's skipText — centres the › icon on the glyphs.
     includeFontPadding: false,

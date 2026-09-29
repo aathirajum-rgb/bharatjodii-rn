@@ -26,7 +26,7 @@ import { os } from './onboardingStyles'
 import { useLanguageReload } from '../../hooks/useLanguageReload'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { stripAndDecodeHtml } from '../../utils/htmlEntities'
-import { Fonts, FontSize } from '../../src/theme/fonts'
+import { FontSize } from '../../src/theme/fonts'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -182,12 +182,13 @@ export default function MotherTongueScreen({ navigation }: Props) {
                   both in global.scss, so at equal specificity (both !important) it wins
                   the font-family cascade; that class maps to var(--english-poppins),
                   which _variable.scss defines as Roboto-Regular (originally meant for
-                  the Rupee symbol), not Poppins/NotoSans. */}
+                  the Rupee symbol), not Poppins/NotoSans. RN uses langFonts instead so
+                  the text follows the app language's script. */}
               <Text
                 style={[
                   styles.selectFieldText,
                   !!selected && styles.selectFieldTextActive,
-                  { fontFamily: Fonts.robotoRegular },
+                  { fontFamily: selected ? langFonts.medium : langFonts.regular },
                 ]}
                 numberOfLines={1}
               >
@@ -248,8 +249,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.surface,
   },
   // Angular: black-color width-95 poppins-family, body2-regular-14 while
-  // showing the placeholder — fontFamily is Fonts.robotoRegular (see the
-  // poppins-family cascade note at the Text element above), not Poppins.
+  // showing the placeholder — fontFamily comes from langFonts inline (see the
+  // poppins-family cascade note at the Text element above).
   selectFieldText: {
     flex:       1,
     fontSize:   FontSize.font14,
@@ -257,7 +258,7 @@ const styles = StyleSheet.create({
     color:      Colors.black,
   },
   // Angular: body1-medium-14 once a value is selected (registration-revamp.
-  // component.html:211) — weight 500; family still Roboto (poppins-family)
+  // component.html:211) — weight 500; family is langFonts.medium (inline)
   selectFieldTextActive: {
     fontWeight: '500',
   },

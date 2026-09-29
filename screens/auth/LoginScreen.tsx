@@ -29,7 +29,8 @@ import { ENavigation } from '../../types/enums/navigation.enum'
 
 // ─── Country codes (Angular signin.config.ts: COUNTRYCODELIST) ────────────────
 
-const COUNTRIES = [
+// Exported for Edit Profile's mobile-number edit sheet (same list + validation).
+export const COUNTRIES = [
   { code: '91',  name: 'India',                minLen: 10, maxLen: 10 },
   { code: '971', name: 'United Arab Emirates', minLen: 8,  maxLen: 10 },
   { code: '974', name: 'Qatar',                minLen: 8,  maxLen: 10 },
@@ -39,7 +40,7 @@ const COUNTRIES = [
   { code: '966', name: 'Saudi Arabia',         minLen: 8,  maxLen: 10 },
 ] as const
 
-type Country = (typeof COUNTRIES)[number]
+export type Country = (typeof COUNTRIES)[number]
 
 // Converts a Phone Number Hint result into the LOCAL (national) number this
 // field expects, i.e. without the country dial code.
@@ -96,7 +97,7 @@ async function shouldShowNotificationPrompt(): Promise<boolean> {
 }
 
 // Angular signin.page.ts validateMobileNumber() — exact regex match
-function isValidMobile(mobile: string, country: Country): boolean {
+export function isValidMobile(mobile: string, country: Country): boolean {
   if (mobile.length < country.minLen || mobile.length > country.maxLen) return false
   const re = country.code === '91' ? /^[6-9][0-9]{7,11}$/ : /^[5-9][0-9]{7,11}$/
   return re.test(mobile)
@@ -275,7 +276,14 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
       {/* Header: back | audio | language pill */}
       <AppHeader
         type="registration"
-        showBackBtn={false}
+        showBackBtn
+        // Back → language selection. On first run LanguageSelection was
+        // replace()d by this screen, so there's nothing to goBack() to —
+        // open it explicitly in that case.
+        onBackPress={() => {
+          if (navigation.canGoBack()) navigation.goBack()
+          else navigation.replace('LanguageSelection')
+        }}
         onLanguagePress={() => navigation.navigate('LanguageSelection')}
       />
 
@@ -388,7 +396,7 @@ export default function LoginScreen({ navigation }: { navigation: any }) {
         </ScrollView>
 
         {/* Sticky "Get OTP" CTA — rises above keyboard via KeyboardAvoidingView */}
-        <View style={[styles.footer, { paddingBottom: Platform.OS === 'ios' ? insets.bottom : 20 }]}>
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
           <ButtonRevamp
             label={t('LOGIN_PAGE.GET_OTP', 'Get OTP')}
             variant="primary"

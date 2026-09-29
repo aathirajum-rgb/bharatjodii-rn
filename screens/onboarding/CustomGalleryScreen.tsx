@@ -45,6 +45,7 @@ import { CDN_LOTTIE } from '../../constants/cdn'
 import CdnLottie from '../../components/CdnLottie'
 import { getFileSizeSafe } from '../../utils/getFileSize'
 import { FontSize } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // expo-media-library's Asset has no mimeType getter (unlike expo-image-picker
 // assets) — derive it from the filename extension, same fallback Android's own
@@ -137,6 +138,7 @@ function CheckBadge() {
 export default function CustomGalleryScreen({ navigation, route, onClose, onUploaded }: Props) {
   const insets        = useSafeAreaInsets()
   const { t }         = useTranslation()
+  const langFonts     = useLanguageFonts()
   const { isOffline } = useNetwork()
   const existingCount = (route.params?.existingCount as number | undefined) ?? 0
   const remaining     = Math.max(0, MAX_PHOTOS - existingCount)
@@ -459,7 +461,7 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
       return (
         <Pressable style={styles.cameraCell} onPress={openCamera}>
           <CameraIcon />
-          <Text style={styles.cameraLabel}>Use camera</Text>
+          <Text style={[styles.cameraLabel, { fontFamily: langFonts.medium }]}>Use camera</Text>
         </Pressable>
       )
     }
@@ -487,8 +489,8 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
           <AppHeader type="registration" showBackBtn closeIcon onBackPress={onClose} />
         )}
         <View style={styles.permDenied}>
-          <Text style={styles.permTitle}>Photo access needed</Text>
-          <Text style={styles.permSub}>
+          <Text style={[styles.permTitle, { fontFamily: langFonts.bold }]}>Photo access needed</Text>
+          <Text style={[styles.permSub, { fontFamily: langFonts.regular }]}>
             Allow Jodii to access your photos in Settings to choose a profile picture.
           </Text>
         </View>
@@ -512,14 +514,14 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
       {/* Sub-header */}
       <View style={styles.subHeader}>
         <Pressable style={styles.albumBtn} onPress={() => setAlbumPickerOpen(true)}>
-          <Text style={styles.albumLabel}>
+          <Text style={[styles.albumLabel, { fontFamily: langFonts.bold }]}>
             {activeAlbum ? activeAlbum.title : 'Recent'}
           </Text>
           <Text style={styles.albumChevron}> ▾</Text>
         </Pressable>
 
         {selected.size > 0 && (
-          <Text style={styles.selectedCount}>{selected.size} selected</Text>
+          <Text style={[styles.selectedCount, { fontFamily: langFonts.semiBold }]}>{selected.size} selected</Text>
         )}
       </View>
 
@@ -545,7 +547,7 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
 
       {/* Bottom bar */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom > 0 ? insets.bottom : 20 }]}>
-        <Text style={styles.limitText}>
+        <Text style={[styles.limitText, { fontFamily: langFonts.regular }]}>
           You can select up to {remaining} more photo{remaining !== 1 ? 's' : ''}.
         </Text>
         <Pressable
@@ -555,7 +557,7 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
         >
           {uploading
             ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={styles.nextBtnLabel}>Next</Text>
+            : <Text style={[styles.nextBtnLabel, { fontFamily: langFonts.medium }]}>Next</Text>
           }
         </Pressable>
       </View>
@@ -570,11 +572,11 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
       >
         <Pressable style={styles.albumOverlay} onPress={() => setAlbumPickerOpen(false)}>
           <View style={[styles.albumSheet, { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 16 : 24 }]}>
-            <Text style={styles.albumSheetTitle}>Select album</Text>
+            <Text style={[styles.albumSheetTitle, { fontFamily: langFonts.bold }]}>Select album</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
 
               <Pressable style={styles.albumRow} onPress={() => switchAlbum(null)}>
-                <Text style={[styles.albumRowText, !activeAlbum && styles.albumRowActive]}>Recent</Text>
+                <Text style={[styles.albumRowText, !activeAlbum && styles.albumRowActive, { fontFamily: !activeAlbum ? langFonts.semiBold : langFonts.regular }]}>Recent</Text>
                 {!activeAlbum && <Text style={styles.albumRowCheck}>✓</Text>}
               </Pressable>
 
@@ -584,7 +586,7 @@ export default function CustomGalleryScreen({ navigation, route, onClose, onUplo
                   style={styles.albumRow}
                   onPress={() => switchAlbum(info)}
                 >
-                  <Text style={[styles.albumRowText, activeAlbum?.album.id === info.album.id && styles.albumRowActive]}>
+                  <Text style={[styles.albumRowText, activeAlbum?.album.id === info.album.id && styles.albumRowActive, { fontFamily: activeAlbum?.album.id === info.album.id ? langFonts.semiBold : langFonts.regular }]}>
                     {info.title}
                   </Text>
                   {activeAlbum?.album.id === info.album.id && (

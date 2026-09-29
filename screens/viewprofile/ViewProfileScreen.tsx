@@ -78,6 +78,7 @@ import { FontSize } from '../../src/theme/fonts'
 import { CDN_SVG, CDN_REACT } from '../../constants/cdn'
 import i18n from '../../i18n'
 import type { ViewProfileModel } from '../../types/interfaces/viewProfile.interface'
+import type { EditOpenField } from '../edit-profile/EditProfileScreen'
 
 // Angular's real back button is Ionic's bundled `icon="arrow-back"` (MD variant —
 // a straight-shaft leftward arrow, ships in the app's own JS bundle, not a network
@@ -1676,14 +1677,13 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   function handleAddFamilyDetails() {
     // Was navigateGlobal(ENavigation.EDIT_FORM, ...) — 'editform' has no matching
     // Stack.Screen (confirmed), so this threw a navigation warning on every tap.
-    // EditProfileFamily is the real registered screen covering brothers/sisters.
-    navigation.navigate('EditProfileFamily')
+    // Opens Edit Profile with the first missing of brothers / sisters open.
+    navigation.navigate('EditProfile', { openField: !profile?.brothers ? 'brothers' : 'sisters' })
   }
 
   function handleAddPropertyDetails() {
-    // Same dead-route fix as handleAddFamilyDetails — EditProfileProperty is the
-    // real registered screen covering property/vehicle.
-    navigation.navigate('EditProfileProperty')
+    // Opens Edit Profile with the Properties owned picker open.
+    navigation.navigate('EditProfile', { openField: 'properties' })
   }
 
   // Angular: download-biodata.component.ts redirectToMissingPage() — a single
@@ -1692,24 +1692,24 @@ export default function ViewProfileScreen({ navigation, route }: { navigation: a
   // photo/physical-status/gothram/horoscope, but none of those have a real edit
   // destination in this port yet (confirmed — see handleAddHoroscope above), so
   // they're left out here rather than pointing the banner at a dead route.
-  function getFirstMissingScreen(p: ViewProfileModel): string | null {
-    if (!p.income)      return 'EditProfileProfessional'
-    if (!p.eatingHabits) return 'EditProfileLifestyle'
-    if (!p.drinking)     return 'EditProfileLifestyle'
-    if (!p.smoking)      return 'EditProfileLifestyle'
-    if (!p.raasi)        return 'EditProfileReligious'
-    if (!p.dosham?.length) return 'EditProfileReligious'
-    if (!p.star)         return 'EditProfileReligious'
-    if (!p.brothers)     return 'EditProfileFamily'
-    if (!p.sisters)      return 'EditProfileFamily'
-    if (!p.property.length && !p.vehicle.length) return 'EditProfileProperty'
+  function getFirstMissingScreen(p: ViewProfileModel): EditOpenField | null {
+    if (!p.income)      return 'income'
+    if (!p.eatingHabits) return 'eating'
+    if (!p.drinking)     return 'drinking'
+    if (!p.smoking)      return 'smoking'
+    if (!p.raasi)        return 'raasi'
+    if (!p.dosham?.length) return 'dosham'
+    if (!p.star)         return 'star'
+    if (!p.brothers)     return 'brothers'
+    if (!p.sisters)      return 'sisters'
+    if (!p.property.length && !p.vehicle.length) return 'properties'
     return null
   }
 
   function handleMissingDetailsPress() {
     if (!profile) return
-    const screen = getFirstMissingScreen(profile)
-    if (screen) navigation.navigate(screen)
+    const field = getFirstMissingScreen(profile)
+    if (field) navigation.navigate('EditProfile', { openField: field })
   }
 
   // Angular: a plain `<a [href]="getBioDataLink()" download>` — Linking.openURL

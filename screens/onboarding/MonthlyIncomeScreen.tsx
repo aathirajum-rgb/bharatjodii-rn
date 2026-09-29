@@ -11,7 +11,7 @@ import { Image } from 'expo-image'
 import { SvgXml } from 'react-native-svg'
 import { Colors } from '../../constants/colors'
 import { StorageKeys as SK } from '../../constants/storage.keys'
-import SearchablePicker from '../../components/searchable-picker/SearchablePicker'
+import SearchablePicker, { renderWithRupeeFont } from '../../components/searchable-picker/SearchablePicker'
 import {
   callPartialRegistrationAPI,
   fetchMonthlyIncomeOptions,
@@ -265,7 +265,7 @@ export default function MonthlyIncomeScreen({ navigation }: Props) {
                   ]}
                   numberOfLines={1}
                 >
-                  {selected ? selected.label : incomePlaceholderText}
+                  {selected ? renderWithRupeeFont(selected.label) : incomePlaceholderText}
                 </Text>
                 <SvgXml xml={CHEVRON_FORWARD_XML} width={24} height={24} />
               </Pressable>

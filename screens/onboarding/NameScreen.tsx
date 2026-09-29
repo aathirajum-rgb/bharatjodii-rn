@@ -230,7 +230,7 @@ export default function NameScreen({ navigation }: Props) {
         <View style={styles.inputOuter}>
           <TextInput
             ref={inputRef}
-            style={[styles.inputBox, { borderColor }, webOutlineReset]}
+            style={[styles.inputBox, { borderColor, fontFamily: langFonts.medium }, webOutlineReset]}
             value={name}
             onChangeText={handleChangeText}
             onFocus={() => setIsFocused(true)}
@@ -249,7 +249,7 @@ export default function NameScreen({ navigation }: Props) {
         </View>
 
         {/* Inline error */}
-        {!!error && <Text style={os.errorText}>{error}</Text>}
+        {!!error && <Text style={[os.errorText, { fontFamily: langFonts.regular }]}>{error}</Text>}
       </ScrollView>
 
       {/* AI name validation sheet — Angular: onboarding3EditSheet, gender hidden */}

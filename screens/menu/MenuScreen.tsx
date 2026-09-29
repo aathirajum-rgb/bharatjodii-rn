@@ -40,6 +40,7 @@ import { getOwnGenderAvatarUrl } from '../../utils/avatar'
 import ButtonRevamp from '../../components/button-revamp/ButtonRevamp'
 import { Fonts, FontSize } from '../../src/theme/fonts'
 import ScreenTopInset from '../../components/screen/ScreenTopInset'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // ─── CDN ──────────────────────────────────────────────────────────────────────
 
@@ -144,6 +145,7 @@ interface RowProps {
 }
 
 function MenuRow({ icon, iconSize = 24, title, onPress, showDivider }: RowProps) {
+  const langFonts = useLanguageFonts()
   return (
     <>
       <Pressable
@@ -154,7 +156,7 @@ function MenuRow({ icon, iconSize = 24, title, onPress, showDivider }: RowProps)
         <View style={s.rowIconWrap}>
           <CdnSvg uri={icon} width={iconSize} height={iconSize} />
         </View>
-        <Text style={s.rowTitle}>{title}</Text>
+        <Text style={[s.rowTitle, { fontFamily: langFonts.medium }]}>{title}</Text>
         <CdnSvg uri={ICON.arrow} width={16} height={16} />
       </Pressable>
       {showDivider && <View style={s.rowDivider} />}
@@ -168,6 +170,7 @@ function MenuRow({ icon, iconSize = 24, title, onPress, showDivider }: RowProps)
 export function LogoutSheet({ visible, onYes, onNo }: { visible: boolean; onYes: () => void; onNo: () => void }) {
   const { t } = useTranslation()
   const insets = useSafeAreaInsets()
+  const langFonts = useLanguageFonts()
   const [modalVisible, setModalVisible] = useState(visible)
   const slideAnim = useRef(new Animated.Value(SCREEN_H)).current
   const scrimAnim = useRef(new Animated.Value(0)).current
@@ -207,10 +210,10 @@ export function LogoutSheet({ visible, onYes, onNo }: { visible: boolean; onYes:
         </View>
 
         {/* Title — left aligned */}
-        <Text style={ls.title}>{t('ACCOUNT.LOGOUT')}</Text>
+        <Text style={[ls.title, { fontFamily: langFonts.bold }]}>{t('ACCOUNT.LOGOUT')}</Text>
 
         {/* Message */}
-        <Text style={ls.message}>{t('ACCOUNT.LOGOUT_MSG_2')}</Text>
+        <Text style={[ls.message, { fontFamily: langFonts.regular }]}>{t('ACCOUNT.LOGOUT_MSG_2')}</Text>
 
         {/* Side-by-side: Yes (secondary) | No (primary) */}
         <View style={ls.btnRow}>
@@ -237,6 +240,7 @@ export function LogoutSheet({ visible, onYes, onNo }: { visible: boolean; onYes:
 export default function MenuScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
 
   const [userName,      setUserName]      = useState('')
   const [userId,        setUserId]        = useState('')
@@ -473,7 +477,7 @@ export default function MenuScreen({ navigation }: Props) {
             <View style={s.profileInfo}>
               {/* Name + verified badge */}
               <View style={s.nameRow}>
-                <Text style={s.profileName} numberOfLines={1}>{userName || '—'}</Text>
+                <Text style={[s.profileName, { fontFamily: langFonts.bold }]} numberOfLines={1}>{userName || '—'}</Text>
                 {isVerified && (
                   <View style={{ marginLeft: 6 }}>
                     <CdnSvg uri={ICON.verified} width={16} height={16} />
@@ -482,7 +486,7 @@ export default function MenuScreen({ navigation }: Props) {
               </View>
 
               {/* ID */}
-              <Text style={s.profileId}>{t('MENU.ID')} {userId}</Text>
+              <Text style={[s.profileId, { fontFamily: langFonts.regular }]}>{t('MENU.ID')} {userId}</Text>
 
               {/* Paid tag */}
               {isPaid && (
@@ -493,7 +497,7 @@ export default function MenuScreen({ navigation }: Props) {
 
               {/* Membership expiry */}
               {isPaid && !!membershipExp && (
-                <Text style={s.expiryText}>{t('MENU.MEMBERSHIP_TILL')} {membershipExp}</Text>
+                <Text style={[s.expiryText, { fontFamily: langFonts.regular }]}>{t('MENU.MEMBERSHIP_TILL')} {membershipExp}</Text>
               )}
             </View>
           </View>
@@ -518,14 +522,14 @@ export default function MenuScreen({ navigation }: Props) {
               <View style={s.promoExpiredRow}>
                 <CdnSvg uri={ICON.expiredAlert} width={28} height={28} />
                 <View style={s.promoTextCol}>
-                  <Text style={s.promoHeadline}>{promoHeadline}</Text>
-                  {!!promoSub && <Text style={s.promoSub}>{promoSub}</Text>}
+                  <Text style={[s.promoHeadline, { fontFamily: langFonts.bold }]}>{promoHeadline}</Text>
+                  {!!promoSub && <Text style={[s.promoSub, { fontFamily: langFonts.regular }]}>{promoSub}</Text>}
                 </View>
               </View>
 
               {!!promoCta && (
                 <View style={s.promoLinkRow}>
-                  <Text style={s.promoLink}>{promoCta}</Text>
+                  <Text style={[s.promoLink, { fontFamily: langFonts.semiBold }]}>{promoCta}</Text>
                   {/* Chevron drawn as a glyph, not the CDN arrow icon — it has
                       to inherit the link's pink, and CdnSvg can't recolor. */}
                   <Text style={s.promoLinkChevron}>{'›'}</Text>
@@ -551,13 +555,13 @@ export default function MenuScreen({ navigation }: Props) {
               </View>
 
               <View style={[s.promoTextCol, s.promoTextColCenter]}>
-                <Text style={[s.promoHeadline, s.promoTextCenter]}>{promoHeadline}</Text>
-                {!!promoSub && <Text style={[s.promoSub, s.promoTextCenter]}>{promoSub}</Text>}
+                <Text style={[s.promoHeadline, s.promoTextCenter, { fontFamily: langFonts.bold }]}>{promoHeadline}</Text>
+                {!!promoSub && <Text style={[s.promoSub, s.promoTextCenter, { fontFamily: langFonts.regular }]}>{promoSub}</Text>}
               </View>
 
               {!!promoCta && (
                 <View style={s.promoBtn}>
-                  <Text style={s.promoBtnText}>{promoCta}</Text>
+                  <Text style={[s.promoBtnText, { fontFamily: langFonts.semiBold }]}>{promoCta}</Text>
                 </View>
               )}
             </Pressable>
@@ -648,7 +652,7 @@ export default function MenuScreen({ navigation }: Props) {
 
         {/* ── Footer ── */}
         {!!appVersion && (
-          <Text style={s.footerVersion}>{t('MENU.APPVERSION')} {appVersion}</Text>
+          <Text style={[s.footerVersion, { fontFamily: langFonts.regular }]}>{t('MENU.APPVERSION')} {appVersion}</Text>
         )}
 
       </ScrollView>
@@ -766,7 +770,6 @@ const s = StyleSheet.create({
   promoLink: {
     fontSize:   FontSize.font14,
     lineHeight: 18,
-    fontFamily: Fonts.poppinsSemiBold,
     color:      Colors.inputError,
   },
   promoLinkChevron: {
@@ -781,14 +784,12 @@ const s = StyleSheet.create({
   promoHeadline: {
     fontSize:   FontSize.font17,
     lineHeight: 22,
-    fontFamily: Fonts.poppinsBold,
     color:      '#1A1A1A',
   },
   promoSub: {
     marginTop:  2,
     fontSize:   FontSize.font13,
     lineHeight: 18,
-    fontFamily: Fonts.poppinsRegular,
     color:      '#4A4A4A',
   },
   // Pill, not the 8pt rounded rect — radius is half the ~44pt tap height.
@@ -802,7 +803,6 @@ const s = StyleSheet.create({
   promoBtnText: {
     fontSize:   FontSize.font14,
     lineHeight: 18,
-    fontFamily: Fonts.poppinsSemiBold,
     color:      Colors.white,
   },
 
@@ -860,20 +860,17 @@ const s = StyleSheet.create({
   // a CSS fact. See the audit notes.
   profileName: {
     fontSize:   FontSize.font16,
-    fontFamily: Fonts.poppinsBold,
     color:      Colors.textDark,
     flexShrink: 1,
   },
   profileId: {
     fontSize:     FontSize.font14,
-    fontFamily:   Fonts.poppinsRegular,
     color:        '#372F3A',
     marginBottom: 6,
   },
   paidTagRow:  { marginBottom: 4 },
   expiryText: {
     fontSize: FontSize.font12,
-    fontFamily: Fonts.poppinsRegular,
     color:    '#888686',
     marginTop: 4,
   },
@@ -901,7 +898,6 @@ const s = StyleSheet.create({
   rowTitle: {
     flex:       1,
     fontSize:   FontSize.font14,
-    fontFamily: Fonts.poppinsMedium,
     color:      Colors.textDark,
   },
   // Angular: `.border-bottom-menu { border-bottom: 1px solid
@@ -929,7 +925,6 @@ const s = StyleSheet.create({
   // nothing.
   footerVersion: {
     fontSize:  FontSize.font12,
-    fontFamily: Fonts.poppinsRegular,
     color:     '#9d9fa6',
     marginTop: 4,
   },
@@ -960,13 +955,11 @@ const ls = StyleSheet.create({
   },
   title: {
     fontSize:     FontSize.font18,
-    fontFamily:   Fonts.poppinsBold,
     color:        Colors.textPrimary,
     marginBottom: 10,
   },
   message: {
     fontSize:     FontSize.font14,
-    fontFamily:   Fonts.poppinsRegular,
     color:        Colors.textMedium,
     lineHeight:   22,
     marginBottom: 24,

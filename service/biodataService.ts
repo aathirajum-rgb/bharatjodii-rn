@@ -168,7 +168,8 @@ export async function resolveFamilyCountLabel(
 // priority order. Angular's own cascade also checks photo/physical-status/
 // gothram/horoscope, but none of those have a real edit destination in this
 // port yet, so they're left out rather than pointing "Add Now" at a dead route.
-export type MissingBiodataField = { screen: string }
+// field — an Edit Profile field key (EditProfile route's openField param).
+export type MissingBiodataField = { field: 'income' | 'eating' | 'drinking' | 'smoking' | 'raasi' | 'dosham' | 'star' | 'brothers' | 'sisters' | 'properties' }
 
 // occupationCode: Angular reads this from localStorage.getItem('OCCUPATION') —
 // the logged-in user's own cached occupation CODE (e.g. '8' = not working),
@@ -180,19 +181,19 @@ export function getFirstMissingBiodataField(
 ): MissingBiodataField | null {
   const income = p.PROFESSIONALINFO?.ANNUALINCOME
   if (!['8', '0'].includes(occupationCode) && (!income || income === '0')) {
-    return { screen: 'EditProfileProfessional' }
+    return { field: 'income' }
   }
-  if (!p.HABITSINFO?.EATINGHABITS) return { screen: 'EditProfileLifestyle' }
-  if (!p.HABITSINFO?.DRINKING)     return { screen: 'EditProfileLifestyle' }
-  if (!p.HABITSINFO?.SMOKING)      return { screen: 'EditProfileLifestyle' }
+  if (!p.HABITSINFO?.EATINGHABITS) return { field: 'eating' }
+  if (!p.HABITSINFO?.DRINKING)     return { field: 'drinking' }
+  if (!p.HABITSINFO?.SMOKING)      return { field: 'smoking' }
   if (showReligiousDetails(p.RELIGION)) {
-    if (!p.RELIGIOUSINFO?.RAASI)        return { screen: 'EditProfileReligious' }
-    if (!p.doshamText)                  return { screen: 'EditProfileReligious' }
-    if (!p.RELIGIOUSINFO?.STAR)         return { screen: 'EditProfileReligious' }
+    if (!p.RELIGIOUSINFO?.RAASI)        return { field: 'raasi' }
+    if (!p.doshamText)                  return { field: 'dosham' }
+    if (!p.RELIGIOUSINFO?.STAR)         return { field: 'star' }
   }
-  if (!p.FAMILYINFO?.BROTHERS) return { screen: 'EditProfileFamily' }
-  if (!p.FAMILYINFO?.SISTERS)  return { screen: 'EditProfileFamily' }
-  if (!hasPropertyDetails(p.FAMILYINFO)) return { screen: 'EditProfileProperty' }
+  if (!p.FAMILYINFO?.BROTHERS) return { field: 'brothers' }
+  if (!p.FAMILYINFO?.SISTERS)  return { field: 'sisters' }
+  if (!hasPropertyDetails(p.FAMILYINFO)) return { field: 'properties' }
   return null
 }
 

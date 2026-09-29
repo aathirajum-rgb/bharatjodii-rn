@@ -26,6 +26,7 @@ import { fetchCustomerCare } from '../../service/homeService'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import BottomSheet from '../bottom-sheet/BottomSheet'
 import { FontSize } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 // Angular's exact asset paths from the editFieldRestrict template.
 const ICON_ALERT = CDN_SVG + 'entry-alert-popup-img.svg'
@@ -38,6 +39,7 @@ type Props = {
 
 export default function FieldRestrictedSheet({ visible, onClose }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   const [phone, setPhone] = useState('')
 
   // Angular reads localStorage's CUSTOMER-CARE directly; in this app that key
@@ -70,12 +72,12 @@ export default function FieldRestrictedSheet({ visible, onClose }: Props) {
 
       <CdnSvg uri={ICON_ALERT} width={72} height={72} style={s.alertIcon} />
 
-      <Text style={s.title}>{t('EDITPROFILE.RESTRICT_FIELD')}</Text>
-      <Text style={s.content}>{t('EDITPROFILE.RESTRICT_SUPPORT')}</Text>
+      <Text style={[s.title, { fontFamily: langFonts.semiBold }]}>{t('EDITPROFILE.RESTRICT_FIELD')}</Text>
+      <Text style={[s.content, { fontFamily: langFonts.regular }]}>{t('EDITPROFILE.RESTRICT_SUPPORT')}</Text>
 
       {!!phone && (
         <Pressable style={s.phoneBox} onPress={callSupport} accessibilityRole="link">
-          <Text style={s.phoneText}>{phone}</Text>
+          <Text style={[s.phoneText, { fontFamily: langFonts.medium }]}>{phone}</Text>
           <CdnSvg uri={ICON_CALL} width={20} height={20} />
         </Pressable>
       )}
@@ -91,7 +93,7 @@ const s = StyleSheet.create({
 
   alertIcon:  { alignSelf: 'center', marginTop: 8 },
 
-  title:      { fontSize: FontSize.font18, fontWeight: '600', color: Colors.textPrimary, textAlign: 'center', marginTop: 20 },
+  title:      { fontSize: FontSize.font18, color: Colors.textPrimary, textAlign: 'center', marginTop: 20 },
   content:    { fontSize: FontSize.font14, color: '#4c4c4c', textAlign: 'center', lineHeight: 20, marginTop: 12, paddingHorizontal: 8 },
 
   // Angular: an <ion-item> row inside .reportprofile-section — number on the
@@ -101,5 +103,5 @@ const s = StyleSheet.create({
     borderWidth: 1, borderColor: Colors.borderSubtle, borderRadius: 8,
     paddingHorizontal: 16, paddingVertical: 14, marginTop: 24,
   },
-  phoneText: { fontSize: FontSize.font14, fontWeight: '500', color: Colors.textPrimary },
+  phoneText: { fontSize: FontSize.font14, color: Colors.textPrimary },
 })

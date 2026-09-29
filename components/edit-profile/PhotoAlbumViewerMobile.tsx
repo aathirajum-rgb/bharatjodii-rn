@@ -42,7 +42,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import CdnSvg from '../cdn-svg/CdnSvg'
 import BottomSheet from '../bottom-sheet/BottomSheet'
 import { Colors } from '../../constants/colors'
-import { CDN_REACT, CDN_REG } from '../../constants/cdn'
+import { CDN_REACT, CDN_REG, CDN_SVG } from '../../constants/cdn'
 import { Endpoints } from '../../service/api.endpoints'
 import { uploadFile } from '../../service/apiClient'
 import { StorageKeys as SK } from '../../constants/storage.keys'
@@ -51,7 +51,8 @@ import { deletePhoto, setMainPhoto } from '../../service/profileService'
 import {
   getPhotoConfig, validatePhotoAsset, getRejectReasons, describeRejection,
 } from '../../service/photoValidationService'
-import { Fonts, FontSize } from '../../src/theme/fonts'
+import { FontSize } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 const ICON_BACK   = CDN_REACT + '/menu_back_arrow.svg'
 // Outline trash (registration-new/trash-img.svg). The earlier
@@ -69,6 +70,7 @@ export interface AlbumPhoto {
   PHOTOURL:    string
   PHOTOTHUMB?: string
   MAINPHOTO:   number
+  PHOTOSTATUS?: number | string   // 1 = verified, 0 = under validation
 }
 
 export interface PhotoAlbumViewerMobileProps {
@@ -91,6 +93,7 @@ export default function PhotoAlbumViewerMobile({
 }: PhotoAlbumViewerMobileProps) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   const [index,        setIndex]        = useState(initialIndex)
   const [busy,         setBusy]         = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<AlbumPhoto | null>(null)
@@ -116,8 +119,22 @@ export default function PhotoAlbumViewerMobile({
     return () => clearTimeout(id)
   }, [visible, initialIndex, slideW])
 
+  // Angular managephoto.page.ts: opening the album on a photo whose PHOTOSTATUS
+  // is 0 pops the UNDERVALIDSHEET bottom sheet after 500ms ("Your photo is under
+  // validation!" / MATCHES.VALIDATION_SUB / OK).
+  const [underValidationVisible, setUnderValidationVisible] = useState(false)
+  useEffect(() => {
+    if (!visible) { setUnderValidationVisible(false); return }
+    if (photos[initialIndex]?.PHOTOSTATUS != 0) return
+    const id = setTimeout(() => setUnderValidationVisible(true), 500)
+    return () => clearTimeout(id)
+  }, [visible, initialIndex, photos])
+
   const current = photos[index]
   const isMain  = current?.MAINPHOTO == 1
+  // A photo still under validation (PHOTOSTATUS 0) can't be deleted — the trash
+  // stays visible but dimmed and inert.
+  const deleteDisabled = current?.PHOTOSTATUS == 0
 
   // Driven from onScroll (fires on native AND web) rather than only
   // onMomentumScrollEnd, which react-native-web never emits — that's why the
@@ -246,14 +263,16 @@ export default function PhotoAlbumViewerMobile({
           <Pressable style={s.backBtn} onPress={onClose} accessibilityRole="button" accessibilityLabel="Back">
             <CdnSvg uri={ICON_BACK} width={24} height={24} />
           </Pressable>
-          <Text style={s.headerTitle} numberOfLines={1}>{t('EDITPROFILE.PHOTO_PREVIEW', 'Photo preview')}</Text>
+          <Text style={[s.headerTitle, { fontFamily: langFonts.medium }]} numberOfLines={1}>{t('EDITPROFILE.PHOTO_PREVIEW', 'Photo preview')}</Text>
           {!isMain && (
             <Pressable
-              style={s.deleteBtn}
+              style={[s.deleteBtn, deleteDisabled && s.deleteBtnDisabled]}
               onPress={() => setDeleteTarget(current)}
+              disabled={deleteDisabled}
               hitSlop={8}
               accessibilityRole="button"
               accessibilityLabel="Delete photo"
+              accessibilityState={{ disabled: deleteDisabled }}
             >
               <CdnSvg uri={ICON_DELETE} width={DELETE_ICON_SIZE} height={DELETE_ICON_SIZE} />
             </Pressable>
@@ -291,7 +310,7 @@ export default function PhotoAlbumViewerMobile({
             />
             {isMain && (
               <View style={s.tag} pointerEvents="none">
-                <Text style={s.tagText}>{t('EDITPROFILE.PROFILE_PICTURE', 'Profile Picture')}</Text>
+                <Text style={[s.tagText, { fontFamily: langFonts.medium }]}>{t('EDITPROFILE.PROFILE_PICTURE', 'Profile Picture')}</Text>
               </View>
             )}
           </View>
@@ -305,7 +324,7 @@ export default function PhotoAlbumViewerMobile({
                 ))}
               </View>
             )}
-            <Text style={s.counter}>({index + 1}/{photos.length})</Text>
+            <Text style={[s.counter, { fontFamily: langFonts.regular }]}>({index + 1}/{photos.length})</Text>
           </View>
         </View>
 
@@ -315,18 +334,32 @@ export default function PhotoAlbumViewerMobile({
             <Pressable style={({ pressed }) => [s.primaryBtn, pressed && s.pressed]} onPress={handleUseAsProfile} disabled={busy}>
               {busy
                 ? <ActivityIndicator color={Colors.white} />
-                : <Text style={s.primaryBtnText}>{t('EDITPROFILE.MAKE_PROFILE_PHOTO', 'Make as profile photo')}</Text>
+                : <Text style={[s.primaryBtnText, { fontFamily: langFonts.medium }]}>{t('EDITPROFILE.MAKE_PROFILE_PHOTO', 'Make as profile photo')}</Text>
               }
             </Pressable>
           )}
           <Pressable style={({ pressed }) => [s.secondaryBtn, pressed && s.pressed]} onPress={handleReplace} disabled={busy}>
             {busy && isMain
               ? <ActivityIndicator color={Colors.textDark} />
-              : <Text style={s.secondaryBtnText}>{t('EDITPROFILE.REPLACE_PHOTO', 'Replace photo')}</Text>
+              : <Text style={[s.secondaryBtnText, { fontFamily: langFonts.regular }]}>{t('EDITPROFILE.REPLACE_PHOTO', 'Replace photo')}</Text>
             }
           </Pressable>
         </View>
       </View>
+
+      <BottomSheet
+        visible={underValidationVisible}
+        type="limitReachInfo"
+        data={{
+          title:     t('MATCHES.VALIDATION', 'Your photo is under validation!'),
+          content:   t('MATCHES.VALIDATION_SUB', 'This may take up to 2 hours.'),
+          image:     CDN_SVG + 'photo-under-validation.svg',
+          ctaLabel:  t('GENERAL.OK_CTA', 'Ok'),
+          showClose: true,
+        }}
+        onClose={() => setUnderValidationVisible(false)}
+        onPrimaryPress={() => setUnderValidationVisible(false)}
+      />
 
       <BottomSheet visible={!!deleteTarget} onClose={() => setDeleteTarget(null)} showClose={false}>
         <View style={s.sheetTopRow}>
@@ -335,10 +368,10 @@ export default function PhotoAlbumViewerMobile({
             <Text style={s.sheetCloseX}>✕</Text>
           </Pressable>
         </View>
-        <Text style={s.sheetTitle}>{t('EDITPROFILE.DELETE_PHOTO_TXT', 'Delete photo?')}</Text>
-        <Text style={s.sheetMessage}>{t('EDITPROFILE.DELETE_PHOTO_SUB_TXT', 'Are you sure you want to delete this photo?')}</Text>
+        <Text style={[s.sheetTitle, { fontFamily: langFonts.semiBold }]}>{t('EDITPROFILE.DELETE_PHOTO_TXT', 'Delete photo?')}</Text>
+        <Text style={[s.sheetMessage, { fontFamily: langFonts.regular }]}>{t('EDITPROFILE.DELETE_PHOTO_SUB_TXT', 'Are you sure you want to delete this photo?')}</Text>
         <Pressable style={({ pressed }) => [s.primaryBtn, s.sheetDeleteBtn, pressed && s.pressed]} onPress={handleConfirmDelete} accessibilityRole="button">
-          <Text style={s.primaryBtnText}>{t('EDITPROFILE.DELETE_PHOTO_CTA_2', 'Delete')}</Text>
+          <Text style={[s.primaryBtnText, { fontFamily: langFonts.medium }]}>{t('EDITPROFILE.DELETE_PHOTO_CTA_2', 'Delete')}</Text>
         </Pressable>
       </BottomSheet>
     </Modal>
@@ -356,8 +389,12 @@ const s = StyleSheet.create({
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginLeft: 14 },
   headerTitle: {
-    flex: 1, fontSize: FontSize.font16, fontFamily: Fonts.poppinsMedium, color: Colors.textDark, marginLeft: 6,
+    flex: 1, fontSize: FontSize.font16, color: Colors.textDark, marginLeft: 6,
+    // lineHeight = the 24px back icon so the two share one vertical centre
+    // (Poppins' default line box sits the glyphs visibly lower than the icon).
+    lineHeight: 24, includeFontPadding: false, textAlignVertical: 'center',
   },
+  deleteBtnDisabled: { opacity: 0.35 },
   deleteBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
 
   // Photo + pager sit centred in the space between the header and the CTAs.
@@ -369,7 +406,7 @@ const s = StyleSheet.create({
     position: 'absolute', top: 0, left: 0, height: 22, justifyContent: 'center',
     backgroundColor: Colors.primaryDark, paddingHorizontal: 8, borderBottomRightRadius: 16,
   },
-  tagText: { fontSize: FontSize.font12, fontFamily: Fonts.poppinsMedium, color: Colors.white },
+  tagText: { fontSize: FontSize.font12, color: Colors.white },
 
   pagerRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 20,
@@ -377,26 +414,26 @@ const s = StyleSheet.create({
   dotsRow:   { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dot:       { width: 6, height: 6, borderRadius: 3, backgroundColor: Colors.borderSubtle },
   dotActive: { width: 20, backgroundColor: Colors.primaryDark },
-  counter:   { fontSize: FontSize.font14, fontFamily: Fonts.poppinsRegular, color: Colors.textDark },
+  counter:   { fontSize: FontSize.font14, color: Colors.textDark },
 
   actions: { paddingHorizontal: 24, paddingTop: 24, gap: 12 },
   primaryBtn: {
     height: 44, borderRadius: 8, backgroundColor: Colors.primaryDark,
     alignItems: 'center', justifyContent: 'center',
   },
-  primaryBtnText: { fontSize: FontSize.font14, fontFamily: Fonts.poppinsMedium, color: Colors.white },
+  primaryBtnText: { fontSize: FontSize.font14, color: Colors.white },
   secondaryBtn: {
     height: 44, borderRadius: 8, borderWidth: 1, borderColor: Colors.textDark, backgroundColor: Colors.white,
     alignItems: 'center', justifyContent: 'center',
   },
-  secondaryBtnText: { fontSize: FontSize.font14, fontFamily: Fonts.poppinsRegular, color: Colors.textDark },
+  secondaryBtnText: { fontSize: FontSize.font14, color: Colors.textDark },
   pressed: { opacity: 0.8 },
 
   // Delete-confirm bottom sheet content (left-aligned, per the mobile design).
   sheetTopRow:   { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   sheetCloseBtn: { padding: 4 },
   sheetCloseX:   { fontSize: FontSize.font16, color: Colors.textTertiary },
-  sheetTitle:    { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font20, color: Colors.black, marginTop: 16 },
-  sheetMessage:  { fontFamily: Fonts.poppinsRegular, fontSize: FontSize.font16, lineHeight: 24, color: Colors.textDark, marginTop: 8 },
+  sheetTitle:    { fontSize: FontSize.font20, color: Colors.black, marginTop: 16 },
+  sheetMessage:  { fontSize: FontSize.font16, lineHeight: 24, color: Colors.textDark, marginTop: 8 },
   sheetDeleteBtn: { marginTop: 24 },
 })

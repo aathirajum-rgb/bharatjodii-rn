@@ -129,14 +129,6 @@ import ViewLaterScreen                     from '../screens/view-later/ViewLater
 import SearchByIdScreen                    from '../screens/search-by-id/SearchByIdScreen'
 import NotificationScreen                  from '../screens/notification/NotificationScreen'
 import EditProfileScreen                   from '../screens/edit-profile/EditProfileScreen'
-import ReligiousDetailsScreen               from '../screens/edit-profile/ReligiousDetailsScreen'
-import ProfessionalDetailsScreen            from '../screens/edit-profile/ProfessionalDetailsScreen'
-import BasicDetailsScreen                   from '../screens/edit-profile/BasicDetailsScreen'
-import LifestyleDetailsScreen               from '../screens/edit-profile/LifestyleDetailsScreen'
-import FamilyDetailsEditScreen               from '../screens/edit-profile/FamilyDetailsScreen'
-import PropertyDetailsEditScreen             from '../screens/edit-profile/PropertyDetailsScreen'
-import EditProfileAgeHeightScreen           from '../screens/edit-profile/EditProfileAgeHeightScreen'
-import EditProfileMaritalScreen             from '../screens/edit-profile/EditProfileMaritalScreen'
 import AddHoroscopeScreen                   from '../screens/edit-profile/AddHoroscopeScreen'
 import ExternalPageScreen                  from '../screens/external-page/ExternalPageScreen'
 
@@ -154,7 +146,10 @@ export type AppStackParamList = {
   // standalone — set when entering page 21 (ManagePhotosScreen) from outside the
   // onboarding wizard (e.g. Help Center's "Add Photo" quick link); its Confirm
   // button goes back to the caller instead of continuing to page 27.
-  onboarding:        { pageNo: string; standalone?: boolean } | undefined
+  // fromEditProfile — the horoscope sub-flow (29 → 30 → 31) was opened from
+  // Edit Profile's Horoscope row: it returns there on finish / skip / upload
+  // instead of carrying on into the wizard (Dosham 32, Star/Raasi 33).
+  onboarding:        { pageNo: string; standalone?: boolean; fromEditProfile?: boolean } | undefined
   Permissions:       undefined
   Gallery:           undefined
   recharge:          { from?: string; paymentId?: string; type?: string; fromTab?: boolean } | undefined
@@ -217,15 +212,8 @@ export type AppStackParamList = {
   // openPhotoPicker: set by the Photo Guidelines screen's "Continue to upload
   // photo" CTA (Angular: callNative('registrationAddPhoto')) so returning to
   // this screen opens its gallery picker.
-  EditProfile: { openPhotoPicker?: boolean } | undefined
-  EditProfileReligious: undefined
-  EditProfileProfessional: undefined
-  EditProfileBasic: undefined
-  EditProfileLifestyle: undefined
-  EditProfileFamily: undefined
-  EditProfileProperty: undefined
-  EditProfileAgeHeight: undefined
-  EditProfileMarital: undefined
+  // openField — open one field's editor directly (see EditOpenField in EditProfileScreen.tsx).
+  EditProfile: { openPhotoPicker?: boolean; openField?: import('../screens/edit-profile/EditProfileScreen').EditOpenField } | undefined
   EditProfileHoroscope: undefined
   'payment-options': { selectedPackage?: SelectedPackage; amountLabel?: string; preselectedMethod?: string } | undefined
   'card-payment': { selectedPackage?: SelectedPackage; amountLabel?: string } | undefined
@@ -555,7 +543,11 @@ function OnboardingRouter({ navigation, route }: { navigation: any; route: any }
         <View
           style={[
             shell.footer,
-            { paddingBottom: Platform.OS === 'ios' ? insets.bottom + 8 : 20 },
+            // Same bottom gap on every onboarding step (and the auth / language
+            // pages): 24 above the safe-area inset (gesture bar / home indicator),
+            // so the CTA sits near the bottom but never flush against it. A
+            // little extra when there's no "I'll do this later" row under it.
+            { paddingBottom: insets.bottom + 24 + (footerState.showSkip ? 0 : 12) },
           ]}
         >
           {/* Angular: SHOWLINKBTN — an underlined link CTA rendered ABOVE the
@@ -690,7 +682,9 @@ const shell = StyleSheet.create({
   // (theme/variables.scss) — Colors.textDark, not the app's general textMedium.
   skipText: {
     fontSize:   FontSize.font14,
-    fontWeight: '400',
+    // lineHeight = the 16px › icon so text and icon share one vertical centre
+    // (the default Poppins line box sat the glyphs below the icon's centre).
+    lineHeight: 16,
     color:      Colors.textDark,
     // Android pads Poppins' text box with extra ascent/descent space, so the
     // box's centre (what alignItems:'center' lines the › icon up with) sat
@@ -868,14 +862,6 @@ export default function AppStack() {
       <Stack.Screen name="ViewLater" component={ViewLaterScreen} />
       <Stack.Screen name="SearchById" component={SearchByIdScreen} />
       <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-      <Stack.Screen name="EditProfileReligious" component={ReligiousDetailsScreen} />
-      <Stack.Screen name="EditProfileProfessional" component={ProfessionalDetailsScreen} />
-      <Stack.Screen name="EditProfileBasic" component={BasicDetailsScreen} />
-      <Stack.Screen name="EditProfileLifestyle" component={LifestyleDetailsScreen} />
-      <Stack.Screen name="EditProfileFamily" component={FamilyDetailsEditScreen} />
-      <Stack.Screen name="EditProfileProperty" component={PropertyDetailsEditScreen} />
-      <Stack.Screen name="EditProfileAgeHeight" component={EditProfileAgeHeightScreen} />
-      <Stack.Screen name="EditProfileMarital" component={EditProfileMaritalScreen} />
       <Stack.Screen name="EditProfileHoroscope" component={AddHoroscopeScreen} />
       <Stack.Screen name="ExternalPage" component={ExternalPageScreen} />
       {__DEV__ && (

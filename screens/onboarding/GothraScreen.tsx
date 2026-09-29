@@ -176,7 +176,7 @@ export default function GothraScreen({ navigation }: Props) {
                 style={[
                   styles.selectFieldText,
                   !!selected && styles.selectFieldTextActive,
-                  selected ? { fontFamily: langFonts.medium } : null,
+                  { fontFamily: selected ? langFonts.medium : langFonts.regular },
                 ]}
                 numberOfLines={1}
               >

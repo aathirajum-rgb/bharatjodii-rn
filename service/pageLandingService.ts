@@ -10,33 +10,21 @@
 // real login/autologin landing) isn't modeled here — this only covers the
 // non-notify path, since that's the one autologin/refreshSession() drives.
 //
-// Editform-PCS field-completion prompts — cross-referenced against every
-// existing EditProfile* screen's actual saved fields (not guessed from
-// numeric coincidence — case 44's Angular target "editform-PCS/3" pointed at
-// GenderScreen by onboarding pageNo, but its own comment/NAMEUPIAPI hint says
-// Name; the field, not the number, is what's trusted here):
-//  - 38 (Country & State), 39 (City), 44 (Name): all three land on
-//    EditProfileBasic — BasicDetailsScreen.tsx already saves NAME,
-//    MOTHERTONGUE, and STATE+CITY (composite) together on one screen.
-//  - 35 (editform-PCS/44, no confirming Angular comment): tentatively also
-//    EditProfileBasic, since BasicDetailsScreen additionally saves
-//    HOMESTATE+HOMECITY and RN's own onboarding pageNo 44 is HomeTownLocation
-//    — plausible, not confirmed the way 38/39/44/45/46/47 are (each has an
-//    explicit Angular comment naming its field).
-//  - 45 (Education), 46 (Occupation): EditProfileProfessional
-//    (ProfessionalDetailsScreen.tsx saves QUALIFICATION + OCCUPATION).
-//  - 47 (Age): EditProfileAgeHeight (same screen as case 42's Height).
-//  - 11: cascades through FAMILYPROPERTY → BROTHERS → SISTERS → RAASI → STAR
-//    → DOSHAM (Angular's own isValidparam() gate — confirmed: excludes '0'
-//    as "not set", so an honest "0 brothers" answer still re-prompts, same
-//    as Angular) to EditProfileProperty / EditProfileFamily /
-//    EditProfileReligious respectively.
-//  - 40 (showReligionDetailsSheet — mother tongue/caste/sub-caste/gothram/
-//    home town): no religionDetailsSheet BottomSheetType exists to match
-//    Angular's inline sheet; approximated with the closest full screen,
-//    EditProfileReligious (covers CASTE/GOTHRA/RAASI/STAR/DOSHAM, though not
-//    MOTHERTONGUE — that's on EditProfileBasic instead — or SUBCASTE/home
-//    town specifically).
+// Editform-PCS field-completion prompts — each opens Edit Profile with that
+// one field's editor already open (EditProfile route's `openField` param; the
+// old per-group intermediate screens are gone). The field, not the Angular
+// page number, is what's trusted here (case 44's "editform-PCS/3" pointed at
+// GenderScreen by onboarding pageNo, but its NAMEUPIAPI hint says Name):
+//  - 38 (Country & State), 39 (City): 'location' (State → City picker).
+//  - 44 (Name): 'name'.
+//  - 35 (editform-PCS/44, tentative — no confirming Angular comment): 'homeTown'.
+//  - 41 (Marital status): 'maritalStatus'; 42 (Height): 'height'; 47 (Age): 'age'.
+//  - 45 (Education): 'education'; 46 (Occupation): 'occupation'.
+//  - 11: cascades FAMILYPROPERTY → BROTHERS → SISTERS → RAASI → STAR → DOSHAM
+//    (Angular's isValidparam() gate — '0' counts as "not set", same as Angular)
+//    and opens the first missing one.
+//  - 40 (showReligionDetailsSheet): 'religion' (Religion → Caste → Sub-caste →
+//    Gothram chain) — Angular's inline sheet has no exact RN equivalent.
 //
 // Explicitly NOT implemented (no RN screen/backing API exists yet — falls to
 // Matches, same as Angular's own unhandled-default outcome). Verified against
@@ -167,54 +155,56 @@ export async function handlePageLanding(pageId: string | undefined, userId: stri
       resetTo('Gallery')
       return
 
-    // cases "41"/"42": editform-PCS Marital-status/Height prompts — reuse the
-    // existing EditProfileMarital/EditProfileAgeHeight screens (built for an
+    // cases "41"/"42": editform-PCS Marital-status/Height prompts — Edit Profile
+    // with that field's editor open (built for an
     // existing user updating one field: correct save endpoint via
     // editProfileService, exits via goBack() rather than advancing a wizard —
     // verified before wiring, see conversation history). navigate (not
     // resetTo, unlike every other case here) — goBack() needs a screen
     // underneath to return to.
     case '41':
-      navigate('EditProfileMarital')
+      navigate('EditProfile', { openField: 'maritalStatus' })
       return
     case '42':
-      navigate('EditProfileAgeHeight')
+      navigate('EditProfile', { openField: 'height' })
       return
 
-    // cases "38"/"39"/"44": Country & State / City / Name — all saved
-    // together on EditProfileBasic (BasicDetailsScreen.tsx).
+    // cases "38"/"39": Country & State / City → location picker; "44": Name.
     case '38':
     case '39':
+      navigate('EditProfile', { openField: 'location' })
+      return
     case '44':
-      navigate('EditProfileBasic')
+      navigate('EditProfile', { openField: 'name' })
       return
 
     // case "35": editform-PCS/44, no confirming Angular comment — tentative
     // HomeTown mapping (see header comment above).
     case '35':
-      navigate('EditProfileBasic')
+      navigate('EditProfile', { openField: 'homeTown' })
       return
 
-    // cases "45"/"46": Education / Occupation — EditProfileProfessional
-    // (ProfessionalDetailsScreen.tsx saves QUALIFICATION + OCCUPATION).
+    // cases "45"/"46": Education / Occupation — their editors on Edit Profile.
     case '45':
+      navigate('EditProfile', { openField: 'education' })
+      return
     case '46':
-      navigate('EditProfileProfessional')
+      navigate('EditProfile', { openField: 'occupation' })
       return
 
     // case "47": Age — same screen as case 42's Height.
     case '47':
-      navigate('EditProfileAgeHeight')
+      navigate('EditProfile', { openField: 'age' })
       return
 
-    // case "40": showReligionDetailsSheet() — approximated with the closest
-    // full screen (see header comment on the MOTHERTONGUE/SUBCASTE/home-town gap).
+    // case "40": showReligionDetailsSheet() — approximated with the Religion
+    // editor chain (see header comment).
     case '40':
-      navigate('EditProfileReligious')
+      navigate('EditProfile', { openField: 'religion' })
       return
 
     // case "11": cascades through the first unanswered field, in Angular's
-    // exact order, to whichever EditProfile* screen owns it.
+    // exact order, and opens that field's editor on Edit Profile.
     case '11': {
       const [familyProperty, brothers, sisters, raasi, star, dosham] = await Promise.all([
         getSessionValue('FAMILYPROPERTY'),
@@ -225,11 +215,11 @@ export async function handlePageLanding(pageId: string | undefined, userId: stri
         getSessionValue('DOSHAM'),
       ])
       if (!isValidParam(familyProperty)) {
-        navigate('EditProfileProperty')
+        navigate('EditProfile', { openField: 'properties' })
       } else if (!isValidParam(brothers) || !isValidParam(sisters)) {
-        navigate('EditProfileFamily')
+        navigate('EditProfile', { openField: !isValidParam(brothers) ? 'brothers' : 'sisters' })
       } else if (!isValidParam(raasi) || !isValidParam(star) || !isValidParam(dosham)) {
-        navigate('EditProfileReligious')
+        navigate('EditProfile', { openField: !isValidParam(raasi) ? 'raasi' : !isValidParam(star) ? 'star' : 'dosham' })
       } else {
         resetTo(ENavigation.MATCHES)
       }

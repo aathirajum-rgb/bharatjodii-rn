@@ -12,7 +12,8 @@ import {
 } from 'react-native'
 import { useTranslation } from 'react-i18next'
 import { Colors } from '../../constants/colors'
-import { Fonts, FontSize, remPx } from '../../src/theme/fonts'
+import { FontSize, remPx } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 import { useOnboardingFooter } from '../../contexts/OnboardingContext'
 import { os } from './onboardingStyles'
 import { getFewMoreDetailsNextPage } from './fewMoreDetailsFlow'
@@ -107,6 +108,7 @@ function InfoIcon() {
 
 export default function ManagePhotosScreen({ navigation, route }: Props) {
   const { t, i18n } = useTranslation()
+  const langFonts = useLanguageFonts()
   const pendingUri  = (route.params as any)?.pendingUri as string | undefined
   const standalone  = !!(route.params as any)?.standalone
 
@@ -250,11 +252,11 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
           />
           <View style={styles.processingOverlay}>
             <ActivityIndicator color="#fff" size="small" />
-            <Text style={styles.processingText}>Processing…</Text>
+            <Text style={[styles.processingText, { fontFamily: langFonts.medium }]}>Processing…</Text>
           </View>
           {isMain && (
             <View style={styles.profileLabel}>
-              <Text style={styles.profileLabelText}>Profile Picture</Text>
+              <Text style={[styles.profileLabelText, { fontFamily: langFonts.medium }]}>Profile Picture</Text>
             </View>
           )}
         </View>
@@ -277,14 +279,14 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
         {/* Under-review overlay */}
         {item.PHOTOSTATUS === 0 && (
           <View style={styles.reviewOverlay}>
-            <Text style={styles.reviewText}>Under review</Text>
+            <Text style={[styles.reviewText, { fontFamily: langFonts.semiBold }]}>Under review</Text>
           </View>
         )}
 
         {/* Profile Picture label on main */}
         {isMain && (
           <View style={styles.profileLabel}>
-            <Text style={styles.profileLabelText}>Profile Picture</Text>
+            <Text style={[styles.profileLabelText, { fontFamily: langFonts.medium }]}>Profile Picture</Text>
           </View>
         )}
 
@@ -315,14 +317,14 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
         </View>
 
         {/* Title + subtitle */}
-        <Text style={styles.title}>{title}</Text>
-        <Text style={styles.subtitle}>{subtitle}</Text>
+        <Text style={[styles.title, { fontFamily: langFonts.semiBold }]}>{title}</Text>
+        <Text style={[styles.subtitle, { fontFamily: langFonts.regular }]}>{subtitle}</Text>
 
         {/* Loading state (no pending URI) */}
         {loading && !pendingUri ? (
           <CdnLottie uri={CDN_LOTTIE + 'loader.json'} width={80} height={80} style={{ alignSelf: 'center', marginTop: 40 }} />
         ) : displayPhotos.length === 0 ? (
-          <Text style={styles.emptyHint}>No photos yet. Go back and add one.</Text>
+          <Text style={[styles.emptyHint, { fontFamily: langFonts.regular }]}>No photos yet. Go back and add one.</Text>
         ) : (
           <>
             {/* ── Top section: large main + 2 small stacked ── */}
@@ -388,7 +390,7 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
             {/* Add more if top section is complete but no grid yet */}
             {gridPhotos.length === 0 && rightPhotos.length >= 2 && (
               <Pressable style={styles.addMoreRow} onPress={pickAndUpload}>
-                <Text style={styles.addMoreText}>+ Add more photos</Text>
+                <Text style={[styles.addMoreText, { fontFamily: langFonts.semiBold }]}>+ Add more photos</Text>
               </Pressable>
             )}
           </>
@@ -400,7 +402,7 @@ export default function ManagePhotosScreen({ navigation, route }: Props) {
           onPress={() => Alert.alert('Photo guidelines', 'Use clear, recent photos with good lighting. Avoid group photos, blurry images, or photos with glasses.')}
         >
           <InfoIcon />
-          <Text style={styles.guidelinesText}>Check out our photo guidelines</Text>
+          <Text style={[styles.guidelinesText, { fontFamily: langFonts.medium }]}>Check out our photo guidelines</Text>
         </Pressable>
       </ScrollView>
     </View>
@@ -429,7 +431,6 @@ const styles = StyleSheet.create({
   // showPhotoPromotion, so the generic template's title col applies again —
   // `.heading1-semibold-22 black-color` (registration-revamp.component.html:32).
   title: {
-    fontFamily:   Fonts.poppinsSemiBold,
     fontSize:     FontSize.font22,
     fontWeight:   '600',
     color:        Colors.black,
@@ -440,7 +441,6 @@ const styles = StyleSheet.create({
   // color (Ionic's unthemed --ion-text-color, #000) applies, not an invented
   // gray, and no line-height is set either.
   subtitle: {
-    fontFamily:   Fonts.poppinsRegular,
     fontSize:     FontSize.font14,
     fontWeight:   '400',
     color:        Colors.black,
@@ -520,7 +520,6 @@ const styles = StyleSheet.create({
   // Angular: `.profile-picture textcta-medium-12 white-color`
   // (onboarding-photo.component.html).
   profileLabelText: {
-    fontFamily: Fonts.poppinsMedium,
     fontSize:   FontSize.font12,
     fontWeight: '500',
     color:      '#fff',
@@ -578,7 +577,6 @@ const styles = StyleSheet.create({
   // Angular: `.textcta-medium-12 color-29339B` wrapped in `<u>`
   // (registration-revamp.component.html:145).
   guidelinesText: {
-    fontFamily:          Fonts.poppinsMedium,
     fontSize:            FontSize.font12,
     fontWeight:          '500',
     color:               Colors.link,

@@ -26,6 +26,7 @@ import PhotoVerdictSheet, { type VerdictPhoto } from '../../components/photo-val
 import VerificationSuccessSheet from '../../components/bottom-sheet/VerificationSuccessSheet'
 import { os } from './onboardingStyles'
 import { FontSize } from '../../src/theme/fonts'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 const MAX_PHOTOS = 10
 
@@ -33,6 +34,7 @@ type Props = { navigation: any; route: any }
 
 export default function CustomGalleryScreen({ navigation, route }: Props) {
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   const existingCount = (route?.params?.existingCount as number | undefined) ?? 0
   const remaining     = Math.max(0, MAX_PHOTOS - existingCount)
 
@@ -171,8 +173,8 @@ export default function CustomGalleryScreen({ navigation, route }: Props) {
   return (
     <View style={os.flex1}>
       <View style={styles.center}>
-        <Text style={styles.title}>Add your photo</Text>
-        <Text style={styles.subtitle}>
+        <Text style={[styles.title, { fontFamily: langFonts.bold }]}>Add your photo</Text>
+        <Text style={[styles.subtitle, { fontFamily: langFonts.regular }]}>
           {remaining > 0
             ? `Select up to ${remaining} more photo${remaining !== 1 ? 's' : ''} from your device`
             : `You've reached the ${MAX_PHOTOS}-photo limit`}
@@ -197,7 +199,7 @@ export default function CustomGalleryScreen({ navigation, route }: Props) {
         >
           {uploading
             ? <ActivityIndicator color="#fff" size="small" />
-            : <Text style={styles.btnLabel}>Choose photos</Text>
+            : <Text style={[styles.btnLabel, { fontFamily: langFonts.semiBold }]}>Choose photos</Text>
           }
         </Pressable>
       </View>

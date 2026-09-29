@@ -449,7 +449,7 @@ export default function OTPScreen({ navigation, route }: Props) {
         </ScrollView>
 
         {/* Sticky "Verify OTP" CTA — matches Angular otp-cta div */}
-        <View style={[styles.footer, { paddingBottom: Platform.OS === 'ios' ? insets.bottom : 20 }]}>
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 24 }]}>
           <ButtonRevamp
             label={t('LOGIN_PAGE.VERIFYOTP', 'Verify OTP')}
             variant="primary"

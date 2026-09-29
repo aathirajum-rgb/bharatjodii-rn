@@ -18,7 +18,19 @@ import { Colors } from '../../constants/colors'
 import { CDN_REVAMP } from '../../constants/cdn'
 import { PICKER_ITEM_HEIGHT, PICKER_PANEL_WIDTH } from '../../constants/registration.constants'
 import { useLanguageFonts } from '../../hooks/useLanguageFonts'
-import { FontSize } from '../../src/theme/fonts'
+import { FontSize, RupeeSymbolFont } from '../../src/theme/fonts'
+
+// Poppins / the NotoSans script fonts don't draw "₹" properly, so every ₹ in a
+// label is rendered as a nested Text in the dedicated rupee font while the rest
+// of the label keeps the caller's (language) font. Labels without ₹ are
+// returned unchanged. Used for the income lists (API labels like
+// "₹10,000 - ₹20,000").
+export function renderWithRupeeFont(label: string): React.ReactNode {
+  if (!label.includes('₹')) return label
+  return label.split('₹').flatMap((part, i) => (
+    i === 0 ? [part] : [<Text key={i} style={{ fontFamily: RupeeSymbolFont }}>₹</Text>, part]
+  ))
+}
 
 // Angular: right-side-panel.component.html:6 — close-icon-gray.svg
 const CDN_CLOSE_ICON = CDN_REVAMP + 'close-icon-gray.svg'
@@ -273,7 +285,7 @@ export default function SearchablePicker({
                     accessibilityState={{ selected: isSelected }}
                   >
                     <Text style={[styles.itemText, { fontFamily: langFonts.regular }]}>
-                      {item.label}
+                      {renderWithRupeeFont(item.label)}
                     </Text>
                   </Pressable>
                 )

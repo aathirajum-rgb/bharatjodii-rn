@@ -39,12 +39,14 @@ const ILLUSTRATION_SIZE = Math.min(345, Math.round(Dimensions.get('window').widt
 
 type Props = {
   navigation: any
-  route: { params?: { pageNo?: string } }
+  route: { params?: { pageNo?: string; fromEditProfile?: boolean } }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function GenerateHoroscopeScreen({ navigation }: Props) {
+export default function GenerateHoroscopeScreen({ navigation, route }: Props) {
+  // Opened from Edit Profile's Horoscope row → come back there when done.
+  const fromEditProfile = !!route?.params?.fromEditProfile
   const { t, i18n } = useTranslation()
   const langFonts = useLanguageFonts()
 
@@ -84,10 +86,11 @@ export default function GenerateHoroscopeScreen({ navigation }: Props) {
   // matching Angular's onBoardingSkip['29'] exactly (the whole horoscope
   // sub-flow, including Star/Raasi, is skippable as one unit).
   function handleNext() {
-    navigation.push('onboarding', { pageNo: '30' })
+    navigation.push('onboarding', { pageNo: '30', ...(fromEditProfile ? { fromEditProfile, standalone: true } : {}) })
   }
 
   function handleSkip() {
+    if (fromEditProfile) { navigation.popTo('EditProfile'); return }
     navigation.push('onboarding', { pageNo: '32' })
   }
 
@@ -107,6 +110,7 @@ export default function GenerateHoroscopeScreen({ navigation }: Props) {
   // differs from this RN port's; RN's equivalent of Angular's "onboarding/26"
   // (STARRASSI) is pageNo '33' (see AppStack.tsx's page-number map).
   async function goToStarRaasiAfterUpload() {
+    if (fromEditProfile) { navigation.popTo('EditProfile'); return }
     navigation.push('onboarding', { pageNo: '33' })
   }
 
@@ -224,7 +228,8 @@ export default function GenerateHoroscopeScreen({ navigation }: Props) {
   useOnboardingFooter({
     nextLabel: t('REGISTRATION.GENERATEHOROSCOPECTA', 'Generate horoscope for FREE'),
     onNext:    handleNext,
-    showSkip:  true,
+    // No "I'll do this later" when opened from Edit Profile's Horoscope row.
+    showSkip:  !fromEditProfile,
     skipLabel: t('REG.DO_LATER', "I'll do this later"),
     onSkip:    handleSkip,
     showLink:  true,
@@ -232,7 +237,7 @@ export default function GenerateHoroscopeScreen({ navigation }: Props) {
     onLink:    handleUploadHoroscope,
     // i18n.language: all three labels are translated, so re-push footer state
     // on a language change — otherwise they keep the wording from mount time.
-  }, [i18n.language])
+  }, [i18n.language, fromEditProfile])
 
   // ─── Render ───────────────────────────────────────────────────────────────
 

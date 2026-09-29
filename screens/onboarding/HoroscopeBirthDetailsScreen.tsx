@@ -76,12 +76,13 @@ type DateField = 'date' | 'month' | 'year'
 
 type Props = {
   navigation: any
-  route: { params?: { pageNo?: string } }
+  route: { params?: { pageNo?: string; fromEditProfile?: boolean } }
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function HoroscopeBirthDetailsScreen({ navigation }: Props) {
+export default function HoroscopeBirthDetailsScreen({ navigation, route }: Props) {
+  const fromEditProfile = !!route?.params?.fromEditProfile
   const { t } = useTranslation()
   const langFonts = useLanguageFonts()
 
@@ -318,7 +319,7 @@ export default function HoroscopeBirthDetailsScreen({ navigation }: Props) {
         MONTH:     selMonth,
         YEAR:      selYear,
       })
-      navigation.push('onboarding', { pageNo: '31' })
+      navigation.push('onboarding', { pageNo: '31', ...(fromEditProfile ? { fromEditProfile, standalone: true } : {}) })
     } catch {
       // Allow retry
     } finally {

@@ -28,8 +28,9 @@ import {
   getBioDataDownloadLink, type BiodataProfile, type BiodataTheme,
 } from '../../service/biodataService'
 import { getOwnGenderAvatarUrl } from '../../utils/avatar'
-import { Fonts, FontSize, SemanticFontsEnglish } from '../../src/theme/fonts'
+import { FontSize } from '../../src/theme/fonts'
 import ScreenTopInset from '../../components/screen/ScreenTopInset'
+import { useLanguageFonts } from '../../hooks/useLanguageFonts'
 
 
 const ICON_BACK        = CDN_REACT + '/menu_back_arrow.svg'
@@ -121,6 +122,7 @@ type Props = { navigation: any }
 export default function BiodataScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets()
   const { t } = useTranslation()
+  const langFonts = useLanguageFonts()
   // Live viewport — recomputes on rotation, on a foldable unfolding, and on a
   // mobile-web resize, so the frame and both caps always match the real width.
   const { width: viewportWidth } = useWindowDimensions()
@@ -213,7 +215,7 @@ export default function BiodataScreen({ navigation }: Props) {
   const missingField = profile ? getFirstMissingBiodataField(profile, occupationCode) : null
 
   function handleAddNow() {
-    if (missingField) navigation.navigate(missingField.screen)
+    if (missingField) navigation.navigate('EditProfile', { openField: missingField.field })
   }
 
   // Add/Edit photo — same standalone Manage Photos entry point HelpCenterScreen
@@ -248,7 +250,7 @@ export default function BiodataScreen({ navigation }: Props) {
     return (
       <View style={[s.screen, s.centered]}>
         <ScreenTopInset style={s.topInsetAbsolute} />
-        <Text style={s.errorText}>Could not load your biodata.</Text>
+        <Text style={[s.errorText, { fontFamily: langFonts.regular }]}>Could not load your biodata.</Text>
         <ButtonRevamp label="Go back" variant="primary" onPress={handleBack} />
       </View>
     )
@@ -297,12 +299,12 @@ export default function BiodataScreen({ navigation }: Props) {
             label — so the language itself was never shown and the group hugged
             the right edge instead of sitting centred. */}
         <View style={s.langGroup}>
-          <Text style={s.langLabel}>{t('BIO_DATA.SELECT_LANGUAGE')}</Text>
+          <Text style={[s.langLabel, { fontFamily: langFonts.regular }]}>{t('BIO_DATA.SELECT_LANGUAGE')}</Text>
           <Pressable style={s.langPill} onPress={() => navigation.navigate('LanguageSelection')}>
             {/* Angular: {{userLanguage}} — ACCOUNT.SELECTED_LANGUAGE holds the
                 native name of the active locale in every locale file
                 ("English" / "தமிழ்" / "हिंदी" / ...). */}
-            <Text style={s.langPillText}>{t('ACCOUNT.SELECTED_LANGUAGE')}</Text>
+            <Text style={[s.langPillText, { fontFamily: langFonts.regular }]}>{t('ACCOUNT.SELECTED_LANGUAGE')}</Text>
             <CdnSvg uri={ICON_LANG_CHEVRON} width={12} height={12} />
           </Pressable>
         </View>
@@ -319,11 +321,11 @@ export default function BiodataScreen({ navigation }: Props) {
         <View style={s.missingBanner}>
           <View style={s.missingBannerRow}>
             <CdnSvg uri={ICON_ALERT} width={20} height={20} />
-            <Text style={s.missingBannerText}>{t('BIO_DATA.MISSING_DETAILS_TXT')}</Text>
+            <Text style={[s.missingBannerText, { fontFamily: langFonts.regular }]}>{t('BIO_DATA.MISSING_DETAILS_TXT')}</Text>
           </View>
           <Pressable style={s.missingBannerCta} onPress={handleAddNow}>
             <CdnSvg uri={ICON_ADD} width={16} height={16} />
-            <Text style={s.missingBannerCtaText}>{t('BIO_DATA.ADD_NOW_TXT')}</Text>
+            <Text style={[s.missingBannerCtaText, { fontFamily: langFonts.medium }]}>{t('BIO_DATA.ADD_NOW_TXT')}</Text>
           </Pressable>
         </View>
       )}
@@ -389,12 +391,12 @@ export default function BiodataScreen({ navigation }: Props) {
                 state was missing from this port entirely. */}
             {!photoAvailable && photoCount === 0 && !cachedPhotoUrl && (
               <Pressable style={s.photoActionBtn} onPress={handleAddPhoto}>
-                <Text style={s.photoActionText}>{t('BIO_DATA.ADD_YOUR_PHOTO')}</Text>
+                <Text style={[s.photoActionText, { fontFamily: langFonts.medium }]}>{t('BIO_DATA.ADD_YOUR_PHOTO')}</Text>
               </Pressable>
             )}
             {photoUnderValidation && (
               <View style={s.photoValidationBtn}>
-                <Text style={s.photoActionText}>{t('BIO_DATA.UNDER_VALIDATION_TXT')}</Text>
+                <Text style={[s.photoActionText, { fontFamily: langFonts.medium }]}>{t('BIO_DATA.UNDER_VALIDATION_TXT')}</Text>
               </View>
             )}
             {photoAvailable && (
@@ -404,8 +406,8 @@ export default function BiodataScreen({ navigation }: Props) {
             )}
           </View>
 
-          <Text style={s.name}>{personal.NAME}</Text>
-          <Text style={s.matriId}>ID {personal.MATRIID}</Text>
+          <Text style={[s.name, { fontFamily: langFonts.semiBold }]}>{personal.NAME}</Text>
+          <Text style={[s.matriId, { fontFamily: langFonts.medium }]}>ID {personal.MATRIID}</Text>
 
           <SectionTitle title={t('BIO_DATA.PERSONAL_DETAILS')} />
           <FieldRow
@@ -430,7 +432,7 @@ export default function BiodataScreen({ navigation }: Props) {
               label={t('EDITPROFILE.INCOME')}
               value={professional.ANNUALINCOME && professional.ANNUALINCOME !== '0' ? professional.ANNUALINCOME : undefined}
               addLabel={t('EDITPROFILE.ADDYOURINCOME')}
-              onAddPress={() => navigation.navigate('EditProfileProfessional')}
+              onAddPress={() => navigation.navigate('EditProfile', { openField: 'income' })}
             />
           )}
           <FieldRow label={t('EDITPROFILE.MARITALSTATUS')} value={personal.MARITALSTATUS} />
@@ -443,25 +445,25 @@ export default function BiodataScreen({ navigation }: Props) {
             label={t('EDITPROFILE.PHYSICALSTATUS')}
             value={personal.PHYSICALSTATUS}
             addLabel={t('BIO_DATA.ADD_PHYSICAL_STATUS')}
-            onAddPress={() => navigation.navigate('EditProfileMarital')}
+            onAddPress={() => navigation.navigate('EditProfile', { openField: 'physicalStatus' })}
           />
           <FieldRow
             label={t('EDITPROFILE.EATING')}
             value={habits.EATINGHABITS}
             addLabel={t('EDITPROFILE.ADDYOUREATING')}
-            onAddPress={() => navigation.navigate('EditProfileLifestyle')}
+            onAddPress={() => navigation.navigate('EditProfile', { openField: 'eating' })}
           />
           <FieldRow
             label={t('BIO_DATA.DRINKING_HABITS')}
             value={habits.DRINKING}
             addLabel={t('EDITPROFILE.ADDYOURDRINKING')}
-            onAddPress={() => navigation.navigate('EditProfileLifestyle')}
+            onAddPress={() => navigation.navigate('EditProfile', { openField: 'drinking' })}
           />
           <FieldRow
             label={t('BIO_DATA.SMOKING_HABITS')}
             value={habits.SMOKING}
             addLabel={t('EDITPROFILE.ADDYOURSMOKING')}
-            onAddPress={() => navigation.navigate('EditProfileLifestyle')}
+            onAddPress={() => navigation.navigate('EditProfile', { openField: 'smoking' })}
           />
 
           {showReligious && (
@@ -477,26 +479,26 @@ export default function BiodataScreen({ navigation }: Props) {
                   // Angular navigates to edit page 16 here; without onAddPress
                   // this rendered as dead, un-tappable text unlike every
                   // sibling "Add ..." link in the section.
-                  onAddPress={() => navigation.navigate('EditProfileReligious')}
+                  onAddPress={() => navigation.navigate('EditProfile', { openField: 'gothram' })}
                 />
               )}
               <FieldRow
                 label={t('EDITPROFILE.RAASI')}
                 value={religious.RAASI}
                 addLabel={t('BIO_DATA.ADD_RAASI_DETAILS')}
-                onAddPress={() => navigation.navigate('EditProfileReligious')}
+                onAddPress={() => navigation.navigate('EditProfile', { openField: 'raasi' })}
               />
               <FieldRow
                 label={t('EDITPROFILE.DOSHAM')}
                 value={profile.doshamText}
                 addLabel={t('BIO_DATA.ADD_DOSHAM_DETAILS')}
-                onAddPress={() => navigation.navigate('EditProfileReligious')}
+                onAddPress={() => navigation.navigate('EditProfile', { openField: 'dosham' })}
               />
               <FieldRow
                 label={t('EDITPROFILE.STAR')}
                 value={religious.STAR}
                 addLabel={t('BIO_DATA.ADD_STAR_DETAILS')}
-                onAddPress={() => navigation.navigate('EditProfileReligious')}
+                onAddPress={() => navigation.navigate('EditProfile', { openField: 'star' })}
               />
             </>
           )}
@@ -506,19 +508,19 @@ export default function BiodataScreen({ navigation }: Props) {
             label={t('BIO_DATA.NO_OF_BROTHERS')}
             value={family.BROTHERS ? brothersLabel : undefined}
             addLabel={t('BIO_DATA.ADD_BROTHER_DETAILS')}
-            onAddPress={() => navigation.navigate('EditProfileFamily')}
+            onAddPress={() => navigation.navigate('EditProfile', { openField: 'brothers' })}
           />
           <FieldRow
             label={t('BIO_DATA.NO_OF_SISTERS')}
             value={family.SISTERS ? sistersLabel : undefined}
             addLabel={t('BIO_DATA.ADD_SISTER_DETAILS')}
-            onAddPress={() => navigation.navigate('EditProfileFamily')}
+            onAddPress={() => navigation.navigate('EditProfile', { openField: 'sisters' })}
           />
           <FieldRow
             label={t('BIO_DATA.PROPERTY_DETAILS')}
             value={hasPropertyDetails(family) ? propertyContentText(family) : undefined}
             addLabel={t('BIO_DATA.ADD_PROPERTY_DETAILS')}
-            onAddPress={() => navigation.navigate('EditProfileProperty')}
+            onAddPress={() => navigation.navigate('EditProfile', { openField: 'properties' })}
           />
 
           {showReligious && (
@@ -528,28 +530,28 @@ export default function BiodataScreen({ navigation }: Props) {
                 <View style={s.horoRow}>
                   {!!horo.RASIGIF && (
                     <View style={s.horoCol}>
-                      <Text style={s.horoLabel}>{t('BIO_DATA.RAASI_TXT')}</Text>
+                      <Text style={[s.horoLabel, { fontFamily: langFonts.bold }]}>{t('BIO_DATA.RAASI_TXT')}</Text>
                       <Image source={{ uri: horo.RASIGIF }} style={s.horoImg} contentFit="contain" />
                     </View>
                   )}
                   {!!horo.NAVAMSAGIF && (
                     <View style={s.horoCol}>
-                      <Text style={s.horoLabel}>{t('BIO_DATA.NAVAMSA_TXT')}</Text>
+                      <Text style={[s.horoLabel, { fontFamily: langFonts.bold }]}>{t('BIO_DATA.NAVAMSA_TXT')}</Text>
                       <Image source={{ uri: horo.NAVAMSAGIF }} style={s.horoImg} contentFit="contain" />
                     </View>
                   )}
                 </View>
               ) : (
                 <View style={s.horoMissingBlock}>
-                  <Text style={s.horoMissingHeader}>{t('BIO_DATA.HORO_HEADER')}</Text>
-                  <Text style={s.horoMissingBody}>{t('BIO_DATA.HORO_BODY')}</Text>
+                  <Text style={[s.horoMissingHeader, { fontFamily: langFonts.medium }]}>{t('BIO_DATA.HORO_HEADER')}</Text>
+                  <Text style={[s.horoMissingBody, { fontFamily: langFonts.regular }]}>{t('BIO_DATA.HORO_BODY')}</Text>
                   {/* Angular: goToEditScreen('22','add') — the add-horoscope
                       form. This was a "Coming soon" stub even though the
                       route exists and EditProfileScreen already links to it. */}
                   <ButtonRevamp
                     label={t('BIO_DATA.HORO_CTA')}
                     variant="primary"
-                    onPress={() => navigation.navigate('EditProfileHoroscope')}
+                    onPress={() => navigation.navigate('EditProfile', { openField: 'horoscope' })}
                     style={{ marginTop: 16 }}
                   />
                 </View>
@@ -560,7 +562,7 @@ export default function BiodataScreen({ navigation }: Props) {
           {!!profile.QRCODE && (
             <View style={s.qrSection}>
               <Image source={{ uri: profile.QRCODE }} style={s.qrImage} contentFit="contain" />
-              <Text style={s.qrCaption}>
+              <Text style={[s.qrCaption, { fontFamily: langFonts.medium }]}>
                 {t('BIO_DATA.QR_CODE_TXT').replace('#HISHER#', t(`PRONOUN.${personal.GENDER === 'F' ? 'F' : 'M'}.hisher`))}
               </Text>
             </View>
@@ -611,8 +613,8 @@ export default function BiodataScreen({ navigation }: Props) {
 
       {showSwipeTip && (
         <View style={s.swipeTipOverlay}>
-          <Text style={s.swipeTipTitle}>{t('BIO_DATA.SWIPE_RIGHT_TXT_1')}</Text>
-          <Text style={s.swipeTipBody}>{t('BIO_DATA.SWIPE_RIGHT_TXT_2')}</Text>
+          <Text style={[s.swipeTipTitle, { fontFamily: langFonts.bold }]}>{t('BIO_DATA.SWIPE_RIGHT_TXT_1')}</Text>
+          <Text style={[s.swipeTipBody, { fontFamily: langFonts.regular }]}>{t('BIO_DATA.SWIPE_RIGHT_TXT_2')}</Text>
           <ButtonRevamp label={t('BIO_DATA.OK_CTA')} variant="primary" fullWidth onPress={dismissSwipeTip} />
         </View>
       )}
@@ -623,25 +625,27 @@ export default function BiodataScreen({ navigation }: Props) {
 // ─── Presentational helpers ─────────────────────────────────────────────────────
 
 function SectionTitle({ title }: { title: string }) {
-  return <Text style={s.sectionTitle}>{title}</Text>
+  const langFonts = useLanguageFonts()
+  return <Text style={[s.sectionTitle, { fontFamily: langFonts.medium }]}>{title}</Text>
 }
 
 function FieldRow({
   label, value, addLabel, onAddPress,
 }: { label: string; value?: string | undefined; addLabel?: string; onAddPress?: () => void }) {
+  const langFonts = useLanguageFonts()
   if (!value) {
     if (!addLabel) return null
     return (
       <View style={s.fieldRow}>
-        <Text style={s.fieldLabel}>{label}</Text>
+        <Text style={[s.fieldLabel, { fontFamily: langFonts.regular }]}>{label}</Text>
         {onAddPress ? (
           <Pressable style={s.fieldAddLink} onPress={onAddPress}>
-            <Text style={s.fieldAddLinkText}>{addLabel}</Text>
+            <Text style={[s.fieldAddLinkText, { fontFamily: langFonts.medium }]}>{addLabel}</Text>
             <CdnSvg uri={ICON_CHEVRON} width={14} height={14} />
           </Pressable>
         ) : (
           <View style={s.fieldAddLink}>
-            <Text style={s.fieldAddLinkText}>{addLabel}</Text>
+            <Text style={[s.fieldAddLinkText, { fontFamily: langFonts.medium }]}>{addLabel}</Text>
           </View>
         )}
       </View>
@@ -649,8 +653,8 @@ function FieldRow({
   }
   return (
     <View style={s.fieldRow}>
-      <Text style={s.fieldLabel}>{label}</Text>
-      <Text style={s.fieldValue}>{value}</Text>
+      <Text style={[s.fieldLabel, { fontFamily: langFonts.regular }]}>{label}</Text>
+      <Text style={[s.fieldValue, { fontFamily: langFonts.medium }]}>{value}</Text>
     </View>
   )
 }
@@ -683,7 +687,7 @@ const s = StyleSheet.create({
   // FLAGGED: Angular's language <select> (.language-selection-biodata) is
   // COMMENTED OUT (download-biodata.component.html:20-22), so there is no live
   // equivalent for this pill's typography. Tokenised only, value unchanged.
-  langLabel: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
+  langLabel: { fontSize: FontSize.font14, color: Colors.black },
   // Angular .language-selection-biodata: border 1px solid #333333, radius 8,
   // padding 4px 24px 4px 8px, white bg, 12px chevron at right 8px. That 24px
   // right padding exists to clear the chevron, so it becomes a gap here.
@@ -694,7 +698,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 4,
   },
   // Angular: same class as langLabel — .body2-regular-14 (14px), not 12px.
-  langPillText: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font14, color: Colors.black },
+  langPillText: { fontSize: FontSize.font14, color: Colors.black },
 
   // Angular: .biodata-details-missing — background #FFF4F7 (not selectionBg's
   // #FFF1F5), box-shadow 0 0px 5px 1px #e5e5e5.
@@ -703,7 +707,7 @@ const s = StyleSheet.create({
     shadowColor: '#e5e5e5', shadowOffset: { width: 0, height: 0 }, shadowOpacity: 1, shadowRadius: 5, elevation: 2,
   },
   missingBannerRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  missingBannerText: { flex: 1, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: '#333333' },
+  missingBannerText: { flex: 1, fontSize: FontSize.font12, color: '#333333' },
   // alignSelf so the pill hugs its content instead of stretching the banner
   // width; marginLeft aligns it under the message, past the alert icon
   // (Angular's offset="1"). marginTop is its mt-6.
@@ -717,7 +721,7 @@ const s = StyleSheet.create({
   // in ANY stylesheet in the project — it contributes no size or family, so the
   // real rendered size is ion-button's own default. No citable value, so 14 is
   // left as-is and only tokenised.
-  missingBannerCtaText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: FontSize.font14, color: Colors.white },
+  missingBannerCtaText: { fontSize: FontSize.font14, color: Colors.white },
 
   // Angular's outer themed <ion-col> — carries theme.BGCOLOR behind the top
   // image, the white card and the bottom decoration alike.
@@ -785,7 +789,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 8, paddingVertical: 4,
   },
   // Angular: .textcta-medium-12 — 12px Poppins-Medium, not 10px.
-  photoActionText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: FontSize.font12, color: '#333333' },
+  photoActionText: { fontSize: FontSize.font12, color: '#333333' },
   // Angular .biodata-profile-image-edit: `right: 10px; top: 10px;
   // background-color: #745430; border-radius: 50%; opacity: 0.8` — a
   // translucent brown disc in the TOP-right corner. This port had a white disc
@@ -813,16 +817,16 @@ const s = StyleSheet.create({
   // Angular: <ion-col class="padd0 mt-24"> around the name label — a 24pt gap
   // between the photo frame and the name, which this port had at 0 so the name
   // sat directly against the frame's bottom border.
-  name: { fontFamily: Fonts.poppinsSemiBold, fontSize: FontSize.font16, color: '#333333', marginTop: 24 },
-  matriId: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: FontSize.font12, color: '#333333', marginTop: 8 },
+  name: { fontSize: FontSize.font16, color: '#333333', marginTop: 24 },
+  matriId: { fontSize: FontSize.font12, color: '#333333', marginTop: 8 },
 
-  sectionTitle: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: FontSize.font14, color: '#333333', marginTop: 16, marginBottom: 8 },
+  sectionTitle: { fontSize: FontSize.font14, color: '#333333', marginTop: 16, marginBottom: 8 },
 
   fieldRow: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', marginTop: 12, gap: 8 },
-  fieldLabel: { flex: 5, fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: '#333333' },
-  fieldValue: { flex: 7, fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: FontSize.font12, color: '#333333' },
+  fieldLabel: { flex: 5, fontSize: FontSize.font12, color: '#333333' },
+  fieldValue: { flex: 7, fontSize: FontSize.font12, color: '#333333' },
   fieldAddLink: { flex: 7, flexDirection: 'row', alignItems: 'center', gap: 4 },
-  fieldAddLinkText: { fontFamily: SemanticFontsEnglish.buttonEnglishMedium, fontWeight: '500', fontSize: FontSize.font12, color: '#D99C00' },
+  fieldAddLinkText: { fontSize: FontSize.font12, color: '#D99C00' },
 
   horoRow: { flexDirection: 'row', gap: 16, marginTop: 8 },
   horoCol: { flex: 1, alignItems: 'center' },
@@ -832,7 +836,7 @@ const s = StyleSheet.create({
   // matched). Caveat: .heading-03-bold-10 is only declared inside global.scss's
   // nine per-language blocks with no English declaration; all nine agree on
   // Bold + --font10, so that is the intent.
-  horoLabel: { fontFamily: Fonts.poppinsBold, fontSize: FontSize.font10, color: '#D8AD6E', marginBottom: 8 },
+  horoLabel: { fontSize: FontSize.font10, color: '#D8AD6E', marginBottom: 8 },
   horoImg: { width: '100%', height: 100 },
   // Angular .biodata-horoscope-block (+ .biodata-horoscope-block-border, which
   // is applied only when HOROSCOPEAVAILABLE=='N', i.e. exactly this block):
@@ -847,8 +851,8 @@ const s = StyleSheet.create({
     marginTop: 8, paddingHorizontal: 24, paddingVertical: 16, borderRadius: 8, alignItems: 'center',
     backgroundColor: '#FFFCF4', borderWidth: 1, borderStyle: 'dashed', borderColor: '#FFE17E',
   },
-  horoMissingHeader: { fontFamily: SemanticFontsEnglish.headingEnglishMedium, fontWeight: '500', fontSize: FontSize.font16, color: '#EF4444', textAlign: 'center' },
-  horoMissingBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font12, color: '#4C4C4C', textAlign: 'center', marginTop: 4 },
+  horoMissingHeader: { fontSize: FontSize.font16, color: '#EF4444', textAlign: 'center' },
+  horoMissingBody: { fontSize: FontSize.font12, color: '#4C4C4C', textAlign: 'center', marginTop: 4 },
 
   // Angular .biodata-barcode-section: `border-top: 1px solid #a9907e;
   // margin-top: 24px` — a hairline rule separating the QR block from the
@@ -867,7 +871,7 @@ const s = StyleSheet.create({
     width: 80, height: 80,
     borderWidth: 1, borderColor: '#E6CA64', borderRadius: 8,
   },
-  qrCaption: { fontFamily: Fonts.poppinsMedium, fontWeight: '500', fontSize: FontSize.font12, color: '#1A1818', textAlign: 'center' },
+  qrCaption: { fontSize: FontSize.font12, color: '#1A1818', textAlign: 'center' },
 
   // Butts straight onto the card — no overlap. The -35 that used to be here was
   // sized for the old (wrongly 100pt-tall) slab and painted over the QR caption,
@@ -897,6 +901,6 @@ const s = StyleSheet.create({
   // var(--font16) + --body-01-english-Regular (Poppins-Regular), NOT 14. Both
   // classes are declared only in the nine per-language blocks; all nine agree,
   // same English gap as heading-03-bold-10 above.
-  swipeTipTitle: { fontFamily: Fonts.poppinsBold, fontSize: FontSize.font24, color: Colors.white, textAlign: 'center' },
-  swipeTipBody: { fontFamily: SemanticFontsEnglish.bodyEnglishRegular, fontSize: FontSize.font16, color: Colors.white, textAlign: 'center' },
+  swipeTipTitle: { fontSize: FontSize.font24, color: Colors.white, textAlign: 'center' },
+  swipeTipBody: { fontSize: FontSize.font16, color: Colors.white, textAlign: 'center' },
 })

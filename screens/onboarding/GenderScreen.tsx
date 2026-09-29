@@ -252,7 +252,7 @@ export default function GenderScreen({ navigation }: Props) {
           </View>
         )}
 
-        {!!error && <Text style={styles.errorText}>{error}</Text>}
+        {!!error && <Text style={[styles.errorText, { fontFamily: langFonts.regular }]}>{error}</Text>}
       </ScrollView>
 
       {/* AI name/gender validation sheet — Angular: onboarding3EditSheet */}
