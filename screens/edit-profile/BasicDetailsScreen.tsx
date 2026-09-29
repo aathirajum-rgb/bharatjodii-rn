@@ -182,25 +182,25 @@ export default function BasicDetailsScreen({ navigation: _navigation }: Props) {
     if (motherTongueEditable && motherTongue && motherTongue.key !== original.motherTongue) {
       changes.push({ field: 'MOTHERTONGUE', value: motherTongue.key, existingValue: original.motherTongue })
     }
-    // STATE/CITY share TYPE code 6 — Angular sends them as one composite update.
-    // Composite VALUE format ('~'-joined) inferred from this app's established
-    // convention for multi-part values elsewhere — not independently confirmed
-    // against a live capture the way EXISTINGVALUE was. Worth verifying.
+    // STATE/CITY share TYPE code 6. Angular (form-fields.component.ts /
+    // validation.component.ts) sends the CITY update as "<city>~<state>" — city
+    // first — which carries both, so one call covers a state and/or city change.
     if (state && city && (state.key !== original.state || city.key !== original.city)) {
       changes.push({
-        field: 'STATE',
-        value: `${state.key}~${city.key}`,
-        existingValue: `${original.state ?? ''}~${original.city ?? ''}`,
+        field: 'CITY',
+        value: `${city.key}~${state.key}`,
+        existingValue: `${original.city ?? ''}~${original.state ?? ''}`,
       })
     }
     // Gated on homeTownVisible too: if the member's mother tongue isn't in the
     // native-place domain the fields aren't shown, so any values still sitting
     // in state (e.g. loaded, then mother tongue switched) must not be saved.
+    // Angular (registration-modal-popup.component.ts): HOMECITY → "<homeCity>~<homeState>".
     if (homeTownVisible && homeState && homeCity && (homeState.key !== original.homeState || homeCity.key !== original.homeCity)) {
       changes.push({
-        field: 'HOMESTATE',
-        value: `${homeState.key}~${homeCity.key}`,
-        existingValue: `${original.homeState ?? ''}~${original.homeCity ?? ''}`,
+        field: 'HOMECITY',
+        value: `${homeCity.key}~${homeState.key}`,
+        existingValue: `${original.homeCity ?? ''}~${original.homeState ?? ''}`,
       })
     }
 

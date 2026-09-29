@@ -356,7 +356,9 @@ export async function fetchMaritalStatusOptions(
 // set every marital-status-history flow uses (Angular form-fields). Shared
 // constant so PersonalReligiousDesktopStep.tsx and Edit Profile's marital
 // screen don't each hardcode their own copy.
+// '0' = None — same key the initialfetch NOOFCHILDREN list uses ({"0":"None",...}).
 export const CHILDREN_OPTIONS: Array<{ key: string; label: string }> = [
+  { key: '0', label: 'None' },
   { key: '1', label: '1 child' }, { key: '2', label: '2 children' },
   { key: '3', label: '3 children' }, { key: '4', label: '4+ children' },
 ]
@@ -912,7 +914,12 @@ export async function fetchCasteOptions(
     return []
   }
 
-  if (arrays?.CASTE) return toList(arrays.CASTE)
+  // The caste list differs per religion AND mother tongue (e.g. Hindu+Tamil = 65
+  // castes, Hindu+Hindi = 252) — only trust the cache if it was fetched for this
+  // same pair, otherwise switching religion kept showing the previous list.
+  // Same pattern as GOTHRAM_CASTE in fetchGothraOptions().
+  const cacheKey = `${religion}|${mothertongue}`
+  if (arrays?.CASTE && arrays?.CASTE_KEY === cacheKey) return toList(arrays.CASTE)
 
   const lang     = (await getItem(SK.Auth.LANG)) ?? 'en'
   const paramStr = `type=caste&religion=${religion}&mothertongue=${mothertongue}&LANG=${lang}`
@@ -922,7 +929,7 @@ export async function fetchCasteOptions(
   const list      = toList(casteData)
 
   if (casteData) {
-    const updated = { ...arrays, CASTE: casteData }
+    const updated = { ...arrays, CASTE: casteData, CASTE_KEY: cacheKey }
     await setItem('REGISTRATIONARRAYS', JSON.stringify(updated))
   }
   return list

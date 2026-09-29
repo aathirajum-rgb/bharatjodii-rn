@@ -44,7 +44,8 @@ import { StorageKeys as SK } from '../../constants/storage.keys'
 import { getItem, setItem } from '../../service/storageService'
 import { Endpoints } from '../../service/api.endpoints'
 import { uploadFile } from '../../service/apiClient'
-import { managePhotos } from '../../service/profileService'
+import { managePhotos, deletePhoto, setMainPhoto } from '../../service/profileService'
+import Toast, { type ToastRequest } from '../../components/toast/Toast'
 import {
   getPhotoConfig, validatePhotoAsset, normalizeWebFile, getRejectReasons, describeRejection,
   pollPhotoValidation,
@@ -56,12 +57,12 @@ import PhotoAlbumViewerMobile from '../../components/edit-profile/PhotoAlbumView
 import PhotoVerdictSheet, { type VerdictPhoto } from '../../components/photo-validation/PhotoVerdictSheet'
 import VerificationSuccessSheet from '../../components/bottom-sheet/VerificationSuccessSheet'
 import {
-  CHILDREN_OPTIONS,
+  CHILDREN_OPTIONS, fetchEducationGroupOptionsFlat, isEducationGroupEligible, fetchSubcasteOptions,
   fetchReligionOptions, fetchCasteOptions, fetchOccupationOptions,
   fetchQualificationOptions, fetchMotherTongueOptions,
   fetchEatingHabitOptions, fetchDrinkingHabitOptions, fetchSmokingHabitOptions, fetchRaasiOptions,
   fetchStarOptions, fetchMonthlyIncomeOptions, fetchPropertyOptions,
-  fetchStates, fetchCities, fetchHeightCategoryOptions,
+  fetchStates, fetchCities, fetchHeightCategoryOptions, fetchExactHeightOptions,
   fetchMaritalStatusOptions, fetchPhysicalStatusOptions, fetchProfileCreatedByOptions,
   fetchFamilyOptions, isHomeTownMotherTongue, storeUserName,
 } from '../../service/registrationService'
@@ -69,6 +70,7 @@ import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import Svg, { Rect } from 'react-native-svg'
 import PhotoPrivacySheet from '../../components/photo-privacy/PhotoPrivacySheet'
 import FieldRestrictedSheet from '../../components/edit-profile/FieldRestrictedSheet'
+import { EditAgeHeightSheets, hasExactHeight, heightCategoryCode, type AgeHeightSheetMode } from './EditProfileAgeHeightScreen'
 import ScreenTopInset from '../../components/screen/ScreenTopInset'
 import { useIsDesktopWeb } from '../../hooks/useIsDesktopWeb'
 import { handleBack } from '../../utils/navigationRef'
@@ -86,6 +88,13 @@ const GUIDELINES_ICON = 16
 
 // Red "+" circle on the photo grid's Add Photo / Add More tile.
 const ICON_ADD_CIRCLE = CDN_REACT + '/add_circle.svg'
+// New design: the mosaic shows at most 6 photo tiles (main + 5) and never a
+// dashed "Add More" tile — adding goes through the "Add more photos" CTA below
+// the grid; past 6 the 6th tile turns into a "+N more" overlay into the viewer.
+const GRID_MAX_TILES = 6
+// Same undo window EditProfileDesktopScreen uses — the delete API call is
+// deferred this long so the toast's Undo can genuinely cancel it.
+const DELETE_UNDO_WINDOW_MS = 3000
 const ADD_CIRCLE_ICON = 24
 
 // Add Photo / Add More tile border. Drawn as an SVG rect because RN's
@@ -156,6 +165,7 @@ const R_ICON = {
   maritalStatus:  CDN_SVG + 'viewprofile/marital-status-icon.svg',
   // 24x24 intrinsic, fill #858585 — already exactly ROW_ICON size.
   physicalStatus: CDN_SVG + 'physical-status.svg',
+  children:       CDN_REACT + '/edit_child.svg',
   mobileNo:       CDN_REACT + '/edit_phone.svg',
 
   name:           CDN_REACT + '/edit_name.svg',
@@ -366,11 +376,28 @@ export default function EditProfileScreen({ navigation, route }: Props) {
   // be changed" popup, opened from showDisableToast() when a one-time-editable
   // field has already been used up. See `restrictedNav` below.
   const [fieldRestrictedVisible, setFieldRestrictedVisible] = useState(false)
+  // New design: Age / Height edit in place via bottom sheets (EditAgeHeightSheets in EditProfileAgeHeightScreen.tsx)
+  // instead of navigating to EditProfileAgeHeight.
+  const [ageHeightSheet, setAgeHeightSheet] = useState<AgeHeightSheetMode>(null)
   const [viewerIndex, setViewerIndex] = useState<number | null>(null)
   const [genderAvatarUrl, setGenderAvatarUrl] = useState('')
   // Photo failed to load (broken URL / still processing) — fall back to the
   // gender avatar instead of a blank tile, same as an empty slot.
   const [failedPhotos, setFailedPhotos] = useState<Set<number>>(new Set())
+  const [toastRequest, setToastRequest] = useState<ToastRequest | null>(null)
+  // One deferred delete tracked at a time — see handleConfirmDeletePhoto().
+  const pendingDeleteRef = useRef<{ photo: any; index: number; timer: ReturnType<typeof setTimeout> } | null>(null)
+
+  // Leaving the screen inside the undo window: commit the delete right away
+  // rather than dropping it.
+  useEffect(() => () => {
+    const pending = pendingDeleteRef.current
+    if (pending) {
+      clearTimeout(pending.timer)
+      pendingDeleteRef.current = null
+      deletePhoto(pending.photo.PHOTOID)
+    }
+  }, [])
 
   useEffect(() => {
     getOwnGenderAvatarUrl().then(setGenderAvatarUrl)
@@ -478,6 +505,7 @@ export default function EditProfileScreen({ navigation, route }: Props) {
         }
       }
       await load()
+      showUploadToast(uploadedPhotoIds)
       if (rejections.length) {
         const reasons = await getRejectReasons()
         Alert.alert('Some photos were not added', rejections.map(code => describeRejection(code, reasons)).join('\n\n'))
@@ -500,7 +528,9 @@ export default function EditProfileScreen({ navigation, route }: Props) {
     ])
     setOwnId(id ?? '')
     setProfile(info)
-    setPhotos(photoData.photos)
+    // A delete still inside its undo window hasn't hit the API yet — keep it hidden.
+    const pendingId = pendingDeleteRef.current?.photo.PHOTOID
+    setPhotos(pendingId ? photoData.photos.filter((p: any) => p.PHOTOID !== pendingId) : photoData.photos)
     if (__DEV__) console.log('[EditProfile] managePhotos() returned:', JSON.stringify(photoData))
 
     if (!info) { setLoading(false); return }
@@ -532,17 +562,21 @@ export default function EditProfileScreen({ navigation, route }: Props) {
       fetchFamilyOptions(),
     ])
 
-    const [caste, star, cities, homeCities] = await Promise.all([
+    const [caste, star, cities, homeCities, educationGroup, subCaste, exactHeight] = await Promise.all([
       info.religion ? fetchCasteOptions(info.religion, info.motherTongue ?? '') : Promise.resolve([]),
       info.raasi ? fetchStarOptions(info.raasi) : Promise.resolve([]),
       info.state ? fetchCities(info.state) : Promise.resolve([]),
       info.homeState ? fetchCities(info.homeState) : Promise.resolve([]),
+      (info.education && isEducationGroupEligible(info.education)) ? fetchEducationGroupOptionsFlat(info.education) : Promise.resolve([]),
+      (info.subCaste && info.caste && info.religion && info.religion !== '2')
+        ? fetchSubcasteOptions(info.religion, info.caste, info.motherTongue ?? '') : Promise.resolve([]),
+      hasExactHeight(info) ? fetchExactHeightOptions(gender) : Promise.resolve([]),
     ])
 
     setLabels({
       religion, occupation, education, motherTongue,
       eatingHabit, drinkingHabit, smokingHabit, raasi, income, property, states,
-      caste, star, cities, homeCities,
+      caste, star, cities, homeCities, educationGroup, subCaste, exactHeight,
       heightCategory, maritalStatus, physicalStatus,
       brothers: familyOptions.brothers, sisters: familyOptions.sisters,
     })
@@ -635,6 +669,7 @@ export default function EditProfileScreen({ navigation, route }: Props) {
           }
         }
         await load()
+        showUploadToast(uploadedPhotoIds)
         if (rejections.length) {
           const reasons = await getRejectReasons()
           Alert.alert('Some photos were not added', rejections.map(code => describeRejection(code, reasons)).join('\n\n'))
@@ -651,6 +686,70 @@ export default function EditProfileScreen({ navigation, route }: Props) {
     } finally {
       pickerBusyRef.current = false
     }
+  }
+
+  // ── Photo toasts (new design: dark snackbar + Undo) ──────────────────────
+
+  // Upload: Undo removes the photo(s) that were just added.
+  function showUploadToast(uploadedPhotoIds: string[]) {
+    if (uploadedPhotoIds.length === 0) return
+    setToastRequest({
+      message: t('EDITPROFILE.PHOTO_UPDATED_TOAST', 'Profile photo updated successfully'),
+      key: Date.now(),
+      onUndo: () => {
+        Promise.all(uploadedPhotoIds.map(id => deletePhoto(id))).then(() => load())
+      },
+    })
+  }
+
+  // "Use as profile photo" from the viewer: Undo restores the previous main photo.
+  function handleMainPhotoSet(previousMainId: string | undefined) {
+    setToastRequest({
+      message: t('EDITPROFILE.PHOTO_UPDATED_TOAST', 'Profile photo updated successfully'),
+      key: Date.now(),
+      onUndo: previousMainId ? () => { setMainPhoto(previousMainId).then(() => load()) } : undefined,
+    })
+  }
+
+  // Same flow as EditProfileDesktopScreen's handleConfirmDeletePhoto(): the
+  // photo disappears immediately, but deletePicture/v1 only fires once the
+  // undo window passes, so Undo can put it back without any API call.
+  // Called once the member has already confirmed in Photo preview's delete sheet.
+  function handleConfirmDeletePhoto(target: any) {
+
+    if (pendingDeleteRef.current) {
+      clearTimeout(pendingDeleteRef.current.timer)
+      const prev = pendingDeleteRef.current
+      pendingDeleteRef.current = null
+      deletePhoto(prev.photo.PHOTOID).then(() => load())
+    }
+
+    const removedIndex = Math.max(0, photos.findIndex(p => p.PHOTOID === target.PHOTOID))
+    setPhotos(prev => prev.filter(p => p.PHOTOID !== target.PHOTOID))
+    setFailedPhotos(new Set())
+
+    const timer = setTimeout(() => {
+      pendingDeleteRef.current = null
+      deletePhoto(target.PHOTOID).then(() => load())
+    }, DELETE_UNDO_WINDOW_MS)
+    pendingDeleteRef.current = { photo: target, index: removedIndex, timer }
+
+    setToastRequest({
+      message: t('EDITPROFILE.PHOTO_DELETED_TOAST', 'Photo deleted successfully'),
+      key: Date.now(),
+      duration: DELETE_UNDO_WINDOW_MS,
+      onUndo: () => {
+        const pending = pendingDeleteRef.current
+        if (!pending) return
+        clearTimeout(pending.timer)
+        pendingDeleteRef.current = null
+        setPhotos(prev => {
+          const next = [...prev]
+          next.splice(Math.min(pending.index, next.length), 0, pending.photo)
+          return next
+        })
+      },
+    })
   }
 
   function openPreview() {
@@ -691,21 +790,33 @@ export default function EditProfileScreen({ navigation, route }: Props) {
     )
   }
 
-  const cityLabel     = labelFor(labels.cities ?? [], profile.city) ?? labelFor(labels.states ?? [], profile.state)
+  // "State, City" (e.g. "Tamil Nadu, Chennai") — whichever parts resolve.
+  const cityLabel     = [labelFor(labels.states ?? [], profile.state), labelFor(labels.cities ?? [], profile.city)]
+    .filter(Boolean).join(', ') || undefined
   const homeCityLabel = labelFor(labels.homeCities ?? [], profile.homeCity) ?? labelFor(labels.states ?? [], profile.homeState)
+  // "EDUCATION, EDUDETAILS" / "OCCUPATION, OCCDETAILS". EDUDETAILS is a group
+  // code (resolved to its label); OCCDETAILS is the member's free-text job detail.
+  const educationLabel  = [labelFor(labels.education ?? [], profile.education), labelFor(labels.educationGroup ?? [], profile.educationGroup)]
+    .filter(Boolean).join(', ') || undefined
+  // Angular edit-profile.page.html "Caste & subcaste" row: "<caste>, <subcaste>".
+  const casteLabel      = [labelFor(labels.caste ?? [], profile.caste), labelFor(labels.subCaste ?? [], profile.subCaste)]
+    .filter(Boolean).join(', ') || undefined
+  const occupationLabel = [labelFor(labels.occupation ?? [], profile.occupation), profile.jobDetail?.trim()]
+    .filter(Boolean).join(', ') || undefined
   // Angular's edit-profile.page.html has exactly one "Properties owned" row —
   // codes '5'/'6'/'7' are explicitly excluded from it (comment: "remove
   // vehicle related changes"), never shown as their own "Own Vehicle" row —
   // see PropertyDetailsScreen.tsx's header comment for the full story.
   const propertiesLabel = labelsFor(labels.property ?? [], profile.properties)
 
-  // Angular: HEIGHTCATEGORY in 101-104 shows the bucket label; otherwise the
-  // exact height (VIEWHEIGHT) is shown as-is. Category labels carry raw HTML
-  // from the API (same quirk HeightScreen.tsx strips) — strip it here too.
-  const heightCategoryLabel = profile.heightCategory
-    ? labelFor(labels.heightCategory ?? [], profile.heightCategory)?.replace(/<[^>]+>/g, '').trim()
-    : undefined
-  const heightLabel = heightCategoryLabel ?? profile.height
+  // Angular getHeightValue(): a valid HEIGHT outside 101-104 is an exact height
+  // (VIEWHEIGHT label, e.g. "5 ft 2 in (157 cm)"); otherwise the 101-104 bucket
+  // label. Same rule decides which editor the Height row opens. Category labels
+  // carry raw HTML from the API (same quirk HeightScreen.tsx strips).
+  const catCode = heightCategoryCode(profile)
+  const heightLabel = hasExactHeight(profile)
+    ? (labelFor(labels.exactHeight ?? [], profile.height) ?? profile.height)
+    : catCode ? labelFor(labels.heightCategory ?? [], catCode)?.replace(/<[^>]+>/g, '').trim() : undefined
   const childrenVisible = !!profile.maritalStatus && profile.maritalStatus !== '1'
 
   return (
@@ -752,16 +863,23 @@ export default function EditProfileScreen({ navigation, route }: Props) {
             )}
           </Pressable>
         ) : (() => {
-          const showAddTile = photos.length < MAX_PHOTOS
-          const slotCount = photos.length + (showAddTile ? 1 : 0)
+          // Photos only — no dashed Add tile in the mosaic once there's at least
+          // one photo (the big Add Photo box above is the empty state). Adding
+          // more goes through the "Add more photos" CTA under the grid.
+          const overflowCount = photos.length - GRID_MAX_TILES   // > 0 → "+N more" on tile 6
+          const gridPhotos = photos.slice(0, GRID_MAX_TILES)
+          // One photo: it fills the same full-width square as the empty
+          // "Add Photo" box instead of sitting at main-tile size on the left.
+          const singlePhoto = gridPhotos.length === 1
           return (
-            <View style={[s.photoGrid, { width: mosaic.size, height: mosaicHeight(slotCount, mosaic) }]}>
-              {photos.map((photo, i) => {
+            <View style={[s.photoGrid, { width: mosaic.size, height: singlePhoto ? mosaic.size : mosaicHeight(gridPhotos.length, mosaic) }]}>
+              {gridPhotos.map((photo, i) => {
                 const pos = photoSlotPosition(i, mosaic)
-                const size = i === 0 ? mosaic.main : mosaic.tile
+                const size = singlePhoto ? mosaic.size : i === 0 ? mosaic.main : mosaic.tile
                 const failed = failedPhotos.has(i)
+                const isOverflowTile = overflowCount > 0 && i === GRID_MAX_TILES - 1
                 return (
-                  <Pressable key={i} style={[s.photoTile, i === 0 && s.photoTileMain, pos, { width: size, height: size }]} onPress={() => setViewerIndex(i)}>
+                  <Pressable key={photo.PHOTOID ?? i} style={[s.photoTile, i === 0 && s.photoTileMain, singlePhoto && s.photoTileSingle, pos, { width: size, height: size }]} onPress={() => setViewerIndex(i)}>
                     {failed ? (
                       // Image failed to load — same gender-avatar placeholder
                       // Angular falls back to (common.ts's getAvatarImg(false)).
@@ -782,25 +900,14 @@ export default function EditProfileScreen({ navigation, route }: Props) {
                         <Text style={s.mainPhotoBadgeText}>{t('EDITPROFILE.PROFILE_PHOTO')}</Text>
                       </View>
                     )}
+                    {isOverflowTile && (
+                      <View style={s.photoMoreOverlay}>
+                        <Text style={s.photoMoreText}>{`+${overflowCount}\n${t('MATCHES.MORE', 'more')}`}</Text>
+                      </View>
+                    )}
                   </Pressable>
                 )
               })}
-              {showAddTile && (
-                <Pressable
-                  style={[s.photoAddSlot, photoSlotPosition(photos.length, mosaic), { width: mosaic.tile, height: mosaic.tile }]}
-                  onPress={openGalleryPicker}
-                  disabled={photoUploading}
-                  accessibilityRole="button"
-                >
-                  <DashedBorder width={mosaic.tile} height={mosaic.tile} radius={8} />
-                  {photoUploading ? <ActivityIndicator color={Colors.textTertiary} size="small" /> : (
-                    <>
-                      <CdnSvg uri={ICON_ADD_CIRCLE} width={ADD_CIRCLE_ICON} height={ADD_CIRCLE_ICON} />
-                      <Text style={s.photoAddText}>{t('EDITPROFILE.ADD_MORE', 'Add More')}</Text>
-                    </>
-                  )}
-                </Pressable>
-              )}
             </View>
           )
         })()}
@@ -813,6 +920,25 @@ export default function EditProfileScreen({ navigation, route }: Props) {
           <Text style={s.guidelinesText}>{t('GENERAL.VIEW_GUIDELINE')}</Text>
         </Pressable>
 
+        {/* ── Add more photos (secondary CTA) — replaces the old dashed
+            "Add More" grid tile; shown whenever there's at least one photo
+            and the MAX_PHOTOS cap isn't reached yet. */}
+        {photos.length > 0 && photos.length < MAX_PHOTOS && (
+          <Pressable
+            style={({ pressed }) => [s.addMoreCta, pressed && s.addPhotoBtnPressed]}
+            onPress={openGalleryPicker}
+            disabled={photoUploading}
+            accessibilityRole="button"
+          >
+            {photoUploading ? <ActivityIndicator color={Colors.primaryDark} size="small" /> : (
+              <>
+                <Text style={s.addMoreCtaPlus}>+</Text>
+                <Text style={s.addMoreCtaText}>{t('EDITPROFILE.ADD_MORE_PHOTOS', 'Add more photos')}</Text>
+              </>
+            )}
+          </Pressable>
+        )}
+
         {/* ── Basic details ── */}
         <Section title={t('EDITPROFILE.BASIC_DETAILS')}>
           {/* New alignment: ID, Profile created for, Name, Mobile number first. */}
@@ -820,8 +946,8 @@ export default function EditProfileScreen({ navigation, route }: Props) {
           <FieldRow label={t('EDITPROFILE.CREATEDFOR')} value={createdByLabel} onPress={() => {}} hideArrow icon={R_ICON.createdBy} showDivider />
           <FieldRow label={t('EDITPROFILE.NAME')} value={profile.name} onPress={restrictedNav(profile.nameEditable, 'EditProfileBasic')} icon={R_ICON.name} showDivider />
           <FieldRow label={t('EDITPROFILE.MOBILENO')} value={profile.mobileNo} onPress={() => {}} hideArrow icon={R_ICON.mobileNo} showDivider />
-          <FieldRow label={t('EDITPROFILE.AGE')} value={profile.age ? `${profile.age} years old` : undefined} onPress={restrictedNav(profile.ageEditable, 'EditProfileAgeHeight')} icon={R_ICON.age} showDivider />
-          <FieldRow label={t('EDITPROFILE.HEIGHT')} value={heightLabel} onPress={() => navigation.navigate('EditProfileAgeHeight')} icon={R_ICON.height} showDivider />
+          <FieldRow label={t('EDITPROFILE.AGE')} value={profile.age ? `${profile.age} years old` : undefined} onPress={() => (profile.ageEditable ? setAgeHeightSheet('age') : setFieldRestrictedVisible(true))} icon={R_ICON.age} showDivider />
+          <FieldRow label={t('EDITPROFILE.HEIGHT')} value={heightLabel} onPress={() => setAgeHeightSheet('height')} icon={R_ICON.height} showDivider />
           <FieldRow
             label={t('EDITPROFILE.MARITALSTATUS')}
             value={labelFor(labels.maritalStatus ?? [], profile.maritalStatus)}
@@ -834,6 +960,7 @@ export default function EditProfileScreen({ navigation, route }: Props) {
               label={t('EDITPROFILE.CHILDREN')}
               value={labelFor(CHILDREN_OPTIONS, profile.noOfChildren)}
               onPress={() => navigation.navigate('EditProfileMarital')}
+              icon={R_ICON.children}
               showDivider
             />
           )}
@@ -853,15 +980,15 @@ export default function EditProfileScreen({ navigation, route }: Props) {
 
         {/* ── Professional details ── */}
         <Section title="Professional details">
-          <FieldRow label={t('EDITPROFILE.EDUCATION')} value={labelFor(labels.education ?? [], profile.education)} onPress={() => navigation.navigate('EditProfileProfessional')} icon={R_ICON.education} showDivider />
-          <FieldRow label={t('EDITPROFILE.OCCUPATION')} value={labelFor(labels.occupation ?? [], profile.occupation)} onPress={() => navigation.navigate('EditProfileProfessional')} icon={R_ICON.occupation} showDivider />
+          <FieldRow label={t('EDITPROFILE.EDUCATION')} value={educationLabel} onPress={() => navigation.navigate('EditProfileProfessional')} icon={R_ICON.education} showDivider />
+          <FieldRow label={t('EDITPROFILE.OCCUPATION')} value={occupationLabel} onPress={() => navigation.navigate('EditProfileProfessional')} icon={R_ICON.occupation} showDivider />
           <FieldRow label={t('EDITPROFILE.INCOME')} value={labelFor(labels.income ?? [], profile.income) ?? profile.income} onPress={restrictedNav(profile.incomeEditable, 'EditProfileProfessional')} icon={R_ICON.income} />
         </Section>
 
         {/* ── Religious details ── */}
         <Section title={t('EDITPROFILE.RELIGIOUSDETAIL')}>
           <FieldRow label={t('EDITPROFILE.RELIGION')} value={labelFor(labels.religion ?? [], profile.religion)} onPress={restrictedNav(profile.religionEditable, 'EditProfileReligious')} icon={R_ICON.religion} showDivider />
-          <FieldRow label={t('EDITPROFILE.CASTESUB')} value={labelFor(labels.caste ?? [], profile.caste)} onPress={restrictedNav(profile.casteEditable, 'EditProfileReligious')} icon={R_ICON.caste} showDivider />
+          <FieldRow label={t('EDITPROFILE.CASTESUB')} value={casteLabel} onPress={restrictedNav(profile.casteEditable, 'EditProfileReligious')} icon={R_ICON.caste} showDivider />
           <FieldRow
             label={t('EDITPROFILE.RAASI')}
             value={labelFor(labels.raasi ?? [], profile.raasi)}
@@ -944,6 +1071,13 @@ export default function EditProfileScreen({ navigation, route }: Props) {
         onClose={() => setFieldRestrictedVisible(false)}
       />
 
+      <EditAgeHeightSheets
+        mode={ageHeightSheet}
+        profile={profile}
+        onClose={() => setAgeHeightSheet(null)}
+        onSaved={load}
+      />
+
       {/* Web only — hidden file input IS the picker (see openGalleryPicker) */}
       {Platform.OS === 'web' && (
         // @ts-ignore — raw DOM element, react-native-web only
@@ -963,7 +1097,10 @@ export default function EditProfileScreen({ navigation, route }: Props) {
         initialIndex={viewerIndex ?? 0}
         onClose={() => setViewerIndex(null)}
         onChanged={load}
+        onDeleteRequest={handleConfirmDeletePhoto}
+        onMainPhotoSet={handleMainPhotoSet}
       />
+      <Toast request={toastRequest} />
 
       <VerificationSuccessSheet
         visible={verdictPhase === 'approved'}
@@ -1033,7 +1170,26 @@ const s = StyleSheet.create({
   // Only the main/profile tile (slot 0) gets the red border in Figma —
   // small tiles are plain rounded photos.
   photoTileMain: { borderWidth: 2, borderColor: Colors.primaryDark },
+  // Single-photo state — same 16 corner radius as the empty Add Photo box.
+  photoTileSingle: { borderRadius: 16 },
   photoTileImg: { width: '100%', height: '100%' },
+  // "+N more" overlay on the 6th tile once there are more than 6 photos.
+  photoMoreOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  photoMoreText: {
+    fontSize: FontSize.font16, fontFamily: Fonts.poppinsMedium, color: Colors.white,
+    textAlign: 'center', lineHeight: 24,
+  },
+  // Secondary (outlined) CTA — same 44 height / radius 8 as the red CTAs.
+  addMoreCta: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+    height: 44, borderRadius: 8, borderWidth: 1, borderColor: Colors.primaryDark,
+    backgroundColor: Colors.white, marginTop: 24,
+  },
+  addMoreCtaPlus: { fontSize: 22, lineHeight: 24, fontFamily: Fonts.poppinsRegular, color: Colors.primaryDark },
+  addMoreCtaText: { fontSize: FontSize.font14, fontFamily: Fonts.poppinsMedium, color: Colors.primaryDark },
   // Figma: 22px tall, pinned to the main tile's bottom-left corner. Width is
   // left content-driven rather than Figma's fixed 100 — the label is localised,
   // and a hard width would clip it in the longer languages.

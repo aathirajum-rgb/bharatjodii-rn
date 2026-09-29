@@ -188,6 +188,10 @@ function splitProperties(raw: any): { properties: string[]; vehicles: string[] }
   }
 }
 
+// Last successfully saved NAME — see the note in fetchEditProfileInfo().
+let pendingName: { value: string; at: number } | null = null
+const PENDING_NAME_TTL_MS = 5 * 60 * 1000
+
 export async function fetchEditProfileInfo(): Promise<EditProfileInfo | null> {
   const [userId, mCode] = await Promise.all([
     getItem(SK.Auth.USER_ID),
@@ -202,8 +206,23 @@ export async function fetchEditProfileInfo(): Promise<EditProfileInfo | null> {
   const { dosham, doshamType } = parseDosham(r['DOSHAM'])
   const { properties, vehicles } = splitProperties(r['FAMILYPROPERTY'])
 
+  // editmemberinfo keeps returning the OLD NAME for a short while after a
+  // successful NAME update (Angular works around it by re-calling
+  // getUserDetails() 500ms later — edit-profile.page.ts, `data == 'NAME'`).
+  // The hub reloads the instant the editor pops, so it got the stale name and
+  // then wrote it back to storage. Serve the just-saved name until the server
+  // catches up (or the grace window expires).
+  let name: string | undefined = r['NAME']
+  if (pendingName) {
+    if (name === pendingName.value || Date.now() - pendingName.at > PENDING_NAME_TTL_MS) {
+      pendingName = null
+    } else {
+      name = pendingName.value
+    }
+  }
+
   return {
-    name:           r['NAME'],
+    name,
     gender:         r['GENDER'],
     createdBy:      r['CREATEDBY'],
     // AGE/HEIGHT/MARITALSTATUS: the API returns these as raw JSON numbers (not
@@ -265,7 +284,9 @@ export async function fetchEditProfileInfo(): Promise<EditProfileInfo | null> {
     mobileNo:     r['MOBILENO'],
     missedCallNo: r['MISSEDCALLNO'],
 
-    nameEditable:         isEditable(r['NAMEEDIT']),
+    // Angular sets nameEditEnable = false right after a NAME edit — the server's
+    // NAMEEDIT flag lags the same way NAME does.
+    nameEditable:         pendingName ? false : isEditable(r['NAMEEDIT']),
     ageEditable:          isEditable(r['DOBEDIT']),
     casteEditable:        isEditable(r['CASTEEDIT']),
     incomeEditable:       isEditable(r['INCOMEEEDIT']),
@@ -285,6 +306,9 @@ export interface FieldChange {
   field:         FieldKey
   value:         string
   existingValue?: string | undefined
+  // INCOME only — Angular appends &INCOMETYPE=<currency> (default 'INR') to the
+  // INCOME update (form-fields.component.ts, registration-modal-popup.component.ts).
+  incomeType?:   string | undefined
 }
 
 export interface SubmitResult {
@@ -298,9 +322,11 @@ export async function submitFieldChanges(changes: FieldChange[]): Promise<Submit
 
   for (const change of changes) {
     try {
-      const res = await updateProfile(FIELD_TYPE_CODE[change.field], change.value, change.existingValue)
+      const extra = change.field === 'INCOME' ? `&INCOMETYPE=${change.incomeType || 'INR'}` : undefined
+      const res = await updateProfile(FIELD_TYPE_CODE[change.field], change.value, change.existingValue, extra)
       if (res?.RESPONSECODE == 1 && res?.ERRCODE == 0) {
         succeeded.push(change.field)
+        if (change.field === 'NAME') pendingName = { value: change.value, at: Date.now() }
       } else {
         failed.push(change.field)
       }

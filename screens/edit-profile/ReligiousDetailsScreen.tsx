@@ -28,6 +28,7 @@ import { submitFieldChanges, type FieldChange } from '../../service/editProfileS
 import {
   fetchReligionOptions, fetchCasteOptions, fetchRaasiOptions,
   fetchStarOptions, fetchDoshamOptions, fetchGothraOptions, isGothraApplicableForCaste,
+  fetchSubcasteOptions,
 } from '../../service/registrationService'
 import CdnSvg from '../../components/cdn-svg/CdnSvg'
 import SelectField from '../../components/input/SelectField'
@@ -39,7 +40,7 @@ import { handleBack } from '../../utils/navigationRef'
 const ICON_BACK = CDN_REACT + '/menu_back_arrow.svg'
 
 type Props = { navigation: any }
-type Picker = 'religion' | 'caste' | 'gothram' | 'raasi' | 'star' | 'doshamYesNo' | 'doshamType' | null
+type Picker = 'religion' | 'caste' | 'subCaste' | 'gothram' | 'raasi' | 'star' | 'doshamYesNo' | 'doshamType' | null
 
 export default function ReligiousDetailsScreen({ navigation: _navigation }: Props) {
   const insets = useSafeAreaInsets()
@@ -52,6 +53,7 @@ export default function ReligiousDetailsScreen({ navigation: _navigation }: Prop
 
   const [religion, setReligion]         = useState<PickerOption | null>(null)
   const [caste, setCaste]               = useState<PickerOption | null>(null)
+  const [subCaste, setSubCaste]         = useState<PickerOption | null>(null)
   const [gothram, setGothram]           = useState<PickerOption | null>(null)
   const [showGothra, setShowGothra]     = useState(false)
   const [raasi, setRaasi]               = useState<PickerOption | null>(null)
@@ -65,6 +67,7 @@ export default function ReligiousDetailsScreen({ navigation: _navigation }: Prop
   const [original, setOriginal] = useState<{
     religion?: string | undefined
     caste?:    string | undefined
+    subCaste?: string | undefined
     gothram?:  string | undefined
     raasi?:    string | undefined
     star?:     string | undefined
@@ -73,6 +76,7 @@ export default function ReligiousDetailsScreen({ navigation: _navigation }: Prop
 
   const [religionOptions, setReligionOptions]     = useState<PickerOption[]>([])
   const [casteOptions, setCasteOptions]           = useState<PickerOption[]>([])
+  const [subCasteOptions, setSubCasteOptions]     = useState<PickerOption[]>([])
   const [gothramOptions, setGothramOptions]       = useState<PickerOption[]>([])
   const [raasiOptions, setRaasiOptions]           = useState<PickerOption[]>([])
   const [starOptions, setStarOptions]             = useState<PickerOption[]>([])
@@ -92,6 +96,7 @@ export default function ReligiousDetailsScreen({ navigation: _navigation }: Prop
     setOriginal({
       religion: info.religion,
       caste:    info.caste,
+      subCaste: info.subCaste,
       gothram:  info.gothram,
       raasi:    info.raasi,
       star:     info.star,
@@ -115,6 +120,14 @@ export default function ReligiousDetailsScreen({ navigation: _navigation }: Prop
     setStarOptions(starList)
     setCaste(casteList.find(o => o.key === info.caste) ?? null)
     setStar(starList.find(o => o.key === info.star) ?? null)
+
+    // Angular edit-profile.page.ts: type=subcaste fetched for the saved caste
+    // ('no subcaste' → empty list → field hidden). Not asked for religion 2.
+    if (info.caste && info.religion && info.religion !== '2') {
+      const subCasteList = await fetchSubcasteOptions(info.religion, info.caste, info.motherTongue ?? '')
+      setSubCasteOptions(subCasteList)
+      setSubCaste(subCasteList.find(o => o.key === info.subCaste) ?? null)
+    }
 
     if (info.caste) {
       const applicable = await isGothraApplicableForCaste(info.caste)
@@ -155,6 +168,8 @@ export default function ReligiousDetailsScreen({ navigation: _navigation }: Prop
     setActivePicker(null)
     if (opt.key === religion?.key) return
     setCaste(null)
+    setSubCaste(null)
+    setSubCasteOptions([])
     setGothram(null)
     setGothramOptions([])
     setShowGothra(false)
@@ -167,7 +182,15 @@ export default function ReligiousDetailsScreen({ navigation: _navigation }: Prop
     setActivePicker(null)
     if (opt.key === caste?.key) return
     setGothram(null)
-    const applicable = await isGothraApplicableForCaste(opt.key)
+    setSubCaste(null)
+    setSubCasteOptions([])
+    // Angular form-fields.component.ts: CASTE select → initialfetch type=subcaste
+    // (skipped for religion 2); a real list opens the sub-caste step.
+    const [subList, applicable] = await Promise.all([
+      religion && religion.key !== '2' ? fetchSubcasteOptions(religion.key, opt.key, motherTongue) : Promise.resolve([]),
+      isGothraApplicableForCaste(opt.key),
+    ])
+    setSubCasteOptions(subList)
     const list = applicable ? await fetchGothraOptions(opt.key) : []
     setGothramOptions(list)
     setShowGothra(applicable || list.length > 0)
@@ -203,6 +226,8 @@ export default function ReligiousDetailsScreen({ navigation: _navigation }: Prop
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
+  const showSubCaste = religion?.key !== '2' && subCasteOptions.length > 0
+
   async function handleSubmit() {
     if (submitting) return
     setSubmitting(true)
@@ -212,7 +237,12 @@ export default function ReligiousDetailsScreen({ navigation: _navigation }: Prop
       changes.push({ field: 'RELIGION', value: religion.key, existingValue: original.religion })
     }
     if (casteEditable && caste && caste.key !== original.caste) {
-      changes.push({ field: 'CASTE', value: caste.key, existingValue: original.caste })
+      // Angular sends CASTE as "<caste>~" (form-fields.component.ts).
+      changes.push({ field: 'CASTE', value: `${caste.key}~`, existingValue: original.caste })
+    }
+    // Angular: SUBCASTE → "<caste>~<subcaste>" (TYPE 11, same as CASTE).
+    if (casteEditable && showSubCaste && caste && subCaste && (subCaste.key !== original.subCaste || caste.key !== original.caste)) {
+      changes.push({ field: 'SUBCASTE', value: `${caste.key}~${subCaste.key}`, existingValue: original.subCaste })
     }
     if (showGothra && gothram && gothram.key !== original.gothram) {
       changes.push({ field: 'GOTHRA', value: gothram.key, existingValue: original.gothram })
@@ -287,6 +317,11 @@ export default function ReligiousDetailsScreen({ navigation: _navigation }: Prop
         ) : (
           <SelectField label="Select your caste" value={caste?.label} locked onPress={showRestricted} />
         )}
+        {showSubCaste && (casteEditable ? (
+          <SelectField label="Select your sub-caste" value={subCaste?.label} onPress={() => setActivePicker('subCaste')} />
+        ) : (
+          <SelectField label="Select your sub-caste" value={subCaste?.label} locked onPress={showRestricted} />
+        ))}
         {showGothra && (
           <SelectField label="Select your gothram" value={gothram?.label} onPress={() => setActivePicker('gothram')} />
         )}
@@ -318,6 +353,15 @@ export default function ReligiousDetailsScreen({ navigation: _navigation }: Prop
         options={casteOptions}
         selectedKey={caste?.key}
         onSelect={handleSelectCaste}
+        onClose={() => setActivePicker(null)}
+      />
+      <SearchablePicker
+        visible={activePicker === 'subCaste'}
+        title="Select your sub-caste"
+        placeholder="Search sub-caste..."
+        options={subCasteOptions}
+        selectedKey={subCaste?.key}
+        onSelect={opt => { setSubCaste(opt); setActivePicker(null) }}
         onClose={() => setActivePicker(null)}
       />
       <SearchablePicker
