@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, type ViewStyle } from 'react-native'
+import { StyleSheet, Text, View, type TextStyle, type ViewStyle } from 'react-native'
 import CdnSvg, { CdnSvgBackground } from '../cdn-svg/CdnSvg'
 import { Colors } from '../../constants/colors'
 import { CDN_SVG } from '../../constants/cdn'
@@ -15,6 +15,9 @@ export interface BadgeProps {
   imageUrl?: string | undefined   // left icon — passed from parent (CDN URL)
   hasInfo?:  boolean | undefined  // shows verified-info icon at end
   style?:    ViewStyle | undefined
+  // Optional label override — e.g. { fontFamily: langFonts.semiBold } so the
+  // badge text follows the app language instead of the system font.
+  labelStyle?: TextStyle | undefined
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -41,7 +44,7 @@ const VARIANT_STYLE: Record<Exclude<BadgeVariant, 'paid'>, { bg: string; textCol
 
 // ─── Badge ────────────────────────────────────────────────────────────────────
 
-export default function Badge({ variant, text, imageUrl, hasInfo = false, style }: BadgeProps) {
+export default function Badge({ variant, text, imageUrl, hasInfo = false, style, labelStyle }: BadgeProps) {
   if (variant === 'paid') {
     // Angular: .paid-tag-position { position:absolute; left:-10px; top:0; height:100% } — the
     // crown deliberately OVERHANGS the pill's left edge, and .paid-member-block sets no
@@ -57,7 +60,7 @@ export default function Badge({ variant, text, imageUrl, hasInfo = false, style 
           {/* Angular: .color-006C48 { color: #006C48 } — a dark green, not the
               generic amber Colors.badgePaidText (shared with an unrelated,
               unreviewed badge elsewhere) was giving this. */}
-          <Text style={[styles.label, styles.paidLabel]} numberOfLines={1}>
+          <Text style={[styles.label, styles.paidLabel, labelStyle]} numberOfLines={1}>
             {text}
           </Text>
           {hasInfo && (
@@ -79,7 +82,7 @@ export default function Badge({ variant, text, imageUrl, hasInfo = false, style 
         <CdnSvg uri={imageUrl} width={18} height={18} style={styles.icon} />
       )}
 
-      <Text style={[styles.label, { color: textColor }]} numberOfLines={1}>
+      <Text style={[styles.label, { color: textColor }, labelStyle]} numberOfLines={1}>
         {text}
       </Text>
 
